@@ -3,6 +3,7 @@ package com.opencamera.core.session
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
+import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotPlan
@@ -92,6 +93,7 @@ data class SessionState(
     val activeDeviceGraph: DeviceGraphSpec,
     val previewMetrics: PreviewMetrics,
     val settings: SessionSettingsSnapshot = SessionSettingsSnapshot(),
+    val activeEffectSpec: EffectSpec = EffectSpec.EMPTY,
     val presentation: SessionPresentationState = SessionPresentationState()
 ) {
     val countdownRemainingSeconds: Int?

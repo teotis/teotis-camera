@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":core:device"))
     implementation(project(":core:media"))
     implementation(project(":core:mode"))
+    implementation(project(":core:effect"))
     implementation(project(":core:settings"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 
