@@ -66,6 +66,12 @@ internal data class SessionUiStrings(
     val outputWaiting: String
 )
 
+internal data class ZoomCapsuleRenderModel(
+    val label: String,
+    val ratio: Float,
+    val isActive: Boolean
+)
+
 internal data class SessionControlsRenderModel(
     val lensFacingButtonLabel: String,
     val zoomButtonLabel: String,
@@ -74,7 +80,9 @@ internal data class SessionControlsRenderModel(
     val lensFacingEnabled: Boolean,
     val zoomEnabled: Boolean,
     val stillQualityEnabled: Boolean,
-    val stillResolutionEnabled: Boolean
+    val stillResolutionEnabled: Boolean,
+    val zoomCapsules: List<ZoomCapsuleRenderModel>,
+    val isZoomCapsuleRowVisible: Boolean
 )
 
 internal data class PreviewOverlayRenderModel(
@@ -391,7 +399,9 @@ internal fun sessionControlsRenderModel(
         lensFacingEnabled = state.activeDeviceCapabilities.availableLensFacings.size > 1,
         zoomEnabled = state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported,
         stillQualityEnabled = state.activeDeviceGraph.template == CaptureTemplate.STILL_CAPTURE,
-        stillResolutionEnabled = isStillResolutionToggleEnabled(state)
+        stillResolutionEnabled = isStillResolutionToggleEnabled(state),
+        zoomCapsules = zoomCapsuleModels(state),
+        isZoomCapsuleRowVisible = state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported
     )
 }
 
@@ -1793,6 +1803,19 @@ private fun zoomButtonLabel(
     }
 }
 
+private fun zoomCapsuleModels(state: SessionState): List<ZoomCapsuleRenderModel> {
+    val capability = state.activeDeviceCapabilities.zoomRatioCapability
+    if (!capability.isSwitchingSupported) return emptyList()
+    val currentRatio = normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
+    return capability.normalizedSupportedRatios.map { ratio ->
+        ZoomCapsuleRenderModel(
+            label = "${ratio}x",
+            ratio = ratio,
+            isActive = ratio == currentRatio
+        )
+    }
+}
+
 private fun stillQualityButtonLabel(
     state: SessionState,
     strings: SessionUiStrings
@@ -1912,6 +1935,114 @@ private fun <T> nextListValueOrNull(current: T, values: List<T>): T? {
     } else {
         values[currentIndex + 1]
     }
+}
+
+// -- Dev Log --
+
+private val KEY_EVENT_NAMES = setOf(
+    "session.created", "session.booted", "session.stopped",
+    "mode.switched", "lens.switched", "zoom.updated",
+    "preview.first.frame", "preview.host.attached", "preview.host.detached",
+    "capture.photo", "capture.saved",
+    "recording.started", "recording.saved",
+    "permissions.updated", "device.capabilities.updated", "settings.updated"
+)
+
+private val CORE_EVENT_NAMES = setOf(
+    "preview.binding.started", "preview.recovery.started", "preview.recovery.requested",
+    "preview.stopped", "preview.snapshot.updated",
+    "capture.countdown.started", "capture.countdown.tick", "capture.countdown.completed",
+    "capture.saving",
+    "recording.requested",
+    "shot.plan.failed",
+    "mode.signal", "mode.event", "mode.hint",
+    "intent.received"
+)
+
+private val ERROR_EVENT_NAMES = setOf(
+    "preview.error", "preview.surface.lost", "preview.runtime.issue",
+    "preview.recovery.failed", "preview.blocked",
+    "capture.failed", "recording.failed", "recording.stop.blocked",
+    "mode.switch.blocked", "mode.intent.blocked",
+    "lens.switch.blocked", "zoom.switch.blocked",
+    "still-quality.blocked", "still-resolution.blocked", "settings.update.blocked"
+)
+
+private val ERROR_SUFFIXES = listOf(".unavailable", ".skipped")
+
+private fun isErrorEvent(name: String): Boolean {
+    return name in ERROR_EVENT_NAMES || ERROR_SUFFIXES.any { name.endsWith(it) }
+}
+
+internal fun devLogRenderModel(
+    state: SessionState,
+    traceEvents: List<SessionTraceEvent>,
+    isDebugBuild: Boolean,
+    selectedTab: DevLogTab
+): DevLogRenderModel {
+    if (!isDebugBuild) {
+        return DevLogRenderModel(
+            isAvailable = false,
+            selectedTab = selectedTab,
+            title = "Dev Log",
+            content = "",
+            exportContent = ""
+        )
+    }
+
+    val keyEvents = traceEvents.filter { it.name in KEY_EVENT_NAMES }
+    val coreEvents = traceEvents.filter { it.name in CORE_EVENT_NAMES }
+    val errorEvents = traceEvents.filter { isErrorEvent(it.name) }
+    val allEvents = traceEvents
+
+    fun formatEvents(events: List<SessionTraceEvent>): String {
+        return events.joinToString("\n") { event ->
+            "${event.sequence}. ${event.name} -> ${event.detail}"
+        }
+    }
+
+    val debugDump = buildSessionDebugDump(state, traceEvents)
+    val perf = debugDump.perfSnapshot
+    val recovery = debugDump.recoveryTrace
+
+    val coreSummary = buildString {
+        appendLine("DebugDump: ${debugDump.lifecycle} | ${debugDump.activeMode.name} | preview=${debugDump.previewStatus} | capture=${debugDump.captureStatus} | recording=${debugDump.recordingStatus}")
+        appendLine("PerfSnapshot: last=${perf.lastFirstFrameLatencyMillis ?: "--"} ms, best=${perf.bestFirstFrameLatencyMillis ?: "--"} ms, worst=${perf.worstFirstFrameLatencyMillis ?: "--"} ms, binds=${perf.bindCount}, recoveries=${perf.recoveryCount}")
+        appendLine("RecoveryTrace: ${if (recovery.isRecoveryActive) "active" else "idle"}, last=${recovery.lastRecoveryReason ?: "--"}, recoveredFrame=${recovery.recoveredFirstFrameLatencyMillis ?: "--"} ms, failure=${recovery.lastFailureReason ?: "--"}")
+    }
+
+    val tabContent = when (selectedTab) {
+        DevLogTab.KEY -> formatEvents(keyEvents)
+        DevLogTab.CORE -> formatEvents(coreEvents)
+        DevLogTab.ERROR -> formatEvents(errorEvents)
+        DevLogTab.ALL -> formatEvents(allEvents)
+    }
+
+    val exportContent = buildString {
+        appendLine("=== KEY EVENTS ===")
+        appendLine(formatEvents(keyEvents))
+        appendLine("=== CORE EVENTS ===")
+        appendLine(formatEvents(coreEvents))
+        appendLine("=== ERROR EVENTS ===")
+        appendLine(formatEvents(errorEvents))
+        appendLine("=== ALL EVENTS ===")
+        appendLine(formatEvents(allEvents))
+        appendLine("=== CORE SUMMARY ===")
+        append(coreSummary)
+    }
+
+    return DevLogRenderModel(
+        isAvailable = true,
+        selectedTab = selectedTab,
+        title = when (selectedTab) {
+            DevLogTab.KEY -> "Key Log (${keyEvents.size})"
+            DevLogTab.CORE -> "Core Log (${coreEvents.size})"
+            DevLogTab.ERROR -> "Error Log (${errorEvents.size})"
+            DevLogTab.ALL -> "All Events (${allEvents.size})"
+        },
+        content = tabContent,
+        exportContent = exportContent
+    )
 }
 
 private val MANUAL_ISO_OPTIONS = listOf<Int?>(null, 100, 200, 320, 640, 800, 1600)

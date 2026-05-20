@@ -156,6 +156,18 @@ class MainActivity : ComponentActivity() {
     private lateinit var captureOutput: TextView
     private lateinit var previewThumbnail: ImageView
     private lateinit var traceSummary: TextView
+    private lateinit var zoomCapsuleScroll: android.widget.HorizontalScrollView
+    private lateinit var zoomCapsuleRow: LinearLayout
+    private lateinit var buttonDevEntry: Button
+    private lateinit var devConsolePanel: androidx.core.widget.NestedScrollView
+    private lateinit var buttonDevTabKey: Button
+    private lateinit var buttonDevTabCore: Button
+    private lateinit var buttonDevTabError: Button
+    private lateinit var buttonDevTabAll: Button
+    private lateinit var devConsoleTitle: TextView
+    private lateinit var devConsoleContent: TextView
+    private lateinit var buttonDevExport: Button
+    private lateinit var buttonDevClose: Button
     private lateinit var shutterButton: Button
     private lateinit var secondaryButton: Button
     private lateinit var tertiaryButton: Button
@@ -189,6 +201,10 @@ class MainActivity : ComponentActivity() {
     private var isFilterPanelVisible = false
     private var isDiagnosticsVisible = false
     private var isMoreControlsVisible = false
+    private var isDevConsoleVisible = false
+    private var selectedDevLogTab = DevLogTab.KEY
+    private var latestDevLogRenderModel: DevLogRenderModel? = null
+    private lateinit var devLogExporter: DevLogExporter
     private var latestSettingsPageRenderModel: SessionSettingsPageRenderModel? = null
     private var latestPortraitLabRenderModel: PortraitLabPageRenderModel? = null
     private var latestWatermarkLabSelectorRenderModel: WatermarkLabSelectorRenderModel? = null
@@ -358,6 +374,19 @@ class MainActivity : ComponentActivity() {
         portraitModeButton = findViewById(R.id.buttonPortraitMode)
         proModeButton = findViewById(R.id.buttonProMode)
         videoModeButton = findViewById(R.id.buttonVideoMode)
+        zoomCapsuleScroll = findViewById(R.id.zoomCapsuleScroll)
+        zoomCapsuleRow = findViewById(R.id.zoomCapsuleRow)
+        buttonDevEntry = findViewById(R.id.buttonDevEntry)
+        devConsolePanel = findViewById(R.id.devConsolePanel)
+        buttonDevTabKey = findViewById(R.id.buttonDevTabKey)
+        buttonDevTabCore = findViewById(R.id.buttonDevTabCore)
+        buttonDevTabError = findViewById(R.id.buttonDevTabError)
+        buttonDevTabAll = findViewById(R.id.buttonDevTabAll)
+        devConsoleTitle = findViewById(R.id.devConsoleTitle)
+        devConsoleContent = findViewById(R.id.devConsoleContent)
+        buttonDevExport = findViewById(R.id.buttonDevExport)
+        buttonDevClose = findViewById(R.id.buttonDevClose)
+        devLogExporter = DevLogExporter(this)
 
         bindActions()
         bindGestureRouter()
@@ -428,6 +457,36 @@ class MainActivity : ComponentActivity() {
         buttonDebugEntry.setOnClickListener {
             isDiagnosticsVisible = !isDiagnosticsVisible
             renderDiagnosticsVisibility()
+        }
+        buttonDevEntry.setOnClickListener {
+            isDevConsoleVisible = !isDevConsoleVisible
+            renderDevConsoleVisibility()
+        }
+        buttonDevTabKey.setOnClickListener {
+            selectedDevLogTab = DevLogTab.KEY
+            renderDevConsole()
+        }
+        buttonDevTabCore.setOnClickListener {
+            selectedDevLogTab = DevLogTab.CORE
+            renderDevConsole()
+        }
+        buttonDevTabError.setOnClickListener {
+            selectedDevLogTab = DevLogTab.ERROR
+            renderDevConsole()
+        }
+        buttonDevTabAll.setOnClickListener {
+            selectedDevLogTab = DevLogTab.ALL
+            renderDevConsole()
+        }
+        buttonDevExport.setOnClickListener {
+            val model = latestDevLogRenderModel ?: return@setOnClickListener
+            if (model.exportContent.isBlank()) return@setOnClickListener
+            val file = devLogExporter.export(model.exportContent)
+            captureOutput.text = "Debug log exported: ${file.absolutePath}"
+        }
+        buttonDevClose.setOnClickListener {
+            isDevConsoleVisible = false
+            renderDevConsoleVisibility()
         }
         buttonMoreControls.setOnClickListener {
             isMoreControlsVisible = !isMoreControlsVisible
@@ -752,6 +811,16 @@ class MainActivity : ComponentActivity() {
         stillResolutionButton.isEnabled = controls.stillResolutionEnabled
         captureOutput.text = sessionCaptureOutputText(state, sessionUiStrings())
         renderDiagnosticsVisibility()
+        renderZoomCapsules(controls)
+        buttonDevEntry.isVisible = com.opencamera.app.BuildConfig.DEBUG
+        val devLogModel = devLogRenderModel(
+            state = state,
+            traceEvents = container.trace.snapshot(),
+            isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
+            selectedTab = selectedDevLogTab
+        )
+        latestDevLogRenderModel = devLogModel
+        renderDevConsole()
 
         val nextThumbnailRenderUri = state.presentation.latestThumbnailSource?.renderUriOrNull()
         when (val command = nextThumbnailRenderCommand(lastRequestedThumbnailUri, nextThumbnailRenderUri)) {
@@ -1153,6 +1222,67 @@ class MainActivity : ComponentActivity() {
     private fun renderDiagnosticsVisibility() {
         debugPanel.isVisible = isDiagnosticsVisible
         buttonDebugEntry.alpha = if (isDiagnosticsVisible) 1f else 0.78f
+    }
+
+    private fun renderZoomCapsules(controls: SessionControlsRenderModel) {
+        zoomCapsuleScroll.isVisible = controls.isZoomCapsuleRowVisible
+        if (!controls.isZoomCapsuleRowVisible) return
+        zoomCapsuleRow.removeAllViews()
+        controls.zoomCapsules.forEach { capsule ->
+            val button = Button(
+                this,
+                null,
+                0,
+                R.style.Widget_OpenCamera_CompactButton
+            ).apply {
+                text = capsule.label
+                isAllCaps = false
+                textSize = 11f
+                if (capsule.isActive) {
+                    setTextColor(0xFFFFFFFF.toInt())
+                    setBackgroundResource(R.drawable.bg_mode_track_active)
+                    alpha = 1f
+                } else {
+                    setTextColor(0xFFF5F7FA.toInt())
+                    background = null
+                    alpha = 0.78f
+                }
+                setOnClickListener {
+                    dispatch(SessionIntent.ZoomRatioToggled)
+                }
+            }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = if (zoomCapsuleRow.childCount == 0) 0 else 6.dp
+            }
+            zoomCapsuleRow.addView(button, params)
+        }
+    }
+
+    private fun renderDevConsoleVisibility() {
+        devConsolePanel.isVisible = isDevConsoleVisible
+        buttonDevEntry.alpha = if (isDevConsoleVisible) 1f else 0.78f
+        if (isDevConsoleVisible) {
+            renderDevConsole()
+        }
+    }
+
+    private fun renderDevConsole() {
+        val model = latestDevLogRenderModel ?: return
+        devConsoleTitle.text = model.title
+        devConsoleContent.text = model.content
+        buttonDevTabKey.isEnabled = model.selectedTab != DevLogTab.KEY
+        buttonDevTabCore.isEnabled = model.selectedTab != DevLogTab.CORE
+        buttonDevTabError.isEnabled = model.selectedTab != DevLogTab.ERROR
+        buttonDevTabAll.isEnabled = model.selectedTab != DevLogTab.ALL
+        val activeAlpha = 1f
+        val inactiveAlpha = 0.84f
+        buttonDevTabKey.alpha = if (model.selectedTab == DevLogTab.KEY) activeAlpha else inactiveAlpha
+        buttonDevTabCore.alpha = if (model.selectedTab == DevLogTab.CORE) activeAlpha else inactiveAlpha
+        buttonDevTabError.alpha = if (model.selectedTab == DevLogTab.ERROR) activeAlpha else inactiveAlpha
+        buttonDevTabAll.alpha = if (model.selectedTab == DevLogTab.ALL) activeAlpha else inactiveAlpha
     }
 
     private fun renderModeTrack(model: ModeTrackRenderModel) {
