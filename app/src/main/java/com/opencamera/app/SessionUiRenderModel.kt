@@ -18,6 +18,7 @@ import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
 import com.opencamera.core.session.buildSessionDebugDump
+import com.opencamera.core.effect.PreviewEffectRenderModel
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
@@ -89,10 +90,11 @@ internal data class PreviewOverlayRenderModel(
     val gridMode: CompositionGridMode,
     val isGridVisible: Boolean,
     val countdownLabel: String?,
-    val isCountdownVisible: Boolean
+    val isCountdownVisible: Boolean,
+    val effectModel: PreviewEffectRenderModel? = null
 ) {
     val isVisible: Boolean
-        get() = isGridVisible || isCountdownVisible
+        get() = isGridVisible || isCountdownVisible || effectModel != null
 }
 
 internal data class SessionSettingsRenderModel(

@@ -43,6 +43,7 @@ android {
 
 dependencies {
     implementation(project(":core:device"))
+    implementation(project(":core:effect"))
     implementation(project(":core:media"))
     implementation(project(":core:mode"))
     implementation(project(":core:settings"))

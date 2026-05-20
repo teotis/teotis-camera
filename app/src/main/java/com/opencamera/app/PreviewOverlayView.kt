@@ -9,7 +9,11 @@ import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
+import com.opencamera.core.effect.FilterOverlaySpec
+import com.opencamera.core.effect.FrameGuidelineSpec
+import com.opencamera.core.effect.WatermarkHintSpec
 import com.opencamera.core.settings.CompositionGridMode
+import com.opencamera.core.settings.WatermarkTextPlacement
 import kotlin.math.min
 
 class PreviewOverlayView @JvmOverloads constructor(
@@ -47,6 +51,29 @@ class PreviewOverlayView @JvmOverloads constructor(
         setShadowLayer(18f, 0f, 6f, Color.argb(190, 0, 0, 0))
     }
 
+    private val filterOverlayPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val frameGuidelinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * density
+    }
+
+    private val watermarkHintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            12f,
+            resources.displayMetrics
+        )
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+    }
+
     private var renderModel = PreviewOverlayRenderModel(
         gridMode = CompositionGridMode.OFF,
         isGridVisible = false,
@@ -75,6 +102,9 @@ class PreviewOverlayView @JvmOverloads constructor(
         if (renderModel.isGridVisible) {
             drawGrid(canvas, renderModel.gridMode)
         }
+        renderModel.effectModel?.filterOverlay?.let { drawFilterOverlay(canvas, it) }
+        renderModel.effectModel?.frameGuideline?.let { drawFrameGuideline(canvas, it) }
+        renderModel.effectModel?.watermarkHint?.let { drawWatermarkHint(canvas, it) }
         if (renderModel.isCountdownVisible) {
             drawCountdown(canvas, renderModel.countdownLabel.orEmpty())
         }
@@ -130,5 +160,79 @@ class PreviewOverlayView @JvmOverloads constructor(
         canvas.drawCircle(centerX, centerY, radius, countdownBubblePaint)
         val baseline = centerY - (countdownTextPaint.ascent() + countdownTextPaint.descent()) / 2f
         canvas.drawText(countdownLabel, centerX, baseline, countdownTextPaint)
+    }
+
+    private fun drawFilterOverlay(canvas: Canvas, spec: FilterOverlaySpec) {
+        if (spec.tintAlpha <= 0f) return
+        filterOverlayPaint.color = spec.tintColor
+        filterOverlayPaint.alpha = (spec.tintAlpha * 255).toInt().coerceIn(0, 255)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), filterOverlayPaint)
+
+        if (spec.vignetteStrength > 0f) {
+            val cx = width / 2f
+            val cy = height / 2f
+            val radius = min(width, height) * 0.7f
+            vignettePaint.shader = android.graphics.RadialGradient(
+                cx, cy, radius,
+                intArrayOf(Color.TRANSPARENT, Color.argb((spec.vignetteStrength * 180).toInt(), 0, 0, 0)),
+                floatArrayOf(0.4f, 1f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), vignettePaint)
+            vignettePaint.shader = null
+        }
+    }
+
+    private fun drawFrameGuideline(canvas: Canvas, spec: FrameGuidelineSpec) {
+        frameGuidelinePaint.color = spec.borderColor
+        frameGuidelinePaint.alpha = (spec.borderAlpha * 255).toInt().coerceIn(0, 255)
+        val ratio = spec.ratio.width.toFloat() / spec.ratio.height.toFloat()
+        val viewRatio = width.toFloat() / height.toFloat()
+        val rect = if (ratio > viewRatio) {
+            val w = width.toFloat()
+            val h = w / ratio
+            val top = (height.toFloat() - h) / 2f
+            RectF(0f, top, w, top + h)
+        } else {
+            val h = height.toFloat()
+            val w = h * ratio
+            val left = (width.toFloat() - w) / 2f
+            RectF(left, 0f, left + w, h)
+        }
+        canvas.drawRect(rect, frameGuidelinePaint)
+    }
+
+    private fun drawWatermarkHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
+        val padding = 16f * density
+        val x: Float
+        val y: Float
+        watermarkHintPaint.textAlign = Paint.Align.LEFT
+        when (spec.placement) {
+            WatermarkTextPlacement.TOP_LEFT -> {
+                x = padding
+                y = padding + watermarkHintPaint.textSize
+            }
+            WatermarkTextPlacement.TOP_RIGHT -> {
+                x = width.toFloat() - padding
+                y = padding + watermarkHintPaint.textSize
+                watermarkHintPaint.textAlign = Paint.Align.RIGHT
+            }
+            WatermarkTextPlacement.BOTTOM_LEFT -> {
+                x = padding
+                y = height.toFloat() - padding
+            }
+            WatermarkTextPlacement.BOTTOM_RIGHT -> {
+                x = width.toFloat() - padding
+                y = height.toFloat() - padding
+                watermarkHintPaint.textAlign = Paint.Align.RIGHT
+            }
+            WatermarkTextPlacement.BOTTOM_CENTER -> {
+                x = width / 2f
+                y = height.toFloat() - padding
+                watermarkHintPaint.textAlign = Paint.Align.CENTER
+            }
+        }
+        canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
     }
 }
