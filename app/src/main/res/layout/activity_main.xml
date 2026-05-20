@@ -99,54 +99,6 @@
             android:visibility="gone" />
     </LinearLayout>
 
-    <!-- Debug summary (default hidden, toggled by debug entry) -->
-    <LinearLayout
-        android:id="@+id/debugPanel"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="8dp"
-        android:orientation="vertical"
-        android:visibility="gone"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topPanel">
-
-        <TextView
-            android:id="@+id/sessionSummary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:textColor="@android:color/white"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/modeSummary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textColor="#D7E2F2"
-            android:textSize="12sp" />
-
-        <TextView
-            android:id="@+id/modeDirectorySummary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:textColor="#9FB8D3"
-            android:textSize="11sp" />
-
-        <TextView
-            android:id="@+id/traceSummary"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:fontFamily="monospace"
-            android:textColor="#9FB1C8"
-            android:textSize="11sp"
-            android:maxLines="8" />
-    </LinearLayout>
-
     <!-- Mode track: horizontal scrolling strip (fixed position above bottom) -->
     <HorizontalScrollView
         android:id="@+id/modeTrackScroll"
@@ -1133,10 +1085,10 @@
             <TextView
                 android:id="@+id/devConsoleContent"
                 android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:fontFamily="monospace"
+                android:scrollbars="vertical"
                 android:textColor="#BFD0E4"
                 android:textSize="11sp" />
 
@@ -1493,14 +1445,6 @@
                     android:textSize="12sp"
                     android:visibility="gone" />
 
-                <Button
-                    android:id="@+id/buttonDebugEntry"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:text="@string/button_debug_entry"
-                    android:textSize="14sp" />
             </LinearLayout>
 
             <!-- Quality/Resolution controls -->

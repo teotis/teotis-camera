@@ -56,13 +56,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var previewOverlayView: PreviewOverlayView
     private lateinit var titleText: TextView
     private lateinit var permissionStatus: TextView
-    private lateinit var debugPanel: LinearLayout
-    private lateinit var sessionSummary: TextView
-    private lateinit var modeSummary: TextView
-    private lateinit var modeDirectorySummary: TextView
     private lateinit var buttonSettingsEntry: Button
     private lateinit var buttonFilterEntry: Button
-    private lateinit var buttonDebugEntry: Button
     private lateinit var buttonQuickFlash: Button
     private lateinit var buttonQuickRatio: Button
     private lateinit var buttonQuickLive: Button
@@ -155,7 +150,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var buttonCloseFilter: Button
     private lateinit var captureOutput: TextView
     private lateinit var previewThumbnail: ImageView
-    private lateinit var traceSummary: TextView
     private lateinit var zoomCapsuleScroll: android.widget.HorizontalScrollView
     private lateinit var zoomCapsuleRow: LinearLayout
     private lateinit var buttonDevEntry: Button
@@ -199,7 +193,6 @@ class MainActivity : ComponentActivity() {
     private var lastPlayedShutterSoundShotId: String? = null
     private var isSettingsPanelVisible = false
     private var isFilterPanelVisible = false
-    private var isDiagnosticsVisible = false
     private var isMoreControlsVisible = false
     private var isDevConsoleVisible = false
     private var selectedDevLogTab = DevLogTab.KEY
@@ -248,13 +241,8 @@ class MainActivity : ComponentActivity() {
         previewOverlayView = findViewById(R.id.previewOverlay)
         titleText = findViewById(R.id.titleText)
         permissionStatus = findViewById(R.id.permissionStatus)
-        debugPanel = findViewById(R.id.debugPanel)
-        sessionSummary = findViewById(R.id.sessionSummary)
-        modeSummary = findViewById(R.id.modeSummary)
-        modeDirectorySummary = findViewById(R.id.modeDirectorySummary)
         buttonSettingsEntry = findViewById(R.id.buttonSettingsEntry)
         buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
-        buttonDebugEntry = findViewById(R.id.buttonDebugEntry)
         buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
         buttonQuickRatio = findViewById(R.id.buttonQuickRatio)
         buttonQuickLive = findViewById(R.id.buttonQuickLive)
@@ -347,7 +335,6 @@ class MainActivity : ComponentActivity() {
         buttonCloseFilter = findViewById(R.id.buttonCloseFilter)
         captureOutput = findViewById(R.id.captureOutput)
         previewThumbnail = findViewById(R.id.previewThumbnail)
-        traceSummary = findViewById(R.id.traceSummary)
         shutterButton = findViewById(R.id.buttonShutter)
         secondaryButton = findViewById(R.id.buttonSecondary)
         tertiaryButton = findViewById(R.id.buttonTertiary)
@@ -453,10 +440,6 @@ class MainActivity : ComponentActivity() {
             selectedFilterLabFamilyOverride = null
             isFilterAdjustmentVisible = false
             renderPanelVisibility()
-        }
-        buttonDebugEntry.setOnClickListener {
-            isDiagnosticsVisible = !isDiagnosticsVisible
-            renderDiagnosticsVisibility()
         }
         buttonDevEntry.setOnClickListener {
             isDevConsoleVisible = !isDevConsoleVisible
@@ -767,10 +750,6 @@ class MainActivity : ComponentActivity() {
         latestRuntimeProControlsRenderModel = runtimeProControls
         // Top panel: lightweight primary status
         titleText.text = "${getString(R.string.app_name)} · ${primaryStatus.modeLabel}"
-        // Debug panel: full diagnostic text
-        sessionSummary.text = sessionSummaryText(state)
-        modeSummary.text = modeSummaryText(state)
-        modeDirectorySummary.text = modeDirectoryText(state)
         renderModeTrack(modeTrack)
         renderSettingsPage(settingsPage)
         renderPortraitLabPage(portraitLabPage)
@@ -810,7 +789,6 @@ class MainActivity : ComponentActivity() {
         stillQualityButton.isEnabled = controls.stillQualityEnabled
         stillResolutionButton.isEnabled = controls.stillResolutionEnabled
         captureOutput.text = sessionCaptureOutputText(state, sessionUiStrings())
-        renderDiagnosticsVisibility()
         renderZoomCapsules(controls)
         buttonDevEntry.isVisible = com.opencamera.app.BuildConfig.DEBUG
         val devLogModel = devLogRenderModel(
@@ -836,10 +814,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        traceSummary.text = sessionDiagnosticsText(
-            state = state,
-            traceEvents = container.trace.snapshot()
-        )
     }
 
     private fun renderSettingsPage(model: SessionSettingsPageRenderModel) {
@@ -1219,11 +1193,6 @@ class MainActivity : ComponentActivity() {
         buttonFilterEntry.alpha = if (isFilterPanelVisible) 1f else 0.92f
     }
 
-    private fun renderDiagnosticsVisibility() {
-        debugPanel.isVisible = isDiagnosticsVisible
-        buttonDebugEntry.alpha = if (isDiagnosticsVisible) 1f else 0.78f
-    }
-
     private fun renderZoomCapsules(controls: SessionControlsRenderModel) {
         zoomCapsuleScroll.isVisible = controls.isZoomCapsuleRowVisible
         if (!controls.isZoomCapsuleRowVisible) return
@@ -1262,7 +1231,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun renderDevConsoleVisibility() {
-        devConsolePanel.isVisible = isDevConsoleVisible
+        devConsolePanel.isVisible = isDevConsoleVisible && com.opencamera.app.BuildConfig.DEBUG
         buttonDevEntry.alpha = if (isDevConsoleVisible) 1f else 0.78f
         if (isDevConsoleVisible) {
             renderDevConsole()
