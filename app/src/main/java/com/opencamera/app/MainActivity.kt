@@ -156,7 +156,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var captureOutput: TextView
     private lateinit var previewThumbnail: ImageView
     private lateinit var traceSummary: TextView
-    private lateinit var diagnosticsToggleButton: Button
     private lateinit var shutterButton: Button
     private lateinit var secondaryButton: Button
     private lateinit var tertiaryButton: Button
@@ -333,7 +332,6 @@ class MainActivity : ComponentActivity() {
         captureOutput = findViewById(R.id.captureOutput)
         previewThumbnail = findViewById(R.id.previewThumbnail)
         traceSummary = findViewById(R.id.traceSummary)
-        diagnosticsToggleButton = findViewById(R.id.buttonDiagnosticsToggle)
         shutterButton = findViewById(R.id.buttonShutter)
         secondaryButton = findViewById(R.id.buttonSecondary)
         tertiaryButton = findViewById(R.id.buttonTertiary)
@@ -426,10 +424,6 @@ class MainActivity : ComponentActivity() {
             selectedFilterLabFamilyOverride = null
             isFilterAdjustmentVisible = false
             renderPanelVisibility()
-        }
-        diagnosticsToggleButton.setOnClickListener {
-            isDiagnosticsVisible = !isDiagnosticsVisible
-            renderDiagnosticsVisibility()
         }
         buttonDebugEntry.setOnClickListener {
             isDiagnosticsVisible = !isDiagnosticsVisible
@@ -1158,9 +1152,6 @@ class MainActivity : ComponentActivity() {
 
     private fun renderDiagnosticsVisibility() {
         debugPanel.isVisible = isDiagnosticsVisible
-        traceSummary.isVisible = isDiagnosticsVisible
-        diagnosticsToggleButton.isVisible = isDiagnosticsVisible
-        diagnosticsToggleButton.text = if (isDiagnosticsVisible) "Hide Debug" else "Show Debug"
         buttonDebugEntry.alpha = if (isDiagnosticsVisible) 1f else 0.78f
     }
 
