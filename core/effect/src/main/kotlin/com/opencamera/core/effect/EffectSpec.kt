@@ -32,7 +32,7 @@ data class PortraitEffect(
     val profileId: String,
     val renderPath: String,
     val beautyPreset: String,
-    val beautyStrength: Float,
+    val beautyStrength: String,
     val bokehEffect: String,
     override val target: EffectTarget = EffectTarget.CAPTURE
 ) : EffectEntry

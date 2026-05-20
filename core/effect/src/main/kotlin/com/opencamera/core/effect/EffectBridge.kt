@@ -17,8 +17,8 @@ object EffectBridge {
             tags.putAll(effect.tokens)
             tags["watermarkTextScale"] = effect.style.textScale.multiplier.toString()
             tags["watermarkTextOpacity"] = effect.style.textOpacity.alphaFraction.toString()
-            tags["watermarkPosition"] = effect.style.textPlacement.name
-            tags["watermarkFrameBackground"] = effect.style.frameBackground.name
+            tags["watermarkPosition"] = effect.style.textPlacement.storageKey
+            tags["watermarkFrameBackground"] = effect.style.frameBackground.storageKey
         }
 
         spec.find<FrameEffect>()?.let { effect ->
@@ -30,7 +30,7 @@ object EffectBridge {
             tags["renderPath"] = effect.renderPath
             tags["portraitProfile"] = effect.profileId
             tags["portraitBeautyPreset"] = effect.beautyPreset
-            tags["portraitBeautyStrength"] = effect.beautyStrength.toString()
+            tags["portraitBeautyStrength"] = effect.beautyStrength
             tags["portraitBokehEffect"] = effect.bokehEffect
         }
 
@@ -49,15 +49,10 @@ object EffectBridge {
 
     fun toPostProcessSpec(spec: EffectSpec): PostProcessSpec {
         val filter = spec.find<FilterEffect>()
-        val watermark = spec.find<WatermarkEffect>()
         return PostProcessSpec(
-            watermarkText = watermark?.let { buildWatermarkText(it) },
+            watermarkText = null,
             exifOverrides = emptyMap(),
             algorithmProfile = filter?.profileId
         )
-    }
-
-    private fun buildWatermarkText(effect: WatermarkEffect): String {
-        return effect.tokens.values.filter { it.isNotBlank() }.joinToString(" | ")
     }
 }

@@ -57,8 +57,8 @@ class EffectBridgeTest {
         assertEquals("World", tags["subtitle"])
         assertEquals(WatermarkTextScale.LARGE.multiplier.toString(), tags["watermarkTextScale"])
         assertEquals(WatermarkTextOpacity.SOFT.alphaFraction.toString(), tags["watermarkTextOpacity"])
-        assertEquals(WatermarkTextPlacement.BOTTOM_RIGHT.name, tags["watermarkPosition"])
-        assertEquals(WatermarkFrameBackground.WHITE.name, tags["watermarkFrameBackground"])
+        assertEquals(WatermarkTextPlacement.BOTTOM_RIGHT.storageKey, tags["watermarkPosition"])
+        assertEquals(WatermarkFrameBackground.WHITE.storageKey, tags["watermarkFrameBackground"])
     }
 
     @Test
@@ -77,7 +77,7 @@ class EffectBridgeTest {
             profileId = "luminous",
             renderPath = "gpu-accelerated",
             beautyPreset = "clear",
-            beautyStrength = 0.7f,
+            beautyStrength = "balanced",
             bokehEffect = "smooth"
         )
         val spec = EffectSpec(listOf(effect))
@@ -88,7 +88,7 @@ class EffectBridgeTest {
         assertEquals("gpu-accelerated", tags["renderPath"])
         assertEquals("luminous", tags["portraitProfile"])
         assertEquals("clear", tags["portraitBeautyPreset"])
-        assertEquals("0.7", tags["portraitBeautyStrength"])
+        assertEquals("balanced", tags["portraitBeautyStrength"])
         assertEquals("smooth", tags["portraitBokehEffect"])
     }
 
@@ -139,8 +139,7 @@ class EffectBridgeTest {
         val result = EffectBridge.toPostProcessSpec(spec)
 
         assertEquals("vivid", result.algorithmProfile)
-        // blank values are filtered out by buildWatermarkText
-        assertEquals("Photo Title", result.watermarkText)
+        assertNull(result.watermarkText)
     }
 
     @Test

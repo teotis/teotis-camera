@@ -278,7 +278,7 @@ private class PortraitModeController(
                 profileId = portraitSettings.portraitProfile.storageKey,
                 renderPath = if (depthEffectEnabled()) "depth" else "focus",
                 beautyPreset = portraitSettings.portraitBeautyPreset.storageKey,
-                beautyStrength = portraitSettings.portraitBeautyStrength.intensity,
+                beautyStrength = portraitSettings.portraitBeautyStrength.storageKey,
                 bokehEffect = portraitSettings.portraitBokehEffect.storageKey
             ),
             FrameEffect(currentFrameRatio())

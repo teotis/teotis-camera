@@ -55,7 +55,7 @@ class EffectCapabilityResolverTest {
             profileId = "bokeh",
             renderPath = "depth",
             beautyPreset = "natural",
-            beautyStrength = 0.5f,
+            beautyStrength = "balanced",
             bokehEffect = "circle"
         )
         val spec = EffectSpec(listOf(portrait))
@@ -76,7 +76,7 @@ class EffectCapabilityResolverTest {
             profileId = "bokeh",
             renderPath = "depth",
             beautyPreset = "natural",
-            beautyStrength = 0.5f,
+            beautyStrength = "balanced",
             bokehEffect = "circle"
         )
         val spec = EffectSpec(listOf(portrait))
@@ -112,7 +112,7 @@ class EffectCapabilityResolverTest {
             profileId = "bokeh",
             renderPath = "depth",
             beautyPreset = "natural",
-            beautyStrength = 0.5f,
+            beautyStrength = "balanced",
             bokehEffect = "circle"
         )
         val document = DocumentEffect(autoCrop = true, contrastProfile = "high")

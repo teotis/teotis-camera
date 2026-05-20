@@ -139,6 +139,11 @@ private class PhotoModeController(
                 )
                 val effectSpec = buildEffectSpec(flashMode)
                 val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+                val basePostProcessSpec = EffectBridge.toPostProcessSpec(effectSpec)
+                val flashLabel = flashMode.name.lowercase().replaceFirstChar { it.titlecase() }
+                val postProcessSpec = basePostProcessSpec.copy(
+                    watermarkText = "PHOTO $flashLabel"
+                )
                 ModeSignal.SubmitCapture(
                     if (livePhotoEnabledByDefault()) {
                         CaptureStrategy.LivePhoto(
@@ -162,7 +167,7 @@ private class PhotoModeController(
                                     }
                                 )
                             ),
-                            postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec),
+                            postProcessSpec = postProcessSpec,
                             captureProfile = CaptureProfile(
                                 flashMode = flashMode,
                                 stillCaptureQuality = runtimeState().stillCaptureQuality,
@@ -189,7 +194,7 @@ private class PhotoModeController(
                                     }
                                 )
                             ),
-                            postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec),
+                            postProcessSpec = postProcessSpec,
                             captureProfile = CaptureProfile(
                                 flashMode = flashMode,
                                 stillCaptureQuality = runtimeState().stillCaptureQuality,
