@@ -1,0 +1,650 @@
+# 当前状态
+
+- 里程碑：按用户当前轮授权，`6B-8` 已完成并允许进入下一阶段；当前 stage 已切换为第 `7` 阶段“稳定性治理与自动化补强”。
+- 阶段进度：原第 `6` 阶段基线与追加包维持已完成/已冻结判断；第 `7` 阶段当前进度更新为 `80%`。
+- 架构口径更新：工程对外介绍、面试表述与高层总结统一采用“四层主链路 + 横切治理能力”的说法；四层主链路指 `Mode Plugin / Session Kernel / Device Adapter / Media Pipeline`，其中后处理归入媒体管线内部能力，稳定性 / 可观测性 / 恢复 / 自动化验证作为跨层治理能力描述，不再与主链路并列拆成独立业务层。
+- 当前阶段判断：第 `7` 阶段已经不再只有 `trace + metrics + PreviewError` 的半成品。当前仓内已建立 `diagnostics owner + runtime issue owner + recovery failure owner + zoom owner + thermal owner + background recovery owner + perf threshold owner + provider invalidation owner + preview startup stall watchdog owner` 的稳定性主链，但距离 stage exit checklist 仍有平台/真机侧缺口。
+- 工程复盘与加固：第 `7` 阶段当前已完成多条已验证闭环：
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 新增 `SessionDebugDump / RecoveryTraceSnapshot / PerfSnapshot`，把 `SessionState + SessionTrace` 升级为统一 diagnostics owner，而不是继续由 `MainActivity` 直接拼 trace 字符串；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 与 [`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 现在消费结构化 diagnostics 文本，UI 可以稳定展示 `DebugDump / RecoveryTrace / PerfSnapshot`；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 把 `PreviewError` 从“只进入 `ERROR`”推进到“在 host/权限仍在且无进行中 shot/recording 时自动请求 recovery bind”，并追加 `preview.recovery.requested` trace；
+  [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt)、[`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt)、[`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 与 [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现已把 `bind/provider heuristic + CameraState` 故障收进结构化 `DeviceRuntimeIssue / PreviewRuntimeIssue`，不再只能压平成无类型 `PreviewError`；
+  同一条链路现已显式记录 `preview.recovery.failed`，并阻止 `RECOVERING` 状态下的 recoverable issue 递归再次请求 recovery，避免 recovery 自己形成重试环；
+  [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt)、[`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt)、[`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt)、[`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 与 [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 现已建立 `zoomRatioCapability + ZoomRatioToggled + ApplyZoomRatio` 主链，`切变焦` 已不再缺少 owner；
+  [`ThermalRuntimeIssueMonitor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/ThermalRuntimeIssueMonitor.kt) 与 [`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 现已建立 `Android PowerManager -> DeviceRuntimeIssue(THERMAL_CRITICAL) -> PreviewRuntimeIssue` 的上层通用接入口；旧系统或无服务时自动退化为空实现，不把无底层支持误判成业务回归；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 与 [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 现已把 `PreviewHostDetached -> PreviewHostAttached` 推进成显式 `preview.host.recovery.requested` 语义；前后台返回不再退回普通 bind，而是进入可追踪的 recovery bind；
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 与 [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 现已把 `lastStartReason` 进一步提升为 `PreviewStartCategory + FirstFrameBudgetSnapshot`，默认阈值化 `cold start / foreground resume / recovery / reconfigure`，不再只展示裸毫秒数；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 命中 `PROVIDER_FAILURE / CAMERA_FATAL` 时会主动作废缓存的 `cameraProvider / boundCamera`，避免后续继续复用陈旧 provider 引用；
+  [`PreviewStartupRuntimeIssueMonitor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PreviewStartupRuntimeIssueMonitor.kt)、[`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt)、[`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 与 [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 现已把“bind 已发起但长期等不到首帧”的 `preview startup stall` 收进可恢复 `DeviceRuntimeIssueKind.PREVIEW_STALL` 和统一 budget/watchdog 语义；
+  [`SessionDiagnosticsTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/SessionDiagnosticsTest.kt)、[`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt)、[`PreviewStartupRuntimeIssueMonitorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/PreviewStartupRuntimeIssueMonitorTest.kt)、[`CameraSessionCoordinatorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraSessionCoordinatorTest.kt)、[`CameraXCaptureAdapterCapabilityDetectionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterCapabilityDetectionTest.kt)、[`CameraXCaptureAdapterRuntimeIssueTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterRuntimeIssueTest.kt)、[`AndroidThermalRuntimeIssueMonitorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/AndroidThermalRuntimeIssueMonitorTest.kt) 与 [`verify_stage_7_observability.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_7_observability.sh) 已把 diagnostics build、preview error recovery、runtime issue forwarding、recovery failure、切变焦、thermal runtime issue、preview startup stall watchdog、perf budget 与 `assembleDebug` 收入口径。
+- 当前产品/阶段决策：
+  第 `6` 阶段的 feature 完成/冻结判断继续成立，不回退去扩写 `6B-6/6B-7/6B-8`；
+  第 `7` 阶段优先做 recovery / observability / automation owner，不在这个阶段抢跑新的模式 feature；
+  对显著依赖底层和硬件的稳定性项，优先先把仓内可验证语义与 diagnostics owner 做实，再决定是否进入真机/平台专项。
+
+## 当前阶段判断
+
+- 第 `6` 阶段完成判断继续有效，`6B-6/6B-7/6B-8` 不再是当前 stage 的 owner。
+- 第 `7` 阶段当前已建立的主链路：
+  [`SessionTrace.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionTrace.kt) 提供 ring-buffer trace owner；
+  [`SessionContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 中的 `PreviewMetrics` 已继续作为 `PerfSnapshot` 的底座，而不是散落在 UI 文本里重复解释；
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 现已把 `trace + metrics + session state` 收束为统一 diagnostics/export 结构；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现在会在普通 `PreviewError` 命中时，根据 `lifecycle / permission / host / activeShot / recordingStatus` 判断是否进入 recovery 请求路径；
+  [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 已新增 `DeviceRuntimeIssue / DeviceRuntimeIssueKind` 作为底层稳定性事件通用结构，允许后续继续接 `thermal / provider / vendor-specific fatal`；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 现会观察 `CameraState`，并把 `bind/provider heuristic + camera fatal/recoverable state` 发为结构化 runtime issue；
+  [`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 现会转发 `RuntimeIssue`，并把 preview bind failure 也纳入同一结构，而不是直接退回无类型 `PreviewError`；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现已把 `PreviewRuntimeIssue` 纳入统一 trace，并在 recovery 中失败时显式记录 `preview.recovery.failed`、停止递归重试；
+  [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 与 [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现已把 `zoomRatioCapability`、`ZoomRatioToggled`、`ApplyZoomRatio` 和 graph 内 `preview.zoomRatio` 收进 session/device contract；
+  [`ThermalRuntimeIssueMonitor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/ThermalRuntimeIssueMonitor.kt) 现已把 `PowerManager` thermal status 收敛为可替换 `RuntimeIssueMonitor`，并由 [`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 统一转发进 session；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现会保留待恢复的 host detach 原因，并在前台 reattach 或权限恢复后发出 `preview.host.recovery.requested`，把后台恢复纳入同一 recovery trace；
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 现已把首帧性能从“只有 metrics”推进到“带预算状态的 diagnostics owner”；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 现会在 `provider/fatal` runtime issue 上主动清理缓存 provider 状态，给下次 recovery 留出真正重取 provider 的空间；
+  [`PreviewStartupRuntimeIssueMonitor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PreviewStartupRuntimeIssueMonitor.kt) 与 [`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 现已把 `bind started -> no first frame within budget+grace` 提升为 recoverable `PREVIEW_STALL` 事件，避免长稳卡死只能等待底层主动抛错；
+  [`verify_stage_7_observability.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_7_observability.sh) 已成为第 `7` 阶段当前正式验证入口。
+- 当前判断：第 `7` 阶段尚未完成工程复盘与加固，距离 exit checklist 仍有明显差距；但“统一 diagnostics owner + runtime issue owner + recovery failure guardrail + zoom owner + thermal owner + background recovery owner + perf threshold owner + provider invalidation owner + preview startup stall watchdog owner”这条当前最高价值、且能在仓内验证的恢复主链已经成立。
+
+## 当前验证基线
+
+- `cd OpenCamera && ./scripts/verify_stage_7_observability.sh`
+- 该脚本当前覆盖：
+  `DefaultCameraSessionTest`
+  `SessionDiagnosticsTest`
+  `AndroidThermalRuntimeIssueMonitorTest`
+  `PreviewStartupRuntimeIssueMonitorTest`
+  `CameraXCaptureAdapterCapabilityDetectionTest`
+  `CameraXCaptureAdapterRuntimeIssueTest`
+  `SessionUiRenderModelTest`
+  `CameraSessionCoordinatorTest`
+  `:app:assembleDebug`
+- 本轮通过：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitorTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest --tests com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitorTest`
+  `./scripts/verify_stage_7_observability.sh`
+
+## 当前遗留风险
+
+- `CameraXCaptureAdapter` 已能输出 `bind/provider heuristic + CameraState` runtime issue，并在 `provider/fatal` issue 上清理缓存 provider；但 `ProcessCameraProvider` 真正 provider death 仍没有平台级强信号，当前 `provider failure` 里依然包含基于异常文案的保守分类。
+- 第 `7` 阶段的 `recovery failure`、`切变焦`、`thermal`、`后台恢复` 与 `preview startup stall` 仓内 owner 已建立，但 `provider death` 真信号与更长时间维度的真机矩阵仍缺少可信来源，继续硬推容易只剩 contract。
+- 当前验证仍以 unit/assemble 为主；首帧超时 watchdog 已建立，但 provider death、provider restart 后真实重连成功率和更长稳的热/权限/生命周期组合仍未建立可收敛的自动化验证。
+- 本地 Gradle/Kotlin 在并行跑多个 task 时仍偶发 `.codex-build/OpenCamera/.../classes/kotlin/main/com` 缺失型瞬时错误；串行验证后本轮脚本通过，因此当前不判为业务回归。
+
+## 下一步建议
+
+- 第 `7` 阶段若继续推进，最高优先级已切到 `provider death / provider restart 真信号` 这类更依赖平台和真机信号的项；当前仓内结构已允许继续挂接，但缺少可信验证来源。
+- 第二优先级是把当前默认 perf budget 接到真实设备/机型阈值矩阵；在没有额外口径和真机的前提下，继续细化只会把默认阈值写死。
+- 现有第 `6` 阶段功能闭环无需继续扩写；后续若回到 feature 侧，应单独获得新的阶段授权。
+- 最近新增的产品化设计输入已归纳为三份可交付 spec：统一手势入口、模式轨道/快门/变焦 cockpit、PreviewRenderEngine / Filter / Watermark 管线；后续实施应优先遵循这三份设计稿的边界，不要回退到老工程式的大型单体 View 或全局协议中心。
+
+---
+
+# 最近有效闭环
+
+## 2026-04-13：第 `7` 阶段第一轮
+
+- 目标：把仓里零散存在的 `SessionTrace + PreviewMetrics + session state` 提升为统一 `DebugDump / RecoveryTrace / PerfSnapshot` 产物，并建立第 `7` 阶段正式验证脚本。
+- 核心结果：
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 新增 `PerfSnapshot / RecoveryTraceSnapshot / SessionDebugDump`；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 新增 `sessionDiagnosticsText()`，不再让 `MainActivity` 直接拼原始 trace；
+  [`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 现已直接消费结构化 diagnostics 文本；
+  [`SessionDiagnosticsTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/SessionDiagnosticsTest.kt)、[`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 与 [`verify_stage_7_observability.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_7_observability.sh) 建立第 `7` 阶段当前正式口径。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段已不再缺少统一 diagnostics owner；后续 recovery/automation 可以围绕结构化 dump 继续推进，而不是重复造 UI 拼接字符串。
+
+## 2026-04-13：第 `7` 阶段第二轮
+
+- 目标：把普通 `PreviewError` 从“只进入 `ERROR` 态”推进到具备保守 recovery 请求语义的 session 闭环。
+- 核心结果：
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现在会在 `lifecycle=RUNNING`、权限和 preview host 仍在、且没有进行中 shot/recording 时，为 `PreviewError` 发出 `preview.recovery.requested` trace，并请求 recovery bind；
+  同文件在录制中或有 in-flight shot 时继续保持保守，不会误触发 recovery rebind；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 新增“preview error 会恢复”和“录制中不会误恢复”两条回归；
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 把 `preview.recovery.requested` 纳入 `RecoveryTraceSnapshot` 事件窗口。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：`PreviewError` 已不再只能把 session 推进死路；第 `7` 阶段现已具备“普通 preview error -> recovery request -> diagnostics 可观测”的最小闭环。
+
+## 2026-04-13：第 `7` 阶段第三轮
+
+- 目标：把 `bind/provider/camera state` 失败从“统一压成 PreviewError 字符串”推进到结构化 runtime issue owner，并纳入 stage7 自动化。
+- 核心结果：
+  [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 新增 `DeviceRuntimeIssue / DeviceRuntimeIssueKind` 与 `displayReason / recoveryReason`，为后续平台/硬件专项预留统一结构；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `classifyPreviewBindingFailure()`、`cameraStateRuntimeIssue()` 与 `CameraState` observer，会把 `bind/provider heuristic + CameraState recoverable/fatal` 送入 `DeviceEvent.RuntimeIssue`；
+  [`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 与 [`SessionContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 现已转发 `PreviewRuntimeIssue`，bind failure 不再回退为无类型 `PreviewError`；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现会把 runtime issue 记入 `preview.runtime.issue` trace，并根据 `isRecoverable` 决定是否允许恢复；
+  [`CameraXCaptureAdapterRuntimeIssueTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterRuntimeIssueTest.kt)、[`CameraSessionCoordinatorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraSessionCoordinatorTest.kt)、[`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 与 [`verify_stage_7_observability.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_7_observability.sh) 补齐 adapter classify、coordinator forwarding 与 session recovery 口径。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest --tests com.opencamera.app.camera.CameraXCaptureAdapterRuntimeIssueTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest --tests com.opencamera.core.session.SessionDiagnosticsTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段已不再缺少结构化 runtime issue owner；后续若接 `thermal / provider / vendor fatal`，可以沿用现有结构继续挂接，而不是再发明新的错误文本约定。
+
+## 2026-04-13：第 `7` 阶段第四轮
+
+- 目标：把 recovery 中的失败从“再次触发 recovery 请求的潜在重试环”推进到显式 `recovery failed` 语义。
+- 核心结果：
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现会在 `previewStatus=RECOVERING` 时，把新到达的 runtime issue 记录为 `preview.recovery.failed`，并停止递归再次请求 recovery；
+  同文件会把 recoverable recovery failure 统一呈现为 `Preview recovery failed`，critical failure 则提升为 `Preview recovery failed, manual intervention required`；
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 已把 `preview.recovery.failed` 纳入 `RecoveryTraceSnapshot` 和 failure event 集；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 与 [`SessionDiagnosticsTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/SessionDiagnosticsTest.kt) 补齐 recovery fail trace 和“不会继续重排 recovery”回归。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest --tests com.opencamera.core.session.SessionDiagnosticsTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段当前恢复主链已从“会报错、会尝试恢复”推进到“恢复失败也有 owner，且不会形成递归 recovery 环”。
+
+## 2026-04-13：第 `7` 阶段第五轮
+
+- 目标：把 stage7 checklist 里的 `切变焦` 从“没有 contract owner 的空项”推进到真正可回归验证的 session/device/app 闭环。
+- 核心结果：
+  [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 新增 `ZoomControlSupport / ZoomRatioCapability / PreviewConfig.zoomRatio / DeviceCommand.UpdateZoomRatio`，让 zoom 进入正式设备契约；
+  [`SessionContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 与 [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 新增 `ZoomRatioToggled / ApplyZoomRatio`，并让 active graph 在切镜头、切模式、录制中都保持已选 zoom ratio；
+  [`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 与 [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 现已把 zoom 更新下发到 CameraX `cameraControl.setZoomRatio()`，避免为了切变焦重绑 preview；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt)、[`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 与 [`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml) 现已暴露 zoom 按钮，并在 unsupported 设备上稳定呈现 `Zoom N/A`。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest --tests com.opencamera.app.camera.CameraXCaptureAdapterCapabilityDetectionTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段已不再缺少 `切变焦` owner；当前 zoom 至少具备 supported / unsupported / recording 中保持一致的可测试语义。
+
+## 2026-04-13：第 `7` 阶段第六轮
+
+- 目标：把 `thermal` 从只存在 issue kind 的预留状态推进到上层通用接入口和 stage7 自动化回归。
+- 核心结果：
+  [`ThermalRuntimeIssueMonitor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/ThermalRuntimeIssueMonitor.kt) 新增 `RuntimeIssueMonitor` 抽象和 `AndroidThermalRuntimeIssueMonitor`，通过 Android `PowerManager` 把 `SEVERE / CRITICAL / EMERGENCY / SHUTDOWN` thermal status 统一映射为 `DeviceRuntimeIssue(THERMAL_CRITICAL)`；
+  同文件在旧系统或无 thermal service 时自动退化为 no-op，不把底层缺失误判成 app/session 回归；
+  [`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 现会在 preview host attach/detach 时统一管理 thermal monitor 生命周期，并把 thermal runtime issue 转发进 session；
+  [`AndroidThermalRuntimeIssueMonitorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/AndroidThermalRuntimeIssueMonitorTest.kt)、[`CameraSessionCoordinatorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraSessionCoordinatorTest.kt) 与 [`verify_stage_7_observability.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_7_observability.sh) 已把 monitor register/detach、critical issue forwarding 与 unsupported fallback 收进 stage7 正式口径。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitorTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest --tests com.opencamera.app.camera.CameraXCaptureAdapterRuntimeIssueTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段已不再缺少 `thermal` 的上层 owner；后续针对具体设备或平台差异，只需要继续适配 backend，而不用再重写 session/coordinator 契约。
+
+## 2026-04-13：第 `7` 阶段第七轮
+
+- 目标：把 `后台恢复` 从“只有 host attach/detach 事件”推进到显式 recovery 语义和自动化回归。
+- 核心结果：
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 新增待恢复的 host detach reason 管理，前台 reattach 不再只发普通 bind，而是会发出 `preview.host.recovery.requested` 并走 `isRecovery=true` 的 bind；
+  同文件在“前台先 attach、随后权限恢复”的场景下，也会继续保留待恢复原因，等权限恢复后再走同一条 recovery bind，而不是退回 `camera permission granted` 的普通起预览路径；
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 已把 `preview.host.recovery.requested` 纳入 `RecoveryTraceSnapshot` 事件窗口；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 补齐“后台 detach 后 reattach 进入 recovery”和“前台 attach 后权限恢复仍保留 recovery 语义”两条回归。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest --tests com.opencamera.core.session.SessionDiagnosticsTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段已不再缺少 `后台恢复` 的上层 owner；后续若继续接更细粒度 app lifecycle / process lifecycle 信号，可以沿用当前 recovery trace 继续挂接。
+
+## 2026-04-13：第 `7` 阶段第八轮
+
+- 目标：把 `冷启动 / 首帧` 从“只有毫秒数”推进到带预算状态的 diagnostics owner。
+- 核心结果：
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 新增 `PreviewStartCategory / PerfBudgetStatus / FirstFrameBudgetSnapshot`，会按 `cold start / foreground resume / recovery / reconfigure` 分类 `lastStartReason`，并给出默认 `warn/fail` 阈值；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 现会把 perf snapshot 渲染成 `budget=within budget|warning|over budget`，不再只有裸毫秒数；
+  [`SessionDiagnosticsTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/SessionDiagnosticsTest.kt) 与 [`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 已补齐 recovery/resume 场景下的阈值分类回归。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段已不再缺少 `cold start / first frame` 的默认预算 owner；后续若补真机矩阵，只需要继续调预算来源，而不是再重写 diagnostics 结构。
+
+## 2026-04-13：第 `7` 阶段第九轮
+
+- 目标：把 `provider death` 从“只发 issue 文本”推进到至少会主动作废陈旧 provider 缓存的上层收敛。
+- 核心结果：
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `shouldInvalidateCachedProviderState()`，并在 `bind/provider failure` 与 `camera fatal` 命中时主动清理 `cameraProvider / boundCamera / use case` 缓存；
+  同文件 `release()` 现在也会把 `cameraProvider` 置空，避免 lifecycle stop 后继续保留旧 provider 引用；
+  [`CameraXCaptureAdapterRuntimeIssueTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterRuntimeIssueTest.kt) 已补齐“哪些 runtime issue 应触发 provider cache invalidation”的回归。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterRuntimeIssueTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段对 `provider death` 已具备仓内可验证的最小 guardrail；但真正的平台级 provider death 信号和长稳验证仍不在当前仓内。
+
+## 2026-04-13：第 `7` 阶段第十轮
+
+- 目标：把 `provider death / 长稳恢复` 在仓内仍缺的高价值 owner，从“只能等底层主动抛错”推进到“bind 发起后长期无首帧也能被通用 watchdog 主动收敛”。
+- 核心结果：
+  [`SessionDiagnostics.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 新增 `previewStartTimeoutMillis()`，把现有 `PreviewStartCategory + fail budget` 继续提升为跨 diagnostics / watchdog 共享的超时口径，而不是再复制另一套硬编码阈值；
+  [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 新增 `DeviceRuntimeIssueKind.PREVIEW_STALL` 及其 `displayReason / recoveryReason`，让“无首帧卡死”正式成为结构化 runtime issue，而不是混进 `bind failure` 或无类型错误文案；
+  [`PreviewStartupRuntimeIssueMonitor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PreviewStartupRuntimeIssueMonitor.kt) 建立 `preview host attached -> preview binding started -> first frame / stop / detach cancel` 的首帧 watchdog；超时后统一发出 recoverable `PREVIEW_STALL`，显式提示当前仍是上层通用收敛，不依赖具体设备 backend；
+  [`ThermalRuntimeIssueMonitor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/ThermalRuntimeIssueMonitor.kt)、[`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 与 [`AppContainer.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/AppContainer.kt) 现已把 `thermal + startup stall` 组合成统一 `CompositeRuntimeIssueMonitor`；coordinator 在 bind start、first frame、preview stop、runtime issue 上统一驱动 watchdog 生命周期，避免这条 owner 回灌成新的 session/coordinator 影子状态机；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt)、[`SessionDiagnosticsTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/SessionDiagnosticsTest.kt)、[`PreviewStartupRuntimeIssueMonitorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/PreviewStartupRuntimeIssueMonitorTest.kt)、[`CameraSessionCoordinatorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraSessionCoordinatorTest.kt) 与 [`verify_stage_7_observability.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_7_observability.sh) 已把 timeout budget、watchdog 超时、coordinator 转发和 session recovery 语义收入口径。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitorTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest --tests com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitorTest`
+  `./scripts/verify_stage_7_observability.sh`
+- 结论：第 `7` 阶段对 `provider death / 长稳恢复` 已不再只有被动等待底层报错这一条路；当前仓内至少具备“bind 卡死无首帧 -> 结构化 runtime issue -> recovery request -> 自动化回归”的最小主动 guardrail。剩余最高价值缺口转向平台级 provider death 真信号与真机矩阵，这部分继续推进已显著依赖外部条件。
+
+## 2026-04-13：`6B-8` 第一轮
+
+- 目标：把 `manualCaptureDraft` 从“只写 metadata / EXIF 的说明性数据”推进到真实 `capture profile -> device request translation` owner，并固化当前 stage 验证脚本。
+- 核心结果：
+  [`MediaPipelineContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/media/src/main/kotlin/com/opencamera/core/media/MediaPipelineContracts.kt) 为 `CaptureProfile` 新增 `manualCaptureParams`，让手动参数正式进入拍摄契约；
+  [`ProModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-pro/src/main/kotlin/com/opencamera/feature/pro/ProModePlugin.kt) 现会把 `catalog.manualCaptureDraft` 同时写进 `manualDraft*` metadata 与 `captureProfile.manualCaptureParams`；
+  [`DeviceShotRequestTranslator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceShotRequestTranslator.kt) 新增 manual request translation 和 `device:manual=*` diagnostics；当设备不支持 manual controls 时会显式降级为 `unsupported-saved-only`，不再默默把 draft 假装成已执行请求；
+  [`DefaultDeviceShotRequestTranslatorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/test/kotlin/com/opencamera/core/device/DefaultDeviceShotRequestTranslatorTest.kt) 与 [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 补齐 supported / unsupported request translation 和 `Pro` 模式 manual draft 进入 `CaptureProfile` 的回归；
+  新增 [`verify_stage_6b8_manual_pro.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b8_manual_pro.sh) 作为 `6B-8` 第一轮正式验证入口。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:device:test --tests com.opencamera.core.device.DefaultDeviceShotRequestTranslatorTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `./scripts/verify_stage_6b8_manual_pro.sh`
+- 结论：`6B-8` 已不再缺少 manual parameter model 到 request translation 的最小 owner 闭环；当前剩余最高价值缺口转向 mode-local pro variant/render model，以及 adapter/provider 对 RAW / manual request 的真实执行。
+
+## 2026-04-13：`6B-8` 第二轮
+
+- 目标：在不复制独立 `Pro` mode 的前提下，为 `NIGHT / PORTRAIT / HUMANISTIC` 建立独立运行态 `Pro` 按钮，并形成 mode-local `pro variant` owner。
+- 核心结果：
+  [`ModeContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/main/kotlin/com/opencamera/core/mode/ModeContracts.kt)、[`SessionContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt)、[`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt)、[`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 与 [`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml) 新增独立 `Pro` 运行态按钮契约与点击链路；
+  [`NightModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-night/src/main/kotlin/com/opencamera/feature/night/NightModePlugin.kt)、[`PortraitModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-portrait/src/main/kotlin/com/opencamera/feature/portrait/PortraitModePlugin.kt)、[`HumanisticModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-humanistic/src/main/kotlin/com/opencamera/feature/humanistic/HumanisticModePlugin.kt) 现在都支持 `Enter/Exit Pro`，并会把 `manualCaptureDraft` 与 unsupported/saved-only 提示写进 capture metadata、`CaptureProfile`、snapshot detail 与 EXIF；
+  [`ModeCatalogContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/main/kotlin/com/opencamera/core/mode/ModeCatalogContracts.kt)、[`ModeCatalogContractsTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/test/kotlin/com/opencamera/core/mode/ModeCatalogContractsTest.kt)、[`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 同步把 `Pro variant` 纳入 mode declaration / UI 回归。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:mode:test --tests com.opencamera.core.mode.ModeCatalogContractsTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
+- 结论：`6B-8` 已不再缺少目标 mode 的独立运行态 `Pro` 入口；当前 mode-local owner 已从“全局 Pro mode 旁路”收敛为 “模式内 variant”。
+
+## 2026-04-13：`6B-8` 第三轮
+
+- 目标：把 `manualCaptureParams` 从 `DeviceShotRequest` 继续推进到 adapter partial consume，并显式区分“已执行”和“仅保存语义”。
+- 核心结果：
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `Camera2ManualCaptureConfig`、manual execution diagnostics 与 Camera2 interop still request apply：`ISO / shutter / EV / focus / aperture` 进入实际 still request config；
+  同文件会把 `RAW / WB` 显式标成 `adapter:manual-request=saved-only/partial`，避免把未真实执行的字段伪装成已下沉；
+  新增 [`CameraXCaptureAdapterManualRequestTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterManualRequestTest.kt) 验证 request->Camera2 config 映射和 `applied / partial / saved-only` diagnostics；
+  [`verify_stage_6b8_manual_pro.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b8_manual_pro.sh) 升级为当前 stage 的正式验证脚本，纳入 `ModeCatalogContractsTest`、`SessionUiRenderModelTest` 与 `CameraXCaptureAdapterManualRequestTest`。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterManualRequestTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:assembleDebug`
+  `./scripts/verify_stage_6b8_manual_pro.sh`
+- 结论：`6B-8` 已不再是“只有 contract / translator，没有 adapter consume”的中间态；但 `RAW` 与 `WB Kelvin` 仍未形成仓内可收敛的真实执行闭环。
+
+## 2026-04-13：`6B-8` 第四轮
+
+- 目标：在不硬推真实 `RAW / WB` 执行的前提下，把 mode-local `Pro` 的上层编辑能力、saved-only 持久化和 `per-control capability matrix` 通用结构补齐到 stage exit 所需状态。
+- 核心结果：
+  [`SettingsContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt)、[`FeatureCatalogStore.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/FeatureCatalogStore.kt)、[`SharedPreferencesFeatureCatalogStore.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SharedPreferencesFeatureCatalogStore.kt) 与 [`SessionSettingsManager.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionSettingsManager.kt) 让 `manualCaptureDraft` 正式具备 runtime 编辑与持久化闭环，不再只停在 mode metadata；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt)、[`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 与 [`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml) 新增 mode-local `Pro` controls panel，并按控制级能力渲染 `Camera2 interop / Saved only / Temporarily unsupported`；
+  [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt)、[`DeviceShotRequestTranslator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceShotRequestTranslator.kt) 与 [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `ManualControlCapabilityMatrix`，并把 manual draft 以 `request + matrix + diagnostics` 的方式推进到 adapter；当前默认让 `ISO / shutter / EV / focus / aperture` 可执行，`RAW / WB` saved-only，显式 unsupported 控件保留 future device adaptation 接点；
+  [`CameraXCaptureAdapterCapabilityDetectionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterCapabilityDetectionTest.kt)、[`CameraXCaptureAdapterManualRequestTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterManualRequestTest.kt)、[`SessionSettingsManagerTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionSettingsManagerTest.kt)、[`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 与 [`verify_stage_6b8_manual_pro.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b8_manual_pro.sh) 把 capability matrix merge、saved-only persistence、runtime controls render、unsupported diagnostics 和 assemble 收为正式口径。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:device:test --tests com.opencamera.core.device.DefaultDeviceShotRequestTranslatorTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionSettingsManagerTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterCapabilityDetectionTest --tests com.opencamera.app.camera.CameraXCaptureAdapterManualRequestTest --tests com.opencamera.app.SessionUiRenderModelTest`
+  `./scripts/verify_stage_6b8_manual_pro.sh`
+- 结论：按当前产品决策，`6B-8` 已满足 stage exit checklist。真实 `RAW / WB` 执行与更细粒度真机能力探测继续推进会显著增加硬件风险，适合作为后续设备适配事项，而不再属于当前 stage 的必做闭环。
+
+## 2026-04-12：`6B-7` 第一轮
+
+- 目标：把 `Live` 从“settings / metadata flag”推进到真实 `still + motion + sidecar` 媒体组合契约，并接通三类 still mode 的 capture strategy。
+- 核心结果：
+  [`MediaPipelineContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/media/src/main/kotlin/com/opencamera/core/media/MediaPipelineContracts.kt) 新增 `ShotKind.LIVE_PHOTO`、`LivePhotoCaptureSpec`、`LivePhotoBundle` 与 `CaptureStrategy.LivePhoto`，让 `ShotExecutor` 能正式规划 live capture；
+  [`DeviceShotRequestTranslator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceShotRequestTranslator.kt) 为 `LIVE_PHOTO` 建立 still template 翻译和 `device:live-photo=*` diagnostics；
+  [`PhotoModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-photo/src/main/kotlin/com/opencamera/feature/photo/PhotoModePlugin.kt)、[`HumanisticModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-humanistic/src/main/kotlin/com/opencamera/feature/humanistic/HumanisticModePlugin.kt)、[`PortraitModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-portrait/src/main/kotlin/com/opencamera/feature/portrait/PortraitModePlugin.kt) 在 `livePhotoDefault=on` 时发出真实 `CaptureStrategy.LivePhoto`；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt)、[`SessionContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt)、[`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 与 [`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 现已保存并展示 `latestLivePhotoBundle`；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `captureLivePhoto()` 与 locatable `motionPath / sidecarPath` 生成。
+- 验证：
+  `./gradlew --no-daemon :core:media:test --tests com.opencamera.core.media.ShotExecutorTest :core:device:test --tests com.opencamera.core.device.DefaultDeviceShotRequestTranslatorTest :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest :app:assembleDebug`
+- 结论：`6B-7` 已不再缺少 live capture plan / media bundle / render model 的最小主链。
+
+## 2026-04-12：`6B-7` 第二轮
+
+- 目标：把 `plan.md` 要求中的 `failure cleanup` 从缺口推进到 adapter 可验证 owner。
+- 核心结果：
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `stillCaptureCleanupPaths()`、`cleanupStillCaptureArtifacts()` 与 `cleanupAbsoluteFilePaths()`，在 still/live capture 失败或完成事件抛错时对主输出、bundle 路径和中间输出做 best-effort 清理；
+  同文件的 `PhotoCaptureOutcome.Failure` 现已携带 cleanup paths，legacy file output 不再在失败路径上静默留下半成品；
+  新增 [`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 验证 live bundle 输出删除、content-uri delete hook 和去重后的 cleanup path 语义；
+  [`verify_stage_6b7_live_photo.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b7_live_photo.sh) 已纳入 adapter live cleanup 测试。
+- 验证：
+  `./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
+  `./scripts/verify_stage_6b7_live_photo.sh`
+- 结论：`6B-7` 当前已具备 `Live capture plan + media bundle + failure cleanup` 的仓内可验证闭环，但真实短动态段采集和 mux 仍未落地。
+
+## 2026-04-12：`6B-7` 第三轮
+
+- 目标：把 `thumbnail + sidecar metadata` 从“隐含在 still 输出里”推进到 live bundle 正式 owner，并让 file-backed sidecar 真正落盘。
+- 核心结果：
+  [`MediaPipelineContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/media/src/main/kotlin/com/opencamera/core/media/MediaPipelineContracts.kt) 为 `LivePhotoBundle` 新增 `thumbnailPath`，明确 live 的 thumbnail owner 不再只是 still 输出的隐式语义；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `materializeLivePhotoSidecar()` 与 `buildLivePhotoSidecarPayload()`，file-backed live capture 成功后会把 still / motion / sidecar / thumbnail / mime / duration 元数据写入 sidecar 文件；
+  同文件在 sidecar materialization 失败时会回退到 `PhotoCaptureOutcome.Failure`，并沿用 live cleanup owner 回滚主输出和 sidecar 残留；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 与 [`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 现在会在 live capture 输出摘要中展示 `Thumbnail:`；
+  [`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 补齐 sidecar materialization 与 thumbnail-aware cleanup 回归。
+- 验证：
+  `./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.SessionUiRenderModelTest`
+  `./scripts/verify_stage_6b7_live_photo.sh`
+- 结论：`6B-7` 的 `metadata + thumbnail` 半链路已经从“路径占位”推进到“bundle owner + file-backed sidecar materialization”，剩余最高价值缺口集中到真实 motion capture / mux。
+
+## 2026-04-12：`6B-7` 第四轮
+
+- 目标：把 MediaStore 路径下的 live sidecar 从“只有 display path 的占位信息”推进到独立 handle、真实 materialization 和可回滚 cleanup owner。
+- 核心结果：
+  [`MediaPipelineContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/media/src/main/kotlin/com/opencamera/core/media/MediaPipelineContracts.kt) 为 `LivePhotoBundle` 新增 `motionHandle / sidecarHandle / thumbnailHandle`，让 live companion asset 不再只有字符串路径；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 现会在 MediaStore still output 成功后为 live sidecar 创建独立 `MediaStore.Files` 句柄，并通过 `content-uri` 写入 sidecar payload；同文件新增 `stillCaptureCleanupContentUris()`，把 still/live companion content-uri 删除纳入统一 cleanup；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 与 [`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 现在会在 live 输出摘要中附带可用的 MediaStore `content-uri`；
+  [`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 补齐 content-uri sidecar materialization、live companion content-uri cleanup 与去重回归。
+- 验证：
+  `./gradlew --no-daemon :core:media:test --tests com.opencamera.core.media.ShotExecutorTest`
+  `./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
+  `./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
+  `./scripts/verify_stage_6b7_live_photo.sh`
+- 结论：`6B-7` 已具备 file-backed / MediaStore 双路径的 live sidecar owner 与 cleanup 语义；当前 stage 剩余最高价值缺口已基本收敛到真实 short motion capture / mux / motion asset materialization，而这部分在当前仓内验证条件下难以安全继续硬推。
+
+## 2026-04-12：`6B-6` 第一轮
+
+- 目标：把 `defaultVideoSpec` 从“settings/UI/metadata 已有”推进到 `capability matrix -> session/device graph -> adapter quality select` 的真实 owner 闭环。
+- 核心结果：
+  [`SettingsContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt) 为录像规格新增 `8K` 契约与按分辨率建模的 fps matrix；
+  [`VideoSpecSelection.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/VideoSpecSelection.kt) 与 [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 建立 `requested -> resolved` 选择与降级语义，`RecordingConfig` 正式持有 `requestedVideoSpec / videoSpec / qualityPreset`；
+  [`VideoModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-video/src/main/kotlin/com/opencamera/feature/video/VideoModePlugin.kt) 改为基于 capability matrix 轮转录像规格，并把 requested/resolved 视频规格同时写入 shot metadata；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 不再硬编码 “4K fallback to FHD”，而是按 active device constraints 渲染 supported / degraded；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 与 [`CameraXCaptureAdapterRecordingQualityTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterRecordingQualityTest.kt) 补齐 `UHD -> Quality.UHD` 的 adapter consume。
+- 验证：
+  `./gradlew --no-daemon :core:device:test --tests com.opencamera.core.device.VideoSpecSelectionTest :app:compileDebugKotlin`
+  `./gradlew --no-daemon :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.CameraXCaptureAdapterRecordingQualityTest`
+- 结论：`6B-6` 的分辨率/规格 owner 已从“设置层影子状态”推进到“device graph + adapter consume”的真实闭环。
+
+## 2026-04-12：`6B-6` 第二轮
+
+- 目标：把 `LOW_LIGHT_AUTO_24FPS` 从“只是一枚 settings 值”推进到可执行的 runtime policy helper，并固化正式 stage 验证入口。
+- 核心结果：
+  [`VideoSpecSelection.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/VideoSpecSelection.kt) 新增 `VideoSceneSignal` 与 `resolveRuntimeVideoSpec()`，在 low-light signal 命中时把 runtime fps 收敛到 `24fps` 或最接近的 supported fallback；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `videoSceneSignalProvider` 注入点，并在录像完成结果里写入 `device:video-scene=low-light` / `device:video-runtime-fps=*` pipeline note；
+  [`VideoSpecSelectionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/test/kotlin/com/opencamera/core/device/VideoSpecSelectionTest.kt) 补齐 low-light runtime fps 纯测；
+  新增 [`verify_stage_6b6_video_spec.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b6_video_spec.sh) 作为 `6B-6` 当前正式验证入口。
+- 验证：
+  `./gradlew --no-daemon :core:device:test --tests com.opencamera.core.device.VideoSpecSelectionTest`
+  `./scripts/verify_stage_6b6_video_spec.sh`
+- 结论：`6B-6` 现在已具备 capability-gated video spec、runtime low-light fps policy helper 与正式验证脚本，但真实 recorder fps / concert route 仍未落底层。
+
+## 2026-04-12：`6B-6` 第三轮
+
+- 目标：把 `6B-6` 剩余的高价值 P1 从“保守默认 capability + 纯 helper”推进到“per-lens capability detect + CameraX target fps bind”。
+- 核心结果：
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增按镜头读取 `CamcorderProfile` 与 `StreamConfigurationMap` 的 `videoSpecConstraints` 探测，并按当前 lens 合并进 `resolveDeviceCapabilities()`；
+  同文件把录像 use case 从 `VideoCapture.withOutput(recorder)` 改为 `VideoCapture.Builder(recorder).setTargetFrameRate(...)`，使 resolved/runtime `VideoSpec.frameRate` 进入实际 CameraX 绑定层；
+  low-light runtime 24fps 命中时，adapter 会先按 runtime `VideoSpec` 重绑录像 use case，再启动 recording，并在 pipeline notes 里补充 `device:video-bound-fps=*`；
+  [`CameraXCaptureAdapterRecordingQualityTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterRecordingQualityTest.kt) 补齐 per-lens constraint merge 与 runtime/bound fps helper 回归。
+- 验证：
+  `./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterRecordingQualityTest`
+  `./scripts/verify_stage_6b6_video_spec.sh`
+- 结论：`6B-6` 的 fps owner 已从“metadata + runtime helper”继续推进到“CameraX video use case bind 层”，而 per-lens capability matrix 也已不再依赖单一保守默认值。
+
+## 2026-04-11：`6B-5` 第一轮
+
+- 目标：先完成 `portrait profile -> capture metadata -> portrait processor spec` 的核心闭环。
+- 核心结果：
+  [`SettingsContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt) 新增 `PortraitProfile / PortraitBeautyPreset / PortraitBeautyStrength / PortraitBokehEffect` 以及对应 reducer actions；
+  [`PersistedSettingsSerializer.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/PersistedSettingsSerializer.kt) 与 [`PersistedSettingsSerializerTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/test/kotlin/com/opencamera/core/settings/PersistedSettingsSerializerTest.kt) 补齐人像产品配置持久化回归；
+  [`PortraitModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-portrait/src/main/kotlin/com/opencamera/feature/portrait/PortraitModePlugin.kt) 把 profile / beauty / bokeh 写入 shot metadata 与 EXIF，并同步进入 mode snapshot summary；
+  [`PortraitRenderPostProcessor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PortraitRenderPostProcessor.kt) 将新 metadata 解析为轻量人像 render spec，支持更保守的 `Native` 和更鲜明的 `Luminous` 差异化渲染；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 与 [`PortraitRenderPostProcessorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/PortraitRenderPostProcessorTest.kt) 补齐 metadata / EXIF / spec 回归。
+- 验证：
+  `./gradlew :core:settings:test --tests com.opencamera.core.settings.PersistedSettingsSerializerTest :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest :app:testDebugUnitTest --tests com.opencamera.app.camera.PortraitRenderPostProcessorTest :app:assembleDebug`
+- 结论：`6B-5` 的 settings contract、capture metadata 和 lightweight processor spec 主链成立。
+
+## 2026-04-11：`6B-5` 第二轮
+
+- 目标：把 `6B-5` 的人像产品设置从“测试可注入”推进到用户可达的独立设置入口。
+- 核心结果：
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 新增独立 `PortraitLabPageRenderModel`，并让 `Lens Lab` root page 明确出现 `Portrait Lab` 入口；
+  [`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 与 [`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml) 接通 `Lens Lab -> Portrait Lab` 二级页导航，以及 `profile / beauty preset / beauty strength / bokeh effect` 四个设置按钮；
+  [`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 补齐 root page 和 portrait lab 的 render model 回归；
+  新增 [`verify_stage_6b5_portrait_lab.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b5_portrait_lab.sh) 作为当前 stage 正式验证脚本。
+- 验证：
+  `./gradlew :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest :app:assembleDebug`
+  `./scripts/verify_stage_6b5_portrait_lab.sh`
+- 结论：`6B-5` 的 UI / settings 闭环已成立，stage exit checklist 满足。
+
+## 2026-04-11：`6B-4` 第一轮
+
+- 目标：把构图线和倒计时从“设置项 / 文案”推进到真实 preview overlay 与多模式 capture gate。
+- 核心结果：
+  [`PreviewOverlayView.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/PreviewOverlayView.kt)、[`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml)、[`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 新增真实预览 overlay，支持 `3x3 / Golden` 构图线和 countdown 气泡；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 新增 `previewOverlayRenderModel()`，把 preview host / preview status / countdown 与 grid mode 收敛成 UI 可消费状态；
+  [`PortraitModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-portrait/src/main/kotlin/com/opencamera/feature/portrait/PortraitModePlugin.kt) 与 [`NightModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-night/src/main/kotlin/com/opencamera/feature/night/NightModePlugin.kt) 现已消费共享 countdown 设置；`Photo / Humanistic / Portrait / Night` 的 still capture 倒计时语义对齐；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 补齐 countdown 的切模式阻断、preview host detach 取消、权限丢失取消，以及 portrait/night countdown 回归；
+  [`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 补齐 overlay render model 单测；
+  [`verify_stage_6b4_capture_aids.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b4_capture_aids.sh) 建立 stage 正式验证入口。
+- 验证：
+  `./scripts/verify_stage_6b4_capture_aids.sh`
+- 结论：`6B-4` 的 grid overlay 与多模式 countdown 主链成立。
+
+## 2026-04-11：`6B-4` 第二轮
+
+- 目标：把 `selfie mirror / shutter sound` 从 persisted setting 推进到真实消费语义。
+- 核心结果：
+  [`ModeContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/main/kotlin/com/opencamera/core/mode/ModeContracts.kt) 新增统一 `captureAidMetadataTags()`，把 `captureLensFacing / selfieMirrorEnabled / selfieMirrorApply / shutterSoundEnabled` 收敛成 still modes 共用 metadata tags；
+  [`PhotoModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-photo/src/main/kotlin/com/opencamera/feature/photo/PhotoModePlugin.kt)、[`HumanisticModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-humanistic/src/main/kotlin/com/opencamera/feature/humanistic/HumanisticModePlugin.kt)、[`PortraitModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-portrait/src/main/kotlin/com/opencamera/feature/portrait/PortraitModePlugin.kt)、[`NightModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-night/src/main/kotlin/com/opencamera/feature/night/NightModePlugin.kt)、[`ProModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-pro/src/main/kotlin/com/opencamera/feature/pro/ProModePlugin.kt)、[`DocumentModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-document/src/main/kotlin/com/opencamera/feature/document/DocumentModePlugin.kt) 全部接入 capture aid metadata；
+  [`PhotoSelfieMirrorPostProcessor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PhotoSelfieMirrorPostProcessor.kt) 新增静态图镜像后处理，前摄自拍镜像不再只停在 metadata；
+  [`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 现已对前摄预览应用镜像，并在 photo shot 进入执行时按设置触发系统快门声；
+  [`MediaPipelineContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/media/src/main/kotlin/com/opencamera/core/media/MediaPipelineContracts.kt) 将 `shutter-sound:*` 与 `selfie-mirror:requested` 纳入 pipeline notes；
+  [`PhotoSelfieMirrorPostProcessorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/PhotoSelfieMirrorPostProcessorTest.kt) 与 [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 补齐 metadata / postprocessor 回归。
+- 验证：
+  `./scripts/verify_stage_6b4_capture_aids.sh`
+- 结论：`6B-4` 的 selfie mirror / shutter sound 已形成 preview + metadata + still-photo consume 的完整闭环。
+
+## 2026-04-11：`6B-3` 第一轮
+
+- 目标：把水印从“模板 id + 一行文字”推进到模板 resolver、结构化 token 与真实边框成片。
+- 核心结果：
+  [`PhotoWatermarkPostProcessor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PhotoWatermarkPostProcessor.kt) 新增 `resolvePhotoWatermarkTemplate()`、`WatermarkFrameBackground`、EXIF token 解析、expanded frame 渲染；
+  [`PhotoModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-photo/src/main/kotlin/com/opencamera/feature/photo/PhotoModePlugin.kt) 为拍照主链补齐 `watermarkModel / watermarkDatetime / watermarkCameraParams` fallback tags；
+  [`PhotoWatermarkTemplateResolverTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/PhotoWatermarkTemplateResolverTest.kt) 建立 template resolver 纯测；
+  [`verify_stage_6b3_watermark_v2.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b3_watermark_v2.sh) 建立当前 stage 正式验证入口。
+- 验证：
+  `./gradlew :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoWatermarkPostProcessorTest --tests com.opencamera.app.camera.PhotoWatermarkTemplateResolverTest :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest :app:assembleDebug`
+  `./scripts/verify_stage_6b3_watermark_v2.sh`
+- 结论：`6B-3` 的模板 resolver、结构化 token、边框成片主链成立。
+
+## 2026-04-11：`6B-3` 第二轮
+
+- 目标：把 watermark 渲染控制从硬编码样式推进到 metadata contract 可配置。
+- 核心结果：
+  [`PhotoWatermarkPostProcessor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PhotoWatermarkPostProcessor.kt) 为模板解析补齐 `placement / textScale / textOpacity`，并让 classic overlay 与 frame templates 真正消费这些控制项；
+  [`PhotoWatermarkTemplateResolverTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/PhotoWatermarkTemplateResolverTest.kt) 补齐 background / position / opacity override 回归。
+- 验证：
+  `./gradlew :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoWatermarkPostProcessorTest --tests com.opencamera.app.camera.PhotoWatermarkTemplateResolverTest :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest :app:assembleDebug`
+  `./scripts/verify_stage_6b3_watermark_v2.sh`
+- 结论：`6B-3` 当前已具备“模板化 + 可配置 contract + expanded frame”能力，但 settings / UI 侧仍未闭环。
+
+## 2026-04-11：`6B-3` 第三轮
+
+- 目标：把 watermark style settings 从 metadata / reducer 推进到用户可操作的独立 `Watermark Lab`。
+- 核心结果：
+  [`SettingsContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt) 与 [`PersistedSettingsSerializer.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/PersistedSettingsSerializer.kt) 补齐 per-template `placement / scale / opacity / background` 枚举、style settings、reducer 和持久化；
+  [`PhotoModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-photo/src/main/kotlin/com/opencamera/feature/photo/PhotoModePlugin.kt) 把 template-specific style 真正写进 capture metadata；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt)、[`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt)、[`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml) 新增独立 `Watermark Lab` selector/detail 页面，并把 `Lens Lab` 的 watermark 入口改成进入二级页面而不是直接循环模板；
+  [`PersistedSettingsSerializerTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/test/kotlin/com/opencamera/core/settings/PersistedSettingsSerializerTest.kt)、[`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt)、[`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 补齐 serializer / metadata / UI render model 回归；
+  [`verify_stage_6b3_watermark_v2.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b3_watermark_v2.sh) 纳入当前 stage 的 settings / UI 验证。
+- 验证：
+  `./gradlew :core:settings:test --tests com.opencamera.core.settings.PersistedSettingsSerializerTest :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.PhotoWatermarkPostProcessorTest --tests com.opencamera.app.camera.PhotoWatermarkTemplateResolverTest :app:assembleDebug`
+  `./scripts/verify_stage_6b3_watermark_v2.sh`
+- 结论：`6B-3` 的 settings / UI 闭环已经成立，水印从“模板 id + metadata override”推进到了“独立 Watermark Lab + per-template 持久化设置”。
+
+## 2026-04-11：`6B-3` 第四轮
+
+- 目标：把 `Live` 动态段里的 watermark 行为从口头决策推进到正式 contract，并用真实样本图补一轮人工验证。
+- 核心结果：
+  [`SettingsContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt) 新增 `LiveWatermarkMotionBehavior`，并让 [`LiveMediaBundle`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt) 正式携带 live watermark 动态策略；
+  [`PhotoModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-photo/src/main/kotlin/com/opencamera/feature/photo/PhotoModePlugin.kt) 与 [`HumanisticModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-humanistic/src/main/kotlin/com/opencamera/feature/humanistic/HumanisticModePlugin.kt) 在 `livePhotoDefault=on` 时写入 `liveWatermarkMode / liveWatermarkBehavior / liveWatermarkBrightnessCoupling / liveWatermarkOpacityCoupling`；
+  [`MediaPipelineContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/media/src/main/kotlin/com/opencamera/core/media/MediaPipelineContracts.kt) 与 [`ShotExecutorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/media/src/test/kotlin/com/opencamera/core/media/ShotExecutorTest.kt) 补齐 `live-watermark:*` pipeline note 回归；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt)、[`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt)、[`verify_stage_6b3_watermark_v2.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b3_watermark_v2.sh) 同步升级；
+  使用样本图 [`Gj7c0RnXwAEBSS3.jpg`](/Volumes/Extreme SSD/好图/Gj7c0RnXwAEBSS3.jpg) 生成三张人工验证样本图，输出见 [`codex/artifacts/6b3_manual_fixture`](/Volumes/Extreme SSD/New_Camera/codex/artifacts/6b3_manual_fixture/report.txt)。
+- 验证：
+  `./gradlew :core:media:test --tests com.opencamera.core.media.ShotExecutorTest :core:settings:test --tests com.opencamera.core.settings.PersistedSettingsSerializerTest :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.PhotoWatermarkPostProcessorTest --tests com.opencamera.app.camera.PhotoWatermarkTemplateResolverTest :app:assembleDebug`
+  `./scripts/verify_stage_6b3_watermark_v2.sh`
+- 结论：`6B-3` 已不再缺少 `Live watermark` 的产品定义与 metadata 契约；当前剩余高价值问题转向自动化位图 golden 与真正的 live 动态媒体执行。
+
+## 2026-04-11：预览显示能力核查
+
+- 目标：判断当前工程是否已经支持“恰当显示相机预览画面”，若不能则形成可执行的工程复盘记录。
+- 核心结果：
+  [`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml:8) 已有真实 `PreviewView`，[`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt:980) 也确实把 `Preview` 绑定到了 `surfaceProvider`，因此“基础出画链路存在”这一点成立；
+  但 [`DeviceContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt:49) 的 `PreviewConfig` 只建模 `snapshotsEnabled`，[`ModeContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/main/kotlin/com/opencamera/core/mode/ModeContracts.kt:136) 也没有独立 preview presentation 契约，导致预览比例、镜像、旋转、framing 没有稳定 owner；
+  当前 [`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml:17) 直接用 `fillCenter` 决定预览裁切策略，而仓内又没有 screenshot / instrumentation 级验证去证明这一策略在多模式、多镜头和横竖屏下是正确的。
+- 验证：
+  `./gradlew :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest`
+  `./gradlew :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+- 结论：当前项目支持“预览能绑、能出画、能上报首帧和基础恢复状态”，但还不能宣称已经支持“恰当显示相机预览画面”。
+
+## 2026-04-11：`6B-2` 第六轮
+
+- 目标：把 `Filter Lab` 的 advanced items 从“部分接通”补齐到与 [`plan.md`](/Volumes/Extreme SSD/New_Camera/codex/plan.md) 一致的正式调参闭环。
+- 核心结果：
+  [`SettingsContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt) 为 `FilterRenderSpec` 补齐 `tintShift + haloStrength`，并同步进入 metadata tags、share codec 与 imported serializer；
+  [`PhotoAlgorithmPostProcessor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PhotoAlgorithmPostProcessor.kt) 让 `halo / tint shift` 进入静态图后处理真实消费链；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt)、[`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt)、[`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml) 把 `HALO / TEMP SHIFT / TINT SHIFT` 接进 `Filter Lab` advanced roster，形成 12 项进阶调参；
+  [`FilterProfileShareCodecTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/test/kotlin/com/opencamera/core/settings/FilterProfileShareCodecTest.kt)、[`SessionSettingsManagerTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionSettingsManagerTest.kt)、[`SessionUiRenderModelTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt)、[`PhotoAlgorithmPostProcessorTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/test/java/com/opencamera/app/camera/PhotoAlgorithmPostProcessorTest.kt) 补齐对应回归。
+- 验证：
+  `./gradlew :core:settings:test --tests com.opencamera.core.settings.FilterProfileShareCodecTest :app:testDebugUnitTest --tests com.opencamera.app.SessionSettingsManagerTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.PhotoAlgorithmPostProcessorTest`
+  `./scripts/verify_stage_6b2_filter_lab.sh`
+- 结论：在导入 / 导出入口继续后置的前提下，`6B-2` 的轻量调色板 + advanced items 正式闭环成立；当前 stage exit checklist 满足。
+
+## 2026-04-10：`6B-1` 收口
+
+- 目标：把 mode directory 从 app 层拼装逻辑下沉为共享契约。
+- 核心结果：
+  [`ModeCatalogContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/main/kotlin/com/opencamera/core/mode/ModeCatalogContracts.kt) 新增 `ModeDirectoryDeclaration + ModeId.modeDirectoryDeclaration()`；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 改为只消费共享 declaration；
+  [`ModeCatalogContractsTest.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/test/kotlin/com/opencamera/core/mode/ModeCatalogContractsTest.kt) 与 [`verify_stage_6b1_mode_catalog.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b1_mode_catalog.sh) 建立正式回归。
+- 验证：
+  `:core:mode:test --tests com.opencamera.core.mode.ModeCatalogContractsTest`
+  `./scripts/verify_stage_6b1_mode_catalog.sh`
+- 结论：`6B-1` exit checklist 满足，可进入 `6B-2`。
+
+## 2026-04-10：`6B-2` 第一轮
+
+- 目标：把滤镜从硬编码 `algorithmProfile` 推进到可枚举、可分享、可持久化、可静态成片消费的 render spec。
+- 核心结果：
+  [`SettingsContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt) 新增 `FilterRenderSpec`、`FilterProfileShareCodec`、catalog merge 与 imported serializer；
+  [`FeatureCatalogStore.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/FeatureCatalogStore.kt) 与 app 侧 store 打通 imported custom filter 持久化；
+  [`PhotoModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-photo/src/main/kotlin/com/opencamera/feature/photo/PhotoModePlugin.kt)、[`HumanisticModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-humanistic/src/main/kotlin/com/opencamera/feature/humanistic/HumanisticModePlugin.kt)、[`VideoModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-video/src/main/kotlin/com/opencamera/feature/video/VideoModePlugin.kt) 将选中滤镜 render spec 写入 metadata；
+  [`PhotoAlgorithmPostProcessor.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/PhotoAlgorithmPostProcessor.kt) 可从 metadata 解析 render spec 执行静态图后处理。
+- 验证：
+  `:core:settings:test`
+  `:app:testDebugUnitTest`
+  `:core:session:test`
+  `:app:assembleDebug`
+- 结论：滤镜 contract、share file、catalog persistence、photo consume 第一条主闭环成立。
+
+## 2026-04-11：`6B-2` 第二轮
+
+- 目标：建立独立 `Filter Lab`，并让 `Humanistic / Portrait` 默认滤镜进入真实消费链。
+- 核心结果：
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 新增 `FilterLabFamily / FilterLabPageRenderModel`；
+  [`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt)、[`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml)、[`strings.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/values/strings.xml) 新增独立 `Filter Lab` 面板与 family tabs；
+  [`HumanisticModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-humanistic/src/main/kotlin/com/opencamera/feature/humanistic/HumanisticModePlugin.kt) 与 [`PortraitModePlugin.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/feature/mode-portrait/src/main/kotlin/com/opencamera/feature/portrait/PortraitModePlugin.kt) 正式消费对应默认滤镜；
+  [`ModeCatalogContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/main/kotlin/com/opencamera/core/mode/ModeCatalogContracts.kt) 修正 photo 默认滤镜 label 渲染。
+- 结论：`Filter Lab` 与模式默认滤镜真实消费链成立，但导入 / 导出继续后置。
+
+## 2026-04-11：`6B-2` 第三轮
+
+- 目标：把 custom filter 从“只能导入”推进到“可在 app 内自生成”。
+- 核心结果：
+  [`SettingsContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings/src/main/kotlin/com/opencamera/core/settings/SettingsContracts.kt) 新增 `FeatureCatalog.createCustomFilterProfile()`；
+  [`SessionSettingsManager.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionSettingsManager.kt) 新增 `saveCurrentFilterAsCustom()`；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt)、[`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt)、[`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml) 接通 `Save as Custom` 入口。
+- 验证：
+  `:core:settings:test`
+  `:app:testDebugUnitTest`
+  `:core:session:test`
+  `:app:assembleDebug`
+- 结论：custom filter 已可由 app 内最小链路自生成，但仍只是 render spec 快照，不等于完整调参系统。
+
+## 2026-04-11：`6B-2` 第四轮
+
+- 目标：把调节入口挂到当前选中滤镜项本身，而不是列表外的全局按钮。
+- 核心结果：
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 为选中项显式建模 `adjustButtonLabel`；
+  [`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 把列表改成“未选中项切换、选中项调节”的动态卡片；
+  [`activity_main.xml`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/res/layout/activity_main.xml) 删除旧的全局 `buttonFilterAdjust`。
+- 验证：
+  `:app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
+  `:app:assembleDebug`
+- 结论：调节入口位置和 render model 语义与最新交互决策对齐。
+
+## 2026-04-11：`6B-2` 第五轮
+
+- 目标：把 `6B-2` 的人工验证组合固化为正式脚本。
+- 核心结果：
+  [`verify_stage_6b2_filter_lab.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b2_filter_lab.sh) 建立 stage 正式验证入口，并内置噪音清理。
+- 验证：
+  `./scripts/verify_stage_6b2_filter_lab.sh`
+- 结论：当前 `6B-2` 已具备可重复复跑的正式验证口径。
+
+## 2026-04-11：决策补记
+
+- 先前“`6B-2` 的 P0/P1 已基本清空”的说法只适用于第五轮停点，不再代表当前判断。
+- 最新有效判断是：
+  导入 / 导出仍明确后置；
+  `6B-2` 仍需继续推进调参交互；
+  轻量级以长方形调色板承载“横划调颜色 / 纵划调影调”；
+  进阶级继续向 [`plan.md`](/Volumes/Extreme SSD/New_Camera/codex/plan.md) 所列 advanced items 收口。
+
+---
+
+# 历史归档（精简版）
+
+## 整理原则
+
+- 主文档只保留当前阶段判断、最近有效闭环、正式验证口径、仍影响下一步的风险。
+- 旧阶段的重复验证日志、已失效中间态、相同问题的多轮重述统一压缩。
+- 历史内容保留“为什么能进入下一步”与“哪些风险仍然有效”，不保留逐条流水账。
+
+## `6B-0` 摘要
+
+- 结论：`6B-0 设置、持久化和能力目录底座` 已完成并经过复核。
+- 已成立的关键事实：
+  独立 [`core/settings`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/settings) 模块；
+  `SessionSettingsSnapshot` 已进入 [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt)；
+  [`ModeContracts.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/mode/src/main/kotlin/com/opencamera/core/mode/ModeContracts.kt) 已把 settings snapshot 作为 mode context 输入；
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 与 [`MainActivity.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/MainActivity.kt) 已建立 `Lens Lab` 与 render-model-only 交互边界；
+  默认 `VideoSpec / photo filter / video filter / Live default / watermark template / manual draft` 均已形成最小真实消费链；
+  [`verify_stage_6b0_settings_foundation.sh`](/Volumes/Extreme SSD/New_Camera/OpenCamera/scripts/verify_stage_6b0_settings_foundation.sh) 已成为正式验证入口。
+- 留存影响：
+  `6B-0` 的功能闭环已满足，但架构 owner 问题并未因 settings 基础设施落地而自动消失。
+
+## 2026-04-10 架构审阅摘要
+
+- 审阅结论：高优先级问题不是“有没有分层”，而是 `state owner / scheduling owner` 尚未钉死。
+- 仍有效的风险摘要：
+  `P0`：[`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 同时维护公开状态与私有影子状态；
+  `P0`：[`CameraSessionCoordinator.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 已演化成影子状态机，而不只是桥接层；
+  `P1`：[`SessionSettingsManager.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/SessionSettingsManager.kt) 与 session 双判定 settings acceptance，存在持久化 / 运行态分叉窗口；
+  `P1`：[`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 过厚，正向 God Object 演化；
+  `P1`：mode 层已有状态复制，录像路径尤甚。
+- 仍有效的建议：
+  若后续进入 `Live / RAW / 更复杂 preview 恢复 / 第 7 阶段稳定性治理`，应优先做 owner 收敛，而不是继续横向叠 feature。
+
+## 第 6 阶段基线摘要
+
+- 结论：原第 6 阶段 feature 扩展基线已完成并归档。
+- 已成立的代表性能力：
+  `PHOTO / PRO / NIGHT / VIDEO` 的关键能力与动态能力刷新；
+  静态图 `style / watermark / frame ratio / document auto-crop / portrait render`；
+  video quality、watermark sidecar、native still output size 等已形成真实 session graph、adapter binding 或 media metadata 闭环。
+- 留存影响：
+  录像 torch 仍不是录制中实时控制；
+  视频 watermark 仍非画面内烧录；
+  portrait / document / style 仍以保守后处理为主，不代表真实厂商级算法。
+
+## 第 5 阶段摘要
+
+- 结论：`PRO / DOCUMENT / PORTRAIT / NIGHT` 四类复杂模式已迁入，`NIGHT` 已进入真实多帧执行。
+- 阶段共识：
+  复杂模式保留入口、按能力降级，不因能力不足直接隐藏；
+  模式只声明策略与状态，真实执行仍统一收敛到 `Session Kernel + Device Adapter + Media Pipeline`。
+- 留存风险：
+  多数验证仍停留在 local unit test / assemble 级别；
+  `NIGHT` 多帧执行已成立，但最终成片仍不是融合结果；
+  真实 Android 生命周期与设备热稳定性仍缺 instrumentation 证明。
+
+## 第 4 阶段完成后的工程复盘与加固
+
+- 结论：进入第 5 阶段前，优先补强统一 `shot / media pipeline` 的状态机一致性和失败清理。
+- 关键结果：
+  [`DefaultCameraSession.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 补强 in-flight shot 防护与权限中断失败收敛；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme SSD/New_Camera/OpenCamera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 建立统一 `emitShotFailure()` 失败清理；
+  对应 session 回归测试已建立。
+- 留存影响：
+  该阶段主要作为后续复杂模式迁入和第 6 阶段 feature 扩展的稳定性背景，不再单独作为当前执行目标。

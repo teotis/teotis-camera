@@ -1,0 +1,179 @@
+package com.opencamera.app.camera
+
+import androidx.camera.view.PreviewView
+import androidx.lifecycle.LifecycleOwner
+import com.opencamera.app.camera.device.CameraDeviceAdapter
+import com.opencamera.core.device.DeviceCommand
+import com.opencamera.core.device.DeviceEvent
+import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.mode.ModeId
+import com.opencamera.core.session.CameraSession
+import com.opencamera.core.session.SessionEffect
+import com.opencamera.core.session.SessionIntent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+
+class CameraSessionCoordinator(
+    private val session: CameraSession,
+    private val cameraAdapter: CameraDeviceAdapter,
+    private val scope: CoroutineScope,
+    private val runtimeIssueMonitor: RuntimeIssueMonitor = NoOpRuntimeIssueMonitor
+) {
+    private var lifecycleOwner: LifecycleOwner? = null
+    private var previewView: PreviewView? = null
+    private var attachedMode: ModeId? = null
+
+    init {
+        scope.launch {
+            session.effects.collect(::handleEffect)
+        }
+        scope.launch {
+            cameraAdapter.events.collect(::handleDeviceEvent)
+        }
+        scope.launch {
+            runtimeIssueMonitor.runtimeIssues.collect { issue ->
+                runtimeIssueMonitor.onPreviewStopped(issue.reason)
+                session.dispatch(SessionIntent.PreviewRuntimeIssue(issue))
+            }
+        }
+    }
+
+    fun attachPreviewHost(
+        lifecycleOwner: LifecycleOwner,
+        previewView: PreviewView
+    ) {
+        this.lifecycleOwner = lifecycleOwner
+        this.previewView = previewView
+        runtimeIssueMonitor.onPreviewHostAttached()
+    }
+
+    fun hasAttachedPreviewHost(): Boolean {
+        return lifecycleOwner != null && previewView != null
+    }
+
+    private suspend fun handleEffect(effect: SessionEffect) {
+        when (effect) {
+            is SessionEffect.ExecuteShot -> cameraAdapter.dispatch(DeviceCommand.ExecuteShot(effect.plan))
+            is SessionEffect.StopActiveShot -> cameraAdapter.dispatch(
+                DeviceCommand.StopActiveShot(effect.shotId)
+            )
+            is SessionEffect.ApplyZoomRatio -> cameraAdapter.dispatch(
+                DeviceCommand.UpdateZoomRatio(effect.zoomRatio)
+            )
+            is SessionEffect.BindPreview -> bindPreview(
+                modeId = effect.modeId,
+                deviceGraph = effect.deviceGraph,
+                reason = effect.reason,
+                isRecovery = effect.isRecovery
+            )
+            is SessionEffect.UnbindPreview -> unbindPreview(
+                reason = effect.reason,
+                clearHost = effect.clearHost
+            )
+        }
+    }
+
+    private suspend fun handleDeviceEvent(event: DeviceEvent) {
+        when (event) {
+            is DeviceEvent.PreviewFirstFrameAvailable -> {
+                runtimeIssueMonitor.onPreviewFirstFrameAvailable(event.firstFrameLatencyMillis)
+                session.dispatch(
+                    SessionIntent.PreviewFirstFrameAvailable(event.firstFrameLatencyMillis)
+                )
+            }
+            is DeviceEvent.PreviewSnapshotAvailable -> session.dispatch(
+                SessionIntent.PreviewSnapshotUpdated(event.source)
+            )
+            is DeviceEvent.PreviewSurfaceLost -> {
+                runtimeIssueMonitor.onPreviewStopped(event.reason)
+                session.dispatch(SessionIntent.PreviewSurfaceLost(event.reason))
+            }
+            is DeviceEvent.PreviewError -> {
+                runtimeIssueMonitor.onPreviewStopped(event.reason)
+                session.dispatch(SessionIntent.PreviewError(event.reason))
+            }
+            is DeviceEvent.RuntimeIssue -> {
+                runtimeIssueMonitor.onPreviewStopped(event.issue.reason)
+                session.dispatch(SessionIntent.PreviewRuntimeIssue(event.issue))
+            }
+            is DeviceEvent.ShotStarted -> session.dispatch(
+                SessionIntent.ShotStarted(event.shot)
+            )
+            is DeviceEvent.ShotCompleted -> session.dispatch(
+                SessionIntent.ShotCompleted(event.result)
+            )
+            is DeviceEvent.ShotFailed -> session.dispatch(
+                SessionIntent.ShotFailed(
+                    shotId = event.shotId,
+                    mediaType = event.mediaType,
+                    reason = event.reason
+                )
+            )
+        }
+    }
+
+    private suspend fun bindPreview(
+        modeId: ModeId,
+        deviceGraph: DeviceGraphSpec,
+        reason: String,
+        isRecovery: Boolean
+    ) {
+        if (attachedMode == modeId && cameraAdapter.boundGraph() == deviceGraph && !isRecovery) {
+            return
+        }
+        syncActiveDeviceCapabilities(deviceGraph)
+        val owner = lifecycleOwner ?: return
+        val preview = previewView ?: return
+        session.dispatch(
+            SessionIntent.PreviewBindingStarted(
+                reason = reason,
+                isRecovery = isRecovery
+            )
+        )
+        runtimeIssueMonitor.onPreviewBindingStarted(
+            reason = reason,
+            isRecovery = isRecovery
+        )
+        runCatching {
+            cameraAdapter.bindUseCases(owner, preview, deviceGraph)
+        }.onSuccess {
+            attachedMode = modeId
+        }.onFailure { throwable ->
+            attachedMode = null
+            runtimeIssueMonitor.onPreviewStopped(throwable.message ?: "bind failure")
+            session.dispatch(
+                SessionIntent.PreviewRuntimeIssue(
+                    classifyPreviewBindingFailure(throwable)
+                )
+            )
+        }
+    }
+
+    private suspend fun unbindPreview(
+        reason: String,
+        clearHost: Boolean
+    ) {
+        cameraAdapter.release()
+        attachedMode = null
+        runtimeIssueMonitor.onPreviewStopped(reason)
+        if (clearHost) {
+            clearPreviewAttachment()
+        }
+        session.dispatch(SessionIntent.PreviewStopped(reason))
+    }
+
+    private suspend fun syncActiveDeviceCapabilities(deviceGraph: DeviceGraphSpec) {
+        val resolvedCapabilities = cameraAdapter.capabilitiesFor(deviceGraph)
+        if (resolvedCapabilities == session.state.value.activeDeviceCapabilities) {
+            return
+        }
+        session.dispatch(SessionIntent.DeviceCapabilitiesUpdated(resolvedCapabilities))
+    }
+
+    private fun clearPreviewAttachment() {
+        runtimeIssueMonitor.onPreviewHostDetached()
+        attachedMode = null
+        lifecycleOwner = null
+        previewView = null
+    }
+}

@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenCamera - Grothendieck 架构分析报告</title>
+<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({ startOnLoad: true, theme: 'dark' });</script>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --card: #1f2b47;
+    --card-hover: #253356;
+    --text: #e0e6f0;
+    --text-secondary: #a0b0c8;
+    --accent: #64b5f6;
+    --accent-glow: #90caf9;
+    --danger: #ef5350;
+    --danger-glow: #ff8a80;
+    --success: #66bb6a;
+    --success-glow: #a5d6a7;
+    --warning: #ffa726;
+    --border: #2a3a5c;
+    --shadow: 0 2px 12px rgba(0,0,0,0.3);
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    display: flex;
+  }
+  #toc {
+    position: sticky; top: 0;
+    width: 260px; min-width: 260px;
+    height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    overflow-y: auto;
+    z-index: 10;
+    font-size: 13px;
+  }
+  #toc h2 { font-size: 15px; color: var(--accent); margin-bottom: 16px; letter-spacing: 0.5px; }
+  #toc a {
+    display: block; color: var(--text-secondary); text-decoration: none;
+    padding: 6px 10px; border-radius: 6px; margin-bottom: 2px;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+  #toc a:hover { color: var(--text); background: var(--card); }
+  #toc a.active { color: var(--accent-glow); background: var(--card); border-left-color: var(--accent); font-weight: 600; }
+  #main {
+    flex: 1; max-width: 960px;
+    padding: 40px 48px 120px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 28px; margin-bottom: 8px; color: #fff; letter-spacing: -0.5px; }
+  h2 { font-size: 22px; margin: 48px 0 20px; color: var(--accent-glow); border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  h3 { font-size: 17px; margin: 28px 0 12px; color: #e8eef8; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin-bottom: 32px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px; margin-bottom: 24px;
+    box-shadow: var(--shadow); transition: border-color 0.2s;
+  }
+  .card:hover { border-color: #3a4a6c; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+  }
+  .badge-danger { background: rgba(239,83,80,0.18); color: var(--danger-glow); }
+  .badge-success { background: rgba(102,187,106,0.18); color: var(--success-glow); }
+  .badge-warning { background: rgba(255,167,38,0.18); color: var(--warning); }
+  .badge-info { background: rgba(100,181,246,0.18); color: var(--accent-glow); }
+  .badge-principle { background: rgba(206,147,216,0.18); color: #ce93d8; font-style: italic; }
+  .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .matrix-container { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .compare-card {
+    border-radius: 8px; padding: 16px; font-size: 13px;
+  }
+  .compare-current { background: rgba(239,83,80,0.08); border: 1px solid rgba(239,83,80,0.25); }
+  .compare-current h4 { color: var(--danger); margin-bottom: 8px; }
+  .compare-improved { background: rgba(102,187,106,0.08); border: 1px solid rgba(102,187,106,0.25); }
+  .compare-improved h4 { color: var(--success); margin-bottom: 8px; }
+  .mermaid-container { margin: 16px 0; text-align: center; cursor: pointer; border-radius: 8px; padding: 8px; background: rgba(0,0,0,0.2); }
+  .mermaid-container:hover { background: rgba(0,0,0,0.35); }
+  .scatter-chart { position: relative; width: 100%; max-width: 520px; height: 380px; margin: 24px auto; }
+  .scatter-chart svg { width: 100%; height: 100%; }
+  details { margin: 12px 0; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 13px; font-weight: 500; padding: 6px 0; }
+  details pre { background: rgba(0,0,0,0.3); border-radius: 6px; padding: 14px; overflow-x: auto; font-size: 12px; line-height: 1.5; }
+  .review-section { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 16px; }
+  .review-section textarea {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 10px; font-size: 13px;
+    resize: vertical; min-height: 56px; font-family: inherit;
+  }
+  .star-rating { display: flex; gap: 4px; margin: 10px 0; }
+  .star { font-size: 22px; cursor: pointer; color: #555; transition: color 0.15s; user-select: none; }
+  .star.active { color: #ffd740; }
+  .tag-selector { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+  .tag-btn {
+    padding: 4px 12px; border-radius: 14px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-secondary); cursor: pointer;
+    font-size: 12px; transition: all 0.15s;
+  }
+  .tag-btn.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #fab {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--accent); color: #fff; border: none;
+    padding: 14px 22px; border-radius: 28px; font-size: 14px; font-weight: 600;
+    cursor: pointer; box-shadow: 0 4px 18px rgba(100,181,246,0.35);
+    z-index: 100; transition: all 0.2s;
+  }
+  #fab:hover { background: #42a5f5; transform: translateY(-2px); }
+  #toast { position: fixed; bottom: 90px; right: 28px; background: var(--success); color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity 0.3s; z-index: 100; }
+  #toast.show { opacity: 1; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal-content { background: var(--surface); border-radius: 12px; padding: 20px; max-width: 90vw; max-height: 90vh; overflow: auto; }
+  .modal-close { float: right; background: none; border: none; color: var(--text); font-size: 24px; cursor: pointer; }
+  .principle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .principle-chip { background: var(--surface); border-radius: 6px; padding: 10px 14px; font-size: 12px; border-left: 3px solid var(--accent); }
+  .principle-chip strong { color: var(--accent-glow); }
+  .file-ref { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; color: var(--warning); }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+  .stat-card { background: var(--surface); border-radius: var(--radius); padding: 16px; text-align: center; border: 1px solid var(--border); }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: var(--accent-glow); }
+  .stat-card .label { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+  blockquote { border-left: 3px solid var(--accent); padding: 8px 16px; margin: 12px 0; background: rgba(100,181,246,0.06); border-radius: 0 6px 6px 0; font-style: italic; color: var(--text-secondary); }
+  .highlight-box { background: rgba(255,167,38,0.08); border: 1px solid rgba(255,167,38,0.3); border-radius: 8px; padding: 14px; margin: 12px 0; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { color: var(--accent); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  @media (max-width: 900px) {
+    body { flex-direction: column; }
+    #toc { position: static; width: 100%; height: auto; max-height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
+    #main { padding: 20px; }
+    .principle-grid, .matrix-container { grid-template-columns: 1fr; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<nav id="toc">
+  <h2>报告目录</h2>
+  <a href="#overview">全局总览</a>
+  <a href="#principle-summary">11 项原则概要</a>
+  <a href="#finding-1">发现 1: PostProcessor 硬编码注册</a>
+  <a href="#finding-2">发现 2: Mode 插件重复模式</a>
+  <a href="#finding-3">发现 3: 渲染模型膨胀</a>
+  <a href="#finding-4">发现 4: 设置系统的复杂性</a>
+  <a href="#finding-5">发现 5: ModeContext 闭包捕获</a>
+  <a href="#finding-6">发现 6: FilterLabFamily 重复</a>
+  <a href="#finding-7">发现 7: DeviceCapabilities 散落检查</a>
+  <a href="#finding-8">发现 8: ModeController 接口过载</a>
+  <a href="#self-assessment">分析师自评</a>
+</nav>
+
+<div id="main">
+
+<h1>OpenCamera — Grothendieck 架构分析</h1>
+<p class="subtitle">基于 Grothendieck 数学思维体系的全面架构审查 · 2026年5月16日 · 中文报告</p>
+
+<!-- ====== OVERVIEW ====== -->
+<section id="overview">
+<h2>一、全局总览矩阵</h2>
+<div class="stats-grid">
+  <div class="stat-card"><div class="num">7</div><div class="label">core 模块</div></div>
+  <div class="stat-card"><div class="num">7</div><div class="label">feature 插件</div></div>
+  <div class="stat-card"><div class="num">~8K</div><div class="label">核心契约行数</div></div>
+  <div class="stat-card"><div class="num">~2K</div><div class="label">渲染模型行数</div></div>
+</div>
+
+<p>OpenCamera 是一个采用<strong>分层模块化 MVI 架构</strong>的 Android 相机应用。项目整体架构质量较高：core 层定义纯 Kotlin 契约（无 Android 依赖），feature 层以插件模式实现相机模式，app 层作为组装点注入 Android 实现。</p>
+
+<h3>收益 × 重构成本 2×2 矩阵</h3>
+<div class="scatter-chart" id="scatter"></div>
+<p style="font-size:12px;color:var(--text-secondary);text-align:center;">横轴: 重构成本（人天估算） · 纵轴: 预期收益（1-10） · 点大小 = 置信度 · 红色 = 高风险</p>
+
+<h3>客观优势</h3>
+<div class="card">
+  <ul style="padding-left:20px;">
+    <li><strong>清晰的契约先行设计</strong> — <span class="file-ref">core/*/src/main/kotlin/.../Contracts.kt</span> 系列文件在实现之前定义了完备的接口</li>
+    <li><strong>不可变状态管理</strong> — 所有数据类使用 <code>copy()</code> + 函数式 <code>reduce</code> 模式，无副作用</li>
+    <li><strong>MVI 单向数据流</strong> — SessionIntent → SessionState → SessionEffect, 状态变化完全可追踪</li>
+    <li><strong>插件式模式扩展</strong> — CameraModePlugin + ModeRegistry 实现了干净的模式发现与生命周期</li>
+    <li><strong>后处理管道</strong> — CompositeMediaPostProcessor 支持声明式后处理链组合</li>
+  </ul>
+</div>
+</section>
+
+<!-- ====== PRINCIPLE SUMMARY ====== -->
+<section id="principle-summary">
+<h2>二、11 项 Grothendieck 原则概要</h2>
+<div class="principle-grid">
+  <div class="principle-chip"><strong>1. 上升的海洋</strong><br>拒绝局部补丁，提升抽象层次消解问题</div>
+  <div class="principle-chip"><strong>2. 寻找绝对 Motive</strong><br>收敛看似不同的多态表象到统一本质</div>
+  <div class="principle-chip"><strong>3. 消除人为边界</strong><br>好边界是事物的天然接缝，不是随意切割</div>
+  <div class="principle-chip"><strong>4. 孩童般简洁</strong><br>正确的基础让新功能像熟透的果实自然落下</div>
+  <div class="principle-chip"><strong>5. 相对观点</strong><br>不孤立分析 X，分析 X→S 的相对参数化结构</div>
+  <div class="principle-chip"><strong>6. 泛性质优先</strong><br>先定义契约和不变式，再证明实现存在</div>
+  <div class="principle-chip"><strong>7. 函子性</strong><br>好构造保持结构；所有变换应是函子</div>
+  <div class="principle-chip"><strong>8. 层/局部到全局</strong><br>局部一致性自动组合为全局对象</div>
+  <div class="principle-chip"><strong>9. 无情泛化</strong><br>不解决3个特例，找到包含它们的母问题</div>
+  <div class="principle-chip"><strong>10. 基变换</strong><br>跨环境的差异应统一为基变换函子</div>
+  <div class="principle-chip"><strong>11. Yoneda 视角</strong><br>对象由"所有指向它的态射"完全确定</div>
+</div>
+</section>
+
+<!-- ====== FINDING 1 ====== -->
+<section id="finding-1">
+<h2>发现 1: PostProcessor 管道硬编码注册</h2>
+<div class="card">
+  <div class="badge-row">
+    <span class="badge badge-danger">难度: 中低</span>
+    <span class="badge badge-success">收益: 7/10</span>
+    <span class="badge badge-warning">风险: 低</span>
+    <span class="badge badge-info">置信度: 高</span>
+    <span class="badge badge-principle">原则 1 · 上升的海洋</span>
+    <span class="badge badge-principle">原则 8 · 层/局部到全局</span>
+  </div>
+
+  <h3>问题描述</h3>
+  <p><span class="file-ref">app/.../AppContainer.kt:58-84</span> — 在 <code>AppContainer</code> 的构造函数中，<code>mediaPostProcessor</code> 是一个手工维护的列表，包含 9 个后处理器。每新增一个后处理器，都必须修改 <code>AppContainer</code>。这是一种"局部补丁"式设计——问题的水位线太低。</p>
+
+  <blockquote>Grothendieck 会问：为什么需要手动编排这 9 个处理器？它们之间的组合关系是否应该是处理器自身的属性？</blockquote>
+
+  <h3>现状 vs 改进对比</h3>
+  <div class="matrix-container">
+    <div class="compare-card compare-current">
+      <h4>当前拓扑 — 中心化编排</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph TD
+    AC[AppContainer] -->|手工构造列表| CP[CompositeMediaPostProcessor]
+    CP --> P1[MultiFrameMerge]
+    CP --> P2[DocumentAutoCrop]
+    CP --> P3[PhotoFrameRatio]
+    CP --> P4[PortraitRender]
+    CP --> P5[PhotoAlgorithm]
+    CP --> P6[PhotoWatermark]
+    CP --> P7[PhotoSelfieMirror]
+    CP --> P8[VideoWatermarkSubtitle]
+    CP --> P9[PipelineMetadata]
+    AC -->|手动注入 Android 依赖| P2
+    AC -->|手动注入 Android 依赖| P3
+    AC -->|手动注入 Android 依赖| P4
+    AC -->|手动注入 Android 依赖| P5
+    AC -->|手动注入 Android 依赖| P6
+    AC -->|手动注入 Android 依赖| P7
+    AC -->|手动注入 Android 依赖| P8
+    linkStyle 0 stroke:#ef5350,stroke-width:2px
+    linkStyle 1 stroke:#ef5350,stroke-width:1px
+    linkStyle 2 stroke:#ef5350,stroke-width:1px
+    linkStyle 3 stroke:#ef5350,stroke-width:1px
+    linkStyle 4 stroke:#ef5350,stroke-width:1px
+    linkStyle 5 stroke:#ef5350,stroke-width:1px
+    linkStyle 6 stroke:#ef5350,stroke-width:1px
+    linkStyle 7 stroke:#ef5350,stroke-width:1px
+    linkStyle 8 stroke:#ef5350,stroke-width:1px
+        </div>
+      </div>
+      <p>问题：AppContainer 必须知道所有处理器的存在和依赖</p>
+    </div>
+    <div class="compare-card compare-improved">
+      <h4>提升后拓扑 — 自注册 + 优先级排序</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph TD
+    AC[AppContainer] -->|仅注入| REG[ProcessorRegistry]
+    REG -->|发现+排序| CP[CompositeMediaPostProcessor]
+    P1[MultiFrameMerge :priority 0] -.->|自注册| REG
+    P2[DocumentAutoCrop :priority 10] -.->|自注册| REG
+    P3[PhotoFrameRatio :priority 20] -.->|自注册| REG
+    P4[PortraitRender :priority 30] -.->|自注册| REG
+    P5[PhotoAlgorithm :priority 40] -.->|自注册| REG
+    P6[PhotoWatermark :priority 50] -.->|自注册| REG
+    P7[PhotoSelfieMirror :priority 60] -.->|自注册| REG
+    P8[VideoWatermarkSubtitle :priority 70] -.->|自注册| REG
+    P9[PipelineMetadata :priority 100] -.->|自注册| REG
+    CP -->|sorted by priority| P1
+    CP --> P2
+    CP --> P3
+    linkStyle 0 stroke:#66bb6a,stroke-width:3px
+    linkStyle 1 stroke:#66bb6a,stroke-width:2px
+        </div>
+      </div>
+      <p>每个处理器通过 <code>MediaPostProcessorPlugin</code> 接口自注册，携带优先级和适用条件</p>
+    </div>
+  </div>
+
+  <h3>具体方案</h3>
+  <p>引入 <code>MediaPostProcessorPlugin</code> 接口：</p>
+  <details>
+    <summary>展开代码草图</summary>
+    <pre>// core/media 中新增
+interface MediaPostProcessorPlugin {
+    val priority: Int  // 越小越先执行
+    fun isApplicable(result: ShotResult): Boolean
+    fun create(context: Context): MediaPostProcessor
+}
+
+// AppContainer 变为
+class AppContainer(context: Context) {
+    private val processorPlugins = listOf(
+        MultiFrameMergePlugin(),
+        DocumentAutoCropPlugin(),
+        // ... 各插件通过 ServiceLoader 或显式列表
+    ).sortedBy { it.priority }
+
+    private val mediaPostProcessor = CompositeMediaPostProcessor(
+        processorPlugins.map { it.create(appContext) }
+    )
+}</pre>
+  </details>
+  <p>核心收益：新增处理器只需添加一个插件类，不再触碰 AppContainer。</p>
+
+  <div class="review-section" data-finding="finding-1">
+    <textarea placeholder="对此发现的评审意见..."></textarea>
+    <div class="star-rating" data-stars="0"><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span></div>
+    <div class="tag-selector">
+      <button class="tag-btn" data-tag="agree">同意</button>
+      <button class="tag-btn" data-tag="doubtful">存疑</button>
+      <button class="tag-btn" data-tag="false-positive">已存在/误报</button>
+      <button class="tag-btn" data-tag="not-applicable">不适用于业务</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ====== FINDING 2 ====== -->
+<section id="finding-2">
+<h2>发现 2: Mode 插件中的重复模式 — 未被发现的 Motive</h2>
+<div class="card">
+  <div class="badge-row">
+    <span class="badge badge-danger">难度: 中高</span>
+    <span class="badge badge-success">收益: 8/10</span>
+    <span class="badge badge-warning">风险: 中</span>
+    <span class="badge badge-info">置信度: 高</span>
+    <span class="badge badge-principle">原则 2 · 绝对 Motive</span>
+    <span class="badge badge-principle">原则 9 · 无情泛化</span>
+  </div>
+
+  <h3>问题描述</h3>
+  <p>观察 <span class="file-ref">feature/mode-photo/.../PhotoModePlugin.kt</span> 和 <span class="file-ref">feature/mode-pro/.../ProModePlugin.kt</span>，它们共享一种深层结构：</p>
+  <ul style="padding-left:20px;margin:8px 0;">
+    <li><code>buildSnapshot(headline, detail)</code> — 构造 UI 快照</li>
+    <li><code>currentDeviceGraph()</code> — 生成设备图规格</li>
+    <li><code>cycleFrameRatio()</code> / <code>cycleFlashMode()</code> — 循环选项</li>
+    <li><code>onSessionEvent()</code> — 响应 session 事件（几乎相同）</li>
+    <li><code>onEnter()</code> / <code>onExit()</code> — 生命周期管理</li>
+  </ul>
+  <p>这些都是同一个 <strong>motive</strong>（"标准静态拍摄模式"）在不同上下文中的投影。但当前代码中，每个模式都是独立实现的，导致约 200+ 行/模式的重复逻辑。</p>
+
+  <blockquote>Grothendieck 的 motive 概念：ℓ-adic 上同调、de Rham 上同调、Betti 上同调——看似不同的理论，实为同一对象的投影。这里的 Photo/Pro/Document/Night/Humanistic/Portrait 六种模式是同一 motive 的六种投影。</blockquote>
+
+  <h3>现状 vs 改进对比</h3>
+  <div class="matrix-container">
+    <div class="compare-card compare-current">
+      <h4>当前拓扑 — 6 个独立实现</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph TD
+    MC[ModeController 接口] --> P[PhotoModeController]
+    MC --> PR[ProModeController]
+    MC --> D[DocumentModeController]
+    MC --> N[NightModeController]
+    MC --> H[HumanisticModeController]
+    MC --> PT[PortraitModeController]
+    P ---|重复实现| P_FR[frameRatio 循环]
+    PR ---|重复实现| PR_FR[frameRatio 循环]
+    D ---|重复实现| D_FR[frameRatio 循环]
+    N ---|重复实现| N_FR[frameRatio 循环]
+    H ---|重复实现| H_FR[frameRatio 循环]
+    PT ---|重复实现| PT_FR[frameRatio 循环]
+    linkStyle 0 stroke:#ef5350,stroke-width:2px
+    linkStyle 1 stroke:#ef5350,stroke-width:2px
+    linkStyle 2 stroke:#ef5350,stroke-width:2px
+    linkStyle 3 stroke:#ef5350,stroke-width:2px
+    linkStyle 4 stroke:#ef5350,stroke-width:2px
+    linkStyle 5 stroke:#ef5350,stroke-width:2px
+        </div>
+      </div>
+    </div>
+    <div class="compare-card compare-improved">
+      <h4>提升后拓扑 — Motive 统一</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph TD
+    B[StandardStillCaptureMotive] -->|参数化| P[Photo 变体]
+    B -->|参数化| PR[Pro 变体]
+    B -->|参数化| D[Document 变体]
+    B -->|参数化| N[Night 变体]
+    B -->|参数化| H[Humanistic 变体]
+    B -->|参数化| PT[Portrait 变体]
+    B ---|内置| FR[FrameRatioSelector]
+    B ---|内置| FM[FlashModeSelector]
+    B ---|内置| SS[SnapshotBuilder]
+    B ---|内置| DG[DeviceGraphBuilder]
+    B ---|内置| SE[SessionEventHandler]
+    linkStyle 0 stroke:#66bb6a,stroke-width:3px
+    linkStyle 1 stroke:#66bb6a,stroke-width:3px
+    linkStyle 2 stroke:#66bb6a,stroke-width:3px
+    linkStyle 3 stroke:#66bb6a,stroke-width:3px
+    linkStyle 4 stroke:#66bb6a,stroke-width:3px
+    linkStyle 5 stroke:#66bb6a,stroke-width:3px
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>具体方案</h3>
+  <p>引入 <code>StillCaptureModeConfig</code> 数据类来参数化共同行为：</p>
+  <details>
+    <summary>展开代码草图</summary>
+    <pre>data class StillCaptureModeConfig(
+    val modeId: ModeId,
+    val uiSpec: ModeUiSpec,
+    val captureStrategyBuilder: (ModeContext) -> CaptureStrategy,
+    val metadataBuilder: (ModeContext) -> Map&lt;String, String&gt;,
+    val supportsFlash: Boolean = true,
+    val supportsFrameRatio: Boolean = true,
+    val frameRatios: List&lt;FrameRatio&gt; = listOf(RATIO_4_3, RATIO_16_9, RATIO_1_1)
+)
+
+class StandardStillCaptureModeController(
+    private val context: ModeContext,
+    private val config: StillCaptureModeConfig
+) : ModeController {
+    // frameRatio 循环、flash 循环、session 事件处理等统一实现
+    // 只有 captureStrategy 构建委托给 config
+}
+
+// PhotoModePlugin 变为：
+class PhotoModePlugin : CameraModePlugin {
+    override fun create(context: ModeContext) = StandardStillCaptureModeController(
+        context, StillCaptureModeConfig(
+            modeId = ModeId.PHOTO,
+            uiSpec = ModeUiSpec(title = "Photo", shutterLabel = "Capture Still", ...),
+            captureStrategyBuilder = { ctx -> /* LivePhoto/SingleFrame 逻辑 */ }
+        )
+    )
+}</pre>
+  </details>
+  <p>判断标准：特例代码是否真正消失？是的——frameRatio 循环、flash 循环、session 事件分发等通用逻辑只存在于 Motive 中一份。</p>
+
+  <div class="review-section" data-finding="finding-2">
+    <textarea placeholder="对此发现的评审意见..."></textarea>
+    <div class="star-rating" data-stars="0"><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span></div>
+    <div class="tag-selector">
+      <button class="tag-btn" data-tag="agree">同意</button>
+      <button class="tag-btn" data-tag="doubtful">存疑</button>
+      <button class="tag-btn" data-tag="false-positive">已存在/误报</button>
+      <button class="tag-btn" data-tag="not-applicable">不适用于业务</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ====== FINDING 3 ====== -->
+<section id="finding-3">
+<h2>发现 3: 渲染模型层膨胀 — 人为边界造成的翻译税</h2>
+<div class="card">
+  <div class="badge-row">
+    <span class="badge badge-danger">难度: 中高</span>
+    <span class="badge badge-success">收益: 6/10</span>
+    <span class="badge badge-warning">风险: 中高</span>
+    <span class="badge badge-info">置信度: 中高</span>
+    <span class="badge badge-principle">原则 3 · 消除人为边界</span>
+    <span class="badge badge-principle">原则 4 · 孩童般简洁</span>
+  </div>
+
+  <h3>问题描述</h3>
+  <p><span class="file-ref">app/.../SessionUiRenderModel.kt</span> 长达 <strong>2244 行</strong>，定义了 20+ 个 RenderModel 数据类和大量转换函数。核心问题：在 <code>SessionState</code>（数据）和 UI 渲染之间人为插入了一层"RenderModel"，但这层并没有真正简化问题——它只是把复杂性从 View 层"移动到了别处"。</p>
+
+  <div class="highlight-box">
+    <strong>关键指标：</strong><code>sessionSettingsPageRenderModel()</code> 函数约 300 行，构造一个包含 6 层嵌套数据类的渲染模型。每个 <code>SettingsControlRenderModel</code> 需要 5-7 个参数，其中大部分是从 <code>SessionState</code> 计算的衍生值。
+  </div>
+
+  <p>这不是真正的抽象——这是 Grothendieck 所说的<strong>虚假泛化</strong>。特殊性代码没有消失，它只是从 <code>MainActivity.render()</code> 移动到了 <code>SessionUiRenderModel.kt</code> 中的巨型函数。</p>
+
+  <h3>现状 vs 改进对比</h3>
+  <div class="matrix-container">
+    <div class="compare-card compare-current">
+      <h4>当前拓扑 — 三层翻译链</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph LR
+    SS[SessionState] -->|300行转换| RM[30+ RenderModel 类]
+    RM -->|逐个字段设置| MA[MainActivity.render]
+    MA -->|手动 findViewById| V[Android Views]
+    linkStyle 0 stroke:#ef5350,stroke-width:2px
+    linkStyle 1 stroke:#ef5350,stroke-width:2px
+    linkStyle 2 stroke:#ef5350,stroke-width:2px
+        </div>
+      </div>
+    </div>
+    <div class="compare-card compare-improved">
+      <h4>提升后拓扑 — 声明式绑定</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph LR
+    SS[SessionState] -->|直接映射| DS[声明式 Section 定义]
+    DS -->|自动绑定| MA[MainActivity]
+    MA -->|统一渲染引擎| V[Android Views]
+    linkStyle 0 stroke:#66bb6a,stroke-width:3px
+    linkStyle 1 stroke:#66bb6a,stroke-width:3px
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>具体方案</h3>
+  <p>将 RenderModel 构建逻辑内联为 SessionState 的扩展属性 + 声明式 Section 定义：</p>
+  <details>
+    <summary>展开代码草图</summary>
+    <pre>// 每个 Section 自己知道如何从 SessionState 渲染
+sealed interface SettingsSection {
+    fun render(state: SessionState): ViewRenderCommand
+
+    data class CommonSection(...) : SettingsSection { ... }
+    data class PhotoSection(...) : SettingsSection { ... }
+}
+
+// MainActivity 变成
+fun render(state: SessionState) {
+    settingsSections.forEach { section ->
+        section.render(state).applyTo(targetView)
+    }
+}</pre>
+  </details>
+
+  <div class="review-section" data-finding="finding-3">
+    <textarea placeholder="对此发现的评审意见..."></textarea>
+    <div class="star-rating" data-stars="0"><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span></div>
+    <div class="tag-selector">
+      <button class="tag-btn" data-tag="agree">同意</button>
+      <button class="tag-btn" data-tag="doubtful">存疑</button>
+      <button class="tag-btn" data-tag="false-positive">已存在/误报</button>
+      <button class="tag-btn" data-tag="not-applicable">不适用于业务</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ====== FINDING 4 ====== -->
+<section id="finding-4">
+<h2>发现 4: 设置系统的全有或全无重建</h2>
+<div class="card">
+  <div class="badge-row">
+    <span class="badge badge-danger">难度: 中</span>
+    <span class="badge badge-success">收益: 7/10</span>
+    <span class="badge badge-warning">风险: 中</span>
+    <span class="badge badge-info">置信度: 高</span>
+    <span class="badge badge-principle">原则 5 · 相对观点</span>
+    <span class="badge badge-principle">原则 10 · 基变换</span>
+  </div>
+
+  <h3>问题描述</h3>
+  <p><span class="file-ref">core/settings/.../SettingsContracts.kt:930-969</span> — <code>PersistedSettingsAction</code> 是一个包含 19 个变体的 sealed interface。每次添加新设置需要：</p>
+  <ol style="padding-left:20px;margin:8px 0;">
+    <li>在 <code>PersistedSettings</code> 中添加字段</li>
+    <li>在 <code>PersistedSettingsAction</code> 中添加变体</li>
+    <li>在 <code>PersistedSettings.reduce()</code> 中添加分支</li>
+    <li>在 <code>SessionSettingsPageRenderModel</code> 构建函数中添加渲染逻辑</li>
+    <li>在 <code>MainActivity</code> 中添加按钮绑定</li>
+  </ol>
+  <p>这不是"孩童般简洁"——这是繁琐的仪式性编码。更关键的是，当 <span class="file-ref">DefaultCameraSession.kt:295-354</span> 中 <code>handleSettingsUpdated</code> <strong>完全销毁并重建</strong> ModeController 时（通过 <code>currentController.onExit()</code> + <code>createController()</code> + <code>onEnter()</code>），说明设置变更与模式控制器的关系未被正确模型化。</p>
+
+  <blockquote>Grothendieck 的相对观点：设置变更应该表示为"基变换"（base change），ModeController 应该是基空间上的一个族（family over the base），基变换自动拉回（pullback）到新模式配置，而不是重建整个对象。</blockquote>
+
+  <div class="highlight-box">
+    <strong>Grothendieck 式问题：</strong>如果设置是 ModeController 的"基"，那么修改一个设置应该是基空间上的一个态射，ModeController 应该函子性地响应这个态射——而不是重建。
+  </div>
+
+  <h3>具体方案</h3>
+  <p>将设置建模为"差异更新"而非"全量快照"：</p>
+  <details>
+    <summary>展开代码草图</summary>
+    <pre>// 不是:
+session.dispatch(SessionIntent.SettingsUpdated(fullSnapshot))
+currentController.onExit()
+currentController = createController(...) // 重建
+
+// 而是:
+sealed interface SettingsDelta {
+    data class PhotoFilterChanged(val id: String) : SettingsDelta
+    data class VideoSpecChanged(val spec: VideoSpec) : SettingsDelta
+    // ...
+}
+// ModeController 接收增量更新
+interface ModeController {
+    suspend fun onSettingsDelta(delta: SettingsDelta) = Unit
+}
+// Session 转发 delta 而不是重建 controller
+session.dispatch(SessionIntent.SettingsDelta(delta))
+currentController.onSettingsDelta(delta) // 就地更新</pre>
+  </details>
+
+  <div class="review-section" data-finding="finding-4">
+    <textarea placeholder="对此发现的评审意见..."></textarea>
+    <div class="star-rating" data-stars="0"><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span></div>
+    <div class="tag-selector">
+      <button class="tag-btn" data-tag="agree">同意</button>
+      <button class="tag-btn" data-tag="doubtful">存疑</button>
+      <button class="tag-btn" data-tag="false-positive">已存在/误报</button>
+      <button class="tag-btn" data-tag="not-applicable">不适用于业务</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ====== FINDING 5 ====== -->
+<section id="finding-5">
+<h2>发现 5: ModeContext 通过闭包捕获可变状态 — 违反引用透明性</h2>
+<div class="card">
+  <div class="badge-row">
+    <span class="badge badge-danger">难度: 中</span>
+    <span class="badge badge-success">收益: 5/10</span>
+    <span class="badge badge-warning">风险: 低</span>
+    <span class="badge badge-info">置信度: 高</span>
+    <span class="badge badge-principle">原则 5 · 相对观点</span>
+    <span class="badge badge-principle">原则 7 · 函子性</span>
+  </div>
+
+  <h3>问题描述</h3>
+  <p><span class="file-ref">core/mode/.../ModeContracts.kt:63-80</span> — <code>ModeContext.runtimeState</code> 是一个 lambda：<code>val runtimeState: () -> ModeRuntimeState</code>，它在 <span class="file-ref">core/session/.../DefaultCameraSession.kt:1514-1520</span> 中被定义为捕获了 <code>sessionDeviceCapabilities</code>、<code>sessionLensFacing</code> 等可变变量的闭包。</p>
+
+  <div class="highlight-box">
+    这意味着 ModeController 调用 <code>context.runtimeState()</code> 时，得到的结果依赖于 Session 中可变字段的<strong>当前值</strong>——而不是一个明确的、参数化的输入。这是引用不透明（referentially opaque）的，使得 ModeController 的单元测试必须依赖一个完整的 Session 状态环境。
+  </div>
+
+  <h3>现状 vs 改进对比</h3>
+  <div class="matrix-container">
+    <div class="compare-card compare-current">
+      <h4>当前 — 隐式依赖</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph LR
+    MC[ModeController] -->|runtimeState()| RS[runtimeState lambda]
+    RS -.->|捕获可变变量| SS[sessionLensFacing]
+    RS -.->|捕获可变变量| SQ[sessionStillQuality]
+    RS -.->|捕获可变变量| SR[sessionResolution]
+    RS -.->|捕获可变变量| SD[sessionDeviceCapabilities]
+    linkStyle 0 stroke:#ffa726,stroke-width:2px,stroke-dasharray:5
+        </div>
+      </div>
+    </div>
+    <div class="compare-card compare-improved">
+      <h4>改进 — 显式参数化</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph LR
+    SS[SessionState] -->|明确传入| MC[ModeController]
+    MC -->|读取| LF[lensFacing]
+    MC -->|读取| SQ[stillQuality]
+    MC -->|读取| SR[resolution]
+    linkStyle 0 stroke:#66bb6a,stroke-width:3px
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p>方案：将 <code>ModeRuntimeState</code> 作为 <code>handle(intent)</code> 的参数显式传入，而非通过闭包隐式捕获。</p>
+
+  <div class="review-section" data-finding="finding-5">
+    <textarea placeholder="对此发现的评审意见..."></textarea>
+    <div class="star-rating" data-stars="0"><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span></div>
+    <div class="tag-selector">
+      <button class="tag-btn" data-tag="agree">同意</button>
+      <button class="tag-btn" data-tag="doubtful">存疑</button>
+      <button class="tag-btn" data-tag="false-positive">已存在/误报</button>
+      <button class="tag-btn" data-tag="not-applicable">不适用于业务</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ====== FINDING 6 ====== -->
+<section id="finding-6">
+<h2>发现 6: FilterLabFamily 的分支逻辑重复</h2>
+<div class="card">
+  <div class="badge-row">
+    <span class="badge badge-danger">难度: 低</span>
+    <span class="badge badge-success">收益: 5/10</span>
+    <span class="badge badge-warning">风险: 低</span>
+    <span class="badge badge-info">置信度: 很高</span>
+    <span class="badge badge-principle">原则 9 · 无情泛化</span>
+    <span class="badge badge-principle">原则 7 · 函子性</span>
+  </div>
+
+  <h3>问题描述</h3>
+  <p><span class="file-ref">app/.../SessionUiRenderModel.kt:1898-1945</span> — <code>filterLabFamilyState()</code> 函数包含 4 个几乎相同的分支（PHOTO / HUMANISTIC / PORTRAIT / VIDEO），每个分支只有 3 个参数不同（currentFilterId、filters 来源、updateAction）。</p>
+  <p>类似地，<span class="file-ref">SessionSettingsManager.kt:213-225</span> 的 <code>familyDefaultAction()</code> 又是一个 4 路 when 分支做同一件事。</p>
+
+  <blockquote>这不是"4 个不同的东西"——这是 1 个东西在不同 filterCategory 上的投影。Grothendieck 的 motive：找到那个唯一的东西，让 4 个分支成为 corollaries。</blockquote>
+
+  <p>方案：将 <code>FilterLabFamily</code> 扩展为包含完整的"如何获取 filters"和"如何生成 updateAction"的元数据。</p>
+
+  <details>
+    <summary>展开代码草图</summary>
+    <pre>enum class FilterLabFamily(
+    val label: String,
+    val category: FilterProfileCategory,
+    val settingsExtractor: (PersistedSettings) -> String,
+    val settingsUpdater: (PersistedSettings, String) -> PersistedSettings
+) {
+    PHOTO("Photo", FilterProfileCategory.PHOTO,
+        { it.photo.defaultFilterProfileId },
+        { s, id -> s.copy(photo = s.photo.copy(defaultFilterProfileId = id)) }
+    ),
+    HUMANISTIC("Humanistic", FilterProfileCategory.HUMANISTIC,
+        { it.photo.defaultHumanisticFilterProfileId },
+        { s, id -> s.copy(photo = s.photo.copy(defaultHumanisticFilterProfileId = id)) }
+    ),
+    // ... PORTRAIT, VIDEO 类似
+}
+
+// filterLabFamilyState 变为单一实现
+private fun filterLabFamilyState(
+    state: SessionState, family: FilterLabFamily
+): FilterLabFamilyState {
+    val currentId = family.settingsExtractor(state.settings.persisted)
+    val filters = state.settings.catalog.filterProfilesFor(family.category, includeCustom = true)
+    return FilterLabFamilyState(
+        family = family,
+        currentFilterId = currentId,
+        filters = filters,
+        // ...
+    )
+}</pre>
+  </details>
+
+  <div class="review-section" data-finding="finding-6">
+    <textarea placeholder="对此发现的评审意见..."></textarea>
+    <div class="star-rating" data-stars="0"><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span></div>
+    <div class="tag-selector">
+      <button class="tag-btn" data-tag="agree">同意</button>
+      <button class="tag-btn" data-tag="doubtful">存疑</button>
+      <button class="tag-btn" data-tag="false-positive">已存在/误报</button>
+      <button class="tag-btn" data-tag="not-applicable">不适用于业务</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ====== FINDING 7 ====== -->
+<section id="finding-7">
+<h2>发现 7: DeviceCapabilities 散落的守卫检查 — 缺少基变换函子</h2>
+<div class="card">
+  <div class="badge-row">
+    <span class="badge badge-danger">难度: 高</span>
+    <span class="badge badge-success">收益: 8/10</span>
+    <span class="badge badge-warning">风险: 中高</span>
+    <span class="badge badge-info">置信度: 中</span>
+    <span class="badge badge-principle">原则 10 · 基变换</span>
+    <span class="badge badge-principle">原则 1 · 上升的海洋</span>
+  </div>
+
+  <h3>问题描述</h3>
+  <p>在整个代码库中，<code>DeviceCapabilities</code> 的检查散落在各处：</p>
+  <ul style="padding-left:20px;margin:8px 0;">
+    <li><span class="file-ref">SessionUiRenderModel.kt</span> — <code>supportsStillCapture</code> 检查出现 20+ 次</li>
+    <li><span class="file-ref">PhotoModePlugin.kt</span> — <code>supportsFlashControl</code> 检查</li>
+    <li><span class="file-ref">DefaultCameraSession.kt</span> — <code>availableLensFacings.size &lt; 2</code> 检查</li>
+    <li>每个 ModePlugin 的 <code>isSupported()</code> 是在插件层的守卫</li>
+  </ul>
+
+  <p>Grothendieck 的基变换理论：<strong>同一结构在不同基上的行为变异应由基变换函子统一</strong>，而非 N 份发散代码。</p>
+
+  <div class="highlight-box">
+    <strong>Grothendieck 式思考：</strong>如果 DeviceCapabilities 是"基空间"，那么整个相机管道应该是基空间上的一个族（family）。更换设备（改变基）应该通过一个统一的 <code>baseChange(capabilities)</code> 函子来拉回整个管道配置，而不是在每个使用点检查 <code>if (supportsXxx)</code>。
+  </div>
+
+  <h3>现状 vs 改进对比</h3>
+  <div class="matrix-container">
+    <div class="compare-card compare-current">
+      <h4>当前 — 散落检查</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph TD
+    DC[DeviceCapabilities] -.->|if supportsFlash| P1[PhotoMode.handle]
+    DC -.->|if supportsStill| P2[RenderModel 构建]
+    DC -.->|if availableLens| P3[Session.lensToggle]
+    DC -.->|if supportsManual| P4[ProModeController]
+    DC -.->|if supportsAudio| P5[VideoSection 渲染]
+    DC -.->|if supportsPreview| P6[DeviceGraph 构建]
+    linkStyle 0 stroke:#ffa726,stroke-width:1px,stroke-dasharray:5
+    linkStyle 1 stroke:#ffa726,stroke-width:1px,stroke-dasharray:5
+    linkStyle 2 stroke:#ffa726,stroke-width:1px,stroke-dasharray:5
+    linkStyle 3 stroke:#ffa726,stroke-width:1px,stroke-dasharray:5
+    linkStyle 4 stroke:#ffa726,stroke-width:1px,stroke-dasharray:5
+    linkStyle 5 stroke:#ffa726,stroke-width:1px,stroke-dasharray:5
+        </div>
+      </div>
+    </div>
+    <div class="compare-card compare-improved">
+      <h4>提升后 — 基变换函子</h4>
+      <div class="mermaid-container" onclick="openModal(this)" title="点击放大">
+        <div class="mermaid">
+graph TD
+    DC[DeviceCapabilities] -->|基变换函子| P[PipelineCapabilityProfile]
+    P -->|统一提供| M1[availableActions]
+    P -->|统一提供| M2[availableSettings]
+    P -->|统一提供| M3[availableControls]
+    P -->|统一提供| M4[qualityPresets]
+    M1 -->|消费| UI[UI 层统一绑定]
+    M2 -->|消费| ST[Settings 层]
+    M3 -->|消费| MC[ModeController]
+    linkStyle 0 stroke:#66bb6a,stroke-width:3px
+    linkStyle 1 stroke:#66bb6a,stroke-width:2px
+    linkStyle 2 stroke:#66bb6a,stroke-width:2px
+    linkStyle 3 stroke:#66bb6a,stroke-width:2px
+    linkStyle 4 stroke:#66bb6a,stroke-width:2px
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p>核心思想：<code>PipelineCapabilityProfile</code> 是从 <code>DeviceCapabilities</code> 计算出的<strong>纯派生数据结构</strong>，包含所有 "supportsXxx" 问题的答案。UI 和 Controller 不再检查 <code>supportsFlashControl</code>，而是查询 <code>profile.flashControl.isAvailable</code>。</p>
+
+  <div class="review-section" data-finding="finding-7">
+    <textarea placeholder="对此发现的评审意见..."></textarea>
+    <div class="star-rating" data-stars="0"><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span></div>
+    <div class="tag-selector">
+      <button class="tag-btn" data-tag="agree">同意</button>
+      <button class="tag-btn" data-tag="doubtful">存疑</button>
+      <button class="tag-btn" data-tag="false-positive">已存在/误报</button>
+      <button class="tag-btn" data-tag="not-applicable">不适用于业务</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ====== FINDING 8 ====== -->
+<section id="finding-8">
+<h2>发现 8: ModeController 接口的 Yoneda 审视 — 从实现者视角设计</h2>
+<div class="card">
+  <div class="badge-row">
+    <span class="badge badge-danger">难度: 低</span>
+    <span class="badge badge-success">收益: 4/10</span>
+    <span class="badge badge-warning">风险: 低</span>
+    <span class="badge badge-info">置信度: 很高</span>
+    <span class="badge badge-principle">原则 11 · Yoneda 视角</span>
+    <span class="badge badge-principle">原则 4 · 孩童般简洁</span>
+  </div>
+
+  <h3>问题描述</h3>
+  <p><span class="file-ref">core/mode/.../ModeContracts.kt:155-180</span> — <code>ModeController</code> 接口定义了 9 个方法，但多数实现只是 no-op：</p>
+
+  <table>
+    <tr><th>方法</th><th>Photo</th><th>Pro</th><th>Document</th><th>Night</th><th>Humanistic</th><th>Portrait</th></tr>
+    <tr><td>onDeviceCapabilitiesChanged</td><td>✓</td><td>✓</td><td>?</td><td>?</td><td>?</td><td>?</td></tr>
+    <tr><td>onLensFacingChanged</td><td>no-op</td><td>no-op</td><td>?</td><td>?</td><td>?</td><td>?</td></tr>
+    <tr><td>onStillCaptureQualityChanged</td><td>✓</td><td>✓</td><td>?</td><td>?</td><td>?</td><td>?</td></tr>
+    <tr><td>onStillCaptureResolutionChanged</td><td>✓</td><td>✓</td><td>?</td><td>?</td><td>?</td><td>?</td></tr>
+    <tr><td>onSessionEvent</td><td>✓</td><td>✓</td><td>?</td><td>?</td><td>?</td><td>?</td></tr>
+  </table>
+
+  <p>Yoneda 引理告诉我们：<strong>一个对象完全由"指向它的所有态射"——即所有使用它的方式——决定。</strong>反向从调用者视角看：Session 调用这些方法的模式是什么？每次状态变更时全部调用一遍。这意味着接口应该反映"调用模式"而非"实现者的能力列表"。</p>
+
+  <blockquote>从 Yoneda 视角重构：接口不应列出"Controller 能响应什么"，而应反映"Session 如何与 Controller 交互"。例如将多个细粒度回调合并为一个 <code>onContextUpdated(ModeRuntimeState)</code>。</blockquote>
+
+  <p>具体建议：将 <code>onDeviceCapabilitiesChanged</code>、<code>onLensFacingChanged</code>、<code>onStillCaptureQualityChanged</code>、<code>onStillCaptureResolutionChanged</code> 合并为 <code>onRuntimeStateChanged(state: ModeRuntimeState)</code>。默认实现为空，需要响应变化的 Controller 可以 override。这样接口从 9 个方法减为 5 个。</p>
+
+  <div class="review-section" data-finding="finding-8">
+    <textarea placeholder="对此发现的评审意见..."></textarea>
+    <div class="star-rating" data-stars="0"><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span><span class="star">☆</span></div>
+    <div class="tag-selector">
+      <button class="tag-btn" data-tag="agree">同意</button>
+      <button class="tag-btn" data-tag="doubtful">存疑</button>
+      <button class="tag-btn" data-tag="false-positive">已存在/误报</button>
+      <button class="tag-btn" data-tag="not-applicable">不适用于业务</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ====== OVERALL ASSESSMENT ====== -->
+<section id="overall-assessment">
+<h2>三、综合评估表</h2>
+<table>
+  <tr><th>发现</th><th>难度</th><th>收益</th><th>风险</th><th>置信度</th><th>核心原则</th><th>建议优先级</th></tr>
+  <tr><td>1. PostProcessor 硬编码</td><td>中低</td><td>7</td><td>低</td><td>高</td><td>#1 上升的海洋</td><td>P0 立即</td></tr>
+  <tr><td>2. Mode 插件 Motive 统一</td><td>中高</td><td>8</td><td>中</td><td>高</td><td>#2 绝对 Motive</td><td>P1 短期</td></tr>
+  <tr><td>4. 设置系统的增量更新</td><td>中</td><td>7</td><td>中</td><td>高</td><td>#5 相对观点</td><td>P1 短期</td></tr>
+  <tr><td>7. 基变换统一</td><td>高</td><td>8</td><td>中高</td><td>中</td><td>#10 基变换</td><td>P2 中期</td></tr>
+  <tr><td>6. FilterLabFamily 泛化</td><td>低</td><td>5</td><td>低</td><td>很高</td><td>#9 无情泛化</td><td>P2 中期</td></tr>
+  <tr><td>3. 渲染模型简化</td><td>中高</td><td>6</td><td>中高</td><td>中高</td><td>#3 消除人为边界</td><td>P3 长期</td></tr>
+  <tr><td>5. ModeContext 闭包消除</td><td>中</td><td>5</td><td>低</td><td>高</td><td>#7 函子性</td><td>P3 长期</td></tr>
+  <tr><td>8. ModeController Yoneda 精简</td><td>低</td><td>4</td><td>低</td><td>很高</td><td>#11 Yoneda</td><td>P4 锦上添花</td></tr>
+</table>
+</section>
+
+<!-- ====== SELF ASSESSMENT ====== -->
+<section id="self-assessment">
+<h2>四、分析师自评 — 盲点与不确定性</h2>
+<div class="card">
+  <ol style="padding-left:20px;">
+    <li><strong>未深入分析 CameraXCaptureAdapter</strong> — 这是与 CameraX API 的胶水层，可能有额外的复杂性未被揭示。建议在后续 deep-dive 中专门审查。</li>
+    <li><strong>未评估测试覆盖率</strong> — 仅从测试文件的存在推断测试质量。实际的测试深度和边界覆盖需要单独审查。</li>
+    <li><strong>Feature 插件未全部详读</strong> — Document/Night/Humanistic/Portrait/Video 插件因篇幅原因未全部展开，可能存在独特的模式未被发现。</li>
+    <li><strong>渲染性能未评估</strong> — <code>sessionSettingsPageRenderModel()</code> 在每次 <code>render()</code> 调用时重新计算全部 300 行逻辑，可能存在不必要的重组。</li>
+    <li><strong>基变换方案是方向性建议</strong> — 将整个管道参数化的"基变换函子"是长远愿景，具体落地需要更多实验验证。</li>
+  </ol>
+</div>
+</section>
+
+<p style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:48px;">
+  OpenCamera Grothendieck Architecture Analysis · Generated 2026-05-16 · Powered by Claude Code
+</p>
+
+</div>
+
+<!-- FAB + Toast -->
+<button id="fab" onclick="exportFeedback()">导出评审反馈</button>
+<div id="toast">已复制到剪贴板，可直接粘贴给 AI 进行下一轮 deep-dive</div>
+
+<!-- Modal for diagram zoom -->
+<div class="modal-overlay" id="modal" onclick="closeModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// Scatter chart
+(function() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 520 380');
+  svg.innerHTML = `
+    <rect x="40" y="20" width="440" height="300" fill="none" stroke="#2a3a5c" stroke-width="1"/>
+    <line x1="260" y1="20" x2="260" y2="320" stroke="#3a4a6c" stroke-width="0.5" stroke-dasharray="6,4"/>
+    <line x1="40" y1="170" x2="480" y2="170" stroke="#3a4a6c" stroke-width="0.5" stroke-dasharray="6,4"/>
+    <text x="480" y="330" fill="#a0b0c8" font-size="11" text-anchor="end">重构成本(人天)→</text>
+    <text x="20" y="30" fill="#a0b0c8" font-size="11" text-anchor="start">↑收益</text>
+    <text x="60" y="340" fill="#54647c" font-size="10">低</text>
+    <text x="460" y="340" fill="#54647c" font-size="10">高</text>
+    <text x="30" y="40" fill="#54647c" font-size="10">高</text>
+    <text x="30" y="310" fill="#54647c" font-size="10">低</text>
+    <circle cx="120" cy="80" r="12" fill="#ef5350" opacity="0.7"/><text x="138" y="84" fill="#e0e6f0" font-size="10">F2: Motive 统一</text>
+    <circle cx="80" cy="110" r="11" fill="#ffa726" opacity="0.7"/><text x="98" y="114" fill="#e0e6f0" font-size="10">F4: 增量设置</text>
+    <circle cx="80" cy="150" r="9" fill="#64b5f6" opacity="0.7"/><text x="96" y="154" fill="#e0e6f0" font-size="10">F1: PostProcessor</text>
+    <circle cx="340" cy="60" r="12" fill="#ef5350" opacity="0.7"/><text x="358" y="64" fill="#e0e6f0" font-size="10">F7: 基变换</text>
+    <circle cx="300" cy="140" r="10" fill="#ffa726" opacity="0.7"/><text x="316" y="144" fill="#e0e6f0" font-size="10">F3: 渲染模型</text>
+    <circle cx="160" cy="200" r="8" fill="#64b5f6" opacity="0.7"/><text x="175" y="204" fill="#e0e6f0" font-size="10">F5: 闭包</text>
+    <circle cx="60" cy="240" r="7" fill="#66bb6a" opacity="0.7"/><text x="75" y="244" fill="#e0e6f0" font-size="10">F6: FilterLab</text>
+    <circle cx="50" cy="280" r="6" fill="#66bb6a" opacity="0.7"/><text x="65" y="284" fill="#e0e6f0" font-size="10">F8: Yoneda</text>
+    <text x="260" y="360" fill="#a0b0c8" font-size="10" text-anchor="middle">圆点大小 = 置信度 · 红=高风险 · 蓝=可落地 · 绿=低风险</text>
+  `;
+  document.getElementById('scatter').appendChild(svg);
+})();
+
+// TOC scroll spy
+const tocLinks = document.querySelectorAll('#toc a');
+const sections = Array.from(tocLinks).map(a => document.getElementById(a.getAttribute('href').slice(1)));
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      tocLinks.forEach(a => a.classList.remove('active'));
+      const link = document.querySelector(`#toc a[href="#${entry.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => s && observer.observe(s));
+
+// Star rating
+document.querySelectorAll('.star-rating').forEach(rating => {
+  const stars = rating.querySelectorAll('.star');
+  stars.forEach((star, i) => {
+    star.addEventListener('click', () => {
+      rating.dataset.stars = i + 1;
+      stars.forEach((s, j) => s.textContent = j <= i ? '★' : '☆');
+      stars.forEach((s, j) => s.classList.toggle('active', j <= i));
+      persistReview(rating.closest('.review-section'));
+    });
+  });
+});
+
+// Tag selector
+document.querySelectorAll('.tag-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const selector = btn.closest('.tag-selector');
+    selector.querySelectorAll('.tag-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    persistReview(btn.closest('.review-section'));
+  });
+});
+
+// Textarea persistence
+document.querySelectorAll('.review-section textarea').forEach(ta => {
+  ta.addEventListener('input', () => persistReview(ta.closest('.review-section')));
+});
+
+function persistReview(section) {
+  const finding = section.dataset.finding;
+  const text = section.querySelector('textarea').value;
+  const rating = section.querySelector('.star-rating').dataset.stars;
+  const tag = section.querySelector('.tag-btn.selected')?.dataset.tag || '';
+  localStorage.setItem(`review-${finding}`, JSON.stringify({ text, rating, tag }));
+}
+
+// Load persisted reviews
+document.querySelectorAll('.review-section').forEach(section => {
+  const finding = section.dataset.finding;
+  const saved = JSON.parse(localStorage.getItem(`review-${finding}`) || '{}');
+  if (saved.text) section.querySelector('textarea').value = saved.text;
+  if (saved.rating) {
+    const stars = section.querySelectorAll('.star');
+    stars.forEach((s, j) => { s.textContent = j < saved.rating ? '★' : '☆'; s.classList.toggle('active', j < saved.rating); });
+    section.querySelector('.star-rating').dataset.stars = saved.rating;
+  }
+  if (saved.tag) {
+    section.querySelectorAll('.tag-btn').forEach(b => {
+      b.classList.toggle('selected', b.dataset.tag === saved.tag);
+    });
+  }
+});
+
+// Export feedback
+function exportFeedback() {
+  const lines = ['# OpenCamera Grothendieck 架构分析 — 评审反馈', '', `> 导出时间: ${new Date().toISOString()}`, ''];
+  document.querySelectorAll('.review-section').forEach(section => {
+    const finding = section.dataset.finding;
+    const card = section.closest('.card');
+    const title = card.querySelector('h3')?.textContent || finding;
+    const saved = JSON.parse(localStorage.getItem(`review-${finding}`) || '{}');
+    if (!saved.text && !saved.rating && !saved.tag) return;
+    lines.push(`## ${title}`);
+    if (saved.rating) lines.push(`- **评分**: ${'★'.repeat(Number(saved.rating))}${'☆'.repeat(5-Number(saved.rating))} (${saved.rating}/5)`);
+    if (saved.tag) lines.push(`- **标签**: ${saved.tag}`);
+    if (saved.text) lines.push(`- **意见**: ${saved.text}`);
+    lines.push('');
+  });
+  const md = lines.join('\n');
+  navigator.clipboard.writeText(md).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  });
+}
+
+// Modal for diagram zoom
+function openModal(el) {
+  const mermaidDiv = el.querySelector('.mermaid');
+  const modalBody = document.getElementById('modal-body');
+  modalBody.innerHTML = '<div class="mermaid">' + mermaidDiv.textContent + '</div>';
+  document.getElementById('modal').classList.add('show');
+  setTimeout(() => { mermaid.init(undefined, modalBody.querySelector('.mermaid')); }, 50);
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+</body>
+</html>
