@@ -21,6 +21,8 @@ import com.opencamera.app.camera.PhotoWatermarkPostProcessor
 import com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitor
 import com.opencamera.app.camera.VideoWatermarkSubtitlePostProcessor
 import com.opencamera.app.camera.device.CameraDeviceAdapter
+import com.opencamera.core.effect.EffectCapabilityResolver
+import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.media.CompositeMediaPostProcessor
 import com.opencamera.core.media.MultiFrameMergePlaceholderPostProcessor
 import com.opencamera.core.media.PipelineMetadataPostProcessor
@@ -100,6 +102,9 @@ class AppContainer(
         shotExecutor = shotExecutor,
         mediaPostProcessor = mediaPostProcessor
     )
+
+    val effectCapabilityResolver = EffectCapabilityResolver(cameraAdapter.capabilities)
+    val previewEffectAdapter = PreviewEffectAdapter()
 
     val cameraSession: CameraSession = DefaultCameraSession(
         registry = modeRegistry,
