@@ -18,6 +18,7 @@ import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
 import com.opencamera.core.session.buildSessionDebugDump
+import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.effect.PreviewEffectRenderModel
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.CompositionGridMode
@@ -408,7 +409,8 @@ internal fun sessionControlsRenderModel(
 }
 
 internal fun previewOverlayRenderModel(
-    state: SessionState
+    state: SessionState,
+    effectAdapter: PreviewEffectAdapter? = null
 ): PreviewOverlayRenderModel {
     val gridMode = state.settings.persisted.common.gridMode
     val previewSupportsOverlay = state.permissionState.cameraGranted &&
@@ -419,13 +421,15 @@ internal fun previewOverlayRenderModel(
             PreviewStatus.RECOVERING
         )
     val countdownLabel = state.countdownRemainingSeconds?.let { "${it}s" }
+    val effectModel = effectAdapter?.adapt(state.activeEffectSpec)
     return PreviewOverlayRenderModel(
         gridMode = gridMode,
         isGridVisible = previewSupportsOverlay && gridMode != CompositionGridMode.OFF,
         countdownLabel = countdownLabel,
         isCountdownVisible = state.captureStatus == CaptureStatus.REQUESTED &&
             countdownLabel != null &&
-            state.permissionState.cameraGranted
+            state.permissionState.cameraGranted,
+        effectModel = effectModel
     )
 }
 

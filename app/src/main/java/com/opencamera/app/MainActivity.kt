@@ -757,7 +757,7 @@ class MainActivity : ComponentActivity() {
         renderWatermarkLabDetailPage(watermarkDetailPage)
         renderFilterLabPage(filterLabPage)
         renderRuntimeProControls(runtimeProControls)
-        previewOverlayView.render(previewOverlayRenderModel(state))
+        previewOverlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter))
         previewView.scaleX = if (
             state.activeDeviceGraph.preferredLensFacing == LensFacing.FRONT &&
             state.settings.persisted.common.selfieMirrorEnabled
