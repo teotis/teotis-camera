@@ -60,16 +60,6 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/permissionStatus"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="@string/permission_pending"
-            android:textColor="#A0C4E8"
-            android:textSize="12sp"
-            android:maxLines="1" />
-
         <Button
             android:id="@+id/buttonSettingsEntry"
             style="@style/Widget.OpenCamera.PillButton"
@@ -90,7 +80,7 @@
 
         <Button
             android:id="@+id/buttonDevEntry"
-            style="@style/Widget.OpenCamera.PillButton"
+            style="@style/Widget.OpenCamera.DevEntryButton"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:layout_marginStart="6dp"
@@ -99,12 +89,27 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/permissionStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="8dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/permission_pending"
+        android:textColor="#A0C4E8"
+        android:textSize="12sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel" />
+
     <!-- Mode track: horizontal scrolling strip (fixed position above bottom) -->
     <HorizontalScrollView
         android:id="@+id/modeTrackScroll"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="4dp"
+        android:layout_marginBottom="10dp"
         android:scrollbars="none"
         android:fadeScrollbars="false"
         android:clipToPadding="false"
@@ -1005,120 +1010,126 @@
     </androidx.core.widget.NestedScrollView>
 
     <!-- Dev console overlay -->
-    <androidx.core.widget.NestedScrollView
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/devConsolePanel"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="14dp"
         android:layout_marginBottom="12dp"
-        android:background="#E6101820"
-        android:fillViewport="true"
-        android:padding="0dp"
         android:visibility="gone"
+        app:cardBackgroundColor="#EC0F141D"
+        app:cardCornerRadius="28dp"
+        app:cardElevation="10dp"
         app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
-        <LinearLayout
+        <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="18dp">
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:padding="0dp">
 
-            <!-- Tab row -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="horizontal">
+                android:orientation="vertical"
+                android:padding="18dp">
 
-                <Button
-                    android:id="@+id/buttonDevTabKey"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
+                <!-- Tab row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/dev_tab_key" />
+                    android:gravity="center"
+                    android:orientation="horizontal">
 
-                <Button
-                    android:id="@+id/buttonDevTabCore"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/dev_tab_core" />
+                    <Button
+                        android:id="@+id/buttonDevTabKey"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_key" />
 
-                <Button
-                    android:id="@+id/buttonDevTabError"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/dev_tab_error" />
+                    <Button
+                        android:id="@+id/buttonDevTabCore"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_core" />
 
-                <Button
-                    android:id="@+id/buttonDevTabAll"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
+                    <Button
+                        android:id="@+id/buttonDevTabError"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_error" />
+
+                    <Button
+                        android:id="@+id/buttonDevTabAll"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_all" />
+                </LinearLayout>
+
+                <!-- Title -->
+                <TextView
+                    android:id="@+id/devConsoleTitle"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/dev_tab_all" />
+                    android:layout_marginTop="12dp"
+                    android:textColor="@android:color/white"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <!-- Content area -->
+                <TextView
+                    android:id="@+id/devConsoleContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:fontFamily="monospace"
+                    android:textColor="#BFD0E4"
+                    android:textSize="11sp" />
+
+                <!-- Action row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/buttonDevExport"
+                        style="@style/Widget.OpenCamera.PillButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_export_log" />
+
+                    <Button
+                        android:id="@+id/buttonDevClose"
+                        style="@style/Widget.OpenCamera.PillButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/dev_close" />
+                </LinearLayout>
             </LinearLayout>
-
-            <!-- Title -->
-            <TextView
-                android:id="@+id/devConsoleTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:textColor="@android:color/white"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <!-- Content area -->
-            <TextView
-                android:id="@+id/devConsoleContent"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:fontFamily="monospace"
-                android:scrollbars="vertical"
-                android:textColor="#BFD0E4"
-                android:textSize="11sp" />
-
-            <!-- Action row -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/buttonDevExport"
-                    style="@style/Widget.OpenCamera.PillButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/dev_export_log" />
-
-                <Button
-                    android:id="@+id/buttonDevClose"
-                    style="@style/Widget.OpenCamera.PillButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/dev_close" />
-            </LinearLayout>
-        </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+        </androidx.core.widget.NestedScrollView>
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Layer 3: Bottom control strip (three-segment cockpit) -->
     <LinearLayout
@@ -1187,22 +1198,6 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:text="@string/button_quick_ratio" />
-
-                <Button
-                    android:id="@+id/buttonQuickLive"
-                    style="@style/Widget.OpenCamera.QuickSettingButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:text="@string/button_quick_live" />
-
-                <Button
-                    android:id="@+id/buttonQuickTimer"
-                    style="@style/Widget.OpenCamera.QuickSettingButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:text="@string/button_quick_timer" />
             </LinearLayout>
 
             <!-- Right: Lens + Zoom -->
@@ -1271,220 +1266,6 @@
                 android:textAllCaps="false"
                 android:textColor="#101318"
                 android:textSize="14sp" />
-        </LinearLayout>
-
-        <!-- More controls entry -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/buttonMoreControls"
-                style="@style/Widget.OpenCamera.PillButton"
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:text="@string/button_more_controls"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- Pro controls panel (collapsed by default) -->
-        <LinearLayout
-            android:id="@+id/proControlPanel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/bg_settings_card"
-            android:orientation="vertical"
-            android:padding="14dp"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/proControlHeadline"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@android:color/white"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/proControlSupportingText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="#D9E6F7"
-                android:textSize="13sp" />
-
-            <TextView
-                android:id="@+id/proControlSummary"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:fontFamily="monospace"
-                android:textColor="#99D7EFFF"
-                android:textSize="12sp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/buttonProRaw"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1" />
-
-                <Button
-                    android:id="@+id/buttonProIso"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1" />
-
-                <Button
-                    android:id="@+id/buttonProShutter"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/buttonProExposure"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1" />
-
-                <Button
-                    android:id="@+id/buttonProFocus"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1" />
-
-                <Button
-                    android:id="@+id/buttonProAperture"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1" />
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/buttonProWhiteBalance"
-                style="@style/Widget.OpenCamera.CompactButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp" />
-        </LinearLayout>
-
-        <!-- More controls panel (collapsed by default) -->
-        <LinearLayout
-            android:id="@+id/moreControlsPanel"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <!-- Mode-specific actions -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/buttonSecondary"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/button_secondary_action"
-                    android:textSize="12sp" />
-
-                <Button
-                    android:id="@+id/buttonTertiary"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/button_tertiary_action"
-                    android:textSize="12sp" />
-
-                <Button
-                    android:id="@+id/buttonRuntimePro"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/button_pro_mode"
-                    android:textSize="12sp"
-                    android:visibility="gone" />
-
-            </LinearLayout>
-
-            <!-- Quality/Resolution controls -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/buttonStillQuality"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/button_still_quality"
-                    android:textSize="12sp" />
-
-                <Button
-                    android:id="@+id/buttonStillResolution"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/button_still_resolution"
-                    android:textSize="12sp" />
-
-                <Button
-                    android:id="@+id/buttonRestartSession"
-                    style="@style/Widget.OpenCamera.CompactButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:layout_weight="1"
-                    android:text="@string/button_restart_session"
-                    android:textSize="12sp" />
-            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

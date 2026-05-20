@@ -57,6 +57,7 @@
     <string name="button_more_controls">More</string>
     <string name="mode_track_label">Mode</string>
     <string name="button_dev_entry">DEV</string>
+    <string name="button_dev_restart_session">Restart Session</string>
     <string name="dev_tab_key">Key</string>
     <string name="dev_tab_core">Core</string>
     <string name="dev_tab_error">Error</string>

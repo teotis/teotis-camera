@@ -37,7 +37,6 @@ import com.opencamera.core.mode.catalogProfile
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.settings.PersistedSettingsAction
-import com.opencamera.core.settings.FeatureCatalogAction
 import com.opencamera.core.settings.FilterRenderSpec
 import kotlinx.coroutines.launch
 
@@ -60,10 +59,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var buttonFilterEntry: Button
     private lateinit var buttonQuickFlash: Button
     private lateinit var buttonQuickRatio: Button
-    private lateinit var buttonQuickLive: Button
-    private lateinit var buttonQuickTimer: Button
-    private lateinit var buttonMoreControls: Button
-    private lateinit var moreControlsPanel: LinearLayout
     private lateinit var settingsPanel: androidx.core.widget.NestedScrollView
     private lateinit var filterPanel: androidx.core.widget.NestedScrollView
     private lateinit var buttonSettingsBack: Button
@@ -163,24 +158,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var buttonDevExport: Button
     private lateinit var buttonDevClose: Button
     private lateinit var shutterButton: Button
-    private lateinit var secondaryButton: Button
-    private lateinit var tertiaryButton: Button
-    private lateinit var runtimeProButton: Button
-    private lateinit var proControlPanel: LinearLayout
-    private lateinit var proControlHeadline: TextView
-    private lateinit var proControlSupportingText: TextView
-    private lateinit var proControlSummary: TextView
-    private lateinit var buttonProRaw: Button
-    private lateinit var buttonProIso: Button
-    private lateinit var buttonProShutter: Button
-    private lateinit var buttonProExposure: Button
-    private lateinit var buttonProFocus: Button
-    private lateinit var buttonProAperture: Button
-    private lateinit var buttonProWhiteBalance: Button
     private lateinit var lensFacingButton: Button
     private lateinit var zoomRatioButton: Button
-    private lateinit var stillQualityButton: Button
-    private lateinit var stillResolutionButton: Button
     private lateinit var photoModeButton: Button
     private lateinit var documentModeButton: Button
     private lateinit var nightModeButton: Button
@@ -193,7 +172,6 @@ class MainActivity : ComponentActivity() {
     private var lastPlayedShutterSoundShotId: String? = null
     private var isSettingsPanelVisible = false
     private var isFilterPanelVisible = false
-    private var isMoreControlsVisible = false
     private var isDevConsoleVisible = false
     private var selectedDevLogTab = DevLogTab.KEY
     private var latestDevLogRenderModel: DevLogRenderModel? = null
@@ -203,7 +181,6 @@ class MainActivity : ComponentActivity() {
     private var latestWatermarkLabSelectorRenderModel: WatermarkLabSelectorRenderModel? = null
     private var latestWatermarkLabDetailRenderModel: WatermarkLabDetailRenderModel? = null
     private var latestFilterLabRenderModel: FilterLabPageRenderModel? = null
-    private var latestRuntimeProControlsRenderModel: RuntimeProControlsRenderModel? = null
     private var latestSessionState: SessionState? = null
     private var currentSettingsSubpage = SettingsSubpage.ROOT
     private var selectedWatermarkDetailTemplateId: String? = null
@@ -245,10 +222,6 @@ class MainActivity : ComponentActivity() {
         buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
         buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
         buttonQuickRatio = findViewById(R.id.buttonQuickRatio)
-        buttonQuickLive = findViewById(R.id.buttonQuickLive)
-        buttonQuickTimer = findViewById(R.id.buttonQuickTimer)
-        buttonMoreControls = findViewById(R.id.buttonMoreControls)
-        moreControlsPanel = findViewById(R.id.moreControlsPanel)
         settingsPanel = findViewById(R.id.settingsPanel)
         filterPanel = findViewById(R.id.filterPanel)
         buttonSettingsBack = findViewById(R.id.buttonSettingsBack)
@@ -336,24 +309,8 @@ class MainActivity : ComponentActivity() {
         captureOutput = findViewById(R.id.captureOutput)
         previewThumbnail = findViewById(R.id.previewThumbnail)
         shutterButton = findViewById(R.id.buttonShutter)
-        secondaryButton = findViewById(R.id.buttonSecondary)
-        tertiaryButton = findViewById(R.id.buttonTertiary)
-        runtimeProButton = findViewById(R.id.buttonRuntimePro)
-        proControlPanel = findViewById(R.id.proControlPanel)
-        proControlHeadline = findViewById(R.id.proControlHeadline)
-        proControlSupportingText = findViewById(R.id.proControlSupportingText)
-        proControlSummary = findViewById(R.id.proControlSummary)
-        buttonProRaw = findViewById(R.id.buttonProRaw)
-        buttonProIso = findViewById(R.id.buttonProIso)
-        buttonProShutter = findViewById(R.id.buttonProShutter)
-        buttonProExposure = findViewById(R.id.buttonProExposure)
-        buttonProFocus = findViewById(R.id.buttonProFocus)
-        buttonProAperture = findViewById(R.id.buttonProAperture)
-        buttonProWhiteBalance = findViewById(R.id.buttonProWhiteBalance)
         lensFacingButton = findViewById(R.id.buttonLensFacing)
         zoomRatioButton = findViewById(R.id.buttonZoomRatio)
-        stillQualityButton = findViewById(R.id.buttonStillQuality)
-        stillResolutionButton = findViewById(R.id.buttonStillResolution)
         photoModeButton = findViewById(R.id.buttonPhotoMode)
         documentModeButton = findViewById(R.id.buttonDocumentMode)
         nightModeButton = findViewById(R.id.buttonNightMode)
@@ -471,20 +428,6 @@ class MainActivity : ComponentActivity() {
             isDevConsoleVisible = false
             renderDevConsoleVisibility()
         }
-        buttonMoreControls.setOnClickListener {
-            isMoreControlsVisible = !isMoreControlsVisible
-            moreControlsPanel.isVisible = isMoreControlsVisible
-        }
-        findViewById<Button>(R.id.buttonRestartSession).setOnClickListener {
-            requestCameraPermissionIfNeeded()
-            lifecycleScope.launch {
-                container.cameraSession.dispatch(
-                    SessionIntent.PreviewHostDetached("Preview rebind requested")
-                )
-                container.cameraCoordinator.attachPreviewHost(this@MainActivity, previewView)
-                container.cameraSession.dispatch(SessionIntent.PreviewHostAttached)
-            }
-        }
         photoModeButton.setOnClickListener {
             dispatch(SessionIntent.SwitchMode(ModeId.PHOTO))
         }
@@ -516,49 +459,11 @@ class MainActivity : ComponentActivity() {
             }
             dispatch(SessionIntent.ShutterPressed)
         }
-        secondaryButton.setOnClickListener {
-            dispatch(SessionIntent.SecondaryActionPressed)
-        }
-        tertiaryButton.setOnClickListener {
-            dispatch(SessionIntent.TertiaryActionPressed)
-        }
-        runtimeProButton.setOnClickListener {
-            dispatch(SessionIntent.ProActionPressed)
-        }
-        buttonProRaw.setOnClickListener {
-            applyFeatureCatalogControlAction(latestRuntimeProControlsRenderModel?.rawControl)
-        }
-        buttonProIso.setOnClickListener {
-            applyFeatureCatalogControlAction(latestRuntimeProControlsRenderModel?.isoControl)
-        }
-        buttonProShutter.setOnClickListener {
-            applyFeatureCatalogControlAction(latestRuntimeProControlsRenderModel?.shutterControl)
-        }
-        buttonProExposure.setOnClickListener {
-            applyFeatureCatalogControlAction(latestRuntimeProControlsRenderModel?.exposureControl)
-        }
-        buttonProFocus.setOnClickListener {
-            applyFeatureCatalogControlAction(latestRuntimeProControlsRenderModel?.focusControl)
-        }
-        buttonProAperture.setOnClickListener {
-            applyFeatureCatalogControlAction(latestRuntimeProControlsRenderModel?.apertureControl)
-        }
-        buttonProWhiteBalance.setOnClickListener {
-            applyFeatureCatalogControlAction(
-                latestRuntimeProControlsRenderModel?.whiteBalanceControl
-            )
-        }
         lensFacingButton.setOnClickListener {
             dispatch(SessionIntent.LensFacingToggled)
         }
         zoomRatioButton.setOnClickListener {
             dispatch(SessionIntent.ZoomRatioToggled)
-        }
-        stillQualityButton.setOnClickListener {
-            dispatch(SessionIntent.StillCaptureQualityToggled)
-        }
-        stillResolutionButton.setOnClickListener {
-            dispatch(SessionIntent.StillCaptureResolutionToggled)
         }
         buttonGridMode.setOnClickListener {
             applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.gridMode)
@@ -685,7 +590,7 @@ class MainActivity : ComponentActivity() {
             val guardState = GestureGuardState(
                 isSettingsPanelOpen = isSettingsPanelVisible,
                 isFilterPanelOpen = isFilterPanelVisible,
-                isMoreControlsOpen = isMoreControlsVisible,
+                isMoreControlsOpen = false,
                 isFilterAdjustmentActive = isFilterAdjustmentVisible
             )
             if (!gestureGuard.isGestureAllowed(GestureZone.PREVIEW, guardState)) {
@@ -739,7 +644,6 @@ class MainActivity : ComponentActivity() {
             showAdjustmentPanel = isFilterAdjustmentVisible,
             adjustmentMode = filterAdjustmentMode
         )
-        val runtimeProControls = runtimeProControlsRenderModel(state)
         val modeTrack = modeTrackRenderModel(state)
         val primaryStatus = primaryStatusRenderModel(state)
         latestSettingsPageRenderModel = settingsPage
@@ -747,7 +651,6 @@ class MainActivity : ComponentActivity() {
         latestWatermarkLabSelectorRenderModel = watermarkSelectorPage
         latestWatermarkLabDetailRenderModel = watermarkDetailPage
         latestFilterLabRenderModel = filterLabPage
-        latestRuntimeProControlsRenderModel = runtimeProControls
         // Top panel: lightweight primary status
         titleText.text = "${getString(R.string.app_name)} · ${primaryStatus.modeLabel}"
         renderModeTrack(modeTrack)
@@ -756,7 +659,6 @@ class MainActivity : ComponentActivity() {
         renderWatermarkLabSelectorPage(watermarkSelectorPage)
         renderWatermarkLabDetailPage(watermarkDetailPage)
         renderFilterLabPage(filterLabPage)
-        renderRuntimeProControls(runtimeProControls)
         previewOverlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter))
         previewView.scaleX = if (
             state.activeDeviceGraph.preferredLensFacing == LensFacing.FRONT &&
@@ -769,25 +671,11 @@ class MainActivity : ComponentActivity() {
         maybePlayShutterSound(state)
 
         shutterButton.text = state.modeSnapshot.uiSpec.shutterLabel
-        secondaryButton.text = state.modeSnapshot.uiSpec.secondaryActionLabel
-            ?: getString(R.string.button_secondary_action)
-        tertiaryButton.text = state.modeSnapshot.uiSpec.tertiaryActionLabel
-            ?: getString(R.string.button_tertiary_action)
-        runtimeProButton.text = state.modeSnapshot.uiSpec.proActionLabel
-            ?: getString(R.string.button_pro_mode)
         lensFacingButton.text = controls.lensFacingButtonLabel
         zoomRatioButton.text = controls.zoomButtonLabel
-        stillQualityButton.text = controls.stillQualityButtonLabel
-        stillResolutionButton.text = controls.stillResolutionButtonLabel
         shutterButton.isEnabled = state.modeSnapshot.state.isShutterEnabled
-        secondaryButton.isEnabled = state.modeSnapshot.state.isSecondaryActionEnabled
-        tertiaryButton.isEnabled = state.modeSnapshot.state.isTertiaryActionEnabled
-        runtimeProButton.isVisible = state.modeSnapshot.uiSpec.proActionLabel != null
-        runtimeProButton.isEnabled = state.modeSnapshot.state.isProActionEnabled
         lensFacingButton.isEnabled = controls.lensFacingEnabled
         zoomRatioButton.isEnabled = controls.zoomEnabled
-        stillQualityButton.isEnabled = controls.stillQualityEnabled
-        stillResolutionButton.isEnabled = controls.stillResolutionEnabled
         captureOutput.text = sessionCaptureOutputText(state, sessionUiStrings())
         renderZoomCapsules(controls)
         buttonDevEntry.isVisible = com.opencamera.app.BuildConfig.DEBUG
@@ -989,31 +877,6 @@ class MainActivity : ComponentActivity() {
     ) {
         button.text = model.buttonLabel
         button.isEnabled = editingEnabled && model.isInteractive
-    }
-
-    private fun renderFeatureCatalogControl(
-        button: Button,
-        model: FeatureCatalogControlRenderModel
-    ) {
-        button.text = model.buttonLabel
-        button.isEnabled = model.isInteractive
-    }
-
-    private fun renderRuntimeProControls(model: RuntimeProControlsRenderModel) {
-        proControlPanel.isVisible = model.isVisible
-        if (!model.isVisible) {
-            return
-        }
-        proControlHeadline.text = model.headline
-        proControlSupportingText.text = model.supportingText
-        proControlSummary.text = model.summary
-        renderFeatureCatalogControl(buttonProRaw, model.rawControl)
-        renderFeatureCatalogControl(buttonProIso, model.isoControl)
-        renderFeatureCatalogControl(buttonProShutter, model.shutterControl)
-        renderFeatureCatalogControl(buttonProExposure, model.exposureControl)
-        renderFeatureCatalogControl(buttonProFocus, model.focusControl)
-        renderFeatureCatalogControl(buttonProAperture, model.apertureControl)
-        renderFeatureCatalogControl(buttonProWhiteBalance, model.whiteBalanceControl)
     }
 
     private fun renderFilterLabPage(model: FilterLabPageRenderModel) {
@@ -1366,18 +1229,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun applyFeatureCatalogAction(action: FeatureCatalogAction) {
-        lifecycleScope.launch {
-            container.sessionSettingsManager.apply(action)
-        }
-    }
-
     private fun applySettingsControlAction(control: SettingsControlRenderModel?) {
         control?.nextAction?.let(::applySettingsAction)
-    }
-
-    private fun applyFeatureCatalogControlAction(control: FeatureCatalogControlRenderModel?) {
-        control?.nextAction?.let(::applyFeatureCatalogAction)
     }
 
     private fun openPortraitLab() {
