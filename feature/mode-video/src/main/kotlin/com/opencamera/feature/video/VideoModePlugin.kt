@@ -4,6 +4,9 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.resolveVideoSpec
+import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FilterEffect
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
@@ -164,6 +167,12 @@ private class VideoModeController(
             context.eventSink("video.recording.start.requested.torch-${torchTag()}")
             val resolvedVideoSpec = resolvedVideoSpec()
             val activeGraph = currentDeviceGraph()
+            val effectSpec = buildEffectSpec()
+            val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+            val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
+            val postProcessSpec = basePostProcess.copy(
+                watermarkText = videoWatermarkText()
+            )
             mutableSnapshot.value = buildSnapshot(
                 headline = "Recording requested",
                 detail = "Waiting for Session Kernel to start the ${resolvedVideoSpec.summaryLabel} recording task."
@@ -205,15 +214,11 @@ private class VideoModeController(
                                         "resolvedAudioProfile",
                                         resolvedVideoSpec.audioProfile.storageKey
                                     )
-                                    put("filterProfile", selectedFilter().id)
-                                    selectedFilter().renderSpec?.let { putAll(it.toMetadataTags()) }
+                                    putAll(bridgeTags)
                                 }
                             )
                         ),
-                    postProcessSpec = PostProcessSpec(
-                        watermarkText = videoWatermarkText(),
-                        algorithmProfile = selectedFilter().id
-                    ),
+                    postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         torchEnabled = torchEnabled
                     )
@@ -229,6 +234,13 @@ private class VideoModeController(
             detail = "Session Kernel is finalizing the active recording."
         )
         return ModeSignal.StopActiveCapture
+    }
+
+    private fun buildEffectSpec(): EffectSpec {
+        val filter = selectedFilter()
+        return EffectSpec(listOf(
+            FilterEffect(filter.id, filter.renderSpec)
+        ))
     }
 
     private suspend fun toggleTorch(): ModeSignal {

@@ -3,6 +3,9 @@ package com.opencamera.feature.document
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.effect.DocumentEffect
+import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
@@ -162,6 +165,24 @@ private class DocumentModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Document capture requested"
         )
+        val effectSpec = buildEffectSpec()
+        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+        val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
+        val postProcessSpec = basePostProcess.copy(
+            watermarkText = if (enhancementEnabled()) {
+                "DOC ${profile.label}"
+            } else {
+                "DOC Basic ${profile.label}"
+            },
+            exifOverrides = basePostProcess.exifOverrides + buildMap {
+                put("SceneCaptureType", "Document")
+                put("ProcessingRendered", if (enhancementEnabled()) "enhanced-scan" else "basic-archive")
+                if (enhancementEnabled()) {
+                    put("Contrast", profile.contrastLabel)
+                }
+            },
+            algorithmProfile = profile.algorithmProfile
+        )
         return ModeSignal.SubmitCapture(
             CaptureStrategy.SingleFrame(
                 saveRequest = SaveRequest.photoLibrary(
@@ -172,35 +193,31 @@ private class DocumentModeController(
                             put("mode", "document")
                             put("profile", profile.id)
                             put("scanMode", if (enhancementEnabled()) "enhanced" else "basic")
-                            put("autoCrop", profile.autoCrop.toString())
                             put("outputClass", "scan")
                             put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                             putAll(context.captureAidMetadataTags())
+                            putAll(bridgeTags)
                         }
                     )
                 ),
-                postProcessSpec = PostProcessSpec(
-                    watermarkText = if (enhancementEnabled()) {
-                        "DOC ${profile.label}"
-                    } else {
-                        "DOC Basic ${profile.label}"
-                    },
-                    exifOverrides = buildMap {
-                        put("SceneCaptureType", "Document")
-                        put("ProcessingRendered", if (enhancementEnabled()) "enhanced-scan" else "basic-archive")
-                        if (enhancementEnabled()) {
-                            put("Contrast", profile.contrastLabel)
-                        }
-                    },
-                    algorithmProfile = profile.algorithmProfile
-                ),
+                postProcessSpec = postProcessSpec,
                 captureProfile = com.opencamera.core.media.CaptureProfile(
                     stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
             )
         )
+    }
+
+    private fun buildEffectSpec(): EffectSpec {
+        val profile = currentProfile()
+        return EffectSpec(listOf(
+            DocumentEffect(
+                autoCrop = profile.autoCrop,
+                contrastProfile = if (enhancementEnabled()) profile.contrastLabel else null
+            )
+        ))
     }
 
     private suspend fun cycleProfile(): ModeSignal {

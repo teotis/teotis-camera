@@ -8,5 +8,6 @@ kotlin {
 
 dependencies {
     implementation(project(":core:mode"))
+    implementation(project(":core:effect"))
 }
 

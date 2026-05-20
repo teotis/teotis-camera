@@ -3,6 +3,9 @@ package com.opencamera.feature.night
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
@@ -176,6 +179,33 @@ private class NightModeController(
                 "Scenery countdown armed"
             }
         )
+        val effectSpec = buildEffectSpec()
+        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+        val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
+        val postProcessSpec = basePostProcess.copy(
+            watermarkText = if (proVariantEnabled) {
+                if (manualControlsEnabled()) {
+                    "Night Pro ${profile.label}"
+                } else {
+                    "Night Pro Assist ${profile.label}"
+                }
+            } else if (multiFrameEnabled()) {
+                "Night ${profile.label}"
+            } else {
+                "Night Assist ${profile.label}"
+            },
+            exifOverrides = basePostProcess.exifOverrides + buildMap {
+                put("SceneCaptureType", "Night")
+                put("NightProfile", profile.label)
+                if (proVariantEnabled) {
+                    put("NightVariant", if (manualControlsEnabled()) "Pro" else "Pro Assist")
+                    put("ManualDraft", currentManualDraft().compactSummary())
+                }
+                profile.longExposureMillis?.let { put("ExposureTime", "${it}ms") }
+                put("MergeStrategy", if (multiFrameEnabled()) "multi-frame" else "bright-single-frame")
+            },
+            algorithmProfile = resolvedAlgorithmProfile(profile.algorithmProfile)
+        )
         val saveRequest = SaveRequest.photoLibrary(
             relativePath = "Pictures/OpenCamera/Night",
             fileNamePrefix = "OpenCamera_NIGHT",
@@ -188,7 +218,6 @@ private class NightModeController(
                     put("stabilization", if (profile.requiresTripod) "tripod" else "handheld")
                     put("mergeFrameCount", profile.frameCount.toString())
                     put("flash", flashMode.name.lowercase())
-                    put("frameRatio", currentFrameRatio().tagValue)
                     put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                     put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                     put("modeVariant", if (proVariantEnabled) "pro" else "standard")
@@ -198,32 +227,9 @@ private class NightModeController(
                         putAll(currentManualDraft().toMetadataTags())
                     }
                     putAll(context.captureAidMetadataTags())
+                    putAll(bridgeTags)
                 }
             )
-        )
-        val postProcessSpec = PostProcessSpec(
-            watermarkText = if (proVariantEnabled) {
-                if (manualControlsEnabled()) {
-                    "Night Pro ${profile.label}"
-                } else {
-                    "Night Pro Assist ${profile.label}"
-                }
-            } else if (multiFrameEnabled()) {
-                "Night ${profile.label}"
-            } else {
-                "Night Assist ${profile.label}"
-            },
-            exifOverrides = buildMap {
-                put("SceneCaptureType", "Night")
-                put("NightProfile", profile.label)
-                if (proVariantEnabled) {
-                    put("NightVariant", if (manualControlsEnabled()) "Pro" else "Pro Assist")
-                    put("ManualDraft", currentManualDraft().compactSummary())
-                }
-                profile.longExposureMillis?.let { put("ExposureTime", "${it}ms") }
-                put("MergeStrategy", if (multiFrameEnabled()) "multi-frame" else "bright-single-frame")
-            },
-            algorithmProfile = resolvedAlgorithmProfile(profile.algorithmProfile)
         )
         val strategy = if (multiFrameEnabled()) {
             CaptureStrategy.MultiFrame(
@@ -255,6 +261,12 @@ private class NightModeController(
             strategy = strategy,
             countdownSeconds = countdownDuration().seconds
         )
+    }
+
+    private fun buildEffectSpec(): EffectSpec {
+        return EffectSpec(listOf(
+            FrameEffect(currentFrameRatio())
+        ))
     }
 
     private suspend fun cycleProfile(): ModeSignal {

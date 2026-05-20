@@ -3,6 +3,9 @@ package com.opencamera.feature.pro
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
@@ -177,6 +180,27 @@ private class ProModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Pro capture requested"
         )
+        val effectSpec = buildEffectSpec()
+        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+        val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
+        val postProcessSpec = basePostProcess.copy(
+            watermarkText = if (manualControlsEnabled()) {
+                "PRO ${preset.label}"
+            } else {
+                "PRO Assist ${preset.label}"
+            },
+            exifOverrides = basePostProcess.exifOverrides + if (manualControlsEnabled()) {
+                buildMap {
+                    preset.iso?.let { put("ISOSpeedRatings", it.toString()) }
+                    preset.exposureTime?.let { put("ExposureTime", it) }
+                    preset.whiteBalanceKelvin?.let { put("WhiteBalance", "${it}K") }
+                    preset.focusMode?.let { put("FocusMode", it) }
+                }
+            } else {
+                emptyMap()
+            },
+            algorithmProfile = preset.algorithmProfile
+        )
         return ModeSignal.SubmitCapture(
             CaptureStrategy.SingleFrame(
                 saveRequest = SaveRequest.photoLibrary(
@@ -193,31 +217,14 @@ private class ProModeController(
                             )
                             putAll(context.settingsSnapshot.catalog.manualCaptureDraft.toMetadataTags())
                             put("flash", flashMode.name.lowercase())
-                            put("frameRatio", currentFrameRatio().tagValue)
                             put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                             putAll(context.captureAidMetadataTags())
+                            putAll(bridgeTags)
                         }
                     )
                 ),
-                postProcessSpec = PostProcessSpec(
-                    watermarkText = if (manualControlsEnabled()) {
-                        "PRO ${preset.label}"
-                    } else {
-                        "PRO Assist ${preset.label}"
-                    },
-                    exifOverrides = if (manualControlsEnabled()) {
-                        buildMap {
-                            preset.iso?.let { put("ISOSpeedRatings", it.toString()) }
-                            preset.exposureTime?.let { put("ExposureTime", it) }
-                            preset.whiteBalanceKelvin?.let { put("WhiteBalance", "${it}K") }
-                            preset.focusMode?.let { put("FocusMode", it) }
-                        }
-                    } else {
-                        emptyMap()
-                    },
-                    algorithmProfile = preset.algorithmProfile
-                ),
+                postProcessSpec = postProcessSpec,
                 captureProfile = CaptureProfile(
                     flashMode = flashMode,
                     manualCaptureParams = context.settingsSnapshot.catalog.manualCaptureDraft,
@@ -226,6 +233,12 @@ private class ProModeController(
                 )
             )
         )
+    }
+
+    private fun buildEffectSpec(): EffectSpec {
+        return EffectSpec(listOf(
+            FrameEffect(currentFrameRatio())
+        ))
     }
 
     private suspend fun cyclePreset(): ModeSignal {

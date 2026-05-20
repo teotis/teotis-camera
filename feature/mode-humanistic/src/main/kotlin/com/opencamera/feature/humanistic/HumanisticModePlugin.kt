@@ -3,6 +3,10 @@ package com.opencamera.feature.humanistic
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FilterEffect
+import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FrameRatio
@@ -167,6 +171,24 @@ private class HumanisticModeController(
                 "Humanistic countdown armed"
             }
         )
+        val effectSpec = buildEffectSpec()
+        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+        val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
+        val postProcessSpec = basePostProcess.copy(
+            watermarkText = resolvedWatermarkText(style),
+            exifOverrides = basePostProcess.exifOverrides + buildMap {
+                put("SceneCaptureType", "Humanistic")
+                put("HumanisticStyle", style.label)
+                if (proVariantEnabled) {
+                    put(
+                        "HumanisticVariant",
+                        if (manualControlsEnabled()) "Pro" else "Pro Assist"
+                    )
+                    put("ManualDraft", currentManualDraft().compactSummary())
+                }
+            },
+            algorithmProfile = resolvedAlgorithmProfile(style.algorithmProfile)
+        )
         return ModeSignal.SubmitCapture(
             if (livePhotoEnabledByDefault()) {
                 CaptureStrategy.LivePhoto(
@@ -178,12 +200,10 @@ private class HumanisticModeController(
                                 put("mode", "humanistic")
                                 put("modeDisplay", "humanistic")
                                 put("style", style.id)
-                                put("filterProfile", style.id)
                                 put("algorithmProfile", style.algorithmProfile)
                                 put("watermarkTemplate", selectedWatermarkTemplate().id)
                                 put("livePhotoDefault", "on")
                                 putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
-                                put("frameRatio", currentFrameRatio().tagValue)
                                 put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                                 put("modeVariant", if (proVariantEnabled) "pro" else "standard")
@@ -193,25 +213,11 @@ private class HumanisticModeController(
                                     putAll(currentManualDraft().toMetadataTags())
                                 }
                                 putAll(context.captureAidMetadataTags())
-                                style.renderSpec?.let { putAll(it.toMetadataTags()) }
+                                putAll(bridgeTags)
                             }
                         )
                     ),
-                    postProcessSpec = PostProcessSpec(
-                        watermarkText = resolvedWatermarkText(style),
-                        algorithmProfile = resolvedAlgorithmProfile(style.algorithmProfile),
-                        exifOverrides = buildMap {
-                            put("SceneCaptureType", "Humanistic")
-                            put("HumanisticStyle", style.label)
-                            if (proVariantEnabled) {
-                                put(
-                                    "HumanisticVariant",
-                                    if (manualControlsEnabled()) "Pro" else "Pro Assist"
-                                )
-                                put("ManualDraft", currentManualDraft().compactSummary())
-                            }
-                        }
-                    ),
+                    postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
                         stillCaptureQuality = runtimeState().stillCaptureQuality,
@@ -229,11 +235,9 @@ private class HumanisticModeController(
                                 put("mode", "humanistic")
                                 put("modeDisplay", "humanistic")
                                 put("style", style.id)
-                                put("filterProfile", style.id)
                                 put("algorithmProfile", style.algorithmProfile)
                                 put("watermarkTemplate", selectedWatermarkTemplate().id)
                                 put("livePhotoDefault", "off")
-                                put("frameRatio", currentFrameRatio().tagValue)
                                 put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                                 put("modeVariant", if (proVariantEnabled) "pro" else "standard")
@@ -243,25 +247,11 @@ private class HumanisticModeController(
                                     putAll(currentManualDraft().toMetadataTags())
                                 }
                                 putAll(context.captureAidMetadataTags())
-                                style.renderSpec?.let { putAll(it.toMetadataTags()) }
+                                putAll(bridgeTags)
                             }
                         )
                     ),
-                    postProcessSpec = PostProcessSpec(
-                        watermarkText = resolvedWatermarkText(style),
-                        algorithmProfile = resolvedAlgorithmProfile(style.algorithmProfile),
-                        exifOverrides = buildMap {
-                            put("SceneCaptureType", "Humanistic")
-                            put("HumanisticStyle", style.label)
-                            if (proVariantEnabled) {
-                                put(
-                                    "HumanisticVariant",
-                                    if (manualControlsEnabled()) "Pro" else "Pro Assist"
-                                )
-                                put("ManualDraft", currentManualDraft().compactSummary())
-                            }
-                        }
-                    ),
+                    postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
                         stillCaptureQuality = runtimeState().stillCaptureQuality,
@@ -271,6 +261,14 @@ private class HumanisticModeController(
             },
             countdownSeconds = countdownDuration().seconds
         )
+    }
+
+    private fun buildEffectSpec(): EffectSpec {
+        val style = currentStyle()
+        return EffectSpec(listOf(
+            FilterEffect(style.id, style.renderSpec),
+            FrameEffect(currentFrameRatio())
+        ))
     }
 
     private suspend fun cycleStyle(): ModeSignal {

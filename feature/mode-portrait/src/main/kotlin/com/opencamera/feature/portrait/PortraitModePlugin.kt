@@ -3,6 +3,11 @@ package com.opencamera.feature.portrait
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FilterEffect
+import com.opencamera.core.effect.FrameEffect
+import com.opencamera.core.effect.PortraitEffect
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FrameRatio
@@ -184,6 +189,14 @@ private class PortraitModeController(
                 "Portrait countdown armed"
             }
         )
+        val effectSpec = buildEffectSpec()
+        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+        val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
+        val postProcessSpec = basePostProcess.copy(
+            watermarkText = resolvedWatermarkText(style),
+            exifOverrides = basePostProcess.exifOverrides + portraitExifOverrides(style, portraitSettings),
+            algorithmProfile = resolvedAlgorithmProfile(style.id)
+        )
         return ModeSignal.SubmitCapture(
             if (livePhotoEnabledByDefault()) {
                 CaptureStrategy.LivePhoto(
@@ -194,25 +207,9 @@ private class PortraitModeController(
                             customTags = buildMap {
                                 put("mode", "portrait")
                                 put("style", style.id)
-                                put("filterProfile", style.id)
-                                put("portraitProfile", portraitSettings.portraitProfile.storageKey)
-                                put(
-                                    "portraitBeautyPreset",
-                                    portraitSettings.portraitBeautyPreset.storageKey
-                                )
-                                put(
-                                    "portraitBeautyStrength",
-                                    portraitSettings.portraitBeautyStrength.storageKey
-                                )
-                                put(
-                                    "portraitBokehEffect",
-                                    portraitSettings.portraitBokehEffect.storageKey
-                                )
-                                put("renderPath", if (depthEffectEnabled()) "depth" else "focus")
                                 put("subjectTracking", style.subjectTracking.toString())
                                 put("livePhotoDefault", "on")
                                 putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
-                                put("frameRatio", currentFrameRatio().tagValue)
                                 put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                                 put("modeVariant", if (proVariantEnabled) "pro" else "standard")
@@ -223,41 +220,11 @@ private class PortraitModeController(
                                 }
                                 putAll(context.captureAidMetadataTags())
                                 style.bokehStrength?.let { put("bokehStrength", it.toString()) }
-                                style.renderSpec?.let { putAll(it.toMetadataTags()) }
+                                putAll(bridgeTags)
                             }
                         )
                     ),
-                    postProcessSpec = PostProcessSpec(
-                        watermarkText = if (proVariantEnabled) {
-                            if (manualControlsEnabled()) {
-                                "Portrait Pro ${style.label}"
-                            } else {
-                                "Portrait Pro Assist ${style.label}"
-                            }
-                        } else if (depthEffectEnabled()) {
-                            "Portrait ${style.label}"
-                        } else {
-                            "Portrait Focus ${style.label}"
-                        },
-                        exifOverrides = buildMap {
-                            put("SceneCaptureType", "Portrait")
-                            put("PortraitStyle", style.label)
-                            if (proVariantEnabled) {
-                                put("PortraitVariant", if (manualControlsEnabled()) "Pro" else "Pro Assist")
-                                put("ManualDraft", currentManualDraft().compactSummary())
-                            }
-                            put("PortraitProfile", portraitSettings.portraitProfile.label)
-                            put("PortraitBeautyPreset", portraitSettings.portraitBeautyPreset.label)
-                            put(
-                                "PortraitBeautyStrength",
-                                portraitSettings.portraitBeautyStrength.label
-                            )
-                            put("PortraitBokehEffect", portraitSettings.portraitBokehEffect.label)
-                            put("DepthEffect", if (depthEffectEnabled()) "simulated-bokeh" else "focus-priority")
-                            style.bokehStrength?.let { put("DepthStrength", "${it}f") }
-                        },
-                        algorithmProfile = resolvedAlgorithmProfile(style.id)
-                    ),
+                    postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
                         stillCaptureQuality = runtimeState().stillCaptureQuality,
@@ -274,24 +241,8 @@ private class PortraitModeController(
                         customTags = buildMap {
                             put("mode", "portrait")
                             put("style", style.id)
-                            put("filterProfile", style.id)
-                            put("portraitProfile", portraitSettings.portraitProfile.storageKey)
-                            put(
-                                "portraitBeautyPreset",
-                                portraitSettings.portraitBeautyPreset.storageKey
-                            )
-                            put(
-                                "portraitBeautyStrength",
-                                portraitSettings.portraitBeautyStrength.storageKey
-                            )
-                            put(
-                                "portraitBokehEffect",
-                                portraitSettings.portraitBokehEffect.storageKey
-                            )
-                            put("renderPath", if (depthEffectEnabled()) "depth" else "focus")
                             put("subjectTracking", style.subjectTracking.toString())
                             put("livePhotoDefault", "off")
-                            put("frameRatio", currentFrameRatio().tagValue)
                             put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                             put("modeVariant", if (proVariantEnabled) "pro" else "standard")
@@ -302,41 +253,11 @@ private class PortraitModeController(
                             }
                             putAll(context.captureAidMetadataTags())
                             style.bokehStrength?.let { put("bokehStrength", it.toString()) }
-                            style.renderSpec?.let { putAll(it.toMetadataTags()) }
+                            putAll(bridgeTags)
                         }
                     )
                 ),
-                postProcessSpec = PostProcessSpec(
-                    watermarkText = if (proVariantEnabled) {
-                        if (manualControlsEnabled()) {
-                            "Portrait Pro ${style.label}"
-                        } else {
-                            "Portrait Pro Assist ${style.label}"
-                        }
-                    } else if (depthEffectEnabled()) {
-                        "Portrait ${style.label}"
-                    } else {
-                        "Portrait Focus ${style.label}"
-                    },
-                    exifOverrides = buildMap {
-                        put("SceneCaptureType", "Portrait")
-                        put("PortraitStyle", style.label)
-                        if (proVariantEnabled) {
-                            put("PortraitVariant", if (manualControlsEnabled()) "Pro" else "Pro Assist")
-                            put("ManualDraft", currentManualDraft().compactSummary())
-                        }
-                        put("PortraitProfile", portraitSettings.portraitProfile.label)
-                        put("PortraitBeautyPreset", portraitSettings.portraitBeautyPreset.label)
-                        put(
-                            "PortraitBeautyStrength",
-                            portraitSettings.portraitBeautyStrength.label
-                        )
-                        put("PortraitBokehEffect", portraitSettings.portraitBokehEffect.label)
-                        put("DepthEffect", if (depthEffectEnabled()) "simulated-bokeh" else "focus-priority")
-                        style.bokehStrength?.let { put("DepthStrength", "${it}f") }
-                    },
-                    algorithmProfile = resolvedAlgorithmProfile(style.id)
-                ),
+                postProcessSpec = postProcessSpec,
                 captureProfile = CaptureProfile(
                     manualCaptureParams = currentManualDraftOrNull(),
                     stillCaptureQuality = runtimeState().stillCaptureQuality,
@@ -346,6 +267,54 @@ private class PortraitModeController(
             },
             countdownSeconds = countdownDuration().seconds
         )
+    }
+
+    private fun buildEffectSpec(): EffectSpec {
+        val style = currentStyle()
+        val portraitSettings = portraitSettings()
+        return EffectSpec(listOf(
+            FilterEffect(style.id, style.renderSpec),
+            PortraitEffect(
+                profileId = portraitSettings.portraitProfile.storageKey,
+                renderPath = if (depthEffectEnabled()) "depth" else "focus",
+                beautyPreset = portraitSettings.portraitBeautyPreset.storageKey,
+                beautyStrength = portraitSettings.portraitBeautyStrength.intensity,
+                bokehEffect = portraitSettings.portraitBokehEffect.storageKey
+            ),
+            FrameEffect(currentFrameRatio())
+        ))
+    }
+
+    private fun portraitExifOverrides(
+        style: PortraitStyle,
+        portraitSettings: PhotoSettings
+    ): Map<String, String> = buildMap {
+        put("SceneCaptureType", "Portrait")
+        put("PortraitStyle", style.label)
+        if (proVariantEnabled) {
+            put("PortraitVariant", if (manualControlsEnabled()) "Pro" else "Pro Assist")
+            put("ManualDraft", currentManualDraft().compactSummary())
+        }
+        put("PortraitProfile", portraitSettings.portraitProfile.label)
+        put("PortraitBeautyPreset", portraitSettings.portraitBeautyPreset.label)
+        put("PortraitBeautyStrength", portraitSettings.portraitBeautyStrength.label)
+        put("PortraitBokehEffect", portraitSettings.portraitBokehEffect.label)
+        put("DepthEffect", if (depthEffectEnabled()) "simulated-bokeh" else "focus-priority")
+        style.bokehStrength?.let { put("DepthStrength", "${it}f") }
+    }
+
+    private fun resolvedWatermarkText(style: PortraitStyle): String {
+        return if (proVariantEnabled) {
+            if (manualControlsEnabled()) {
+                "Portrait Pro ${style.label}"
+            } else {
+                "Portrait Pro Assist ${style.label}"
+            }
+        } else if (depthEffectEnabled()) {
+            "Portrait ${style.label}"
+        } else {
+            "Portrait Focus ${style.label}"
+        }
     }
 
     private suspend fun cycleStyle(): ModeSignal {
