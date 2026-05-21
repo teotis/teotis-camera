@@ -285,28 +285,12 @@
                 android:text="@string/button_photo_mode" />
 
             <Button
-                android:id="@+id/buttonDocumentMode"
-                style="@style/Widget.OpenCamera.ModeTrackButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/button_document_mode" />
-
-            <Button
                 android:id="@+id/buttonNightMode"
                 style="@style/Widget.OpenCamera.ModeTrackButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="@string/button_night_mode" />
-
-            <Button
-                android:id="@+id/buttonHumanisticMode"
-                style="@style/Widget.OpenCamera.ModeTrackButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/button_humanistic_mode" />
 
             <Button
                 android:id="@+id/buttonPortraitMode"
@@ -331,6 +315,23 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="@string/button_video_mode" />
+
+            <Button
+                android:id="@+id/buttonDocumentMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_document_mode" />
+
+            <Button
+                android:id="@+id/buttonHumanisticMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_humanistic_mode"
+                android:visibility="gone" />
         </LinearLayout>
     </HorizontalScrollView>
 

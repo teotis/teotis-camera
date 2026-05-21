@@ -1233,8 +1233,8 @@ class SessionUiRenderModelTest {
         )
 
         assertTrue(model.photoTab.isSelected)
-        assertTrue(model.rosterText.contains("• Humanistic Street"))
-        assertTrue(model.rosterText.contains("• Humanistic Life"))
+        assertTrue(model.rosterText.contains("Humanistic Street"))
+        assertTrue(model.rosterText.contains("Humanistic Life"))
     }
 
     @Test

@@ -584,7 +584,7 @@ internal fun modeDirectoryRenderModel(
     text: AppTextResolver
 ): ModeDirectoryRenderModel {
     return ModeDirectoryRenderModel(
-        items = state.availableModes.map { modeId ->
+        items = visibleModeEntryOrder(state.availableModes).map { modeId ->
             val declaration = modeId.modeDirectoryDeclaration(
                 deviceCapabilities = state.activeDeviceCapabilities,
                 settingsSnapshot = state.settings
@@ -606,11 +606,7 @@ internal fun modeTrackRenderModel(
     text: AppTextResolver
 ): ModeTrackRenderModel {
     return ModeTrackRenderModel(
-        items = state.availableModes.map { modeId ->
-            val declaration = modeId.modeDirectoryDeclaration(
-                deviceCapabilities = state.activeDeviceCapabilities,
-                settingsSnapshot = state.settings
-            )
+        items = visibleModeEntryOrder(state.availableModes).map { modeId ->
             ModeTrackItemRenderModel(
                 modeId = modeId,
                 trackLabel = text.modeTrackLabel(modeId),
@@ -619,6 +615,20 @@ internal fun modeTrackRenderModel(
             )
         }
     )
+}
+
+private val PRODUCT_MODE_ENTRY_ORDER = listOf(
+    ModeId.PHOTO,
+    ModeId.NIGHT,
+    ModeId.PORTRAIT,
+    ModeId.PRO,
+    ModeId.VIDEO,
+    ModeId.DOCUMENT
+)
+
+private fun visibleModeEntryOrder(availableModes: List<ModeId>): List<ModeId> {
+    val available = availableModes.toSet()
+    return PRODUCT_MODE_ENTRY_ORDER.filter { modeId -> modeId in available }
 }
 
 internal fun primaryStatusRenderModel(

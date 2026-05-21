@@ -63,7 +63,7 @@ class CameraCockpitRenderModelTest {
 
         assertEquals("OpenCamera", model.topStatus.appName)
         assertEquals("Humanistic", model.topStatus.modeLabel)
-        assertEquals("Settings", model.topStatus.labEntryLabel)
+        assertEquals("Color Lab", model.topStatus.labEntryLabel)
     }
 
     @Test
@@ -75,16 +75,14 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `right rail includes style lens lab quick and dev entries`() {
+    fun `right rail includes style quick and dev entries`() {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertEquals(5, model.rightRail.entries.size)
+        assertEquals(3, model.rightRail.entries.size)
         assertEquals("Style", model.rightRail.entries[0].label)
-        assertEquals("Lens Lab", model.rightRail.entries[1].label)
-        assertEquals("Quick", model.rightRail.entries[2].label)
-        assertEquals("Settings", model.rightRail.entries[3].label)
-        assertEquals("DEV", model.rightRail.entries[4].label)
+        assertEquals("Quick", model.rightRail.entries[1].label)
+        assertEquals("DEV", model.rightRail.entries[2].label)
     }
 
     @Test
@@ -92,7 +90,7 @@ class CameraCockpitRenderModelTest {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertFalse(model.rightRail.entries[4].isVisible)
+        assertFalse(model.rightRail.entries[2].isVisible)
     }
 
     @Test

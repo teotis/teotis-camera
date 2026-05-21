@@ -1428,13 +1428,14 @@ class MainActivity : AppCompatActivity() {
     private fun bindModeTrackTouch() {
         val buttons = listOf(
             photoModeButton to ModeId.PHOTO,
-            documentModeButton to ModeId.DOCUMENT,
             nightModeButton to ModeId.NIGHT,
-            humanisticModeButton to ModeId.HUMANISTIC,
             portraitModeButton to ModeId.PORTRAIT,
             proModeButton to ModeId.PRO,
-            videoModeButton to ModeId.VIDEO
+            videoModeButton to ModeId.VIDEO,
+            documentModeButton to ModeId.DOCUMENT
         )
+        humanisticModeButton.visibility = View.GONE
+        humanisticModeButton.setOnClickListener(null)
         modeTrackScrollGuard.attach(modeTrackScroll)
         buttons.forEach { (button, modeId) ->
             button.setOnClickListener {
@@ -1460,16 +1461,17 @@ class MainActivity : AppCompatActivity() {
     private fun renderModeTrack(model: ModeTrackRenderModel) {
         val buttons = listOf(
             photoModeButton,
-            documentModeButton,
             nightModeButton,
-            humanisticModeButton,
             portraitModeButton,
             proModeButton,
-            videoModeButton
+            videoModeButton,
+            documentModeButton
         )
+        humanisticModeButton.visibility = View.GONE
         model.items.forEachIndexed { index, item ->
             if (index < buttons.size) {
                 val button = buttons[index]
+                button.visibility = View.VISIBLE
                 button.text = item.trackLabel
                 button.isEnabled = item.isAvailable
                 if (item.isActive) {
@@ -1484,6 +1486,9 @@ class MainActivity : AppCompatActivity() {
                     button.alpha = if (item.isAvailable) 0.82f else 0.42f
                 }
             }
+        }
+        buttons.drop(model.items.size).forEach { button ->
+            button.visibility = View.GONE
         }
         // Auto-scroll only when active mode changes and user is not dragging
         val activeItem = model.items.firstOrNull { it.isActive }
