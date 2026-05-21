@@ -59,6 +59,7 @@ import com.opencamera.core.settings.WatermarkTextScale
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SessionUiRenderModelTest {
@@ -1250,7 +1251,7 @@ class SessionUiRenderModelTest {
     @Test
     fun `filter lab page uses text resolver for all key labels`() {
         val customResolver = object : TestAppTextResolver() {
-            override fun filterLab(): String = "滤镜实验室"
+            override fun stylePanelTitle(): String = "滤镜实验室"
             override fun saveAsCustom(): String = "保存"
         }
         val model = filterLabPageRenderModel(
@@ -1276,20 +1277,22 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `cockpit right rail exposes tone quick and lens lab entries`() {
+    fun `cockpit right rail exposes style lens lab quick and settings entries`() {
         val state = defaultSessionState()
         val text = TestAppTextResolver()
         val cockpit = cameraCockpitRenderModel(state, text, strings)
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
-        assertEquals(3, visibleEntries.size)
-        assertEquals("Tone", visibleEntries[0].label)
-        assertEquals("Quick", visibleEntries[1].label)
-        assertEquals("Settings", visibleEntries[2].label)
+        assertEquals(4, visibleEntries.size)
+        assertEquals("Style", visibleEntries[0].label)
+        assertEquals("Lens Lab", visibleEntries[1].label)
+        assertEquals("Quick", visibleEntries[2].label)
+        assertEquals("Settings", visibleEntries[3].label)
 
         assertTrue(visibleEntries[0].route is CockpitPanelRoute.FilterLab)
-        assertTrue(visibleEntries[1].route is CockpitPanelRoute.QuickBubble)
-        assertTrue(visibleEntries[2].route is CockpitPanelRoute.Settings)
+        assertTrue(visibleEntries[1].route is CockpitPanelRoute.LensLab)
+        assertTrue(visibleEntries[2].route is CockpitPanelRoute.QuickBubble)
+        assertTrue(visibleEntries[3].route is CockpitPanelRoute.Settings)
     }
 
     @Test
@@ -1304,20 +1307,21 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `tone lab entry label is Chinese via text resolver`() {
+    fun `style entry label is Chinese via text resolver`() {
         val chineseResolver = object : TestAppTextResolver() {
-            override fun tone(): String = "色调"
+            override fun styleEntry(): String = "风格"
+            override fun lensLabEntry(): String = "镜头实验室"
             override fun quickLauncher(): String = "快捷"
-            override fun lensLab(): String = "镜头实验室"
             override fun settingsEntry(): String = "设置"
         }
         val state = defaultSessionState()
         val cockpit = cameraCockpitRenderModel(state, chineseResolver, strings)
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
-        assertEquals("色调", visibleEntries[0].label)
-        assertEquals("快捷", visibleEntries[1].label)
-        assertEquals("设置", visibleEntries[2].label)
+        assertEquals("风格", visibleEntries[0].label)
+        assertEquals("镜头实验室", visibleEntries[1].label)
+        assertEquals("快捷", visibleEntries[2].label)
+        assertEquals("设置", visibleEntries[3].label)
     }
 
     @Test
@@ -1475,9 +1479,9 @@ class SessionUiRenderModelTest {
 
         val selectedItem = model.filterItems.firstOrNull { it.isSelected }
         assertNotNull(selectedItem)
-        assertTrue(selectedItem.supportingText.contains("Photo"),
-            "Selected item should contain family label: ${selectedItem.supportingText}")
-        assertTrue(selectedItem.supportingText.contains("Selected default"),
-            "Selected item should contain selected badge: ${selectedItem.supportingText}")
+        assertTrue(selectedItem!!.supportingText.contains("Photo"),
+            "Selected item should contain family label: ${selectedItem!!.supportingText}")
+        assertTrue(selectedItem!!.supportingText.contains("Selected default"),
+            "Selected item should contain selected badge: ${selectedItem!!.supportingText}")
     }
 }

@@ -1091,7 +1091,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Show/hide filter selection list based on panel role
-        val filterSectionParent = filterCurrentSummary.parent as? ViewGroup
         if (model.showFilterItems) {
             renderFilterSelectionList(model)
             renderSaveCustomControl(model.saveCustomControl, model.editingEnabled)

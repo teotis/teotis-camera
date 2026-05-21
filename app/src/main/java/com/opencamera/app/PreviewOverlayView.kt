@@ -148,15 +148,30 @@ class PreviewOverlayView @JvmOverloads constructor(
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (renderModel.isGridVisible) {
-            drawGrid(canvas, renderModel.gridMode)
-        }
         renderModel.effectModel?.filterOverlay?.let { drawFilterOverlay(canvas, it) }
         renderModel.effectModel?.frameGuideline?.let { drawFrameGuideline(canvas, it) }
         renderModel.frame?.let { drawPreviewFrame(canvas, it) }
+        if (renderModel.isGridVisible) {
+            drawGrid(canvas, renderModel.gridMode)
+        }
         renderModel.effectModel?.watermarkHint?.let { drawWatermarkHint(canvas, it) }
         if (renderModel.isCountdownVisible) {
             drawCountdown(canvas, renderModel.countdownLabel.orEmpty())
+        }
+    }
+
+    private fun activeFrameRectOrFullView(): RectF {
+        val frameRatio = renderModel.frame?.ratio
+            ?: renderModel.effectModel?.frameGuideline?.ratio
+        return if (frameRatio != null) {
+            computePreviewFrameRect(
+                viewWidth = width,
+                viewHeight = height,
+                ratioWidth = frameRatio.width,
+                ratioHeight = frameRatio.height
+            )
+        } else {
+            RectF(0f, 0f, width.toFloat(), height.toFloat())
         }
     }
 
@@ -164,40 +179,29 @@ class PreviewOverlayView @JvmOverloads constructor(
         canvas: Canvas,
         gridMode: CompositionGridMode
     ) {
+        val bounds = activeFrameRectOrFullView()
         when (gridMode) {
             CompositionGridMode.OFF -> Unit
             CompositionGridMode.RULE_OF_THIRDS -> {
-                drawGridLines(canvas, listOf(1f / 3f, 2f / 3f))
+                drawGridLines(canvas, listOf(1f / 3f, 2f / 3f), bounds)
             }
             CompositionGridMode.GOLDEN_RATIO -> {
-                drawGridLines(canvas, listOf(0.38196602f, 0.61803395f))
+                drawGridLines(canvas, listOf(0.38196602f, 0.61803395f), bounds)
             }
         }
     }
 
     private fun drawGridLines(
         canvas: Canvas,
-        fractions: List<Float>
+        fractions: List<Float>,
+        bounds: RectF
     ) {
-        val widthValue = width.toFloat()
-        val heightValue = height.toFloat()
-        fractions.forEach { fraction ->
-            val x = widthValue * fraction
-            val y = heightValue * fraction
-            canvas.drawLine(x, 0f, x, heightValue, gridPaint)
-            canvas.drawLine(0f, y, widthValue, y, gridPaint)
-        }
-
-        val safeInset = 18f * density
-        canvas.drawRect(
-            RectF(
-                safeInset,
-                safeInset,
-                widthValue - safeInset,
-                heightValue - safeInset
-            ),
-            gridEmphasisPaint
+        val segments = gridLinePositions(
+            bounds.left, bounds.top, bounds.width(), bounds.height(), fractions
         )
+        segments.forEach { seg ->
+            canvas.drawLine(seg.x1, seg.y1, seg.x2, seg.y2, gridPaint)
+        }
     }
 
     private fun drawCountdown(
@@ -230,19 +234,12 @@ class PreviewOverlayView @JvmOverloads constructor(
     private fun drawFrameGuideline(canvas: Canvas, spec: FrameGuidelineSpec) {
         frameGuidelinePaint.color = spec.borderColor
         frameGuidelinePaint.alpha = (spec.borderAlpha * 255).toInt().coerceIn(0, 255)
-        val ratio = spec.ratio.width.toFloat() / spec.ratio.height.toFloat()
-        val viewRatio = width.toFloat() / height.toFloat()
-        val rect = if (ratio > viewRatio) {
-            val w = width.toFloat()
-            val h = w / ratio
-            val top = (height.toFloat() - h) / 2f
-            RectF(0f, top, w, top + h)
-        } else {
-            val h = height.toFloat()
-            val w = h * ratio
-            val left = (width.toFloat() - w) / 2f
-            RectF(left, 0f, left + w, h)
-        }
+        val rect = computePreviewFrameRect(
+            viewWidth = width,
+            viewHeight = height,
+            ratioWidth = spec.ratio.width,
+            ratioHeight = spec.ratio.height
+        )
         canvas.drawRect(rect, frameGuidelinePaint)
     }
 
@@ -301,6 +298,79 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 }
 
+internal enum class PreviewDisplayOrientation { PORTRAIT, LANDSCAPE }
+
+internal data class OrientedFrameRatio(
+    val orientedWidth: Int,
+    val orientedHeight: Int
+)
+
+internal fun orientedFrameRatio(
+    ratioWidth: Int,
+    ratioHeight: Int,
+    orientation: PreviewDisplayOrientation
+): OrientedFrameRatio {
+    if (ratioWidth == ratioHeight) return OrientedFrameRatio(1, 1)
+    return when (orientation) {
+        PreviewDisplayOrientation.PORTRAIT -> OrientedFrameRatio(
+            orientedWidth = minOf(ratioWidth, ratioHeight),
+            orientedHeight = maxOf(ratioWidth, ratioHeight)
+        )
+        PreviewDisplayOrientation.LANDSCAPE -> OrientedFrameRatio(
+            orientedWidth = maxOf(ratioWidth, ratioHeight),
+            orientedHeight = minOf(ratioWidth, ratioHeight)
+        )
+    }
+}
+
+internal data class FrameRect(
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float
+) {
+    val width: Float get() = right - left
+    val height: Float get() = bottom - top
+    val centerX: Float get() = (left + right) / 2f
+    val centerY: Float get() = (top + bottom) / 2f
+}
+
+internal fun computeFrameRect(
+    viewWidth: Int,
+    viewHeight: Int,
+    ratioWidth: Int,
+    ratioHeight: Int,
+    horizontalPaddingPx: Float = 0f,
+    topInsetPx: Float = 0f,
+    bottomInsetPx: Float = 0f
+): FrameRect {
+    val availableLeft = horizontalPaddingPx
+    val availableTop = topInsetPx
+    val availableRight = viewWidth - horizontalPaddingPx
+    val availableBottom = viewHeight - bottomInsetPx
+    val availableWidth = (availableRight - availableLeft).coerceAtLeast(1f)
+    val availableHeight = (availableBottom - availableTop).coerceAtLeast(1f)
+    val orientation = if (viewWidth <= viewHeight) {
+        PreviewDisplayOrientation.PORTRAIT
+    } else {
+        PreviewDisplayOrientation.LANDSCAPE
+    }
+    val oriented = orientedFrameRatio(ratioWidth, ratioHeight, orientation)
+    val targetRatio = oriented.orientedWidth.toFloat() / oriented.orientedHeight.toFloat()
+    val availableRatio = availableWidth / availableHeight
+    return if (targetRatio > availableRatio) {
+        val w = availableWidth
+        val h = w / targetRatio
+        val top = availableTop + (availableHeight - h) / 2f
+        FrameRect(availableLeft, top, availableRight, top + h)
+    } else {
+        val h = availableHeight
+        val w = h * targetRatio
+        val left = availableLeft + (availableWidth - w) / 2f
+        FrameRect(left, availableTop, left + w, availableBottom)
+    }
+}
+
 internal fun computePreviewFrameRect(
     viewWidth: Int,
     viewHeight: Int,
@@ -310,23 +380,29 @@ internal fun computePreviewFrameRect(
     topInsetPx: Float = 0f,
     bottomInsetPx: Float = 0f
 ): RectF {
-    val availableLeft = horizontalPaddingPx
-    val availableTop = topInsetPx
-    val availableRight = viewWidth - horizontalPaddingPx
-    val availableBottom = viewHeight - bottomInsetPx
-    val availableWidth = (availableRight - availableLeft).coerceAtLeast(1f)
-    val availableHeight = (availableBottom - availableTop).coerceAtLeast(1f)
-    val targetRatio = ratioWidth.toFloat() / ratioHeight.toFloat()
-    val availableRatio = availableWidth / availableHeight
-    return if (targetRatio > availableRatio) {
-        val w = availableWidth
-        val h = w / targetRatio
-        val top = availableTop + (availableHeight - h) / 2f
-        RectF(availableLeft, top, availableRight, top + h)
-    } else {
-        val h = availableHeight
-        val w = h * targetRatio
-        val left = availableLeft + (availableWidth - w) / 2f
-        RectF(left, availableTop, left + w, availableBottom)
+    val r = computeFrameRect(viewWidth, viewHeight, ratioWidth, ratioHeight,
+        horizontalPaddingPx, topInsetPx, bottomInsetPx)
+    return RectF(r.left, r.top, r.right, r.bottom)
+}
+
+internal data class GridLineSegment(
+    val x1: Float, val y1: Float,
+    val x2: Float, val y2: Float
+)
+
+internal fun gridLinePositions(
+    frameLeft: Float,
+    frameTop: Float,
+    frameWidth: Float,
+    frameHeight: Float,
+    fractions: List<Float>
+): List<GridLineSegment> {
+    return fractions.flatMap { fraction ->
+        val x = frameLeft + frameWidth * fraction
+        val y = frameTop + frameHeight * fraction
+        listOf(
+            GridLineSegment(x, frameTop, x, frameTop + frameHeight),
+            GridLineSegment(frameLeft, y, frameLeft + frameWidth, y)
+        )
     }
 }
