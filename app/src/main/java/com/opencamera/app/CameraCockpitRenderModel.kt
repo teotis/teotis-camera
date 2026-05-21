@@ -20,7 +20,8 @@ internal data class TopStatusRenderModel(
     val appName: String,
     val modeLabel: String,
     val statusText: String,
-    val labEntryLabel: String
+    val labEntryLabel: String,
+    val settingsEntryLabel: String
 )
 
 internal data class RightRailEntryRenderModel(
@@ -90,7 +91,8 @@ internal fun cameraCockpitRenderModel(
             appName = "OpenCamera",
             modeLabel = primary.modeLabel,
             statusText = primary.statusText,
-            labEntryLabel = text.colorLabEntry()
+            labEntryLabel = text.colorLabEntry(),
+            settingsEntryLabel = text.settingsEntry()
         ),
         rightRail = RightRailRenderModel(
             entries = listOf(
@@ -107,8 +109,7 @@ internal fun cameraCockpitRenderModel(
                 RightRailEntryRenderModel(
                     route = CockpitPanelRoute.DevConsole,
                     label = text.devEntry(),
-                    isActive = activeRoute is CockpitPanelRoute.DevConsole,
-                    isVisible = false
+                    isActive = activeRoute is CockpitPanelRoute.DevConsole
                 )
             )
         ),

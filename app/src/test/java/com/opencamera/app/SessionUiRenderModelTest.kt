@@ -1336,18 +1336,20 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `cockpit right rail exposes style and quick entries`() {
+    fun `cockpit right rail exposes style quick and dev entries`() {
         val state = defaultSessionState()
         val text = TestAppTextResolver()
         val cockpit = cameraCockpitRenderModel(state, text, strings)
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
-        assertEquals(2, visibleEntries.size)
+        assertEquals(3, visibleEntries.size)
         assertEquals("Style", visibleEntries[0].label)
         assertEquals("Quick", visibleEntries[1].label)
+        assertEquals("DEV", visibleEntries[2].label)
 
         assertTrue(visibleEntries[0].route is CockpitPanelRoute.FilterLab)
         assertTrue(visibleEntries[1].route is CockpitPanelRoute.QuickBubble)
+        assertTrue(visibleEntries[2].route is CockpitPanelRoute.DevConsole)
     }
 
     @Test
@@ -1367,6 +1369,7 @@ class SessionUiRenderModelTest {
             override fun styleEntry(): String = "风格"
             override fun quickLauncher(): String = "快捷"
             override fun colorLabEntry(): String = "色彩实验室"
+            override fun settingsEntry(): String = "设置"
         }
         val state = defaultSessionState()
         val cockpit = cameraCockpitRenderModel(state, chineseResolver, strings)
@@ -1375,6 +1378,7 @@ class SessionUiRenderModelTest {
         assertEquals("风格", visibleEntries[0].label)
         assertEquals("快捷", visibleEntries[1].label)
         assertEquals("色彩实验室", cockpit.topStatus.labEntryLabel)
+        assertEquals("设置", cockpit.topStatus.settingsEntryLabel)
     }
 
     @Test

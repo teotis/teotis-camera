@@ -66,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var panelDismissScrim: View
     private lateinit var titleText: TextView
     private lateinit var permissionStatus: TextView
+    private lateinit var buttonColorLabEntry: Button
     private lateinit var buttonSettingsEntry: Button
     private lateinit var buttonLensLabEntry: Button
     private lateinit var buttonFilterEntry: Button
@@ -242,6 +243,7 @@ class MainActivity : AppCompatActivity() {
         panelDismissScrim = findViewById(R.id.panelDismissScrim)
         titleText = findViewById(R.id.titleText)
         permissionStatus = findViewById(R.id.permissionStatus)
+        buttonColorLabEntry = findViewById(R.id.buttonColorLabEntry)
         buttonSettingsEntry = findViewById(R.id.buttonSettingsEntry)
         buttonLensLabEntry = findViewById(R.id.buttonLensLabEntry)
         buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
@@ -441,7 +443,7 @@ class MainActivity : AppCompatActivity() {
             renderPanelVisibility()
             renderDevConsoleVisibility()
         }
-        buttonSettingsEntry.setOnClickListener {
+        buttonColorLabEntry.setOnClickListener {
             activePanelRoute = if (activePanelRoute is CockpitPanelRoute.LensLab) {
                 CockpitPanelRoute.None
             } else {
@@ -457,6 +459,9 @@ class MainActivity : AppCompatActivity() {
                 lightPaletteBaseSpec = null
             }
             renderPanelVisibility()
+        }
+        buttonSettingsEntry.setOnClickListener {
+            toggleSettingsPanel()
         }
         buttonLensLabEntry.setOnClickListener {
             activePanelRoute = if (activePanelRoute is CockpitPanelRoute.LensLab) {
@@ -827,7 +832,7 @@ class MainActivity : AppCompatActivity() {
         latestWatermarkLabDetailRenderModel = watermarkDetailPage
         latestFilterLabRenderModel = filterLabPage
         // Top panel: lightweight primary status
-        titleText.text = "${getString(R.string.app_name)} · ${text.modeDisplayName(state.activeMode)}"
+        titleText.text = getString(R.string.app_name)
         renderModeTrack(modeTrack)
         renderSettingsPage(settingsPage)
         renderPortraitLabPage(portraitLabPage)
@@ -1331,7 +1336,8 @@ class MainActivity : AppCompatActivity() {
         settingsWatermarkDetailContent.isVisible = subpage == SettingsSubpage.WATERMARK_DETAIL
         buttonSettingsBack.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
 
-        buttonSettingsEntry.alpha = if (route is CockpitPanelRoute.LensLab) 1f else 0.92f
+        buttonColorLabEntry.alpha = if (route is CockpitPanelRoute.LensLab) 1f else 0.92f
+        buttonSettingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
         buttonFilterEntry.alpha = if (route is CockpitPanelRoute.FilterLab) 1f else 0.92f
         quickBubblePanel.isVisible = route is CockpitPanelRoute.QuickBubble
         buttonQuickLauncher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
@@ -1378,7 +1384,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderDevConsoleVisibility() {
         val isDevVisible = activePanelRoute is CockpitPanelRoute.DevConsole
-        devConsolePanel.isVisible = isDevVisible && com.opencamera.app.BuildConfig.DEBUG
+        devConsolePanel.isVisible = isDevVisible
         buttonDevEntry.alpha = if (isDevVisible) 1f else 0.78f
         if (isDevVisible) {
             renderDevConsole()

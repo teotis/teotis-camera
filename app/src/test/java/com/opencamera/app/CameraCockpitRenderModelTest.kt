@@ -64,6 +64,7 @@ class CameraCockpitRenderModelTest {
         assertEquals("OpenCamera", model.topStatus.appName)
         assertEquals("Humanistic", model.topStatus.modeLabel)
         assertEquals("Color Lab", model.topStatus.labEntryLabel)
+        assertEquals("Settings", model.topStatus.settingsEntryLabel)
     }
 
     @Test
@@ -86,11 +87,11 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `right rail dev entry is not visible by default`() {
+    fun `right rail dev entry is visible by default`() {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertFalse(model.rightRail.entries[2].isVisible)
+        assertTrue(model.rightRail.entries[2].isVisible)
     }
 
     @Test
