@@ -77,12 +77,8 @@ internal data class ZoomCapsuleRenderModel(
 internal data class SessionControlsRenderModel(
     val lensFacingButtonLabel: String,
     val zoomButtonLabel: String,
-    val stillQualityButtonLabel: String,
-    val stillResolutionButtonLabel: String,
     val lensFacingEnabled: Boolean,
     val zoomEnabled: Boolean,
-    val stillQualityEnabled: Boolean,
-    val stillResolutionEnabled: Boolean,
     val zoomCapsules: List<ZoomCapsuleRenderModel>,
     val isZoomCapsuleRowVisible: Boolean
 )
@@ -397,12 +393,8 @@ internal fun sessionControlsRenderModel(
     return SessionControlsRenderModel(
         lensFacingButtonLabel = lensFacingButtonLabel(state, strings),
         zoomButtonLabel = zoomButtonLabel(state, strings),
-        stillQualityButtonLabel = stillQualityButtonLabel(state, strings),
-        stillResolutionButtonLabel = stillResolutionButtonLabel(state, strings),
         lensFacingEnabled = state.activeDeviceCapabilities.availableLensFacings.size > 1,
         zoomEnabled = state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported,
-        stillQualityEnabled = state.activeDeviceGraph.template == CaptureTemplate.STILL_CAPTURE,
-        stillResolutionEnabled = isStillResolutionToggleEnabled(state),
         zoomCapsules = zoomCapsuleModels(state),
         isZoomCapsuleRowVisible = state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported
     )
@@ -676,10 +668,6 @@ internal fun sessionDiagnosticsText(
             }
         )
     }
-}
-
-internal fun diagnosticsToggleLabel(isVisible: Boolean): String {
-    return if (isVisible) "Hide Debug" else "Show Debug"
 }
 
 private fun StringBuilder.appendLiveAssetLine(
@@ -1822,19 +1810,6 @@ private fun zoomCapsuleModels(state: SessionState): List<ZoomCapsuleRenderModel>
     }
 }
 
-private fun stillQualityButtonLabel(
-    state: SessionState,
-    strings: SessionUiStrings
-): String {
-    if (state.activeDeviceGraph.template != CaptureTemplate.STILL_CAPTURE) {
-        return strings.buttonStillQualityUnavailable
-    }
-    return when (state.activeDeviceGraph.stillCapture.qualityPreference) {
-        com.opencamera.core.media.StillCaptureQualityPreference.LATENCY -> strings.buttonStillFast
-        com.opencamera.core.media.StillCaptureQualityPreference.QUALITY -> strings.buttonStillMax
-    }
-}
-
 private fun zoomRatioLabel(zoomRatio: Float): String {
     return "${normalizedZoomRatioValue(zoomRatio)}x"
 }
@@ -1848,25 +1823,6 @@ private fun ZoomRatioCapability.zoomRatioSummary(): String {
         )
         append(" | ")
         append(support.label)
-    }
-}
-
-private fun stillResolutionButtonLabel(
-    state: SessionState,
-    strings: SessionUiStrings
-): String {
-    if (state.activeDeviceGraph.template != CaptureTemplate.STILL_CAPTURE) {
-        return strings.buttonStillResolutionUnavailable
-    }
-    val outputSize = selectedNativeStillCaptureOutputSizeOrNull(state)
-    return if (outputSize != null) {
-        "Still ${outputSize.label}"
-    } else {
-        when (state.activeDeviceGraph.stillCapture.resolutionPreset) {
-            com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP -> strings.buttonStill12Mp
-            com.opencamera.core.media.StillCaptureResolutionPreset.MEDIUM_8MP -> strings.buttonStill8Mp
-            com.opencamera.core.media.StillCaptureResolutionPreset.SMALL_2MP -> strings.buttonStill2Mp
-        }
     }
 }
 

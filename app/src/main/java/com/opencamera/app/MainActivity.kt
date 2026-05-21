@@ -148,7 +148,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var zoomCapsuleScroll: android.widget.HorizontalScrollView
     private lateinit var zoomCapsuleRow: LinearLayout
     private lateinit var buttonDevEntry: Button
-    private lateinit var devConsolePanel: androidx.core.widget.NestedScrollView
+    private lateinit var devConsolePanel: com.google.android.material.card.MaterialCardView
     private lateinit var buttonDevTabKey: Button
     private lateinit var buttonDevTabCore: Button
     private lateinit var buttonDevTabError: Button

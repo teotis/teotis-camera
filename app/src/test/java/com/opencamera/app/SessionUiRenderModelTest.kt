@@ -88,12 +88,8 @@ class SessionUiRenderModelTest {
 
         assertEquals("Switch to Front", model.lensFacingButtonLabel)
         assertEquals("Zoom 2.0x", model.zoomButtonLabel)
-        assertEquals("Still Max", model.stillQualityButtonLabel)
-        assertEquals("Still 4000x3000", model.stillResolutionButtonLabel)
         assertTrue(model.lensFacingEnabled)
         assertTrue(model.zoomEnabled)
-        assertTrue(model.stillQualityEnabled)
-        assertTrue(model.stillResolutionEnabled)
     }
 
     @Test
@@ -113,12 +109,8 @@ class SessionUiRenderModelTest {
 
         assertEquals("Single Lens", model.lensFacingButtonLabel)
         assertEquals("Zoom N/A", model.zoomButtonLabel)
-        assertEquals("Still N/A", model.stillQualityButtonLabel)
-        assertEquals("Size N/A", model.stillResolutionButtonLabel)
         assertFalse(model.lensFacingEnabled)
         assertFalse(model.zoomEnabled)
-        assertFalse(model.stillQualityEnabled)
-        assertFalse(model.stillResolutionEnabled)
     }
 
     @Test
@@ -303,12 +295,6 @@ class SessionUiRenderModelTest {
         )
         assertTrue(diagnostics.contains("Error: provider restarted"))
         assertTrue(diagnostics.contains("2. preview.recovery.started -> recover after provider restart"))
-    }
-
-    @Test
-    fun `diagnostics toggle label reflects visibility`() {
-        assertEquals("Show Debug", diagnosticsToggleLabel(false))
-        assertEquals("Hide Debug", diagnosticsToggleLabel(true))
     }
 
     @Test
