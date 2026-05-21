@@ -86,6 +86,20 @@
 
 # 最近有效闭环
 
+## 2026-05-22：人文入口并入拍照风格，模式栏顺序收敛
+
+- 目标：按产品判断移除 `HUMANISTIC` 的主模式视觉入口，把人文核心滤镜资源作为拍照风格子项继续保留，并将模式栏顺序调整为 `拍照 / 风景 / 人像 / 专业 / 视频 / 文档`。
+- 核心结果：
+  [`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 新增可见模式入口顺序，`modeDirectoryRenderModel` 与 `modeTrackRenderModel` 现在过滤 `ModeId.HUMANISTIC` 并按 `PHOTO / NIGHT / PORTRAIT / PRO / VIDEO / DOCUMENT` 输出；
+  [`MainActivity.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/MainActivity.kt) 与 [`activity_main.xml`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/res/layout/activity_main.xml) 同步将模式栏点击绑定和 XML 顺序改为相同 6 项，并隐藏旧人文按钮；
+  `HUMANISTIC` mode/plugin/metadata 内部能力未删除，避免破坏历史保存路径、滤镜资源、Live/Pro variant 兼容语义；
+  [`SessionUiRenderModelTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/SessionUiRenderModelTest.kt) 与 [`CameraCockpitRenderModelTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/CameraCockpitRenderModelTest.kt) 补齐模式入口顺序和“拍照风格池包含 Humanistic Street/Life”回归。
+- 验证：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests "com.opencamera.app.SessionUiRenderModelTest.mode directory render model hides humanistic entry and uses product order" --tests "com.opencamera.app.SessionUiRenderModelTest.mode track render model hides humanistic entry and uses product order" --tests "com.opencamera.app.SessionUiRenderModelTest.photo filter family exposes humanistic styles as photo style subitems" --tests "com.opencamera.app.CameraCockpitRenderModelTest.mode track hides humanistic and uses product order"`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
+  `./gradlew --no-daemon :app:assembleDebug`
+- 备注：完整 `CameraCockpitRenderModelTest` 类当前仍有右侧栏旧期望失败，失败点与本次模式入口改动无关；本轮只验证了新增/修改的 cockpit mode track 用例。
+
 ## 2026-05-22：最新版 APK 第四轮真机反馈方案文档
 
 - 目标：把用户对最新版 APK 的新一轮真机问题按处理领域拆解，形成可直接交给非多模态 agent 的 Markdown 落地方案，并把需要观察截图、录屏、横屏真实手感和保存图对比的事项隔离给多模态 agent。
