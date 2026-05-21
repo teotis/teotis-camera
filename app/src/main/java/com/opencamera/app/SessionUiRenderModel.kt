@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import com.opencamera.core.device.CaptureTemplate
+import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.device.LensFacing
@@ -739,6 +740,15 @@ internal fun sessionDiagnosticsText(
                 "failure=${recovery.lastFailureReason ?: "--"}"
         )
         appendLine("Action: ${debugDump.lastAction}")
+        debugDump.resourceDiagnostics?.let { res ->
+            val degradations = res.featureDegradations.entries.joinToString(", ") { "${it.key}=${it.value}" }
+            appendLine(
+                "Resource: thermal=${res.thermalState.tagValue} | class=${res.performanceClass.tagValue} | " +
+                    "memory=${res.memoryBudgetBytes / 1024 / 1024}MB | " +
+                    "jobs=${res.activeAlgorithmJobs}/${res.maxConcurrentAlgorithmJobs}" +
+                    if (degradations.isNotEmpty()) " | degradations=$degradations" else ""
+            )
+        }
         if (debugDump.lastError != null) {
             appendLine("Error: ${debugDump.lastError}")
         }
@@ -2083,6 +2093,9 @@ internal fun devLogRenderModel(
         appendLine("DebugDump: ${debugDump.lifecycle} | ${debugDump.activeMode.name} | preview=${debugDump.previewStatus} | capture=${debugDump.captureStatus} | recording=${debugDump.recordingStatus}")
         appendLine("PerfSnapshot: last=${perf.lastFirstFrameLatencyMillis ?: "--"} ms, best=${perf.bestFirstFrameLatencyMillis ?: "--"} ms, worst=${perf.worstFirstFrameLatencyMillis ?: "--"} ms, binds=${perf.bindCount}, recoveries=${perf.recoveryCount}")
         appendLine("RecoveryTrace: ${if (recovery.isRecoveryActive) "active" else "idle"}, last=${recovery.lastRecoveryReason ?: "--"}, recoveredFrame=${recovery.recoveredFirstFrameLatencyMillis ?: "--"} ms, failure=${recovery.lastFailureReason ?: "--"}")
+        debugDump.resourceDiagnostics?.let { res ->
+            appendLine("Resource: thermal=${res.thermalState.tagValue} | class=${res.performanceClass.tagValue} | jobs=${res.activeAlgorithmJobs}/${res.maxConcurrentAlgorithmJobs}")
+        }
     }
 
     val tabContent = when (selectedTab) {
@@ -2101,6 +2114,10 @@ internal fun devLogRenderModel(
         appendLine(formatEvents(errorEvents))
         appendLine("=== ALL EVENTS ===")
         appendLine(formatEvents(allEvents))
+        debugDump.resourceDiagnostics?.let { res ->
+            appendLine("=== RESOURCE DIAGNOSTICS ===")
+            res.pipelineNotes.forEach { note -> appendLine(note) }
+        }
         appendLine("=== CORE SUMMARY ===")
         append(coreSummary)
     }
