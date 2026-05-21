@@ -938,7 +938,7 @@ internal fun sessionSettingsPageRenderModel(
                 supportLabel = when {
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.resolutionDegraded ->
-                        "Saved as ${selectedVideoSpec.resolution.label}, active graph uses ${activeVideoSpec.resolution.label}"
+                        "已保存为 ${selectedVideoSpec.resolution.label}，活跃图使用 ${activeVideoSpec.resolution.label}"
                     else -> supportCountLabel(videoConstraints.resolutions.size)
                 },
                 nextAction = if (supportsVideoRecording) {
@@ -1056,7 +1056,7 @@ internal fun sessionSettingsPageRenderModel(
                     SettingsControlAvailability.UNSUPPORTED
                 },
                 supportLabel = if (supportsVideoRecording) {
-                    "Saved filter seed only; ${videoFilters.size} looks staged"
+                    "已保存滤镜种子；${videoFilters.size} 个外观已暂存"
                 } else {
                     text.videoRecordingUnavailable()
                 },
@@ -1099,27 +1099,27 @@ internal fun runtimeProControlsRenderModel(
     val manualCapabilities = state.activeDeviceCapabilities.resolvedManualControlCapabilities
     val hasAppliedManualControls = state.activeDeviceCapabilities.supportsAppliedManualControls
     val editingEnabled = state.activeShot == null && state.countdownRemainingSeconds == null
-    val runtimeSupportLabel = manualSupportSummary(manualCapabilities)
+    val runtimeSupportLabel = manualSupportSummary(text, manualCapabilities)
     return RuntimeProControlsRenderModel(
         isVisible = isVisible,
         headline = when (state.activeMode) {
-            ModeId.NIGHT -> "Scenery Pro Controls"
-            ModeId.PORTRAIT -> "Portrait Pro Controls"
-            ModeId.HUMANISTIC -> "Humanistic Pro Controls"
-            ModeId.PRO -> "Pro Controls"
-            else -> "Pro Controls"
+            ModeId.NIGHT -> text.proControlsScenery()
+            ModeId.PORTRAIT -> text.proControlsPortrait()
+            ModeId.HUMANISTIC -> text.proControlsHumanistic()
+            ModeId.PRO -> text.proControlsDefault()
+            else -> text.proControlsDefault()
         },
         supportingText = if (hasAppliedManualControls) {
-            "Upper-layer manual draft is editable now; each control declares whether it is applied, saved-only, or temporarily unsupported."
+            "上层手动草稿当前可编辑；每个控件会标明其状态：已应用、仅保存、或暂时不支持。"
         } else {
-            "Draft changes are allowed, but this device currently keeps every control in saved-only or temporarily unsupported state."
+            "允许草稿更改，但此设备当前所有控件均处于仅保存或暂时不支持状态。"
         },
         summary = buildString {
             append(draft.compactSummary())
             append(" | ")
             append(runtimeSupportLabel)
             if (!editingEnabled) {
-                append(" Finish the current capture before editing.")
+                append(" 完成当前拍摄后方可编辑。")
             }
         },
         rawControl = FeatureCatalogControlRenderModel(
@@ -1127,7 +1127,7 @@ internal fun runtimeProControlsRenderModel(
             value = onOffLabel(draft.rawEnabled, text),
             availability = manualCapabilities.raw.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.raw.toSettingsAvailability()),
-            supportLabel = manualCapabilities.raw.manualSupportLabel(),
+            supportLabel = manualCapabilities.raw.manualSupportLabel(text),
             nextAction = FeatureCatalogAction.UpdateManualRawEnabled(!draft.rawEnabled)
                 .takeIf { isVisible && editingEnabled }
         ),
@@ -1136,7 +1136,7 @@ internal fun runtimeProControlsRenderModel(
             value = draft.iso?.toString() ?: "Auto",
             availability = manualCapabilities.iso.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.iso.toSettingsAvailability()),
-            supportLabel = manualCapabilities.iso.manualSupportLabel(),
+            supportLabel = manualCapabilities.iso.manualSupportLabel(text),
             nextAction = nextListValueOrNull(draft.iso, MANUAL_ISO_OPTIONS)
                 ?.let(FeatureCatalogAction::UpdateManualIso)
                 ?.takeIf { isVisible && editingEnabled }
@@ -1146,7 +1146,7 @@ internal fun runtimeProControlsRenderModel(
             value = draft.shutterSpeedMillis?.let { "${it}ms" } ?: "Auto",
             availability = manualCapabilities.shutter.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.shutter.toSettingsAvailability()),
-            supportLabel = manualCapabilities.shutter.manualSupportLabel(),
+            supportLabel = manualCapabilities.shutter.manualSupportLabel(text),
             nextAction = nextListValueOrNull(
                 draft.shutterSpeedMillis,
                 MANUAL_SHUTTER_OPTIONS
@@ -1158,7 +1158,7 @@ internal fun runtimeProControlsRenderModel(
             value = draft.exposureCompensationSteps?.let(::manualEvLabel) ?: "Auto",
             availability = manualCapabilities.exposureCompensation.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.exposureCompensation.toSettingsAvailability()),
-            supportLabel = manualCapabilities.exposureCompensation.manualSupportLabel(),
+            supportLabel = manualCapabilities.exposureCompensation.manualSupportLabel(text),
             nextAction = nextListValueOrNull(
                 draft.exposureCompensationSteps,
                 MANUAL_EXPOSURE_OPTIONS
@@ -1171,7 +1171,7 @@ internal fun runtimeProControlsRenderModel(
                 ?: "Auto",
             availability = manualCapabilities.focusDistance.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.focusDistance.toSettingsAvailability()),
-            supportLabel = manualCapabilities.focusDistance.manualSupportLabel(),
+            supportLabel = manualCapabilities.focusDistance.manualSupportLabel(text),
             nextAction = nextListValueOrNull(
                 draft.focusDistanceDiopters,
                 MANUAL_FOCUS_OPTIONS
@@ -1183,7 +1183,7 @@ internal fun runtimeProControlsRenderModel(
             value = draft.apertureFNumber?.let { "f/${manualOneDecimal(it)}" } ?: "Auto",
             availability = manualCapabilities.aperture.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.aperture.toSettingsAvailability()),
-            supportLabel = manualCapabilities.aperture.manualSupportLabel(),
+            supportLabel = manualCapabilities.aperture.manualSupportLabel(text),
             nextAction = nextListValueOrNull(
                 draft.apertureFNumber,
                 MANUAL_APERTURE_OPTIONS
@@ -1195,7 +1195,7 @@ internal fun runtimeProControlsRenderModel(
             value = draft.whiteBalanceKelvin?.let { "${it}K" } ?: "Auto",
             availability = manualCapabilities.whiteBalance.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.whiteBalance.toSettingsAvailability()),
-            supportLabel = manualCapabilities.whiteBalance.manualSupportLabel(),
+            supportLabel = manualCapabilities.whiteBalance.manualSupportLabel(text),
             nextAction = nextListValueOrNull(
                 draft.whiteBalanceKelvin,
                 MANUAL_WHITE_BALANCE_OPTIONS
@@ -1213,15 +1213,16 @@ private fun ManualControlSupport.toSettingsAvailability(): SettingsControlAvaila
     }
 }
 
-private fun ManualControlSupport.manualSupportLabel(): String {
+private fun ManualControlSupport.manualSupportLabel(text: AppTextResolver): String {
     return when (this) {
-        ManualControlSupport.APPLY -> "Camera2 interop"
-        ManualControlSupport.SAVED_ONLY -> "Saved only"
-        ManualControlSupport.UNSUPPORTED -> "Temporarily unsupported"
+        ManualControlSupport.APPLY -> text.camera2Interop()
+        ManualControlSupport.SAVED_ONLY -> text.savedOnly()
+        ManualControlSupport.UNSUPPORTED -> text.temporarilyUnsupported()
     }
 }
 
 private fun manualSupportSummary(
+    text: AppTextResolver,
     capabilities: ManualControlCapabilityMatrix
 ): String {
     val applied = mutableListOf<String>()
@@ -1246,7 +1247,8 @@ private fun manualSupportSummary(
 
     return buildString {
         if (applied.isNotEmpty()) {
-            append("Adapter applies ")
+            append(text.manualAdapterApplies())
+            append(" ")
             append(applied.joinToString(separator = " / "))
         }
         if (savedOnly.isNotEmpty()) {
@@ -1254,17 +1256,19 @@ private fun manualSupportSummary(
                 append(" | ")
             }
             append(savedOnly.joinToString(separator = " / "))
-            append(" stay saved-only")
+            append(" ")
+            append(text.manualStaySavedOnly())
         }
         if (unsupported.isNotEmpty()) {
             if (isNotEmpty()) {
                 append(" | ")
             }
             append(unsupported.joinToString(separator = " / "))
-            append(" temporarily unsupported")
+            append(" ")
+            append(text.manualTempUnsupportedSuffix())
         }
         if (isEmpty()) {
-            append("Manual controls currently unavailable")
+            append(text.manualControlsUnavailable())
         }
     }
 }

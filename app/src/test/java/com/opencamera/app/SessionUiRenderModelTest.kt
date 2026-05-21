@@ -386,7 +386,7 @@ class SessionUiRenderModelTest {
         assertTrue(model.isVisible)
         assertEquals(SettingsControlAvailability.DEGRADED, model.isoControl.availability)
         assertEquals("Saved only", model.isoControl.supportLabel)
-        assertTrue(model.supportingText.contains("saved-only or temporarily unsupported state"))
+        assertTrue(model.supportingText.contains("仅保存或暂时不支持"))
         assertTrue(model.summary.contains("stay saved-only"))
     }
 
@@ -766,7 +766,7 @@ class SessionUiRenderModelTest {
         assertTrue(model.currentFilterSummary.contains("Current default Portrait Original"))
         assertTrue(model.saveCustomControl.isEnabled)
         assertEquals("portrait-original", model.saveCustomControl.sourceProfileId)
-        assertTrue(model.footer.contains("independent Tone Lab"))
+        assertTrue(model.footer.contains("独立色调实验室优先交付"))
     }
 
     @Test
