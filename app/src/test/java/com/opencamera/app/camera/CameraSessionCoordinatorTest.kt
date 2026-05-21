@@ -708,6 +708,102 @@ class CameraSessionCoordinatorTest {
         assertEquals(frontGraph, adapter.boundGraph())
     }
 
+    @Test
+    fun `pending preview bind queues when host is missing and replays on attach`() = runTest {
+        val photoGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK,
+            enablePreviewSnapshots = true
+        )
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        val coordinator = CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.PHOTO,
+                deviceGraph = photoGraph,
+                reason = "camera permission granted",
+                isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(0, adapter.bindRequests)
+
+        val lifecycleOwner = TestLifecycleOwner()
+        val previewView = allocateInstance(PreviewView::class.java)
+        coordinator.attachPreviewHost(lifecycleOwner, previewView)
+        advanceUntilIdle()
+
+        assertEquals(1, adapter.bindRequests)
+        assertEquals(photoGraph, adapter.boundGraph())
+        assertTrue(
+            session.recordedIntents.contains(
+                SessionIntent.PreviewBindingStarted(
+                    reason = "camera permission granted",
+                    isRecovery = false
+                )
+            )
+        )
+    }
+
+    @Test
+    fun `multiple pending preview binds keep only the latest`() = runTest {
+        val photoGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK,
+            enablePreviewSnapshots = true
+        )
+        val nightGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.FRONT,
+            enablePreviewSnapshots = true
+        )
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        val coordinator = CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.PHOTO,
+                deviceGraph = photoGraph,
+                reason = "session boot",
+                isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.NIGHT,
+                deviceGraph = nightGraph,
+                reason = "mode switched to night",
+                isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(0, adapter.bindRequests)
+
+        val lifecycleOwner = TestLifecycleOwner()
+        val previewView = allocateInstance(PreviewView::class.java)
+        coordinator.attachPreviewHost(lifecycleOwner, previewView)
+        advanceUntilIdle()
+
+        assertEquals(1, adapter.bindRequests)
+        assertEquals(nightGraph, adapter.boundGraph())
+    }
+
     private class FakeCameraSession(
         initialState: SessionState = defaultSessionState()
     ) : CameraSession {

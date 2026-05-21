@@ -22,6 +22,7 @@ class CameraSessionCoordinator(
     private var lifecycleOwner: LifecycleOwner? = null
     private var previewView: PreviewView? = null
     private var attachedMode: ModeId? = null
+    private var pendingPreviewBind: PendingPreviewBind? = null
 
     init {
         scope.launch {
@@ -45,6 +46,17 @@ class CameraSessionCoordinator(
         this.lifecycleOwner = lifecycleOwner
         this.previewView = previewView
         runtimeIssueMonitor.onPreviewHostAttached()
+        pendingPreviewBind?.let { pending ->
+            pendingPreviewBind = null
+            scope.launch {
+                bindPreview(
+                    modeId = pending.modeId,
+                    deviceGraph = pending.deviceGraph,
+                    reason = pending.reason,
+                    isRecovery = pending.isRecovery
+                )
+            }
+        }
     }
 
     fun hasAttachedPreviewHost(): Boolean {
@@ -122,8 +134,12 @@ class CameraSessionCoordinator(
             return
         }
         syncActiveDeviceCapabilities(deviceGraph)
-        val owner = lifecycleOwner ?: return
-        val preview = previewView ?: return
+        val owner = lifecycleOwner
+        val preview = previewView
+        if (owner == null || preview == null) {
+            pendingPreviewBind = PendingPreviewBind(modeId, deviceGraph, reason, isRecovery)
+            return
+        }
         session.dispatch(
             SessionIntent.PreviewBindingStarted(
                 reason = reason,
@@ -157,6 +173,7 @@ class CameraSessionCoordinator(
         attachedMode = null
         runtimeIssueMonitor.onPreviewStopped(reason)
         if (clearHost) {
+            pendingPreviewBind = null
             clearPreviewAttachment()
         }
         session.dispatch(SessionIntent.PreviewStopped(reason))
@@ -176,4 +193,11 @@ class CameraSessionCoordinator(
         lifecycleOwner = null
         previewView = null
     }
+
+    private data class PendingPreviewBind(
+        val modeId: ModeId,
+        val deviceGraph: DeviceGraphSpec,
+        val reason: String,
+        val isRecovery: Boolean
+    )
 }

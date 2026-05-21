@@ -417,6 +417,41 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `first launch permission dialog recovery emits bind preview after host reattach`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect ->
+                effects += effect
+            }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = false, microphoneGranted = false))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        assertTrue(effects.none { it is SessionEffect.BindPreview })
+
+        session.dispatch(SessionIntent.PreviewHostDetached("permission dialog"))
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        advanceUntilIdle()
+
+        assertTrue(effects.none { it is SessionEffect.BindPreview })
+
+        effects.clear()
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        advanceUntilIdle()
+
+        val bindEffect = effects.filterIsInstance<SessionEffect.BindPreview>().lastOrNull()
+        assertNotNull(bindEffect)
+        assertTrue(bindEffect.isRecovery)
+
+        effectCollector.cancel()
+    }
+
+    @Test
     fun `boot enters running session with photo mode active`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace, this)
