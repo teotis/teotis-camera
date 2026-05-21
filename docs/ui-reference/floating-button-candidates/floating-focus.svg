@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="720" viewBox="0 0 980 720">
+  <defs>
+    <linearGradient id="previewA" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#233340"/>
+      <stop offset="0.45" stop-color="#526058"/>
+      <stop offset="1" stop-color="#080B0F"/>
+    </linearGradient>
+    <linearGradient id="glassA" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0A1218" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#05070A" stop-opacity="0.92"/>
+    </linearGradient>
+    <linearGradient id="paletteA" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#D8C4A6"/>
+      <stop offset="0.34" stop-color="#55B9AA"/>
+      <stop offset="0.68" stop-color="#7286D2"/>
+      <stop offset="1" stop-color="#E17D5F"/>
+    </linearGradient>
+    <filter id="shadowA" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="980" height="720" fill="#101417"/>
+  <text x="70" y="54" fill="#F5FAFA" font-family="Inter, Arial" font-size="24" font-weight="800">A. Floating Focus</text>
+  <text x="70" y="82" fill="#AFC2C8" font-family="Inter, Arial" font-size="14">Initial main screen</text>
+  <text x="550" y="82" fill="#AFC2C8" font-family="Inter, Arial" font-size="14">Secondary palette open</text>
+
+  <g transform="translate(70 105)">
+    <rect width="320" height="570" rx="34" fill="#05070A"/>
+    <rect x="8" y="8" width="304" height="554" rx="28" fill="url(#previewA)"/>
+    <path d="M8 355 C70 310 112 334 155 284 C196 236 236 263 312 198 L312 562 L8 562 Z" fill="#071010" opacity="0.62"/>
+    <rect x="8" y="8" width="304" height="108" rx="28" fill="#000" opacity="0.22"/>
+    <rect x="8" y="420" width="304" height="142" rx="28" fill="url(#glassA)"/>
+    <text x="28" y="48" fill="#FFF" font-family="Inter, Arial" font-size="15" font-weight="800">Photo</text>
+    <text x="76" y="48" fill="#B7CDD3" font-family="Inter, Arial" font-size="11">Ready</text>
+    <circle cx="272" cy="43" r="17" fill="#0B151B" opacity="0.75"/>
+    <path d="M264 43 h16 M272 35 v16" stroke="#F4FAFA" stroke-width="2" stroke-linecap="round"/>
+
+    <g filter="url(#shadowA)">
+      <circle cx="270" cy="205" r="22" fill="#16D6C7"/>
+      <rect x="260" y="195" width="20" height="20" rx="6" fill="url(#paletteA)"/>
+      <circle cx="270" cy="262" r="20" fill="#071014" opacity="0.75"/>
+      <text x="270" y="267" text-anchor="middle" fill="#F4FAFA" font-family="Inter, Arial" font-size="11" font-weight="800">1x</text>
+      <circle cx="270" cy="318" r="18" fill="#071014" opacity="0.7"/>
+      <text x="270" y="322" text-anchor="middle" fill="#75F2E8" font-family="Inter, Arial" font-size="9" font-weight="800">DEV</text>
+    </g>
+
+    <text x="42" y="468" fill="#AAB9BE" font-family="Inter, Arial" font-size="12">Doc</text>
+    <text x="92" y="468" fill="#FFF" font-family="Inter, Arial" font-size="13" font-weight="800">Photo</text>
+    <text x="154" y="468" fill="#AAB9BE" font-family="Inter, Arial" font-size="12">Human</text>
+    <text x="226" y="468" fill="#AAB9BE" font-family="Inter, Arial" font-size="12">Video</text>
+    <rect x="91" y="477" width="42" height="3" rx="2" fill="#16D6C7"/>
+    <rect x="30" y="505" width="44" height="44" rx="14" fill="#CED8CC" opacity="0.7"/>
+    <circle cx="160" cy="527" r="34" fill="#FFF"/>
+    <circle cx="160" cy="527" r="25" fill="none" stroke="#11181C" stroke-width="3"/>
+    <circle cx="272" cy="527" r="22" fill="#FFF" opacity="0.14"/>
+    <path d="M264 524 c6-8 18-7 22 3 M280 531 c-6 8-18 7-22-3" stroke="#F4FAFA" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(550 105)">
+    <rect width="320" height="570" rx="34" fill="#05070A"/>
+    <rect x="8" y="8" width="304" height="554" rx="28" fill="url(#previewA)"/>
+    <rect x="8" y="8" width="304" height="554" rx="28" fill="#000" opacity="0.08"/>
+    <path d="M8 355 C70 310 112 334 155 284 C196 236 236 263 312 198 L312 562 L8 562 Z" fill="#071010" opacity="0.62"/>
+    <rect x="8" y="420" width="304" height="142" rx="28" fill="url(#glassA)"/>
+    <text x="28" y="48" fill="#FFF" font-family="Inter, Arial" font-size="15" font-weight="800">Photo</text>
+    <circle cx="272" cy="43" r="17" fill="#0B151B" opacity="0.75"/>
+    <path d="M266 37 l12 12 M278 37 l-12 12" stroke="#F4FAFA" stroke-width="2" stroke-linecap="round"/>
+
+    <g filter="url(#shadowA)">
+      <rect x="28" y="300" width="248" height="118" rx="24" fill="#071014" opacity="0.82"/>
+      <text x="48" y="329" fill="#FFF" font-family="Inter, Arial" font-size="15" font-weight="800">Palette</text>
+      <text x="116" y="329" fill="#B8CDD2" font-family="Inter, Arial" font-size="11">Natural warm</text>
+      <rect x="48" y="350" width="39" height="25" rx="13" fill="#D8C4A6"/>
+      <rect x="96" y="350" width="39" height="25" rx="13" fill="#55B9AA"/>
+      <rect x="144" y="350" width="39" height="25" rx="13" fill="#7286D2"/>
+      <rect x="192" y="350" width="39" height="25" rx="13" fill="#E17D5F"/>
+      <rect x="48" y="393" width="178" height="5" rx="3" fill="#FFF" opacity="0.28"/>
+      <circle cx="136" cy="395" r="8" fill="#16D6C7"/>
+    </g>
+    <circle cx="270" cy="252" r="20" fill="#071014" opacity="0.76"/>
+    <text x="270" y="257" text-anchor="middle" fill="#F4FAFA" font-family="Inter, Arial" font-size="11" font-weight="800">1x</text>
+    <circle cx="270" cy="308" r="18" fill="#071014" opacity="0.7"/>
+    <text x="270" y="312" text-anchor="middle" fill="#75F2E8" font-family="Inter, Arial" font-size="9" font-weight="800">DEV</text>
+    <text x="42" y="468" fill="#AAB9BE" font-family="Inter, Arial" font-size="12">Doc</text>
+    <text x="92" y="468" fill="#FFF" font-family="Inter, Arial" font-size="13" font-weight="800">Photo</text>
+    <text x="154" y="468" fill="#AAB9BE" font-family="Inter, Arial" font-size="12">Human</text>
+    <text x="226" y="468" fill="#AAB9BE" font-family="Inter, Arial" font-size="12">Video</text>
+    <rect x="91" y="477" width="42" height="3" rx="2" fill="#16D6C7"/>
+    <rect x="30" y="505" width="44" height="44" rx="14" fill="#CED8CC" opacity="0.7"/>
+    <circle cx="160" cy="527" r="34" fill="#FFF"/>
+    <circle cx="160" cy="527" r="25" fill="none" stroke="#11181C" stroke-width="3"/>
+    <circle cx="272" cy="527" r="22" fill="#FFF" opacity="0.14"/>
+  </g>
+</svg>
