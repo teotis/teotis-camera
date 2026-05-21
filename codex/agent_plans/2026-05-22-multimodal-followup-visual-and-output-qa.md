@@ -96,7 +96,7 @@ Procedure:
 4. Compare saved JPEG against preview/neutral photo.
 5. Review debug output for:
    - `algorithm-render:applied:<profile-id>`
-   - no `Primary directory Pictures not allowed...`
+   - no `Primary directory Pictures not allowed for content://media/external/file`
 
 Pass criteria:
 
@@ -159,11 +159,11 @@ Use this structure:
 
 ## Findings
 
-1. ...
+1. Record each observed issue with the screen, timestamp, and expected behavior.
 
 ## Follow-Up Engineering Tasks
 
-1. ...
+1. Record each follow-up as an actionable engineering task with the owning plan or file area.
 ```
 
 ## Non-Goals

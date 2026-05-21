@@ -77,10 +77,21 @@
 - 最近新增的产品化设计输入已归纳为三份可交付 spec：统一手势入口、模式轨道/快门/变焦 cockpit、PreviewRenderEngine / Filter / Watermark 管线；后续实施应优先遵循这三份设计稿的边界，不要回退到老工程式的大型单体 View 或全局协议中心。
 - `OpenCamera UI/Interaction 2.0` 统一设计资料已沉淀到 [`codex/v2_ui`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui)：包含主界面 cockpit 线框、视觉系统、交互语法、功能便利性分层、统一面板与 labs、参考图资料包和多模态延期视觉审查。后续 UI 落地 agent 应优先按这些 Markdown 规格执行；参考 PNG 只作为视觉资料，不替代文字规格。
 - `2026-05-22` 真机最新版 APK 反馈已拆成 5 份可交给非多模态 agent 的落地方案：首次授权后预览恢复、零延时缩略图反馈、窄横向变焦条、画幅/预览 cockpit、色调调色板可发现性；需要看截图/录屏/视觉对比的事项单独隔离到多模态延期清单。
+- `2026-05-22` 最新版 APK 第二轮真机反馈已按相近问题合并为 3 份非多模态实施方案和 1 份多模态延期 QA：媒体输出/滤镜/缩略图、面板入口信息架构、中文文案与窄屏布局、多模态视觉和成片验收。后续落地应优先处理媒体保存失败和面板 IA，因为它们会同时影响“滤镜成片”和“缩略图回退”的可验证性。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-22：最新版 APK 第二轮真机反馈方案文档
+
+- 目标：把用户对最新版 APK 的 6 个新真机问题按相近根因合并拆解，形成可直接交给非多模态 agent 的 Markdown 落地方案；涉及截图判读、成片视觉对比、缩略图录屏时序的事项单独隔离给多模态 agent。
+- 核心结果：
+  [`2026-05-22-media-output-filter-thumbnail-stability.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-media-output-filter-thumbnail-stability.md) 将“滤镜未进成片”和“缩略图回退”合并到媒体输出链路，指出日志中 `filterSpec.*` 已进入 shot metadata，但 Live sidecar 走 `MediaStore.Files` 写入 `Pictures` 触发 `Primary directory Pictures not allowed for content://media/external/file`，导致 `ShotCompleted` 和最终后处理/官方缩略图不可验证；
+  [`2026-05-22-panel-entry-information-architecture.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-panel-entry-information-architecture.md) 将“镜头 / 镜头实验室 / 设置 / 快捷重复混杂”收敛为入口 IA 调整，建议右侧 `镜头` 改为 `设置`，保留底部镜头按钮做真正前后摄切换，并把 `快捷` 限定为短的一跳控制；
+  [`2026-05-22-localization-and-narrow-layout-cleanup.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-localization-and-narrow-layout-cleanup.md) 聚焦中文显示不全、右侧竖排、快捷二行和次级面板英文残留，要求清理 `SessionUiRenderModel` 中剩余英文、缩短右侧/快捷标签、拆掉水印卡片里的多行混合按钮；
+  [`2026-05-22-multimodal-followup-visual-and-output-qa.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-multimodal-followup-visual-and-output-qa.md) 单独收纳需要截图、录屏、保存 JPEG 对比的视觉和成片 QA，不交给非多模态实现 agent。
+- 验证：本轮只新增方案文档，未改运行时代码；已用用户日志、截图现象、`CameraXCaptureAdapter`、`PhotoAlgorithmPostProcessor`、`DefaultCameraSession`、`CameraCockpitRenderModel`、`SessionUiRenderModel` 与当前资源文件交叉定位 owner。
 
 ## 2026-05-22：真机反馈专项方案文档
 

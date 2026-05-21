@@ -26,7 +26,7 @@ Current log evidence from `/Users/dingren/Downloads/opencamera-debug-17793884601
   - `filterSpec.contrast=1.1108352`
   - `filterSpec.saturation=1.1945403`
 - The same shots fail before a saved-media result:
-  - `ShotFailed(... reason=Primary directory Pictures not allowed for content://media/external/file; allowed directories are [Download, Documents])`
+  - `ShotFailed(reason=Primary directory Pictures not allowed for content://media/external/file; allowed directories are [Download, Documents])`
 - Capture feedback snapshots do arrive:
   - `capture.feedback.snapshot.updated -> shotId=shot-6`
   - followed by `capture.failed`.
@@ -34,7 +34,7 @@ Current log evidence from `/Users/dingren/Downloads/opencamera-debug-17793884601
 Current code evidence:
 
 - `PhotoAlgorithmPostProcessor.decidePhotoAlgorithmWork()` already reads `FilterRenderSpec.fromMetadataTags(result.metadata.customTags)`, so custom filters are not just hard-coded profile ids.
-- `CameraXCaptureAdapter.createLivePhotoBundle()` creates a Live sidecar through `MediaStore.Files.getContentUri("external")` with `RELATIVE_PATH = Pictures/OpenCamera...`.
+- `CameraXCaptureAdapter.createLivePhotoBundle()` creates a Live sidecar through `MediaStore.Files.getContentUri("external")` with a `RELATIVE_PATH` under `Pictures/OpenCamera`.
 - On current Android, generic `MediaStore.Files` rejects primary directory `Pictures`; it usually only allows roots like `Download` or `Documents`. This matches the real-device failure.
 - `DefaultCameraSession.handleShotFailed()` clears `pendingCaptureFeedback` but leaves previous official thumbnail state unchanged.
 - `DefaultCameraSession.handlePreviewSnapshotUpdated()` ignores preview snapshots after `latestThumbnailSource is ThumbnailSource.SavedMedia`, but it can still accept preview snapshots before the first successful saved media.
@@ -177,7 +177,7 @@ After implementation:
 
 1. Enable a visibly strong custom tone/filter.
 2. Capture a photo with Live enabled.
-3. Confirm no `Primary directory Pictures not allowed...` failure appears.
+3. Confirm no `Primary directory Pictures not allowed for content://media/external/file` failure appears.
 4. Confirm the status/output shows a saved photo path.
 5. Confirm debug output includes `algorithm-render:applied:<selected-profile>`.
 6. Capture twice quickly and switch mode/lens after save; thumbnail must end on latest saved media, not preview feedback.

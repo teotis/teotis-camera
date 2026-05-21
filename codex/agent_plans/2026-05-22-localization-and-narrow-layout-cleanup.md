@@ -97,7 +97,7 @@ Examples:
 - `Timer` -> `定时`
 - `Low-light auto 24fps` -> `弱光自动 24fps`
 - `Locked fps` -> `锁定帧率`
-- `Saved as ... active graph uses ...` -> `已保存为...，当前图使用...`
+- `Saved as 4K, active graph uses FHD` -> `已保存为 4K，当前图使用 FHD`
 
 Add tests asserting `SessionSettingsPageRenderModel` does not contain these English words in Chinese/default resolver:
 
@@ -131,7 +131,7 @@ Do not use template English labels as the only visible title. Either add localiz
 
 In `watermarkLabDetailRenderModel()`:
 
-- `Placement ... • Scale ... • Opacity ...` -> `位置 ... • 大小 ... • 透明度 ...`
+- `Placement Bottom Right • Scale Normal • Opacity Soft` -> `位置 右下 • 大小 正常 • 透明度 柔和`
 - Support labels such as `5 placements` -> `5 个位置`.
 
 - [ ] **Step 4: Remove multi-line action buttons in watermark cards**

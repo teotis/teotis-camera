@@ -138,9 +138,9 @@ In `sessionSettingsPageRenderModel()`:
 - Supporting text should be short and Chinese by default:
   - `调整相机默认项。高频拍摄控制保留在快捷面板。`
 - Remove English phrases such as:
-  - `Quick defaults with explicit supported...`
-  - `Still watermark templates now flow...`
-  - `Manual drafts and Live/video defaults remain staged...`
+  - `Quick defaults with explicit supported, degraded, and staged capability hints.`
+  - `Still watermark templates now flow into metadata and photo rendering.`
+  - `Manual drafts and Live/video defaults remain staged in the same settings spine.`
 
 Use `AppTextResolver` methods or string resources instead of inline English.
 
