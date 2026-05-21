@@ -148,6 +148,13 @@ class ShotExecutorTest {
                 "manual-draft:metadata-draft:raw-off:iso-auto:s-auto:wb-auto"
             )
         )
+
+        // Verify stable ordering: algorithm notes (live-default, live-watermark) before transaction notes (manual-draft)
+        val liveDefaultIndex = result.pipelineNotes.indexOf("live-default:on")
+        val liveWatermarkIndex = result.pipelineNotes.indexOf("live-watermark:follow-frame-luma-and-motion")
+        val manualDraftIndex = result.pipelineNotes.indexOfFirst { it.startsWith("manual-draft:") }
+        assertTrue(liveDefaultIndex < manualDraftIndex, "live-default should come before manual-draft")
+        assertTrue(liveWatermarkIndex < manualDraftIndex, "live-watermark should come before manual-draft")
     }
 
     @Test
