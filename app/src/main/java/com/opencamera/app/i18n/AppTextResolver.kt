@@ -26,9 +26,9 @@ open class AppTextResolver(private val context: Context?) {
     open fun modeTrackLabel(modeId: ModeId): String = modeDisplayName(modeId)
 
     open fun gridModeLabel(value: CompositionGridMode): String = when (value) {
-        CompositionGridMode.OFF -> str(R.string.button_still_quality, "Quality")
-        CompositionGridMode.RULE_OF_THIRDS -> "3x3"
-        CompositionGridMode.GOLDEN_RATIO -> str(R.string.button_still_max, "Golden")
+        CompositionGridMode.OFF -> str(R.string.grid_off, "Off")
+        CompositionGridMode.RULE_OF_THIRDS -> str(R.string.grid_rule_of_thirds, "3x3")
+        CompositionGridMode.GOLDEN_RATIO -> str(R.string.grid_golden_ratio, "Golden")
     }
 
     open fun countdownLabel(value: CountdownDuration): String = when (value) {
@@ -39,15 +39,15 @@ open class AppTextResolver(private val context: Context?) {
     }
 
     internal open fun availabilityLabel(value: SettingsControlAvailability): String = when (value) {
-        SettingsControlAvailability.SUPPORTED -> str(R.string.button_still_max, "Max")
-        SettingsControlAvailability.DEGRADED -> str(R.string.button_still_fast, "Fast")
-        SettingsControlAvailability.UNSUPPORTED -> str(R.string.button_still_quality_unavailable, "N/A")
+        SettingsControlAvailability.SUPPORTED -> str(R.string.availability_supported, "Supported")
+        SettingsControlAvailability.DEGRADED -> str(R.string.availability_degraded, "Degraded")
+        SettingsControlAvailability.UNSUPPORTED -> str(R.string.availability_unsupported, "Unsupported")
     }
 
     open fun onOff(enabled: Boolean): String = if (enabled) {
-        str(R.string.button_quick_flash, "On")
+        str(R.string.label_on, "On")
     } else {
-        str(R.string.button_quick_ratio, "Off")
+        str(R.string.label_off, "Off")
     }
 
     open fun shutterShort(): String = str(R.string.button_shutter_short, "Shutter")
@@ -105,6 +105,200 @@ open class AppTextResolver(private val context: Context?) {
     open fun switchToBack(): String = str(R.string.button_switch_to_back, "Switch to Back")
     open fun singleLens(): String = str(R.string.button_single_lens, "Single Lens")
     open fun tone(): String = str(R.string.button_palette_entry, "Tone")
+
+    // Filter advanced control labels
+    open fun filterCtrlExposure(): String = str(R.string.filter_ctrl_exposure, "Exposure")
+    open fun filterCtrlSoftGlow(): String = str(R.string.filter_ctrl_soft_glow, "Soft Glow")
+    open fun filterCtrlHalo(): String = str(R.string.filter_ctrl_halo, "Halo")
+    open fun filterCtrlGrain(): String = str(R.string.filter_ctrl_grain, "Grain")
+    open fun filterCtrlSharpness(): String = str(R.string.filter_ctrl_sharpness, "Sharpness")
+    open fun filterCtrlVignette(): String = str(R.string.filter_ctrl_vignette, "Vignette")
+    open fun filterCtrlHighlights(): String = str(R.string.filter_ctrl_highlights, "Highlights")
+    open fun filterCtrlShadows(): String = str(R.string.filter_ctrl_shadows, "Shadows")
+    open fun filterCtrlWarmBoost(): String = str(R.string.filter_ctrl_warm_boost, "Warm Boost")
+    open fun filterCtrlCoolBoost(): String = str(R.string.filter_ctrl_cool_boost, "Cool Boost")
+    open fun filterCtrlTempShift(): String = str(R.string.filter_ctrl_temp_shift, "Temp Shift")
+    open fun filterCtrlTintShift(): String = str(R.string.filter_ctrl_tint_shift, "Tint Shift")
+
+    // Filter family labels
+    open fun filterFamilyPhoto(): String = str(R.string.filter_family_photo, "Photo")
+    open fun filterFamilyHumanistic(): String = str(R.string.filter_family_humanistic, "Humanistic")
+    open fun filterFamilyPortrait(): String = str(R.string.filter_family_portrait, "Portrait")
+    open fun filterFamilyVideo(): String = str(R.string.filter_family_video, "Video")
+
+    // Pro controls headings
+    open fun proControlsScenery(): String = str(R.string.pro_controls_scenery, "Scenery Pro Controls")
+    open fun proControlsPortrait(): String = str(R.string.pro_controls_portrait, "Portrait Pro Controls")
+    open fun proControlsHumanistic(): String = str(R.string.pro_controls_humanistic, "Humanistic Pro Controls")
+    open fun proControlsDefault(): String = str(R.string.pro_controls_default, "Pro Controls")
+
+    // Settings section labels
+    open fun compositionGridLabel(): String = str(R.string.label_composition_grid, "Composition grid")
+    open fun shutterToneLabel(): String = str(R.string.label_shutter_tone, "Shutter tone")
+    open fun selfieMirrorLabel(): String = str(R.string.label_selfie_mirror, "Selfie mirror")
+    open fun defaultPhotoFilterLabel(): String = str(R.string.label_default_photo_filter, "Default photo filter")
+    open fun portraitLabSettingLabel(): String = str(R.string.label_portrait_lab, "Portrait Lab")
+    open fun watermarkLabSettingLabel(): String = str(R.string.label_watermark_lab, "Watermark Lab")
+    open fun livePhotoDefaultLabel(): String = str(R.string.label_live_photo_default, "Live photo default")
+    open fun countdownLabel(): String = str(R.string.label_countdown, "Countdown")
+    open fun resolutionLabel(): String = str(R.string.label_resolution, "Resolution")
+    open fun frameRateLabel(): String = str(R.string.label_frame_rate, "Frame rate")
+    open fun dynamicFpsLabel(): String = str(R.string.label_dynamic_fps, "Dynamic fps")
+    open fun audioSceneLabel(): String = str(R.string.label_audio_scene, "Audio scene")
+    open fun videoFilterSeedLabel(): String = str(R.string.label_video_filter_seed, "Video filter seed")
+
+    // Portrait Lab labels
+    open fun portraitProfileLabel(): String = str(R.string.label_portrait_profile, "Portrait profile")
+    open fun beautyPresetLabel(): String = str(R.string.label_beauty_preset, "Beauty preset")
+    open fun beautyStrengthLabel(): String = str(R.string.label_beauty_strength, "Beauty strength")
+    open fun bokehEffectLabel(): String = str(R.string.label_bokeh_effect, "Bokeh effect")
+
+    // Watermark detail labels
+    open fun textPlacementLabel(): String = str(R.string.label_text_placement, "Text placement")
+    open fun textScaleLabel(): String = str(R.string.label_text_scale, "Text scale")
+    open fun textOpacityLabel(): String = str(R.string.label_text_opacity, "Text opacity")
+    open fun frameBackgroundLabel(): String = str(R.string.label_frame_background, "Frame background")
+    open fun tokensLabel(): String = str(R.string.label_tokens, "Tokens")
+
+    // Pro controls attribute labels
+    open fun rawLabel(): String = str(R.string.label_raw, "RAW")
+    open fun isoLabel(): String = str(R.string.label_iso, "ISO")
+    open fun shutterLabel(): String = str(R.string.label_shutter, "Shutter")
+    open fun evLabel(): String = str(R.string.label_ev, "EV")
+    open fun focusLabel(): String = str(R.string.label_focus, "Focus")
+    open fun apertureLabel(): String = str(R.string.label_aperture, "Aperture")
+    open fun wbLabel(): String = str(R.string.label_wb, "WB")
+    open fun autoLabel(): String = str(R.string.label_auto, "Auto")
+
+    // Button labels
+    open fun adjustSelected(): String = str(R.string.button_adjust_selected, "Adjust Selected")
+    open fun saveAsCustom(): String = str(R.string.button_save_as_custom, "Save as Custom")
+    open fun useThisTemplate(): String = str(R.string.button_use_this_template, "Use This Template")
+    open fun useThisLook(): String = str(R.string.button_use_this_look, "Use This Look")
+    open fun openStylePage(): String = str(R.string.button_open_style_page, "Open Style Page")
+    open fun switchToAdvanced(): String = str(R.string.button_switch_to_advanced, "Switch to Advanced")
+    open fun switchToLight(): String = str(R.string.button_switch_to_light, "Switch to Light")
+    open fun tapToCycleLabel(): String = str(R.string.button_tap_to_cycle, "Tap to cycle")
+
+    // Level labels
+    open fun levelWarm(): String = str(R.string.level_warm, "Warm")
+    open fun levelWarmPlus(): String = str(R.string.level_warm_plus, "Warm+")
+    open fun levelCool(): String = str(R.string.level_cool, "Cool")
+    open fun levelCoolPlus(): String = str(R.string.level_cool_plus, "Cool+")
+    open fun levelMagenta(): String = str(R.string.level_magenta, "Magenta")
+    open fun levelMagentaPlus(): String = str(R.string.level_magenta_plus, "Magenta+")
+    open fun levelGreen(): String = str(R.string.level_green, "Green")
+    open fun levelGreenPlus(): String = str(R.string.level_green_plus, "Green+")
+
+    // Tone/Color labels
+    open fun toneSoftLift(): String = str(R.string.tone_soft_lift, "Soft Lift")
+    open fun toneDeepContrast(): String = str(R.string.tone_deep_contrast, "Deep Contrast")
+    open fun toneBalanced(): String = str(R.string.tone_balanced, "Balanced")
+    open fun colorMagentaWarm(): String = str(R.string.color_magenta_warm, "Magenta/Warm")
+    open fun colorGreenCool(): String = str(R.string.color_green_cool, "Green/Cool")
+    open fun colorCoolMuted(): String = str(R.string.color_cool_muted, "Cool/Muted")
+    open fun colorNeutral(): String = str(R.string.color_neutral, "Neutral")
+
+    // Status labels
+    open fun currentDefault(): String = str(R.string.status_current_default, "Current default")
+    open fun selectedDefault(): String = str(R.string.status_selected_default, "Selected default")
+    open fun rendererPending(): String = str(R.string.status_renderer_pending, "Renderer pending")
+    open fun statusCustom(): String = str(R.string.status_custom, "Custom")
+    open fun unavailableMissingProfile(): String = str(R.string.status_unavailable_missing_profile, "Unavailable • Missing source profile")
+    open fun readyEditableCopy(): String = str(R.string.status_ready_editable_copy, "Ready • Opens an editable custom copy")
+    open fun readyEditingCustom(): String = str(R.string.status_ready_editing_custom, "Ready • Editing current custom look")
+    open fun unavailableAlreadyCustom(): String = str(R.string.status_unavailable_already_custom, "Unavailable • Current default already custom")
+    open fun readyBecomesDefault(): String = str(R.string.status_ready_becomes_default, "Ready • Becomes the default")
+    open fun noCompatibleLooks(): String = str(R.string.status_no_compatible_looks, "No compatible looks")
+
+    // Error/Unavailable
+    open fun stillCaptureUnavailable(): String = str(R.string.error_still_capture_unavailable, "Still capture unavailable on this device")
+    open fun videoRecordingUnavailable(): String = str(R.string.error_video_recording_unavailable, "Video recording unavailable on this device")
+    open fun microphoneUnavailable(): String = str(R.string.error_microphone_unavailable, "Microphone capture unavailable on this device")
+    open fun noCompatibleFilters(): String = str(R.string.error_no_compatible_filters, "No compatible filters")
+    open fun noWatermarkTemplates(): String = str(R.string.error_no_watermark_templates, "No watermark templates available")
+
+    // Manual control support
+    open fun camera2Interop(): String = str(R.string.manual_camera2_interop, "Camera2 interop")
+    open fun savedOnly(): String = str(R.string.manual_saved_only, "Saved only")
+    open fun temporarilyUnsupported(): String = str(R.string.manual_temporarily_unsupported, "Temporarily unsupported")
+    open fun manualControlsUnavailable(): String = str(R.string.manual_controls_unavailable, "Manual controls currently unavailable")
+    open fun manualAdapterApplies(): String = str(R.string.manual_adapter_applies, "Adapter applies")
+    open fun manualStaySavedOnly(): String = str(R.string.manual_stay_saved_only, "stay saved-only")
+    open fun manualTempUnsupportedSuffix(): String = str(R.string.manual_temporarily_unsupported_suffix, "temporarily unsupported")
+
+    // Dynamic format methods
+    open fun zoomRatioLabel(ratio: Float): String = String.format(str(R.string.format_zoom_ratio, "%sx"), ratio)
+    open fun countdownSeconds(seconds: Int): String = String.format(str(R.string.format_countdown_seconds, "%ss"), seconds)
+    open fun outputSizeLabel(width: Int, height: Int): String =
+        String.format(str(R.string.format_output_size, "%sx%s"), width, height)
+    open fun kelvinLabel(k: Int): String = String.format(str(R.string.format_kelvin, "%sK"), k)
+    open fun shutterSpeedMs(ms: Int): String = String.format(str(R.string.format_shutter_ms, "%sms"), ms)
+    open fun focusDistanceDiopters(d: Float): String =
+        String.format(str(R.string.format_focus_diopters, "%.1fD"), d)
+    open fun apertureFNumber(f: Float): String =
+        String.format(str(R.string.format_aperture_f, "f/%s"), f)
+    open fun supportCount(count: Int): String =
+        String.format(str(R.string.format_support_count, "%s options"), count)
+    open fun looksCount(count: Int): String =
+        String.format(str(R.string.format_looks_count, "%s curated looks"), count)
+    open fun templatesCount(count: Int): String =
+        String.format(str(R.string.format_templates_count, "%s templates"), count)
+    open fun presetsCount(count: Int): String =
+        String.format(str(R.string.format_presets_count, "%s presets"), count)
+    open fun placementsCount(count: Int): String =
+        String.format(str(R.string.format_placements_count, "%s placements"), count)
+    open fun stepsCount(count: Int): String =
+        String.format(str(R.string.format_steps_count, "%s steps"), count)
+    open fun levelsCount(count: Int): String =
+        String.format(str(R.string.format_levels_count, "%s levels"), count)
+    open fun moodsCount(count: Int): String =
+        String.format(str(R.string.format_moods_count, "%s moods"), count)
+    open fun productProfilesCount(count: Int): String =
+        String.format(str(R.string.format_product_profiles_count, "%s product profiles"), count)
+    open fun plansCount(count: Int): String =
+        String.format(str(R.string.format_plans_count, "%s plans"), count)
+    open fun renderingFeelsCount(count: Int): String =
+        String.format(str(R.string.format_rendering_feels_count, "%s rendering feels"), count)
+    open fun nextLookLabel(label: String): String =
+        String.format(str(R.string.format_next_look, "Next %s look"), label)
+
+    // Watermark tokens
+    open fun watermarkTokenCameraParams(): String = str(R.string.watermark_token_camera_params, "Camera Params")
+    open fun watermarkTokenDateTime(): String = str(R.string.watermark_token_datetime, "Date/Time")
+    open fun watermarkTokenLocation(): String = str(R.string.watermark_token_location, "Location")
+    open fun watermarkTokenModel(): String = str(R.string.watermark_token_model, "Model")
+
+    // Lens labels
+    open fun backLens(): String = str(R.string.lens_back, "Back")
+    open fun frontLens(): String = str(R.string.lens_front, "Front")
+
+    // General labels
+    open fun placementLabel(): String = str(R.string.label_placement, "Placement")
+    open fun scaleLabel(): String = str(R.string.label_scale, "Scale")
+    open fun opacityLabel(): String = str(R.string.label_opacity, "Opacity")
+    open fun backgroundLabel(): String = str(R.string.label_background, "Background")
+    open fun colorLabel(): String = str(R.string.label_color, "Color")
+    open fun toneLabel(): String = str(R.string.label_tone, "Tone")
+
+    // Video spec labels
+    open fun lowLightAuto24fps(): String = str(R.string.video_low_light_auto, "Low-light auto 24fps")
+    open fun lockedFps(): String = str(R.string.video_locked_fps, "Locked fps")
+
+    // Settings summary helpers
+    open fun settingsSummaryGrid(): String = str(R.string.settings_summary_grid, "Grid")
+    open fun settingsSummaryShutterSound(): String = str(R.string.settings_summary_shutter_sound, "Shutter sound")
+    open fun settingsSummarySelfieMirror(): String = str(R.string.settings_summary_selfie_mirror, "Selfie mirror")
+    open fun settingsSummaryFilter(): String = str(R.string.settings_summary_filter, "Filter")
+    open fun settingsSummaryPortrait(): String = str(R.string.settings_summary_portrait, "Portrait")
+    open fun settingsSummaryWatermark(): String = str(R.string.settings_summary_watermark, "Watermark")
+    open fun settingsSummaryLive(): String = str(R.string.settings_summary_live, "Live")
+    open fun settingsSummaryTimer(): String = str(R.string.settings_summary_timer, "Timer")
+    open fun settingsSummaryMic(): String = str(R.string.settings_summary_mic, "Mic")
+    open fun settingsSummaryFilters(): String = str(R.string.settings_summary_filters, "filters")
+    open fun settingsSummaryWatermarkTemplates(): String = str(R.string.settings_summary_watermark_templates, "watermark templates")
+    open fun settingsSummaryMsBundle(): String = str(R.string.settings_summary_ms_bundle, "ms bundle")
+    open fun settingsSummaryProManualDraft(): String = str(R.string.settings_summary_pro_manual_draft, "Pro manual draft")
 
     open fun languageDisplayName(settings: PersistedSettings): String = when (settings.common.appLanguage) {
         AppLanguage.ZH -> str(R.string.app_name, "OpenCamera")
