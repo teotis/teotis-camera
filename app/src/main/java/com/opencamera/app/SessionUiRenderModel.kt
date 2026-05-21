@@ -359,6 +359,11 @@ internal data class FilterAdjustmentPanelRenderModel(
     val needsAutoPrepare: Boolean = false
 )
 
+internal enum class StyleAndColorLabRole {
+    STYLE,
+    LENS_LAB
+}
+
 internal data class FilterLabPageRenderModel(
     val headline: String,
     val supportingText: String,
@@ -367,6 +372,10 @@ internal data class FilterLabPageRenderModel(
     val rosterText: String,
     val editingEnabled: Boolean,
     val editingHint: String,
+    val panelRole: StyleAndColorLabRole = StyleAndColorLabRole.STYLE,
+    val showFamilyTabs: Boolean = true,
+    val showFilterItems: Boolean = true,
+    val showAdjustmentPanel: Boolean = true,
     val photoTab: FilterLabTabRenderModel,
     val humanisticTab: FilterLabTabRenderModel,
     val portraitTab: FilterLabTabRenderModel,
@@ -869,7 +878,7 @@ internal fun sessionSettingsPageRenderModel(
     return SessionSettingsPageRenderModel(
         headline = text.settingsEntry(),
         supportingText = text.settingsPageSupporting(),
-        heroSummary = "${renderModel.commonSummary} • ${renderModel.photoSummary}",
+        heroSummary = "",
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
             text.lensLabEditingEnabled()
@@ -877,7 +886,7 @@ internal fun sessionSettingsPageRenderModel(
             text.lensLabEditingDisabled()
         },
         commonSection = CommonSettingsSectionRenderModel(
-            summary = renderModel.commonSummary,
+            summary = "",
             gridMode = SettingsControlRenderModel(
                 label = text.compositionGridLabel(),
                 value = settings.common.gridMode.label,
@@ -902,7 +911,7 @@ internal fun sessionSettingsPageRenderModel(
             )
         ),
         photoSection = PhotoSettingsSectionRenderModel(
-            summary = renderModel.photoSummary,
+            summary = "",
             defaultFilter = SettingsControlRenderModel(
                 label = text.defaultPhotoFilterLabel(),
                 value = photoFilterLabel(settings.photo.defaultFilterProfileId, photoFilters),
@@ -1011,7 +1020,7 @@ internal fun sessionSettingsPageRenderModel(
             )
         ),
         videoSection = VideoSettingsSectionRenderModel(
-            summary = renderModel.videoSummary,
+            summary = "",
             resolution = SettingsControlRenderModel(
                 label = text.resolutionLabel(),
                 value = selectedVideoSpec.resolution.label,
@@ -1377,15 +1386,7 @@ internal fun portraitLabPageRenderModel(
     return PortraitLabPageRenderModel(
         headline = text.portraitLab(),
         supportingText = "人像产品调节位于设置下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。",
-        heroSummary = buildString {
-            append(settings.photo.portraitProfile.label)
-            append(" • Beauty ")
-            append(settings.photo.portraitBeautyPreset.label)
-            append(" ")
-            append(settings.photo.portraitBeautyStrength.label)
-            append(" • Bokeh ")
-            append(settings.photo.portraitBokehEffect.label)
-        },
+        heroSummary = "",
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
             text.portraitLabEditingEnabled()
@@ -1489,13 +1490,7 @@ internal fun watermarkLabSelectorRenderModel(
     return WatermarkLabSelectorRenderModel(
         headline = text.watermarkLab(),
         supportingText = text.watermarkSelectorSupporting(),
-        heroSummary = buildString {
-            append(text.watermarkSelectorDefaultPrefix())
-            append(selectedTemplate?.label ?: settings.photo.defaultWatermarkTemplateId)
-            append(" • ")
-            append(catalog.watermarkTemplates.size)
-            append(text.watermarkSelectorTemplatesStaged(catalog.watermarkTemplates.size))
-        },
+        heroSummary = "",
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
             text.watermarkSelectorEditingEnabled()
@@ -1579,21 +1574,7 @@ internal fun watermarkLabDetailRenderModel(
         } else {
             text.watermarkDetailSupportingNotSelected()
         },
-        heroSummary = buildString {
-            append(text.watermarkAttrPlacementPrefix())
-            append(style.textPlacement.label)
-            append(" • ")
-            append(text.watermarkAttrScalePrefix())
-            append(style.textScale.label)
-            append(" • ")
-            append(text.watermarkAttrOpacityPrefix())
-            append(style.textOpacity.label)
-            if (template.supportsFrameBorder) {
-                append(" • ")
-                append(text.watermarkAttrBackgroundPrefix())
-                append(style.frameBackground.label)
-            }
-        },
+        heroSummary = "",
         templateId = template.id,
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
@@ -1702,6 +1683,7 @@ internal fun filterLabPageRenderModel(
     state: SessionState,
     text: AppTextResolver,
     selectedFamily: FilterLabFamily = defaultFilterLabFamily(state.activeMode),
+    panelRole: StyleAndColorLabRole = StyleAndColorLabRole.STYLE,
     showAdjustmentPanel: Boolean = true,
     adjustmentMode: FilterAdjustmentMode = FilterAdjustmentMode.LIGHT
 ): FilterLabPageRenderModel {
@@ -1725,9 +1707,12 @@ internal fun filterLabPageRenderModel(
         null
     }
     return FilterLabPageRenderModel(
-        headline = text.filterLab(),
+        headline = when (panelRole) {
+            StyleAndColorLabRole.STYLE -> text.stylePanelTitle()
+            StyleAndColorLabRole.LENS_LAB -> text.lensLabPanelTitle()
+        },
         supportingText = text.filterLabSupportingText(),
-        heroSummary = text.filterLabHeroSummary(family.label, currentFilterLabel, family.filters.size),
+        heroSummary = "",
         currentFilterSummary = buildString {
             append(text.filterLabCurrentDefault(currentFilterLabel))
             currentProfile?.renderSpec?.let { renderSpec ->
@@ -1746,6 +1731,10 @@ internal fun filterLabPageRenderModel(
         } else {
             text.filterLabEditingDisabled()
         },
+        panelRole = panelRole,
+        showFamilyTabs = panelRole == StyleAndColorLabRole.STYLE,
+        showFilterItems = panelRole == StyleAndColorLabRole.STYLE,
+        showAdjustmentPanel = panelRole == StyleAndColorLabRole.LENS_LAB,
         photoTab = filterLabTabRenderModel(
             family = FilterLabFamily.PHOTO,
             currentFilterId = settings.photo.defaultFilterProfileId,

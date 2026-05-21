@@ -495,10 +495,7 @@ class SessionUiRenderModelTest {
         val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
 
         assertEquals("Settings", model.headline)
-        assertEquals(
-            "Grid 3x3 | Shutter sound Off | Selfie mirror On • Filter Portrait Retro | Portrait Native Portrait | Watermark Travel Polaroid | Live On | Timer 3s",
-            model.heroSummary
-        )
+        assertEquals("", model.heroSummary)
         assertTrue(model.editingEnabled)
         assertEquals(
             "Composition grid\n3x3\nSupported • Cycle 3 layouts",
@@ -629,7 +626,7 @@ class SessionUiRenderModelTest {
         val model = watermarkLabSelectorRenderModel(defaultSessionState(), TestAppTextResolver())
 
         assertEquals("Watermark Lab", model.headline)
-        assertTrue(model.heroSummary.contains("Default Travel Polaroid"))
+        assertEquals("", model.heroSummary)
         assertEquals(3, model.items.size)
         val selected = model.items.first { it.templateId == "travel-polaroid" }
         val classic = model.items.first { it.templateId == "classic-overlay" }
@@ -665,7 +662,7 @@ class SessionUiRenderModelTest {
         )
 
         assertEquals("Portrait Lab", model.headline)
-        assertTrue(model.heroSummary.contains("Luminous Portrait"))
+        assertEquals("", model.heroSummary)
         assertEquals(
             PersistedSettingsAction.UpdatePortraitProfile(PortraitProfile.NATIVE),
             model.profileControl.nextAction
@@ -709,7 +706,7 @@ class SessionUiRenderModelTest {
         )
 
         assertEquals("Travel Polaroid", model.headline)
-        assertTrue(model.heroSummary.contains("Placement Top Right"))
+        assertEquals("", model.heroSummary)
         assertEquals(
             PersistedSettingsAction.UpdateWatermarkTextPlacement(
                 templateId = "travel-polaroid",
@@ -775,7 +772,7 @@ class SessionUiRenderModelTest {
         )
 
         assertEquals("Tone Lab", model.headline)
-        assertTrue(model.heroSummary.contains("Portrait default Portrait Original"))
+        assertEquals("", model.heroSummary)
         assertTrue(model.portraitTab.isSelected)
         assertFalse(model.photoTab.isSelected)
         assertEquals(
@@ -1405,5 +1402,37 @@ class SessionUiRenderModelTest {
             outputPreviewPrefix = "Preview thumbnail:",
             outputWaiting = "No photo captured yet."
         )
+    }
+
+    @Test
+    fun `style lab shows filter items and family tabs but not adjustment panel`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+
+        assertEquals(StyleAndColorLabRole.STYLE, model.panelRole)
+        assertTrue(model.showFamilyTabs)
+        assertTrue(model.showFilterItems)
+        assertFalse(model.showAdjustmentPanel)
+        assertEquals("Style", model.headline)
+    }
+
+    @Test
+    fun `lens lab shows adjustment panel but not filter items and family tabs`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.LENS_LAB
+        )
+
+        assertEquals(StyleAndColorLabRole.LENS_LAB, model.panelRole)
+        assertFalse(model.showFamilyTabs)
+        assertFalse(model.showFilterItems)
+        assertTrue(model.showAdjustmentPanel)
+        assertEquals("Lens Lab", model.headline)
     }
 }

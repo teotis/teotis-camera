@@ -15,6 +15,7 @@ import android.widget.Toast
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import com.opencamera.app.gesture.GestureAction
 import com.opencamera.app.gesture.GestureEvent
 import com.opencamera.app.gesture.GestureGuard
@@ -388,6 +389,22 @@ class MainActivity : AppCompatActivity() {
         bindGestureRouter()
         bindState()
         syncPermissionState()
+        applyControlRotationForDisplay()
+    }
+
+    private fun applyControlRotationForDisplay() {
+        val rotation = display?.rotation ?: android.view.Surface.ROTATION_0
+        val degrees = when (rotation) {
+            android.view.Surface.ROTATION_90 -> 90f
+            android.view.Surface.ROTATION_270 -> -90f
+            else -> 0f
+        }
+        listOf(
+            buttonFilterEntry,
+            buttonQuickLauncher,
+            buttonLensLabEntry,
+            buttonDevEntry
+        ).forEach { it.rotation = degrees }
     }
 
     override fun onStart() {
@@ -775,6 +792,11 @@ class MainActivity : AppCompatActivity() {
             state = state,
             text = text,
             selectedFamily = selectedFilterLabFamily(state),
+            panelRole = if (activePanelRoute is CockpitPanelRoute.LensLab) {
+                StyleAndColorLabRole.LENS_LAB
+            } else {
+                StyleAndColorLabRole.STYLE
+            },
             showAdjustmentPanel = isFilterAdjustmentVisible,
             adjustmentMode = filterAdjustmentMode
         )
@@ -855,9 +877,13 @@ class MainActivity : AppCompatActivity() {
         settingsHeadline.text = model.headline
         settingsSupportingText.text = model.supportingText
         settingsHeroSummary.text = model.heroSummary
+        settingsHeroSummary.isVisible = model.heroSummary.isNotEmpty()
         settingsCommonSummary.text = model.commonSection.summary
+        settingsCommonSummary.isVisible = model.commonSection.summary.isNotEmpty()
         settingsPhotoSummary.text = model.photoSection.summary
+        settingsPhotoSummary.isVisible = model.photoSection.summary.isNotEmpty()
         settingsVideoSummary.text = model.videoSection.summary
+        settingsVideoSummary.isVisible = model.videoSection.summary.isNotEmpty()
         settingsCatalogFooter.text = model.catalogFooter
         settingsEditingHint.text = model.editingHint
         renderSettingsControl(buttonGridMode, model.commonSection.gridMode, model.editingEnabled)
@@ -897,6 +923,7 @@ class MainActivity : AppCompatActivity() {
         portraitLabHeadline.text = model.headline
         portraitLabSupportingText.text = model.supportingText
         portraitLabHeroSummary.text = model.heroSummary
+        portraitLabHeroSummary.isVisible = model.heroSummary.isNotEmpty()
         portraitLabEditingHint.text = model.editingHint
         portraitLabFooter.text = model.footer
         renderSettingsControl(buttonPortraitProfile, model.profileControl, model.editingEnabled)
@@ -922,6 +949,7 @@ class MainActivity : AppCompatActivity() {
         watermarkSelectorHeadline.text = model.headline
         watermarkSelectorSupportingText.text = model.supportingText
         watermarkSelectorHeroSummary.text = model.heroSummary
+        watermarkSelectorHeroSummary.isVisible = model.heroSummary.isNotEmpty()
         watermarkSelectorEditingHint.text = model.editingHint
         watermarkSelectorFooter.text = model.footer
         watermarkSelectorList.removeAllViews()
@@ -1000,6 +1028,7 @@ class MainActivity : AppCompatActivity() {
         watermarkDetailHeadline.text = model.headline
         watermarkDetailSupportingText.text = model.supportingText
         watermarkDetailHeroSummary.text = model.heroSummary
+        watermarkDetailHeroSummary.isVisible = model.heroSummary.isNotEmpty()
         watermarkDetailEditingHint.text = model.editingHint
         watermarkDetailFooter.text = model.footer
         renderSettingsControl(
@@ -1043,16 +1072,43 @@ class MainActivity : AppCompatActivity() {
         filterHeadline.text = model.headline
         filterSupportingText.text = model.supportingText
         filterHeroSummary.text = model.heroSummary
+        filterHeroSummary.isVisible = model.heroSummary.isNotEmpty()
         filterCurrentSummary.text = model.currentFilterSummary
         filterEditingHint.text = model.editingHint
         filterFooter.text = model.footer
-        renderFilterLabTab(buttonFilterPhotoTab, model.photoTab)
-        renderFilterLabTab(buttonFilterHumanisticTab, model.humanisticTab)
-        renderFilterLabTab(buttonFilterPortraitTab, model.portraitTab)
-        renderFilterLabTab(buttonFilterVideoTab, model.videoTab)
-        renderFilterSelectionList(model)
-        renderSaveCustomControl(model.saveCustomControl, model.editingEnabled)
-        renderAdjustmentPanel(model.adjustmentPanel, model.editingEnabled)
+
+        // Show/hide family tabs based on panel role
+        val tabsVisible = model.showFamilyTabs
+        buttonFilterPhotoTab.isVisible = tabsVisible
+        buttonFilterHumanisticTab.isVisible = tabsVisible
+        buttonFilterPortraitTab.isVisible = tabsVisible
+        buttonFilterVideoTab.isVisible = tabsVisible
+        if (tabsVisible) {
+            renderFilterLabTab(buttonFilterPhotoTab, model.photoTab)
+            renderFilterLabTab(buttonFilterHumanisticTab, model.humanisticTab)
+            renderFilterLabTab(buttonFilterPortraitTab, model.portraitTab)
+            renderFilterLabTab(buttonFilterVideoTab, model.videoTab)
+        }
+
+        // Show/hide filter selection list based on panel role
+        val filterSectionParent = filterCurrentSummary.parent as? ViewGroup
+        if (model.showFilterItems) {
+            renderFilterSelectionList(model)
+            renderSaveCustomControl(model.saveCustomControl, model.editingEnabled)
+            filterCurrentSummary.isVisible = true
+        } else {
+            filterSelectionList.removeAllViews()
+            filterCurrentSummary.isVisible = false
+            buttonFilterSaveCustom.isVisible = false
+        }
+
+        // Show/hide adjustment panel based on panel role
+        if (model.showAdjustmentPanel) {
+            renderAdjustmentPanel(model.adjustmentPanel, model.editingEnabled)
+        } else {
+            filterAdjustmentPanel.isVisible = false
+        }
+
         renderPanelVisibility()
     }
 
@@ -1634,6 +1690,11 @@ class MainActivity : AppCompatActivity() {
             state = state,
             text = text,
             selectedFamily = selectedFilterLabFamily(state),
+            panelRole = if (activePanelRoute is CockpitPanelRoute.LensLab) {
+                StyleAndColorLabRole.LENS_LAB
+            } else {
+                StyleAndColorLabRole.STYLE
+            },
             showAdjustmentPanel = isFilterAdjustmentVisible,
             adjustmentMode = filterAdjustmentMode
         )
