@@ -712,9 +712,10 @@ internal fun sessionCaptureOutputText(
 
 internal fun sessionDiagnosticsText(
     state: SessionState,
-    traceEvents: List<SessionTraceEvent>
+    traceEvents: List<SessionTraceEvent>,
+    resourceDiagnostics: ResourceDiagnosticsSnapshot? = null
 ): String {
-    val debugDump = buildSessionDebugDump(state, traceEvents)
+    val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics)
     val perf = debugDump.perfSnapshot
     val recovery = debugDump.recoveryTrace
     return buildString {
@@ -2061,7 +2062,8 @@ internal fun devLogRenderModel(
     traceEvents: List<SessionTraceEvent>,
     isDebugBuild: Boolean,
     selectedTab: DevLogTab,
-    text: AppTextResolver
+    text: AppTextResolver,
+    resourceDiagnostics: ResourceDiagnosticsSnapshot? = null
 ): DevLogRenderModel {
     if (!isDebugBuild) {
         return DevLogRenderModel(
@@ -2085,7 +2087,7 @@ internal fun devLogRenderModel(
         }
     }
 
-    val debugDump = buildSessionDebugDump(state, traceEvents)
+    val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics)
     val perf = debugDump.perfSnapshot
     val recovery = debugDump.recoveryTrace
 

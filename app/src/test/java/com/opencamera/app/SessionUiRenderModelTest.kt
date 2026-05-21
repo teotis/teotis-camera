@@ -8,7 +8,10 @@ import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
+import com.opencamera.core.media.CameraPerformanceClass
+import com.opencamera.core.media.CameraThermalState
 import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
@@ -291,6 +294,26 @@ class SessionUiRenderModelTest {
         )
         assertTrue(diagnostics.contains("Error: provider restarted"))
         assertTrue(diagnostics.contains("2. preview.recovery.started -> recover after provider restart"))
+    }
+
+    @Test
+    fun `session diagnostics text includes resource diagnostics when present`() {
+        val state = defaultSessionState(previewStatus = PreviewStatus.ACTIVE)
+        val resourceDiag = ResourceDiagnosticsSnapshot(
+            thermalState = CameraThermalState.WARM,
+            performanceClass = CameraPerformanceClass.MID,
+            memoryBudgetBytes = 256L * 1024 * 1024,
+            activeAlgorithmJobs = 1,
+            maxConcurrentAlgorithmJobs = 2,
+            featureDegradations = mapOf("live" to "degraded:max-frames"),
+            pipelineNotes = listOf("resource:class=mid", "resource:thermal=warm")
+        )
+        val diagnostics = sessionDiagnosticsText(
+            state = state,
+            traceEvents = emptyList(),
+            resourceDiagnostics = resourceDiag
+        )
+        assertTrue(diagnostics.contains("Resource: thermal=warm | class=mid | memory=256MB | jobs=1/2 | degradations=live=degraded:max-frames"))
     }
 
     @Test

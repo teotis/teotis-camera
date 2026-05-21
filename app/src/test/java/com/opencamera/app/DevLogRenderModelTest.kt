@@ -3,6 +3,9 @@ package com.opencamera.app
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.media.CameraPerformanceClass
+import com.opencamera.core.media.CameraThermalState
+import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.ModeId
@@ -207,6 +210,44 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver()
         )
         assertTrue(model.content.contains("preview.snapshot.ignored"))
+    }
+
+    @Test
+    fun `dev log includes resource diagnostics in export when available`() {
+        val resourceDiag = ResourceDiagnosticsSnapshot(
+            thermalState = CameraThermalState.WARM,
+            performanceClass = CameraPerformanceClass.MID,
+            memoryBudgetBytes = 256L * 1024 * 1024,
+            activeAlgorithmJobs = 1,
+            maxConcurrentAlgorithmJobs = 2,
+            featureDegradations = mapOf("live" to "degraded:max-frames"),
+            pipelineNotes = listOf("resource:class=mid", "resource:thermal=warm", "resource:live=degraded:max-frames")
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            resourceDiagnostics = resourceDiag
+        )
+        assertTrue(model.exportContent.contains("=== RESOURCE DIAGNOSTICS ==="))
+        assertTrue(model.exportContent.contains("resource:class=mid"))
+        assertTrue(model.exportContent.contains("resource:thermal=warm"))
+        assertTrue(model.exportContent.contains("resource:live=degraded:max-frames"))
+    }
+
+    @Test
+    fun `dev log omits resource diagnostics section when null`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            resourceDiagnostics = null
+        )
+        assertFalse(model.exportContent.contains("=== RESOURCE DIAGNOSTICS ==="))
     }
 
     private fun defaultTestSessionState(): SessionState {
