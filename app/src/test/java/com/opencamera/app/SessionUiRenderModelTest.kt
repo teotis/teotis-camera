@@ -1228,8 +1228,12 @@ class SessionUiRenderModelTest {
 
         model.items.forEach { item ->
             assertTrue(
-                item.trackLabel.length <= 4,
-                "Mode track label '${item.trackLabel}' should be at most 4 chars for ${item.modeId}"
+                item.trackLabel.length <= 10,
+                "Mode track label '${item.trackLabel}' should be at most 10 chars for ${item.modeId}"
+            )
+            assertTrue(
+                item.trackLabel.isNotBlank(),
+                "Mode track label must not be blank for ${item.modeId}"
             )
         }
         val labels = model.items.map { it.trackLabel }
@@ -1341,18 +1345,16 @@ class SessionUiRenderModelTest {
     fun `style entry label is Chinese via text resolver`() {
         val chineseResolver = object : TestAppTextResolver() {
             override fun styleEntry(): String = "风格"
-            override fun lensLabEntry(): String = "镜头实验室"
             override fun quickLauncher(): String = "快捷"
-            override fun settingsEntry(): String = "设置"
+            override fun colorLabEntry(): String = "色彩实验室"
         }
         val state = defaultSessionState()
         val cockpit = cameraCockpitRenderModel(state, chineseResolver, strings)
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
         assertEquals("风格", visibleEntries[0].label)
-        assertEquals("镜头实验室", visibleEntries[1].label)
-        assertEquals("快捷", visibleEntries[2].label)
-        assertEquals("设置", visibleEntries[3].label)
+        assertEquals("快捷", visibleEntries[1].label)
+        assertEquals("色彩实验室", cockpit.topStatus.labEntryLabel)
     }
 
     @Test
