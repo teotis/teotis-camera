@@ -60,9 +60,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var titleText: TextView
     private lateinit var permissionStatus: TextView
     private lateinit var buttonSettingsEntry: Button
+    private lateinit var buttonLensLabEntry: Button
     private lateinit var buttonFilterEntry: Button
+    private lateinit var buttonQuickGrid: Button
     private lateinit var buttonQuickFlash: Button
     private lateinit var buttonQuickRatio: Button
+    private lateinit var buttonQuickLivePhoto: Button
+    private lateinit var buttonQuickTimer: Button
+    private lateinit var buttonQuickMore: Button
     private lateinit var buttonQuickLauncher: Button
     private lateinit var quickBubblePanel: LinearLayout
     private lateinit var settingsPanel: androidx.core.widget.NestedScrollView
@@ -152,6 +157,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var captureOutput: TextView
     private lateinit var previewThumbnail: ImageView
     private lateinit var zoomCapsuleScroll: android.widget.HorizontalScrollView
+    private lateinit var modeTrackScroll: android.widget.HorizontalScrollView
     private lateinit var zoomCapsuleRow: LinearLayout
     private lateinit var buttonDevEntry: Button
     private lateinit var devConsolePanel: com.google.android.material.card.MaterialCardView
@@ -160,6 +166,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonDevTabError: Button
     private lateinit var buttonDevTabAll: Button
     private lateinit var devConsoleTitle: TextView
+    private lateinit var devConsoleSummary: TextView
     private lateinit var devConsoleContent: TextView
     private lateinit var buttonDevExport: Button
     private lateinit var buttonDevClose: Button
@@ -223,9 +230,14 @@ class MainActivity : AppCompatActivity() {
         titleText = findViewById(R.id.titleText)
         permissionStatus = findViewById(R.id.permissionStatus)
         buttonSettingsEntry = findViewById(R.id.buttonSettingsEntry)
+        buttonLensLabEntry = findViewById(R.id.buttonLensLabEntry)
         buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
+        buttonQuickGrid = findViewById(R.id.buttonQuickGrid)
         buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
         buttonQuickRatio = findViewById(R.id.buttonQuickRatio)
+        buttonQuickLivePhoto = findViewById(R.id.buttonQuickLivePhoto)
+        buttonQuickTimer = findViewById(R.id.buttonQuickTimer)
+        buttonQuickMore = findViewById(R.id.buttonQuickMore)
         buttonQuickLauncher = findViewById(R.id.buttonQuickLauncher)
         quickBubblePanel = findViewById(R.id.quickBubblePanel)
         settingsPanel = findViewById(R.id.settingsPanel)
@@ -325,6 +337,7 @@ class MainActivity : AppCompatActivity() {
         proModeButton = findViewById(R.id.buttonProMode)
         videoModeButton = findViewById(R.id.buttonVideoMode)
         zoomCapsuleScroll = findViewById(R.id.zoomCapsuleScroll)
+        modeTrackScroll = findViewById(R.id.modeTrackScroll)
         zoomCapsuleRow = findViewById(R.id.zoomCapsuleRow)
         buttonDevEntry = findViewById(R.id.buttonDevEntry)
         devConsolePanel = findViewById(R.id.devConsolePanel)
@@ -333,6 +346,7 @@ class MainActivity : AppCompatActivity() {
         buttonDevTabError = findViewById(R.id.buttonDevTabError)
         buttonDevTabAll = findViewById(R.id.buttonDevTabAll)
         devConsoleTitle = findViewById(R.id.devConsoleTitle)
+        devConsoleSummary = findViewById(R.id.devConsoleSummary)
         devConsoleContent = findViewById(R.id.devConsoleContent)
         buttonDevExport = findViewById(R.id.buttonDevExport)
         buttonDevClose = findViewById(R.id.buttonDevClose)
@@ -380,16 +394,10 @@ class MainActivity : AppCompatActivity() {
             renderDevConsoleVisibility()
         }
         buttonSettingsEntry.setOnClickListener {
-            activePanelRoute = if (activePanelRoute.isSettingsOpen) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.Settings()
-            }
-            selectedWatermarkDetailTemplateId = null
-            if (activePanelRoute.isSettingsOpen) {
-                renderLatestSettingsSurfaces()
-            }
-            renderPanelVisibility()
+            toggleSettingsPanel()
+        }
+        buttonLensLabEntry.setOnClickListener {
+            toggleSettingsPanel()
         }
         buttonFilterEntry.setOnClickListener {
             activePanelRoute = if (activePanelRoute is CockpitPanelRoute.FilterLab) {
@@ -445,6 +453,24 @@ class MainActivity : AppCompatActivity() {
                 CockpitPanelRoute.QuickBubble
             }
             latestSessionState?.let(::render)
+        }
+        buttonQuickGrid.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.gridMode)
+        }
+        buttonQuickFlash.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.gridMode)
+        }
+        buttonQuickRatio.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.videoSection?.resolution)
+        }
+        buttonQuickLivePhoto.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.livePhoto)
+        }
+        buttonQuickTimer.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.countdown)
+        }
+        buttonQuickMore.setOnClickListener {
+            toggleSettingsPanel()
         }
         buttonDevTabKey.setOnClickListener {
             selectedDevLogTab = DevLogTab.KEY
@@ -747,6 +773,7 @@ class MainActivity : AppCompatActivity() {
         zoomRatioButton.isEnabled = controls.zoomEnabled
         captureOutput.text = sessionCaptureOutputText(state, sessionUiStrings())
         renderZoomCapsules(controls)
+        renderQuickBubble()
         buttonDevEntry.isVisible = com.opencamera.app.BuildConfig.DEBUG
         val devLogModel = devLogRenderModel(
             state = state,
@@ -1106,6 +1133,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun toggleSettingsPanel() {
+        activePanelRoute = if (activePanelRoute.isSettingsOpen) {
+            CockpitPanelRoute.None
+        } else {
+            CockpitPanelRoute.Settings()
+        }
+        selectedWatermarkDetailTemplateId = null
+        if (activePanelRoute.isSettingsOpen) {
+            renderLatestSettingsSurfaces()
+        }
+        renderPanelVisibility()
+    }
+
+    private fun renderQuickBubble() {
+        buttonQuickGrid.text = getString(R.string.button_quick_grid)
+        buttonQuickFlash.text = getString(R.string.button_quick_flash)
+        buttonQuickRatio.text = getString(R.string.button_quick_ratio)
+        buttonQuickLivePhoto.text = getString(R.string.button_quick_live)
+        buttonQuickTimer.text = getString(R.string.button_quick_timer)
+        buttonQuickMore.text = getString(R.string.button_quick_more)
+    }
+
     private fun renderPanelVisibility() {
         val route = activePanelRoute
         settingsPanel.isVisible = route.isSettingsOpen
@@ -1120,6 +1169,7 @@ class MainActivity : AppCompatActivity() {
         buttonSettingsBack.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
 
         buttonSettingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
+        buttonLensLabEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
         buttonFilterEntry.alpha = if (route is CockpitPanelRoute.FilterLab) 1f else 0.92f
         quickBubblePanel.isVisible = route is CockpitPanelRoute.QuickBubble
         buttonQuickLauncher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
@@ -1175,6 +1225,8 @@ class MainActivity : AppCompatActivity() {
     private fun renderDevConsole() {
         val model = latestDevLogRenderModel ?: return
         devConsoleTitle.text = model.title
+        devConsoleSummary.text = model.summaryText
+        devConsoleSummary.isVisible = model.summaryText.isNotBlank()
         devConsoleContent.text = model.content
         buttonDevTabKey.isEnabled = model.selectedTab != DevLogTab.KEY
         buttonDevTabCore.isEnabled = model.selectedTab != DevLogTab.CORE
@@ -1277,6 +1329,17 @@ class MainActivity : AppCompatActivity() {
                     button.background = null
                     button.alpha = if (item.isAvailable) 0.78f else 0.42f
                 }
+            }
+        }
+        // Auto-scroll to keep active mode visible
+        modeTrackScroll.post {
+            val activeButton = buttons.firstOrNull { b ->
+                val idx = buttons.indexOf(b)
+                idx < model.items.size && model.items[idx].isActive
+            }
+            activeButton?.let {
+                val scrollX = (it.left - 48.dp).coerceAtLeast(0)
+                modeTrackScroll.smoothScrollTo(scrollX, 0)
             }
         }
     }

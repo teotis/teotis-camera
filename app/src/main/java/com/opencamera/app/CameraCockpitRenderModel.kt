@@ -84,6 +84,11 @@ internal fun cameraCockpitRenderModel(
                     isActive = activeRoute is CockpitPanelRoute.QuickBubble
                 ),
                 RightRailEntryRenderModel(
+                    route = CockpitPanelRoute.Settings(),
+                    label = text.lensLab(),
+                    isActive = activeRoute is CockpitPanelRoute.Settings
+                ),
+                RightRailEntryRenderModel(
                     route = CockpitPanelRoute.DevConsole,
                     label = text.devEntry(),
                     isActive = activeRoute is CockpitPanelRoute.DevConsole,
@@ -105,8 +110,8 @@ internal fun cameraCockpitRenderModel(
         bottomCockpit = BottomCockpitRenderModel(
             captureOutputText = captureOutput,
             shutterLabel = text.shutterShort(),
-            isShutterEnabled = true,
-            isRecording = false,
+            isShutterEnabled = state.modeSnapshot.state.isShutterEnabled,
+            isRecording = state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE,
             lensButtonLabel = controls.lensFacingButtonLabel,
             lensButtonEnabled = controls.lensFacingEnabled,
             zoomButtonLabel = controls.zoomButtonLabel,

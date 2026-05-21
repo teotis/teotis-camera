@@ -1208,6 +1208,50 @@ class SessionUiRenderModelTest {
         assertFalse(model.videoSection.frameRate.buttonLabel.contains("N/A"))
     }
 
+    @Test
+    fun `cockpit right rail exposes tone quick and lens lab entries`() {
+        val state = defaultSessionState()
+        val text = TestAppTextResolver()
+        val cockpit = cameraCockpitRenderModel(state, text, strings)
+
+        val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
+        assertEquals(3, visibleEntries.size)
+        assertEquals("Tone", visibleEntries[0].label)
+        assertEquals("Quick", visibleEntries[1].label)
+        assertEquals("Lens Lab", visibleEntries[2].label)
+
+        assertTrue(visibleEntries[0].route is CockpitPanelRoute.FilterLab)
+        assertTrue(visibleEntries[1].route is CockpitPanelRoute.QuickBubble)
+        assertTrue(visibleEntries[2].route is CockpitPanelRoute.Settings)
+    }
+
+    @Test
+    fun `cockpit bottom reflects recording state`() {
+        val state = defaultSessionState().copy(
+            recordingStatus = RecordingStatus.RECORDING
+        )
+        val text = TestAppTextResolver()
+        val cockpit = cameraCockpitRenderModel(state, text, strings)
+
+        assertTrue(cockpit.bottomCockpit.isRecording)
+    }
+
+    @Test
+    fun `tone lab entry label is Chinese via text resolver`() {
+        val chineseResolver = object : TestAppTextResolver() {
+            override fun tone(): String = "色调"
+            override fun quickLauncher(): String = "快捷"
+            override fun lensLab(): String = "镜头实验室"
+        }
+        val state = defaultSessionState()
+        val cockpit = cameraCockpitRenderModel(state, chineseResolver, strings)
+
+        val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
+        assertEquals("色调", visibleEntries[0].label)
+        assertEquals("快捷", visibleEntries[1].label)
+        assertEquals("镜头实验室", visibleEntries[2].label)
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",

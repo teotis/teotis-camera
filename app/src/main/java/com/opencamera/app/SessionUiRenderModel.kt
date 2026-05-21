@@ -1977,6 +1977,7 @@ internal fun devLogRenderModel(
             isAvailable = false,
             selectedTab = selectedTab,
             title = "Dev Log",
+            summaryText = "",
             content = "",
             exportContent = ""
         )
@@ -2023,6 +2024,21 @@ internal fun devLogRenderModel(
         append(coreSummary)
     }
 
+    val lastTiming = traceEvents.lastOrNull { it.name.endsWith(".timing") }
+    val lastIssue = errorEvents.lastOrNull()
+    val summaryText = buildString {
+        append("状态: ${debugDump.previewStatus} | ")
+        append("模式: ${debugDump.activeMode.name} | ")
+        append("拍摄: ${debugDump.captureStatus} | ")
+        append("录制: ${debugDump.recordingStatus}")
+        if (lastTiming != null) {
+            append(" | 最后耗时: ${lastTiming.detail}")
+        }
+        if (lastIssue != null) {
+            append(" | 最近问题: ${lastIssue.name}")
+        }
+    }
+
     return DevLogRenderModel(
         isAvailable = true,
         selectedTab = selectedTab,
@@ -2032,6 +2048,7 @@ internal fun devLogRenderModel(
             DevLogTab.ERROR -> "Error Log (${errorEvents.size})"
             DevLogTab.ALL -> "All Events (${allEvents.size})"
         },
+        summaryText = summaryText,
         content = tabContent,
         exportContent = exportContent
     )
