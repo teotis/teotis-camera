@@ -929,6 +929,7 @@ private fun String?.decodeAutoLong(): Long? = this?.takeUnless { it == "auto" }?
 private fun String?.decodeAutoFloat(): Float? = this?.takeUnless { it == "auto" }?.toFloatOrNull()
 
 sealed interface PersistedSettingsAction {
+    data class UpdateAppLanguage(val language: AppLanguage) : PersistedSettingsAction
     data class UpdateGridMode(val gridMode: CompositionGridMode) : PersistedSettingsAction
     data class UpdateShutterSoundEnabled(val enabled: Boolean) : PersistedSettingsAction
     data class UpdateSelfieMirrorEnabled(val enabled: Boolean) : PersistedSettingsAction
@@ -971,6 +972,9 @@ sealed interface PersistedSettingsAction {
 
 fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings {
     return when (action) {
+        is PersistedSettingsAction.UpdateAppLanguage -> copy(
+            common = common.copy(appLanguage = action.language)
+        )
         is PersistedSettingsAction.UpdateGridMode -> copy(
             common = common.copy(gridMode = action.gridMode)
         )
