@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaActionSound
 import android.net.Uri
@@ -9,6 +10,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import android.view.MotionEvent
 import android.view.View
 import com.opencamera.app.gesture.GestureAction
@@ -25,7 +27,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.opencamera.app.i18n.AppTextResolver
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -39,9 +44,11 @@ import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.catalogProfile
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
+import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.FilterRenderSpec
 import kotlinx.coroutines.launch
+import java.io.File
 
 private enum class SettingsSubpage {
     ROOT,
@@ -342,6 +349,12 @@ class MainActivity : AppCompatActivity() {
         buttonDevClose = findViewById(R.id.buttonDevClose)
         devLogExporter = DevLogExporter(this)
 
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.topPanel)) { v, insets ->
+            val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
+            v.updatePadding(top = statusBars.top)
+            insets
+        }
+
         bindActions()
         bindGestureRouter()
         bindState()
@@ -500,6 +513,30 @@ class MainActivity : AppCompatActivity() {
         }
         zoomRatioButton.setOnClickListener {
             dispatch(SessionIntent.ZoomRatioToggled)
+        }
+        previewThumbnail.setOnClickListener {
+            val presentation = latestSessionState?.presentation ?: return@setOnClickListener
+            val filePath = presentation.latestCapturePath
+                ?: presentation.latestVideoPath
+                ?: return@setOnClickListener
+            val file = File(filePath)
+            if (!file.exists()) {
+                Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+            val mimeType = when (presentation.latestSavedMediaType) {
+                com.opencamera.core.session.SavedMediaType.VIDEO -> "video/*"
+                com.opencamera.core.session.SavedMediaType.PHOTO -> "image/*"
+                null -> "image/*"
+            }
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            runCatching { startActivity(intent) }.onFailure {
+                Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
+            }
         }
         buttonGridMode.setOnClickListener {
             applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.gridMode)
@@ -719,7 +756,16 @@ class MainActivity : AppCompatActivity() {
         }
         maybePlayShutterSound(state)
 
-        shutterButton.text = state.modeSnapshot.uiSpec.shutterLabel
+        val shutterLabel = when (state.recordingStatus) {
+            RecordingStatus.IDLE -> state.modeSnapshot.uiSpec.shutterLabel
+            RecordingStatus.REQUESTING -> getString(R.string.button_recording_starting)
+            RecordingStatus.RECORDING -> getString(R.string.button_recording_stop)
+            RecordingStatus.STOPPING -> getString(R.string.button_recording_saving)
+        }
+        shutterButton.text = shutterLabel
+        if (state.recordingStatus != RecordingStatus.IDLE) {
+            shutterButton.setTextColor(0xFFFF4444.toInt())
+        }
         lensFacingButton.text = controls.lensFacingButtonLabel
         zoomRatioButton.text = controls.zoomButtonLabel
         shutterButton.isEnabled = state.modeSnapshot.state.isShutterEnabled

@@ -1127,6 +1127,29 @@ class SessionUiRenderModelTest {
         assertEquals(listOf(false, true, false, false), controls.zoomCapsules.map { it.isActive })
     }
 
+    @Test
+    fun `mode track render model preserves available mode order and identity`() {
+        val availableModes = listOf(
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
+            ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+        )
+        val state = defaultSessionState(
+            activeMode = ModeId.HUMANISTIC,
+            availableModes = availableModes
+        )
+        val model = modeTrackRenderModel(state, TestAppTextResolver())
+
+        assertEquals(7, model.items.size)
+        assertEquals(
+            listOf(ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
+                   ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO),
+            model.items.map { it.modeId }
+        )
+        assertTrue(model.items.first { it.modeId == ModeId.HUMANISTIC }.isActive)
+        assertFalse(model.items.first { it.modeId == ModeId.PHOTO }.isActive)
+        assertTrue(model.items.all { it.isAvailable })
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",
