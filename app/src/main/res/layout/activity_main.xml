@@ -6,6 +6,12 @@
     android:background="#05070A">
 
     <!-- Layer 1: Full-screen camera preview -->
+    <!-- Layer 2: Lightweight top status -->
+    <!-- Layer 3: Floating Focus utilities -->
+    <!-- Layer 4: Bottom capture deck -->
+    <!-- Overlay: Quick Bubble tools -->
+    <!-- Overlay: Palette panel -->
+    <!-- Overlay: Dev console -->
     <androidx.camera.view.PreviewView
         android:id="@+id/cameraPreview"
         android:layout_width="0dp"
@@ -68,25 +74,6 @@
             android:layout_marginStart="6dp"
             android:text="@string/button_settings_entry"
             android:textSize="12sp" />
-
-        <Button
-            android:id="@+id/buttonFilterEntry"
-            style="@style/Widget.OpenCamera.PillButton"
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginStart="6dp"
-            android:text="@string/button_filter_entry"
-            android:textSize="12sp" />
-
-        <Button
-            android:id="@+id/buttonDevEntry"
-            style="@style/Widget.OpenCamera.DevEntryButton"
-            android:layout_width="wrap_content"
-            android:layout_height="32dp"
-            android:layout_marginStart="6dp"
-            android:text="@string/button_dev_entry"
-            android:textSize="12sp"
-            android:visibility="gone" />
     </LinearLayout>
 
     <TextView
@@ -103,6 +90,70 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel" />
+
+    <!-- Floating Focus utilities -->
+    <LinearLayout
+        android:id="@+id/floatingUtilityGroup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="18dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <Button
+            android:id="@+id/buttonFilterEntry"
+            style="@style/Widget.OpenCamera.FloatingActionButton"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:text="@string/button_palette_entry" />
+
+        <Button
+            android:id="@+id/buttonQuickLauncher"
+            style="@style/Widget.OpenCamera.FloatingActionButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/button_quick_launcher" />
+
+        <Button
+            android:id="@+id/buttonDevEntry"
+            style="@style/Widget.OpenCamera.FloatingDevButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:text="@string/button_dev_entry"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- Overlay: Quick Bubble tools -->
+    <LinearLayout
+        android:id="@+id/quickBubblePanel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="74dp"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <Button
+            android:id="@+id/buttonQuickFlash"
+            style="@style/Widget.OpenCamera.QuickBubbleButton"
+            android:layout_width="64dp"
+            android:layout_height="44dp" />
+
+        <Button
+            android:id="@+id/buttonQuickRatio"
+            style="@style/Widget.OpenCamera.QuickBubbleButton"
+            android:layout_width="64dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="10dp" />
+    </LinearLayout>
 
     <!-- Mode track: horizontal scrolling strip (fixed position above bottom) -->
     <HorizontalScrollView
@@ -1131,6 +1182,26 @@
         </androidx.core.widget.NestedScrollView>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- Zoom capsule row -->
+    <HorizontalScrollView
+        android:id="@+id/zoomCapsuleScroll"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp"
+        android:clipToPadding="false"
+        android:scrollbars="none"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:id="@+id/zoomCapsuleRow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
     <!-- Layer 3: Bottom control strip (three-segment cockpit) -->
     <LinearLayout
         android:id="@+id/bottomSheet"
@@ -1157,7 +1228,7 @@
             android:textColor="#BFD0E4"
             android:textSize="12sp" />
 
-        <!-- Three-segment row: Thumbnail | Quick actions | Lens/Zoom -->
+        <!-- Three-segment row: Thumbnail | Lens/Zoom -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -1174,31 +1245,6 @@
                 android:contentDescription="@string/preview_thumbnail_content_description"
                 android:padding="2dp"
                 android:scaleType="centerCrop" />
-
-            <!-- Center: Quick action buttons -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="horizontal"
-                android:paddingHorizontal="8dp">
-
-                <Button
-                    android:id="@+id/buttonQuickFlash"
-                    style="@style/Widget.OpenCamera.QuickSettingButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/button_quick_flash" />
-
-                <Button
-                    android:id="@+id/buttonQuickRatio"
-                    style="@style/Widget.OpenCamera.QuickSettingButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:text="@string/button_quick_ratio" />
-            </LinearLayout>
 
             <!-- Right: Lens + Zoom -->
             <LinearLayout
@@ -1224,26 +1270,6 @@
                     android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
-
-        <!-- Zoom capsule row -->
-        <HorizontalScrollView
-            android:id="@+id/zoomCapsuleScroll"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:scrollbars="none"
-            android:fadeScrollbars="false"
-            android:clipToPadding="false"
-            android:paddingHorizontal="12dp"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/zoomCapsuleRow"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal" />
-        </HorizontalScrollView>
 
         <!-- Shutter row: centered anchor -->
         <LinearLayout

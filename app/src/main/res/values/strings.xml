@@ -65,4 +65,8 @@
     <string name="dev_export_log">Export Log</string>
     <string name="dev_close">Close</string>
     <string name="dev_console_content_description">Debug console overlay</string>
+    <string name="button_palette_entry">Tone</string>
+    <string name="button_quick_launcher">Quick</string>
+    <string name="quick_bubble_panel_content_description">Quick camera controls</string>
+    <string name="floating_utility_group_content_description">Floating camera tools</string>
 </resources>

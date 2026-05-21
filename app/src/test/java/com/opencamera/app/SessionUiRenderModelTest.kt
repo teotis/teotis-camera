@@ -1063,6 +1063,40 @@ class SessionUiRenderModelTest {
         )
     }
 
+    @Test
+    fun `cockpit controls remain available for floating focus layout`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT),
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
+                    defaultRatio = 1f
+                ),
+                availableStillCaptureOutputSizes = listOf(
+                    StillCaptureOutputSize(width = 6000, height = 4000),
+                    StillCaptureOutputSize(width = 4000, height = 3000)
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 1f,
+                qualityPreference = StillCaptureQualityPreference.QUALITY,
+                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
+                outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
+            )
+        )
+
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.zoomCapsules.map { it.label }.containsAll(listOf("0.6", "1x", "2x", "5x")))
+        assertTrue(controls.flashText.isNotBlank())
+        assertTrue(controls.ratioText.isNotBlank())
+        assertTrue(controls.stillQualityText.isNotBlank())
+        assertTrue(controls.stillSizeText.isNotBlank())
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",

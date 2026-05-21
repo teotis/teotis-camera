@@ -59,6 +59,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var buttonFilterEntry: Button
     private lateinit var buttonQuickFlash: Button
     private lateinit var buttonQuickRatio: Button
+    private lateinit var buttonQuickLauncher: Button
+    private lateinit var quickBubblePanel: LinearLayout
+    private var isQuickBubblePanelVisible = false
     private lateinit var settingsPanel: androidx.core.widget.NestedScrollView
     private lateinit var filterPanel: androidx.core.widget.NestedScrollView
     private lateinit var buttonSettingsBack: Button
@@ -222,6 +225,8 @@ class MainActivity : ComponentActivity() {
         buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
         buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
         buttonQuickRatio = findViewById(R.id.buttonQuickRatio)
+        buttonQuickLauncher = findViewById(R.id.buttonQuickLauncher)
+        quickBubblePanel = findViewById(R.id.quickBubblePanel)
         settingsPanel = findViewById(R.id.settingsPanel)
         filterPanel = findViewById(R.id.filterPanel)
         buttonSettingsBack = findViewById(R.id.buttonSettingsBack)
@@ -357,6 +362,7 @@ class MainActivity : ComponentActivity() {
             isSettingsPanelVisible = !isSettingsPanelVisible
             if (isSettingsPanelVisible) {
                 isFilterPanelVisible = false
+                isQuickBubblePanelVisible = false
                 currentSettingsSubpage = SettingsSubpage.ROOT
                 selectedWatermarkDetailTemplateId = null
                 renderLatestSettingsSurfaces()
@@ -367,6 +373,7 @@ class MainActivity : ComponentActivity() {
             isFilterPanelVisible = !isFilterPanelVisible
             if (isFilterPanelVisible) {
                 isSettingsPanelVisible = false
+                isQuickBubblePanelVisible = false
                 renderLatestFilterLab()
             } else {
                 selectedFilterLabFamilyOverride = null
@@ -400,7 +407,19 @@ class MainActivity : ComponentActivity() {
         }
         buttonDevEntry.setOnClickListener {
             isDevConsoleVisible = !isDevConsoleVisible
+            if (isDevConsoleVisible) {
+                isQuickBubblePanelVisible = false
+            }
             renderDevConsoleVisibility()
+        }
+        buttonQuickLauncher.setOnClickListener {
+            isQuickBubblePanelVisible = !isQuickBubblePanelVisible
+            if (isQuickBubblePanelVisible) {
+                isSettingsPanelVisible = false
+                isFilterPanelVisible = false
+                isDevConsoleVisible = false
+            }
+            latestSessionState?.let(::render)
         }
         buttonDevTabKey.setOnClickListener {
             selectedDevLogTab = DevLogTab.KEY
@@ -1054,6 +1073,8 @@ class MainActivity : ComponentActivity() {
         buttonSettingsBack.isVisible = !showRoot
         buttonSettingsEntry.alpha = if (isSettingsPanelVisible) 1f else 0.92f
         buttonFilterEntry.alpha = if (isFilterPanelVisible) 1f else 0.92f
+        quickBubblePanel.isVisible = isQuickBubblePanelVisible
+        buttonQuickLauncher.alpha = if (isQuickBubblePanelVisible) 1f else 0.86f
     }
 
     private fun renderZoomCapsules(controls: SessionControlsRenderModel) {
