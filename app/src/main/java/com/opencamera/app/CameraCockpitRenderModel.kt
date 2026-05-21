@@ -75,7 +75,7 @@ internal fun cameraCockpitRenderModel(
             appName = "OpenCamera",
             modeLabel = primary.modeLabel,
             statusText = primary.statusText,
-            labEntryLabel = text.lensLab()
+            labEntryLabel = text.settingsEntry()
         ),
         rightRail = RightRailRenderModel(
             entries = listOf(
@@ -91,7 +91,7 @@ internal fun cameraCockpitRenderModel(
                 ),
                 RightRailEntryRenderModel(
                     route = CockpitPanelRoute.Settings(),
-                    label = text.lensLab(),
+                    label = text.settingsEntry(),
                     isActive = activeRoute is CockpitPanelRoute.Settings
                 ),
                 RightRailEntryRenderModel(

@@ -63,7 +63,7 @@ class CameraCockpitRenderModelTest {
 
         assertEquals("OpenCamera", model.topStatus.appName)
         assertEquals("Humanistic", model.topStatus.modeLabel)
-        assertEquals("Lens Lab", model.topStatus.labEntryLabel)
+        assertEquals("Settings", model.topStatus.labEntryLabel)
     }
 
     @Test
@@ -82,7 +82,7 @@ class CameraCockpitRenderModelTest {
         assertEquals(4, model.rightRail.entries.size)
         assertEquals("Tone", model.rightRail.entries[0].label)
         assertEquals("Quick", model.rightRail.entries[1].label)
-        assertEquals("Lens Lab", model.rightRail.entries[2].label)
+        assertEquals("Settings", model.rightRail.entries[2].label)
         assertEquals("DEV", model.rightRail.entries[3].label)
     }
 

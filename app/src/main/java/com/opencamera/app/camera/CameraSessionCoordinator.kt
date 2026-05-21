@@ -94,7 +94,7 @@ class CameraSessionCoordinator(
                 )
             }
             is DeviceEvent.PreviewSnapshotAvailable -> session.dispatch(
-                SessionIntent.PreviewSnapshotUpdated(event.source)
+                SessionIntent.PreviewSnapshotUpdated(event.source, event.generation)
             )
             is DeviceEvent.CaptureFeedbackSnapshotAvailable -> session.dispatch(
                 SessionIntent.CaptureFeedbackSnapshotUpdated(

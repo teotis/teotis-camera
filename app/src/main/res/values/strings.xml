@@ -28,9 +28,9 @@
     <string name="button_switch_to_back">切换后摄</string>
     <string name="button_single_lens">单镜头</string>
     <string name="button_stop_session">停止会话</string>
-    <string name="button_settings_entry">镜头实验室</string>
-    <string name="button_lens_rail">镜头</string>
-    <string name="button_settings_close">关闭镜头实验室</string>
+    <string name="button_settings_entry">设置</string>
+    <string name="button_lens_rail">设置</string>
+    <string name="button_settings_close">关闭设置</string>
     <string name="button_filter_entry">色调</string>
     <string name="button_filter_close">关闭色调</string>
     <string name="permission_pending">需要相机权限才能开始预览。</string>
@@ -44,7 +44,7 @@
     <string name="output_error_prefix">相机问题：</string>
     <string name="output_preview_prefix">预览缩略图：</string>
     <string name="preview_thumbnail_content_description">最新预览缩略图</string>
-    <string name="settings_panel_content_description">相机默认参数和能力设置</string>
+    <string name="settings_panel_content_description">相机设置</string>
     <string name="filter_panel_content_description">色调实验室独立默认参数面板</string>
     <string name="settings_section_common">通用</string>
     <string name="settings_section_photo">拍照</string>
@@ -54,7 +54,7 @@
     <string name="button_quick_grid">网格</string>
     <string name="button_quick_flash">画质</string>
     <string name="button_quick_more">更多</string>
-    <string name="button_quick_ratio">分辨率</string>
+    <string name="button_quick_ratio">画幅</string>
     <string name="button_preview_ratio">预览比例</string>
     <string name="button_quick_live">实况</string>
     <string name="button_quick_timer">定时</string>
@@ -93,8 +93,8 @@
     <string name="label_shutter_tone">快门音效</string>
     <string name="label_selfie_mirror">自拍镜像</string>
     <string name="label_default_photo_filter">默认照片滤镜</string>
-    <string name="label_portrait_lab">人像实验室</string>
-    <string name="label_watermark_lab">水印实验室</string>
+    <string name="label_portrait_lab">人像</string>
+    <string name="label_watermark_lab">水印</string>
     <string name="label_live_photo_default">实况照片默认</string>
     <string name="label_countdown">倒计时</string>
     <string name="label_resolution">分辨率</string>
@@ -276,4 +276,66 @@
     <string name="dev_log_title_core">核心日志 (%d)</string>
     <string name="dev_log_title_error">错误日志 (%d)</string>
     <string name="dev_log_title_all">全部事件 (%d)</string>
+
+    <!-- Settings joiners for sessionSettingsRenderModel -->
+    <string name="settings_joiner_grid">网格</string>
+    <string name="settings_joiner_shutter_sound"> | 快门声音</string>
+    <string name="settings_joiner_selfie_mirror"> | 自拍镜像</string>
+    <string name="settings_joiner_filter">滤镜</string>
+    <string name="settings_joiner_portrait"> | 人像</string>
+    <string name="settings_joiner_watermark"> | 水印</string>
+    <string name="settings_joiner_live"> | 实况</string>
+    <string name="settings_joiner_timer"> | 定时</string>
+    <string name="settings_joiner_mic"> | 麦克风</string>
+
+    <!-- Settings page -->
+    <string name="settings_page_supporting">调整相机默认项。高频拍摄控制保留在快捷面板。</string>
+    <string name="settings_page_grid_support">切换 %d 种布局</string>
+    <string name="settings_page_portrait_support">打开配置、美颜与散景调节</string>
+    <string name="settings_page_watermark_support">打开选择器与逐模板调节；%d 个模板</string>
+    <string name="settings_page_live_support">仅保存默认值；%d ms 包 | 动态水印 %s</string>
+    <string name="settings_page_degraded_resolution">已保存为 %s，活跃图使用 %s</string>
+    <string name="settings_page_degraded_framerate">已保存为 %s，活跃图使用 %s</string>
+    <string name="settings_page_degraded_dynamic_fps">已保存为 %s，活跃图使用 %s</string>
+    <string name="settings_page_degraded_audio">已保存为 %s，活跃图使用 %s</string>
+    <string name="settings_page_video_filter_seed">已保存滤镜种子；%d 个外观已暂存</string>
+    <string name="settings_page_catalog_footer_1">静态照片水印模板现已集成到元数据和照片渲染中。</string>
+    <string name="settings_page_catalog_footer_2">手动草稿和实况/视频默认值仍在同一设置主干中暂存。</string>
+    <string name="settings_page_pro_manual_prefix"> | 专业手动草稿</string>
+
+    <!-- Watermark selector -->
+    <string name="watermark_selector_supporting">水印选择位于镜头实验室下一级。在此选择活跃模板，然后进入模板专属样式页面进行编辑。</string>
+    <string name="watermark_selector_default_prefix">默认</string>
+    <string name="watermark_selector_templates_staged"> 个模板已暂存</string>
+    <string name="watermark_selector_current_default"> | 当前默认</string>
+    <string name="watermark_selector_edit_attrs_frame">位置、大小、透明度、背景</string>
+    <string name="watermark_selector_edit_attrs_classic">位置、大小、透明度</string>
+    <string name="watermark_selector_footer_supported">经典叠加保持其边框背景固定；旅行拍立得和复古边框在其专属样式页上提供边框背景变体。</string>
+    <string name="watermark_selector_footer_unsupported">此设备不支持拍照，水印实验室保持只读状态。</string>
+
+    <!-- Watermark detail -->
+    <string name="watermark_detail_supporting_selected">这是当前活跃的默认水印。此处更改将影响使用此模板渲染的下一张静态照片。</string>
+    <string name="watermark_detail_supporting_not_selected">此模板尚不是当前默认。请先在此调整，准备就绪后从选择器页面切换。</string>
+    <string name="watermark_detail_footer_frame">边框渲染对静态照片导出已激活。</string>
+    <string name="watermark_detail_footer_overlay">经典叠加保持在源图像内，不扩展边框。</string>
+    <string name="watermark_detail_tokens_prefix">标记：</string>
+
+    <!-- Watermark attribute prefixes for hero summary -->
+    <string name="watermark_attr_placement_prefix">位置</string>
+    <string name="watermark_attr_scale_prefix">大小</string>
+    <string name="watermark_attr_opacity_prefix">透明度</string>
+    <string name="watermark_attr_background_prefix">背景</string>
+    <string name="watermark_template_expanded_frame">扩展边框</string>
+    <string name="watermark_template_classic_overlay">经典叠加</string>
+
+    <!-- Portrait lab -->
+    <string name="portrait_lab_supporting">人像产品调节位于镜头实验室下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。</string>
+    <string name="portrait_lab_joiner_beauty">美颜</string>
+    <string name="portrait_lab_joiner_bokeh">散景</string>
+    <string name="portrait_lab_footer">色调实验室仍负责人像色彩风格选择。人像实验室仅管理 6B-5 中引入的产品配置、美颜方案/强度和轻量散景渲染元数据。</string>
+
+    <!-- Pro controls -->
+    <string name="pro_controls_supporting_editable">上层手动草稿当前可编辑；每个控件会标明其状态：已应用、仅保存、或暂时不支持。</string>
+    <string name="pro_controls_supporting_readonly">允许草稿更改，但此设备当前所有控件均处于仅保存或暂时不支持状态。</string>
+    <string name="pro_controls_finish_capture_hint">完成当前拍摄后方可编辑。</string>
 </resources>

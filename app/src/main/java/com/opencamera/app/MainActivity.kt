@@ -39,6 +39,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.StillCaptureOutputSize
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.renderUriOrNull
@@ -69,8 +70,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonFilterEntry: Button
     private lateinit var buttonQuickGrid: Button
     private lateinit var buttonQuickFlash: Button
-    private lateinit var buttonQuickRatio: Button
-    private lateinit var buttonPreviewRatio: Button
+    private lateinit var buttonFrameRatio43: Button
+    private lateinit var buttonFrameRatio169: Button
+    private lateinit var buttonFrameRatio11: Button
     private lateinit var buttonQuickLivePhoto: Button
     private lateinit var buttonQuickTimer: Button
     private lateinit var buttonQuickMore: Button
@@ -245,8 +247,9 @@ class MainActivity : AppCompatActivity() {
         buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
         buttonQuickGrid = findViewById(R.id.buttonQuickGrid)
         buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
-        buttonQuickRatio = findViewById(R.id.buttonQuickRatio)
-        buttonPreviewRatio = findViewById(R.id.buttonPreviewRatio)
+        buttonFrameRatio43 = findViewById(R.id.buttonFrameRatio43)
+        buttonFrameRatio169 = findViewById(R.id.buttonFrameRatio169)
+        buttonFrameRatio11 = findViewById(R.id.buttonFrameRatio11)
         buttonQuickLivePhoto = findViewById(R.id.buttonQuickLivePhoto)
         buttonQuickTimer = findViewById(R.id.buttonQuickTimer)
         buttonQuickMore = findViewById(R.id.buttonQuickMore)
@@ -488,11 +491,14 @@ class MainActivity : AppCompatActivity() {
         buttonQuickFlash.setOnClickListener {
             dispatch(SessionIntent.StillCaptureQualityToggled)
         }
-        buttonQuickRatio.setOnClickListener {
-            dispatch(SessionIntent.StillCaptureResolutionToggled)
+        buttonFrameRatio43.setOnClickListener {
+            dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_4_3))
         }
-        buttonPreviewRatio.setOnClickListener {
-            dispatch(SessionIntent.PreviewRatioToggled)
+        buttonFrameRatio169.setOnClickListener {
+            dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_16_9))
+        }
+        buttonFrameRatio11.setOnClickListener {
+            dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_1_1))
         }
         buttonQuickLivePhoto.setOnClickListener {
             applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.livePhoto)
@@ -1196,9 +1202,19 @@ class MainActivity : AppCompatActivity() {
         buttonQuickGrid.isEnabled = grid.isInteractive
 
         buttonQuickFlash.text = getString(R.string.button_quick_flash)
-        buttonQuickRatio.text = getString(R.string.button_quick_ratio)
-        buttonPreviewRatio.text = latestSessionState?.previewRatio?.label
-            ?: getString(R.string.button_preview_ratio)
+        latestSessionState?.let { state ->
+            val frameControl = frameRatioControlRenderModel(state)
+            buttonFrameRatio43.isEnabled = frameControl.isEnabled
+            buttonFrameRatio169.isEnabled = frameControl.isEnabled
+            buttonFrameRatio11.isEnabled = frameControl.isEnabled
+            frameControl.options.forEach { option ->
+                when (option.ratio) {
+                    FrameRatio.RATIO_4_3 -> buttonFrameRatio43.alpha = if (option.isSelected) 1f else 0.6f
+                    FrameRatio.RATIO_16_9 -> buttonFrameRatio169.alpha = if (option.isSelected) 1f else 0.6f
+                    FrameRatio.RATIO_1_1 -> buttonFrameRatio11.alpha = if (option.isSelected) 1f else 0.6f
+                }
+            }
+        }
 
         val live = settingsPage.photoSection.livePhoto
         buttonQuickLivePhoto.text = "${getString(R.string.button_quick_live)}\n${live.value}"
@@ -1224,7 +1240,7 @@ class MainActivity : AppCompatActivity() {
         settingsWatermarkDetailContent.isVisible = subpage == SettingsSubpage.WATERMARK_DETAIL
         buttonSettingsBack.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
 
-        buttonSettingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
+        buttonSettingsEntry.visibility = View.GONE
         buttonLensLabEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
         buttonFilterEntry.alpha = if (route is CockpitPanelRoute.FilterLab) 1f else 0.92f
         quickBubblePanel.isVisible = route is CockpitPanelRoute.QuickBubble

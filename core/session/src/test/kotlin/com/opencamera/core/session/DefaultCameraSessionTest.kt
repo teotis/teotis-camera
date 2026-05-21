@@ -3064,6 +3064,75 @@ class DefaultCameraSessionTest {
         assertNull(session.state.value.presentation.pendingCaptureFeedback)
     }
 
+    @Test
+    fun `saved media thumbnail survives after subsequent shot fails`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shotA = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shotA))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shotA.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/photo-good.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia(
+                        "Pictures/OpenCamera/photo-good.jpg",
+                        "file:///tmp/photo-good.jpg"
+                    ),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        advanceUntilIdle()
+        assertEquals("Pictures/OpenCamera/photo-good.jpg", session.state.value.previewThumbnailPath)
+        assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.SavedMedia)
+
+        // Fail a subsequent shot
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shotB = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shotB))
+        session.dispatch(
+            SessionIntent.ShotFailed(shotId = shotB.shotId, mediaType = MediaType.PHOTO, reason = "camera error")
+        )
+        advanceUntilIdle()
+
+        // Thumbnail from previous successful shot should survive
+        assertEquals("Pictures/OpenCamera/photo-good.jpg", session.state.value.previewThumbnailPath)
+        assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.SavedMedia)
+        assertEquals(CaptureStatus.FAILED, session.state.value.captureStatus)
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertEquals("camera error", session.state.value.lastError)
+    }
+
+    @Test
+    fun `preview snapshot before first saved media populates thumbnail`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        // Before any saved media, preview snapshot fills thumbnail
+        session.dispatch(
+            SessionIntent.PreviewSnapshotUpdated(
+                ThumbnailSource.PreviewSnapshot("/tmp/preview-initial.jpg")
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals("/tmp/preview-initial.jpg", session.state.value.previewThumbnailPath)
+        assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.PreviewSnapshot)
+    }
+
     private fun createSession(
         trace: InMemorySessionTrace,
         testScope: TestScope,

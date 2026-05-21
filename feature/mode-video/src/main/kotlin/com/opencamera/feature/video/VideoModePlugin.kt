@@ -116,6 +116,7 @@ private class VideoModeController(
             ModeIntent.ShutterPressed -> toggleRecording()
             ModeIntent.SecondaryActionPressed -> toggleTorch()
             ModeIntent.TertiaryActionPressed -> cycleQuality()
+            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("视频模式暂不支持画幅切换")
             ModeIntent.ProActionPressed -> ModeSignal.None
         }
     }

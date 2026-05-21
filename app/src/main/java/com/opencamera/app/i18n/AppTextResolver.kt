@@ -59,6 +59,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun timer(): String = str(R.string.button_quick_timer, "Timer")
     open fun flash(): String = str(R.string.button_quick_flash, "Flash")
     open fun lensLab(): String = str(R.string.button_settings_entry, "Lens Lab")
+    open fun settingsEntry(): String = str(R.string.button_settings_entry, "Settings")
     open fun filterLab(): String = str(R.string.button_filter_entry, "Filter Lab")
     open fun portraitLab(): String = str(R.string.button_portrait_mode, "Portrait Lab")
     open fun watermarkLab(): String = str(R.string.button_palette_entry, "Watermark Lab")
@@ -74,7 +75,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun moreControls(): String = str(R.string.button_more_controls, "More")
     open fun stopSession(): String = str(R.string.button_stop_session, "Stop Session")
     open fun restartSession(): String = str(R.string.button_restart_session, "Restart Session")
-    open fun closeSettings(): String = str(R.string.button_settings_close, "Close Lens Lab")
+    open fun closeSettings(): String = str(R.string.button_settings_close, "Close Settings")
     open fun closeFilter(): String = str(R.string.button_filter_close, "Close Filter Lab")
     open fun permissionPending(): String = str(R.string.permission_pending, "Camera permission is required before preview can start.")
     open fun permissionGranted(): String = str(R.string.permission_granted, "Camera permission granted. Preview is ready.")
@@ -387,6 +388,68 @@ open class AppTextResolver(private val context: Context?) {
     open fun settingsSummaryWatermarkTemplates(): String = str(R.string.settings_summary_watermark_templates, "watermark templates")
     open fun settingsSummaryMsBundle(): String = str(R.string.settings_summary_ms_bundle, "ms bundle")
     open fun settingsSummaryProManualDraft(): String = str(R.string.settings_summary_pro_manual_draft, "Pro manual draft")
+
+    // Settings joiners for sessionSettingsRenderModel
+    open fun settingsJoinerGrid(): String = str(R.string.settings_joiner_grid, "Grid ")
+    open fun settingsJoinerShutterSound(): String = str(R.string.settings_joiner_shutter_sound, " | Shutter sound ")
+    open fun settingsJoinerSelfieMirror(): String = str(R.string.settings_joiner_selfie_mirror, " | Selfie mirror ")
+    open fun settingsJoinerFilter(): String = str(R.string.settings_joiner_filter, "Filter ")
+    open fun settingsJoinerPortrait(): String = str(R.string.settings_joiner_portrait, " | Portrait ")
+    open fun settingsJoinerWatermark(): String = str(R.string.settings_joiner_watermark, " | Watermark ")
+    open fun settingsJoinerLive(): String = str(R.string.settings_joiner_live, " | Live ")
+    open fun settingsJoinerTimer(): String = str(R.string.settings_joiner_timer, " | Timer ")
+    open fun settingsJoinerMic(): String = str(R.string.settings_joiner_mic, " | Mic ")
+
+    // Settings page
+    open fun settingsPageSupporting(): String = str(R.string.settings_page_supporting, "Quick defaults with explicit supported, degraded, and staged capability hints.")
+    open fun gridSupportLabel(count: Int): String = String.format(str(R.string.settings_page_grid_support, "Cycle %d layouts"), count)
+    open fun portraitTuningLabel(): String = str(R.string.settings_page_portrait_support, "Open profile, beauty, and bokeh tuning")
+    open fun watermarkTuningLabel(count: Int): String = String.format(str(R.string.settings_page_watermark_support, "Open selector + per-template tuning; %d templates"), count)
+    open fun liveSupportLabel(durationMs: Int, watermarkBehavior: String): String = String.format(str(R.string.settings_page_live_support, "Saved default only; %d ms bundle | dynamic watermark %s"), durationMs, watermarkBehavior)
+    open fun degradedResolutionLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_resolution, "Saved as %s, active graph uses %s"), saved, active)
+    open fun degradedFramerateLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_framerate, "Saved as %s, active graph uses %s"), saved, active)
+    open fun degradedDynamicFpsLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_dynamic_fps, "Saved as %s, active graph uses %s"), saved, active)
+    open fun degradedAudioLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_audio, "Saved as %s, active graph uses %s"), saved, active)
+    open fun videoFilterSeedCountLabel(count: Int): String = String.format(str(R.string.settings_page_video_filter_seed, "Saved filter seed; %d looks staged"), count)
+    open fun catalogFooterStillWatermark(): String = str(R.string.settings_page_catalog_footer_1, "Still watermark templates now flow into metadata and photo rendering.")
+    open fun catalogFooterManualStaged(): String = str(R.string.settings_page_catalog_footer_2, "Manual drafts and Live/video defaults remain staged in the same settings spine.")
+    open fun catalogFooterProManualPrefix(): String = str(R.string.settings_page_pro_manual_prefix, " | Pro manual draft ")
+
+    // Watermark selector
+    open fun watermarkSelectorSupporting(): String = str(R.string.watermark_selector_supporting, "Watermark selection sits one level below Lens Lab. Pick the active template here, then enter the template-specific style page to edit.")
+    open fun watermarkSelectorDefaultPrefix(): String = str(R.string.watermark_selector_default_prefix, "Default ")
+    open fun watermarkSelectorTemplatesStaged(count: Int): String = String.format(str(R.string.watermark_selector_templates_staged, " templates staged"), count)
+    open fun watermarkSelectorCurrentDefault(): String = str(R.string.watermark_selector_current_default, " | Current default")
+    open fun watermarkEditAttrsFrame(): String = str(R.string.watermark_selector_edit_attrs_frame, "Placement, scale, opacity, background")
+    open fun watermarkEditAttrsClassic(): String = str(R.string.watermark_selector_edit_attrs_classic, "Placement, scale, opacity")
+    open fun watermarkSelectorFooterSupported(): String = str(R.string.watermark_selector_footer_supported, "Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages.")
+    open fun watermarkSelectorFooterUnsupported(): String = str(R.string.watermark_selector_footer_unsupported, "Still capture is unavailable on this device, so Watermark Lab stays read-only.")
+
+    // Watermark detail
+    open fun watermarkDetailSupportingSelected(): String = str(R.string.watermark_detail_supporting_selected, "This is the active default watermark. Changes here will affect the next static photo rendered with this template.")
+    open fun watermarkDetailSupportingNotSelected(): String = str(R.string.watermark_detail_supporting_not_selected, "This template is not yet the current default. Adjust here first, then switch from the selector page when ready.")
+    open fun watermarkDetailFooterFrame(): String = str(R.string.watermark_detail_footer_frame, "Frame border rendering is live for static-photo export.")
+    open fun watermarkDetailFooterOverlay(): String = str(R.string.watermark_detail_footer_overlay, "Classic overlay stays inside the source image without an expanded border.")
+    open fun watermarkDetailTokensPrefix(): String = str(R.string.watermark_detail_tokens_prefix, "Tokens: ")
+
+    // Watermark attribute prefixes for hero summary
+    open fun watermarkAttrPlacementPrefix(): String = str(R.string.watermark_attr_placement_prefix, "Placement ")
+    open fun watermarkAttrScalePrefix(): String = str(R.string.watermark_attr_scale_prefix, "Scale ")
+    open fun watermarkAttrOpacityPrefix(): String = str(R.string.watermark_attr_opacity_prefix, "Opacity ")
+    open fun watermarkAttrBackgroundPrefix(): String = str(R.string.watermark_attr_background_prefix, "Background ")
+    open fun watermarkTemplateExpandedFrame(): String = str(R.string.watermark_template_expanded_frame, "Expanded frame")
+    open fun watermarkTemplateClassicOverlay(): String = str(R.string.watermark_template_classic_overlay, "Classic overlay")
+
+    // Portrait lab
+    open fun portraitLabSupporting(): String = str(R.string.portrait_lab_supporting, "Portrait product controls sit one level below Lens Lab. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.")
+    open fun portraitLabJoinerBeauty(): String = str(R.string.portrait_lab_joiner_beauty, "Beauty ")
+    open fun portraitLabJoinerBokeh(): String = str(R.string.portrait_lab_joiner_bokeh, "Bokeh ")
+    open fun portraitLabFooter(): String = str(R.string.portrait_lab_footer, "Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5.")
+
+    // Pro controls
+    open fun proControlsSupportingEditable(): String = str(R.string.pro_controls_supporting_editable, "Upper-layer manual draft is currently editable; each control indicates its status: Applied, Saved-only, or Temporarily unsupported.")
+    open fun proControlsSupportingReadonly(): String = str(R.string.pro_controls_supporting_readonly, "Draft changes allowed, but this device currently holds all controls in saved-only or temporarily-unsupported state.")
+    open fun proControlsFinishCaptureHint(): String = str(R.string.pro_controls_finish_capture_hint, "Finish the current capture before editing.")
 
     open fun languageDisplayName(settings: PersistedSettings): String = when (settings.common.appLanguage) {
         AppLanguage.ZH -> str(R.string.app_name, "OpenCamera")

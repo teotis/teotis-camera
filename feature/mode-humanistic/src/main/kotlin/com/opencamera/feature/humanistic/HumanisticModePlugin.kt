@@ -124,6 +124,7 @@ private class HumanisticModeController(
             ModeIntent.ShutterPressed -> submitCurrentStyle()
             ModeIntent.SecondaryActionPressed -> cycleStyle()
             ModeIntent.TertiaryActionPressed -> cycleFrameRatio()
+            is ModeIntent.FrameRatioSelected -> selectFrameRatio(intent.ratio)
             ModeIntent.ProActionPressed -> toggleProVariant()
         }
     }
@@ -319,6 +320,16 @@ private class HumanisticModeController(
         )
         context.onEffectSpecChanged(buildEffectSpec())
         return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
+    }
+
+    private suspend fun selectFrameRatio(ratio: FrameRatio): ModeSignal {
+        val nextIndex = frameRatios.indexOf(ratio)
+        if (nextIndex < 0) return ModeSignal.ShowHint("当前模式不支持 ${ratio.label} 画幅")
+        frameRatioIndex = nextIndex
+        context.eventSink("humanistic.frame-ratio.selected.${ratio.eventTag()}")
+        mutableSnapshot.value = buildSnapshot(headline = "画幅已更新")
+        context.onEffectSpecChanged(buildEffectSpec())
+        return ModeSignal.ShowHint("画幅：${ratio.label}")
     }
 
     private fun buildSnapshot(

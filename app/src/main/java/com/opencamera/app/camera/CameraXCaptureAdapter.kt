@@ -1012,6 +1012,7 @@ class CameraXCaptureAdapter(
     private var currentStillCaptureOutputSize: StillCaptureOutputSize? = null
     private var currentManualCaptureConfig: Camera2ManualCaptureConfig? = null
     private var currentVideoSpec: VideoSpec? = null
+    private var previewSnapshotGeneration: Int = 0
     private var suppressPreviewStateEvents = false
     private var firstFrameReportedForCurrentBind = false
     private var bindStartElapsedRealtimeNanos: Long = 0L
@@ -1250,38 +1251,37 @@ class CameraXCaptureAdapter(
                     relativePath = plan.saveTask.saveRequest.relativePath,
                     livePhotoSpec = plan.saveTask.livePhotoSpec
                 )
-                runCatching {
+                val sidecarResult = runCatching {
                     materializeLivePhotoSidecar(
                         bundle = livePhotoBundle,
                         writeContentUriPayload = ::writeTextToContentUri
                     )
-                }.fold(
-                    onSuccess = {
-                        result.copy(
-                            livePhotoBundle = livePhotoBundle,
-                            diagnostics = result.diagnostics + buildList {
-                                add("device:live-photo=bundle")
-                                add(
-                                    if (File(livePhotoBundle.sidecarPath).isAbsolute) {
-                                        "device:live-sidecar=materialized"
-                                    } else {
-                                        "device:live-sidecar=planned"
-                                    }
-                                )
+                }
+
+                val diagnosisBuilder = buildList {
+                    add("device:live-photo=bundle")
+                    if (sidecarResult.isSuccess) {
+                        add(
+                            if (File(livePhotoBundle.sidecarPath).isAbsolute) {
+                                "device:live-sidecar=materialized"
+                            } else {
+                                "device:live-sidecar=planned"
                             }
                         )
-                    },
-                    onFailure = { throwable ->
-                        PhotoCaptureOutcome.Failure(
-                            reason = throwable.message ?: "Failed to materialize live photo sidecar",
-                            cleanupPaths = stillCaptureCleanupPaths(
-                                outputPath = result.outputPath,
-                                outputHandle = result.outputHandle,
-                                livePhotoBundle = livePhotoBundle,
-                                intermediateOutputPaths = result.intermediateOutputPaths
-                            )
-                        )
+                    } else {
+                        val sidecarError = sidecarResult.exceptionOrNull()?.message ?: "unknown"
+                        add("device:live-sidecar=failed:$sidecarError")
+                        add("device:live-photo=still-only-fallback")
+                        livePhotoBundle.sidecarHandle.contentUri?.let { deleteContentUriQuietly(it) }
                     }
+                }
+
+                // Sidecar failure is non-fatal: still photo was already saved.
+                // Return Success with livePhotoBundle = null so consumers
+                // treat it as a regular still photo, not a live photo.
+                result.copy(
+                    livePhotoBundle = if (sidecarResult.isSuccess) livePhotoBundle else null,
+                    diagnostics = result.diagnostics + diagnosisBuilder
                 )
             }
         }
@@ -1579,10 +1579,12 @@ class CameraXCaptureAdapter(
                 filePath = sidecarPath
             )
         } else {
-            createMediaStoreFileHandle(
+            createLivePhotoSidecarHandle(
                 displayName = "$baseName.live.json",
                 mimeType = resolvedSpec.sidecarMimeType,
-                relativePath = liveRelativeDir
+                relativePath = liveRelativeDir,
+                fallbackParentDir = context.getExternalFilesDir(null)
+                    ?: context.filesDir
             )
         }
         return LivePhotoBundle(
@@ -1620,6 +1622,36 @@ class CameraXCaptureAdapter(
         return MediaOutputHandle(
             displayPath = "$relativePath/$displayName",
             contentUri = contentUri.toString()
+        )
+    }
+
+    private fun createLivePhotoSidecarHandle(
+        displayName: String,
+        mimeType: String,
+        relativePath: String,
+        fallbackParentDir: File
+    ): MediaOutputHandle {
+        runCatching {
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+            }
+            val contentUri = context.contentResolver.insert(
+                MediaStore.Files.getContentUri("external"),
+                values
+            )
+            if (contentUri != null) {
+                return MediaOutputHandle(
+                    displayPath = "$relativePath/$displayName",
+                    contentUri = contentUri.toString()
+                )
+            }
+        }
+        val fallbackFile = File(fallbackParentDir, displayName)
+        return MediaOutputHandle(
+            displayPath = "$relativePath/$displayName",
+            filePath = fallbackFile.absolutePath
         )
     }
 
@@ -2186,6 +2218,7 @@ class CameraXCaptureAdapter(
 
     private fun capturePreviewSnapshot() {
         val previewView = boundPreviewView ?: return
+        val capturedGeneration = ++previewSnapshotGeneration
         adapterScope.launch {
             val bitmap = awaitPreviewBitmap(previewView) ?: return@launch
 
@@ -2194,7 +2227,8 @@ class CameraXCaptureAdapter(
             }.onSuccess { outputPath ->
                 _events.emit(
                     DeviceEvent.PreviewSnapshotAvailable(
-                        ThumbnailSource.PreviewSnapshot(outputPath)
+                        source = ThumbnailSource.PreviewSnapshot(outputPath),
+                        generation = capturedGeneration
                     )
                 )
             }

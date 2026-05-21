@@ -476,7 +476,10 @@ fun DeviceRuntimeIssue.recoveryReason(): String {
 
 sealed interface DeviceEvent {
     data class PreviewFirstFrameAvailable(val firstFrameLatencyMillis: Long) : DeviceEvent
-    data class PreviewSnapshotAvailable(val source: ThumbnailSource) : DeviceEvent
+    data class PreviewSnapshotAvailable(
+        val source: ThumbnailSource,
+        val generation: Int = 0
+    ) : DeviceEvent
     data class PreviewSurfaceLost(val reason: String) : DeviceEvent
     data class PreviewError(val reason: String) : DeviceEvent
     data class RuntimeIssue(val issue: DeviceRuntimeIssue) : DeviceEvent

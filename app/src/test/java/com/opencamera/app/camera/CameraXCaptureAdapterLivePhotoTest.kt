@@ -201,4 +201,33 @@ class CameraXCaptureAdapterLivePhotoTest {
             uris
         )
     }
+
+    @Test
+    fun `materialize live photo sidecar writes to filePath handle when no contentUri`() {
+        val tempDir = Files.createTempDirectory("live-fallback").toFile()
+        try {
+            val sidecarFile = File(tempDir, "capture.live.json")
+            val bundle = LivePhotoBundle(
+                stillPath = File(tempDir, "capture.jpg").absolutePath,
+                motionPath = File(tempDir, "capture.live.mp4").absolutePath,
+                sidecarPath = sidecarFile.absolutePath,
+                thumbnailPath = File(tempDir, "capture.jpg").absolutePath,
+                motionDurationMillis = 1_500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json",
+                sidecarHandle = MediaOutputHandle(
+                    displayPath = sidecarFile.absolutePath,
+                    filePath = sidecarFile.absolutePath
+                )
+            )
+
+            materializeLivePhotoSidecar(bundle)
+
+            assertTrue(sidecarFile.exists())
+            val payload = sidecarFile.readText()
+            assertTrue(payload.contains("\"stillPath\""))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
 }

@@ -169,7 +169,9 @@ class DefaultCameraSession(
             is SessionIntent.PreviewFirstFrameAvailable -> handlePreviewFirstFrameAvailable(
                 intent.firstFrameLatencyMillis
             )
-            is SessionIntent.PreviewSnapshotUpdated -> handlePreviewSnapshotUpdated(intent.source)
+            is SessionIntent.PreviewSnapshotUpdated -> handlePreviewSnapshotUpdated(
+                intent.source, intent.generation
+            )
             is SessionIntent.CaptureFeedbackSnapshotUpdated -> handleCaptureFeedbackSnapshotUpdated(
                 intent.shotId, intent.outputPath
             )
@@ -1079,7 +1081,12 @@ class DefaultCameraSession(
         trace.record("preview.first.frame", "${firstFrameLatencyMillis}ms")
     }
 
-    private fun handlePreviewSnapshotUpdated(source: ThumbnailSource) {
+    private fun handlePreviewSnapshotUpdated(source: ThumbnailSource, generation: Int) {
+        val currentGen = _state.value.presentation.previewSnapshotGeneration
+        if (generation < currentGen) {
+            trace.record("preview.snapshot.stale", "gen=$generation,current=$currentGen")
+            return
+        }
         val hasSavedMediaThumbnail = _state.value.presentation.latestThumbnailSource is ThumbnailSource.SavedMedia
         if (hasSavedMediaThumbnail) {
             trace.record("preview.snapshot.ignored", source.outputPathOrNull().orEmpty())
@@ -1087,7 +1094,8 @@ class DefaultCameraSession(
         }
         updateState(
             previewThumbnailPath = source.outputPathOrNull(),
-            latestThumbnailSource = source
+            latestThumbnailSource = source,
+            previewSnapshotGeneration = generation
         )
         trace.record("preview.snapshot.updated", source.outputPathOrNull().orEmpty())
     }
@@ -1493,6 +1501,7 @@ class DefaultCameraSession(
         countdownRemainingSeconds: Int? = _state.value.presentation.countdownRemainingSeconds,
         previewThumbnailPath: String? = _state.value.presentation.previewThumbnailPath,
         latestThumbnailSource: ThumbnailSource? = _state.value.presentation.latestThumbnailSource,
+        previewSnapshotGeneration: Int = _state.value.presentation.previewSnapshotGeneration,
         lastAction: String = _state.value.presentation.lastAction,
         latestCapturePath: String? = _state.value.presentation.latestCapturePath,
         latestVideoPath: String? = _state.value.presentation.latestVideoPath,
@@ -1523,6 +1532,7 @@ class DefaultCameraSession(
                 countdownRemainingSeconds = countdownRemainingSeconds,
                 previewThumbnailPath = previewThumbnailPath,
                 latestThumbnailSource = latestThumbnailSource,
+                previewSnapshotGeneration = previewSnapshotGeneration,
                 pendingCaptureFeedback = pendingCaptureFeedback,
                 lastAction = lastAction,
                 latestCapturePath = latestCapturePath,

@@ -74,6 +74,21 @@ class PreviewOverlayView @JvmOverloads constructor(
         typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
     }
 
+    private val frameScrimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(116, 0, 0, 0)
+        style = Paint.Style.FILL
+    }
+
+    private val frameLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            12f,
+            resources.displayMetrics
+        )
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+    }
+
     private var vignetteGradient: android.graphics.RadialGradient? = null
     private var vignetteOverlayRect: RectF? = null
     private var lastVignetteKey: Float = -1f
@@ -138,6 +153,7 @@ class PreviewOverlayView @JvmOverloads constructor(
         }
         renderModel.effectModel?.filterOverlay?.let { drawFilterOverlay(canvas, it) }
         renderModel.effectModel?.frameGuideline?.let { drawFrameGuideline(canvas, it) }
+        renderModel.frame?.let { drawPreviewFrame(canvas, it) }
         renderModel.effectModel?.watermarkHint?.let { drawWatermarkHint(canvas, it) }
         if (renderModel.isCountdownVisible) {
             drawCountdown(canvas, renderModel.countdownLabel.orEmpty())
@@ -262,5 +278,55 @@ class PreviewOverlayView @JvmOverloads constructor(
             }
         }
         canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
+    }
+
+    private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
+        val rect = computePreviewFrameRect(
+            viewWidth = width,
+            viewHeight = height,
+            ratioWidth = frame.ratio.width,
+            ratioHeight = frame.ratio.height,
+            horizontalPaddingPx = 12f * density
+        )
+        if (frame.dimOutsideFrame) {
+            val outsidePath = android.graphics.Path().apply {
+                fillType = android.graphics.Path.FillType.EVEN_ODD
+                addRect(0f, 0f, width.toFloat(), height.toFloat(), android.graphics.Path.Direction.CW)
+                addRect(rect, android.graphics.Path.Direction.CW)
+            }
+            canvas.drawPath(outsidePath, frameScrimPaint)
+        }
+        canvas.drawRect(rect, frameGuidelinePaint)
+        canvas.drawText(frame.label, rect.left + 10f * density, rect.top + 20f * density, frameLabelPaint)
+    }
+}
+
+internal fun computePreviewFrameRect(
+    viewWidth: Int,
+    viewHeight: Int,
+    ratioWidth: Int,
+    ratioHeight: Int,
+    horizontalPaddingPx: Float = 0f,
+    topInsetPx: Float = 0f,
+    bottomInsetPx: Float = 0f
+): RectF {
+    val availableLeft = horizontalPaddingPx
+    val availableTop = topInsetPx
+    val availableRight = viewWidth - horizontalPaddingPx
+    val availableBottom = viewHeight - bottomInsetPx
+    val availableWidth = (availableRight - availableLeft).coerceAtLeast(1f)
+    val availableHeight = (availableBottom - availableTop).coerceAtLeast(1f)
+    val targetRatio = ratioWidth.toFloat() / ratioHeight.toFloat()
+    val availableRatio = availableWidth / availableHeight
+    return if (targetRatio > availableRatio) {
+        val w = availableWidth
+        val h = w / targetRatio
+        val top = availableTop + (availableHeight - h) / 2f
+        RectF(availableLeft, top, availableRight, top + h)
+    } else {
+        val h = availableHeight
+        val w = h * targetRatio
+        val left = availableLeft + (availableWidth - w) / 2f
+        RectF(left, availableTop, left + w, availableBottom)
     }
 }

@@ -123,6 +123,7 @@ private class DocumentModeController(
             ModeIntent.ShutterPressed -> submitCurrentProfile()
             ModeIntent.SecondaryActionPressed -> cycleProfile()
             ModeIntent.TertiaryActionPressed -> ModeSignal.None
+            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("文档模式使用自动裁边，不使用普通画幅")
             ModeIntent.ProActionPressed -> ModeSignal.None
         }
     }

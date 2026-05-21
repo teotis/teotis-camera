@@ -1,6 +1,8 @@
 package com.opencamera.app
 
 import com.opencamera.core.device.CaptureTemplate
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ManualControlCapabilityMatrix
 import com.opencamera.core.device.ManualControlSupport
@@ -20,6 +22,7 @@ import com.opencamera.core.session.SessionTraceEvent
 import com.opencamera.core.session.buildSessionDebugDump
 import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.effect.PreviewEffectRenderModel
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
@@ -87,11 +90,34 @@ internal data class PreviewOverlayRenderModel(
     val isGridVisible: Boolean,
     val countdownLabel: String?,
     val isCountdownVisible: Boolean,
-    val effectModel: PreviewEffectRenderModel? = null
+    val effectModel: PreviewEffectRenderModel? = null,
+    val frame: PreviewFrameRenderModel? = null
 ) {
     val isVisible: Boolean
-        get() = isGridVisible || isCountdownVisible || effectModel != null
+        get() = isGridVisible || isCountdownVisible || effectModel != null || frame != null
 }
+
+internal data class PreviewFrameRenderModel(
+    val ratio: FrameRatio,
+    val label: String,
+    val dimOutsideFrame: Boolean
+)
+
+internal data class FrameRatioOptionRenderModel(
+    val label: String,
+    val ratio: FrameRatio,
+    val isSelected: Boolean,
+    val isEnabled: Boolean
+)
+
+internal data class FrameRatioControlRenderModel(
+    val title: String,
+    val currentLabel: String,
+    val options: List<FrameRatioOptionRenderModel>,
+    val isVisible: Boolean,
+    val isEnabled: Boolean,
+    val disabledReason: String?
+)
 
 internal data class SessionSettingsRenderModel(
     val commonSummary: String,
@@ -414,6 +440,16 @@ internal fun previewOverlayRenderModel(
         )
     val countdownLabel = state.countdownRemainingSeconds?.let { "${it}s" }
     val effectModel = effectAdapter?.adapt(state.activeEffectSpec)
+    val frameRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio
+    val frame = if (previewSupportsOverlay && frameRatio != null) {
+        PreviewFrameRenderModel(
+            ratio = frameRatio,
+            label = frameRatio.label,
+            dimOutsideFrame = true
+        )
+    } else {
+        null
+    }
     return PreviewOverlayRenderModel(
         gridMode = gridMode,
         isGridVisible = previewSupportsOverlay && gridMode != CompositionGridMode.OFF,
@@ -421,7 +457,44 @@ internal fun previewOverlayRenderModel(
         isCountdownVisible = state.captureStatus == CaptureStatus.REQUESTED &&
             countdownLabel != null &&
             state.permissionState.cameraGranted,
-        effectModel = effectModel
+        effectModel = effectModel,
+        frame = frame
+    )
+}
+
+private val stillModesWithFrameRatio = setOf(
+    ModeId.PHOTO,
+    ModeId.NIGHT,
+    ModeId.PORTRAIT,
+    ModeId.HUMANISTIC,
+    ModeId.PRO
+)
+
+internal fun frameRatioControlRenderModel(state: SessionState): FrameRatioControlRenderModel {
+    val current = state.activeEffectSpec.find<FrameEffect>()?.ratio ?: FrameRatio.RATIO_4_3
+    val isSupportedMode = state.activeMode in stillModesWithFrameRatio
+    val isBusy = state.activeShot != null || state.countdownRemainingSeconds != null
+    val enabled = isSupportedMode && !isBusy
+    val reason = when {
+        !isSupportedMode -> "当前模式不支持画幅"
+        state.activeShot != null -> "等待当前拍摄完成后才能切换画幅"
+        state.countdownRemainingSeconds != null -> "倒计时结束后才能切换画幅"
+        else -> null
+    }
+    return FrameRatioControlRenderModel(
+        title = "画幅",
+        currentLabel = current.label,
+        options = FrameRatio.entries.map { ratio ->
+            FrameRatioOptionRenderModel(
+                label = ratio.label,
+                ratio = ratio,
+                isSelected = ratio == current,
+                isEnabled = enabled
+            )
+        },
+        isVisible = true,
+        isEnabled = enabled,
+        disabledReason = reason
     )
 }
 
@@ -708,48 +781,52 @@ internal fun sessionSettingsRenderModel(
     val videoSpec = settings.video.defaultVideoSpec
     return SessionSettingsRenderModel(
         commonSummary = buildString {
-            append("Grid ${settings.common.gridMode.label}")
-            append(" | Shutter sound ")
-            append(if (settings.common.shutterSoundEnabled) "On" else "Off")
-            append(" | Selfie mirror ")
-            append(if (settings.common.selfieMirrorEnabled) "On" else "Off")
+            append(text.settingsJoinerGrid())
+            append(settings.common.gridMode.label)
+            append(text.settingsJoinerShutterSound())
+            append(text.onOff(settings.common.shutterSoundEnabled))
+            append(text.settingsJoinerSelfieMirror())
+            append(text.onOff(settings.common.selfieMirrorEnabled))
         },
         photoSummary = buildString {
-            append("Filter ")
+            append(text.settingsJoinerFilter())
             append(photoFilterLabel)
-            append(" | Portrait ")
+            append(text.settingsJoinerPortrait())
             append(settings.photo.portraitProfile.label)
-            append(" | Watermark ")
+            append(text.settingsJoinerWatermark())
             append(watermarkTemplateLabel)
-            append(" | Live ")
-            append(if (settings.photo.livePhotoEnabledByDefault) "On" else "Off")
-            append(" | Timer ")
+            append(text.settingsJoinerLive())
+            append(text.onOff(settings.photo.livePhotoEnabledByDefault))
+            append(text.settingsJoinerTimer())
             append(settings.photo.countdownDuration.label)
         },
         videoSummary = buildString {
             append(videoSpec.summaryLabel)
-            append(" | Mic ")
+            append(text.settingsJoinerMic())
             append(videoSpec.audioProfile.label)
             append(" | ")
             append(
                 if (videoSpec.dynamicFpsPolicy == DynamicVideoFpsPolicy.LOW_LIGHT_AUTO_24FPS) {
-                    "Low-light auto 24fps"
+                    text.lowLightAuto24fps()
                 } else {
-                    "Locked fps"
+                    text.lockedFps()
                 }
             )
-            append(" | Filter ")
+            append(text.settingsJoinerFilter())
             append(videoFilterLabel)
         },
         catalogSummary = buildString {
             append(catalog.filterProfiles.size)
-            append(" filters")
+            append(" ")
+            append(text.settingsSummaryFilters())
             append(" | ")
             append(catalog.watermarkTemplates.size)
-            append(" watermark templates")
+            append(" ")
+            append(text.settingsSummaryWatermarkTemplates())
             append(" | Live ")
             append(catalog.liveMediaBundleDraft.motionDurationMillis)
-            append(" ms bundle")
+            append(" ")
+            append(text.settingsSummaryMsBundle())
         },
         manualDraftSummary = catalog.manualCaptureDraft.compactSummary()
     )
@@ -778,8 +855,8 @@ internal fun sessionSettingsPageRenderModel(
         .resolveVideoSpec(selectedVideoSpec)
     val activeVideoSpec = resolvedVideoSelection.applied
     return SessionSettingsPageRenderModel(
-        headline = text.lensLab(),
-        supportingText = "Quick defaults with explicit supported, degraded, and staged capability hints.",
+        headline = text.settingsEntry(),
+        supportingText = text.settingsPageSupporting(),
         heroSummary = "${renderModel.commonSummary} • ${renderModel.photoSummary}",
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
@@ -792,7 +869,7 @@ internal fun sessionSettingsPageRenderModel(
             gridMode = SettingsControlRenderModel(
                 label = text.compositionGridLabel(),
                 value = settings.common.gridMode.label,
-                supportLabel = "Cycle ${CompositionGridMode.entries.size} layouts",
+                supportLabel = text.gridSupportLabel(CompositionGridMode.entries.size),
                 nextAction = PersistedSettingsAction.UpdateGridMode(
                     nextListValue(settings.common.gridMode, CompositionGridMode.entries.toList())
                 )
@@ -851,7 +928,7 @@ internal fun sessionSettingsPageRenderModel(
                     SettingsControlAvailability.UNSUPPORTED
                 },
                 supportLabel = if (supportsStillCapture) {
-                    "Open profile + beauty + bokeh tuning"
+                    text.portraitTuningLabel()
                 } else {
                     text.stillCaptureUnavailable()
                 },
@@ -869,7 +946,7 @@ internal fun sessionSettingsPageRenderModel(
                     SettingsControlAvailability.UNSUPPORTED
                 },
                 supportLabel = if (supportsStillCapture && watermarkTemplates.isNotEmpty()) {
-                    "Open selector + per-template tuning; ${watermarkTemplates.size} templates"
+                    text.watermarkTuningLabel(watermarkTemplates.size)
                 } else if (!supportsStillCapture) {
                     text.stillCaptureUnavailable()
                 } else {
@@ -886,7 +963,7 @@ internal fun sessionSettingsPageRenderModel(
                     SettingsControlAvailability.UNSUPPORTED
                 },
                 supportLabel = if (supportsStillCapture) {
-                    "Saved default only; ${catalog.liveMediaBundleDraft.motionDurationMillis} ms bundle | dynamic watermark ${catalog.liveMediaBundleDraft.watermarkMotionBehavior.label}"
+                    text.liveSupportLabel(catalog.liveMediaBundleDraft.motionDurationMillis.toInt(), catalog.liveMediaBundleDraft.watermarkMotionBehavior.label)
                 } else {
                     text.stillCaptureUnavailable()
                 },
@@ -935,7 +1012,7 @@ internal fun sessionSettingsPageRenderModel(
                 supportLabel = when {
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.resolutionDegraded ->
-                        "已保存为 ${selectedVideoSpec.resolution.label}，活跃图使用 ${activeVideoSpec.resolution.label}"
+                        text.degradedResolutionLabel(selectedVideoSpec.resolution.label, activeVideoSpec.resolution.label)
                     else -> supportCountLabel(videoConstraints.resolutions.size)
                 },
                 nextAction = if (supportsVideoRecording) {
@@ -963,7 +1040,7 @@ internal fun sessionSettingsPageRenderModel(
                 supportLabel = when {
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.frameRateDegraded ->
-                        "Saved as ${selectedVideoSpec.frameRate.label}, active graph uses ${activeVideoSpec.frameRate.label}"
+                        text.degradedFramerateLabel(selectedVideoSpec.frameRate.label, activeVideoSpec.frameRate.label)
                     else -> supportCountLabel(videoConstraints.frameRatesFor(activeVideoSpec.resolution).size)
                 },
                 nextAction = if (supportsVideoRecording) {
@@ -994,7 +1071,7 @@ internal fun sessionSettingsPageRenderModel(
                 supportLabel = when {
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.dynamicPolicyDegraded ->
-                        "Saved as ${selectedVideoSpec.dynamicFpsPolicy.label}, active graph uses ${activeVideoSpec.dynamicFpsPolicy.label}"
+                        text.degradedDynamicFpsLabel(selectedVideoSpec.dynamicFpsPolicy.label, activeVideoSpec.dynamicFpsPolicy.label)
                     else ->
                         supportCountLabel(videoConstraints.dynamicPolicies.size)
                 },
@@ -1027,7 +1104,7 @@ internal fun sessionSettingsPageRenderModel(
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     !supportsAudioRecording -> text.microphoneUnavailable()
                     resolvedVideoSelection.audioProfileDegraded ->
-                        "Saved as ${selectedVideoSpec.audioProfile.label}, active graph uses ${activeVideoSpec.audioProfile.label}"
+                        text.degradedAudioLabel(selectedVideoSpec.audioProfile.label, activeVideoSpec.audioProfile.label)
                     else ->
                         supportCountLabel(videoConstraints.audioProfiles.size)
                 },
@@ -1053,7 +1130,7 @@ internal fun sessionSettingsPageRenderModel(
                     SettingsControlAvailability.UNSUPPORTED
                 },
                 supportLabel = if (supportsVideoRecording) {
-                    "已保存滤镜种子；${videoFilters.size} 个外观已暂存"
+                    text.videoFilterSeedCountLabel(videoFilters.size)
                 } else {
                     text.videoRecordingUnavailable()
                 },
@@ -1069,11 +1146,13 @@ internal fun sessionSettingsPageRenderModel(
         ),
         catalogFooter = buildString {
             append(renderModel.catalogSummary)
-            append(" | Still watermark templates now flow into metadata and photo rendering.")
-            append(" | Pro manual draft ")
+            append(" ")
+            append(text.catalogFooterStillWatermark())
+            append(text.catalogFooterProManualPrefix())
             append(renderModel.manualDraftSummary)
             append(".")
-            append(" | Manual drafts and Live/video defaults remain staged in the same settings spine.")
+            append(" ")
+            append(text.catalogFooterManualStaged())
         }
     )
 }
@@ -1107,16 +1186,17 @@ internal fun runtimeProControlsRenderModel(
             else -> text.proControlsDefault()
         },
         supportingText = if (hasAppliedManualControls) {
-            "上层手动草稿当前可编辑；每个控件会标明其状态：已应用、仅保存、或暂时不支持。"
+            text.proControlsSupportingEditable()
         } else {
-            "允许草稿更改，但此设备当前所有控件均处于仅保存或暂时不支持状态。"
+            text.proControlsSupportingReadonly()
         },
         summary = buildString {
             append(draft.compactSummary())
             append(" | ")
             append(runtimeSupportLabel)
             if (!editingEnabled) {
-                append(" 完成当前拍摄后方可编辑。")
+                append(" ")
+                append(text.proControlsFinishCaptureHint())
             }
         },
         rawControl = FeatureCatalogControlRenderModel(
@@ -1130,7 +1210,7 @@ internal fun runtimeProControlsRenderModel(
         ),
         isoControl = FeatureCatalogControlRenderModel(
             label = text.isoLabel(),
-            value = draft.iso?.toString() ?: "Auto",
+            value = draft.iso?.toString() ?: text.autoLabel(),
             availability = manualCapabilities.iso.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.iso.toSettingsAvailability()),
             supportLabel = manualCapabilities.iso.manualSupportLabel(text),
@@ -1140,7 +1220,7 @@ internal fun runtimeProControlsRenderModel(
         ),
         shutterControl = FeatureCatalogControlRenderModel(
             label = text.shutterLabel(),
-            value = draft.shutterSpeedMillis?.let { "${it}ms" } ?: "Auto",
+            value = draft.shutterSpeedMillis?.let { "${it}ms" } ?: text.autoLabel(),
             availability = manualCapabilities.shutter.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.shutter.toSettingsAvailability()),
             supportLabel = manualCapabilities.shutter.manualSupportLabel(text),
@@ -1152,7 +1232,7 @@ internal fun runtimeProControlsRenderModel(
         ),
         exposureControl = FeatureCatalogControlRenderModel(
             label = text.evLabel(),
-            value = draft.exposureCompensationSteps?.let(::manualEvLabel) ?: "Auto",
+            value = draft.exposureCompensationSteps?.let(::manualEvLabel) ?: text.autoLabel(),
             availability = manualCapabilities.exposureCompensation.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.exposureCompensation.toSettingsAvailability()),
             supportLabel = manualCapabilities.exposureCompensation.manualSupportLabel(text),
@@ -1165,7 +1245,7 @@ internal fun runtimeProControlsRenderModel(
         focusControl = FeatureCatalogControlRenderModel(
             label = text.focusLabel(),
             value = draft.focusDistanceDiopters?.let { String.format(Locale.US, "%.1fD", it) }
-                ?: "Auto",
+                ?: text.autoLabel(),
             availability = manualCapabilities.focusDistance.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.focusDistance.toSettingsAvailability()),
             supportLabel = manualCapabilities.focusDistance.manualSupportLabel(text),
@@ -1177,7 +1257,7 @@ internal fun runtimeProControlsRenderModel(
         ),
         apertureControl = FeatureCatalogControlRenderModel(
             label = text.apertureLabel(),
-            value = draft.apertureFNumber?.let { "f/${manualOneDecimal(it)}" } ?: "Auto",
+            value = draft.apertureFNumber?.let { "f/${manualOneDecimal(it)}" } ?: text.autoLabel(),
             availability = manualCapabilities.aperture.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.aperture.toSettingsAvailability()),
             supportLabel = manualCapabilities.aperture.manualSupportLabel(text),
@@ -1189,7 +1269,7 @@ internal fun runtimeProControlsRenderModel(
         ),
         whiteBalanceControl = FeatureCatalogControlRenderModel(
             label = text.wbLabel(),
-            value = draft.whiteBalanceKelvin?.let { "${it}K" } ?: "Auto",
+            value = draft.whiteBalanceKelvin?.let { "${it}K" } ?: text.autoLabel(),
             availability = manualCapabilities.whiteBalance.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.whiteBalance.toSettingsAvailability()),
             supportLabel = manualCapabilities.whiteBalance.manualSupportLabel(text),
@@ -1284,7 +1364,7 @@ internal fun portraitLabPageRenderModel(
     }
     return PortraitLabPageRenderModel(
         headline = text.portraitLab(),
-        supportingText = "人像产品调节位于镜头实验室下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。",
+        supportingText = "人像产品调节位于设置下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。",
         heroSummary = buildString {
             append(settings.photo.portraitProfile.label)
             append(" • Beauty ")
@@ -1324,7 +1404,7 @@ internal fun portraitLabPageRenderModel(
             availability = availability,
             availabilityLabel = text.availabilityLabel(availability),
             supportLabel = if (supportsStillCapture) {
-                "${PortraitBeautyPreset.entries.size} plans"
+                text.plansCount(PortraitBeautyPreset.entries.size)
             } else {
                 text.stillCaptureUnavailable()
             },
@@ -1345,7 +1425,7 @@ internal fun portraitLabPageRenderModel(
             availability = availability,
             availabilityLabel = text.availabilityLabel(availability),
             supportLabel = if (supportsStillCapture) {
-                "${PortraitBeautyStrength.entries.size} levels"
+                text.levelsCount(PortraitBeautyStrength.entries.size)
             } else {
                 text.stillCaptureUnavailable()
             },
@@ -1366,7 +1446,7 @@ internal fun portraitLabPageRenderModel(
             availability = availability,
             availabilityLabel = text.availabilityLabel(availability),
             supportLabel = if (supportsStillCapture) {
-                "${PortraitBokehEffect.entries.size} rendering feels"
+                text.renderingFeelsCount(PortraitBokehEffect.entries.size)
             } else {
                 text.stillCaptureUnavailable()
             },
@@ -1381,7 +1461,7 @@ internal fun portraitLabPageRenderModel(
                 null
             }
         ),
-        footer = "Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5."
+        footer = text.portraitLabFooter()
     )
 }
 
@@ -1396,13 +1476,13 @@ internal fun watermarkLabSelectorRenderModel(
     val selectedTemplate = catalog.watermarkTemplateOrNull(settings.photo.defaultWatermarkTemplateId)
     return WatermarkLabSelectorRenderModel(
         headline = text.watermarkLab(),
-        supportingText = "水印选择位于镜头实验室下一级。在此选择活跃模板，然后进入模板专属样式页面进行编辑。",
+        supportingText = text.watermarkSelectorSupporting(),
         heroSummary = buildString {
-            append("Default ")
+            append(text.watermarkSelectorDefaultPrefix())
             append(selectedTemplate?.label ?: settings.photo.defaultWatermarkTemplateId)
             append(" • ")
             append(catalog.watermarkTemplates.size)
-            append(" templates staged")
+            append(text.watermarkSelectorTemplatesStaged(catalog.watermarkTemplates.size))
         },
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
@@ -1417,21 +1497,27 @@ internal fun watermarkLabSelectorRenderModel(
                 templateId = template.id,
                 title = template.label,
                 supportingText = buildString {
-                    append(if (template.supportsFrameBorder) "Expanded frame" else "Classic overlay")
-                    append(" | Tokens ")
+                    append(if (template.supportsFrameBorder) text.watermarkTemplateExpandedFrame() else text.watermarkTemplateClassicOverlay())
+                    append(" | ")
+                    append(text.tokensLabel())
+                    append(" ")
                     append(template.tokenKeys.prettyWatermarkTokens())
-                    append(" | Placement ")
+                    append(" | ")
+                    append(text.watermarkAttrPlacementPrefix())
                     append(style.textPlacement.label)
-                    append(" | Scale ")
+                    append(" | ")
+                    append(text.watermarkAttrScalePrefix())
                     append(style.textScale.label)
-                    append(" | Opacity ")
+                    append(" | ")
+                    append(text.watermarkAttrOpacityPrefix())
                     append(style.textOpacity.label)
                     if (template.supportsFrameBorder) {
-                        append(" | Background ")
+                        append(" | ")
+                        append(text.watermarkAttrBackgroundPrefix())
                         append(style.frameBackground.label)
                     }
                     if (isSelected) {
-                        append(" | Current default")
+                        append(text.watermarkSelectorCurrentDefault())
                     }
                 },
                 isSelected = isSelected,
@@ -1441,28 +1527,16 @@ internal fun watermarkLabSelectorRenderModel(
                     null
                 },
                 editButtonLabel = if (supportsStillCapture) {
-                    buildString {
-                        append(text.openStylePage())
-                        append('\n')
-                        append(template.label)
-                        append('\n')
-                        append(
-                            if (template.supportsFrameBorder) {
-                                "Placement, scale, opacity, background"
-                            } else {
-                                "Placement, scale, opacity"
-                            }
-                        )
-                    }
+                    text.openStylePage()
                 } else {
                     null
                 }
             )
         },
         footer = if (supportsStillCapture) {
-            "Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages."
+            text.watermarkSelectorFooterSupported()
         } else {
-            "Still capture is unavailable on this device, so Watermark Lab stays read-only."
+            text.watermarkSelectorFooterUnsupported()
         }
     )
 }
@@ -1489,19 +1563,22 @@ internal fun watermarkLabDetailRenderModel(
     return WatermarkLabDetailRenderModel(
         headline = template.label,
         supportingText = if (template.id == settings.photo.defaultWatermarkTemplateId) {
-            "这是当前活跃的默认水印。此处更改将影响使用此模板渲染的下一张静态照片。"
+            text.watermarkDetailSupportingSelected()
         } else {
-            "此模板尚不是当前默认。请先在此调整，准备就绪后从选择器页面切换。"
+            text.watermarkDetailSupportingNotSelected()
         },
         heroSummary = buildString {
-            append("Placement ")
+            append(text.watermarkAttrPlacementPrefix())
             append(style.textPlacement.label)
-            append(" • Scale ")
+            append(" • ")
+            append(text.watermarkAttrScalePrefix())
             append(style.textScale.label)
-            append(" • Opacity ")
+            append(" • ")
+            append(text.watermarkAttrOpacityPrefix())
             append(style.textOpacity.label)
             if (template.supportsFrameBorder) {
-                append(" • Background ")
+                append(" • ")
+                append(text.watermarkAttrBackgroundPrefix())
                 append(style.frameBackground.label)
             }
         },
@@ -1518,7 +1595,7 @@ internal fun watermarkLabDetailRenderModel(
             availability = controlAvailability,
             availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
-                "${WatermarkTextPlacement.entries.size} placements"
+                text.placementsCount(WatermarkTextPlacement.entries.size)
             } else {
                 text.stillCaptureUnavailable()
             },
@@ -1537,7 +1614,7 @@ internal fun watermarkLabDetailRenderModel(
             availability = controlAvailability,
             availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
-                "${WatermarkTextScale.entries.size} steps"
+                text.stepsCount(WatermarkTextScale.entries.size)
             } else {
                 text.stillCaptureUnavailable()
             },
@@ -1556,7 +1633,7 @@ internal fun watermarkLabDetailRenderModel(
             availability = controlAvailability,
             availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
-                "${WatermarkTextOpacity.entries.size} steps"
+                text.stepsCount(WatermarkTextOpacity.entries.size)
             } else {
                 text.stillCaptureUnavailable()
             },
@@ -1575,7 +1652,7 @@ internal fun watermarkLabDetailRenderModel(
                 value = style.frameBackground.label,
                 availability = controlAvailability,
                 supportLabel = if (supportsStillCapture) {
-                    "${WatermarkFrameBackground.entries.size} moods"
+                    text.moodsCount(WatermarkFrameBackground.entries.size)
                 } else {
                     text.stillCaptureUnavailable()
                 },
@@ -1595,14 +1672,14 @@ internal fun watermarkLabDetailRenderModel(
             null
         },
         footer = buildString {
-            append("Tokens: ")
+            append(text.watermarkDetailTokensPrefix())
             append(template.tokenKeys.prettyWatermarkTokens())
             append(". ")
             append(
                 if (template.supportsFrameBorder) {
-                    "Frame border rendering is live for static-photo export."
+                    text.watermarkDetailFooterFrame()
                 } else {
-                    "Classic overlay stays inside the source image without an expanded border."
+                    text.watermarkDetailFooterOverlay()
                 }
             )
         }

@@ -471,7 +471,7 @@ class SessionUiRenderModelTest {
     fun `settings page render model exposes section controls and catalog hints`() {
         val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
 
-        assertEquals("Lens Lab", model.headline)
+        assertEquals("Settings", model.headline)
         assertEquals(
             "Grid 3x3 | Shutter sound Off | Selfie mirror On • Filter Portrait Retro | Portrait Native Portrait | Watermark Travel Polaroid | Live On | Timer 3s",
             model.heroSummary
@@ -1255,7 +1255,7 @@ class SessionUiRenderModelTest {
         assertEquals(3, visibleEntries.size)
         assertEquals("Tone", visibleEntries[0].label)
         assertEquals("Quick", visibleEntries[1].label)
-        assertEquals("Lens Lab", visibleEntries[2].label)
+        assertEquals("Settings", visibleEntries[2].label)
 
         assertTrue(visibleEntries[0].route is CockpitPanelRoute.FilterLab)
         assertTrue(visibleEntries[1].route is CockpitPanelRoute.QuickBubble)
@@ -1279,6 +1279,7 @@ class SessionUiRenderModelTest {
             override fun tone(): String = "色调"
             override fun quickLauncher(): String = "快捷"
             override fun lensLab(): String = "镜头实验室"
+            override fun settingsEntry(): String = "设置"
         }
         val state = defaultSessionState()
         val cockpit = cameraCockpitRenderModel(state, chineseResolver, strings)
@@ -1286,7 +1287,7 @@ class SessionUiRenderModelTest {
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
         assertEquals("色调", visibleEntries[0].label)
         assertEquals("快捷", visibleEntries[1].label)
-        assertEquals("镜头实验室", visibleEntries[2].label)
+        assertEquals("设置", visibleEntries[2].label)
     }
 
     @Test

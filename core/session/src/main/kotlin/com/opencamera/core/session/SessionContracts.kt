@@ -85,6 +85,7 @@ data class SessionPresentationState(
     val previewThumbnailPath: String? = null,
     val latestThumbnailSource: ThumbnailSource? = null,
     val pendingCaptureFeedback: CaptureFeedbackPreview? = null,
+    val previewSnapshotGeneration: Int = 0,
     val lastAction: String = "",
     val latestCapturePath: String? = null,
     val latestVideoPath: String? = null,
@@ -175,7 +176,10 @@ sealed interface SessionIntent {
         val isRecovery: Boolean
     ) : SessionIntent
     data class PreviewFirstFrameAvailable(val firstFrameLatencyMillis: Long) : SessionIntent
-    data class PreviewSnapshotUpdated(val source: ThumbnailSource) : SessionIntent
+    data class PreviewSnapshotUpdated(
+        val source: ThumbnailSource,
+        val generation: Int = 0
+    ) : SessionIntent
     data class CaptureFeedbackSnapshotUpdated(
         val shotId: String,
         val outputPath: String

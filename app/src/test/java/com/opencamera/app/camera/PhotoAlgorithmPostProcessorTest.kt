@@ -164,6 +164,37 @@ class PhotoAlgorithmPostProcessorTest {
         assertNotNull(pro)
     }
 
+    @Test
+    fun `custom vivid metadata from capture log is rendered`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmEditorResult.Applied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "custom-vivid-1",
+                saveRequest = SaveRequest.photoLibrary(
+                    metadata = MediaMetadata(
+                        algorithmProfile = "custom-vivid-1",
+                        customTags = FilterRenderSpec(
+                            brightnessShift = -2,
+                            contrast = 1.1108352f,
+                            saturation = 1.1945403f,
+                            warmthShift = 2
+                        ).toMetadataTags() + mapOf("filterProfile" to "custom-vivid-1")
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals("custom-vivid-1", inv.spec.profile)
+        assertEquals(-2, inv.spec.brightnessShift)
+        assertEquals(1.1108352f, inv.spec.contrast)
+        assertEquals(1.1945403f, inv.spec.saturation)
+        assertEquals(2, inv.spec.warmthShift)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:custom-vivid-1"))
+    }
+
     private fun photoResult(
         algorithmProfile: String?,
         outputHandle: MediaOutputHandle = MediaOutputHandle(

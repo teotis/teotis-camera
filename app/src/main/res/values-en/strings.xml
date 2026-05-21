@@ -28,9 +28,9 @@
     <string name="button_switch_to_back">Switch to Back</string>
     <string name="button_single_lens">Single Lens</string>
     <string name="button_stop_session">Stop Session</string>
-    <string name="button_settings_entry">Lens Lab</string>
-    <string name="button_lens_rail">Lens</string>
-    <string name="button_settings_close">Close Lens Lab</string>
+    <string name="button_settings_entry">Settings</string>
+    <string name="button_lens_rail">Settings</string>
+    <string name="button_settings_close">Close Settings</string>
     <string name="button_filter_entry">Tone Lab</string>
     <string name="button_filter_close">Close Tone Lab</string>
     <string name="permission_pending">Camera permission is required before preview can start.</string>
@@ -44,7 +44,7 @@
     <string name="output_error_prefix">Camera issue:</string>
     <string name="output_preview_prefix">Preview thumbnail:</string>
     <string name="preview_thumbnail_content_description">Latest preview thumbnail</string>
-    <string name="settings_panel_content_description">Camera defaults and capability settings</string>
+    <string name="settings_panel_content_description">Camera settings</string>
     <string name="filter_panel_content_description">Tone Lab independent defaults panel</string>
     <string name="settings_section_common">General</string>
     <string name="settings_section_photo">Photo</string>
@@ -52,7 +52,7 @@
     <string name="button_debug_entry">⋯</string>
     <string name="button_debug_close">Close Debug</string>
     <string name="button_quick_flash">Flash</string>
-    <string name="button_quick_ratio">Ratio</string>
+    <string name="button_quick_ratio">Frame</string>
     <string name="button_preview_ratio">Preview Ratio</string>
     <string name="button_quick_live">Live</string>
     <string name="button_quick_timer">Timer</string>
@@ -91,8 +91,8 @@
     <string name="label_shutter_tone">Shutter tone</string>
     <string name="label_selfie_mirror">Selfie mirror</string>
     <string name="label_default_photo_filter">Default photo filter</string>
-    <string name="label_portrait_lab">Portrait Lab</string>
-    <string name="label_watermark_lab">Watermark Lab</string>
+    <string name="label_portrait_lab">Portrait</string>
+    <string name="label_watermark_lab">Watermark</string>
     <string name="label_live_photo_default">Live photo default</string>
     <string name="label_countdown">Countdown</string>
     <string name="label_resolution">Resolution</string>
@@ -274,4 +274,70 @@
     <string name="dev_log_title_core">Core Log (%d)</string>
     <string name="dev_log_title_error">Error Log (%d)</string>
     <string name="dev_log_title_all">All Events (%d)</string>
+
+    <!-- Missing quick bubble strings -->
+    <string name="button_quick_grid">Grid</string>
+    <string name="button_quick_more">More</string>
+
+    <!-- Settings joiners for sessionSettingsRenderModel -->
+    <string name="settings_joiner_grid">Grid </string>
+    <string name="settings_joiner_shutter_sound"> | Shutter sound </string>
+    <string name="settings_joiner_selfie_mirror"> | Selfie mirror </string>
+    <string name="settings_joiner_filter">Filter </string>
+    <string name="settings_joiner_portrait"> | Portrait </string>
+    <string name="settings_joiner_watermark"> | Watermark </string>
+    <string name="settings_joiner_live"> | Live </string>
+    <string name="settings_joiner_timer"> | Timer </string>
+    <string name="settings_joiner_mic"> | Mic </string>
+
+    <!-- Settings page -->
+    <string name="settings_page_supporting">Adjust camera defaults. High-frequency shooting controls stay in the Quick panel.</string>
+    <string name="settings_page_grid_support">Cycle %d layouts</string>
+    <string name="settings_page_portrait_support">Open profile, beauty, and bokeh tuning</string>
+    <string name="settings_page_watermark_support">Open selector + per-template tuning; %d templates</string>
+    <string name="settings_page_live_support">Saved default only; %d ms bundle | dynamic watermark %s</string>
+    <string name="settings_page_degraded_resolution">Saved as %s, active graph uses %s</string>
+    <string name="settings_page_degraded_framerate">Saved as %s, active graph uses %s</string>
+    <string name="settings_page_degraded_dynamic_fps">Saved as %s, active graph uses %s</string>
+    <string name="settings_page_degraded_audio">Saved as %s, active graph uses %s</string>
+    <string name="settings_page_video_filter_seed">Saved filter seed; %d looks staged</string>
+    <string name="settings_page_catalog_footer_1">Still watermark templates now flow into metadata and photo rendering.</string>
+    <string name="settings_page_catalog_footer_2">Manual drafts and Live/video defaults remain staged in the same settings spine.</string>
+    <string name="settings_page_pro_manual_prefix"> | Pro manual draft </string>
+
+    <!-- Watermark selector -->
+    <string name="watermark_selector_supporting">Watermark selection sits one level below Lens Lab. Pick the active template here, then enter the template-specific style page to edit.</string>
+    <string name="watermark_selector_default_prefix">Default </string>
+    <string name="watermark_selector_templates_staged"> templates staged</string>
+    <string name="watermark_selector_current_default"> | Current default</string>
+    <string name="watermark_selector_edit_attrs_frame">Placement, scale, opacity, background</string>
+    <string name="watermark_selector_edit_attrs_classic">Placement, scale, opacity</string>
+    <string name="watermark_selector_footer_supported">Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages.</string>
+    <string name="watermark_selector_footer_unsupported">Still capture is unavailable on this device, so Watermark Lab stays read-only.</string>
+
+    <!-- Watermark detail -->
+    <string name="watermark_detail_supporting_selected">This is the active default watermark. Changes here will affect the next static photo rendered with this template.</string>
+    <string name="watermark_detail_supporting_not_selected">This template is not yet the current default. Adjust here first, then switch from the selector page when ready.</string>
+    <string name="watermark_detail_footer_frame">Frame border rendering is live for static-photo export.</string>
+    <string name="watermark_detail_footer_overlay">Classic overlay stays inside the source image without an expanded border.</string>
+    <string name="watermark_detail_tokens_prefix">Tokens: </string>
+
+    <!-- Watermark attribute prefixes for hero summary -->
+    <string name="watermark_attr_placement_prefix">Placement </string>
+    <string name="watermark_attr_scale_prefix">Scale </string>
+    <string name="watermark_attr_opacity_prefix">Opacity </string>
+    <string name="watermark_attr_background_prefix">Background </string>
+    <string name="watermark_template_expanded_frame">Expanded frame</string>
+    <string name="watermark_template_classic_overlay">Classic overlay</string>
+
+    <!-- Portrait lab -->
+    <string name="portrait_lab_supporting">Portrait product controls sit one level below Lens Lab. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.</string>
+    <string name="portrait_lab_joiner_beauty">Beauty </string>
+    <string name="portrait_lab_joiner_bokeh">Bokeh </string>
+    <string name="portrait_lab_footer">Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5.</string>
+
+    <!-- Pro controls -->
+    <string name="pro_controls_supporting_editable">Upper-layer manual draft is currently editable; each control indicates its status: Applied, Saved-only, or Temporarily unsupported.</string>
+    <string name="pro_controls_supporting_readonly">Draft changes allowed, but this device currently holds all controls in saved-only or temporarily-unsupported state.</string>
+    <string name="pro_controls_finish_capture_hint">Finish the current capture before editing.</string>
 </resources>
