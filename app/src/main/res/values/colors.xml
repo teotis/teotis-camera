@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Surface tokens -->
+    <color name="oc_surface_scrim">#8C000000</color>
+    <color name="oc_surface_scrim_light">#52000000</color>
+    <color name="oc_surface_panel">#E61B1F24</color>
+    <color name="oc_surface_panel_alt">#CC242A30</color>
+
+    <!-- Text tokens -->
+    <color name="oc_text_primary">#F8FAFC</color>
+    <color name="oc_text_secondary">#CBD5E1</color>
+    <color name="oc_text_muted">#94A3B8</color>
+
+    <!-- Accent and semantic -->
+    <color name="oc_accent">#55D6BE</color>
+    <color name="oc_record">#FF3B30</color>
+    <color name="oc_warning">#FBBF24</color>
+    <color name="oc_error">#F87171</color>
+
+    <!-- Divider -->
+    <color name="oc_divider">#2FFFFFFF</color>
+
+    <!-- Root background (visible when preview has not started) -->
+    <color name="oc_root_background">#FF000000</color>
+</resources>

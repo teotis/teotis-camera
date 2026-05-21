@@ -65,7 +65,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonQuickRatio: Button
     private lateinit var buttonQuickLauncher: Button
     private lateinit var quickBubblePanel: LinearLayout
-    private var isQuickBubblePanelVisible = false
     private lateinit var settingsPanel: androidx.core.widget.NestedScrollView
     private lateinit var filterPanel: androidx.core.widget.NestedScrollView
     private lateinit var buttonSettingsBack: Button
@@ -177,9 +176,7 @@ class MainActivity : AppCompatActivity() {
     private val shutterClickSound = MediaActionSound()
     private var lastRequestedThumbnailUri: String? = null
     private var lastPlayedShutterSoundShotId: String? = null
-    private var isSettingsPanelVisible = false
-    private var isFilterPanelVisible = false
-    private var isDevConsoleVisible = false
+    private var activePanelRoute: CockpitPanelRoute = CockpitPanelRoute.None
     private var selectedDevLogTab = DevLogTab.KEY
     private var latestDevLogRenderModel: DevLogRenderModel? = null
     private lateinit var devLogExporter: DevLogExporter
@@ -189,7 +186,6 @@ class MainActivity : AppCompatActivity() {
     private var latestWatermarkLabDetailRenderModel: WatermarkLabDetailRenderModel? = null
     private var latestFilterLabRenderModel: FilterLabPageRenderModel? = null
     private var latestSessionState: SessionState? = null
-    private var currentSettingsSubpage = SettingsSubpage.ROOT
     private var selectedWatermarkDetailTemplateId: String? = null
     private var selectedFilterLabFamilyOverride: FilterLabFamily? = null
     private var isFilterAdjustmentVisible = false
@@ -376,11 +372,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun bindActions() {
         panelDismissScrim.setOnClickListener {
-            isSettingsPanelVisible = false
-            isFilterPanelVisible = false
-            isQuickBubblePanelVisible = false
-            isDevConsoleVisible = false
-            currentSettingsSubpage = SettingsSubpage.ROOT
+            activePanelRoute = CockpitPanelRoute.None
             selectedWatermarkDetailTemplateId = null
             selectedFilterLabFamilyOverride = null
             isFilterAdjustmentVisible = false
@@ -388,21 +380,24 @@ class MainActivity : AppCompatActivity() {
             renderDevConsoleVisibility()
         }
         buttonSettingsEntry.setOnClickListener {
-            isSettingsPanelVisible = !isSettingsPanelVisible
-            if (isSettingsPanelVisible) {
-                isFilterPanelVisible = false
-                isQuickBubblePanelVisible = false
-                currentSettingsSubpage = SettingsSubpage.ROOT
-                selectedWatermarkDetailTemplateId = null
+            activePanelRoute = if (activePanelRoute.isSettingsOpen) {
+                CockpitPanelRoute.None
+            } else {
+                CockpitPanelRoute.Settings()
+            }
+            selectedWatermarkDetailTemplateId = null
+            if (activePanelRoute.isSettingsOpen) {
                 renderLatestSettingsSurfaces()
             }
             renderPanelVisibility()
         }
         buttonFilterEntry.setOnClickListener {
-            isFilterPanelVisible = !isFilterPanelVisible
-            if (isFilterPanelVisible) {
-                isSettingsPanelVisible = false
-                isQuickBubblePanelVisible = false
+            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.FilterLab) {
+                CockpitPanelRoute.None
+            } else {
+                CockpitPanelRoute.FilterLab
+            }
+            if (activePanelRoute is CockpitPanelRoute.FilterLab) {
                 renderLatestFilterLab()
             } else {
                 selectedFilterLabFamilyOverride = null
@@ -411,42 +406,43 @@ class MainActivity : AppCompatActivity() {
             renderPanelVisibility()
         }
         buttonCloseSettings.setOnClickListener {
-            isSettingsPanelVisible = false
-            currentSettingsSubpage = SettingsSubpage.ROOT
+            activePanelRoute = CockpitPanelRoute.None
             selectedWatermarkDetailTemplateId = null
             renderPanelVisibility()
         }
         buttonSettingsBack.setOnClickListener {
-            currentSettingsSubpage = when (currentSettingsSubpage) {
-                SettingsSubpage.ROOT -> SettingsSubpage.ROOT
-                SettingsSubpage.PORTRAIT_LAB -> SettingsSubpage.ROOT
-                SettingsSubpage.WATERMARK_SELECTOR -> SettingsSubpage.ROOT
-                SettingsSubpage.WATERMARK_DETAIL -> SettingsSubpage.WATERMARK_SELECTOR
-            }
-            if (currentSettingsSubpage != SettingsSubpage.WATERMARK_DETAIL) {
-                selectedWatermarkDetailTemplateId = null
+            val currentSettings = activePanelRoute as? CockpitPanelRoute.Settings ?: return@setOnClickListener
+            activePanelRoute = when (currentSettings.subpage) {
+                SettingsSubpage.WATERMARK_DETAIL -> {
+                    selectedWatermarkDetailTemplateId = null
+                    CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR)
+                }
+                SettingsSubpage.PORTRAIT_LAB,
+                SettingsSubpage.WATERMARK_SELECTOR -> CockpitPanelRoute.Settings()
+                else -> CockpitPanelRoute.Settings()
             }
             renderLatestSettingsSurfaces()
+            renderPanelVisibility()
         }
         buttonCloseFilter.setOnClickListener {
-            isFilterPanelVisible = false
+            activePanelRoute = CockpitPanelRoute.None
             selectedFilterLabFamilyOverride = null
             isFilterAdjustmentVisible = false
             renderPanelVisibility()
         }
         buttonDevEntry.setOnClickListener {
-            isDevConsoleVisible = !isDevConsoleVisible
-            if (isDevConsoleVisible) {
-                isQuickBubblePanelVisible = false
+            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.DevConsole) {
+                CockpitPanelRoute.None
+            } else {
+                CockpitPanelRoute.DevConsole
             }
             renderDevConsoleVisibility()
         }
         buttonQuickLauncher.setOnClickListener {
-            isQuickBubblePanelVisible = !isQuickBubblePanelVisible
-            if (isQuickBubblePanelVisible) {
-                isSettingsPanelVisible = false
-                isFilterPanelVisible = false
-                isDevConsoleVisible = false
+            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.QuickBubble) {
+                CockpitPanelRoute.None
+            } else {
+                CockpitPanelRoute.QuickBubble
             }
             latestSessionState?.let(::render)
         }
@@ -473,7 +469,7 @@ class MainActivity : AppCompatActivity() {
             captureOutput.text = "Debug log exported: ${file.absolutePath}"
         }
         buttonDevClose.setOnClickListener {
-            isDevConsoleVisible = false
+            activePanelRoute = CockpitPanelRoute.None
             renderDevConsoleVisibility()
         }
         photoModeButton.setOnClickListener {
@@ -662,9 +658,7 @@ class MainActivity : AppCompatActivity() {
     private fun bindGestureRouter() {
         gestureRouter = GestureRouter(this) { event ->
             val guardState = GestureGuardState(
-                isSettingsPanelOpen = isSettingsPanelVisible,
-                isFilterPanelOpen = isFilterPanelVisible,
-                isMoreControlsOpen = false,
+                activePanel = activePanelRoute,
                 isFilterAdjustmentActive = isFilterAdjustmentVisible
             )
             if (!gestureGuard.isGestureAllowed(GestureZone.PREVIEW, guardState)) {
@@ -763,7 +757,7 @@ class MainActivity : AppCompatActivity() {
         }
         shutterButton.text = shutterLabel
         if (state.recordingStatus != RecordingStatus.IDLE) {
-            shutterButton.setTextColor(0xFFFF4444.toInt())
+            shutterButton.setTextColor(ContextCompat.getColor(this, R.color.oc_record))
         }
         lensFacingButton.text = controls.lensFacingButtonLabel
         zoomRatioButton.text = controls.zoomButtonLabel
@@ -875,13 +869,13 @@ class MainActivity : AppCompatActivity() {
             val title = TextView(this).apply {
                 text = item.title
                 textSize = 15f
-                setTextColor(ContextCompat.getColor(context, android.R.color.white))
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
             }
             card.addView(title)
             val supporting = TextView(this).apply {
                 text = item.supportingText
                 textSize = 12f
-                setTextColor(0xFFD9E6F7.toInt())
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
                 setPadding(0, 6.dp, 0, 0)
             }
             card.addView(supporting)
@@ -1026,14 +1020,14 @@ class MainActivity : AppCompatActivity() {
             val title = TextView(this).apply {
                 text = item.title
                 textSize = 15f
-                setTextColor(ContextCompat.getColor(context, android.R.color.white))
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
             }
             card.addView(title)
 
             val supporting = TextView(this).apply {
                 text = item.supportingText
                 textSize = 12f
-                setTextColor(0xFFD9E6F7.toInt())
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
                 setPadding(0, 6.dp, 0, 0)
             }
             card.addView(supporting)
@@ -1132,26 +1126,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderPanelVisibility() {
-        settingsPanel.isVisible = isSettingsPanelVisible
-        filterPanel.isVisible = isFilterPanelVisible
-        val anyPanelOpen = isSettingsPanelVisible || isFilterPanelVisible || isQuickBubblePanelVisible || isDevConsoleVisible
-        panelDismissScrim.isVisible = anyPanelOpen
-        val showRoot = isSettingsPanelVisible && currentSettingsSubpage == SettingsSubpage.ROOT
-        val showPortraitLab =
-            isSettingsPanelVisible && currentSettingsSubpage == SettingsSubpage.PORTRAIT_LAB
-        val showWatermarkSelector =
-            isSettingsPanelVisible && currentSettingsSubpage == SettingsSubpage.WATERMARK_SELECTOR
-        val showWatermarkDetail =
-            isSettingsPanelVisible && currentSettingsSubpage == SettingsSubpage.WATERMARK_DETAIL
-        settingsRootContent.isVisible = showRoot
-        settingsPortraitLabContent.isVisible = showPortraitLab
-        settingsWatermarkSelectorContent.isVisible = showWatermarkSelector
-        settingsWatermarkDetailContent.isVisible = showWatermarkDetail
-        buttonSettingsBack.isVisible = !showRoot
-        buttonSettingsEntry.alpha = if (isSettingsPanelVisible) 1f else 0.92f
-        buttonFilterEntry.alpha = if (isFilterPanelVisible) 1f else 0.92f
-        quickBubblePanel.isVisible = isQuickBubblePanelVisible
-        buttonQuickLauncher.alpha = if (isQuickBubblePanelVisible) 1f else 0.86f
+        val route = activePanelRoute
+        settingsPanel.isVisible = route.isSettingsOpen
+        filterPanel.isVisible = route is CockpitPanelRoute.FilterLab
+        panelDismissScrim.isVisible = route.isAnyPanelOpen
+
+        val subpage = (route as? CockpitPanelRoute.Settings)?.subpage
+        settingsRootContent.isVisible = route.isSettingsOpen && (subpage == null || subpage == SettingsSubpage.ROOT)
+        settingsPortraitLabContent.isVisible = subpage == SettingsSubpage.PORTRAIT_LAB
+        settingsWatermarkSelectorContent.isVisible = subpage == SettingsSubpage.WATERMARK_SELECTOR
+        settingsWatermarkDetailContent.isVisible = subpage == SettingsSubpage.WATERMARK_DETAIL
+        buttonSettingsBack.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
+
+        buttonSettingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
+        buttonFilterEntry.alpha = if (route is CockpitPanelRoute.FilterLab) 1f else 0.92f
+        quickBubblePanel.isVisible = route is CockpitPanelRoute.QuickBubble
+        buttonQuickLauncher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
     }
 
     private fun renderZoomCapsules(controls: SessionControlsRenderModel) {
@@ -1169,11 +1159,11 @@ class MainActivity : AppCompatActivity() {
                 isAllCaps = false
                 textSize = 11f
                 if (capsule.isActive) {
-                    setTextColor(0xFFFFFFFF.toInt())
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.oc_text_primary))
                     setBackgroundResource(R.drawable.bg_mode_track_active)
                     alpha = 1f
                 } else {
-                    setTextColor(0xFFF5F7FA.toInt())
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.oc_text_secondary))
                     background = null
                     alpha = 0.78f
                 }
@@ -1192,9 +1182,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderDevConsoleVisibility() {
-        devConsolePanel.isVisible = isDevConsoleVisible && com.opencamera.app.BuildConfig.DEBUG
-        buttonDevEntry.alpha = if (isDevConsoleVisible) 1f else 0.78f
-        if (isDevConsoleVisible) {
+        val isDevVisible = activePanelRoute is CockpitPanelRoute.DevConsole
+        devConsolePanel.isVisible = isDevVisible && com.opencamera.app.BuildConfig.DEBUG
+        buttonDevEntry.alpha = if (isDevVisible) 1f else 0.78f
+        if (isDevVisible) {
             renderDevConsole()
         }
     }
@@ -1231,12 +1222,12 @@ class MainActivity : AppCompatActivity() {
                 button.text = item.trackLabel
                 button.isEnabled = item.isAvailable
                 if (item.isActive) {
-                    button.setTextColor(0xFFFFFFFF.toInt())
+                    button.setTextColor(ContextCompat.getColor(this, R.color.oc_text_primary))
                     button.setTypeface(null, android.graphics.Typeface.BOLD)
                     button.setBackgroundResource(R.drawable.bg_mode_track_active)
                     button.alpha = 1f
                 } else {
-                    button.setTextColor(0xFFF5F7FA.toInt())
+                    button.setTextColor(ContextCompat.getColor(this, R.color.oc_text_secondary))
                     button.setTypeface(null, android.graphics.Typeface.NORMAL)
                     button.background = null
                     button.alpha = if (item.isAvailable) 0.78f else 0.42f
@@ -1338,7 +1329,7 @@ class MainActivity : AppCompatActivity() {
         ) {
             return
         }
-        currentSettingsSubpage = SettingsSubpage.PORTRAIT_LAB
+        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.PORTRAIT_LAB)
         renderLatestSettingsSurfaces()
     }
 
@@ -1349,7 +1340,7 @@ class MainActivity : AppCompatActivity() {
         ) {
             return
         }
-        currentSettingsSubpage = SettingsSubpage.WATERMARK_SELECTOR
+        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR)
         selectedWatermarkDetailTemplateId = null
         renderLatestSettingsSurfaces()
     }
@@ -1360,7 +1351,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         selectedWatermarkDetailTemplateId = templateId
-        currentSettingsSubpage = SettingsSubpage.WATERMARK_DETAIL
+        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_DETAIL)
         renderLatestSettingsSurfaces()
     }
 

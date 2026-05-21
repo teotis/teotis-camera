@@ -1,24 +1,30 @@
 package com.opencamera.app.gesture
 
+import com.opencamera.app.CockpitPanelRoute
+import com.opencamera.app.isSettingsOpen
+
 data class GestureGuardState(
-    val isSettingsPanelOpen: Boolean = false,
-    val isFilterPanelOpen: Boolean = false,
-    val isMoreControlsOpen: Boolean = false,
+    val activePanel: CockpitPanelRoute = CockpitPanelRoute.None,
     val isFilterAdjustmentActive: Boolean = false
 )
 
 class GestureGuard {
 
     fun isGestureAllowed(zone: GestureZone, state: GestureGuardState): Boolean {
-        if (state.isSettingsPanelOpen) return false
-        if (state.isFilterPanelOpen) {
+        val panel = state.activePanel
+        if (panel.isSettingsOpen) return false
+        if (panel is CockpitPanelRoute.FilterLab) {
             return zone == GestureZone.SECONDARY_PANEL
         }
-        if (state.isMoreControlsOpen) return false
+        if (panel is CockpitPanelRoute.DevConsole) return false
+        if (panel is CockpitPanelRoute.QuickBubble) return false
         return true
     }
 
     fun isHorizontalScrollAllowed(state: GestureGuardState): Boolean {
-        return !state.isSettingsPanelOpen && !state.isFilterPanelOpen && !state.isFilterAdjustmentActive
+        val panel = state.activePanel
+        return !panel.isSettingsOpen &&
+               panel !is CockpitPanelRoute.FilterLab &&
+               !state.isFilterAdjustmentActive
     }
 }

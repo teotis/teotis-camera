@@ -1,0 +1,243 @@
+package com.opencamera.app
+
+import com.opencamera.core.device.DeviceCapabilities
+import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.ZoomControlSupport
+import com.opencamera.core.device.ZoomRatioCapability
+import com.opencamera.core.media.StillCaptureQualityPreference
+import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.mode.ModeId
+import com.opencamera.core.mode.ModeSnapshot
+import com.opencamera.core.mode.ModeState
+import com.opencamera.core.mode.ModeUiSpec
+import com.opencamera.core.session.CaptureStatus
+import com.opencamera.core.session.PermissionState
+import com.opencamera.core.session.PreviewMetrics
+import com.opencamera.core.session.PreviewStatus
+import com.opencamera.core.session.RecordingStatus
+import com.opencamera.core.session.SavedMediaType
+import com.opencamera.core.session.SessionLifecycle
+import com.opencamera.core.session.SessionPresentationState
+import com.opencamera.core.session.SessionState
+import com.opencamera.core.settings.CommonSettings
+import com.opencamera.core.settings.CompositionGridMode
+import com.opencamera.core.settings.CountdownDuration
+import com.opencamera.core.settings.PhotoSettings
+import com.opencamera.core.settings.PersistedSettings
+import com.opencamera.core.settings.SessionSettingsSnapshot
+import com.opencamera.core.settings.VideoSettings
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class CameraCockpitRenderModelTest {
+
+    private val strings = SessionUiStrings(
+        buttonSwitchToFront = "Switch to Front",
+        buttonSwitchToBack = "Switch to Back",
+        buttonSingleLens = "Single Lens",
+        buttonZoomPrefix = "Zoom",
+        buttonZoomUnavailable = "Zoom N/A",
+        buttonStillFast = "Still Fast",
+        buttonStillMax = "Still Max",
+        buttonStillQualityUnavailable = "Still N/A",
+        buttonStill12Mp = "Still 12MP",
+        buttonStill8Mp = "Still 8MP",
+        buttonStill2Mp = "Still 2MP",
+        buttonStillResolutionUnavailable = "Size N/A",
+        outputErrorPrefix = "Camera issue:",
+        outputVideoPrefix = "Last video:",
+        outputLivePrefix = "Last Live photo:",
+        outputSavedPrefix = "Last photo:",
+        outputPreviewPrefix = "Preview thumbnail:",
+        outputWaiting = "No photo captured yet."
+    )
+
+    @Test
+    fun `cockpit render model top status carries app name and mode label`() {
+        val state = defaultSessionState(activeMode = ModeId.HUMANISTIC)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("OpenCamera", model.topStatus.appName)
+        assertEquals("Humanistic", model.topStatus.modeLabel)
+        assertEquals("Lens Lab", model.topStatus.labEntryLabel)
+    }
+
+    @Test
+    fun `cockpit render model top status reflects preview status`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.topStatus.statusText.isNotEmpty())
+    }
+
+    @Test
+    fun `right rail includes tone quick and dev entries`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(3, model.rightRail.entries.size)
+        assertEquals("Tone", model.rightRail.entries[0].label)
+        assertEquals("Quick", model.rightRail.entries[1].label)
+        assertEquals("DEV", model.rightRail.entries[2].label)
+    }
+
+    @Test
+    fun `right rail dev entry is not visible by default`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(model.rightRail.entries[2].isVisible)
+    }
+
+    @Test
+    fun `right rail marks active route`() {
+        val state = defaultSessionState()
+        val activeRoute = CockpitPanelRoute.FilterLab
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, activeRoute)
+
+        assertTrue(model.rightRail.entries[0].isActive)
+        assertFalse(model.rightRail.entries[1].isActive)
+    }
+
+    @Test
+    fun `zoom strip chips match zoom ratio capability`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.7f, 1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 2f
+            )
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.zoomStrip.isVisible)
+        assertEquals(4, model.zoomStrip.chips.size)
+        assertEquals("2.0x", model.zoomStrip.chips.first { it.isActive }.label)
+    }
+
+    @Test
+    fun `zoom strip is hidden when unsupported`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(model.zoomStrip.isVisible)
+    }
+
+    @Test
+    fun `mode track preserves available mode order`() {
+        val availableModes = listOf(
+            ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC,
+            ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+        )
+        val state = defaultSessionState(
+            activeMode = ModeId.PORTRAIT,
+            availableModes = availableModes
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(6, model.modeTrack.items.size)
+        assertEquals(
+            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO),
+            model.modeTrack.items.map { it.modeId }
+        )
+        assertTrue(model.modeTrack.items.first { it.modeId == ModeId.PORTRAIT }.isActive)
+    }
+
+    @Test
+    fun `bottom cockpit carries lens and zoom labels`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT)
+            )
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("Shutter", model.bottomCockpit.shutterLabel)
+        assertEquals("Switch to Front", model.bottomCockpit.lensButtonLabel)
+        assertTrue(model.bottomCockpit.lensButtonEnabled)
+    }
+
+    @Test
+    fun `bottom cockpit lens disabled with single lens`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(model.bottomCockpit.lensButtonEnabled)
+    }
+
+    @Test
+    fun `cockpit render model carries active route through`() {
+        val state = defaultSessionState()
+        val route = CockpitPanelRoute.Settings(SettingsSubpage.ROOT)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, route)
+
+        assertTrue(model.activePanelRoute.isSettingsOpen)
+        assertEquals(SettingsSubpage.ROOT, (model.activePanelRoute as CockpitPanelRoute.Settings).subpage)
+    }
+
+    private fun defaultSessionState(
+        activeMode: ModeId = ModeId.PHOTO,
+        availableModes: List<ModeId> = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),
+        activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
+        activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK,
+            enablePreviewSnapshots = true,
+            qualityPreference = StillCaptureQualityPreference.LATENCY,
+            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+        )
+    ): SessionState {
+        return SessionState(
+            lifecycle = SessionLifecycle.RUNNING,
+            permissionState = PermissionState(cameraGranted = true, microphoneGranted = true),
+            previewHostAvailable = true,
+            previewStatus = PreviewStatus.ACTIVE,
+            previewStatusDetail = null,
+            activeMode = activeMode,
+            availableModes = availableModes,
+            captureStatus = CaptureStatus.IDLE,
+            recordingStatus = RecordingStatus.IDLE,
+            activeShot = null,
+            modeSnapshot = ModeSnapshot(
+                id = ModeId.PHOTO,
+                uiSpec = ModeUiSpec(title = "PHOTO", shutterLabel = "Capture PHOTO"),
+                state = ModeState(headline = "PHOTO mode active", detail = "Ready")
+            ),
+            activeDeviceCapabilities = activeDeviceCapabilities,
+            activeDeviceGraph = activeDeviceGraph,
+            previewMetrics = PreviewMetrics(),
+            settings = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    common = CommonSettings(
+                        gridMode = CompositionGridMode.RULE_OF_THIRDS,
+                        shutterSoundEnabled = false,
+                        selfieMirrorEnabled = true
+                    ),
+                    photo = PhotoSettings(
+                        defaultFilterProfileId = "portrait-retro",
+                        countdownDuration = CountdownDuration.SECONDS_3
+                    ),
+                    video = VideoSettings()
+                )
+            ),
+            presentation = SessionPresentationState(
+                lastAction = "Ready",
+                latestCapturePath = null,
+                latestVideoPath = null,
+                latestLivePhotoBundle = null,
+                latestSavedMediaType = null,
+                latestPipelineNotes = emptyList(),
+                lastError = null
+            )
+        )
+    }
+}
