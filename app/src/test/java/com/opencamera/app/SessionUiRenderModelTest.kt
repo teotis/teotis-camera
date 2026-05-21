@@ -1312,22 +1312,18 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `cockpit right rail exposes style lens lab quick and settings entries`() {
+    fun `cockpit right rail exposes style and quick entries`() {
         val state = defaultSessionState()
         val text = TestAppTextResolver()
         val cockpit = cameraCockpitRenderModel(state, text, strings)
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
-        assertEquals(4, visibleEntries.size)
+        assertEquals(2, visibleEntries.size)
         assertEquals("Style", visibleEntries[0].label)
-        assertEquals("Lens Lab", visibleEntries[1].label)
-        assertEquals("Quick", visibleEntries[2].label)
-        assertEquals("Settings", visibleEntries[3].label)
+        assertEquals("Quick", visibleEntries[1].label)
 
         assertTrue(visibleEntries[0].route is CockpitPanelRoute.FilterLab)
-        assertTrue(visibleEntries[1].route is CockpitPanelRoute.LensLab)
-        assertTrue(visibleEntries[2].route is CockpitPanelRoute.QuickBubble)
-        assertTrue(visibleEntries[3].route is CockpitPanelRoute.Settings)
+        assertTrue(visibleEntries[1].route is CockpitPanelRoute.QuickBubble)
     }
 
     @Test
