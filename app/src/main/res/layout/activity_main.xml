@@ -767,23 +767,21 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Filter panel (unchanged) -->
+    <!-- Filter panel (compact palette style) -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/filterPanel"
         android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginHorizontal="16dp"
-        android:layout_marginTop="14dp"
-        android:layout_marginBottom="12dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="22dp"
+        android:layout_marginBottom="132dp"
         android:background="@drawable/bg_settings_panel"
         android:contentDescription="@string/filter_panel_content_description"
         android:fillViewport="true"
         android:padding="0dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/topPanel">
+        app:layout_constraintStart_toStartOf="parent">
 
         <LinearLayout
             android:layout_width="match_parent"

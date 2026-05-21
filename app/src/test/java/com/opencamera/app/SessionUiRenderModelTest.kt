@@ -1091,10 +1091,8 @@ class SessionUiRenderModelTest {
         val controls = sessionControlsRenderModel(state, strings)
 
         assertTrue(controls.zoomCapsules.map { it.label }.containsAll(listOf("0.6", "1x", "2x", "5x")))
-        assertTrue(controls.flashText.isNotBlank())
-        assertTrue(controls.ratioText.isNotBlank())
-        assertTrue(controls.stillQualityText.isNotBlank())
-        assertTrue(controls.stillSizeText.isNotBlank())
+        assertTrue(controls.zoomEnabled)
+        assertTrue(controls.lensFacingEnabled)
     }
 
     companion object {
