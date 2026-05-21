@@ -12,6 +12,7 @@ import com.opencamera.core.device.nextZoomRatio
 import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.device.resolvedZoomRatioSelection
 import com.opencamera.core.device.recoveryReason
+import com.opencamera.core.media.CaptureFeedbackPreview
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
@@ -1088,7 +1089,19 @@ class DefaultCameraSession(
     }
 
     private fun handleCaptureFeedbackSnapshotUpdated(shotId: String, outputPath: String) {
-        trace.record("capture.feedback.snapshot", "shotId=$shotId output=$outputPath")
+        val activeShot = _state.value.activeShot
+        if (activeShot == null || activeShot.shotId != shotId) {
+            trace.record("capture.feedback.snapshot.skipped", "shotId=$shotId,active=${activeShot?.shotId}")
+            return
+        }
+        updateState(
+            pendingCaptureFeedback = CaptureFeedbackPreview(
+                shotId = shotId,
+                outputPath = outputPath
+            ),
+            lastAction = "Capture feedback ready"
+        )
+        trace.record("capture.feedback.snapshot.updated", "shotId=$shotId")
     }
 
     private suspend fun handlePreviewSurfaceLost(reason: String) {
@@ -1197,6 +1210,7 @@ class DefaultCameraSession(
             },
             activeShot = shot,
             countdownRemainingSeconds = null,
+            pendingCaptureFeedback = null,
             modeSnapshot = currentController.snapshot.value,
             activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
             activeDeviceGraph = resolvedActiveDeviceGraph(),
@@ -1211,6 +1225,9 @@ class DefaultCameraSession(
             },
             lastError = null
         )
+        if (shot.mediaType == MediaType.PHOTO) {
+            trace.record("capture.feedback.snapshot.requested", "shotId=${shot.shotId}")
+        }
         trace.record(
             if (shot.mediaType == MediaType.PHOTO) "capture.saving" else "recording.started",
             "shot=${shot.shotId},mode=${currentController.id}"

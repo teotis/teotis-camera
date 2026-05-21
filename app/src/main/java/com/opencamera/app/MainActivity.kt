@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonQuickGrid: Button
     private lateinit var buttonQuickFlash: Button
     private lateinit var buttonQuickRatio: Button
+    private lateinit var buttonPreviewRatio: Button
     private lateinit var buttonQuickLivePhoto: Button
     private lateinit var buttonQuickTimer: Button
     private lateinit var buttonQuickMore: Button
@@ -245,6 +246,7 @@ class MainActivity : AppCompatActivity() {
         buttonQuickGrid = findViewById(R.id.buttonQuickGrid)
         buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
         buttonQuickRatio = findViewById(R.id.buttonQuickRatio)
+        buttonPreviewRatio = findViewById(R.id.buttonPreviewRatio)
         buttonQuickLivePhoto = findViewById(R.id.buttonQuickLivePhoto)
         buttonQuickTimer = findViewById(R.id.buttonQuickTimer)
         buttonQuickMore = findViewById(R.id.buttonQuickMore)
@@ -483,6 +485,9 @@ class MainActivity : AppCompatActivity() {
         }
         buttonQuickRatio.setOnClickListener {
             dispatch(SessionIntent.StillCaptureResolutionToggled)
+        }
+        buttonPreviewRatio.setOnClickListener {
+            dispatch(SessionIntent.PreviewRatioToggled)
         }
         buttonQuickLivePhoto.setOnClickListener {
             applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.livePhoto)
@@ -1185,6 +1190,8 @@ class MainActivity : AppCompatActivity() {
 
         buttonQuickFlash.text = getString(R.string.button_quick_flash)
         buttonQuickRatio.text = getString(R.string.button_quick_ratio)
+        buttonPreviewRatio.text = latestSessionState?.previewRatio?.label
+            ?: getString(R.string.button_preview_ratio)
 
         val live = settingsPage.photoSection.livePhoto
         buttonQuickLivePhoto.text = "${getString(R.string.button_quick_live)}\n${live.value}"
