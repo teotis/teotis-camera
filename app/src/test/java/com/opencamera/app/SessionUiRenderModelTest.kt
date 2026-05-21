@@ -1150,6 +1150,64 @@ class SessionUiRenderModelTest {
         assertTrue(model.items.all { it.isAvailable })
     }
 
+    @Test
+    fun `save as custom button label is localized via text resolver`() {
+        val customResolver = object : TestAppTextResolver() {
+            override fun saveAsCustom(): String = "保存为自定义"
+        }
+        val model = filterLabPageRenderModel(
+            state = defaultSessionState(activeMode = ModeId.PORTRAIT),
+            text = customResolver,
+            selectedFamily = FilterLabFamily.PORTRAIT
+        )
+        assertTrue(model.saveCustomControl.buttonLabel.startsWith("保存为自定义"))
+    }
+
+    @Test
+    fun `portrait lab page render model uses text resolver for all labels`() {
+        val customResolver = object : TestAppTextResolver() {
+            override fun portraitLab(): String = "人像实验室"
+            override fun portraitProfileLabel(): String = "人像配置文件"
+            override fun beautyPresetLabel(): String = "美颜预设"
+            override fun beautyStrengthLabel(): String = "美颜强度"
+            override fun bokehEffectLabel(): String = "散景效果"
+        }
+        val model = portraitLabPageRenderModel(defaultSessionState(), customResolver)
+        assertEquals("人像实验室", model.headline)
+        assertTrue(model.profileControl.buttonLabel.startsWith("人像配置文件"))
+        assertTrue(model.beautyPresetControl.buttonLabel.startsWith("美颜预设"))
+        assertTrue(model.beautyStrengthControl.buttonLabel.startsWith("美颜强度"))
+        assertTrue(model.bokehEffectControl.buttonLabel.startsWith("散景效果"))
+    }
+
+    @Test
+    fun `filter lab page uses text resolver for all key labels`() {
+        val customResolver = object : TestAppTextResolver() {
+            override fun filterLab(): String = "滤镜实验室"
+            override fun saveAsCustom(): String = "保存"
+        }
+        val model = filterLabPageRenderModel(
+            state = defaultSessionState(activeMode = ModeId.PHOTO),
+            text = customResolver
+        )
+        assertEquals("滤镜实验室", model.headline)
+        assertTrue(model.saveCustomControl.buttonLabel.startsWith("保存"))
+    }
+
+    @Test
+    fun `availability labels use dedicated strings not quality level labels`() {
+        val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
+        assertTrue(model.photoSection.livePhoto.buttonLabel.contains("Degraded"))
+        assertTrue(model.photoSection.portraitLab.buttonLabel.contains("Degraded"))
+        assertTrue(model.photoSection.watermarkTemplate.buttonLabel.contains("Degraded"))
+        assertTrue(model.photoSection.countdown.buttonLabel.contains("Supported"))
+        assertTrue(model.videoSection.frameRate.buttonLabel.contains("Supported"))
+        assertFalse(model.photoSection.livePhoto.buttonLabel.contains("Fast"))
+        assertFalse(model.photoSection.livePhoto.buttonLabel.contains("Max"))
+        assertFalse(model.videoSection.frameRate.buttonLabel.contains("Fast"))
+        assertFalse(model.videoSection.frameRate.buttonLabel.contains("N/A"))
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",

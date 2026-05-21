@@ -351,13 +351,13 @@ class MainActivity : AppCompatActivity() {
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.topPanel)) { v, insets ->
             val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
-            v.updatePadding(top = statusBars.top)
+            v.setPadding(v.paddingLeft, statusBars.top, v.paddingRight, v.paddingBottom)
             insets
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.bottomSheet)) { v, insets ->
             val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            v.updatePadding(bottom = navBars.bottom)
+            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, navBars.bottom)
             insets
         }
 

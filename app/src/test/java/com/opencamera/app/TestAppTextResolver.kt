@@ -6,7 +6,7 @@ import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.PersistedSettings
 
-class TestAppTextResolver : AppTextResolver(null) {
+open class TestAppTextResolver : AppTextResolver(null) {
     override fun modeDisplayName(modeId: ModeId): String = when (modeId) {
         ModeId.PHOTO -> "Photo"
         ModeId.DOCUMENT -> "Doc"

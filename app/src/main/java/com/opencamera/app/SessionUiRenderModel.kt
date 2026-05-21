@@ -1280,7 +1280,7 @@ internal fun portraitLabPageRenderModel(
         SettingsControlAvailability.UNSUPPORTED
     }
     return PortraitLabPageRenderModel(
-        headline = "Portrait Lab",
+        headline = text.portraitLab(),
         supportingText = "Portrait product tuning lives one level below Lens Lab. Use this page to shape the saved portrait profile, beauty behavior, and bokeh feel without changing the active portrait filter roster.",
         heroSummary = buildString {
             append(settings.photo.portraitProfile.label)
@@ -1392,7 +1392,7 @@ internal fun watermarkLabSelectorRenderModel(
     val supportsStillCapture = state.activeDeviceCapabilities.supportsStillCapture
     val selectedTemplate = catalog.watermarkTemplateOrNull(settings.photo.defaultWatermarkTemplateId)
     return WatermarkLabSelectorRenderModel(
-        headline = "Watermark Lab",
+        headline = text.watermarkLab(),
         supportingText = "Watermark selection lives one level below Lens Lab. Choose the active template here, then open the template-specific style page inside this lab.",
         heroSummary = buildString {
             append("Default ")
@@ -1633,7 +1633,7 @@ internal fun filterLabPageRenderModel(
         null
     }
     return FilterLabPageRenderModel(
-        headline = "Filter Lab",
+        headline = text.filterLab(),
         supportingText = "Independent filter panel for mode defaults. Import and export stay deferred in this 6B-2 closure; selected looks can be adjusted or saved as custom.",
         heroSummary = "${family.label} default $currentFilterLabel • ${family.filters.size} looks staged",
         currentFilterSummary = buildString {
