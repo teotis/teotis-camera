@@ -1083,14 +1083,7 @@ class SessionUiRenderModelTest {
                         shutterSoundEnabled = false,
                         selfieMirrorEnabled = true
                     ),
-                    photo = PhotoSettings(
-                        defaultFilterProfileId = "portrait-retro",
-                        defaultHumanisticFilterProfileId = "humanistic-street",
-                        defaultPortraitFilterProfileId = "portrait-original",
-                        defaultWatermarkTemplateId = "travel-polaroid",
-                        livePhotoEnabledByDefault = true,
-                        countdownDuration = CountdownDuration.SECONDS_3
-                    ),
+                    photo = persistedPhotoSettings,
                     video = VideoSettings(
                         defaultVideoSpec = VideoSpec(
                             resolution = VideoResolution.UHD_4K,
