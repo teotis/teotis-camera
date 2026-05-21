@@ -30,8 +30,8 @@
     <string name="button_stop_session">停止会话</string>
     <string name="button_settings_entry">镜头实验室</string>
     <string name="button_settings_close">关闭镜头实验室</string>
-    <string name="button_filter_entry">滤镜实验室</string>
-    <string name="button_filter_close">关闭滤镜实验室</string>
+    <string name="button_filter_entry">色调实验室</string>
+    <string name="button_filter_close">关闭色调实验室</string>
     <string name="permission_pending">需要相机权限才能开始预览。</string>
     <string name="permission_granted">相机权限已授予，预览就绪。</string>
     <string name="permission_camera_only">相机已授权。在授予麦克风权限前，视频录制将静音。</string>
@@ -44,7 +44,7 @@
     <string name="output_preview_prefix">预览缩略图：</string>
     <string name="preview_thumbnail_content_description">最新预览缩略图</string>
     <string name="settings_panel_content_description">相机默认参数和能力设置</string>
-    <string name="filter_panel_content_description">独立滤镜默认参数面板</string>
+    <string name="filter_panel_content_description">色调实验室独立默认参数面板</string>
     <string name="settings_section_common">通用</string>
     <string name="settings_section_photo">拍照</string>
     <string name="settings_section_video">视频</string>
@@ -233,4 +233,6 @@
     <string name="disabled_permission">需要相机权限</string>
     <string name="disabled_unsupported">当前设备不支持</string>
     <string name="disabled_capture_in_progress">拍摄进行中，暂不能更改</string>
+    <string name="watermark_detail_editing_enabled">模板专属样式即时保存，并保持与此水印预设关联。</string>
+    <string name="watermark_detail_editing_disabled">完成当前拍摄后才可以更改水印样式。</string>
 </resources>

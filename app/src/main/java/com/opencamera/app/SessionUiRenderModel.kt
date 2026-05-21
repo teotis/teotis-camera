@@ -115,10 +115,12 @@ internal data class SettingsControlRenderModel(
     val availability: SettingsControlAvailability = SettingsControlAvailability.SUPPORTED,
     val availabilityLabel: String = "",
     val supportLabel: String? = null,
-    val nextAction: PersistedSettingsAction? = null
+    val nextAction: PersistedSettingsAction? = null,
+    val enabled: Boolean = true,
+    val disabledReason: String? = null
 ) {
     val isInteractive: Boolean
-        get() = availability != SettingsControlAvailability.UNSUPPORTED && nextAction != null
+        get() = enabled && availability != SettingsControlAvailability.UNSUPPORTED && nextAction != null
 
     val buttonLabel: String
         get() = buildString {
@@ -1378,7 +1380,7 @@ internal fun portraitLabPageRenderModel(
                 null
             }
         ),
-        footer = "Filter Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5."
+        footer = "Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5."
     )
 }
 
@@ -1505,9 +1507,9 @@ internal fun watermarkLabDetailRenderModel(
         templateId = template.id,
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
-            "Template-specific styles save instantly and stay attached to this watermark preset."
+            text.watermarkDetailEditingEnabled()
         } else {
-            "Finish the current capture before changing watermark styles."
+            text.watermarkDetailEditingDisabled()
         },
         placementControl = SettingsControlRenderModel(
             label = text.textPlacementLabel(),
@@ -1798,7 +1800,7 @@ internal fun filterLabPageRenderModel(
             sourceProfileId = currentProfile?.id,
             isEnabled = currentProfile?.builtIn == true
         ),
-        footer = "Strategy locked for current 6B-2 work: ship an independent Filter Lab first. Import/export remain deferred while in-panel adjustment and custom save move forward."
+        footer = "Strategy locked for current 6B-2 work: ship an independent Tone Lab first. Import/export remain deferred while in-panel adjustment and custom save move forward."
     )
 }
 

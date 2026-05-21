@@ -113,6 +113,10 @@ open class AppTextResolver(private val context: Context?) {
     open fun portraitLabEditingDisabled(): String = "Finish the current capture before changing portrait product defaults."
     open fun watermarkSelectorEditingEnabled(): String = "Default template changes save instantly. Each template keeps its own placement, scale, opacity, and frame background preset."
     open fun watermarkSelectorEditingDisabled(): String = "Finish the current capture before changing watermark defaults."
+    open fun watermarkDetailEditingEnabled(): String =
+        str(R.string.watermark_detail_editing_enabled, "Template-specific styles save instantly and stay attached to this watermark preset.")
+    open fun watermarkDetailEditingDisabled(): String =
+        str(R.string.watermark_detail_editing_disabled, "Finish the current capture before changing watermark styles.")
     open fun filterLabEditingEnabled(): String = "Selected family defaults save instantly and refresh the active mode when relevant."
     open fun filterLabEditingDisabled(): String = "Finish the current capture before changing filter defaults."
     open fun statusCustomBadge(): String = " | Custom"

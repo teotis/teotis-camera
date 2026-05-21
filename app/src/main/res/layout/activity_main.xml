@@ -354,6 +354,42 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/buttonSettingsTabCommon"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_common" />
+
+                    <Button
+                        android:id="@+id/buttonSettingsTabPhoto"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_photo" />
+
+                    <Button
+                        android:id="@+id/buttonSettingsTabVideo"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_video" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/settingsCommonSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
                     android:background="@drawable/bg_settings_card"
                     android:orientation="vertical"
                     android:padding="@dimen/space_16">
@@ -406,6 +442,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/settingsPhotoSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
@@ -481,6 +518,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/settingsVideoSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"

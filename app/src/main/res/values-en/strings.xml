@@ -30,8 +30,8 @@
     <string name="button_stop_session">Stop Session</string>
     <string name="button_settings_entry">Lens Lab</string>
     <string name="button_settings_close">Close Lens Lab</string>
-    <string name="button_filter_entry">Filter Lab</string>
-    <string name="button_filter_close">Close Filter Lab</string>
+    <string name="button_filter_entry">Tone Lab</string>
+    <string name="button_filter_close">Close Tone Lab</string>
     <string name="permission_pending">Camera permission is required before preview can start.</string>
     <string name="permission_granted">Camera permission granted. Preview is ready.</string>
     <string name="permission_camera_only">Camera granted. Video recording will be silent until microphone permission is granted.</string>
@@ -44,7 +44,7 @@
     <string name="output_preview_prefix">Preview thumbnail:</string>
     <string name="preview_thumbnail_content_description">Latest preview thumbnail</string>
     <string name="settings_panel_content_description">Camera defaults and capability settings</string>
-    <string name="filter_panel_content_description">Independent filter defaults panel</string>
+    <string name="filter_panel_content_description">Tone Lab independent defaults panel</string>
     <string name="settings_section_common">General</string>
     <string name="settings_section_photo">Photo</string>
     <string name="settings_section_video">Video</string>
@@ -231,4 +231,6 @@
     <string name="disabled_permission">Camera permission required</string>
     <string name="disabled_unsupported">Unavailable on this device</string>
     <string name="disabled_capture_in_progress">Capture in progress</string>
+    <string name="watermark_detail_editing_enabled">Template-specific styles save instantly and stay attached to this watermark preset.</string>
+    <string name="watermark_detail_editing_disabled">Finish the current capture before changing watermark styles.</string>
 </resources>

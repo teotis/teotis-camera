@@ -78,10 +78,11 @@ class CameraCockpitRenderModelTest {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertEquals(3, model.rightRail.entries.size)
+        assertEquals(4, model.rightRail.entries.size)
         assertEquals("Tone", model.rightRail.entries[0].label)
         assertEquals("Quick", model.rightRail.entries[1].label)
-        assertEquals("DEV", model.rightRail.entries[2].label)
+        assertEquals("Lens Lab", model.rightRail.entries[2].label)
+        assertEquals("DEV", model.rightRail.entries[3].label)
     }
 
     @Test
@@ -89,7 +90,7 @@ class CameraCockpitRenderModelTest {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertFalse(model.rightRail.entries[2].isVisible)
+        assertFalse(model.rightRail.entries[3].isVisible)
     }
 
     @Test

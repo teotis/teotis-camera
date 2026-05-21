@@ -663,7 +663,7 @@ class SessionUiRenderModelTest {
             PersistedSettingsAction.UpdatePortraitBokehEffect(PortraitBokehEffect.NATURAL),
             model.bokehEffectControl.nextAction
         )
-        assertTrue(model.footer.contains("Filter Lab still owns portrait color style selection"))
+        assertTrue(model.footer.contains("Tone Lab still owns portrait color style selection"))
     }
 
     @Test
@@ -755,7 +755,7 @@ class SessionUiRenderModelTest {
             TestAppTextResolver()
         )
 
-        assertEquals("Filter Lab", model.headline)
+        assertEquals("Tone Lab", model.headline)
         assertTrue(model.heroSummary.contains("Portrait default Portrait Original"))
         assertTrue(model.portraitTab.isSelected)
         assertFalse(model.photoTab.isSelected)
@@ -766,7 +766,7 @@ class SessionUiRenderModelTest {
         assertTrue(model.currentFilterSummary.contains("Current default Portrait Original"))
         assertTrue(model.saveCustomControl.isEnabled)
         assertEquals("portrait-original", model.saveCustomControl.sourceProfileId)
-        assertTrue(model.footer.contains("independent Filter Lab"))
+        assertTrue(model.footer.contains("independent Tone Lab"))
     }
 
     @Test

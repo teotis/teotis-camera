@@ -50,10 +50,13 @@ import com.opencamera.core.settings.FilterRenderSpec
 import kotlinx.coroutines.launch
 import java.io.File
 
+private enum class SettingsTab { COMMON, PHOTO, VIDEO }
+
 class MainActivity : AppCompatActivity() {
     private val container: AppContainer
         get() = (application as OpenCameraApplication).container
 
+    private var selectedSettingsTab = SettingsTab.COMMON
     private lateinit var previewView: PreviewView
     private lateinit var previewOverlayView: PreviewOverlayView
     private lateinit var panelDismissScrim: View
@@ -123,6 +126,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonVideoAudio: Button
     private lateinit var buttonVideoFilter: Button
     private lateinit var buttonCloseSettings: Button
+    private lateinit var buttonSettingsTabCommon: Button
+    private lateinit var buttonSettingsTabPhoto: Button
+    private lateinit var buttonSettingsTabVideo: Button
+    private lateinit var settingsCommonSection: LinearLayout
+    private lateinit var settingsPhotoSection: LinearLayout
+    private lateinit var settingsVideoSection: LinearLayout
     private lateinit var filterHeadline: TextView
     private lateinit var filterSupportingText: TextView
     private lateinit var filterHeroSummary: TextView
@@ -293,6 +302,12 @@ class MainActivity : AppCompatActivity() {
         buttonVideoAudio = findViewById(R.id.buttonVideoAudio)
         buttonVideoFilter = findViewById(R.id.buttonVideoFilter)
         buttonCloseSettings = findViewById(R.id.buttonCloseSettings)
+        buttonSettingsTabCommon = findViewById(R.id.buttonSettingsTabCommon)
+        buttonSettingsTabPhoto = findViewById(R.id.buttonSettingsTabPhoto)
+        buttonSettingsTabVideo = findViewById(R.id.buttonSettingsTabVideo)
+        settingsCommonSection = findViewById(R.id.settingsCommonSection)
+        settingsPhotoSection = findViewById(R.id.settingsPhotoSection)
+        settingsVideoSection = findViewById(R.id.settingsVideoSection)
         filterHeadline = findViewById(R.id.filterHeadline)
         filterSupportingText = findViewById(R.id.filterSupportingText)
         filterHeroSummary = findViewById(R.id.filterHeroSummary)
@@ -390,6 +405,7 @@ class MainActivity : AppCompatActivity() {
             selectedWatermarkDetailTemplateId = null
             selectedFilterLabFamilyOverride = null
             isFilterAdjustmentVisible = false
+            selectedSettingsTab = SettingsTab.COMMON
             renderPanelVisibility()
             renderDevConsoleVisibility()
         }
@@ -416,8 +432,12 @@ class MainActivity : AppCompatActivity() {
         buttonCloseSettings.setOnClickListener {
             activePanelRoute = CockpitPanelRoute.None
             selectedWatermarkDetailTemplateId = null
+            selectedSettingsTab = SettingsTab.COMMON
             renderPanelVisibility()
         }
+        buttonSettingsTabCommon.setOnClickListener { selectedSettingsTab = SettingsTab.COMMON; renderSettingsTabs() }
+        buttonSettingsTabPhoto.setOnClickListener { selectedSettingsTab = SettingsTab.PHOTO; renderSettingsTabs() }
+        buttonSettingsTabVideo.setOnClickListener { selectedSettingsTab = SettingsTab.VIDEO; renderSettingsTabs() }
         buttonSettingsBack.setOnClickListener {
             val currentSettings = activePanelRoute as? CockpitPanelRoute.Settings ?: return@setOnClickListener
             activePanelRoute = when (currentSettings.subpage) {
@@ -826,7 +846,20 @@ class MainActivity : AppCompatActivity() {
         renderSettingsControl(buttonVideoDynamicFps, model.videoSection.dynamicFps, model.editingEnabled)
         renderSettingsControl(buttonVideoAudio, model.videoSection.audioProfile, model.editingEnabled)
         renderSettingsControl(buttonVideoFilter, model.videoSection.defaultFilter, model.editingEnabled)
+        renderSettingsTabs()
         renderPanelVisibility()
+    }
+
+    private fun renderSettingsTabs() {
+        buttonSettingsTabCommon.isEnabled = selectedSettingsTab != SettingsTab.COMMON
+        buttonSettingsTabPhoto.isEnabled = selectedSettingsTab != SettingsTab.PHOTO
+        buttonSettingsTabVideo.isEnabled = selectedSettingsTab != SettingsTab.VIDEO
+        buttonSettingsTabCommon.alpha = if (selectedSettingsTab == SettingsTab.COMMON) 1f else 0.84f
+        buttonSettingsTabPhoto.alpha = if (selectedSettingsTab == SettingsTab.PHOTO) 1f else 0.84f
+        buttonSettingsTabVideo.alpha = if (selectedSettingsTab == SettingsTab.VIDEO) 1f else 0.84f
+        settingsCommonSection.isVisible = selectedSettingsTab == SettingsTab.COMMON
+        settingsPhotoSection.isVisible = selectedSettingsTab == SettingsTab.PHOTO
+        settingsVideoSection.isVisible = selectedSettingsTab == SettingsTab.VIDEO
     }
 
     private fun renderPortraitLabPage(model: PortraitLabPageRenderModel) {
@@ -1410,6 +1443,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     SettingsSubpage.ROOT -> {
                         activePanelRoute = CockpitPanelRoute.None
+                        selectedSettingsTab = SettingsTab.COMMON
                     }
                 }
                 renderLatestSettingsSurfaces()
