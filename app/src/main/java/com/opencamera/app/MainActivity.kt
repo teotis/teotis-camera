@@ -790,18 +790,17 @@ class MainActivity : AppCompatActivity() {
         maybePlayShutterSound(state)
 
         val shutterLabel = when (state.recordingStatus) {
-            RecordingStatus.IDLE -> ""
+            RecordingStatus.IDLE -> getString(R.string.button_photo_capture)
             RecordingStatus.REQUESTING -> getString(R.string.button_recording_starting)
             RecordingStatus.RECORDING -> getString(R.string.button_recording_stop)
             RecordingStatus.STOPPING -> getString(R.string.button_recording_saving)
         }
-        shutterButton.text = shutterLabel
+        shutterButton.contentDescription = shutterLabel
+        shutterButton.text = ""
         if (state.recordingStatus != RecordingStatus.IDLE) {
-            shutterButton.setTextColor(ContextCompat.getColor(this, R.color.oc_text_primary))
-            shutterButton.setBackgroundResource(R.drawable.bg_shutter_recording)
+            shutterButton.setBackgroundResource(R.drawable.bg_shutter_recording_selector)
         } else {
-            shutterButton.setTextColor(ContextCompat.getColor(this, R.color.oc_surface_panel))
-            shutterButton.setBackgroundResource(R.drawable.bg_shutter_circle)
+            shutterButton.setBackgroundResource(R.drawable.bg_shutter_selector)
         }
         lensFacingButton.text = controls.lensFacingButtonLabel
         shutterButton.isEnabled = state.modeSnapshot.state.isShutterEnabled

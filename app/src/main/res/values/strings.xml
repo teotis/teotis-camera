@@ -32,6 +32,11 @@
     <string name="button_lens_rail">设置</string>
     <string name="button_settings_close">关闭设置</string>
     <string name="button_filter_entry">色调</string>
+    <string name="button_style_entry">风格</string>
+    <string name="button_lens_lab_entry">镜头实验室</string>
+    <string name="style_panel_title">风格</string>
+    <string name="lens_lab_panel_title">镜头实验室</string>
+    <string name="button_use_this_style">使用此风格</string>
     <string name="button_filter_close">关闭色调</string>
     <string name="permission_pending">需要相机权限才能开始预览。</string>
     <string name="permission_granted">相机权限已授予，预览就绪。</string>
@@ -225,6 +230,7 @@
     <string name="button_recording_starting">启动录制中…</string>
     <string name="button_recording_stop">停止录制</string>
     <string name="button_recording_saving">保存视频中…</string>
+    <string name="button_photo_capture">拍照</string>
     <string name="gallery_open_failed">无法打开媒体文件</string>
     <string name="disabled_countdown">倒计时中，暂不能切换</string>
     <string name="disabled_saving_photo">正在保存上一张</string>

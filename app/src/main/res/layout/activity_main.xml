@@ -1424,15 +1424,19 @@
                     android:id="@+id/buttonShutter"
                     android:layout_width="@dimen/touch_target_shutter"
                     android:layout_height="@dimen/touch_target_shutter"
-                    android:background="@drawable/bg_shutter_circle"
+                    android:background="@drawable/bg_shutter_selector"
+                    android:includeFontPadding="false"
                     android:insetLeft="0dp"
                     android:insetTop="0dp"
                     android:insetRight="0dp"
                     android:insetBottom="0dp"
                     android:maxLines="1"
+                    android:ellipsize="end"
+                    android:minWidth="@dimen/touch_target_shutter"
+                    android:minHeight="@dimen/touch_target_shutter"
                     android:text=""
                     android:textAllCaps="false"
-                    android:textColor="@color/oc_surface_panel"
+                    android:textColor="@android:color/transparent"
                     android:textSize="@dimen/text_size_control_value" />
             </LinearLayout>
 

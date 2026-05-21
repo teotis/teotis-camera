@@ -17,6 +17,13 @@
     <color name="oc_warning">#FBBF24</color>
     <color name="oc_error">#F87171</color>
 
+    <!-- Shutter button states -->
+    <color name="oc_shutter_ring">#CCF8FAFC</color>
+    <color name="oc_shutter_fill_pressed">#B3F8FAFC</color>
+    <color name="oc_shutter_fill_disabled">#4DF8FAFC</color>
+    <color name="oc_shutter_ring_disabled">#33F8FAFC</color>
+    <color name="oc_shutter_recording_pressed">#CCFF3B30</color>
+
     <!-- Divider -->
     <color name="oc_divider">#2FFFFFFF</color>
 

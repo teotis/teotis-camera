@@ -32,6 +32,11 @@
     <string name="button_lens_rail">Settings</string>
     <string name="button_settings_close">Close Settings</string>
     <string name="button_filter_entry">Tone Lab</string>
+    <string name="button_style_entry">Style</string>
+    <string name="button_lens_lab_entry">Lens Lab</string>
+    <string name="style_panel_title">Style</string>
+    <string name="lens_lab_panel_title">Lens Lab</string>
+    <string name="button_use_this_style">Use Style</string>
     <string name="button_filter_close">Close Tone Lab</string>
     <string name="permission_pending">Camera permission is required before preview can start.</string>
     <string name="permission_granted">Camera permission granted. Preview is ready.</string>
@@ -223,6 +228,7 @@
     <string name="button_recording_starting">Starting…</string>
     <string name="button_recording_stop">Stop</string>
     <string name="button_recording_saving">Saving…</string>
+    <string name="button_photo_capture">Capture</string>
     <string name="gallery_open_failed">Cannot open media file</string>
     <string name="disabled_countdown">Countdown in progress</string>
     <string name="disabled_saving_photo">Saving previous photo</string>
