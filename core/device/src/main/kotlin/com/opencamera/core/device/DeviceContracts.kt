@@ -487,4 +487,8 @@ sealed interface DeviceEvent {
         val mediaType: MediaType,
         val reason: String
     ) : DeviceEvent
+    data class CaptureFeedbackSnapshotAvailable(
+        val shotId: String,
+        val outputPath: String
+    ) : DeviceEvent
 }

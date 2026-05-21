@@ -104,6 +104,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun filterLabCurrentDefault(filterLabel: String): String = "Current default $filterLabel"
     override fun filterLabSelectedDefault(): String = " | Selected default"
     override fun filterLabLightPaletteHint(): String = "Horizontal swipe for color, vertical swipe for tone."
+    override fun filterLabDragToCreateCustom(): String = "Drag palette to save as custom"
     override fun filterLabNextLook(familyLabel: String): String = "Next $familyLabel look"
     override fun filterLabLooksDeferred(count: Int): String = "$count looks | import/export deferred"
     override fun filterLabFooter(): String = "Independent Tone Lab prioritized. Panel adjustments and custom saves ongoing; import/export deferred."

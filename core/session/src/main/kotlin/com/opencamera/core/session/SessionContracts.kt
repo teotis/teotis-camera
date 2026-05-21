@@ -4,6 +4,7 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.media.CaptureFeedbackPreview
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotPlan
@@ -52,6 +53,18 @@ enum class SavedMediaType {
     VIDEO
 }
 
+enum class PreviewRatio(val tagValue: String, val label: String) {
+    FULL("full", "Full"),
+    RATIO_4_3("4:3", "4:3"),
+    RATIO_16_9("16:9", "16:9"),
+    RATIO_1_1("1:1", "1:1");
+
+    companion object {
+        fun fromTag(value: String?): PreviewRatio? =
+            entries.firstOrNull { it.tagValue == value }
+    }
+}
+
 data class PermissionState(
     val cameraGranted: Boolean = false,
     val microphoneGranted: Boolean = false
@@ -70,6 +83,7 @@ data class SessionPresentationState(
     val countdownRemainingSeconds: Int? = null,
     val previewThumbnailPath: String? = null,
     val latestThumbnailSource: ThumbnailSource? = null,
+    val pendingCaptureFeedback: CaptureFeedbackPreview? = null,
     val lastAction: String = "",
     val latestCapturePath: String? = null,
     val latestVideoPath: String? = null,
@@ -96,6 +110,7 @@ data class SessionState(
     val previewMetrics: PreviewMetrics,
     val settings: SessionSettingsSnapshot = SessionSettingsSnapshot(),
     val activeEffectSpec: EffectSpec = EffectSpec.EMPTY,
+    val previewRatio: PreviewRatio = PreviewRatio.FULL,
     val presentation: SessionPresentationState = SessionPresentationState()
 ) {
     val countdownRemainingSeconds: Int?
@@ -145,6 +160,7 @@ sealed interface SessionIntent {
     data class ApplyZoomRatio(val ratio: Float) : SessionIntent
     data object StillCaptureQualityToggled : SessionIntent
     data object StillCaptureResolutionToggled : SessionIntent
+    data object PreviewRatioToggled : SessionIntent
     data class DeviceCapabilitiesUpdated(val capabilities: DeviceCapabilities) : SessionIntent
     data class PermissionsUpdated(
         val cameraGranted: Boolean,
@@ -158,6 +174,10 @@ sealed interface SessionIntent {
     ) : SessionIntent
     data class PreviewFirstFrameAvailable(val firstFrameLatencyMillis: Long) : SessionIntent
     data class PreviewSnapshotUpdated(val source: ThumbnailSource) : SessionIntent
+    data class CaptureFeedbackSnapshotUpdated(
+        val shotId: String,
+        val outputPath: String
+    ) : SessionIntent
     data class PreviewSurfaceLost(val reason: String) : SessionIntent
     data class PreviewError(val reason: String) : SessionIntent
     data class PreviewRuntimeIssue(val issue: DeviceRuntimeIssue) : SessionIntent

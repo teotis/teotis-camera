@@ -3,6 +3,7 @@ package com.opencamera.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.media.MediaActionSound
 import android.net.Uri
 import android.os.Bundle
@@ -11,6 +12,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import com.opencamera.app.gesture.GestureAction
@@ -1220,17 +1222,18 @@ class MainActivity : AppCompatActivity() {
         if (!controls.isZoomCapsuleRowVisible) return
         zoomCapsuleRow.removeAllViews()
         controls.zoomCapsules.forEach { capsule ->
-            val button = Button(this).apply {
+            val chip = TextView(this).apply {
                 text = capsule.label
-                isAllCaps = false
                 textSize = resources.getDimension(R.dimen.text_size_zoom_chip) / resources.displayMetrics.density
                 minWidth = resources.getDimension(R.dimen.zoom_chip_min_width).toInt()
                 minHeight = resources.getDimension(R.dimen.zoom_chip_min_height).toInt()
+                gravity = Gravity.CENTER
+                typeface = Typeface.DEFAULT
                 setPadding(
-                    resources.getDimension(R.dimen.space_8).toInt(),
-                    resources.getDimension(R.dimen.space_4).toInt(),
-                    resources.getDimension(R.dimen.space_8).toInt(),
-                    resources.getDimension(R.dimen.space_4).toInt()
+                    resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
+                    resources.getDimension(R.dimen.zoom_chip_padding_v).toInt(),
+                    resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
+                    resources.getDimension(R.dimen.zoom_chip_padding_v).toInt()
                 )
                 if (capsule.isActive) {
                     setTextColor(ContextCompat.getColor(this@MainActivity, R.color.oc_text_primary))
@@ -1247,9 +1250,9 @@ class MainActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                marginStart = if (zoomCapsuleRow.childCount == 0) 0 else 6.dp
+                marginStart = if (zoomCapsuleRow.childCount == 0) 0 else 4.dp
             }
-            zoomCapsuleRow.addView(button, params)
+            zoomCapsuleRow.addView(chip, params)
         }
     }
 

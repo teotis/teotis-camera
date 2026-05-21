@@ -266,6 +266,11 @@ sealed interface ThumbnailSource {
     ) : ThumbnailSource
 }
 
+data class CaptureFeedbackPreview(
+    val shotId: String,
+    val outputPath: String
+)
+
 data class MediaOutputHandle(
     val displayPath: String,
     val filePath: String? = null,

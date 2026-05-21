@@ -96,6 +96,12 @@ class CameraSessionCoordinator(
             is DeviceEvent.PreviewSnapshotAvailable -> session.dispatch(
                 SessionIntent.PreviewSnapshotUpdated(event.source)
             )
+            is DeviceEvent.CaptureFeedbackSnapshotAvailable -> session.dispatch(
+                SessionIntent.CaptureFeedbackSnapshotUpdated(
+                    shotId = event.shotId,
+                    outputPath = event.outputPath
+                )
+            )
             is DeviceEvent.PreviewSurfaceLost -> {
                 runtimeIssueMonitor.onPreviewStopped(event.reason)
                 session.dispatch(SessionIntent.PreviewSurfaceLost(event.reason))

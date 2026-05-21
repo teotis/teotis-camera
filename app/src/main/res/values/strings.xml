@@ -31,8 +31,8 @@
     <string name="button_settings_entry">镜头实验室</string>
     <string name="button_lens_rail">镜头</string>
     <string name="button_settings_close">关闭镜头实验室</string>
-    <string name="button_filter_entry">色调实验室</string>
-    <string name="button_filter_close">关闭色调实验室</string>
+    <string name="button_filter_entry">色调</string>
+    <string name="button_filter_close">关闭色调</string>
     <string name="permission_pending">需要相机权限才能开始预览。</string>
     <string name="permission_granted">相机权限已授予，预览就绪。</string>
     <string name="permission_camera_only">相机已授权。在授予麦克风权限前，视频录制将静音。</string>
@@ -250,6 +250,7 @@
     <string name="filter_lab_current_default">当前默认 %s</string>
     <string name="filter_lab_selected_default"> | 已选默认</string>
     <string name="filter_lab_light_palette_hint">水平滑动选择颜色，垂直滑动选择色调。</string>
+    <string name="filter_lab_drag_to_create_custom">拖动调色板将保存为自定义</string>
     <string name="filter_lab_next_look">下一个 %s 风格</string>
     <string name="filter_lab_looks_deferred">%d 个风格 | 导入/导出暂缓</string>
     <string name="filter_lab_footer">独立色调实验室优先交付。面板内调节和自定义保存持续推进中，导入/导出暂缓。</string>
@@ -258,6 +259,9 @@
     <string name="filter_lab_save_custom_ready">就绪 • 将成为 %s 的默认</string>
     <string name="filter_light_palette_color">颜色</string>
     <string name="filter_light_palette_tone">色调</string>
+    <string name="filter_section_filters">滤镜</string>
+    <string name="filter_section_palette">调色板</string>
+    <string name="filter_section_advanced">进阶</string>
     <string name="filter_signed_off">关闭</string>
     <string name="filter_signed_warm">暖</string>
     <string name="filter_signed_warm_plus">暖+</string>

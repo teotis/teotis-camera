@@ -248,6 +248,7 @@
     <string name="filter_lab_current_default">Current default %s</string>
     <string name="filter_lab_selected_default"> | Selected default</string>
     <string name="filter_lab_light_palette_hint">Horizontal swipe for color, vertical swipe for tone.</string>
+    <string name="filter_lab_drag_to_create_custom">Drag palette to save as custom</string>
     <string name="filter_lab_next_look">Next %s look</string>
     <string name="filter_lab_looks_deferred">%d looks | import/export deferred</string>
     <string name="filter_lab_footer">Independent Tone Lab prioritized. Panel adjustments and custom saves ongoing; import/export deferred.</string>
@@ -256,6 +257,9 @@
     <string name="filter_lab_save_custom_ready">Ready • Becomes the %s default</string>
     <string name="filter_light_palette_color">Color</string>
     <string name="filter_light_palette_tone">Tone</string>
+    <string name="filter_section_filters">Filters</string>
+    <string name="filter_section_palette">Palette</string>
+    <string name="filter_section_advanced">Advanced</string>
     <string name="filter_signed_off">Off</string>
     <string name="filter_signed_warm">Warm</string>
     <string name="filter_signed_warm_plus">Warm+</string>

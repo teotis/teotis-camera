@@ -328,7 +328,8 @@ internal data class FilterAdjustmentPanelRenderModel(
     val renderSpec: FilterRenderSpec,
     val modeToggleLabel: String,
     val lightPalette: FilterLightPaletteRenderModel,
-    val advancedControls: List<FilterAdvancedControlRenderModel>
+    val advancedControls: List<FilterAdvancedControlRenderModel>,
+    val needsAutoPrepare: Boolean = false
 )
 
 internal data class FilterLabPageRenderModel(
@@ -1612,7 +1613,7 @@ internal fun filterLabPageRenderModel(
     state: SessionState,
     text: AppTextResolver,
     selectedFamily: FilterLabFamily = defaultFilterLabFamily(state.activeMode),
-    showAdjustmentPanel: Boolean = false,
+    showAdjustmentPanel: Boolean = true,
     adjustmentMode: FilterAdjustmentMode = FilterAdjustmentMode.LIGHT
 ): FilterLabPageRenderModel {
     val settings = state.settings.persisted
@@ -1751,7 +1752,11 @@ internal fun filterLabPageRenderModel(
             },
             lightPalette = FilterLightPaletteRenderModel(
                 summary = currentRenderSpec.lightPaletteSummary(text),
-                supportingText = text.filterLabLightPaletteHint()
+                supportingText = if (currentProfile?.builtIn == true) {
+                    text.filterLabDragToCreateCustom()
+                } else {
+                    text.filterLabLightPaletteHint()
+                }
             ),
             advancedControls = FilterAdvancedControl.entries.map { control ->
                 FilterAdvancedControlRenderModel(
@@ -1764,7 +1769,8 @@ internal fun filterLabPageRenderModel(
                         append(text.tapToCycleLabel())
                     }
                 )
-            }
+            },
+            needsAutoPrepare = currentProfile?.builtIn == true
         ),
         cycleControl = SettingsControlRenderModel(
             label = text.filterLabNextLook(family.label),
@@ -1823,7 +1829,7 @@ private fun zoomCapsuleModels(state: SessionState): List<ZoomCapsuleRenderModel>
     val currentRatio = normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
     return capability.normalizedSupportedRatios.map { ratio ->
         ZoomCapsuleRenderModel(
-            label = "${ratio}x",
+            label = compactZoomLabel(ratio),
             ratio = ratio,
             isActive = ratio == currentRatio
         )
@@ -1832,6 +1838,12 @@ private fun zoomCapsuleModels(state: SessionState): List<ZoomCapsuleRenderModel>
 
 private fun zoomRatioLabel(zoomRatio: Float): String {
     return "${normalizedZoomRatioValue(zoomRatio)}x"
+}
+
+private fun compactZoomLabel(ratio: Float): String {
+    if (ratio == 1.0f) return "1x"
+    val formatted = String.format(java.util.Locale.US, "%.1f", ratio)
+    return if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
 }
 
 private fun ZoomRatioCapability.zoomRatioSummary(): String {

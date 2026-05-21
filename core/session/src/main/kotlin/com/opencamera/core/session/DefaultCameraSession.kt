@@ -73,6 +73,7 @@ class DefaultCameraSession(
     private var sessionLensFacing = initialLensFacing
     private var sessionStillCaptureQuality = initialStillCaptureQuality
     private var sessionStillCaptureResolutionPreset = initialStillCaptureResolutionPreset
+    private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
     private var sessionSettingsSnapshot = settingsSnapshot
     private var pendingCountdownJob: Job? = null
     private var pendingCountdownStrategy: CaptureStrategy? = null
@@ -149,6 +150,7 @@ class DefaultCameraSession(
             is SessionIntent.ApplyZoomRatio -> handleApplyZoomRatio(intent.ratio)
             SessionIntent.StillCaptureQualityToggled -> handleStillCaptureQualityToggled()
             SessionIntent.StillCaptureResolutionToggled -> handleStillCaptureResolutionToggled()
+            SessionIntent.PreviewRatioToggled -> handlePreviewRatioToggled()
             is SessionIntent.DeviceCapabilitiesUpdated -> handleDeviceCapabilitiesUpdated(
                 intent.capabilities
             )
@@ -658,6 +660,33 @@ class DefaultCameraSession(
                 ?: nextPreset.tagValue
         )
         requestPreviewBinding(reason = "still resolution updated to ${nextPreset.tagValue}")
+    }
+
+    private suspend fun handlePreviewRatioToggled() {
+        if (countdownInProgress()) {
+            updateState(lastAction = "倒计时结束后才能切换预览比例")
+            trace.record("preview-ratio.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
+            return
+        }
+        val activeShot = _state.value.activeShot
+        if (activeShot != null) {
+            val reason = if (activeShot.mediaType == MediaType.VIDEO) {
+                "停止录制后才能切换预览比例"
+            } else {
+                "等待当前拍摄完成后才能切换预览比例"
+            }
+            updateState(lastAction = reason)
+            trace.record("preview-ratio.blocked", "shot=${activeShot.shotId},mediaType=${activeShot.mediaType}")
+            return
+        }
+        val nextRatio = nextPreviewRatio(sessionPreviewRatio)
+        sessionPreviewRatio = nextRatio
+        updateState(
+            previewRatio = nextRatio,
+            lastAction = "预览比例已设为 ${nextRatio.label}",
+            lastError = null
+        )
+        trace.record("preview-ratio.updated", nextRatio.tagValue)
     }
 
     private suspend fun handleModeIntent(intent: ModeIntent) {
@@ -1430,6 +1459,7 @@ class DefaultCameraSession(
         previewMetrics: PreviewMetrics = _state.value.previewMetrics,
         settings: SessionSettingsSnapshot = _state.value.settings,
         activeEffectSpec: com.opencamera.core.effect.EffectSpec = _state.value.activeEffectSpec,
+        previewRatio: PreviewRatio = _state.value.previewRatio,
         countdownRemainingSeconds: Int? = _state.value.presentation.countdownRemainingSeconds,
         previewThumbnailPath: String? = _state.value.presentation.previewThumbnailPath,
         latestThumbnailSource: ThumbnailSource? = _state.value.presentation.latestThumbnailSource,
@@ -1457,6 +1487,7 @@ class DefaultCameraSession(
             previewMetrics = previewMetrics,
             settings = settings,
             activeEffectSpec = activeEffectSpec,
+            previewRatio = previewRatio,
             presentation = _state.value.presentation.copy(
                 countdownRemainingSeconds = countdownRemainingSeconds,
                 previewThumbnailPath = previewThumbnailPath,
@@ -1662,6 +1693,12 @@ class DefaultCameraSession(
         if (currentIndex == -1) {
             return ordered.first()
         }
+        return ordered[(currentIndex + 1) % ordered.size]
+    }
+
+    private fun nextPreviewRatio(current: PreviewRatio): PreviewRatio {
+        val ordered = PreviewRatio.entries
+        val currentIndex = ordered.indexOf(current)
         return ordered[(currentIndex + 1) % ordered.size]
     }
 

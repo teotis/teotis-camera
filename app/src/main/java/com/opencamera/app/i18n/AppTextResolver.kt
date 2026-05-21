@@ -141,6 +141,10 @@ open class AppTextResolver(private val context: Context?) {
         str(R.string.filter_lab_selected_default, " | Selected default")
     open fun filterLabLightPaletteHint(): String =
         str(R.string.filter_lab_light_palette_hint, "Horizontal swipe for color, vertical swipe for tone.")
+
+    open fun filterLabDragToCreateCustom(): String =
+        str(R.string.filter_lab_drag_to_create_custom, "Drag palette to save as custom")
+
     open fun filterLabNextLook(familyLabel: String): String =
         String.format(str(R.string.filter_lab_next_look, "Next %s look"), familyLabel)
     open fun filterLabLooksDeferred(count: Int): String =

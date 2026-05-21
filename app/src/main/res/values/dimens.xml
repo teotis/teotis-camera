@@ -16,6 +16,11 @@
     <dimen name="zoom_chip_min_width">36dp</dimen>
     <dimen name="zoom_chip_min_height">26dp</dimen>
 
+    <!-- Zoom strip layout -->
+    <dimen name="zoom_strip_container_height">32dp</dimen>
+    <dimen name="zoom_chip_padding_h">8dp</dimen>
+    <dimen name="zoom_chip_padding_v">2dp</dimen>
+
     <!-- Shape radii -->
     <dimen name="radius_top_status">12dp</dimen>
     <dimen name="radius_bottom_cockpit">24dp</dimen>

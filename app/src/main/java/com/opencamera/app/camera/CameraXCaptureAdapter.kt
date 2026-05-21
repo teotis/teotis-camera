@@ -1171,6 +1171,7 @@ class CameraXCaptureAdapter(
         val capture = imageCapture ?: error("ImageCapture is not bound")
         applyStillCaptureFlashMode(capture, deviceRequest.flashMode)
         _events.emit(DeviceEvent.ShotStarted(plan.request))
+        captureCaptureFeedbackSnapshot(plan.request.shotId)
         val adapterManualDiagnostics = manualCaptureExecutionDiagnostics(
             requestedParams = deviceRequest.manualCaptureParams,
             capabilityMatrix = deviceRequest.manualControlCapabilities
@@ -2140,6 +2141,46 @@ class CameraXCaptureAdapter(
                 ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
             StillCaptureResolutionPreset.SMALL_2MP ->
                 ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
+        }
+    }
+
+    private fun captureCaptureFeedbackSnapshot(shotId: String) {
+        val previewView = boundPreviewView ?: return
+        adapterScope.launch {
+            val bitmap = awaitPreviewBitmap(previewView) ?: return@launch
+            runCatching {
+                saveCaptureFeedbackBitmap(shotId, bitmap)
+            }.onSuccess { outputPath ->
+                _events.emit(
+                    DeviceEvent.CaptureFeedbackSnapshotAvailable(
+                        shotId = shotId,
+                        outputPath = outputPath
+                    )
+                )
+            }
+            bitmap.recycle()
+        }
+    }
+
+    private suspend fun saveCaptureFeedbackBitmap(shotId: String, bitmap: Bitmap): String {
+        return withContext(Dispatchers.IO) {
+            val outputDir = File(context.cacheDir, "capture-feedback").apply {
+                mkdirs()
+            }
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+            val outputFile = File(outputDir, "feedback_${shotId}_$stamp.jpg")
+            FileOutputStream(outputFile).use { output ->
+                check(bitmap.compress(Bitmap.CompressFormat.JPEG, 85, output)) {
+                    "Capture feedback snapshot compression failed"
+                }
+            }
+            outputDir.listFiles { file ->
+                file.isFile && file.name.startsWith("feedback_") && file.name.endsWith(".jpg")
+            }
+                ?.sortedByDescending { it.lastModified() }
+                ?.drop(5)
+                ?.forEach { it.delete() }
+            outputFile.absolutePath
         }
     }
 

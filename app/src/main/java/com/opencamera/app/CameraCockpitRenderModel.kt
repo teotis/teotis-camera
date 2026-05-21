@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import com.opencamera.app.i18n.AppTextResolver
+import com.opencamera.core.session.PreviewRatio
 import com.opencamera.core.session.SessionState
 
 internal data class TopStatusRenderModel(
@@ -42,12 +43,19 @@ internal data class BottomCockpitRenderModel(
     val lensButtonEnabled: Boolean
 )
 
+internal data class PreviewRatioChipRenderModel(
+    val label: String,
+    val ratio: PreviewRatio,
+    val isActive: Boolean
+)
+
 internal data class CameraCockpitRenderModel(
     val topStatus: TopStatusRenderModel,
     val rightRail: RightRailRenderModel,
     val zoomStrip: ZoomStripRenderModel,
     val modeTrack: ModeTrackRenderModel,
     val bottomCockpit: BottomCockpitRenderModel,
+    val previewRatioChip: PreviewRatioChipRenderModel,
     val activePanelRoute: CockpitPanelRoute = CockpitPanelRoute.None
 )
 
