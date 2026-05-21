@@ -18,8 +18,11 @@ import com.opencamera.app.gesture.GestureGuardState
 import com.opencamera.app.gesture.GesturePolicy
 import com.opencamera.app.gesture.GestureRouter
 import com.opencamera.app.gesture.GestureZone
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.activity.result.contract.ActivityResultContracts
+import com.opencamera.app.i18n.AppTextResolver
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
@@ -47,7 +50,7 @@ private enum class SettingsSubpage {
     WATERMARK_DETAIL
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val container: AppContainer
         get() = (application as OpenCameraApplication).container
 
@@ -638,6 +641,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun applyLocale(settings: com.opencamera.core.settings.PersistedSettings) {
+        val language = settings.common.appLanguage
+        val localeList = LocaleListCompat.forLanguageTags(language.storageKey)
+        if (AppCompatDelegate.getApplicationLocales() != localeList) {
+            AppCompatDelegate.setApplicationLocales(localeList)
+        }
+    }
+
     private fun bindState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -648,23 +659,27 @@ class MainActivity : ComponentActivity() {
 
     private fun render(state: SessionState) {
         latestSessionState = state
-        val controls = sessionControlsRenderModel(state, sessionUiStrings())
-        val settingsPage = sessionSettingsPageRenderModel(state)
-        val portraitLabPage = portraitLabPageRenderModel(state)
-        val watermarkSelectorPage = watermarkLabSelectorRenderModel(state)
+        val text = AppTextResolver(this)
+        applyLocale(state.settings.persisted)
+        val controls = sessionControlsRenderModel(state, text.sessionUiStrings())
+        val settingsPage = sessionSettingsPageRenderModel(state, text)
+        val portraitLabPage = portraitLabPageRenderModel(state, text)
+        val watermarkSelectorPage = watermarkLabSelectorRenderModel(state, text)
         val watermarkDetailPage = watermarkLabDetailRenderModel(
             state = state,
             templateId = selectedWatermarkDetailTemplateId
-                ?: state.settings.persisted.photo.defaultWatermarkTemplateId
+                ?: state.settings.persisted.photo.defaultWatermarkTemplateId,
+            text = text
         )
         val filterLabPage = filterLabPageRenderModel(
             state = state,
+            text = text,
             selectedFamily = selectedFilterLabFamily(state),
             showAdjustmentPanel = isFilterAdjustmentVisible,
             adjustmentMode = filterAdjustmentMode
         )
-        val modeTrack = modeTrackRenderModel(state)
-        val primaryStatus = primaryStatusRenderModel(state)
+        val modeTrack = modeTrackRenderModel(state, text)
+        val primaryStatus = primaryStatusRenderModel(state, text)
         latestSettingsPageRenderModel = settingsPage
         latestPortraitLabRenderModel = portraitLabPage
         latestWatermarkLabSelectorRenderModel = watermarkSelectorPage
@@ -1299,8 +1314,10 @@ class MainActivity : ComponentActivity() {
 
     private fun renderLatestFilterLab() {
         val state = latestSessionState ?: return
+        val text = AppTextResolver(this)
         val model = filterLabPageRenderModel(
             state = state,
+            text = text,
             selectedFamily = selectedFilterLabFamily(state),
             showAdjustmentPanel = isFilterAdjustmentVisible,
             adjustmentMode = filterAdjustmentMode
@@ -1311,13 +1328,15 @@ class MainActivity : ComponentActivity() {
 
     private fun renderLatestSettingsSurfaces() {
         val state = latestSessionState ?: return
-        val settingsModel = sessionSettingsPageRenderModel(state)
-        val portraitLabModel = portraitLabPageRenderModel(state)
-        val selectorModel = watermarkLabSelectorRenderModel(state)
+        val text = AppTextResolver(this)
+        val settingsModel = sessionSettingsPageRenderModel(state, text)
+        val portraitLabModel = portraitLabPageRenderModel(state, text)
+        val selectorModel = watermarkLabSelectorRenderModel(state, text)
         val detailModel = watermarkLabDetailRenderModel(
             state = state,
             templateId = selectedWatermarkDetailTemplateId
-                ?: state.settings.persisted.photo.defaultWatermarkTemplateId
+                ?: state.settings.persisted.photo.defaultWatermarkTemplateId,
+            text = text
         )
         latestSettingsPageRenderModel = settingsModel
         latestPortraitLabRenderModel = portraitLabModel

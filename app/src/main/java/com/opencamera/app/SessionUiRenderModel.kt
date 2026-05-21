@@ -46,6 +46,7 @@ import com.opencamera.core.settings.WatermarkTextScale
 import com.opencamera.core.settings.watermarkStyleFor
 import com.opencamera.core.settings.VideoResolution
 import java.util.Locale
+import com.opencamera.app.i18n.AppTextResolver
 
 internal data class SessionUiStrings(
     val buttonSwitchToFront: String,
@@ -425,9 +426,9 @@ internal fun previewOverlayRenderModel(
     )
 }
 
-internal fun sessionSummaryText(state: SessionState): String {
+internal fun sessionSummaryText(state: SessionState, text: AppTextResolver): String {
     val presentation = state.presentation
-    val settingsRenderModel = sessionSettingsRenderModel(state)
+    val settingsRenderModel = sessionSettingsRenderModel(state, text)
     return buildString {
         appendLine("Lifecycle: ${state.lifecycle}")
         appendLine(
@@ -497,7 +498,8 @@ internal fun modeSummaryText(state: SessionState): String {
 }
 
 internal fun modeDirectoryRenderModel(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): ModeDirectoryRenderModel {
     return ModeDirectoryRenderModel(
         items = state.availableModes.map { modeId ->
@@ -518,7 +520,8 @@ internal fun modeDirectoryRenderModel(
 }
 
 internal fun modeTrackRenderModel(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): ModeTrackRenderModel {
     return ModeTrackRenderModel(
         items = state.availableModes.map { modeId ->
@@ -537,7 +540,8 @@ internal fun modeTrackRenderModel(
 }
 
 internal fun primaryStatusRenderModel(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): PrimaryStatusRenderModel {
     val modeLabel = state.modeSnapshot.uiSpec.title
     val statusText = buildString {
@@ -560,9 +564,10 @@ internal fun primaryStatusRenderModel(
 }
 
 internal fun modeDirectoryText(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): String {
-    return modeDirectoryRenderModel(state).items.joinToString(separator = "\n") { item ->
+    return modeDirectoryRenderModel(state, text).items.joinToString(separator = "\n") { item ->
         val marker = if (item.isActive) "•" else "·"
         "$marker ${item.displayName} | Default ${item.defaultStyleLabel} | ${item.declaredSubfeatures}"
     }
@@ -689,7 +694,8 @@ private fun StringBuilder.appendLiveAssetLine(
 }
 
 internal fun sessionSettingsRenderModel(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): SessionSettingsRenderModel {
     val settings = state.settings.persisted
     val catalog = state.settings.catalog
@@ -751,11 +757,12 @@ internal fun sessionSettingsRenderModel(
 }
 
 internal fun sessionSettingsPageRenderModel(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): SessionSettingsPageRenderModel {
     val settings = state.settings.persisted
     val catalog = state.settings.catalog
-    val renderModel = sessionSettingsRenderModel(state)
+    val renderModel = sessionSettingsRenderModel(state, text)
     val editingEnabled = state.activeShot == null && state.countdownRemainingSeconds == null
     val photoFilters = catalog.photoSettingsFilterProfiles()
     val videoFilters = catalog.videoSettingsFilterProfiles()
@@ -1073,7 +1080,8 @@ internal fun sessionSettingsPageRenderModel(
 }
 
 internal fun runtimeProControlsRenderModel(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): RuntimeProControlsRenderModel {
     val isEditableMode = state.activeMode in setOf(
         ModeId.NIGHT,
@@ -1253,7 +1261,8 @@ private fun manualSupportSummary(
 }
 
 internal fun portraitLabPageRenderModel(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): PortraitLabPageRenderModel {
     val settings = state.settings.persisted
     val editingEnabled = state.activeShot == null && state.countdownRemainingSeconds == null
@@ -1363,7 +1372,8 @@ internal fun portraitLabPageRenderModel(
 }
 
 internal fun watermarkLabSelectorRenderModel(
-    state: SessionState
+    state: SessionState,
+    text: AppTextResolver
 ): WatermarkLabSelectorRenderModel {
     val settings = state.settings.persisted
     val catalog = state.settings.catalog
@@ -1445,7 +1455,8 @@ internal fun watermarkLabSelectorRenderModel(
 
 internal fun watermarkLabDetailRenderModel(
     state: SessionState,
-    templateId: String
+    templateId: String,
+    text: AppTextResolver
 ): WatermarkLabDetailRenderModel {
     val settings = state.settings.persisted
     val catalog = state.settings.catalog
@@ -1583,6 +1594,7 @@ internal fun watermarkLabDetailRenderModel(
 
 internal fun filterLabPageRenderModel(
     state: SessionState,
+    text: AppTextResolver,
     selectedFamily: FilterLabFamily = defaultFilterLabFamily(state.activeMode),
     showAdjustmentPanel: Boolean = false,
     adjustmentMode: FilterAdjustmentMode = FilterAdjustmentMode.LIGHT
