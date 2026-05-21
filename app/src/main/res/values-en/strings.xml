@@ -29,6 +29,7 @@
     <string name="button_single_lens">Single Lens</string>
     <string name="button_stop_session">Stop Session</string>
     <string name="button_settings_entry">Lens Lab</string>
+    <string name="button_lens_rail">Lens</string>
     <string name="button_settings_close">Close Lens Lab</string>
     <string name="button_filter_entry">Tone Lab</string>
     <string name="button_filter_close">Close Tone Lab</string>

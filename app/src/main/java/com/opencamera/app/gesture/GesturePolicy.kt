@@ -20,7 +20,7 @@ class GesturePolicy {
         lastPinchTimestamp = 0L
     }
 
-    fun map(event: GestureEvent, @Suppress("UNUSED_PARAMETER") activeMode: ModeId): GestureAction {
+    fun map(event: GestureEvent, @Suppress("UNUSED_PARAMETER") activeMode: ModeId, currentZoomRatio: Float = 1.0f): GestureAction {
         return when (event) {
             is GestureEvent.Tap -> GestureAction.FocusAt(event.x, event.y)
             is GestureEvent.DoubleTap -> GestureAction.DispatchSession(SessionIntent.LensFacingToggled)
@@ -29,7 +29,7 @@ class GesturePolicy {
                 val now = System.currentTimeMillis()
                 if (now - lastPinchTimestamp > 50) {
                     lastPinchTimestamp = now
-                    val targetRatio = cumulativeScaleFactor.coerceIn(0.5f, 10.0f)
+                    val targetRatio = (currentZoomRatio * cumulativeScaleFactor).coerceIn(0.5f, 10.0f)
                     GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(targetRatio))
                 } else {
                     GestureAction.Ignore

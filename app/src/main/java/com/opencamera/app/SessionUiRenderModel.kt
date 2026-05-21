@@ -1283,7 +1283,7 @@ internal fun portraitLabPageRenderModel(
     }
     return PortraitLabPageRenderModel(
         headline = text.portraitLab(),
-        supportingText = "Portrait product tuning lives one level below Lens Lab. Use this page to shape the saved portrait profile, beauty behavior, and bokeh feel without changing the active portrait filter roster.",
+        supportingText = "人像产品调节位于镜头实验室下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。",
         heroSummary = buildString {
             append(settings.photo.portraitProfile.label)
             append(" • Beauty ")
@@ -1395,7 +1395,7 @@ internal fun watermarkLabSelectorRenderModel(
     val selectedTemplate = catalog.watermarkTemplateOrNull(settings.photo.defaultWatermarkTemplateId)
     return WatermarkLabSelectorRenderModel(
         headline = text.watermarkLab(),
-        supportingText = "Watermark selection lives one level below Lens Lab. Choose the active template here, then open the template-specific style page inside this lab.",
+        supportingText = "水印选择位于镜头实验室下一级。在此选择活跃模板，然后进入模板专属样式页面进行编辑。",
         heroSummary = buildString {
             append("Default ")
             append(selectedTemplate?.label ?: settings.photo.defaultWatermarkTemplateId)
@@ -1488,9 +1488,9 @@ internal fun watermarkLabDetailRenderModel(
     return WatermarkLabDetailRenderModel(
         headline = template.label,
         supportingText = if (template.id == settings.photo.defaultWatermarkTemplateId) {
-            "This is the active watermark default. Changes here will affect the next static photo rendered with this template."
+            "这是当前活跃的默认水印。此处更改将影响使用此模板渲染的下一张静态照片。"
         } else {
-            "This template is not the current default yet. Tune it here first, then switch to it from the selector page when you're ready."
+            "此模板尚不是当前默认。请先在此调整，准备就绪后从选择器页面切换。"
         },
         heroSummary = buildString {
             append("Placement ")
@@ -1790,9 +1790,9 @@ internal fun filterLabPageRenderModel(
                 append('\n')
                 append(
                     when {
-                        currentProfile == null -> "Unavailable • Missing source profile"
-                        !currentProfile.builtIn -> "Unavailable • Current default already custom"
-                else -> "Ready • Becomes the default for ${family.label}"
+                        currentProfile == null -> "不可用 • 缺少源配置"
+                        !currentProfile.builtIn -> "不可用 • 当前默认已是自定义"
+                else -> "就绪 • 将成为 ${family.label} 的默认"
                     }
                 )
             },
@@ -1800,7 +1800,7 @@ internal fun filterLabPageRenderModel(
             sourceProfileId = currentProfile?.id,
             isEnabled = currentProfile?.builtIn == true
         ),
-        footer = "Strategy locked for current 6B-2 work: ship an independent Tone Lab first. Import/export remain deferred while in-panel adjustment and custom save move forward."
+        footer = "独立色调实验室优先交付。面板内调节和自定义保存持续推进中，导入/导出暂缓。"
     )
 }
 

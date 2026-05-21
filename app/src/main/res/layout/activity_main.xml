@@ -141,7 +141,8 @@
             android:layout_width="@dimen/touch_target_min"
             android:layout_height="@dimen/touch_target_min"
             android:layout_marginTop="@dimen/right_rail_gap"
-            android:text="@string/button_settings_entry" />
+            android:contentDescription="@string/button_settings_entry"
+            android:text="@string/button_lens_rail" />
 
         <Button
             android:id="@+id/buttonDevEntry"

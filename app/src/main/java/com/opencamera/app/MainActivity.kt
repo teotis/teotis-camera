@@ -465,6 +465,7 @@ class MainActivity : AppCompatActivity() {
                 CockpitPanelRoute.DevConsole
             }
             renderDevConsoleVisibility()
+            renderPanelVisibility()
         }
         buttonQuickLauncher.setOnClickListener {
             activePanelRoute = if (activePanelRoute is CockpitPanelRoute.QuickBubble) {
@@ -478,10 +479,10 @@ class MainActivity : AppCompatActivity() {
             applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.gridMode)
         }
         buttonQuickFlash.setOnClickListener {
-            applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.gridMode)
+            dispatch(SessionIntent.StillCaptureQualityToggled)
         }
         buttonQuickRatio.setOnClickListener {
-            applySettingsControlAction(latestSettingsPageRenderModel?.videoSection?.resolution)
+            dispatch(SessionIntent.StillCaptureResolutionToggled)
         }
         buttonQuickLivePhoto.setOnClickListener {
             applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.livePhoto)
@@ -517,6 +518,7 @@ class MainActivity : AppCompatActivity() {
         buttonDevClose.setOnClickListener {
             activePanelRoute = CockpitPanelRoute.None
             renderDevConsoleVisibility()
+            renderPanelVisibility()
         }
         bindModeTrackTouch()
         shutterButton.setOnClickListener {
@@ -691,7 +693,8 @@ class MainActivity : AppCompatActivity() {
                 return@GestureRouter
             }
             val activeMode = latestSessionState?.activeMode ?: return@GestureRouter
-            when (val action = gesturePolicy.map(event, activeMode)) {
+            val currentZoom = latestSessionState?.activeDeviceGraph?.preview?.zoomRatio ?: 1.0f
+            when (val action = gesturePolicy.map(event, activeMode, currentZoom)) {
                 is GestureAction.DispatchSession -> dispatch(action.intent)
                 is GestureAction.FocusAt -> {
                     // TODO: focus/metering tap-to-focus integration

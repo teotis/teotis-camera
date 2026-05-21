@@ -29,6 +29,7 @@
     <string name="button_single_lens">单镜头</string>
     <string name="button_stop_session">停止会话</string>
     <string name="button_settings_entry">镜头实验室</string>
+    <string name="button_lens_rail">镜头</string>
     <string name="button_settings_close">关闭镜头实验室</string>
     <string name="button_filter_entry">色调实验室</string>
     <string name="button_filter_close">关闭色调实验室</string>
