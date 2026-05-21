@@ -1111,7 +1111,9 @@ class DefaultCameraSession(
             trace.record("capture.feedback.snapshot.skipped", "shotId=$shotId,active=${activeShot?.shotId}")
             return
         }
-        if (captureFeedbackPolicyFor(activeShot) == CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA) {
+        val policy = captureFeedbackPolicyFor(activeShot)
+        trace.record("capture.feedback.policy", "shotId=$shotId,policy=$policy,wt=${activeShot.saveRequest.metadata.watermarkText},tpl=${activeShot.saveRequest.metadata.customTags["watermarkTemplate"]}")
+        if (policy == CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA) {
             trace.record("capture.feedback.snapshot.suppressed", "shotId=$shotId,reason=watermark-final-output")
             return
         }
