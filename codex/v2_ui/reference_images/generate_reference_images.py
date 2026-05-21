@@ -97,28 +97,28 @@ def phone_base() -> Image.Image:
 
 
 def top_status(draw, mode="拍照", status="预览就绪", recording=False):
-    rounded(draw, (36, 58, 1044, 176), 28, (0, 0, 0, 72))
-    text(draw, (70, 88), "OpenCamera", f=F["brand"])
-    text(draw, (294, 88), "·", f=F["title"])
-    text(draw, (326, 88), mode, f=F["title"])
+    rounded(draw, (36, 58, 1044, 250), 28, (0, 0, 0, 72))
+    text(draw, (70, 100), "OpenCamera", f=F["brand"])
+    text(draw, (294, 100), "·", f=F["title"])
+    text(draw, (326, 100), mode, f=F["title"])
     if recording:
-        draw.ellipse((70, 139, 90, 159), fill=COLORS["record"])
-        text(draw, (104, 130), status, fill=COLORS["secondary"], f=F["status"])
+        draw.ellipse((70, 155, 90, 175), fill=COLORS["record"])
+        text(draw, (104, 148), status, fill=COLORS["secondary"], f=F["status"])
     else:
-        text(draw, (70, 130), status, fill=COLORS["secondary"], f=F["status"])
-    rounded(draw, (790, 82, 1010, 148), 22, (12, 18, 22, 150), outline=COLORS["line"], width=2)
-    text(draw, (900, 114), "镜头实验室", f=F["small"], anchor="mm")
+        text(draw, (70, 148), status, fill=COLORS["secondary"], f=F["status"])
+    rounded(draw, (780, 90, 1010, 162), 22, (12, 18, 22, 150), outline=COLORS["line"], width=2)
+    text(draw, (895, 126), "镜头实验室", f=F["small"], anchor="mm")
 
 
 def right_rail(draw, dev=True, active=None):
     labels = ["色调", "快捷"] + (["开发"] if dev else [])
-    top = 540
+    top = 620
     for idx, label in enumerate(labels):
-        y = top + idx * 112
+        y = top + idx * 124
         fill = (0, 0, 0, 116)
         outline = COLORS["accent"] if active == label else COLORS["line"]
-        rounded(draw, (942, y, 1030, y + 82), 22, fill, outline=outline, width=2)
-        text(draw, (986, y + 42), label, f=F["small"], anchor="mm")
+        rounded(draw, (928, y, 1030, y + 106), 22, fill, outline=outline, width=2)
+        text(draw, (979, y + 53), label, f=F["small"], anchor="mm")
 
 
 def zoom_strip(draw, selected="1x"):
@@ -141,7 +141,8 @@ def mode_track(draw, active="拍照"):
     for i, label in enumerate(labels):
         x = x0 + i * 132
         if label == active:
-            rounded(draw, (x - 18, y - 12, x + 90, y + 48), 22, (85, 214, 190, 48), outline=COLORS["accent"], width=2)
+            # accent underline instead of filled chip
+            draw.line((x + 4, y + 48, x + 100, y + 48), fill=COLORS["accent"], width=6)
             fill = COLORS["text"]
         else:
             fill = COLORS["secondary"]
@@ -152,21 +153,23 @@ def bottom_cockpit(draw, recording=False):
     rounded(draw, (30, 1510, 1050, 1878), 42, (0, 0, 0, 142), outline=(255, 255, 255, 34), width=1)
     status = "录制中 00:12" if recording else "上次保存  IMG_160053.jpg"
     text(draw, (70, 1548), status, fill=COLORS["secondary"], f=F["status"])
-    rounded(draw, (72, 1618, 208, 1754), 22, (240, 248, 255, 32), outline=COLORS["line"], width=2)
-    rounded(draw, (88, 1634, 192, 1738), 18, (72, 120, 112, 210))
-    draw.line((92, 1718, 188, 1645), fill=(255, 255, 255, 54), width=4)
-    cx, cy = 540, 1690
-    draw.ellipse((cx - 84, cy - 84, cx + 84, cy + 84), fill=(255, 255, 255, 230))
+    # Thumbnail: ~56dp target
+    rounded(draw, (72, 1600, 238, 1766), 22, (240, 248, 255, 32), outline=COLORS["line"], width=2)
+    rounded(draw, (88, 1616, 222, 1750), 18, (72, 120, 112, 210))
+    draw.line((92, 1730, 222, 1645), fill=(255, 255, 255, 54), width=4)
+    cx, cy = 540, 1686
+    # Shutter: ~72dp target
+    draw.ellipse((cx - 104, cy - 104, cx + 104, cy + 104), fill=(255, 255, 255, 230))
     if recording:
-        draw.ellipse((cx - 68, cy - 68, cx + 68, cy + 68), fill=(255, 59, 48, 255))
-        rounded(draw, (cx - 28, cy - 28, cx + 28, cy + 28), 10, (255, 255, 255, 245))
-        text(draw, (cx, cy + 112), "停止", f=F["small"], anchor="mm")
+        draw.ellipse((cx - 84, cy - 84, cx + 84, cy + 84), fill=(255, 59, 48, 255))
+        rounded(draw, (cx - 34, cy - 34, cx + 34, cy + 34), 12, (255, 255, 255, 245))
+        text(draw, (cx, cy + 118), "停止", f=F["small"], anchor="mm")
     else:
-        draw.ellipse((cx - 65, cy - 65, cx + 65, cy + 65), outline=(15, 23, 25, 255), width=5)
-        text(draw, (cx, cy + 112), "快门", f=F["small"], anchor="mm")
-    rounded(draw, (858, 1622, 1002, 1748), 28, (0, 0, 0, 110), outline=COLORS["line"], width=2)
-    text(draw, (930, 1660), "镜头", f=F["small"], anchor="mm")
-    text(draw, (930, 1702), "切换", fill=COLORS["secondary"], f=F["tiny"], anchor="mm")
+        draw.ellipse((cx - 82, cy - 82, cx + 82, cy + 82), outline=(15, 23, 25, 255), width=5)
+        text(draw, (cx, cy + 118), "快门", f=F["small"], anchor="mm")
+    rounded(draw, (840, 1610, 1002, 1750), 28, (0, 0, 0, 110), outline=COLORS["line"], width=2)
+    text(draw, (921, 1652), "镜头", f=F["small"], anchor="mm")
+    text(draw, (921, 1698), "切换", fill=COLORS["secondary"], f=F["tiny"], anchor="mm")
 
 
 def draw_main(filename, mode="拍照", active_mode="拍照", status="预览就绪", selected_zoom="1x", recording=False):
