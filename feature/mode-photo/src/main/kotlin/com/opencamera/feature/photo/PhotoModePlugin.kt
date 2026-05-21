@@ -112,6 +112,7 @@ private class PhotoModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Photo mode active"
         )
+        context.onEffectSpecChanged(buildEffectSpec(currentFlashMode()))
     }
 
     override suspend fun onExit() {
@@ -258,6 +259,7 @@ private class PhotoModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Flash mode updated"
         )
+        context.onEffectSpecChanged(buildEffectSpec(flashMode))
         return ModeSignal.ShowHint("Flash: ${flashMode.label}")
     }
 
@@ -337,6 +339,7 @@ private class PhotoModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Frame ratio updated"
         )
+        context.onEffectSpecChanged(buildEffectSpec(currentFlashMode()))
         return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
     }
 

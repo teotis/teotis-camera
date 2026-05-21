@@ -117,6 +117,7 @@ private class NightModeController(
                 "Scenery brightening active"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
     }
 
     override suspend fun onExit() {
@@ -411,6 +412,7 @@ private class NightModeController(
                 "Scenery assist frame updated"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
         return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
     }
 

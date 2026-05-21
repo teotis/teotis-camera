@@ -108,6 +108,7 @@ private class DocumentModeController(
                 "Document archive active"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
     }
 
     override suspend fun onExit() {
@@ -231,6 +232,7 @@ private class DocumentModeController(
                 "Archive style updated"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
         return ModeSignal.ShowHint("Scan style: ${profile.label}")
     }
 

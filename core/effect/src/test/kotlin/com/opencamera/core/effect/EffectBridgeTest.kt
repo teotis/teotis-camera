@@ -139,7 +139,7 @@ class EffectBridgeTest {
         val result = EffectBridge.toPostProcessSpec(spec)
 
         assertEquals("vivid", result.algorithmProfile)
-        assertNull(result.watermarkText)
+        assertEquals("Photo Title", result.watermarkText)
     }
 
     @Test

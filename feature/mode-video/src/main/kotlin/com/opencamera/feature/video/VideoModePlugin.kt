@@ -98,6 +98,7 @@ private class VideoModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Video mode active"
         )
+        context.onEffectSpecChanged(buildEffectSpec())
     }
 
     override suspend fun onExit() {

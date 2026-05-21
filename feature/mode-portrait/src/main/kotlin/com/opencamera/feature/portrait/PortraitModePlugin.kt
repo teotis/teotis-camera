@@ -127,6 +127,7 @@ private class PortraitModeController(
                 "Portrait focus active"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
     }
 
     override suspend fun onExit() {
@@ -328,6 +329,7 @@ private class PortraitModeController(
                 "Portrait focus style updated"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
         return ModeSignal.ShowHint("Portrait style: ${style.label}")
     }
 
@@ -515,6 +517,7 @@ private class PortraitModeController(
                 "Focus frame updated"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
         return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
     }
 

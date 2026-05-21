@@ -3,6 +3,7 @@ package com.opencamera.core.mode
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.FrameRatio
@@ -78,6 +79,7 @@ data class ModeContext(
         )
     },
     val eventSink: suspend (String) -> Unit = {},
+    val onEffectSpecChanged: suspend (EffectSpec) -> Unit = {},
     private val settingsSnapshotProvider: () -> SessionSettingsSnapshot = { SessionSettingsSnapshot() }
 ) {
     val settingsSnapshot: SessionSettingsSnapshot get() = settingsSnapshotProvider()

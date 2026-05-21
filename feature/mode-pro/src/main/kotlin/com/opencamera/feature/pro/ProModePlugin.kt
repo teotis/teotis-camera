@@ -122,6 +122,7 @@ private class ProModeController(
                 "Pro assist active"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
     }
 
     override suspend fun onExit() {
@@ -326,6 +327,7 @@ private class ProModeController(
                 "Assist frame ratio updated"
             }
         )
+        context.onEffectSpecChanged(buildEffectSpec())
         return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
     }
 

@@ -49,7 +49,8 @@ class DefaultCameraSession(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val defaultMode: ModeId = ModeId.PHOTO,
     private val settingsSnapshot: SessionSettingsSnapshot = SessionSettingsSnapshot(),
-    private val shotExecutor: ShotExecutor = ShotExecutor()
+    private val shotExecutor: ShotExecutor = ShotExecutor(),
+    private val effectCapabilityResolver: com.opencamera.core.effect.EffectCapabilityResolver? = null
 ) : CameraSession {
     private val intentChannel = Channel<SessionIntent>(Channel.UNLIMITED)
     private val supportedModes = registry.supportedModes(baseDeviceCapabilities)
@@ -1315,6 +1316,7 @@ class DefaultCameraSession(
         activeDeviceGraph: DeviceGraphSpec = _state.value.activeDeviceGraph,
         previewMetrics: PreviewMetrics = _state.value.previewMetrics,
         settings: SessionSettingsSnapshot = _state.value.settings,
+        activeEffectSpec: com.opencamera.core.effect.EffectSpec = _state.value.activeEffectSpec,
         countdownRemainingSeconds: Int? = _state.value.presentation.countdownRemainingSeconds,
         previewThumbnailPath: String? = _state.value.presentation.previewThumbnailPath,
         latestThumbnailSource: ThumbnailSource? = _state.value.presentation.latestThumbnailSource,
@@ -1341,6 +1343,7 @@ class DefaultCameraSession(
             activeDeviceGraph = activeDeviceGraph,
             previewMetrics = previewMetrics,
             settings = settings,
+            activeEffectSpec = activeEffectSpec,
             presentation = _state.value.presentation.copy(
                 countdownRemainingSeconds = countdownRemainingSeconds,
                 previewThumbnailPath = previewThumbnailPath,
@@ -1512,6 +1515,15 @@ class DefaultCameraSession(
                 },
                 eventSink = { detail ->
                     trace.record("mode.event", detail)
+                },
+                onEffectSpecChanged = { spec ->
+                    val resolver = effectCapabilityResolver
+                    if (resolver != null) {
+                        val report = resolver.resolve(spec)
+                        updateState(activeEffectSpec = report.effectiveSpec)
+                    } else {
+                        updateState(activeEffectSpec = spec)
+                    }
                 },
                 settingsSnapshotProvider = { sessionSettingsSnapshot }
             )

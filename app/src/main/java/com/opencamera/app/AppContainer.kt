@@ -112,7 +112,8 @@ class AppContainer(
         baseDeviceCapabilities = cameraAdapter.capabilities,
         scope = applicationScope,
         settingsSnapshot = initialSettingsSnapshot,
-        shotExecutor = shotExecutor
+        shotExecutor = shotExecutor,
+        effectCapabilityResolver = effectCapabilityResolver
     )
 
     val sessionSettingsManager = SessionSettingsManager(

@@ -108,6 +108,7 @@ private class HumanisticModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Humanistic mode active"
         )
+        context.onEffectSpecChanged(buildEffectSpec())
     }
 
     override suspend fun onExit() {
@@ -278,6 +279,7 @@ private class HumanisticModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Humanistic style updated"
         )
+        context.onEffectSpecChanged(buildEffectSpec())
         return ModeSignal.ShowHint("Humanistic style: ${style.label}")
     }
 
@@ -315,6 +317,7 @@ private class HumanisticModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = "Humanistic frame updated"
         )
+        context.onEffectSpecChanged(buildEffectSpec())
         return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
     }
 
