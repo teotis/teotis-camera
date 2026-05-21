@@ -1154,8 +1154,7 @@ val DEFAULT_FILTER_PROFILES: List<FilterProfile> = listOf(
         category = FilterProfileCategory.PHOTO,
         renderSpec = renderSpec(
             contrast = 1.08f,
-            saturation = 1.14f,
-            warmthShift = 2
+            saturation = 1.14f
         )
     ),
     builtInFilterProfile(
