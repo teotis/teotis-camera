@@ -238,4 +238,35 @@ class PersistedSettingsSerializerTest {
         assertEquals("large", store.snapshot()["photo.watermark.retroFrame.scale"])
         assertEquals("720p", store.snapshot()["video.defaultVideoResolution"])
     }
+
+    @Test
+    fun `persisted settings reducer updates color lab spec`() {
+        val spec = ColorLabSpec(colorAxis = 0.5f, toneAxis = -0.25f, strength = 0.8f)
+
+        val settings = PersistedSettings().reduce(
+            PersistedSettingsAction.UpdateColorLabSpec(spec)
+        )
+
+        assertEquals(spec.normalized(), settings.photo.colorLabSpec)
+    }
+
+    @Test
+    fun `serializer round trips color lab spec`() {
+        val settings = PersistedSettings(
+            photo = PhotoSettings(
+                colorLabSpec = ColorLabSpec(
+                    colorAxis = -0.75f,
+                    toneAxis = 0.5f,
+                    strength = 0.6f,
+                    presetId = "cool-air"
+                )
+            )
+        )
+
+        val decoded = PersistedSettingsSerializer.fromMap(
+            PersistedSettingsSerializer.toMap(settings)
+        )
+
+        assertEquals(settings.photo.colorLabSpec, decoded.photo.colorLabSpec)
+    }
 }

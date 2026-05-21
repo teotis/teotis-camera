@@ -31,6 +31,10 @@ object PersistedSettingsSerializer {
     private const val KEY_VIDEO_FRAME_RATE = "video.defaultVideoFrameRate"
     private const val KEY_VIDEO_DYNAMIC_FPS_POLICY = "video.defaultVideoDynamicFpsPolicy"
     private const val KEY_VIDEO_AUDIO_PROFILE = "video.defaultVideoAudioProfile"
+    private const val KEY_COLOR_LAB_COLOR_AXIS = "photo.colorLab.colorAxis"
+    private const val KEY_COLOR_LAB_TONE_AXIS = "photo.colorLab.toneAxis"
+    private const val KEY_COLOR_LAB_STRENGTH = "photo.colorLab.strength"
+    private const val KEY_COLOR_LAB_PRESET_ID = "photo.colorLab.presetId"
 
     fun toMap(settings: PersistedSettings): Map<String, String> {
         return linkedMapOf(
@@ -63,7 +67,11 @@ object PersistedSettingsSerializer {
             KEY_VIDEO_RESOLUTION to settings.video.defaultVideoSpec.resolution.storageKey,
             KEY_VIDEO_FRAME_RATE to settings.video.defaultVideoSpec.frameRate.storageKey,
             KEY_VIDEO_DYNAMIC_FPS_POLICY to settings.video.defaultVideoSpec.dynamicFpsPolicy.storageKey,
-            KEY_VIDEO_AUDIO_PROFILE to settings.video.defaultVideoSpec.audioProfile.storageKey
+            KEY_VIDEO_AUDIO_PROFILE to settings.video.defaultVideoSpec.audioProfile.storageKey,
+            KEY_COLOR_LAB_COLOR_AXIS to settings.photo.colorLabSpec.colorAxis.toString(),
+            KEY_COLOR_LAB_TONE_AXIS to settings.photo.colorLabSpec.toneAxis.toString(),
+            KEY_COLOR_LAB_STRENGTH to settings.photo.colorLabSpec.strength.toString(),
+            KEY_COLOR_LAB_PRESET_ID to (settings.photo.colorLabSpec.presetId ?: "")
         )
     }
 
@@ -156,7 +164,13 @@ object PersistedSettingsSerializer {
                     defaults.photo.livePhotoEnabledByDefault
                 ),
                 countdownDuration = CountdownDuration.fromStorageKey(values[KEY_PHOTO_COUNTDOWN])
-                    ?: defaults.photo.countdownDuration
+                    ?: defaults.photo.countdownDuration,
+                colorLabSpec = ColorLabSpec(
+                    colorAxis = values[KEY_COLOR_LAB_COLOR_AXIS]?.toFloatOrNull() ?: 0f,
+                    toneAxis = values[KEY_COLOR_LAB_TONE_AXIS]?.toFloatOrNull() ?: 0f,
+                    strength = values[KEY_COLOR_LAB_STRENGTH]?.toFloatOrNull() ?: 1f,
+                    presetId = values[KEY_COLOR_LAB_PRESET_ID]?.takeIf { it.isNotBlank() }
+                ).normalized()
             ),
             video = VideoSettings(
                 defaultVideoSpec = VideoSpec(

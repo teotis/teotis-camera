@@ -587,7 +587,8 @@ data class PhotoSettings(
         frameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR
     ),
     val livePhotoEnabledByDefault: Boolean = false,
-    val countdownDuration: CountdownDuration = CountdownDuration.OFF
+    val countdownDuration: CountdownDuration = CountdownDuration.OFF,
+    val colorLabSpec: ColorLabSpec = ColorLabSpec()
 )
 
 data class VideoSettings(
@@ -968,6 +969,7 @@ sealed interface PersistedSettingsAction {
         PersistedSettingsAction
     data class UpdateDefaultVideoSpec(val videoSpec: VideoSpec) : PersistedSettingsAction
     data class UpdateVideoFilter(val filterProfileId: String) : PersistedSettingsAction
+    data class UpdateColorLabSpec(val spec: ColorLabSpec) : PersistedSettingsAction
 }
 
 fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings {
@@ -1057,6 +1059,10 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
 
         is PersistedSettingsAction.UpdateVideoFilter -> copy(
             video = video.copy(defaultFilterProfileId = action.filterProfileId)
+        )
+
+        is PersistedSettingsAction.UpdateColorLabSpec -> copy(
+            photo = photo.copy(colorLabSpec = action.spec.normalized())
         )
     }
 }
