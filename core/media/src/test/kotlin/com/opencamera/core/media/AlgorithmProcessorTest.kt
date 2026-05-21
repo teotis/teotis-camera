@@ -66,8 +66,9 @@ class AlgorithmProcessorTest {
         val result = processor.process(request)
 
         assertTrue(result is AlgorithmResult.Applied)
-        assertEquals(expectedOutput, (result as AlgorithmResult.Applied).output)
-        assertEquals(expectedNotes, result.notes)
+        val applied = result as AlgorithmResult.Applied
+        assertEquals(expectedOutput, applied.output)
+        assertEquals(expectedNotes, applied.notes)
         assertEquals(1, processor.invocations.size)
         assertEquals(request, processor.invocations.first())
     }
