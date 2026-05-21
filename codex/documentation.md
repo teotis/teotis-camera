@@ -76,10 +76,23 @@
 - 现有第 `6` 阶段功能闭环无需继续扩写；后续若回到 feature 侧，应单独获得新的阶段授权。
 - 最近新增的产品化设计输入已归纳为三份可交付 spec：统一手势入口、模式轨道/快门/变焦 cockpit、PreviewRenderEngine / Filter / Watermark 管线；后续实施应优先遵循这三份设计稿的边界，不要回退到老工程式的大型单体 View 或全局协议中心。
 - `OpenCamera UI/Interaction 2.0` 统一设计资料已沉淀到 [`codex/v2_ui`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui)：包含主界面 cockpit 线框、视觉系统、交互语法、功能便利性分层、统一面板与 labs、参考图资料包和多模态延期视觉审查。后续 UI 落地 agent 应优先按这些 Markdown 规格执行；参考 PNG 只作为视觉资料，不替代文字规格。
+- `2026-05-22` 真机最新版 APK 反馈已拆成 5 份可交给非多模态 agent 的落地方案：首次授权后预览恢复、零延时缩略图反馈、窄横向变焦条、画幅/预览 cockpit、色调调色板可发现性；需要看截图/录屏/视觉对比的事项单独隔离到多模态延期清单。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-22：真机反馈专项方案文档
+
+- 目标：把用户对最新版 APK 的 5 个真机问题拆成可直接交给其他 agent 落地的 Markdown 方案，并隔离需要多模态能力的视觉 QA。
+- 核心结果：
+  [`2026-05-22-first-launch-permission-preview-recovery.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-first-launch-permission-preview-recovery.md) 聚焦首次授权后预览失败，建议补齐 coordinator pending bind，避免权限弹窗生命周期造成 `BindPreview` effect 被静默丢弃；
+  [`2026-05-22-zero-latency-thumbnail-feedback.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-zero-latency-thumbnail-feedback.md) 将预览截图定义为 transient capture feedback，而不是 saved-media thumbnail；
+  [`2026-05-22-zoom-strip-interaction.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-zoom-strip-interaction.md) 收敛为窄横向、数字点位、精确 `ApplyZoomRatio` 的变焦条；
+  [`2026-05-22-preview-aspect-ratio-cockpit.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-preview-aspect-ratio-cockpit.md) 区分成片画幅、预览 viewport/mask 与底部 cockpit safe area；
+  [`2026-05-22-tone-palette-discoverability.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-tone-palette-discoverability.md) 让已有 `FilterPaletteView` 从隐藏的 adjust 流程变成 `色调 -> 调色板` 的首屏可发现工具；
+  [`2026-05-22-multimodal-deferred-items.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-multimodal-deferred-items.md) 单独收纳截图标注、录屏时序、真实预览视觉对比和调色板可见性评审。
+- 验证：本轮为方案文档交付，未改运行时代码；已用仓内文档和当前实现路径交叉定位对应 owner 与验证入口。
 
 ## 2026-05-21：OpenCamera UI/Interaction 2.0 设计资料沉淀
 
