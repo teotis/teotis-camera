@@ -1547,7 +1547,6 @@ class SessionUiRenderModelTest {
             "画幅",   // button_quick_ratio
             "实况",   // button_quick_live
             "定时",   // button_quick_timer
-            "更多",   // button_quick_more
         )
         quickLabels.forEach { label ->
             assertTrue(

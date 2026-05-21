@@ -76,7 +76,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonFrameRatio11: Button
     private lateinit var buttonQuickLivePhoto: Button
     private lateinit var buttonQuickTimer: Button
-    private lateinit var buttonQuickMore: Button
     private lateinit var buttonQuickLauncher: Button
     private lateinit var quickBubblePanel: androidx.core.widget.NestedScrollView
     private lateinit var settingsPanel: androidx.core.widget.NestedScrollView
@@ -253,7 +252,6 @@ class MainActivity : AppCompatActivity() {
         buttonFrameRatio11 = findViewById(R.id.buttonFrameRatio11)
         buttonQuickLivePhoto = findViewById(R.id.buttonQuickLivePhoto)
         buttonQuickTimer = findViewById(R.id.buttonQuickTimer)
-        buttonQuickMore = findViewById(R.id.buttonQuickMore)
         buttonQuickLauncher = findViewById(R.id.buttonQuickLauncher)
         quickBubblePanel = findViewById(R.id.quickBubblePanel)
         settingsPanel = findViewById(R.id.settingsPanel)
@@ -561,9 +559,6 @@ class MainActivity : AppCompatActivity() {
         }
         buttonQuickTimer.setOnClickListener {
             applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.countdown)
-        }
-        buttonQuickMore.setOnClickListener {
-            toggleSettingsPanel()
         }
         buttonDevTabKey.setOnClickListener {
             selectedDevLogTab = DevLogTab.KEY
@@ -1321,8 +1316,6 @@ class MainActivity : AppCompatActivity() {
         buttonQuickTimer.text = getString(R.string.button_quick_timer)
         buttonQuickTimer.contentDescription = "${getString(R.string.button_quick_timer)} ${timer.value}"
         buttonQuickTimer.isEnabled = timer.isInteractive
-
-        buttonQuickMore.text = getString(R.string.button_quick_more)
     }
 
     private fun renderPanelVisibility() {
