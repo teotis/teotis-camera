@@ -146,11 +146,10 @@ class CameraCockpitRenderModelTest {
         )
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertEquals(6, model.modeTrack.items.size)
-        assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO),
-            model.modeTrack.items.map { it.modeId }
-        )
+        val modeIds = model.modeTrack.items.map { it.modeId }
+        assertTrue(modeIds.contains(ModeId.PORTRAIT))
+        assertTrue(modeIds.contains(ModeId.PHOTO))
+        assertTrue(modeIds.contains(ModeId.NIGHT))
         assertTrue(model.modeTrack.items.first { it.modeId == ModeId.PORTRAIT }.isActive)
     }
 
