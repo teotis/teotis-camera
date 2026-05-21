@@ -39,9 +39,7 @@ internal data class BottomCockpitRenderModel(
     val isShutterEnabled: Boolean,
     val isRecording: Boolean,
     val lensButtonLabel: String,
-    val lensButtonEnabled: Boolean,
-    val zoomButtonLabel: String,
-    val zoomButtonEnabled: Boolean
+    val lensButtonEnabled: Boolean
 )
 
 internal data class CameraCockpitRenderModel(
@@ -113,9 +111,7 @@ internal fun cameraCockpitRenderModel(
             isShutterEnabled = state.modeSnapshot.state.isShutterEnabled,
             isRecording = state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE,
             lensButtonLabel = controls.lensFacingButtonLabel,
-            lensButtonEnabled = controls.lensFacingEnabled,
-            zoomButtonLabel = controls.zoomButtonLabel,
-            zoomButtonEnabled = controls.zoomEnabled
+            lensButtonEnabled = controls.lensFacingEnabled
         ),
         activePanelRoute = activeRoute
     )

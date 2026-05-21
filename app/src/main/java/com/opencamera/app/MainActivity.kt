@@ -181,7 +181,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonDevClose: Button
     private lateinit var shutterButton: Button
     private lateinit var lensFacingButton: Button
-    private lateinit var zoomRatioButton: Button
     private lateinit var photoModeButton: Button
     private lateinit var documentModeButton: Button
     private lateinit var nightModeButton: Button
@@ -343,7 +342,6 @@ class MainActivity : AppCompatActivity() {
         previewThumbnail = findViewById(R.id.previewThumbnail)
         shutterButton = findViewById(R.id.buttonShutter)
         lensFacingButton = findViewById(R.id.buttonLensFacing)
-        zoomRatioButton = findViewById(R.id.buttonZoomRatio)
         photoModeButton = findViewById(R.id.buttonPhotoMode)
         documentModeButton = findViewById(R.id.buttonDocumentMode)
         nightModeButton = findViewById(R.id.buttonNightMode)
@@ -530,9 +528,6 @@ class MainActivity : AppCompatActivity() {
         }
         lensFacingButton.setOnClickListener {
             dispatch(SessionIntent.LensFacingToggled)
-        }
-        zoomRatioButton.setOnClickListener {
-            dispatch(SessionIntent.ZoomRatioToggled)
         }
         previewThumbnail.setOnClickListener {
             val presentation = latestSessionState?.presentation ?: return@setOnClickListener
@@ -790,10 +785,8 @@ class MainActivity : AppCompatActivity() {
             shutterButton.setBackgroundResource(R.drawable.bg_shutter_circle)
         }
         lensFacingButton.text = controls.lensFacingButtonLabel
-        zoomRatioButton.text = controls.zoomButtonLabel
         shutterButton.isEnabled = state.modeSnapshot.state.isShutterEnabled
         lensFacingButton.isEnabled = controls.lensFacingEnabled
-        zoomRatioButton.isEnabled = controls.zoomEnabled
         captureOutput.text = sessionCaptureOutputText(state, sessionUiStrings())
         renderZoomCapsules(controls)
         renderQuickBubble()
@@ -802,7 +795,8 @@ class MainActivity : AppCompatActivity() {
             state = state,
             traceEvents = container.trace.snapshot(),
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
-            selectedTab = selectedDevLogTab
+            selectedTab = selectedDevLogTab,
+            text = text
         )
         latestDevLogRenderModel = devLogModel
         renderDevConsole()
@@ -1223,9 +1217,9 @@ class MainActivity : AppCompatActivity() {
                 minWidth = resources.getDimension(R.dimen.zoom_chip_min_width).toInt()
                 minHeight = resources.getDimension(R.dimen.zoom_chip_min_height).toInt()
                 setPadding(
-                    resources.getDimension(R.dimen.space_12).toInt(),
+                    resources.getDimension(R.dimen.space_8).toInt(),
                     resources.getDimension(R.dimen.space_4).toInt(),
-                    resources.getDimension(R.dimen.space_12).toInt(),
+                    resources.getDimension(R.dimen.space_8).toInt(),
                     resources.getDimension(R.dimen.space_4).toInt()
                 )
                 if (capsule.isActive) {

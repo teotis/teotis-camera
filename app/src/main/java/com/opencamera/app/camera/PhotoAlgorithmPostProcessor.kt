@@ -608,7 +608,13 @@ internal fun resolvePhotoAlgorithmSpec(profile: String): PhotoAlgorithmSpec? {
 private fun MediaOutputHandle.toPhotoAlgorithmTargetOrNull(): PhotoAlgorithmTarget? {
     contentUri?.let { return PhotoAlgorithmTarget.ContentUri(it) }
     filePath?.let { return PhotoAlgorithmTarget.FilePath(it) }
-    return displayPath.takeIf { File(it).isAbsolute }?.let(PhotoAlgorithmTarget::FilePath)
+    val absPath = if (File(displayPath).isAbsolute) {
+        displayPath
+    } else {
+        @Suppress("DEPRECATION")
+        File(android.os.Environment.getExternalStoragePublicDirectory(null), displayPath).absolutePath
+    }
+    return File(absPath).takeIf { it.exists() }?.absolutePath?.let(PhotoAlgorithmTarget::FilePath)
 }
 
 private fun ShotResult.withPipelineNotes(vararg notes: String): ShotResult {

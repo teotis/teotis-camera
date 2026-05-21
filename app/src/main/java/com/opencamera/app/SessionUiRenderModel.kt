@@ -1640,11 +1640,10 @@ internal fun filterLabPageRenderModel(
     }
     return FilterLabPageRenderModel(
         headline = text.filterLab(),
-        supportingText = "Independent filter panel for mode defaults. Import and export stay deferred in this 6B-2 closure; selected looks can be adjusted or saved as custom.",
-        heroSummary = "${family.label} default $currentFilterLabel • ${family.filters.size} looks staged",
+        supportingText = text.filterLabSupportingText(),
+        heroSummary = text.filterLabHeroSummary(family.label, currentFilterLabel, family.filters.size),
         currentFilterSummary = buildString {
-            append("Current default ")
-            append(currentFilterLabel)
+            append(text.filterLabCurrentDefault(currentFilterLabel))
             currentProfile?.renderSpec?.let { renderSpec ->
                 append(" | ")
                 append(renderSpec.compactSummary())
@@ -1652,7 +1651,7 @@ internal fun filterLabPageRenderModel(
         },
         rosterText = family.filters.joinToString(separator = "\n") { profile ->
             val marker = if (profile.id == family.currentFilterId) "•" else "·"
-            val customBadge = if (profile.builtIn) "" else " | Custom"
+            val customBadge = if (profile.builtIn) "" else text.statusCustomBadge()
             "$marker ${profile.label}${customBadge} | ${profile.renderSpec?.compactSummary() ?: text.rendererPending()}"
         },
         editingEnabled = editingEnabled,
@@ -1693,9 +1692,9 @@ internal fun filterLabPageRenderModel(
                 append('\n')
                 append(
                     when {
-                        currentProfile == null -> "Unavailable • Missing source profile"
-                        currentProfile.builtIn -> "Ready • Opens an editable custom copy"
-                        else -> "Ready • Editing current custom look"
+                        currentProfile == null -> text.unavailableMissingProfile()
+                        currentProfile.builtIn -> text.readyEditableCopy()
+                        else -> text.readyEditingCustom()
                     }
                 )
             },
@@ -1712,10 +1711,10 @@ internal fun filterLabPageRenderModel(
                 supportingText = buildString {
                     append(profile.renderSpec?.compactSummary() ?: text.rendererPending())
                     if (!profile.builtIn) {
-                        append(" | Custom")
+                        append(text.statusCustomBadge())
                     }
                     if (isSelected) {
-                        append(" | Selected default")
+                        append(text.filterLabSelectedDefault())
                     }
                 },
                 isSelected = isSelected,
@@ -1732,9 +1731,9 @@ internal fun filterLabPageRenderModel(
                         append('\n')
                         append(
                             if (profile.builtIn) {
-                                "Ready • Opens an editable custom copy"
+                                text.readyEditableCopy()
                             } else {
-                                "Ready • Editing current custom look"
+                                text.readyEditingCustom()
                             }
                         )
                     }
@@ -1755,8 +1754,8 @@ internal fun filterLabPageRenderModel(
                 text.switchToLight()
             },
             lightPalette = FilterLightPaletteRenderModel(
-                summary = currentRenderSpec.lightPaletteSummary(),
-                supportingText = "Horizontal swipe for color, vertical swipe for tone."
+                summary = currentRenderSpec.lightPaletteSummary(text),
+                supportingText = text.filterLabLightPaletteHint()
             ),
             advancedControls = FilterAdvancedControl.entries.map { control ->
                 FilterAdvancedControlRenderModel(
@@ -1764,7 +1763,7 @@ internal fun filterLabPageRenderModel(
                     buttonLabel = buildString {
                         append(control.label)
                         append('\n')
-                        append(currentRenderSpec.levelLabel(control))
+                        append(currentRenderSpec.levelLabel(control, text))
                         append('\n')
                         append(text.tapToCycleLabel())
                     }
@@ -1772,7 +1771,7 @@ internal fun filterLabPageRenderModel(
             }
         ),
         cycleControl = SettingsControlRenderModel(
-            label = "Next ${family.label} look",
+            label = text.filterLabNextLook(family.label),
             value = currentFilterLabel,
             availability = if (family.supported && family.filters.isNotEmpty()) {
                 SettingsControlAvailability.SUPPORTED
@@ -1782,7 +1781,7 @@ internal fun filterLabPageRenderModel(
             supportLabel = when {
                 !family.supported -> family.unsupportedReason
                 family.filters.isEmpty() -> text.noCompatibleLooks()
-                else -> "${family.filters.size} looks | import/export deferred"
+                else -> text.filterLabLooksDeferred(family.filters.size)
             },
             nextAction = cycleAction
         ),
@@ -1794,9 +1793,9 @@ internal fun filterLabPageRenderModel(
                 append('\n')
                 append(
                     when {
-                        currentProfile == null -> "不可用 • 缺少源配置"
-                        !currentProfile.builtIn -> "不可用 • 当前默认已是自定义"
-                else -> "就绪 • 将成为 ${family.label} 的默认"
+                        currentProfile == null -> text.filterLabSaveCustomUnavailableProfile()
+                        !currentProfile.builtIn -> text.filterLabSaveCustomAlreadyCustom()
+                        else -> text.filterLabSaveCustomReady(family.label)
                     }
                 )
             },
@@ -1804,7 +1803,7 @@ internal fun filterLabPageRenderModel(
             sourceProfileId = currentProfile?.id,
             isEnabled = currentProfile?.builtIn == true
         ),
-        footer = "独立色调实验室优先交付。面板内调节和自定义保存持续推进中，导入/导出暂缓。"
+        footer = text.filterLabFooter()
     )
 }
 
@@ -1819,17 +1818,6 @@ private fun lensFacingButtonLabel(
     return when (state.activeDeviceGraph.preferredLensFacing) {
         LensFacing.BACK -> strings.buttonSwitchToFront
         LensFacing.FRONT -> strings.buttonSwitchToBack
-    }
-}
-
-private fun zoomButtonLabel(
-    state: SessionState,
-    strings: SessionUiStrings
-): String {
-    return if (!state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported) {
-        strings.buttonZoomUnavailable
-    } else {
-        "${strings.buttonZoomPrefix} ${zoomRatioLabel(state.activeDeviceGraph.preview.zoomRatio)}"
     }
 }
 
@@ -1976,13 +1964,14 @@ internal fun devLogRenderModel(
     state: SessionState,
     traceEvents: List<SessionTraceEvent>,
     isDebugBuild: Boolean,
-    selectedTab: DevLogTab
+    selectedTab: DevLogTab,
+    text: AppTextResolver
 ): DevLogRenderModel {
     if (!isDebugBuild) {
         return DevLogRenderModel(
             isAvailable = false,
             selectedTab = selectedTab,
-            title = "Dev Log",
+            title = text.devEntry(),
             summaryText = "",
             content = "",
             exportContent = ""
@@ -2049,10 +2038,10 @@ internal fun devLogRenderModel(
         isAvailable = true,
         selectedTab = selectedTab,
         title = when (selectedTab) {
-            DevLogTab.KEY -> "Key Log (${keyEvents.size})"
-            DevLogTab.CORE -> "Core Log (${coreEvents.size})"
-            DevLogTab.ERROR -> "Error Log (${errorEvents.size})"
-            DevLogTab.ALL -> "All Events (${allEvents.size})"
+            DevLogTab.KEY -> text.devLogTitleKey(keyEvents.size)
+            DevLogTab.CORE -> text.devLogTitleCore(coreEvents.size)
+            DevLogTab.ERROR -> text.devLogTitleError(errorEvents.size)
+            DevLogTab.ALL -> text.devLogTitleAll(allEvents.size)
         },
         summaryText = summaryText,
         content = tabContent,
@@ -2323,32 +2312,35 @@ private fun FilterRenderSpec.currentLevel(
     return nearestFloatLevel(value)
 }
 
-private fun FilterRenderSpec.levelLabel(control: FilterAdvancedControl): String {
+private fun FilterRenderSpec.levelLabel(control: FilterAdvancedControl, text: AppTextResolver): String {
     return when (control) {
-        FilterAdvancedControl.TEMPERATURE_SHIFT -> warmthShiftLevel(warmthShift).labelForTemperature()
-        FilterAdvancedControl.TINT_SHIFT -> tintShiftLevel(tintShift).labelForTint()
+        FilterAdvancedControl.TEMPERATURE_SHIFT -> warmthShiftLevel(warmthShift).labelForTemperature(text)
+        FilterAdvancedControl.TINT_SHIFT -> tintShiftLevel(tintShift).labelForTint(text)
         else -> currentLevel(control).label
     }
 }
 
-private fun FilterRenderSpec.lightPaletteSummary(): String {
+private fun FilterRenderSpec.lightPaletteSummary(text: AppTextResolver): String {
     return buildString {
-        append("Color ")
+        append(text.filterLightPaletteColor())
+        append(" ")
         append(
             when {
-                tintShift >= 4 -> "Magenta/Warm"
-                tintShift <= -4 -> "Green/Cool"
-                warmthShift > 3 || saturation > 1.08f -> "Warm+"
-                warmthShift < -3 || saturation < 0.96f -> "Cool/Muted"
-                else -> "Neutral"
+                tintShift >= 4 -> text.colorMagentaWarm()
+                tintShift <= -4 -> text.colorGreenCool()
+                warmthShift > 3 || saturation > 1.08f -> text.levelWarmPlus()
+                warmthShift < -3 || saturation < 0.96f -> text.colorCoolMuted()
+                else -> text.colorNeutral()
             }
         )
-        append(" | Tone ")
+        append(" | ")
+        append(text.filterLightPaletteTone())
+        append(" ")
         append(
             when {
-                brightnessShift >= 8 || contrast <= 0.96f -> "Soft Lift"
-                brightnessShift <= -4 || contrast >= 1.12f -> "Deep Contrast"
-                else -> "Balanced"
+                brightnessShift >= 8 || contrast <= 0.96f -> text.toneSoftLift()
+                brightnessShift <= -4 || contrast >= 1.12f -> text.toneDeepContrast()
+                else -> text.toneBalanced()
             }
         )
     }
@@ -2409,23 +2401,23 @@ private enum class FilterSignedAdjustmentLevel(
     HIGH_NEGATIVE
 }
 
-private fun FilterSignedAdjustmentLevel.labelForTemperature(): String {
+private fun FilterSignedAdjustmentLevel.labelForTemperature(text: AppTextResolver): String {
     return when (this) {
-        FilterSignedAdjustmentLevel.OFF -> "Off"
-        FilterSignedAdjustmentLevel.LOW_POSITIVE -> "Warm"
-        FilterSignedAdjustmentLevel.HIGH_POSITIVE -> "Warm+"
-        FilterSignedAdjustmentLevel.LOW_NEGATIVE -> "Cool"
-        FilterSignedAdjustmentLevel.HIGH_NEGATIVE -> "Cool+"
+        FilterSignedAdjustmentLevel.OFF -> text.filterSignedOff()
+        FilterSignedAdjustmentLevel.LOW_POSITIVE -> text.filterSignedWarm()
+        FilterSignedAdjustmentLevel.HIGH_POSITIVE -> text.filterSignedWarmPlus()
+        FilterSignedAdjustmentLevel.LOW_NEGATIVE -> text.filterSignedCool()
+        FilterSignedAdjustmentLevel.HIGH_NEGATIVE -> text.filterSignedCoolPlus()
     }
 }
 
-private fun FilterSignedAdjustmentLevel.labelForTint(): String {
+private fun FilterSignedAdjustmentLevel.labelForTint(text: AppTextResolver): String {
     return when (this) {
-        FilterSignedAdjustmentLevel.OFF -> "Off"
-        FilterSignedAdjustmentLevel.LOW_POSITIVE -> "Magenta"
-        FilterSignedAdjustmentLevel.HIGH_POSITIVE -> "Magenta+"
-        FilterSignedAdjustmentLevel.LOW_NEGATIVE -> "Green"
-        FilterSignedAdjustmentLevel.HIGH_NEGATIVE -> "Green+"
+        FilterSignedAdjustmentLevel.OFF -> text.filterSignedOff()
+        FilterSignedAdjustmentLevel.LOW_POSITIVE -> text.filterSignedMagenta()
+        FilterSignedAdjustmentLevel.HIGH_POSITIVE -> text.filterSignedMagentaPlus()
+        FilterSignedAdjustmentLevel.LOW_NEGATIVE -> text.filterSignedGreen()
+        FilterSignedAdjustmentLevel.HIGH_NEGATIVE -> text.filterSignedGreenPlus()
     }
 }
 

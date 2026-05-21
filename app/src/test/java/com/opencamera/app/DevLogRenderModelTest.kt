@@ -56,7 +56,8 @@ class DevLogRenderModelTest {
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = true,
-            selectedTab = DevLogTab.KEY
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver()
         )
         assertTrue(model.isAvailable)
     }
@@ -67,7 +68,8 @@ class DevLogRenderModelTest {
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = false,
-            selectedTab = DevLogTab.KEY
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver()
         )
         assertFalse(model.isAvailable)
         assertEquals("", model.content)
@@ -80,7 +82,8 @@ class DevLogRenderModelTest {
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = true,
-            selectedTab = DevLogTab.KEY
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver()
         )
         assertTrue(model.content.contains("session.created"))
         assertTrue(model.content.contains("session.booted"))
@@ -96,7 +99,8 @@ class DevLogRenderModelTest {
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = true,
-            selectedTab = DevLogTab.ERROR
+            selectedTab = DevLogTab.ERROR,
+            text = TestAppTextResolver()
         )
         assertTrue(model.content.contains("preview.error"))
         assertTrue(model.content.contains("zoom.switch.blocked"))
@@ -110,7 +114,8 @@ class DevLogRenderModelTest {
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = true,
-            selectedTab = DevLogTab.CORE
+            selectedTab = DevLogTab.CORE,
+            text = TestAppTextResolver()
         )
         assertTrue(model.content.contains("preview.binding.started"))
         assertTrue(model.content.contains("preview.recovery.started"))
@@ -124,7 +129,8 @@ class DevLogRenderModelTest {
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = true,
-            selectedTab = DevLogTab.ALL
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver()
         )
         assertTrue(model.content.contains("session.created"))
         assertTrue(model.content.contains("preview.error"))
@@ -138,7 +144,8 @@ class DevLogRenderModelTest {
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = true,
-            selectedTab = DevLogTab.ALL
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver()
         )
         assertTrue(model.exportContent.contains("=== KEY EVENTS ==="))
         assertTrue(model.exportContent.contains("=== CORE EVENTS ==="))
@@ -156,14 +163,16 @@ class DevLogRenderModelTest {
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = true,
-            selectedTab = DevLogTab.KEY
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver()
         )
         assertTrue(keyModel.title.startsWith("Key Log"))
         val allModel = devLogRenderModel(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
             isDebugBuild = true,
-            selectedTab = DevLogTab.ALL
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver()
         )
         assertTrue(allModel.title.startsWith("All Events"))
     }
@@ -177,7 +186,8 @@ class DevLogRenderModelTest {
                 SessionTraceEvent(12, "recording.timing", "shot=shot-2,device=--ms,postprocess=--ms,total=5230ms", 12L)
             ),
             isDebugBuild = true,
-            selectedTab = DevLogTab.KEY
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver()
         )
         assertTrue(model.content.contains("capture.timing"))
         assertTrue(model.content.contains("recording.timing"))
@@ -193,7 +203,8 @@ class DevLogRenderModelTest {
                 SessionTraceEvent(11, "preview.snapshot.ignored", "/tmp/preview-b.jpg", 11L)
             ),
             isDebugBuild = true,
-            selectedTab = DevLogTab.CORE
+            selectedTab = DevLogTab.CORE,
+            text = TestAppTextResolver()
         )
         assertTrue(model.content.contains("preview.snapshot.ignored"))
     }

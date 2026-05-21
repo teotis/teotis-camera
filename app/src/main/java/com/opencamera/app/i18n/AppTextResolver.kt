@@ -107,19 +107,88 @@ open class AppTextResolver(private val context: Context?) {
     open fun tone(): String = str(R.string.button_palette_entry, "Tone")
 
     // Editing hints
-    open fun lensLabEditingEnabled(): String = "Changes save instantly and refresh the active mode defaults."
-    open fun lensLabEditingDisabled(): String = "Finish the current capture before changing saved defaults."
-    open fun portraitLabEditingEnabled(): String = "Portrait defaults save instantly and apply to the next portrait capture metadata and lightweight render pass."
-    open fun portraitLabEditingDisabled(): String = "Finish the current capture before changing portrait product defaults."
-    open fun watermarkSelectorEditingEnabled(): String = "Default template changes save instantly. Each template keeps its own placement, scale, opacity, and frame background preset."
-    open fun watermarkSelectorEditingDisabled(): String = "Finish the current capture before changing watermark defaults."
+    open fun lensLabEditingEnabled(): String =
+        str(R.string.lens_lab_editing_enabled, "Changes save instantly and refresh the active mode defaults.")
+    open fun lensLabEditingDisabled(): String =
+        str(R.string.lens_lab_editing_disabled, "Finish the current capture before changing saved defaults.")
+    open fun portraitLabEditingEnabled(): String =
+        str(R.string.portrait_lab_editing_enabled, "Portrait defaults save instantly and apply to the next portrait capture metadata and lightweight render pass.")
+    open fun portraitLabEditingDisabled(): String =
+        str(R.string.portrait_lab_editing_disabled, "Finish the current capture before changing portrait product defaults.")
+    open fun watermarkSelectorEditingEnabled(): String =
+        str(R.string.watermark_selector_editing_enabled, "Default template changes save instantly. Each template keeps its own placement, scale, opacity, and frame background preset.")
+    open fun watermarkSelectorEditingDisabled(): String =
+        str(R.string.watermark_selector_editing_disabled, "Finish the current capture before changing watermark defaults.")
     open fun watermarkDetailEditingEnabled(): String =
         str(R.string.watermark_detail_editing_enabled, "Template-specific styles save instantly and stay attached to this watermark preset.")
     open fun watermarkDetailEditingDisabled(): String =
         str(R.string.watermark_detail_editing_disabled, "Finish the current capture before changing watermark styles.")
-    open fun filterLabEditingEnabled(): String = "Selected family defaults save instantly and refresh the active mode when relevant."
-    open fun filterLabEditingDisabled(): String = "Finish the current capture before changing filter defaults."
-    open fun statusCustomBadge(): String = " | Custom"
+    open fun filterLabEditingEnabled(): String =
+        str(R.string.filter_lab_editing_enabled, "Selected family defaults save instantly and refresh the active mode when relevant.")
+    open fun filterLabEditingDisabled(): String =
+        str(R.string.filter_lab_editing_disabled, "Finish the current capture before changing filter defaults.")
+    open fun statusCustomBadge(): String =
+        str(R.string.status_custom_badge, " | Custom")
+
+    // Filter Lab page strings
+    open fun filterLabSupportingText(): String =
+        str(R.string.filter_lab_supporting_text, "Independent filter panel for mode defaults. Import and export stay deferred in this closure; selected looks can be adjusted or saved as custom.")
+    open fun filterLabHeroSummary(familyLabel: String, filterLabel: String, count: Int): String =
+        String.format(str(R.string.filter_lab_hero_summary, "%s default %s • %d looks staged"), familyLabel, filterLabel, count)
+    open fun filterLabCurrentDefault(filterLabel: String): String =
+        String.format(str(R.string.filter_lab_current_default, "Current default %s"), filterLabel)
+    open fun filterLabSelectedDefault(): String =
+        str(R.string.filter_lab_selected_default, " | Selected default")
+    open fun filterLabLightPaletteHint(): String =
+        str(R.string.filter_lab_light_palette_hint, "Horizontal swipe for color, vertical swipe for tone.")
+    open fun filterLabNextLook(familyLabel: String): String =
+        String.format(str(R.string.filter_lab_next_look, "Next %s look"), familyLabel)
+    open fun filterLabLooksDeferred(count: Int): String =
+        String.format(str(R.string.filter_lab_looks_deferred, "%d looks | import/export deferred"), count)
+    open fun filterLabFooter(): String =
+        str(R.string.filter_lab_footer, "Independent Tone Lab prioritized. Panel adjustments and custom saves ongoing; import/export deferred.")
+    open fun filterLabSaveCustomUnavailableProfile(): String =
+        str(R.string.filter_lab_save_custom_unavailable_profile, "Unavailable • Missing source profile")
+    open fun filterLabSaveCustomAlreadyCustom(): String =
+        str(R.string.filter_lab_save_custom_already_custom, "Unavailable • Current default already custom")
+    open fun filterLabSaveCustomReady(familyLabel: String): String =
+        String.format(str(R.string.filter_lab_save_custom_ready, "Ready • Becomes the %s default"), familyLabel)
+
+    // Filter light palette labels
+    open fun filterLightPaletteColor(): String =
+        str(R.string.filter_light_palette_color, "Color")
+    open fun filterLightPaletteTone(): String =
+        str(R.string.filter_light_palette_tone, "Tone")
+
+    // Filter signed adjustment level labels
+    open fun filterSignedOff(): String =
+        str(R.string.filter_signed_off, "Off")
+    open fun filterSignedWarm(): String =
+        str(R.string.filter_signed_warm, "Warm")
+    open fun filterSignedWarmPlus(): String =
+        str(R.string.filter_signed_warm_plus, "Warm+")
+    open fun filterSignedCool(): String =
+        str(R.string.filter_signed_cool, "Cool")
+    open fun filterSignedCoolPlus(): String =
+        str(R.string.filter_signed_cool_plus, "Cool+")
+    open fun filterSignedMagenta(): String =
+        str(R.string.filter_signed_magenta, "Magenta")
+    open fun filterSignedMagentaPlus(): String =
+        str(R.string.filter_signed_magenta_plus, "Magenta+")
+    open fun filterSignedGreen(): String =
+        str(R.string.filter_signed_green, "Green")
+    open fun filterSignedGreenPlus(): String =
+        str(R.string.filter_signed_green_plus, "Green+")
+
+    // Dev log title labels
+    open fun devLogTitleKey(count: Int): String =
+        String.format(str(R.string.dev_log_title_key, "Key Log (%d)"), count)
+    open fun devLogTitleCore(count: Int): String =
+        String.format(str(R.string.dev_log_title_core, "Core Log (%d)"), count)
+    open fun devLogTitleError(count: Int): String =
+        String.format(str(R.string.dev_log_title_error, "Error Log (%d)"), count)
+    open fun devLogTitleAll(count: Int): String =
+        String.format(str(R.string.dev_log_title_all, "All Events (%d)"), count)
 
     // Filter advanced control labels
     open fun filterCtrlExposure(): String = str(R.string.filter_ctrl_exposure, "Exposure")

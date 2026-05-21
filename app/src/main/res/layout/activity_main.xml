@@ -209,7 +209,7 @@
             android:layout_marginTop="10dp" />
     </LinearLayout>
 
-    <!-- Mode track: horizontal scrolling strip (fixed position above bottom) -->
+    <!-- Mode track: horizontal scrolling strip (positioned above zoom chips) -->
     <HorizontalScrollView
         android:id="@+id/modeTrackScroll"
         android:layout_width="0dp"
@@ -219,7 +219,7 @@
         android:fadeScrollbars="false"
         android:clipToPadding="false"
         android:paddingHorizontal="@dimen/space_12"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toTopOf="@id/zoomCapsuleScroll"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
@@ -1281,15 +1281,15 @@
         </androidx.core.widget.NestedScrollView>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Zoom capsule row -->
+    <!-- Zoom capsule row (positioned below mode track, above bottom cockpit) -->
     <HorizontalScrollView
         android:id="@+id/zoomCapsuleScroll"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="14dp"
+        android:layout_marginBottom="@dimen/space_8"
         android:clipToPadding="false"
         android:scrollbars="none"
-        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
@@ -1369,11 +1369,11 @@
                     android:textSize="@dimen/text_size_control_value" />
             </LinearLayout>
 
-            <!-- Right: Lens + Zoom -->
+            <!-- Right: Lens -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center"
+                android:gravity="center_vertical"
                 android:orientation="vertical">
 
                 <Button
@@ -1382,15 +1382,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="@string/button_switch_lens" />
-
-                <Button
-                    android:id="@+id/buttonZoomRatio"
-                    style="@style/Widget.OpenCamera.QuickSettingButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/button_zoom_prefix"
-                    android:textSize="@dimen/text_size_dev_log" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
