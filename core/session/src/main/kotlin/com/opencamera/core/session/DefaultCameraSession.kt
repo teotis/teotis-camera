@@ -1280,6 +1280,7 @@ class DefaultCameraSession(
                 SavedMediaType.VIDEO
             },
             latestPipelineNotes = result.pipelineNotes,
+            pendingCaptureFeedback = null,
             lastError = null
         )
         trace.record(
@@ -1352,6 +1353,7 @@ class DefaultCameraSession(
                 "Video recording failed"
             },
             latestPipelineNotes = emptyList(),
+            pendingCaptureFeedback = null,
             lastError = reason
         )
         trace.record(
@@ -1493,6 +1495,7 @@ class DefaultCameraSession(
         latestLivePhotoBundle: LivePhotoBundle? = _state.value.presentation.latestLivePhotoBundle,
         latestSavedMediaType: SavedMediaType? = _state.value.presentation.latestSavedMediaType,
         latestPipelineNotes: List<String> = _state.value.presentation.latestPipelineNotes,
+        pendingCaptureFeedback: CaptureFeedbackPreview? = _state.value.presentation.pendingCaptureFeedback,
         lastError: String? = _state.value.presentation.lastError
     ) {
         _state.value = _state.value.copy(
@@ -1516,6 +1519,7 @@ class DefaultCameraSession(
                 countdownRemainingSeconds = countdownRemainingSeconds,
                 previewThumbnailPath = previewThumbnailPath,
                 latestThumbnailSource = latestThumbnailSource,
+                pendingCaptureFeedback = pendingCaptureFeedback,
                 lastAction = lastAction,
                 latestCapturePath = latestCapturePath,
                 latestVideoPath = latestVideoPath,

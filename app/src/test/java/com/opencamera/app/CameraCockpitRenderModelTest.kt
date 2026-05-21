@@ -14,6 +14,7 @@ import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PermissionState
 import com.opencamera.core.session.PreviewMetrics
+import com.opencamera.core.session.PreviewRatio
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SavedMediaType
@@ -186,6 +187,25 @@ class CameraCockpitRenderModelTest {
         assertEquals(SettingsSubpage.ROOT, (model.activePanelRoute as CockpitPanelRoute.Settings).subpage)
     }
 
+    @Test
+    fun `cockpit includes preview ratio chip with default full ratio`() {
+        val state = defaultSessionState()
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("Full", cockpit.previewRatioChip.label)
+        assertEquals(PreviewRatio.FULL, cockpit.previewRatioChip.ratio)
+        assertTrue(cockpit.previewRatioChip.isActive)
+    }
+
+    @Test
+    fun `cockpit preview ratio chip reflects 16 9 ratio`() {
+        val state = defaultSessionState(previewRatio = PreviewRatio.RATIO_16_9)
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("16:9", cockpit.previewRatioChip.label)
+        assertEquals(PreviewRatio.RATIO_16_9, cockpit.previewRatioChip.ratio)
+    }
+
     private fun defaultSessionState(
         activeMode: ModeId = ModeId.PHOTO,
         availableModes: List<ModeId> = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),
@@ -195,7 +215,8 @@ class CameraCockpitRenderModelTest {
             enablePreviewSnapshots = true,
             qualityPreference = StillCaptureQualityPreference.LATENCY,
             resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
-        )
+        ),
+        previewRatio: PreviewRatio = PreviewRatio.FULL
     ): SessionState {
         return SessionState(
             lifecycle = SessionLifecycle.RUNNING,
@@ -230,6 +251,7 @@ class CameraCockpitRenderModelTest {
                     video = VideoSettings()
                 )
             ),
+            previewRatio = previewRatio,
             presentation = SessionPresentationState(
                 lastAction = "Ready",
                 latestCapturePath = null,

@@ -1947,6 +1947,8 @@ private val CORE_EVENT_NAMES = setOf(
     "preview.stopped", "preview.snapshot.updated", "preview.snapshot.ignored",
     "capture.countdown.started", "capture.countdown.tick", "capture.countdown.completed",
     "capture.saving",
+    "capture.feedback.snapshot.requested", "capture.feedback.snapshot.updated",
+    "capture.feedback.snapshot.skipped",
     "recording.requested",
     "shot.plan.failed",
     "mode.signal", "mode.event", "mode.hint",

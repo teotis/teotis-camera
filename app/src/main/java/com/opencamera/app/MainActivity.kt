@@ -808,7 +808,9 @@ class MainActivity : AppCompatActivity() {
         latestDevLogRenderModel = devLogModel
         renderDevConsole()
 
-        val nextThumbnailRenderUri = state.presentation.latestThumbnailSource?.renderUriOrNull()
+        val nextThumbnailRenderUri = state.presentation.pendingCaptureFeedback?.let { feedback ->
+            feedback.outputPath.takeIf { File(it).isAbsolute }?.let { File(it).toURI().toString() }
+        } ?: state.presentation.latestThumbnailSource?.renderUriOrNull()
         when (val command = nextThumbnailRenderCommand(lastRequestedThumbnailUri, nextThumbnailRenderUri)) {
             ThumbnailRenderCommand.NoOp -> Unit
             ThumbnailRenderCommand.Clear -> {
