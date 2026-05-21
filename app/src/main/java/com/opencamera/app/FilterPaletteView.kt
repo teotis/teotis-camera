@@ -5,11 +5,45 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.RadialGradient
+import android.graphics.RectF
 import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import kotlin.math.min
+
+internal data class PaletteAxes(
+    val colorAxis: Float,
+    val toneAxis: Float
+)
+
+internal data class PalettePoint(
+    val xFraction: Float,
+    val yFraction: Float
+)
+
+internal fun paletteAxesFromPoint(
+    x: Float,
+    y: Float,
+    width: Int,
+    height: Int
+): PaletteAxes {
+    if (width <= 0 || height <= 0) return PaletteAxes(0f, 0f)
+    return PaletteAxes(
+        colorAxis = (x / width.toFloat() * 2f - 1f).coerceIn(-1f, 1f),
+        toneAxis = (1f - y / height.toFloat() * 2f).coerceIn(-1f, 1f)
+    )
+}
+
+internal fun palettePointFromAxes(
+    colorAxis: Float,
+    toneAxis: Float
+): PalettePoint {
+    return PalettePoint(
+        xFraction = ((colorAxis.coerceIn(-1f, 1f) + 1f) / 2f).coerceIn(0f, 1f),
+        yFraction = ((1f - toneAxis.coerceIn(-1f, 1f)) / 2f).coerceIn(0f, 1f)
+    )
+}
 
 class FilterPaletteView @JvmOverloads constructor(
     context: Context,
@@ -18,6 +52,25 @@ class FilterPaletteView @JvmOverloads constructor(
 ) : View(context, attrs, defStyleAttr) {
 
     private val palettePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tonePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val centerGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.argb(34, 255, 255, 255)
+    }
+    private val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.argb(120, 255, 255, 255)
+    }
+    private val axisPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.25f
+        color = Color.argb(86, 255, 255, 255)
+    }
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
+        color = Color.argb(110, 255, 255, 255)
+    }
     private val reticlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 3f
@@ -27,7 +80,9 @@ class FilterPaletteView @JvmOverloads constructor(
         style = Paint.Style.FILL
         color = Color.argb(80, 255, 255, 255)
     }
-    private var paletteGradient: RadialGradient? = null
+    private val paletteRect = RectF()
+    private var colorGradient: LinearGradient? = null
+    private var toneGradient: LinearGradient? = null
     private var reticleX: Float = 0.5f
     private var reticleY: Float = 0.5f
     private var onPaletteTouch: ((Float, Float) -> Unit)? = null
@@ -37,25 +92,41 @@ class FilterPaletteView @JvmOverloads constructor(
     }
 
     fun updateReticle(colorAxis: Float, toneAxis: Float) {
-        reticleX = (colorAxis + 1f) / 2f
-        reticleY = (toneAxis + 1f) / 2f
+        val point = palettePointFromAxes(colorAxis, toneAxis)
+        reticleX = point.xFraction
+        reticleY = point.yFraction
         invalidate()
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         if (w > 0 && h > 0) {
-            paletteGradient = RadialGradient(
-                w / 2f, h / 2f, Math.min(w, h) / 2f,
+            colorGradient = LinearGradient(
+                0f,
+                0f,
+                w.toFloat(),
+                0f,
                 intArrayOf(
-                    Color.rgb(80, 140, 210),
-                    Color.rgb(200, 200, 200),
-                    Color.rgb(60, 60, 100),
-                    Color.rgb(220, 180, 120),
-                    Color.rgb(200, 200, 200),
-                    Color.rgb(40, 60, 40)
+                    Color.rgb(20, 138, 196),
+                    Color.rgb(88, 185, 178),
+                    Color.rgb(226, 216, 151),
+                    Color.rgb(237, 139, 82),
+                    Color.rgb(231, 88, 95)
                 ),
-                floatArrayOf(0f, 0.3f, 0.5f, 0.7f, 0.85f, 1f),
+                floatArrayOf(0f, 0.24f, 0.5f, 0.76f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            toneGradient = LinearGradient(
+                0f,
+                0f,
+                0f,
+                h.toFloat(),
+                intArrayOf(
+                    Color.argb(138, 255, 255, 255),
+                    Color.argb(0, 255, 255, 255),
+                    Color.argb(128, 0, 0, 0)
+                ),
+                floatArrayOf(0f, 0.48f, 1f),
                 Shader.TileMode.CLAMP
             )
         }
@@ -64,40 +135,60 @@ class FilterPaletteView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        // Draw palette background with color gradient
-        palettePaint.shader = paletteGradient
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), palettePaint)
+        paletteRect.set(0f, 0f, width.toFloat(), height.toFloat())
 
-        // Draw grid lines
-        val gridPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            strokeWidth = 0.5f
-            color = Color.argb(40, 255, 255, 255)
-        }
-        for (i in 1..3) {
-            val x = width * i / 4f
-            canvas.drawLine(x, 0f, x, height.toFloat(), gridPaint)
-            val y = height * i / 4f
-            canvas.drawLine(0f, y, width.toFloat(), y, gridPaint)
-        }
+        palettePaint.shader = colorGradient
+        canvas.drawRoundRect(paletteRect, 18f, 18f, palettePaint)
 
-        // Draw reticle
+        tonePaint.shader = toneGradient
+        canvas.drawRoundRect(paletteRect, 18f, 18f, tonePaint)
+
+        drawPaletteDotGrid(canvas)
+        drawPaletteAxes(canvas)
+
         val cx = reticleX * width
         val cy = reticleY * height
-        val reticleRadius = 24f
+        val reticleRadius = (min(width, height) * 0.055f)
+            .coerceIn(16f, 26f)
+        canvas.drawCircle(cx, cy, reticleRadius * 1.55f, centerGlowPaint)
         canvas.drawCircle(cx, cy, reticleRadius, reticleFillPaint)
         canvas.drawCircle(cx, cy, reticleRadius, reticlePaint)
         canvas.drawLine(cx - reticleRadius - 4f, cy, cx + reticleRadius + 4f, cy, reticlePaint)
         canvas.drawLine(cx, cy - reticleRadius - 4f, cx, cy + reticleRadius + 4f, reticlePaint)
+        canvas.drawRoundRect(paletteRect, 18f, 18f, borderPaint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val colorAxis = (event.x / width * 2f - 1f).coerceIn(-1f, 1f)
-        val toneAxis = (event.y / height * 2f - 1f).coerceIn(-1f, 1f)
-        reticleX = (colorAxis + 1f) / 2f
-        reticleY = (toneAxis + 1f) / 2f
-        onPaletteTouch?.invoke(colorAxis, toneAxis)
+        val axes = paletteAxesFromPoint(event.x, event.y, width, height)
+        val point = palettePointFromAxes(axes.colorAxis, axes.toneAxis)
+        reticleX = point.xFraction
+        reticleY = point.yFraction
+        onPaletteTouch?.invoke(axes.colorAxis, axes.toneAxis)
         invalidate()
         return true
+    }
+
+    private fun drawPaletteDotGrid(canvas: Canvas) {
+        val columns = 17
+        val rows = 9
+        val xStep = width / (columns + 1f)
+        val yStep = height / (rows + 1f)
+        val radius = (min(width, height) * 0.0065f)
+            .coerceIn(1.6f, 3.2f)
+        for (row in 1..rows) {
+            for (column in 1..columns) {
+                val distanceFromCenter = kotlin.math.abs(column - (columns + 1) / 2f) / columns +
+                    kotlin.math.abs(row - (rows + 1) / 2f) / rows
+                dotPaint.alpha = (150 - distanceFromCenter * 70).toInt().coerceIn(72, 150)
+                canvas.drawCircle(column * xStep, row * yStep, radius, dotPaint)
+            }
+        }
+    }
+
+    private fun drawPaletteAxes(canvas: Canvas) {
+        val centerX = width / 2f
+        val centerY = height / 2f
+        canvas.drawLine(centerX, 0f, centerX, height.toFloat(), axisPaint)
+        canvas.drawLine(0f, centerY, width.toFloat(), centerY, axisPaint)
     }
 }

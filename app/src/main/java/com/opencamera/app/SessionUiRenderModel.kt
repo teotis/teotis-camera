@@ -25,6 +25,7 @@ import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.effect.PreviewEffectRenderModel
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.AudioProfile
+import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
@@ -365,6 +366,30 @@ internal enum class StyleAndColorLabRole {
     LENS_LAB
 }
 
+internal data class ColorLabPanelRenderModel(
+    val title: String,
+    val colorAxis: Float,
+    val toneAxis: Float,
+    val strength: Float,
+    val summary: String,
+    val resetAction: PersistedSettingsAction.UpdateColorLabSpec
+)
+
+internal fun colorLabPanelRenderModel(
+    state: SessionState,
+    text: AppTextResolver
+): ColorLabPanelRenderModel {
+    val spec = state.settings.persisted.photo.colorLabSpec
+    return ColorLabPanelRenderModel(
+        title = text.colorLabEntry(),
+        colorAxis = spec.colorAxis,
+        toneAxis = spec.toneAxis,
+        strength = spec.strength,
+        summary = "Color: ${"%.2f".format(spec.colorAxis)}, Tone: ${"%.2f".format(spec.toneAxis)}",
+        resetAction = PersistedSettingsAction.UpdateColorLabSpec(ColorLabSpec())
+    )
+}
+
 internal data class FilterLabPageRenderModel(
     val headline: String,
     val supportingText: String,
@@ -377,6 +402,7 @@ internal data class FilterLabPageRenderModel(
     val showFamilyTabs: Boolean = true,
     val showFilterItems: Boolean = true,
     val showAdjustmentPanel: Boolean = true,
+    val showAdvancedControls: Boolean = true,
     val photoTab: FilterLabTabRenderModel,
     val humanisticTab: FilterLabTabRenderModel,
     val portraitTab: FilterLabTabRenderModel,
@@ -1737,6 +1763,7 @@ internal fun filterLabPageRenderModel(
         showFamilyTabs = panelRole == StyleAndColorLabRole.STYLE,
         showFilterItems = panelRole == StyleAndColorLabRole.STYLE,
         showAdjustmentPanel = panelRole == StyleAndColorLabRole.LENS_LAB,
+        showAdvancedControls = panelRole == StyleAndColorLabRole.STYLE,
         photoTab = filterLabTabRenderModel(
             family = FilterLabFamily.PHOTO,
             currentFilterId = settings.photo.defaultFilterProfileId,

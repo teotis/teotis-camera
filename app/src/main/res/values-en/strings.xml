@@ -30,6 +30,7 @@
     <string name="button_stop_session">Stop Session</string>
     <string name="button_settings_entry">Settings</string>
     <string name="button_color_lab_entry">Color Lab</string>
+    <string name="button_color_lab_reset">Reset Color</string>
     <string name="button_lens_rail">Settings</string>
     <string name="button_settings_close">Close Settings</string>
     <string name="button_filter_entry">Tone Lab</string>

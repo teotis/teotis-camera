@@ -49,8 +49,9 @@ import com.opencamera.core.mode.catalogProfile
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.RecordingStatus
-import com.opencamera.core.settings.PersistedSettingsAction
+import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PersistedSettingsAction
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -707,7 +708,15 @@ class MainActivity : AppCompatActivity() {
             saveCurrentFilterAsCustom(latestFilterLabRenderModel?.saveCustomControl)
         }
         buttonFilterModeToggle.setOnClickListener {
-            toggleFilterAdjustmentMode()
+            if (activePanelRoute is CockpitPanelRoute.LensLab) {
+                lifecycleScope.launch {
+                    container.sessionSettingsManager.apply(
+                        PersistedSettingsAction.UpdateColorLabSpec(ColorLabSpec())
+                    )
+                }
+            } else {
+                toggleFilterAdjustmentMode()
+            }
         }
         buttonAdvancedExposure.setOnClickListener {
             applyAdvancedFilterControl(FilterAdvancedControl.EXPOSURE)
@@ -825,6 +834,10 @@ class MainActivity : AppCompatActivity() {
             showAdjustmentPanel = isFilterAdjustmentVisible,
             adjustmentMode = filterAdjustmentMode
         )
+        if (activePanelRoute is CockpitPanelRoute.LensLab) {
+            val colorLabModel = colorLabPanelRenderModel(state, text)
+            filterPaletteSurface.updateReticle(colorLabModel.colorAxis, colorLabModel.toneAxis)
+        }
         val modeTrack = modeTrackRenderModel(state, text)
         latestSettingsPageRenderModel = settingsPage
         latestPortraitLabRenderModel = portraitLabPage
@@ -1129,7 +1142,7 @@ class MainActivity : AppCompatActivity() {
 
         // Show/hide adjustment panel based on panel role
         if (model.showAdjustmentPanel) {
-            renderAdjustmentPanel(model.adjustmentPanel, model.editingEnabled)
+            renderAdjustmentPanel(model.adjustmentPanel, model.editingEnabled, model.showAdvancedControls)
         } else {
             filterAdjustmentPanel.isVisible = false
         }
@@ -1235,16 +1248,22 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderAdjustmentPanel(
         model: FilterAdjustmentPanelRenderModel,
-        editingEnabled: Boolean
+        editingEnabled: Boolean,
+        showAdvancedControls: Boolean = true
     ) {
         filterAdjustmentPanel.isVisible = model.isVisible
-        buttonFilterModeToggle.text = model.modeToggleLabel
-        buttonFilterModeToggle.isEnabled = editingEnabled && model.selectedProfileId != null
+        if (showAdvancedControls) {
+            buttonFilterModeToggle.text = model.modeToggleLabel
+            buttonFilterModeToggle.isEnabled = editingEnabled && model.selectedProfileId != null
+        } else {
+            buttonFilterModeToggle.text = getString(R.string.button_color_lab_reset)
+            buttonFilterModeToggle.isEnabled = true
+        }
         filterPaletteSummary.text = "${model.selectedProfileLabel}\n${model.lightPalette.summary}"
         filterPaletteHint.text = model.lightPalette.supportingText
         filterPaletteSurface.isVisible = model.mode == FilterAdjustmentMode.LIGHT
         filterPaletteHint.isVisible = model.mode == FilterAdjustmentMode.LIGHT
-        filterAdvancedControls.isVisible = model.mode == FilterAdjustmentMode.ADVANCED
+        filterAdvancedControls.isVisible = showAdvancedControls && model.mode == FilterAdjustmentMode.ADVANCED
         buttonAdvancedExposure.text = model.advancedControls.buttonLabel(FilterAdvancedControl.EXPOSURE)
         buttonAdvancedSoftGlow.text = model.advancedControls.buttonLabel(FilterAdvancedControl.SOFT_GLOW)
         buttonAdvancedHalo.text = model.advancedControls.buttonLabel(FilterAdvancedControl.HALO)

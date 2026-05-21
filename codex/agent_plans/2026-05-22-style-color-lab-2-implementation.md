@@ -4,7 +4,7 @@
 
 **Goal:** Build `风格 + 色彩实验室` 2.0: style is the base color-science layer, and Color Lab is a secondary XY render on top of the selected style.
 
-**Architecture:** The hardest 30% is already implemented in `core/settings`: `StyleColorPipeline` and `ColorLabSpec` define order, inheritance, and style-specific palette response. Remaining agents should wire this core into persistent settings, mode/effect creation, UI panels, resources, preview/saved output, and visual QA without inventing new color math.
+**Architecture:** The hardest 30% is already implemented in `core/settings`: `StyleColorPipeline` and `ColorLabSpec` define order, inheritance, and style-specific palette response. Remaining agents should wire this core into persistent settings, mode/effect creation, UI panels, resources, and preview/saved output without inventing new color math.
 
 **Tech Stack:** Kotlin core settings, Android Views/XML, existing filter profile catalog, existing `FilterRenderSpec`, existing preview effect adapter, existing `PhotoAlgorithmPostProcessor`, Markdown handoff docs.
 
@@ -80,8 +80,6 @@ Recommended owners:
 3. Mode/Effect Pipeline Agent
 4. UI/Interaction Agent
 5. Preview/Media Verification Agent
-6. Multimodal Visual QA Agent
-
 These can run in parallel after agreeing on model names. One integrator should merge `MainActivity.kt` changes.
 
 ## Workstream 1: Core Persistence
@@ -307,6 +305,7 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests 
 - `app/src/main/java/com/opencamera/app/CockpitPanelRoute.kt`
 - `app/src/main/java/com/opencamera/app/CameraCockpitRenderModel.kt`
 - `app/src/main/java/com/opencamera/app/FilterPaletteView.kt`
+- `app/src/test/java/com/opencamera/app/FilterPaletteViewTest.kt`
 - strings/resources
 - tests
 
@@ -337,7 +336,13 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests 
   - optional strength slider;
   - no professional parameter list.
 
-- [ ] Fix palette vertical axis:
+- [ ] Keep the improved palette implementation:
+  - horizontal gradient expresses cool-to-warm color tendency;
+  - vertical overlay expresses airy-to-deep tone;
+  - dot grid and center axes show two-dimensional control;
+  - reticle remains visible on light and dark areas.
+
+- [ ] Keep palette vertical axis:
 
 ```kotlin
 val toneAxis = (1f - event.y / height * 2f).coerceIn(-1f, 1f)
@@ -347,6 +352,7 @@ reticleY = (1f - toneAxis) / 2f
 Verification:
 
 ```bash
+rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.FilterPaletteViewTest
 rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.CameraCockpitRenderModelTest --tests com.opencamera.app.SessionUiRenderModelTest
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
@@ -384,32 +390,6 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:effect:test --tests c
 rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoAlgorithmPostProcessorTest
 ```
 
-## Workstream 6: Multimodal Visual QA
-
-**Owner:** Codex or another multimodal-capable agent.
-
-**Goal:** Validate visual effect quality after non-multimodal agents implement code.
-
-Required captures:
-
-- style = 自然, Color Lab center;
-- style = 质感, tone up/down, color left/right;
-- style = 鲜明, tone up/down, color left/right;
-- style = 黑白, color left/right should not tint image strongly;
-- preview screenshot and saved JPEG for each.
-
-Checks:
-
-- `质感` tone-up should look like fade/gray-lift, not simple exposure lift.
-- `质感` warm should show split-grade feeling if possible.
-- `鲜明` color boost should avoid obvious skin oversaturation.
-- `黑白` should ignore color axis visibly.
-- preview and saved output should be directionally consistent.
-
-Output:
-
-- Markdown QA report with screenshots and pass/fail table.
-
 ## Non-Goals For 2.0 First Implementation
 
 - Do not implement full Apple-style semantic segmentation in this pass.
@@ -431,4 +411,3 @@ If the change touches Stage 7 owners, also run:
 ```bash
 rtk ./scripts/verify_stage_7_observability.sh
 ```
-

@@ -82,7 +82,7 @@
 - `2026-05-22` 最新版 APK 第三轮真机反馈已新增总索引、5 份非多模态实施方案和 1 份多模态视觉 QA：水印缩略图首帧反馈、横屏/网格/画幅几何、面板状态去重、风格与镜头实验室 IA、快门按钮视觉刷新，以及需要截图/录屏/保存 JPEG 对比的多模态验收。后续并行落地时优先从水印缩略图和面板状态去重开始，避免先做大 IA 时继续放大已有反馈错觉和重复信息。
 - `2026-05-22` 最新版 APK 第四轮真机反馈已新增总索引、4 份非多模态实施方案和 1 份多模态视觉 QA，并按最新产品口径修订顶部/侧栏 IA：顶部左侧仅应用名、中部靠右 `色彩实验室`、最右 `设置`，侧边栏收敛为 `风格 / 快捷 / Dev`；同时覆盖横屏控制旋转与预览成像区域对齐、快捷面板与二级面板边界、模式栏清晰度和命中区域，以及需要截图/录屏/保存图对比的视觉验收。后续落地应优先收敛入口 IA 与面板边界，再处理模式栏触控和横屏/预览几何，避免多个 agent 同时改 `MainActivity.kt`。
 - `2026-05-22` 色彩实验室第一阶段已完成最难的 10% 核心内核：新增 `ColorLabSpec`，把二维调色板坐标稳定映射为现有 `FilterRenderSpec`，并让旧 `applyLightPalette` 委托到该内核；剩余 UI/持久化/预览/成片接线已沉淀到 [`2026-05-22-color-lab-stage1-implementation.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-color-lab-stage1-implementation.md)，可交给非多模态 agent 落地。
-- `2026-05-22` `风格 + 色彩实验室 2.0` 已完成最难的 30% 核心内核：新增 `StyleColorPipeline`，将“风格基底先继承、色彩实验室后渲染”的顺序、风格强度、风格色彩科学分支和同一 XY 在不同风格下的不同响应固化为可测试纯 Kotlin 规则；剩余 UI/持久化/模式接线/预览与成片一致性/多模态视觉 QA 已沉淀到 [`2026-05-22-style-color-lab-2-implementation.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-style-color-lab-2-implementation.md)，可拆给多个非多模态 agent 并行落地。
+- `2026-05-22` `风格 + 色彩实验室 2.0` 已完成最难的 30% 核心内核：新增 `StyleColorPipeline`，将“风格基底先继承、色彩实验室后渲染”的顺序、风格强度、风格色彩科学分支和同一 XY 在不同风格下的不同响应固化为可测试纯 Kotlin 规则；同时优化了现有调色盘 UI，实现横向冷暖、纵向影调、点阵网格、中心轴线和正确的上正下负 tone 坐标；剩余 UI/持久化/模式接线/预览与成片一致性已沉淀到 [`2026-05-22-style-color-lab-2-implementation.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-style-color-lab-2-implementation.md)，可拆给多个非多模态 agent 并行落地。
 
 ---
 

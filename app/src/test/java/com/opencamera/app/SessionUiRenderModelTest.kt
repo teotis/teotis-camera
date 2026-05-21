@@ -35,6 +35,7 @@ import com.opencamera.core.session.SessionLifecycle
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
 import com.opencamera.core.settings.AudioProfile
+import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.CommonSettings
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
@@ -1050,6 +1051,14 @@ class SessionUiRenderModelTest {
                 headline = "PHOTO mode active",
                 detail = "Ready"
             )
+        ),
+        persistedPhotoSettings: PhotoSettings = PhotoSettings(
+            defaultFilterProfileId = "portrait-retro",
+            defaultHumanisticFilterProfileId = "humanistic-street",
+            defaultPortraitFilterProfileId = "portrait-original",
+            defaultWatermarkTemplateId = "travel-polaroid",
+            livePhotoEnabledByDefault = true,
+            countdownDuration = CountdownDuration.SECONDS_3
         )
     ): SessionState {
         return SessionState(
@@ -1558,5 +1567,66 @@ class SessionUiRenderModelTest {
                 "Quick button label '$label' exceeds 2 chars and may ellipsize in 96dp button"
             )
         }
+    }
+
+    @Test
+    fun `color lab panel render model title is color lab`() {
+        val state = defaultSessionState()
+        val model = colorLabPanelRenderModel(state, TestAppTextResolver())
+
+        assertEquals("Color Lab", model.title)
+    }
+
+    @Test
+    fun `color lab panel render model reflects persisted spec`() {
+        val spec = ColorLabSpec(colorAxis = 0.5f, toneAxis = -0.25f, strength = 0.8f)
+        val state = defaultSessionState(
+            persistedPhotoSettings = PhotoSettings(colorLabSpec = spec)
+        )
+        val model = colorLabPanelRenderModel(state, TestAppTextResolver())
+
+        assertEquals(0.5f, model.colorAxis)
+        assertEquals(-0.25f, model.toneAxis)
+        assertEquals(0.8f, model.strength)
+    }
+
+    @Test
+    fun `color lab panel render model exposes reset action`() {
+        val state = defaultSessionState()
+        val model = colorLabPanelRenderModel(state, TestAppTextResolver())
+
+        val resetSpec = model.resetAction.spec
+        assertEquals(0f, resetSpec.colorAxis)
+        assertEquals(0f, resetSpec.toneAxis)
+        assertEquals(1f, resetSpec.strength)
+    }
+
+    @Test
+    fun `lens lab filter page does not show advanced controls`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.LENS_LAB
+        )
+
+        assertFalse(model.showAdvancedControls)
+        assertFalse(model.showFamilyTabs)
+        assertFalse(model.showFilterItems)
+        assertTrue(model.showAdjustmentPanel)
+    }
+
+    @Test
+    fun `style filter page shows advanced controls`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+
+        assertTrue(model.showAdvancedControls)
+        assertTrue(model.showFamilyTabs)
+        assertTrue(model.showFilterItems)
     }
 }

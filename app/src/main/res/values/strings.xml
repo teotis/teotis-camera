@@ -30,6 +30,7 @@
     <string name="button_stop_session">停止会话</string>
     <string name="button_settings_entry">设置</string>
     <string name="button_color_lab_entry">色彩实验室</string>
+    <string name="button_color_lab_reset">重置色彩</string>
     <string name="button_lens_rail">设置</string>
     <string name="button_settings_close">关闭设置</string>
     <string name="button_filter_entry">色调</string>
