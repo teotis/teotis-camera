@@ -48,5 +48,6 @@
     <dimen name="top_scrim_height">72dp</dimen>
     <dimen name="panel_margin_horizontal">16dp</dimen>
     <dimen name="panel_padding">18dp</dimen>
+    <dimen name="panel_max_height">480dp</dimen>
     <dimen name="bottom_cockpit_padding_horizontal">16dp</dimen>
 </resources>
