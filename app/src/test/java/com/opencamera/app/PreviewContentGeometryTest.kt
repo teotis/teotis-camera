@@ -1,118 +1,99 @@
 package com.opencamera.app
 
-import android.graphics.RectF
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PreviewContentGeometryTest {
 
-    // With isReturnDefaultValues=true, RectF methods (width/height/centerX/centerY) return 0.
-    // We verify geometry correctness via computeFrameRect (tested in PreviewOverlayGeometryTest)
-    // and here verify PreviewContentGeometry structure and field values.
-
     @Test
-    fun `content geometry with no ratio returns full view rect`() {
+    fun `portrait 1080x2400 with 16_9 ratio produces centered 9_16 frame`() {
         val geo = previewContentGeometry(
             viewWidth = 1080,
-            viewHeight = 1920
+            viewHeight = 2400,
+            ratioWidth = 16,
+            ratioHeight = 9
         )
-        assertEquals(0f, geo.contentRect.left)
-        assertEquals(0f, geo.contentRect.top)
-        assertEquals(1080f, geo.contentRect.right)
-        assertEquals(1920f, geo.contentRect.bottom)
-        assertEquals(geo.contentRect.left, geo.activeFrameRect.left)
-        assertEquals(geo.contentRect.top, geo.activeFrameRect.top)
-        assertEquals(geo.contentRect.right, geo.activeFrameRect.right)
-        assertEquals(geo.contentRect.bottom, geo.activeFrameRect.bottom)
+        // Oriented: 9:16. targetRatio = 0.5625, availableRatio = 1080/2400 = 0.45
+        // targetRatio > availableRatio => width-limited: w=1080, h=1080/0.5625=1920
+        assertEquals(1080f, geo.activeFrameRect.width(), 1f)
+        assertEquals(1920f, geo.activeFrameRect.height(), 1f)
+        assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
     @Test
-    fun `content geometry with ratio produces frame inside content rect`() {
-        val geo = previewContentGeometry(
-            viewWidth = 1080,
-            viewHeight = 1920,
-            ratioWidth = 4,
-            ratioHeight = 3
-        )
-        assertTrue(geo.activeFrameRect.left >= geo.contentRect.left)
-        assertTrue(geo.activeFrameRect.top >= geo.contentRect.top)
-        assertTrue(geo.activeFrameRect.right <= geo.contentRect.right)
-        assertTrue(geo.activeFrameRect.bottom <= geo.contentRect.bottom)
-    }
-
-    @Test
-    fun `horizontal padding shrinks content rect`() {
-        val geo = previewContentGeometry(
-            viewWidth = 1080,
-            viewHeight = 1920,
-            horizontalPaddingPx = 24f
-        )
-        assertEquals(24f, geo.contentRect.left)
-        assertEquals(1056f, geo.contentRect.right)
-        assertEquals(0f, geo.contentRect.top)
-        assertEquals(1920f, geo.contentRect.bottom)
-    }
-
-    @Test
-    fun `view dimensions are preserved`() {
+    fun `landscape 2400x1080 with 16_9 ratio produces centered 16_9 frame`() {
         val geo = previewContentGeometry(
             viewWidth = 2400,
             viewHeight = 1080,
             ratioWidth = 16,
             ratioHeight = 9
         )
-        assertEquals(2400, geo.viewWidth)
-        assertEquals(1080, geo.viewHeight)
+        // Oriented: 16:9. targetRatio = 1.778, availableRatio = 2400/1080 = 2.222
+        // targetRatio < availableRatio => height-limited: h=1080, w=1080*1.778=1920
+        assertEquals(1920f, geo.activeFrameRect.width(), 1f)
+        assertEquals(1080f, geo.activeFrameRect.height(), 1f)
+        assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
     @Test
-    fun `frame rect fields match computeFrameRect output`() {
+    fun `portrait 1080x2400 with 4_3 ratio produces centered 3_4 frame`() {
         val geo = previewContentGeometry(
             viewWidth = 1080,
-            viewHeight = 1920,
+            viewHeight = 2400,
             ratioWidth = 4,
             ratioHeight = 3
         )
-        val fr = computeFrameRect(1080, 1920, 4, 3)
-        assertEquals(fr.left, geo.activeFrameRect.left)
-        assertEquals(fr.top, geo.activeFrameRect.top)
-        assertEquals(fr.right, geo.activeFrameRect.right)
-        assertEquals(fr.bottom, geo.activeFrameRect.bottom)
+        // Oriented: 3:4. targetRatio = 0.75, availableRatio = 0.45
+        // targetRatio > availableRatio => width-limited: w=1080, h=1080/0.75=1440
+        assertEquals(1080f, geo.activeFrameRect.width(), 1f)
+        assertEquals(1440f, geo.activeFrameRect.height(), 1f)
+        assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
     @Test
-    fun `frame rect fields match computeFrameRect for landscape 16_9`() {
+    fun `landscape 2400x1080 with 4_3 ratio produces centered 4_3 frame`() {
         val geo = previewContentGeometry(
             viewWidth = 2400,
             viewHeight = 1080,
-            ratioWidth = 16,
-            ratioHeight = 9
+            ratioWidth = 4,
+            ratioHeight = 3
         )
-        val fr = computeFrameRect(2400, 1080, 16, 9)
-        assertEquals(fr.left, geo.activeFrameRect.left)
-        assertEquals(fr.top, geo.activeFrameRect.top)
-        assertEquals(fr.right, geo.activeFrameRect.right)
-        assertEquals(fr.bottom, geo.activeFrameRect.bottom)
+        // Oriented: 4:3. targetRatio = 1.333, availableRatio = 2.222
+        // targetRatio < availableRatio => height-limited: h=1080, w=1080*1.333=1440
+        assertEquals(1440f, geo.activeFrameRect.width(), 1f)
+        assertEquals(1080f, geo.activeFrameRect.height(), 1f)
+        assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
     @Test
-    fun `frame rect fields match computeFrameRect for square`() {
+    fun `portrait 1080x2400 with 1_1 ratio produces centered square`() {
         val geo = previewContentGeometry(
             viewWidth = 1080,
-            viewHeight = 1920,
+            viewHeight = 2400,
             ratioWidth = 1,
             ratioHeight = 1
         )
-        val fr = computeFrameRect(1080, 1920, 1, 1)
-        assertEquals(fr.left, geo.activeFrameRect.left)
-        assertEquals(fr.top, geo.activeFrameRect.top)
-        assertEquals(fr.right, geo.activeFrameRect.right)
-        assertEquals(fr.bottom, geo.activeFrameRect.bottom)
+        assertEquals(1080f, geo.activeFrameRect.width(), 1f)
+        assertEquals(1080f, geo.activeFrameRect.height(), 1f)
+        assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
     @Test
-    fun `frame is centered in content rect`() {
+    fun `landscape 2400x1080 with 1_1 ratio produces centered square`() {
+        val geo = previewContentGeometry(
+            viewWidth = 2400,
+            viewHeight = 1080,
+            ratioWidth = 1,
+            ratioHeight = 1
+        )
+        assertEquals(1080f, geo.activeFrameRect.width(), 1f)
+        assertEquals(1080f, geo.activeFrameRect.height(), 1f)
+        assertRectCentered(geo.contentRect, geo.activeFrameRect)
+    }
+
+    @Test
+    fun `frame center equals content center within 1px for all ratios`() {
         val configs = listOf(
             Triple(1080, 2400, listOf(1 to 1, 4 to 3, 16 to 9)),
             Triple(2400, 1080, listOf(1 to 1, 4 to 3, 16 to 9)),
@@ -121,16 +102,12 @@ class PreviewContentGeometryTest {
         for ((vw, vh, ratios) in configs) {
             for ((rw, rh) in ratios) {
                 val geo = previewContentGeometry(vw, vh, rw, rh)
-                val contentCenterX = (geo.contentRect.left + geo.contentRect.right) / 2f
-                val contentCenterY = (geo.contentRect.top + geo.contentRect.bottom) / 2f
-                val frameCenterX = (geo.activeFrameRect.left + geo.activeFrameRect.right) / 2f
-                val frameCenterY = (geo.activeFrameRect.top + geo.activeFrameRect.bottom) / 2f
                 assertEquals(
-                    contentCenterX, frameCenterX, 1f,
+                    geo.contentCenterX, geo.frameCenterX, 1f,
                     "Center X mismatch for ${vw}x${vh} ratio ${rw}:${rh}"
                 )
                 assertEquals(
-                    contentCenterY, frameCenterY, 1f,
+                    geo.contentCenterY, geo.frameCenterY, 1f,
                     "Center Y mismatch for ${vw}x${vh} ratio ${rw}:${rh}"
                 )
             }
@@ -155,6 +132,37 @@ class PreviewContentGeometryTest {
             assertTrue(seg.x1 <= frame.right, "x1=${seg.x1} > right=${frame.right}")
             assertTrue(seg.y1 >= frame.top, "y1=${seg.y1} < top=${frame.top}")
             assertTrue(seg.y1 <= frame.bottom, "y1=${seg.y1} > bottom=${frame.bottom}")
+            assertTrue(seg.x2 >= frame.left, "x2=${seg.x2} < left=${frame.left}")
+            assertTrue(seg.x2 <= frame.right, "x2=${seg.x2} > right=${frame.right}")
+            assertTrue(seg.y2 >= frame.top, "y2=${seg.y2} < top=${frame.top}")
+            assertTrue(seg.y2 <= frame.bottom, "y2=${seg.y2} > bottom=${frame.bottom}")
         }
+    }
+
+    @Test
+    fun `no ratio returns full view as active frame`() {
+        val geo = previewContentGeometry(
+            viewWidth = 1080,
+            viewHeight = 1920
+        )
+        assertEquals(geo.contentRect, geo.activeFrameRect)
+    }
+
+    @Test
+    fun `horizontal padding shrinks content rect symmetrically`() {
+        val geo = previewContentGeometry(
+            viewWidth = 1080,
+            viewHeight = 1920,
+            horizontalPaddingPx = 24f
+        )
+        assertEquals(24f, geo.contentRect.left)
+        assertEquals(1056f, geo.contentRect.right)
+        assertEquals(0f, geo.contentRect.top)
+        assertEquals(1920f, geo.contentRect.bottom)
+    }
+
+    private fun assertRectCentered(outer: android.graphics.RectF, inner: android.graphics.RectF) {
+        assertEquals(outer.centerX(), inner.centerX(), 1f)
+        assertEquals(outer.centerY(), inner.centerY(), 1f)
     }
 }

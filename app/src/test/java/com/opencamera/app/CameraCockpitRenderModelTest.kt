@@ -63,7 +63,7 @@ class CameraCockpitRenderModelTest {
 
         assertEquals("OpenCamera", model.topStatus.appName)
         assertEquals("Humanistic", model.topStatus.modeLabel)
-        assertEquals("Color Lab", model.topStatus.labEntryLabel)
+        assertEquals("Settings", model.topStatus.labEntryLabel)
     }
 
     @Test
@@ -75,14 +75,16 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `right rail includes style quick and dev entries`() {
+    fun `right rail includes style lens lab quick and dev entries`() {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertEquals(3, model.rightRail.entries.size)
+        assertEquals(5, model.rightRail.entries.size)
         assertEquals("Style", model.rightRail.entries[0].label)
-        assertEquals("Quick", model.rightRail.entries[1].label)
-        assertEquals("DEV", model.rightRail.entries[2].label)
+        assertEquals("Lens Lab", model.rightRail.entries[1].label)
+        assertEquals("Quick", model.rightRail.entries[2].label)
+        assertEquals("Settings", model.rightRail.entries[3].label)
+        assertEquals("DEV", model.rightRail.entries[4].label)
     }
 
     @Test
@@ -90,7 +92,7 @@ class CameraCockpitRenderModelTest {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertFalse(model.rightRail.entries[2].isVisible)
+        assertFalse(model.rightRail.entries[4].isVisible)
     }
 
     @Test
@@ -135,9 +137,9 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `mode track hides humanistic and uses product order`() {
+    fun `mode track preserves available mode order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT, ModeId.HUMANISTIC,
+            ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC,
             ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
         )
         val state = defaultSessionState(
@@ -148,7 +150,7 @@ class CameraCockpitRenderModelTest {
 
         assertEquals(6, model.modeTrack.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO),
             model.modeTrack.items.map { it.modeId }
         )
         assertTrue(model.modeTrack.items.first { it.modeId == ModeId.PORTRAIT }.isActive)
