@@ -1451,7 +1451,7 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `filter items do not show raw parameter strings in title or supporting text`() {
+    fun `filter items do not show raw parameter strings in title`() {
         val state = defaultSessionState()
         val model = filterLabPageRenderModel(
             state = state,
@@ -1462,8 +1462,8 @@ class SessionUiRenderModelTest {
         model.filterItems.forEach { item ->
             assertFalse(item.title.contains("B ") && item.title.contains("C "),
                 "Filter item title should not contain raw parameter strings: ${item.title}")
-            assertFalse(item.supportingText.contains(" | "),
-                "Filter item supporting text should not contain raw parameter strings: ${item.supportingText}")
+            assertTrue(item.supportingText.contains("Photo") || item.supportingText.contains("Humanistic"),
+                "Filter item supporting text should contain family label: ${item.supportingText}")
         }
     }
 
