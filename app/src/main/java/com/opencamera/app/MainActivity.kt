@@ -1133,7 +1133,7 @@ class MainActivity : AppCompatActivity() {
                     alpha = 0.78f
                 }
                 setOnClickListener {
-                    dispatch(SessionIntent.ZoomRatioToggled)
+                    dispatch(SessionIntent.ApplyZoomRatio(capsule.ratio))
                 }
             }
             val params = LinearLayout.LayoutParams(

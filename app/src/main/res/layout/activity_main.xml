@@ -205,7 +205,7 @@
                 style="@style/Widget.OpenCamera.ModeTrackButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="8dp"
                 android:text="@string/button_document_mode" />
 
             <Button
@@ -213,7 +213,7 @@
                 style="@style/Widget.OpenCamera.ModeTrackButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="8dp"
                 android:text="@string/button_night_mode" />
 
             <Button
@@ -221,7 +221,7 @@
                 style="@style/Widget.OpenCamera.ModeTrackButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="8dp"
                 android:text="@string/button_humanistic_mode" />
 
             <Button
@@ -229,7 +229,7 @@
                 style="@style/Widget.OpenCamera.ModeTrackButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="8dp"
                 android:text="@string/button_portrait_mode" />
 
             <Button
@@ -237,7 +237,7 @@
                 style="@style/Widget.OpenCamera.ModeTrackButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="8dp"
                 android:text="@string/button_pro_mode" />
 
             <Button
@@ -245,7 +245,7 @@
                 style="@style/Widget.OpenCamera.ModeTrackButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="8dp"
                 android:text="@string/button_video_mode" />
         </LinearLayout>
     </HorizontalScrollView>
@@ -1242,23 +1242,46 @@
             android:textColor="#BFD0E4"
             android:textSize="12sp" />
 
-        <!-- Three-segment row: Thumbnail | Lens/Zoom -->
+        <!-- Main control row: Thumbnail | Shutter | Lens/Zoom -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <!-- Left: Thumbnail -->
             <ImageView
                 android:id="@+id/previewThumbnail"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
                 android:background="#102235"
                 android:contentDescription="@string/preview_thumbnail_content_description"
                 android:padding="2dp"
                 android:scaleType="centerCrop" />
+
+            <!-- Center: Shutter (round) -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/buttonShutter"
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
+                    android:backgroundTint="#F5F7FA"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    android:text="@string/button_shutter_short"
+                    android:textAllCaps="false"
+                    android:textColor="#101318"
+                    android:textSize="13sp" />
+            </LinearLayout>
 
             <!-- Right: Lens + Zoom -->
             <LinearLayout
@@ -1283,29 +1306,6 @@
                     android:text="@string/button_zoom_prefix"
                     android:textSize="11sp" />
             </LinearLayout>
-        </LinearLayout>
-
-        <!-- Shutter row: centered anchor -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:gravity="center"
-            android:orientation="horizontal">
-
-            <Button
-                android:id="@+id/buttonShutter"
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:backgroundTint="#F5F7FA"
-                android:insetLeft="0dp"
-                android:insetTop="0dp"
-                android:insetRight="0dp"
-                android:insetBottom="0dp"
-                android:text="@string/button_shutter_short"
-                android:textAllCaps="false"
-                android:textColor="#101318"
-                android:textSize="14sp" />
         </LinearLayout>
     </LinearLayout>
 

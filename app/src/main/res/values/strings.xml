@@ -218,4 +218,8 @@
     <string name="settings_summary_watermark_templates">个水印模板</string>
     <string name="settings_summary_ms_bundle">ms 包</string>
     <string name="settings_summary_pro_manual_draft">专业手动草稿</string>
+    <string name="button_recording_starting">启动录制中…</string>
+    <string name="button_recording_stop">停止录制</string>
+    <string name="button_recording_saving">保存视频中…</string>
+    <string name="gallery_open_failed">无法打开媒体文件</string>
 </resources>

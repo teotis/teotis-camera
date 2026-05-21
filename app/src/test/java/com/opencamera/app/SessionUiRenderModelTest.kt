@@ -1104,6 +1104,29 @@ class SessionUiRenderModelTest {
         assertTrue(controls.lensFacingEnabled)
     }
 
+    @Test
+    fun `zoom capsule render model carries individual ratio and active state`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 1f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertEquals(4, controls.zoomCapsules.size)
+        assertEquals(listOf(0.6f, 1f, 2f, 5f), controls.zoomCapsules.map { it.ratio })
+        assertEquals(listOf(false, true, false, false), controls.zoomCapsules.map { it.isActive })
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",

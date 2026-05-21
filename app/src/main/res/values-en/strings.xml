@@ -218,4 +218,8 @@
     <string name="settings_summary_watermark_templates">watermark templates</string>
     <string name="settings_summary_ms_bundle">ms bundle</string>
     <string name="settings_summary_pro_manual_draft">Pro manual draft</string>
+    <string name="button_recording_starting">Starting…</string>
+    <string name="button_recording_stop">Stop</string>
+    <string name="button_recording_saving">Saving…</string>
+    <string name="gallery_open_failed">Cannot open media file</string>
 </resources>
