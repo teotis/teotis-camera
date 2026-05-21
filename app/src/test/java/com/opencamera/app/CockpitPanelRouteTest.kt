@@ -62,6 +62,6 @@ class CockpitPanelRouteTest {
     fun `FilterLab and QuickBubble are distinct routes`() {
         val a: CockpitPanelRoute = CockpitPanelRoute.FilterLab
         val b: CockpitPanelRoute = CockpitPanelRoute.QuickBubble
-        assertFalse((a as CockpitPanelRoute) == (b as CockpitPanelRoute))
+        assertFalse(a == b)
     }
 }
