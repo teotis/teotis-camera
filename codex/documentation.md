@@ -80,10 +80,23 @@
 - `2026-05-22` 真机最新版 APK 反馈已拆成 5 份可交给非多模态 agent 的落地方案：首次授权后预览恢复、零延时缩略图反馈、窄横向变焦条、画幅/预览 cockpit、色调调色板可发现性；需要看截图/录屏/视觉对比的事项单独隔离到多模态延期清单。
 - `2026-05-22` 最新版 APK 第二轮真机反馈已按相近问题合并为 3 份非多模态实施方案和 1 份多模态延期 QA：媒体输出/滤镜/缩略图、面板入口信息架构、中文文案与窄屏布局、多模态视觉和成片验收。后续落地应优先处理媒体保存失败和面板 IA，因为它们会同时影响“滤镜成片”和“缩略图回退”的可验证性。
 - `2026-05-22` 最新版 APK 第三轮真机反馈已新增总索引、5 份非多模态实施方案和 1 份多模态视觉 QA：水印缩略图首帧反馈、横屏/网格/画幅几何、面板状态去重、风格与镜头实验室 IA、快门按钮视觉刷新，以及需要截图/录屏/保存 JPEG 对比的多模态验收。后续并行落地时优先从水印缩略图和面板状态去重开始，避免先做大 IA 时继续放大已有反馈错觉和重复信息。
+- `2026-05-22` 最新版 APK 第四轮真机反馈已新增总索引、4 份非多模态实施方案和 1 份多模态视觉 QA：横屏控制旋转与预览成像区域对齐、顶部实验室入口和右侧栏 IA、快捷面板与二级面板边界、模式栏清晰度和命中区域，以及需要截图/录屏/保存图对比的视觉验收。后续落地应优先收敛入口 IA 与面板边界，再处理模式栏触控和横屏/预览几何，避免多个 agent 同时改 `MainActivity.kt`。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-22：最新版 APK 第四轮真机反馈方案文档
+
+- 目标：把用户对最新版 APK 的新一轮真机问题按处理领域拆解，形成可直接交给非多模态 agent 的 Markdown 落地方案，并把需要观察截图、录屏、横屏真实手感和保存图对比的事项隔离给多模态 agent。
+- 核心结果：
+  [`2026-05-22-fourth-real-device-feedback-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fourth-real-device-feedback-index.md) 建立第四轮反馈总索引、问题映射、依赖顺序和全局验证口径；
+  [`2026-05-22-landscape-preview-alignment-and-rotation.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-landscape-preview-alignment-and-rotation.md) 将“横屏交互不好”和“真实成像区域相对预览偏下”合并为方向渲染与预览几何同源问题，要求控件旋转、active content rect 和 frame/grid/tap 区域使用同一套纯几何；
+  [`2026-05-22-rail-and-color-lab-entry-consolidation.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-rail-and-color-lab-entry-consolidation.md) 要求恢复顶部右侧 `色彩实验室/镜头实验室` 入口，缩短右侧栏为 `风格/快捷/Dev` 等高频项，并避免 `设置`、`风格`、`实验室` 混作同一入口；
+  [`2026-05-22-quick-and-secondary-panel-bounds.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-quick-and-secondary-panel-bounds.md) 将快捷面板省略号和二级面板过大合并为布局边界问题，要求短标签、状态分离、内部滚动和统一 max-height/safe-area 策略；
+  [`2026-05-22-mode-track-legibility-and-hit-targets.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-mode-track-legibility-and-hit-targets.md) 聚焦模式栏文字显著性、触控命中、scroll/tap 仲裁和 auto-scroll 稳定性；
+  [`2026-05-22-fourth-feedback-multimodal-visual-qa.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fourth-feedback-multimodal-visual-qa.md) 单独收纳第四轮需要多模态能力的横屏观感、预览/成片对齐、面板遮挡、模式栏触控录屏和入口 IA 视觉验收。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读当前 `activity_main.xml`、`MainActivity.kt`、`CameraCockpitRenderModel.kt`、`CockpitPanelRoute.kt`、样式/字符串资源和第三轮 agent plans，按用户新反馈重新合并为四个可并行落地领域。
 
 ## 2026-05-22：最新版 APK 第三轮真机反馈方案文档
 
