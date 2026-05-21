@@ -81,7 +81,7 @@ internal fun cameraCockpitRenderModel(
             entries = listOf(
                 RightRailEntryRenderModel(
                     route = CockpitPanelRoute.FilterLab,
-                    label = text.tone(),
+                    label = text.styleEntry(),
                     isActive = activeRoute is CockpitPanelRoute.FilterLab
                 ),
                 RightRailEntryRenderModel(

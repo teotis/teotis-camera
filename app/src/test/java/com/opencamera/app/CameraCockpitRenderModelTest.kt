@@ -75,12 +75,12 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `right rail includes tone quick and dev entries`() {
+    fun `right rail includes style quick and dev entries`() {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals(4, model.rightRail.entries.size)
-        assertEquals("Tone", model.rightRail.entries[0].label)
+        assertEquals("Style", model.rightRail.entries[0].label)
         assertEquals("Quick", model.rightRail.entries[1].label)
         assertEquals("Settings", model.rightRail.entries[2].label)
         assertEquals("DEV", model.rightRail.entries[3].label)
