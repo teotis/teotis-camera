@@ -419,7 +419,21 @@ class MainActivity : AppCompatActivity() {
             toggleSettingsPanel()
         }
         buttonLensLabEntry.setOnClickListener {
-            toggleSettingsPanel()
+            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.LensLab) {
+                CockpitPanelRoute.None
+            } else {
+                CockpitPanelRoute.LensLab
+            }
+            if (activePanelRoute is CockpitPanelRoute.LensLab) {
+                isFilterAdjustmentVisible = true
+                maybeAutoPrepareFilter()
+                renderLatestFilterLab()
+            } else {
+                selectedFilterLabFamilyOverride = null
+                isFilterAdjustmentVisible = false
+                lightPaletteBaseSpec = null
+            }
+            renderPanelVisibility()
         }
         buttonFilterEntry.setOnClickListener {
             activePanelRoute = if (activePanelRoute is CockpitPanelRoute.FilterLab) {
@@ -1230,7 +1244,7 @@ class MainActivity : AppCompatActivity() {
     private fun renderPanelVisibility() {
         val route = activePanelRoute
         settingsPanel.isVisible = route.isSettingsOpen
-        filterPanel.isVisible = route is CockpitPanelRoute.FilterLab
+        filterPanel.isVisible = route is CockpitPanelRoute.FilterLab || route is CockpitPanelRoute.LensLab
         panelDismissScrim.isVisible = route.isAnyPanelOpen
 
         val subpage = (route as? CockpitPanelRoute.Settings)?.subpage
@@ -1241,7 +1255,7 @@ class MainActivity : AppCompatActivity() {
         buttonSettingsBack.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
 
         buttonSettingsEntry.visibility = View.GONE
-        buttonLensLabEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
+        buttonLensLabEntry.alpha = if (route is CockpitPanelRoute.LensLab) 1f else 0.92f
         buttonFilterEntry.alpha = if (route is CockpitPanelRoute.FilterLab) 1f else 0.92f
         quickBubblePanel.isVisible = route is CockpitPanelRoute.QuickBubble
         buttonQuickLauncher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
@@ -1503,9 +1517,10 @@ class MainActivity : AppCompatActivity() {
                 renderPanelVisibility()
             }
             CockpitPanelRoute.FilterLab,
+            CockpitPanelRoute.LensLab,
             CockpitPanelRoute.DevConsole,
             CockpitPanelRoute.QuickBubble -> {
-                if (activePanelRoute is CockpitPanelRoute.FilterLab) {
+                if (activePanelRoute is CockpitPanelRoute.FilterLab || activePanelRoute is CockpitPanelRoute.LensLab) {
                     selectedFilterLabFamilyOverride = null
                     isFilterAdjustmentVisible = false
                     lightPaletteBaseSpec = null

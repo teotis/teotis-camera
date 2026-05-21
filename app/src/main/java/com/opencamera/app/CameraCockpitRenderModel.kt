@@ -85,6 +85,11 @@ internal fun cameraCockpitRenderModel(
                     isActive = activeRoute is CockpitPanelRoute.FilterLab
                 ),
                 RightRailEntryRenderModel(
+                    route = CockpitPanelRoute.LensLab,
+                    label = text.lensLabEntry(),
+                    isActive = activeRoute is CockpitPanelRoute.LensLab
+                ),
+                RightRailEntryRenderModel(
                     route = CockpitPanelRoute.QuickBubble,
                     label = text.quickLauncher(),
                     isActive = activeRoute is CockpitPanelRoute.QuickBubble

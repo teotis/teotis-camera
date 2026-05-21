@@ -13,6 +13,7 @@ sealed class CockpitPanelRoute {
     data object DevConsole : CockpitPanelRoute()
     data class Settings(val subpage: SettingsSubpage = SettingsSubpage.ROOT) : CockpitPanelRoute()
     data object FilterLab : CockpitPanelRoute()
+    data object LensLab : CockpitPanelRoute()
 }
 
 internal val CockpitPanelRoute.isSettingsOpen: Boolean
