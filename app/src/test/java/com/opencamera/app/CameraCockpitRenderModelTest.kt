@@ -135,9 +135,9 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `mode track preserves available mode order`() {
+    fun `mode track hides humanistic and uses product order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC,
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT, ModeId.HUMANISTIC,
             ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
         )
         val state = defaultSessionState(
@@ -148,7 +148,7 @@ class CameraCockpitRenderModelTest {
 
         assertEquals(6, model.modeTrack.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO),
+            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
             model.modeTrack.items.map { it.modeId }
         )
         assertTrue(model.modeTrack.items.first { it.modeId == ModeId.PORTRAIT }.isActive)

@@ -945,10 +945,18 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `mode directory render model productizes scenery and humanistic entries`() {
+    fun `mode directory render model hides humanistic entry and uses product order`() {
         val state = defaultSessionState(
             activeMode = ModeId.NIGHT,
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),
+            availableModes = listOf(
+                ModeId.PHOTO,
+                ModeId.DOCUMENT,
+                ModeId.NIGHT,
+                ModeId.HUMANISTIC,
+                ModeId.PORTRAIT,
+                ModeId.PRO,
+                ModeId.VIDEO
+            ),
             modeSnapshot = ModeSnapshot(
                 id = ModeId.NIGHT,
                 uiSpec = ModeUiSpec(
@@ -965,19 +973,18 @@ class SessionUiRenderModelTest {
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Scenery", "Humanistic", "Video"),
+            listOf("Photo", "Scenery", "Port", "Pro", "Video", "Doc"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
+        )
+        assertEquals(
+            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
         assertEquals("Handheld", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
         assertEquals(
             "Scenery style, Pro variant, night fusion, frame ratio",
             model.items.first { it.modeId == ModeId.NIGHT }.declaredSubfeatures
-        )
-        assertEquals("Human", model.items.first { it.modeId == ModeId.HUMANISTIC }.buttonLabel)
-        assertEquals(
-            "Humanistic Street",
-            model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel
         )
         assertEquals(
             "• Scenery | Default Handheld | Scenery style, Pro variant, night fusion, frame ratio",
@@ -1195,7 +1202,7 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `mode track render model preserves available mode order and identity`() {
+    fun `mode track render model hides humanistic entry and uses product order`() {
         val availableModes = listOf(
             ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
             ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
@@ -1206,15 +1213,28 @@ class SessionUiRenderModelTest {
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(7, model.items.size)
+        assertEquals(6, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
-                   ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO),
+            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map { it.modeId }
         )
-        assertTrue(model.items.first { it.modeId == ModeId.HUMANISTIC }.isActive)
+        assertTrue(model.items.none { it.modeId == ModeId.HUMANISTIC })
+        assertFalse(model.items.any { it.isActive })
         assertFalse(model.items.first { it.modeId == ModeId.PHOTO }.isActive)
         assertTrue(model.items.all { it.isAvailable })
+    }
+
+    @Test
+    fun `photo filter family exposes humanistic styles as photo style subitems`() {
+        val model = filterLabPageRenderModel(
+            state = defaultSessionState(activeMode = ModeId.PHOTO),
+            text = TestAppTextResolver(),
+            selectedFamily = FilterLabFamily.PHOTO
+        )
+
+        assertTrue(model.photoTab.isSelected)
+        assertTrue(model.rosterText.contains("• Humanistic Street"))
+        assertTrue(model.rosterText.contains("• Humanistic Life"))
     }
 
     @Test

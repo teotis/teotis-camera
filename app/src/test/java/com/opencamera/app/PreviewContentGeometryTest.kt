@@ -16,8 +16,8 @@ class PreviewContentGeometryTest {
         )
         // Oriented: 9:16. targetRatio = 0.5625, availableRatio = 1080/2400 = 0.45
         // targetRatio > availableRatio => width-limited: w=1080, h=1080/0.5625=1920
-        assertApprox(1080f, geo.activeFrameRect.width)
-        assertApprox(1920f, geo.activeFrameRect.height)
+        assertApprox(1080f, geo.activeFrameRect.width())
+        assertApprox(1920f, geo.activeFrameRect.height())
         assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
@@ -31,8 +31,8 @@ class PreviewContentGeometryTest {
         )
         // Oriented: 16:9. targetRatio = 1.778, availableRatio = 2400/1080 = 2.222
         // targetRatio < availableRatio => height-limited: h=1080, w=1080*1.778=1920
-        assertApprox(1920f, geo.activeFrameRect.width)
-        assertApprox(1080f, geo.activeFrameRect.height)
+        assertApprox(1920f, geo.activeFrameRect.width())
+        assertApprox(1080f, geo.activeFrameRect.height())
         assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
@@ -46,8 +46,8 @@ class PreviewContentGeometryTest {
         )
         // Oriented: 3:4. targetRatio = 0.75, availableRatio = 0.45
         // targetRatio > availableRatio => width-limited: w=1080, h=1080/0.75=1440
-        assertApprox(1080f, geo.activeFrameRect.width)
-        assertApprox(1440f, geo.activeFrameRect.height)
+        assertApprox(1080f, geo.activeFrameRect.width())
+        assertApprox(1440f, geo.activeFrameRect.height())
         assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
@@ -61,8 +61,8 @@ class PreviewContentGeometryTest {
         )
         // Oriented: 4:3. targetRatio = 1.333, availableRatio = 2.222
         // targetRatio < availableRatio => height-limited: h=1080, w=1080*1.333=1440
-        assertApprox(1440f, geo.activeFrameRect.width)
-        assertApprox(1080f, geo.activeFrameRect.height)
+        assertApprox(1440f, geo.activeFrameRect.width())
+        assertApprox(1080f, geo.activeFrameRect.height())
         assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
@@ -74,8 +74,8 @@ class PreviewContentGeometryTest {
             ratioWidth = 1,
             ratioHeight = 1
         )
-        assertApprox(1080f, geo.activeFrameRect.width)
-        assertApprox(1080f, geo.activeFrameRect.height)
+        assertApprox(1080f, geo.activeFrameRect.width())
+        assertApprox(1080f, geo.activeFrameRect.height())
         assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
@@ -87,8 +87,8 @@ class PreviewContentGeometryTest {
             ratioWidth = 1,
             ratioHeight = 1
         )
-        assertApprox(1080f, geo.activeFrameRect.width)
-        assertApprox(1080f, geo.activeFrameRect.height)
+        assertApprox(1080f, geo.activeFrameRect.width())
+        assertApprox(1080f, geo.activeFrameRect.height())
         assertRectCentered(geo.contentRect, geo.activeFrameRect)
     }
 
@@ -124,7 +124,7 @@ class PreviewContentGeometryTest {
         )
         val frame = geo.activeFrameRect
         val lines = gridLinePositions(
-            frame.left, frame.top, frame.width, frame.height,
+            frame.left, frame.top, frame.width(), frame.height(),
             listOf(1f / 3f, 2f / 3f)
         )
         lines.forEach { seg ->
@@ -168,8 +168,8 @@ class PreviewContentGeometryTest {
         assertEquals(expected, actual, tolerance)
     }
 
-    private fun assertRectCentered(outer: FrameRect, inner: FrameRect) {
-        assertEquals(outer.centerX, inner.centerX, 1f)
-        assertEquals(outer.centerY, inner.centerY, 1f)
+    private fun assertRectCentered(outer: android.graphics.RectF, inner: android.graphics.RectF) {
+        assertEquals(outer.centerX(), inner.centerX(), 1f)
+        assertEquals(outer.centerY(), inner.centerY(), 1f)
     }
 }
