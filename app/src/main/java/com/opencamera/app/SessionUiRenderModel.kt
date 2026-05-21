@@ -39,6 +39,7 @@ import com.opencamera.core.settings.PortraitBeautyPreset
 import com.opencamera.core.settings.PortraitBeautyStrength
 import com.opencamera.core.settings.PortraitBokehEffect
 import com.opencamera.core.settings.PortraitProfile
+import com.opencamera.core.settings.applyColorLab
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.filterProfilesFor
 import com.opencamera.core.settings.VideoFrameRate
@@ -2295,13 +2296,11 @@ internal fun FilterRenderSpec.applyLightPalette(
     colorAxis: Float,
     toneAxis: Float
 ): FilterRenderSpec {
-    val clampedColor = colorAxis.coerceIn(-1f, 1f)
-    val clampedTone = toneAxis.coerceIn(-1f, 1f)
-    return copy(
-        saturation = (saturation + (clampedColor * 0.16f)).coerceIn(0.72f, 1.38f),
-        warmthShift = (warmthShift + (clampedColor * 8f).toInt()).coerceIn(-24, 24),
-        brightnessShift = (brightnessShift + (clampedTone * 10f).toInt()).coerceIn(-24, 32),
-        contrast = (contrast - (clampedTone * 0.12f)).coerceIn(0.82f, 1.28f)
+    return applyColorLab(
+        com.opencamera.core.settings.ColorLabSpec(
+            colorAxis = colorAxis,
+            toneAxis = toneAxis
+        )
     )
 }
 
