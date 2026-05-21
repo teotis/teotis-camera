@@ -1350,7 +1350,7 @@
         android:id="@+id/zoomCapsuleScroll"
         android:layout_width="wrap_content"
         android:layout_height="@dimen/zoom_strip_container_height"
-        android:layout_marginBottom="2dp"
+        android:layout_marginBottom="@dimen/space_4"
         android:clipToPadding="false"
         android:scrollbars="none"
         app:layout_constraintBottom_toTopOf="@id/bottomSheet"

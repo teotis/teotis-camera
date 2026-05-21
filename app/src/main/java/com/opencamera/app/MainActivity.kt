@@ -511,21 +511,22 @@ class MainActivity : AppCompatActivity() {
         }
         buttonDevTabKey.setOnClickListener {
             selectedDevLogTab = DevLogTab.KEY
-            renderDevConsole()
+            refreshDevLogModel()
         }
         buttonDevTabCore.setOnClickListener {
             selectedDevLogTab = DevLogTab.CORE
-            renderDevConsole()
+            refreshDevLogModel()
         }
         buttonDevTabError.setOnClickListener {
             selectedDevLogTab = DevLogTab.ERROR
-            renderDevConsole()
+            refreshDevLogModel()
         }
         buttonDevTabAll.setOnClickListener {
             selectedDevLogTab = DevLogTab.ALL
-            renderDevConsole()
+            refreshDevLogModel()
         }
         buttonDevExport.setOnClickListener {
+            refreshDevLogModel()
             val model = latestDevLogRenderModel ?: return@setOnClickListener
             if (model.exportContent.isBlank()) return@setOnClickListener
             val file = devLogExporter.export(model.exportContent)
@@ -1293,6 +1294,19 @@ class MainActivity : AppCompatActivity() {
         if (isDevVisible) {
             renderDevConsole()
         }
+    }
+
+    private fun refreshDevLogModel() {
+        val state = latestSessionState ?: return
+        val model = devLogRenderModel(
+            state = state,
+            traceEvents = container.trace.snapshot(),
+            isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
+            selectedTab = selectedDevLogTab,
+            text = AppTextResolver(this)
+        )
+        latestDevLogRenderModel = model
+        renderDevConsole()
     }
 
     private fun renderDevConsole() {
