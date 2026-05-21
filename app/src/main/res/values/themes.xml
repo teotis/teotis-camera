@@ -89,7 +89,7 @@
         <item name="cardElevation">10dp</item>
     </style>
 
-    <style name="Widget.OpenCamera.FloatingActionButton" parent="Widget.MaterialComponents.Button">
+    <style name="Widget.OpenCamera.RightRailButton" parent="Widget.MaterialComponents.Button">
         <item name="android:textAllCaps">false</item>
         <item name="android:textColor">@color/oc_text_primary</item>
         <item name="android:textSize">@dimen/text_size_right_rail</item>
@@ -101,14 +101,14 @@
         <item name="android:paddingEnd">@dimen/space_4</item>
     </style>
 
-    <style name="Widget.OpenCamera.FloatingDevButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+    <style name="Widget.OpenCamera.RightRailDevButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
         <item name="android:textAllCaps">false</item>
         <item name="android:textColor">@color/oc_accent</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">@dimen/text_size_status</item>
+        <item name="android:textSize">@dimen/text_size_right_rail</item>
         <item name="strokeColor">@color/oc_divider</item>
         <item name="backgroundTint">@color/oc_surface_scrim_light</item>
-        <item name="cornerRadius">@dimen/radius_chip</item>
+        <item name="cornerRadius">@dimen/radius_small_button</item>
         <item name="android:minWidth">0dp</item>
         <item name="android:minHeight">0dp</item>
     </style>

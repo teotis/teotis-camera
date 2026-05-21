@@ -734,7 +734,11 @@ class MainActivity : AppCompatActivity() {
         }
         shutterButton.text = shutterLabel
         if (state.recordingStatus != RecordingStatus.IDLE) {
-            shutterButton.setTextColor(ContextCompat.getColor(this, R.color.oc_record))
+            shutterButton.setTextColor(ContextCompat.getColor(this, R.color.oc_text_primary))
+            shutterButton.setBackgroundResource(R.drawable.bg_shutter_recording)
+        } else {
+            shutterButton.setTextColor(ContextCompat.getColor(this, R.color.oc_surface_panel))
+            shutterButton.setBackgroundResource(R.drawable.bg_shutter_circle)
         }
         lensFacingButton.text = controls.lensFacingButtonLabel
         zoomRatioButton.text = controls.zoomButtonLabel
@@ -1126,23 +1130,24 @@ class MainActivity : AppCompatActivity() {
         if (!controls.isZoomCapsuleRowVisible) return
         zoomCapsuleRow.removeAllViews()
         controls.zoomCapsules.forEach { capsule ->
-            val button = Button(
-                this,
-                null,
-                0,
-                R.style.Widget_OpenCamera_CompactButton
-            ).apply {
+            val button = Button(this).apply {
                 text = capsule.label
                 isAllCaps = false
-                textSize = 11f
+                textSize = resources.getDimension(R.dimen.text_size_zoom_chip) / resources.displayMetrics.density
+                minWidth = resources.getDimension(R.dimen.zoom_chip_min_width).toInt()
+                minHeight = resources.getDimension(R.dimen.zoom_chip_min_height).toInt()
+                setPadding(
+                    resources.getDimension(R.dimen.space_12).toInt(),
+                    resources.getDimension(R.dimen.space_4).toInt(),
+                    resources.getDimension(R.dimen.space_12).toInt(),
+                    resources.getDimension(R.dimen.space_4).toInt()
+                )
                 if (capsule.isActive) {
                     setTextColor(ContextCompat.getColor(this@MainActivity, R.color.oc_text_primary))
-                    setBackgroundResource(R.drawable.bg_mode_track_active)
-                    alpha = 1f
+                    setBackgroundResource(R.drawable.bg_zoom_chip_active)
                 } else {
                     setTextColor(ContextCompat.getColor(this@MainActivity, R.color.oc_text_secondary))
-                    background = null
-                    alpha = 0.78f
+                    setBackgroundResource(R.drawable.bg_zoom_chip)
                 }
                 setOnClickListener {
                     dispatch(SessionIntent.ApplyZoomRatio(capsule.ratio))

@@ -44,8 +44,8 @@
     <dimen name="right_rail_gap">8dp</dimen>
     <dimen name="control_row_min_height">48dp</dimen>
     <dimen name="thumbnail_size">56dp</dimen>
-    <dimen name="shutter_size">68dp</dimen>
-    <dimen name="top_scrim_height">120dp</dimen>
+    <dimen name="shutter_size">72dp</dimen>
+    <dimen name="top_scrim_height">72dp</dimen>
     <dimen name="panel_margin_horizontal">16dp</dimen>
     <dimen name="panel_padding">18dp</dimen>
     <dimen name="bottom_cockpit_padding_horizontal">16dp</dimen>

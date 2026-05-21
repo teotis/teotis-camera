@@ -122,25 +122,25 @@
 
         <Button
             android:id="@+id/buttonFilterEntry"
-            style="@style/Widget.OpenCamera.FloatingActionButton"
-            android:layout_width="52dp"
-            android:layout_height="52dp"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
             android:text="@string/button_palette_entry" />
 
         <Button
             android:id="@+id/buttonQuickLauncher"
-            style="@style/Widget.OpenCamera.FloatingActionButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="12dp"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:layout_marginTop="@dimen/right_rail_gap"
             android:text="@string/button_quick_launcher" />
 
         <Button
             android:id="@+id/buttonDevEntry"
-            style="@style/Widget.OpenCamera.FloatingDevButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginTop="12dp"
+            style="@style/Widget.OpenCamera.RightRailDevButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:layout_marginTop="@dimen/right_rail_gap"
             android:text="@string/button_dev_entry"
             android:visibility="gone" />
     </LinearLayout>
@@ -1253,8 +1253,8 @@
             <!-- Left: Thumbnail -->
             <ImageView
                 android:id="@+id/previewThumbnail"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="@dimen/thumbnail_size"
+                android:layout_height="@dimen/thumbnail_size"
                 android:background="@drawable/bg_thumbnail"
                 android:contentDescription="@string/preview_thumbnail_content_description"
                 android:padding="2dp"
@@ -1270,8 +1270,8 @@
 
                 <Button
                     android:id="@+id/buttonShutter"
-                    android:layout_width="68dp"
-                    android:layout_height="68dp"
+                    android:layout_width="@dimen/touch_target_shutter"
+                    android:layout_height="@dimen/touch_target_shutter"
                     android:background="@drawable/bg_shutter_circle"
                     android:insetLeft="0dp"
                     android:insetTop="0dp"
