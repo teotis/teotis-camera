@@ -49,10 +49,15 @@ object EffectBridge {
 
     fun toPostProcessSpec(spec: EffectSpec): PostProcessSpec {
         val filter = spec.find<FilterEffect>()
+        val watermark = spec.find<WatermarkEffect>()
         return PostProcessSpec(
-            watermarkText = null,
+            watermarkText = watermark?.let(::buildWatermarkText),
             exifOverrides = emptyMap(),
             algorithmProfile = filter?.profileId
         )
+    }
+
+    private fun buildWatermarkText(effect: WatermarkEffect): String {
+        return effect.tokens.values.filter { it.isNotBlank() }.joinToString(" | ")
     }
 }
