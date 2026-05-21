@@ -50,13 +50,6 @@ import com.opencamera.core.settings.FilterRenderSpec
 import kotlinx.coroutines.launch
 import java.io.File
 
-private enum class SettingsSubpage {
-    ROOT,
-    PORTRAIT_LAB,
-    WATERMARK_SELECTOR,
-    WATERMARK_DETAIL
-}
-
 class MainActivity : AppCompatActivity() {
     private val container: AppContainer
         get() = (application as OpenCameraApplication).container
