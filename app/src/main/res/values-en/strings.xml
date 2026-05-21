@@ -222,4 +222,13 @@
     <string name="button_recording_stop">Stop</string>
     <string name="button_recording_saving">Saving…</string>
     <string name="gallery_open_failed">Cannot open media file</string>
+    <string name="disabled_countdown">Countdown in progress</string>
+    <string name="disabled_saving_photo">Saving previous photo</string>
+    <string name="disabled_preparing_recording">Preparing to record</string>
+    <string name="disabled_recording">Unavailable during recording</string>
+    <string name="disabled_stopping_recording">Stopping and saving</string>
+    <string name="disabled_preview_recovering">Camera recovering</string>
+    <string name="disabled_permission">Camera permission required</string>
+    <string name="disabled_unsupported">Unavailable on this device</string>
+    <string name="disabled_capture_in_progress">Capture in progress</string>
 </resources>

@@ -472,30 +472,7 @@ class MainActivity : AppCompatActivity() {
             activePanelRoute = CockpitPanelRoute.None
             renderDevConsoleVisibility()
         }
-        photoModeButton.setOnClickListener {
-            dispatch(SessionIntent.SwitchMode(ModeId.PHOTO))
-        }
-        documentModeButton.setOnClickListener {
-            dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
-        }
-        nightModeButton.setOnClickListener {
-            dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        }
-        humanisticModeButton.setOnClickListener {
-            dispatch(SessionIntent.SwitchMode(ModeId.HUMANISTIC))
-        }
-        portraitModeButton.setOnClickListener {
-            dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
-        }
-        proModeButton.setOnClickListener {
-            dispatch(SessionIntent.SwitchMode(ModeId.PRO))
-        }
-        videoModeButton.setOnClickListener {
-            if (!hasPermission(Manifest.permission.RECORD_AUDIO)) {
-                permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-            }
-            dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
-        }
+        bindModeTrackTouch()
         shutterButton.setOnClickListener {
             if (!hasPermission(Manifest.permission.CAMERA)) {
                 requestCameraPermissionIfNeeded()
@@ -1206,6 +1183,69 @@ class MainActivity : AppCompatActivity() {
         buttonDevTabAll.alpha = if (model.selectedTab == DevLogTab.ALL) activeAlpha else inactiveAlpha
     }
 
+    private fun bindModeTrackTouch() {
+        val buttons = listOf(
+            photoModeButton to ModeId.PHOTO,
+            documentModeButton to ModeId.DOCUMENT,
+            nightModeButton to ModeId.NIGHT,
+            humanisticModeButton to ModeId.HUMANISTIC,
+            portraitModeButton to ModeId.PORTRAIT,
+            proModeButton to ModeId.PRO,
+            videoModeButton to ModeId.VIDEO
+        )
+        val touchSlop = 20.dp.toFloat()
+        var downButton: Button? = null
+        var downX = 0f
+        var downY = 0f
+        var didScroll = false
+
+        val listener = View.OnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    downButton = v as Button
+                    downX = event.rawX
+                    downY = event.rawY
+                    didScroll = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (kotlin.math.abs(event.rawX - downX) > touchSlop ||
+                        kotlin.math.abs(event.rawY - downY) > touchSlop) {
+                        didScroll = true
+                    }
+                    false
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!didScroll && v == downButton && v.isEnabled) {
+                        val pair = buttons.firstOrNull { it.first == v } ?: return@OnTouchListener false
+                        val modeId = pair.second
+                        val state = latestSessionState
+                        if (state != null) {
+                            val reason = captureConfigDisabledReason(state)
+                            if (reason != null) {
+                                showDisabledReason(reason)
+                                downButton = null
+                                return@OnTouchListener true
+                            }
+                        }
+                        if (modeId == ModeId.VIDEO && !hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+                        }
+                        dispatch(SessionIntent.SwitchMode(modeId))
+                    }
+                    downButton = null
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    downButton = null
+                    true
+                }
+                else -> false
+            }
+        }
+        buttons.forEach { (button, _) -> button.setOnTouchListener(listener) }
+    }
+
     private fun renderModeTrack(model: ModeTrackRenderModel) {
         val buttons = listOf(
             photoModeButton,
@@ -1282,6 +1322,43 @@ class MainActivity : AppCompatActivity() {
 
     private fun hasPermission(permission: String): Boolean {
         return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    override fun onBackPressed() {
+        when (activePanelRoute) {
+            CockpitPanelRoute.None -> {
+                super.onBackPressed()
+            }
+            is CockpitPanelRoute.Settings -> {
+                val settings = activePanelRoute as CockpitPanelRoute.Settings
+                when (settings.subpage) {
+                    SettingsSubpage.WATERMARK_DETAIL -> {
+                        selectedWatermarkDetailTemplateId = null
+                        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR)
+                    }
+                    SettingsSubpage.PORTRAIT_LAB,
+                    SettingsSubpage.WATERMARK_SELECTOR -> {
+                        activePanelRoute = CockpitPanelRoute.Settings()
+                    }
+                    SettingsSubpage.ROOT -> {
+                        activePanelRoute = CockpitPanelRoute.None
+                    }
+                }
+                renderLatestSettingsSurfaces()
+                renderPanelVisibility()
+            }
+            CockpitPanelRoute.FilterLab,
+            CockpitPanelRoute.DevConsole,
+            CockpitPanelRoute.QuickBubble -> {
+                if (activePanelRoute is CockpitPanelRoute.FilterLab) {
+                    selectedFilterLabFamilyOverride = null
+                    isFilterAdjustmentVisible = false
+                }
+                activePanelRoute = CockpitPanelRoute.None
+                renderPanelVisibility()
+                renderDevConsoleVisibility()
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -1475,6 +1552,24 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             container.cameraSession.dispatch(intent)
         }
+    }
+
+    private fun showDisabledReason(reason: String) {
+        Toast.makeText(this, reason, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun captureConfigDisabledReason(state: SessionState): String? {
+        if (!state.permissionState.cameraGranted) return getString(R.string.disabled_permission)
+        if (state.previewStatus == com.opencamera.core.session.PreviewStatus.RECOVERING)
+            return getString(R.string.disabled_preview_recovering)
+        if (state.countdownRemainingSeconds != null) return getString(R.string.disabled_countdown)
+        if (state.activeShot != null && state.recordingStatus == RecordingStatus.REQUESTING)
+            return getString(R.string.disabled_preparing_recording)
+        if (state.recordingStatus == RecordingStatus.RECORDING) return getString(R.string.disabled_recording)
+        if (state.recordingStatus == RecordingStatus.STOPPING) return getString(R.string.disabled_stopping_recording)
+        if (state.captureStatus == com.opencamera.core.session.CaptureStatus.SAVING)
+            return getString(R.string.disabled_saving_photo)
+        return null
     }
 
     private fun syncPermissionState(

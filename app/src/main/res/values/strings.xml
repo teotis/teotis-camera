@@ -222,4 +222,13 @@
     <string name="button_recording_stop">停止录制</string>
     <string name="button_recording_saving">保存视频中…</string>
     <string name="gallery_open_failed">无法打开媒体文件</string>
+    <string name="disabled_countdown">倒计时中，暂不能切换</string>
+    <string name="disabled_saving_photo">正在保存上一张</string>
+    <string name="disabled_preparing_recording">正在准备录制</string>
+    <string name="disabled_recording">录制中暂不可用</string>
+    <string name="disabled_stopping_recording">正在停止并保存</string>
+    <string name="disabled_preview_recovering">相机恢复中</string>
+    <string name="disabled_permission">需要相机权限</string>
+    <string name="disabled_unsupported">当前设备不支持</string>
+    <string name="disabled_capture_in_progress">拍摄进行中，暂不能更改</string>
 </resources>

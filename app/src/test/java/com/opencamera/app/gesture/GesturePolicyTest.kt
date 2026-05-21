@@ -70,4 +70,26 @@ class GesturePolicyTest {
         val action = policy.map(GestureEvent.DragCancel, ModeId.PHOTO)
         assertEquals(GestureAction.Ignore, action)
     }
+
+    @Test
+    fun `pinchZoom with scale above maximum clamps to 10x`() {
+        policy.resetZoomAccumulation()
+        val action = policy.map(GestureEvent.PinchZoom(12f, 200f, 300f), ModeId.PHOTO)
+        assertTrue(action is GestureAction.DispatchSession)
+        val dispatch = action as GestureAction.DispatchSession
+        assertTrue(dispatch.intent is SessionIntent.ApplyZoomRatio)
+        val ratio = (dispatch.intent as SessionIntent.ApplyZoomRatio).ratio
+        assertEquals(10.0f, ratio)
+    }
+
+    @Test
+    fun `pinchZoom with scale below minimum clamps to 0_5x`() {
+        policy.resetZoomAccumulation()
+        val action = policy.map(GestureEvent.PinchZoom(0.1f, 200f, 300f), ModeId.PHOTO)
+        assertTrue(action is GestureAction.DispatchSession)
+        val dispatch = action as GestureAction.DispatchSession
+        assertTrue(dispatch.intent is SessionIntent.ApplyZoomRatio)
+        val ratio = (dispatch.intent as SessionIntent.ApplyZoomRatio).ratio
+        assertEquals(0.5f, ratio)
+    }
 }
