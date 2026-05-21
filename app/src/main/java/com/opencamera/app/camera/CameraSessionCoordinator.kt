@@ -139,13 +139,13 @@ class CameraSessionCoordinator(
         if (attachedMode == modeId && cameraAdapter.boundGraph() == deviceGraph && !isRecovery) {
             return
         }
-        syncActiveDeviceCapabilities(deviceGraph)
         val owner = lifecycleOwner
         val preview = previewView
         if (owner == null || preview == null) {
             pendingPreviewBind = PendingPreviewBind(modeId, deviceGraph, reason, isRecovery)
             return
         }
+        syncActiveDeviceCapabilities(deviceGraph)
         session.dispatch(
             SessionIntent.PreviewBindingStarted(
                 reason = reason,

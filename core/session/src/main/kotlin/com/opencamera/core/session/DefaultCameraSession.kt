@@ -168,6 +168,9 @@ class DefaultCameraSession(
                 intent.firstFrameLatencyMillis
             )
             is SessionIntent.PreviewSnapshotUpdated -> handlePreviewSnapshotUpdated(intent.source)
+            is SessionIntent.CaptureFeedbackSnapshotUpdated -> handleCaptureFeedbackSnapshotUpdated(
+                intent.shotId, intent.outputPath
+            )
             is SessionIntent.PreviewSurfaceLost -> handlePreviewSurfaceLost(intent.reason)
             is SessionIntent.PreviewError -> handlePreviewError(intent.reason)
             is SessionIntent.PreviewRuntimeIssue -> handlePreviewRuntimeIssue(intent.issue)
@@ -1082,6 +1085,10 @@ class DefaultCameraSession(
             latestThumbnailSource = source
         )
         trace.record("preview.snapshot.updated", source.outputPathOrNull().orEmpty())
+    }
+
+    private fun handleCaptureFeedbackSnapshotUpdated(shotId: String, outputPath: String) {
+        trace.record("capture.feedback.snapshot", "shotId=$shotId output=$outputPath")
     }
 
     private suspend fun handlePreviewSurfaceLost(reason: String) {

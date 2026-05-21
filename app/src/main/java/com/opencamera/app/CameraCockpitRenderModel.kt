@@ -121,6 +121,11 @@ internal fun cameraCockpitRenderModel(
             lensButtonLabel = controls.lensFacingButtonLabel,
             lensButtonEnabled = controls.lensFacingEnabled
         ),
+        previewRatioChip = PreviewRatioChipRenderModel(
+            label = state.previewRatio.label,
+            ratio = state.previewRatio,
+            isActive = true
+        ),
         activePanelRoute = activeRoute
     )
 }

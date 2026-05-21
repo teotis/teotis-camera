@@ -123,7 +123,7 @@ class CameraCockpitRenderModelTest {
 
         assertTrue(model.zoomStrip.isVisible)
         assertEquals(4, model.zoomStrip.chips.size)
-        assertEquals("2.0x", model.zoomStrip.chips.first { it.isActive }.label)
+        assertEquals("2", model.zoomStrip.chips.first { it.isActive }.label)
     }
 
     @Test

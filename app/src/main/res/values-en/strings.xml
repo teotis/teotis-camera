@@ -53,6 +53,7 @@
     <string name="button_debug_close">Close Debug</string>
     <string name="button_quick_flash">Flash</string>
     <string name="button_quick_ratio">Ratio</string>
+    <string name="button_preview_ratio">Preview Ratio</string>
     <string name="button_quick_live">Live</string>
     <string name="button_quick_timer">Timer</string>
     <string name="button_more_controls">More</string>

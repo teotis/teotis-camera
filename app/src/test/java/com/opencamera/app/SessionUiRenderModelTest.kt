@@ -1123,6 +1123,48 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `zoom capsule labels use compact format`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 1f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertEquals(listOf("0.6", "1x", "2", "5"), controls.zoomCapsules.map { it.label })
+    }
+
+    @Test
+    fun `zoom capsule compact label handles 1x and integer ratios`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.7f, 1f, 3f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 1f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertEquals(listOf("0.7", "1x", "3"), controls.zoomCapsules.map { it.label })
+    }
+
+    @Test
     fun `mode track render model preserves available mode order and identity`() {
         val availableModes = listOf(
             ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,

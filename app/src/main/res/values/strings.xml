@@ -55,6 +55,7 @@
     <string name="button_quick_flash">画质</string>
     <string name="button_quick_more">更多</string>
     <string name="button_quick_ratio">分辨率</string>
+    <string name="button_preview_ratio">预览比例</string>
     <string name="button_quick_live">实况</string>
     <string name="button_quick_timer">定时</string>
     <string name="button_more_controls">更多</string>

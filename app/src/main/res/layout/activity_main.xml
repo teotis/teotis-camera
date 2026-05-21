@@ -188,6 +188,13 @@
             android:layout_marginTop="10dp" />
 
         <Button
+            android:id="@+id/buttonPreviewRatio"
+            style="@style/Widget.OpenCamera.QuickBubbleButton"
+            android:layout_width="64dp"
+            android:layout_height="44dp"
+            android:layout_marginTop="10dp" />
+
+        <Button
             android:id="@+id/buttonQuickLivePhoto"
             style="@style/Widget.OpenCamera.QuickBubbleButton"
             android:layout_width="64dp"
