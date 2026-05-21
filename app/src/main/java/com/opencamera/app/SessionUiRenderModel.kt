@@ -1784,7 +1784,7 @@ internal fun filterLabPageRenderModel(
                 filterProfileId = profile.id,
                 title = profile.label,
                 supportingText = buildString {
-                    append(profile.renderSpec?.compactSummary() ?: text.rendererPending())
+                    append(family.label)
                     if (!profile.builtIn) {
                         append(text.statusCustomBadge())
                     }

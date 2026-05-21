@@ -549,6 +549,16 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `settings page section summaries are empty to avoid duplication`() {
+        val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
+        assertEquals("", model.heroSummary)
+        assertEquals("", model.commonSection.summary)
+        assertEquals("", model.photoSection.summary)
+        assertEquals("", model.videoSection.summary)
+        assertEquals("Composition grid", model.commonSection.gridMode.label)
+    }
+
+    @Test
     fun `settings page render model disables editing while shot is active`() {
         val model = sessionSettingsPageRenderModel(
             defaultSessionState(
@@ -1434,5 +1444,40 @@ class SessionUiRenderModelTest {
         assertFalse(model.showFilterItems)
         assertTrue(model.showAdjustmentPanel)
         assertEquals("Lens Lab", model.headline)
+    }
+
+    @Test
+    fun `filter items do not show raw parameter strings in title or supporting text`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+
+        model.filterItems.forEach { item ->
+            assertFalse(item.title.contains("B ") && item.title.contains("C "),
+                "Filter item title should not contain raw parameter strings: ${item.title}")
+            assertFalse(item.supportingText.contains(" | "),
+                "Filter item supporting text should not contain raw parameter strings: ${item.supportingText}")
+        }
+    }
+
+    @Test
+    fun `selected filter item shows family label in supporting text`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            selectedFamily = FilterLabFamily.PHOTO,
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+
+        val selectedItem = model.filterItems.firstOrNull { it.isSelected }
+        assertNotNull(selectedItem)
+        assertTrue(selectedItem.supportingText.contains("Photo"),
+            "Selected item should contain family label: ${selectedItem.supportingText}")
+        assertTrue(selectedItem.supportingText.contains("Selected default"),
+            "Selected item should contain selected badge: ${selectedItem.supportingText}")
     }
 }
