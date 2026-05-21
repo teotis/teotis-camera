@@ -997,7 +997,7 @@ class CameraXCaptureAdapter(
     private var boundCamera: Camera? = null
     private var activeRecording: Recording? = null
     private var activeVideoPlan: ShotPlan? = null
-    private var lifecycleInterruptedShotId: String? = null
+    private val lifecycleInterruptedShotIds = mutableSetOf<String>()
     private var currentTorchEnabled = false
     private var currentGraph: DeviceGraphSpec? = null
     private var boundLifecycleOwner: LifecycleOwner? = null
@@ -1098,7 +1098,7 @@ class CameraXCaptureAdapter(
             removeCameraStateObserver()
             applyVideoTorch(false)
             if (activeRecording != null) {
-                lifecycleInterruptedShotId = activeVideoPlan?.request?.shotId
+                activeVideoPlan?.request?.shotId?.let { lifecycleInterruptedShotIds.add(it) }
                 val interruptedPlan = activeVideoPlan
                 activeRecording?.close()
                 activeRecording = null
@@ -1641,8 +1641,7 @@ class CameraXCaptureAdapter(
                             applyVideoTorch(false)
                         }
                         val finalizeShotId = plan.request.shotId
-                        val wasLifecycleInterrupted = finalizeShotId == lifecycleInterruptedShotId
-                        lifecycleInterruptedShotId = null
+                        val wasLifecycleInterrupted = lifecycleInterruptedShotIds.remove(finalizeShotId)
                         activeRecording = null
                         activeVideoPlan = null
                         if (!wasLifecycleInterrupted && event.hasError()) {

@@ -9,7 +9,6 @@ sealed interface GestureAction {
     data class ShowExposureHint(val deltaY: Float) : GestureAction
     data class AssistModeSwitch(val deltaX: Float) : GestureAction
     data object Ignore : GestureAction
-    data object ZoomAccumulationReset : GestureAction
 }
 
 class GesturePolicy {
@@ -26,21 +25,20 @@ class GesturePolicy {
             is GestureEvent.Tap -> GestureAction.FocusAt(event.x, event.y)
             is GestureEvent.DoubleTap -> GestureAction.DispatchSession(SessionIntent.LensFacingToggled)
             is GestureEvent.PinchZoom -> {
+                cumulativeScaleFactor *= event.scaleFactor
                 val now = System.currentTimeMillis()
                 if (now - lastPinchTimestamp > 50) {
-                    cumulativeScaleFactor *= event.scaleFactor
                     lastPinchTimestamp = now
+                    val targetRatio = cumulativeScaleFactor.coerceIn(0.5f, 10.0f)
+                    GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(targetRatio))
+                } else {
+                    GestureAction.Ignore
                 }
-                val targetRatio = cumulativeScaleFactor.coerceIn(0.5f, 10.0f)
-                GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(targetRatio))
             }
             is GestureEvent.VerticalScroll -> GestureAction.ShowExposureHint(event.deltaY)
             is GestureEvent.HorizontalScroll -> GestureAction.AssistModeSwitch(event.deltaX)
             is GestureEvent.LongPress -> GestureAction.Ignore
-            is GestureEvent.DragCancel -> {
-                resetZoomAccumulation()
-                GestureAction.ZoomAccumulationReset
-            }
+            is GestureEvent.DragCancel -> GestureAction.Ignore
         }
     }
 }

@@ -241,7 +241,7 @@ class SessionUiRenderModelTest {
             )
         )
 
-        val summary = sessionSummaryText(state)
+        val summary = sessionSummaryText(state, TestAppTextResolver())
 
         assertTrue(summary.contains("Lens: Front (available: back/front)"))
         assertTrue(summary.contains("Zoom: 2.0x (available: 1.0x/2.0x/5.0x | Preset steps)"))
@@ -312,7 +312,7 @@ class SessionUiRenderModelTest {
     fun `settings render model resolves configured defaults from session snapshot`() {
         val state = defaultSessionState()
 
-        val model = sessionSettingsRenderModel(state)
+        val model = sessionSettingsRenderModel(state, TestAppTextResolver())
 
         assertEquals("Grid 3x3 | Shutter sound Off | Selfie mirror On", model.commonSummary)
         assertEquals(
@@ -350,7 +350,7 @@ class SessionUiRenderModelTest {
             )
         )
 
-        val model = runtimeProControlsRenderModel(state)
+        val model = runtimeProControlsRenderModel(state, TestAppTextResolver())
 
         assertTrue(model.isVisible)
         assertEquals("Scenery Pro Controls", model.headline)
@@ -381,7 +381,7 @@ class SessionUiRenderModelTest {
             )
         )
 
-        val model = runtimeProControlsRenderModel(state)
+        val model = runtimeProControlsRenderModel(state, TestAppTextResolver())
 
         assertTrue(model.isVisible)
         assertEquals(SettingsControlAvailability.DEGRADED, model.isoControl.availability)
@@ -415,7 +415,7 @@ class SessionUiRenderModelTest {
             )
         )
 
-        val model = runtimeProControlsRenderModel(state)
+        val model = runtimeProControlsRenderModel(state, TestAppTextResolver())
 
         assertEquals(SettingsControlAvailability.UNSUPPORTED, model.apertureControl.availability)
         assertEquals("Temporarily unsupported", model.apertureControl.supportLabel)
@@ -473,7 +473,7 @@ class SessionUiRenderModelTest {
 
     @Test
     fun `settings page render model exposes section controls and catalog hints`() {
-        val model = sessionSettingsPageRenderModel(defaultSessionState())
+        val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
 
         assertEquals("Lens Lab", model.headline)
         assertEquals(
@@ -545,7 +545,8 @@ class SessionUiRenderModelTest {
                     postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
                     captureProfile = CaptureProfile()
                 )
-            )
+            ),
+            TestAppTextResolver()
         )
 
         assertFalse(model.editingEnabled)
@@ -557,7 +558,7 @@ class SessionUiRenderModelTest {
 
     @Test
     fun `settings page render model surfaces supported degraded and unsupported controls`() {
-        val supportedModel = sessionSettingsPageRenderModel(defaultSessionState())
+        val supportedModel = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
 
         assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.photoSection.livePhoto.availability)
         assertTrue(supportedModel.photoSection.livePhoto.isInteractive)
@@ -582,7 +583,8 @@ class SessionUiRenderModelTest {
                     supportsVideoRecording = false,
                     supportsAudioRecording = false
                 )
-            )
+            ),
+            TestAppTextResolver()
         )
 
         assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.livePhoto.availability)
@@ -605,7 +607,7 @@ class SessionUiRenderModelTest {
 
     @Test
     fun `watermark lab selector render model exposes selection and per template style entry`() {
-        val model = watermarkLabSelectorRenderModel(defaultSessionState())
+        val model = watermarkLabSelectorRenderModel(defaultSessionState(), TestAppTextResolver())
 
         assertEquals("Watermark Lab", model.headline)
         assertTrue(model.heroSummary.contains("Default Travel Polaroid"))
@@ -639,7 +641,8 @@ class SessionUiRenderModelTest {
                         )
                     )
                 )
-            )
+            ),
+            TestAppTextResolver()
         )
 
         assertEquals("Portrait Lab", model.headline)
@@ -682,7 +685,8 @@ class SessionUiRenderModelTest {
                     )
                 )
             ),
-            templateId = "travel-polaroid"
+            templateId = "travel-polaroid",
+            text = TestAppTextResolver()
         )
 
         assertEquals("Travel Polaroid", model.headline)
@@ -721,7 +725,8 @@ class SessionUiRenderModelTest {
     fun `watermark lab detail hides frame background control for classic overlay`() {
         val model = watermarkLabDetailRenderModel(
             state = defaultSessionState(),
-            templateId = "classic-overlay"
+            templateId = "classic-overlay",
+            text = TestAppTextResolver()
         )
 
         assertEquals("Classic Overlay", model.headline)
@@ -746,7 +751,8 @@ class SessionUiRenderModelTest {
                         detail = "Ready"
                     )
                 )
-            )
+            ),
+            TestAppTextResolver()
         )
 
         assertEquals("Filter Lab", model.headline)
@@ -767,6 +773,7 @@ class SessionUiRenderModelTest {
     fun `filter lab render model switches to humanistic family and keeps import export deferred`() {
         val model = filterLabPageRenderModel(
             state = defaultSessionState(),
+            text = TestAppTextResolver(),
             selectedFamily = FilterLabFamily.HUMANISTIC
         )
 
@@ -815,6 +822,7 @@ class SessionUiRenderModelTest {
 
         val model = filterLabPageRenderModel(
             state = state,
+            text = TestAppTextResolver(),
             selectedFamily = FilterLabFamily.PORTRAIT,
             showAdjustmentPanel = true,
             adjustmentMode = FilterAdjustmentMode.LIGHT
@@ -836,6 +844,7 @@ class SessionUiRenderModelTest {
     fun `filter lab render model exposes advanced adjustment controls for selected portrait filter`() {
         val model = filterLabPageRenderModel(
             state = defaultSessionState(activeMode = ModeId.PORTRAIT),
+            text = TestAppTextResolver(),
             selectedFamily = FilterLabFamily.PORTRAIT,
             showAdjustmentPanel = true,
             adjustmentMode = FilterAdjustmentMode.ADVANCED
@@ -927,7 +936,7 @@ class SessionUiRenderModelTest {
             )
         )
 
-        val model = modeDirectoryRenderModel(state)
+        val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
             listOf("Photo", "Scenery", "Humanistic", "Video"),
@@ -946,7 +955,7 @@ class SessionUiRenderModelTest {
         )
         assertEquals(
             "• Scenery | Default Handheld | Scenery style, Pro variant, night fusion, frame ratio",
-            modeDirectoryText(state).lineSequence().elementAt(1)
+            modeDirectoryText(state, TestAppTextResolver()).lineSequence().elementAt(1)
         )
     }
 
@@ -960,7 +969,7 @@ class SessionUiRenderModelTest {
             availableModes = listOf(ModeId.NIGHT, ModeId.PORTRAIT)
         )
 
-        val model = modeDirectoryRenderModel(state)
+        val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals("Balanced", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
         assertEquals(

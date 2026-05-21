@@ -66,8 +66,8 @@ class GesturePolicyTest {
     }
 
     @Test
-    fun dragCancel_mapsToZoomAccumulationReset() {
+    fun dragCancel_mapsToIgnore() {
         val action = policy.map(GestureEvent.DragCancel, ModeId.PHOTO)
-        assertEquals(GestureAction.ZoomAccumulationReset, action)
+        assertEquals(GestureAction.Ignore, action)
     }
 }

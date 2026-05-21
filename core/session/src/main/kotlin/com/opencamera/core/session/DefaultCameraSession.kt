@@ -6,6 +6,7 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.StillCaptureOutputSize
+import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.displayReason
 import com.opencamera.core.device.nextZoomRatio
 import com.opencamera.core.device.normalizedZoomRatioValue
@@ -76,6 +77,7 @@ class DefaultCameraSession(
     private var pendingCountdownJob: Job? = null
     private var pendingCountdownStrategy: CaptureStrategy? = null
     private var pendingPreviewHostRecoveryReason: String? = null
+    private var recordingWatchdogJob: Job? = null
     private var currentController: ModeController = createController(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
@@ -206,6 +208,22 @@ class DefaultCameraSession(
         )
         trace.record("session.booted", "mode=${currentController.id}")
         requestPreviewBinding(reason = "session boot", isRecovery = false)
+    }
+
+    private fun startRecordingWatchdog(expectedStatus: RecordingStatus, timeoutMillis: Long) {
+        recordingWatchdogJob?.cancel()
+        recordingWatchdogJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
+            delay(timeoutMillis)
+            if (_state.value.recordingStatus == expectedStatus) {
+                trace.record("recording.watchdog.timeout", "status=$expectedStatus, timeout=${timeoutMillis}ms")
+                updateState(
+                    recordingStatus = RecordingStatus.IDLE,
+                    activeShot = null,
+                    lastAction = "Recording timed out after ${timeoutMillis}ms",
+                    lastError = "Recording state $expectedStatus timed out"
+                )
+            }
+        }
     }
 
     private suspend fun handleShutdown() {
@@ -478,10 +496,16 @@ class DefaultCameraSession(
             return
         }
 
-        val clampedRatio = normalizedZoomRatioValue(targetRatio).coerceIn(
-            zoomCapability.normalizedSupportedRatios.first(),
-            zoomCapability.normalizedSupportedRatios.last()
-        )
+        val normalizedTarget = normalizedZoomRatioValue(targetRatio)
+        val clampedRatio = if (zoomCapability.support == ZoomControlSupport.DISCRETE_PRESET) {
+            zoomCapability.normalizedSupportedRatios.minByOrNull { kotlin.math.abs(it - normalizedTarget) }
+                ?: normalizedTarget
+        } else {
+            normalizedTarget.coerceIn(
+                zoomCapability.normalizedSupportedRatios.first(),
+                zoomCapability.normalizedSupportedRatios.last()
+            )
+        }
         val currentZoomRatio = _state.value.activeDeviceGraph.preview.zoomRatio
         if (clampedRatio == normalizedZoomRatioValue(currentZoomRatio)) {
             updateState(lastAction = "Zoom already active at ${zoomLabel(clampedRatio)}")
@@ -727,6 +751,7 @@ class DefaultCameraSession(
                     recordingStatus = RecordingStatus.STOPPING,
                     lastAction = "Stopping video recording"
                 )
+                startRecordingWatchdog(RecordingStatus.STOPPING, 15_000L)
                 _effects.emit(SessionEffect.StopActiveShot(stoppableShot.shotId))
                 trace.record("recording.stop.requested", "mode=${currentController.id}")
             }
@@ -1349,6 +1374,9 @@ class DefaultCameraSession(
             },
             lastError = null
         )
+        if (plan.request.mediaType == MediaType.VIDEO) {
+            startRecordingWatchdog(RecordingStatus.REQUESTING, 10_000L)
+        }
         _effects.emit(SessionEffect.ExecuteShot(plan))
         trace.record(
             if (plan.request.mediaType == MediaType.PHOTO) {
