@@ -144,6 +144,7 @@ class DefaultCameraSession(
             SessionIntent.CountdownCompleted -> handleCountdownCompleted()
             SessionIntent.LensFacingToggled -> handleLensFacingToggled()
             SessionIntent.ZoomRatioToggled -> handleZoomRatioToggled()
+            is SessionIntent.ApplyZoomRatio -> handleApplyZoomRatio(intent.ratio)
             SessionIntent.StillCaptureQualityToggled -> handleStillCaptureQualityToggled()
             SessionIntent.StillCaptureResolutionToggled -> handleStillCaptureResolutionToggled()
             is SessionIntent.DeviceCapabilitiesUpdated -> handleDeviceCapabilitiesUpdated(
@@ -456,6 +457,52 @@ class DefaultCameraSession(
         requestZoomApply(nextRatio)
     }
 
+    private suspend fun handleApplyZoomRatio(targetRatio: Float) {
+        if (countdownInProgress()) {
+            updateState(lastAction = "Wait for countdown to finish before switching zoom")
+            trace.record("zoom.apply.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
+            return
+        }
+
+        val activeShot = _state.value.activeShot
+        if (activeShot != null && activeShot.mediaType == MediaType.PHOTO) {
+            updateState(lastAction = "Wait for current capture to finish before switching zoom")
+            trace.record("zoom.apply.blocked", "shot=${activeShot.shotId}")
+            return
+        }
+
+        val zoomCapability = _state.value.activeDeviceCapabilities.zoomRatioCapability
+        if (!zoomCapability.isSwitchingSupported) {
+            updateState(lastAction = "Zoom switching is unavailable on this device")
+            trace.record("zoom.apply.unavailable", zoomCapability.support.tagValue)
+            return
+        }
+
+        val clampedRatio = normalizedZoomRatioValue(targetRatio).coerceIn(
+            zoomCapability.normalizedSupportedRatios.first(),
+            zoomCapability.normalizedSupportedRatios.last()
+        )
+        val currentZoomRatio = _state.value.activeDeviceGraph.preview.zoomRatio
+        if (clampedRatio == normalizedZoomRatioValue(currentZoomRatio)) {
+            updateState(lastAction = "Zoom already active at ${zoomLabel(clampedRatio)}")
+            trace.record("zoom.apply.skipped", zoomLabel(clampedRatio))
+            return
+        }
+
+        updateState(
+            activeDeviceGraph = resolveActiveDeviceGraph(
+                baseGraph = currentController.deviceGraph(),
+                deviceCapabilities = _state.value.activeDeviceCapabilities,
+                requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
+                requestedZoomRatio = clampedRatio
+            ),
+            lastAction = "Zoom set to ${zoomLabel(clampedRatio)}",
+            lastError = null
+        )
+        trace.record("zoom.updated", zoomLabel(clampedRatio))
+        requestZoomApply(clampedRatio)
+    }
+
     private suspend fun handleStillCaptureQualityToggled() {
         if (countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before changing still quality")
@@ -676,7 +723,10 @@ class DefaultCameraSession(
                     trace.record("recording.stop.blocked", throwable.message ?: "unknown")
                     return
                 }
-                updateState(lastAction = "Stopping video recording")
+                updateState(
+                    recordingStatus = RecordingStatus.STOPPING,
+                    lastAction = "Stopping video recording"
+                )
                 _effects.emit(SessionEffect.StopActiveShot(stoppableShot.shotId))
                 trace.record("recording.stop.requested", "mode=${currentController.id}")
             }
@@ -1168,6 +1218,11 @@ class DefaultCameraSession(
         mediaType: MediaType,
         reason: String
     ) {
+        val currentActiveShot = _state.value.activeShot
+        if (currentActiveShot == null || currentActiveShot.shotId != shotId) {
+            trace.record("shot.failed.duplicate", "$shotId:$reason")
+            return
+        }
         currentController.onSessionEvent(
             ModeSessionEvent.ShotFailed(
                 shotId = shotId,
@@ -1280,7 +1335,11 @@ class DefaultCameraSession(
             } else {
                 CaptureStatus.IDLE
             },
-            recordingStatus = RecordingStatus.IDLE,
+            recordingStatus = if (plan.request.mediaType == MediaType.VIDEO) {
+                RecordingStatus.REQUESTING
+            } else {
+                RecordingStatus.IDLE
+            },
             activeShot = plan.request,
             countdownRemainingSeconds = null,
             lastAction = if (plan.request.mediaType == MediaType.PHOTO) {

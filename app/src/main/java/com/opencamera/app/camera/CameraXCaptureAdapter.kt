@@ -997,6 +997,7 @@ class CameraXCaptureAdapter(
     private var boundCamera: Camera? = null
     private var activeRecording: Recording? = null
     private var activeVideoPlan: ShotPlan? = null
+    private var lifecycleInterruptedShotId: String? = null
     private var currentTorchEnabled = false
     private var currentGraph: DeviceGraphSpec? = null
     private var boundLifecycleOwner: LifecycleOwner? = null
@@ -1097,6 +1098,7 @@ class CameraXCaptureAdapter(
             removeCameraStateObserver()
             applyVideoTorch(false)
             if (activeRecording != null) {
+                lifecycleInterruptedShotId = activeVideoPlan?.request?.shotId
                 val interruptedPlan = activeVideoPlan
                 activeRecording?.close()
                 activeRecording = null
@@ -1638,17 +1640,20 @@ class CameraXCaptureAdapter(
                         adapterScope.launch {
                             applyVideoTorch(false)
                         }
+                        val finalizeShotId = plan.request.shotId
+                        val wasLifecycleInterrupted = finalizeShotId == lifecycleInterruptedShotId
+                        lifecycleInterruptedShotId = null
                         activeRecording = null
                         activeVideoPlan = null
-                        if (event.hasError()) {
+                        if (!wasLifecycleInterrupted && event.hasError()) {
                             adapterScope.launch {
                                 emitShotFailure(
-                                    shotId = plan.request.shotId,
+                                    shotId = finalizeShotId,
                                     mediaType = plan.request.mediaType,
                                     reason = event.cause?.message ?: event.error.toString()
                                 )
                             }
-                        } else {
+                        } else if (!wasLifecycleInterrupted) {
                             adapterScope.launch {
                                 emitShotCompleted(
                                     plan = plan,

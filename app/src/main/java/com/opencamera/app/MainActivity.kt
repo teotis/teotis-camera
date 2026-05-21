@@ -630,6 +630,7 @@ class MainActivity : ComponentActivity() {
                 is GestureAction.AssistModeSwitch -> {
                     // TODO: mode track assist switch via horizontal scroll
                 }
+                is GestureAction.ZoomAccumulationReset -> gesturePolicy.resetZoomAccumulation()
                 is GestureAction.Ignore -> Unit
             }
         }

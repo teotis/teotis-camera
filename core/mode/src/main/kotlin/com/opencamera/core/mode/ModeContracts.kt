@@ -46,7 +46,7 @@ fun ModeId.catalogProfile(): ModeCatalogProfile {
         )
         ModeId.PORTRAIT -> ModeCatalogProfile(
             displayName = "Portrait",
-            buttonLabel = "Port"
+            buttonLabel = "Portrait"
         )
         ModeId.PRO -> ModeCatalogProfile(
             displayName = "Pro",

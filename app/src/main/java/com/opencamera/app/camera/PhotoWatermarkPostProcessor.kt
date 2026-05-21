@@ -12,6 +12,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
+import android.os.Build
 import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaMetadata
@@ -653,6 +654,8 @@ private const val PHOTO_WATERMARK_CAMERA_PARAMS_KEY = "watermarkCameraParams"
 private const val PHOTO_WATERMARK_POSITION_KEY = "watermarkPosition"
 private const val PHOTO_WATERMARK_TEXT_SCALE_KEY = "watermarkTextScale"
 private const val PHOTO_WATERMARK_TEXT_OPACITY_KEY = "watermarkTextOpacity"
+private const val PHOTO_WATERMARK_MODE_NAME_KEY = "watermarkModeName"
+private const val PHOTO_WATERMARK_PROFILE_NAME_KEY = "watermarkProfileName"
 private const val TEMPLATE_CLASSIC_OVERLAY = "classic-overlay"
 private const val TEMPLATE_TRAVEL_POLAROID = "travel-polaroid"
 private const val TEMPLATE_RETRO_FRAME = "retro-frame"
@@ -682,8 +685,7 @@ internal fun resolvePhotoWatermarkTemplate(
     } else {
         "template-fallback"
     }
-    val model = metadata.customTags[PHOTO_WATERMARK_MODEL_KEY]
-        ?: preservedExif[ExifInterface.TAG_MODEL]
+    val model = resolveDeviceModel(metadata.customTags, preservedExif)
     val datetime = metadata.customTags[PHOTO_WATERMARK_DATETIME_KEY]
         ?: formatExifDateTime(
             preservedExif[ExifInterface.TAG_DATETIME_ORIGINAL]
@@ -693,15 +695,16 @@ internal fun resolvePhotoWatermarkTemplate(
         ?: formatExifLocation(preservedExif)
     val cameraParams = metadata.customTags[PHOTO_WATERMARK_CAMERA_PARAMS_KEY]
         ?: formatCameraParams(preservedExif)
+    val profileName = metadata.customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY]
     val supportedTokens = when (normalizedTemplateId) {
-        TEMPLATE_CLASSIC_OVERLAY -> listOfNotNull(model, datetime, location, cameraParams)
-        TEMPLATE_TRAVEL_POLAROID -> listOfNotNull(model, datetime, location)
-        TEMPLATE_RETRO_FRAME -> listOfNotNull(model, datetime, cameraParams)
+        TEMPLATE_CLASSIC_OVERLAY -> listOfNotNull(datetime, location, cameraParams)
+        TEMPLATE_TRAVEL_POLAROID -> listOfNotNull(datetime, location, profileName)
+        TEMPLATE_RETRO_FRAME -> listOfNotNull(datetime, cameraParams, profileName)
         else -> emptyList()
     }
     return ResolvedPhotoWatermarkTemplate(
         templateId = normalizedTemplateId,
-        title = resolveWatermarkTitle(normalizedTemplateId, watermarkText),
+        title = resolveWatermarkTitle(normalizedTemplateId, watermarkText, metadata.customTags, model),
         supportingLines = chunkWatermarkTokens(supportedTokens),
         frameBackground = resolveWatermarkFrameBackground(
             templateId = normalizedTemplateId,
@@ -758,13 +761,39 @@ private fun defaultWatermarkFrameBackground(templateId: String): WatermarkFrameB
 
 private fun resolveWatermarkTitle(
     templateId: String,
-    watermarkText: String
+    watermarkText: String,
+    customTags: Map<String, String>,
+    deviceModel: String
 ): String {
+    val modeName = customTags[PHOTO_WATERMARK_MODE_NAME_KEY]
+    val profileName = customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY]
+    if (modeName != null) {
+        val title = buildString {
+            append(deviceModel)
+            append(" · ")
+            append(modeName)
+            profileName?.let {
+                append(" ")
+                append(it)
+            }
+        }
+        return title
+    }
     val normalizedText = watermarkText.trim().ifBlank { "OpenCamera" }
     return when {
         templateId == TEMPLATE_TRAVEL_POLAROID && normalizedText.startsWith("PHOTO ") -> "去有天空的地方"
         else -> normalizedText
     }
+}
+
+private fun resolveDeviceModel(
+    customTags: Map<String, String>,
+    preservedExif: Map<String, String>
+): String {
+    return customTags[PHOTO_WATERMARK_MODEL_KEY]
+        ?: preservedExif[ExifInterface.TAG_MODEL]
+        ?: Build.MODEL
+        ?: "OpenCamera"
 }
 
 private fun chunkWatermarkTokens(tokens: List<String>): List<String> {

@@ -186,14 +186,14 @@ private class NightModeController(
         val postProcessSpec = basePostProcess.copy(
             watermarkText = if (proVariantEnabled) {
                 if (manualControlsEnabled()) {
-                    "Night Pro ${profile.label}"
+                    "Scenery Pro ${profile.label}"
                 } else {
-                    "Night Pro Assist ${profile.label}"
+                    "Scenery Pro Assist ${profile.label}"
                 }
             } else if (multiFrameEnabled()) {
-                "Night ${profile.label}"
+                "Scenery ${profile.label}"
             } else {
-                "Night Assist ${profile.label}"
+                "Scenery Assist ${profile.label}"
             },
             exifOverrides = basePostProcess.exifOverrides + buildMap {
                 put("SceneCaptureType", "Night")
@@ -222,6 +222,8 @@ private class NightModeController(
                     put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                     put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                     put("modeVariant", if (proVariantEnabled) "pro" else "standard")
+                    put("watermarkModeName", "Scenery")
+                    put("watermarkProfileName", profile.label)
                     if (proVariantEnabled) {
                         put("controlMode", resolvedControlMode())
                         put("manualDraftState", manualDraftState())

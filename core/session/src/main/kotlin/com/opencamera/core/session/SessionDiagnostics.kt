@@ -204,6 +204,16 @@ fun previewStartTimeoutMillis(lastStartReason: String?): Long {
     return budget.failThresholdMillis + FIRST_FRAME_TIMEOUT_GRACE_MILLIS
 }
 
+fun previewStartWatchdogMillis(lastStartReason: String?): Long {
+    return when (classifyPreviewStartCategory(lastStartReason)) {
+        PreviewStartCategory.COLD_START -> 1200L
+        PreviewStartCategory.FOREGROUND_RESUME -> 1200L
+        PreviewStartCategory.RECOVERY -> 1500L
+        PreviewStartCategory.RECONFIGURE -> 1000L
+        PreviewStartCategory.UNKNOWN -> 1200L
+    }
+}
+
 private fun firstFrameBudgetFor(
     startCategory: PreviewStartCategory
 ): FirstFrameBudget {

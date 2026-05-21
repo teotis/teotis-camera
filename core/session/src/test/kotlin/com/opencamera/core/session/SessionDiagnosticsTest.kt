@@ -177,6 +177,20 @@ class SessionDiagnosticsTest {
         assertEquals(300L, previewStartTimeoutMillis("session boot"))
     }
 
+    @Test
+    fun `preview start watchdog uses independent conservative thresholds`() {
+        assertEquals(1200L, previewStartWatchdogMillis("session boot"))
+        assertEquals(1200L, previewStartWatchdogMillis("preview host attached"))
+        assertEquals(1200L, previewStartWatchdogMillis("camera permission granted"))
+        assertEquals(1200L, previewStartWatchdogMillis("recover after preview host detached: Activity moved to background"))
+        assertEquals(1500L, previewStartWatchdogMillis("recover after provider failure: provider restarted"))
+        assertEquals(1000L, previewStartWatchdogMillis("mode switched to video"))
+        assertEquals(1000L, previewStartWatchdogMillis("lens switched to front"))
+        assertEquals(1000L, previewStartWatchdogMillis("session settings updated"))
+        assertEquals(1200L, previewStartWatchdogMillis("unknown reason"))
+        assertEquals(1200L, previewStartWatchdogMillis(null))
+    }
+
     private fun defaultSessionState(
         previewStatus: PreviewStatus = PreviewStatus.IDLE,
         previewMetrics: PreviewMetrics = PreviewMetrics(),

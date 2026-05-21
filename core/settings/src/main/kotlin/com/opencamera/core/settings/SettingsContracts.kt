@@ -553,6 +553,7 @@ data class VideoSpecConstraints(
 }
 
 data class CommonSettings(
+    val appLanguage: AppLanguage = AppLanguage.ZH,
     val gridMode: CompositionGridMode = CompositionGridMode.OFF,
     val shutterSoundEnabled: Boolean = true,
     val selfieMirrorEnabled: Boolean = false

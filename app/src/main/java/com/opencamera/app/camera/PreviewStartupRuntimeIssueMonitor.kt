@@ -3,7 +3,7 @@ package com.opencamera.app.camera
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.session.classifyPreviewStartCategory
-import com.opencamera.core.session.previewStartTimeoutMillis
+import com.opencamera.core.session.previewStartWatchdogMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,7 +38,7 @@ class PreviewStartupRuntimeIssueMonitor(
             return
         }
         cancelPendingTimeout()
-        val timeoutMillis = previewStartTimeoutMillis(reason)
+        val timeoutMillis = previewStartWatchdogMillis(reason)
         pendingTimeoutJob = scope.launch {
             delay(timeoutMillis)
             mutableRuntimeIssues.emit(

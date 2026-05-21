@@ -546,8 +546,11 @@ internal fun primaryStatusRenderModel(
             append(" · ${state.captureStatus.name.lowercase().replaceFirstChar(Char::titlecase)}")
         }
         state.countdownRemainingSeconds?.let { append(" · ${it}s") }
-        if (state.recordingStatus != RecordingStatus.IDLE) {
-            append(" · Rec")
+        when (state.recordingStatus) {
+            RecordingStatus.REQUESTING -> append(" · Starting...")
+            RecordingStatus.RECORDING -> append(" · Recording")
+            RecordingStatus.STOPPING -> append(" · Saving...")
+            RecordingStatus.IDLE -> Unit
         }
     }
     return PrimaryStatusRenderModel(

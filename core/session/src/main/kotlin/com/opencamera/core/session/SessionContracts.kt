@@ -42,7 +42,9 @@ enum class CaptureStatus {
 
 enum class RecordingStatus {
     IDLE,
-    RECORDING
+    REQUESTING,
+    RECORDING,
+    STOPPING
 }
 
 enum class SavedMediaType {
@@ -140,6 +142,7 @@ sealed interface SessionIntent {
     data object CountdownCompleted : SessionIntent
     data object LensFacingToggled : SessionIntent
     data object ZoomRatioToggled : SessionIntent
+    data class ApplyZoomRatio(val ratio: Float) : SessionIntent
     data object StillCaptureQualityToggled : SessionIntent
     data object StillCaptureResolutionToggled : SessionIntent
     data class DeviceCapabilitiesUpdated(val capabilities: DeviceCapabilities) : SessionIntent

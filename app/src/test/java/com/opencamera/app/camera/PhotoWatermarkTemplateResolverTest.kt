@@ -11,6 +11,64 @@ import kotlin.test.assertTrue
 
 class PhotoWatermarkTemplateResolverTest {
     @Test
+    fun `structured watermarkModeName produces device-model dot mode-name title`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "classic-overlay",
+            watermarkText = "PHOTO Auto",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Scenery",
+                    "watermarkProfileName" to "Handheld"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "vivo X300 Ultra"
+            )
+        )
+
+        assertEquals("vivo X300 Ultra · Scenery Handheld", resolved.title)
+    }
+
+    @Test
+    fun `device model priority prefers custom tag over exif tag`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "classic-overlay",
+            watermarkText = "PHOTO Auto",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModel" to "Custom Model",
+                    "watermarkModeName" to "Photo"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "EXIF Model"
+            )
+        )
+
+        assertEquals("Custom Model · Photo", resolved.title)
+    }
+
+    @Test
+    fun `night mode structured tags output Scenery not Night`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "retro-frame",
+            watermarkText = "Scenery Handheld",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Scenery",
+                    "watermarkProfileName" to "Handheld",
+                    "watermarkCameraParams" to "1/50s • f/1.8 • ISO 320"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("OpenCamera · Scenery Handheld", resolved.title)
+        assertTrue(resolved.supportingLines.any { it.contains("Handheld") })
+        assertTrue(resolved.supportingLines.any { it.contains("1/50s") })
+    }
+
+    @Test
     fun `travel polaroid resolver uses default slogan and degrades without location`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "travel-polaroid",
@@ -26,8 +84,6 @@ class PhotoWatermarkTemplateResolverTest {
         assertEquals("去有天空的地方", resolved.title)
         assertEquals(WatermarkFrameBackground.WHITE, resolved.frameBackground)
         assertTrue(resolved.usesExpandedFrame)
-        assertTrue(resolved.supportingLines.any { it.contains("vivo X300 Ultra") })
-        assertTrue(resolved.supportingLines.any { it.contains("2026-04-11 20-16-00") })
         assertFalse(resolved.supportingLines.any { it.contains(",") })
     }
 
@@ -56,7 +112,7 @@ class PhotoWatermarkTemplateResolverTest {
         assertEquals(WatermarkTextPlacement.BOTTOM_RIGHT, resolved.placement)
         assertEquals(1.2f, resolved.textScale)
         assertEquals(0.8f, resolved.textOpacity)
-        assertTrue(resolved.supportingLines.any { it.contains("X300U") })
+        assertTrue(resolved.supportingLines.any { it.contains("2026-04-11 21:00") })
         assertTrue(resolved.supportingLines.any { it.contains("ISO 320") })
     }
 

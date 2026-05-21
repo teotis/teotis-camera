@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class PreviewStartupRuntimeIssueMonitorTest {
     @Test
-    fun `bind without first frame emits recoverable preview stall issue after timeout`() = runTest {
+    fun `bind without first frame does not emit stall before watchdog timeout`() = runTest {
         val monitorScope = TestScope(StandardTestDispatcher(testScheduler))
         val monitor = PreviewStartupRuntimeIssueMonitor(monitorScope)
         val recordedIssues = mutableListOf<String>()
@@ -31,7 +31,29 @@ class PreviewStartupRuntimeIssueMonitorTest {
             reason = "session boot",
             isRecovery = false
         )
-        monitorScope.advanceTimeBy(299)
+        monitorScope.advanceTimeBy(495)
+        monitorScope.runCurrent()
+        assertTrue(recordedIssues.isEmpty())
+        collectionJob.cancel()
+    }
+
+    @Test
+    fun `bind without first frame emits recoverable preview stall after watchdog timeout`() = runTest {
+        val monitorScope = TestScope(StandardTestDispatcher(testScheduler))
+        val monitor = PreviewStartupRuntimeIssueMonitor(monitorScope)
+        val recordedIssues = mutableListOf<String>()
+        val collectionJob = monitorScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            monitor.runtimeIssues.collect { issue ->
+                recordedIssues += "${issue.kind}:${issue.reason}:${issue.isRecoverable}"
+            }
+        }
+
+        monitor.onPreviewHostAttached()
+        monitor.onPreviewBindingStarted(
+            reason = "session boot",
+            isRecovery = false
+        )
+        monitorScope.advanceTimeBy(1199)
         monitorScope.runCurrent()
         assertTrue(recordedIssues.isEmpty())
 
@@ -40,7 +62,7 @@ class PreviewStartupRuntimeIssueMonitorTest {
 
         assertEquals(
             listOf(
-                "PREVIEW_STALL:first frame timed out after 300 ms (Cold start): session boot:true"
+                "PREVIEW_STALL:first frame timed out after 1200 ms (Cold start): session boot:true"
             ),
             recordedIssues
         )

@@ -67,6 +67,7 @@ import kotlin.test.assertFalse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -681,6 +682,31 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `apply zoom ratio sets target ratio directly`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ApplyZoomRatio(5f))
+        advanceUntilIdle()
+
+        assertEquals(5f, session.state.value.activeDeviceGraph.preview.zoomRatio)
+        assertEquals("Zoom set to 5.0x", session.state.value.lastAction)
+        assertTrue(trace.snapshot().any { it.name == "zoom.updated" && it.detail == "5.0x" })
+    }
+
+    @Test
     fun `preview host detach cancels active photo countdown`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
@@ -844,6 +870,51 @@ class DefaultCameraSessionTest {
             )
         )
         assertTrue(session.state.value.modeSnapshot.state.headline.contains("Recording requested"))
+    }
+
+    @Test
+    fun `shot failed for already-terminal shot id is idempotent`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+
+        // First failure clears the active shot
+        session.dispatch(
+            SessionIntent.ShotFailed(
+                shotId = shot.shotId,
+                mediaType = MediaType.VIDEO,
+                reason = "Recording interrupted by lifecycle stop"
+            )
+        )
+        advanceUntilIdle()
+        assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+        assertNull(session.state.value.activeShot)
+
+        // Second failure for same shotId should be idempotent (no-op)
+        session.dispatch(
+            SessionIntent.ShotFailed(
+                shotId = shot.shotId,
+                mediaType = MediaType.VIDEO,
+                reason = "Video recording error: code 4"
+            )
+        )
+        advanceUntilIdle()
+
+        // Should only have one recording.failed trace event
+        val failedTraces = trace.snapshot().filter { it.name == "recording.failed" }
+        assertEquals(1, failedTraces.size)
+        assertTrue(failedTraces[0].detail.contains("Recording interrupted by lifecycle stop"))
+        assertTrue(trace.snapshot().any { it.name == "shot.failed.duplicate" })
     }
 
     @Test

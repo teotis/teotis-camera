@@ -36,11 +36,11 @@ class GesturePolicyTest {
     }
 
     @Test
-    fun pinchZoom_mapsToZoomRatioToggled() {
+    fun pinchZoom_mapsToApplyZoomRatio() {
         val action = policy.map(GestureEvent.PinchZoom(1.5f, 200f, 300f), ModeId.PHOTO)
         assertTrue(action is GestureAction.DispatchSession)
         val dispatch = action as GestureAction.DispatchSession
-        assertEquals(SessionIntent.ZoomRatioToggled, dispatch.intent)
+        assertTrue(dispatch.intent is SessionIntent.ApplyZoomRatio)
     }
 
     @Test
@@ -66,8 +66,8 @@ class GesturePolicyTest {
     }
 
     @Test
-    fun dragCancel_mapsToIgnore() {
+    fun dragCancel_mapsToZoomAccumulationReset() {
         val action = policy.map(GestureEvent.DragCancel, ModeId.PHOTO)
-        assertEquals(GestureAction.Ignore, action)
+        assertEquals(GestureAction.ZoomAccumulationReset, action)
     }
 }

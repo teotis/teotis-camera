@@ -154,6 +154,8 @@ private class PhotoModeController(
                                         put("mode", "photo")
                                         put("flash", flashMode.name.lowercase())
                                         put("livePhotoDefault", "on")
+                                        put("watermarkModeName", "Photo")
+                                        put("watermarkProfileName", flashLabel)
                                         putAll(
                                             context.settingsSnapshot.catalog.liveMediaBundleDraft
                                                 .liveWatermarkMetadataTags()
@@ -185,6 +187,8 @@ private class PhotoModeController(
                                         put("mode", "photo")
                                         put("flash", flashMode.name.lowercase())
                                         put("livePhotoDefault", "off")
+                                        put("watermarkModeName", "Photo")
+                                        put("watermarkProfileName", flashLabel)
                                         put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                         put(
                                             "stillResolution",

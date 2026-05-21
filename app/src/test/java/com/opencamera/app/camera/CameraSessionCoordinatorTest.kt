@@ -309,7 +309,7 @@ class CameraSessionCoordinatorTest {
                 isRecovery = false
             )
         )
-        advanceTimeBy(300)
+        advanceTimeBy(1200)
         advanceUntilIdle()
 
         assertTrue(
@@ -317,7 +317,7 @@ class CameraSessionCoordinatorTest {
                 SessionIntent.PreviewRuntimeIssue(
                     DeviceRuntimeIssue(
                         kind = DeviceRuntimeIssueKind.PREVIEW_STALL,
-                        reason = "first frame timed out after 300 ms (Cold start): session boot",
+                        reason = "first frame timed out after 1200 ms (Cold start): session boot",
                         isRecoverable = true
                     )
                 )
