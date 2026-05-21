@@ -435,4 +435,39 @@ class SessionSettingsManagerTest {
             )
         }
     }
+
+    @Test
+    fun `lens lab palette render spec is present in settings snapshot`() = runTest {
+        val session = FakeCameraSession()
+        val store = MapPersistedSettingsStore()
+        val catalogStore = MapFeatureCatalogStore()
+        val manager = SessionSettingsManager(
+            session = session,
+            store = store,
+            catalogStore = catalogStore
+        )
+
+        // Apply a custom filter with palette changes
+        manager.apply(
+            PersistedSettingsAction.UpdatePhotoFilter("photo-original")
+        )
+
+        // Update the render spec with palette changes
+        manager.updateCustomFilterRenderSpec(
+            filterProfileId = "photo-original",
+            renderSpec = FilterRenderSpec(
+                brightnessShift = 10,
+                tintShift = -3,
+                warmBoost = 0.15f
+            )
+        )
+
+        // Verify the render spec is present in the settings snapshot
+        val snapshot = manager.loadSnapshot()
+        val profile = snapshot.catalog.filterProfileOrNull("photo-original")
+        assertNotNull(profile)
+        assertEquals(10, profile.renderSpec.brightnessShift)
+        assertEquals(-3, profile.renderSpec.tintShift)
+        assertEquals(0.15f, profile.renderSpec.warmBoost)
+    }
 }
