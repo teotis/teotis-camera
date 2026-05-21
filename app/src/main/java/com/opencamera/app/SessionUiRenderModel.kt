@@ -509,7 +509,7 @@ internal fun modeDirectoryRenderModel(
             )
             ModeDirectoryItemRenderModel(
                 modeId = modeId,
-                displayName = declaration.catalogProfile.displayName,
+                displayName = text.modeDisplayName(modeId),
                 buttonLabel = declaration.catalogProfile.buttonLabel,
                 defaultStyleLabel = declaration.defaultStyleLabel,
                 declaredSubfeatures = declaration.declaredSubfeatures,
@@ -531,7 +531,7 @@ internal fun modeTrackRenderModel(
             )
             ModeTrackItemRenderModel(
                 modeId = modeId,
-                trackLabel = declaration.catalogProfile.buttonLabel,
+                trackLabel = text.modeTrackLabel(modeId),
                 isActive = modeId == state.activeMode,
                 isAvailable = true
             )
@@ -543,7 +543,7 @@ internal fun primaryStatusRenderModel(
     state: SessionState,
     text: AppTextResolver
 ): PrimaryStatusRenderModel {
-    val modeLabel = state.modeSnapshot.uiSpec.title
+    val modeLabel = text.modeDisplayName(state.activeMode)
     val statusText = buildString {
         append(state.previewStatus.name.lowercase().replaceFirstChar(Char::titlecase))
         if (state.captureStatus != CaptureStatus.IDLE) {

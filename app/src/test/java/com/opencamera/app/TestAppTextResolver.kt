@@ -11,7 +11,7 @@ class TestAppTextResolver : AppTextResolver(null) {
         ModeId.PHOTO -> "Photo"
         ModeId.DOCUMENT -> "Doc"
         ModeId.NIGHT -> "Scenery"
-        ModeId.HUMANISTIC -> "Human"
+        ModeId.HUMANISTIC -> "Humanistic"
         ModeId.PORTRAIT -> "Port"
         ModeId.PRO -> "Pro"
         ModeId.VIDEO -> "Video"

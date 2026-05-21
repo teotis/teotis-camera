@@ -679,14 +679,13 @@ class MainActivity : AppCompatActivity() {
             adjustmentMode = filterAdjustmentMode
         )
         val modeTrack = modeTrackRenderModel(state, text)
-        val primaryStatus = primaryStatusRenderModel(state, text)
         latestSettingsPageRenderModel = settingsPage
         latestPortraitLabRenderModel = portraitLabPage
         latestWatermarkLabSelectorRenderModel = watermarkSelectorPage
         latestWatermarkLabDetailRenderModel = watermarkDetailPage
         latestFilterLabRenderModel = filterLabPage
         // Top panel: lightweight primary status
-        titleText.text = "${getString(R.string.app_name)} · ${primaryStatus.modeLabel}"
+        titleText.text = "${getString(R.string.app_name)} · ${text.modeDisplayName(state.activeMode)}"
         renderModeTrack(modeTrack)
         renderSettingsPage(settingsPage)
         renderPortraitLabPage(portraitLabPage)
