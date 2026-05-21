@@ -2,14 +2,17 @@
 
 Canonical reference:
 
-- `flagship-side-rail-palette.md`
-- `flagship-side-rail-palette.svg`
+- `floating-focus-decision.md`
+- `floating-button-candidates/floating-focus.svg`
+- `floating-button-candidates/quick-bubble.svg`
 
-The approved direction is **Flagship Side Rail + Palette**:
+The approved direction is **Floating Focus + Quick Bubble**:
 
-- right side rail for high-frequency shooting controls;
-- palette panel for photographic style and tone;
+- Candidate A Floating Focus is the main layout direction;
+- Candidate B Quick Bubble contributes the secondary expansion behavior;
+- floating buttons replace fixed side columns;
+- default surface stays clean and preview-first;
 - bottom deck reserved for thumbnail, shutter, lens switch, and mode rail;
-- `DEV` entry lives in the debug-only side rail, not in the top bar.
+- palette and `DEV` both have explicit, non-noisy entries.
 
-The older files under `docs/ui-design-candidates/` are historical candidates only. Do not use them as the implementation target unless this reference is explicitly superseded.
+The older files under `docs/ui-design-candidates/` and `flagship-side-rail-palette.*` are historical references only. Do not use them as the implementation target unless this reference is explicitly superseded.
