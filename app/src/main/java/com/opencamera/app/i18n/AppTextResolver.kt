@@ -108,6 +108,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun tone(): String = str(R.string.button_palette_entry, "Tone")
     open fun styleEntry(): String = str(R.string.button_style_entry, "Style")
     open fun lensLabEntry(): String = str(R.string.button_lens_lab_entry, "Lens Lab")
+    open fun colorLabEntry(): String = str(R.string.button_color_lab_entry, "Color Lab")
     open fun stylePanelTitle(): String = str(R.string.style_panel_title, "Style")
     open fun lensLabPanelTitle(): String = str(R.string.lens_lab_panel_title, "Lens Lab")
     open fun useThisStyle(): String = str(R.string.button_use_this_style, "Use Style")

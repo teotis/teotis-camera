@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonQuickTimer: Button
     private lateinit var buttonQuickMore: Button
     private lateinit var buttonQuickLauncher: Button
-    private lateinit var quickBubblePanel: LinearLayout
+    private lateinit var quickBubblePanel: androidx.core.widget.NestedScrollView
     private lateinit var settingsPanel: androidx.core.widget.NestedScrollView
     private lateinit var filterPanel: androidx.core.widget.NestedScrollView
     private lateinit var buttonSettingsBack: Button
@@ -394,18 +394,22 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyControlRotationForDisplay() {
         val rotation = display?.rotation ?: android.view.Surface.ROTATION_0
-        val degrees = when (rotation) {
-            android.view.Surface.ROTATION_90 -> 90f
-            android.view.Surface.ROTATION_270 -> -90f
-            else -> 0f
-        }
+        val orientationModel = orientationRenderModel(rotation)
+        val degrees = orientationModel.controlRotationDegrees
         listOf(
+            // Right rail utility buttons
             buttonFilterEntry,
             buttonQuickLauncher,
             buttonLensLabEntry,
             buttonDevEntry,
+            // Bottom cockpit controls
             shutterButton,
-            lensFacingButton
+            lensFacingButton,
+            // Quick panel text-bearing buttons
+            buttonFrameRatio43,
+            buttonFrameRatio169,
+            buttonFrameRatio11,
+            buttonGridMode
         ).forEach { it.rotation = degrees }
     }
 
@@ -440,7 +444,21 @@ class MainActivity : AppCompatActivity() {
             renderDevConsoleVisibility()
         }
         buttonSettingsEntry.setOnClickListener {
-            toggleSettingsPanel()
+            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.LensLab) {
+                CockpitPanelRoute.None
+            } else {
+                CockpitPanelRoute.LensLab
+            }
+            if (activePanelRoute is CockpitPanelRoute.LensLab) {
+                isFilterAdjustmentVisible = true
+                maybeAutoPrepareFilter()
+                renderLatestFilterLab()
+            } else {
+                selectedFilterLabFamilyOverride = null
+                isFilterAdjustmentVisible = false
+                lightPaletteBaseSpec = null
+            }
+            renderPanelVisibility()
         }
         buttonLensLabEntry.setOnClickListener {
             activePanelRoute = if (activePanelRoute is CockpitPanelRoute.LensLab) {
@@ -1275,7 +1293,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderQuickBubble(settingsPage: SessionSettingsPageRenderModel) {
         val grid = settingsPage.commonSection.gridMode
-        buttonQuickGrid.text = "${getString(R.string.button_quick_grid)} ${grid.value}"
+        buttonQuickGrid.text = getString(R.string.button_quick_grid)
+        buttonQuickGrid.contentDescription = "${getString(R.string.button_quick_grid)} ${grid.value}"
         buttonQuickGrid.isEnabled = grid.isInteractive
 
         buttonQuickFlash.text = getString(R.string.button_quick_flash)
@@ -1294,11 +1313,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         val live = settingsPage.photoSection.livePhoto
-        buttonQuickLivePhoto.text = "${getString(R.string.button_quick_live)} ${live.value}"
+        buttonQuickLivePhoto.text = getString(R.string.button_quick_live)
+        buttonQuickLivePhoto.contentDescription = "${getString(R.string.button_quick_live)} ${live.value}"
         buttonQuickLivePhoto.isEnabled = live.isInteractive
 
         val timer = settingsPage.photoSection.countdown
-        buttonQuickTimer.text = "${getString(R.string.button_quick_timer)} ${timer.value}"
+        buttonQuickTimer.text = getString(R.string.button_quick_timer)
+        buttonQuickTimer.contentDescription = "${getString(R.string.button_quick_timer)} ${timer.value}"
         buttonQuickTimer.isEnabled = timer.isInteractive
 
         buttonQuickMore.text = getString(R.string.button_quick_more)
@@ -1317,8 +1338,7 @@ class MainActivity : AppCompatActivity() {
         settingsWatermarkDetailContent.isVisible = subpage == SettingsSubpage.WATERMARK_DETAIL
         buttonSettingsBack.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
 
-        buttonSettingsEntry.visibility = View.GONE
-        buttonLensLabEntry.alpha = if (route is CockpitPanelRoute.LensLab) 1f else 0.92f
+        buttonSettingsEntry.alpha = if (route is CockpitPanelRoute.LensLab) 1f else 0.92f
         buttonFilterEntry.alpha = if (route is CockpitPanelRoute.FilterLab) 1f else 0.92f
         quickBubblePanel.isVisible = route is CockpitPanelRoute.QuickBubble
         buttonQuickLauncher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
@@ -1403,6 +1423,8 @@ class MainActivity : AppCompatActivity() {
         buttonDevTabAll.alpha = if (model.selectedTab == DevLogTab.ALL) activeAlpha else inactiveAlpha
     }
 
+    private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
+
     private fun bindModeTrackTouch() {
         val buttons = listOf(
             photoModeButton to ModeId.PHOTO,
@@ -1413,58 +1435,27 @@ class MainActivity : AppCompatActivity() {
             proModeButton to ModeId.PRO,
             videoModeButton to ModeId.VIDEO
         )
-        val touchSlop = 20.dp.toFloat()
-        var downButton: Button? = null
-        var downX = 0f
-        var downY = 0f
-        var didScroll = false
-
-        val listener = View.OnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    downButton = v as Button
-                    downX = event.rawX
-                    downY = event.rawY
-                    didScroll = false
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (kotlin.math.abs(event.rawX - downX) > touchSlop ||
-                        kotlin.math.abs(event.rawY - downY) > touchSlop) {
-                        didScroll = true
+        modeTrackScrollGuard.attach(modeTrackScroll)
+        buttons.forEach { (button, modeId) ->
+            button.setOnClickListener {
+                if (modeTrackScrollGuard.isScrolling) return@setOnClickListener
+                val state = latestSessionState
+                if (state != null) {
+                    val reason = captureConfigDisabledReason(state)
+                    if (reason != null) {
+                        showDisabledReason(reason)
+                        return@setOnClickListener
                     }
-                    false
                 }
-                MotionEvent.ACTION_UP -> {
-                    if (!didScroll && v == downButton && v.isEnabled) {
-                        val pair = buttons.firstOrNull { it.first == v } ?: return@OnTouchListener false
-                        val modeId = pair.second
-                        val state = latestSessionState
-                        if (state != null) {
-                            val reason = captureConfigDisabledReason(state)
-                            if (reason != null) {
-                                showDisabledReason(reason)
-                                downButton = null
-                                return@OnTouchListener true
-                            }
-                        }
-                        if (modeId == ModeId.VIDEO && !hasPermission(Manifest.permission.RECORD_AUDIO)) {
-                            permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-                        }
-                        dispatch(SessionIntent.SwitchMode(modeId))
-                    }
-                    downButton = null
-                    true
+                if (modeId == ModeId.VIDEO && !hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                    permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
                 }
-                MotionEvent.ACTION_CANCEL -> {
-                    downButton = null
-                    true
-                }
-                else -> false
+                dispatch(SessionIntent.SwitchMode(modeId))
             }
         }
-        buttons.forEach { (button, _) -> button.setOnTouchListener(listener) }
     }
+
+    private var lastAutoScrolledActiveMode: ModeId? = null
 
     private fun renderModeTrack(model: ModeTrackRenderModel) {
         val buttons = listOf(
@@ -1490,19 +1481,26 @@ class MainActivity : AppCompatActivity() {
                     button.setTextColor(ContextCompat.getColor(this, R.color.oc_text_secondary))
                     button.setTypeface(null, android.graphics.Typeface.NORMAL)
                     button.background = null
-                    button.alpha = if (item.isAvailable) 0.78f else 0.42f
+                    button.alpha = if (item.isAvailable) 0.82f else 0.42f
                 }
             }
         }
-        // Auto-scroll to keep active mode visible
-        modeTrackScroll.post {
-            val activeButton = buttons.firstOrNull { b ->
-                val idx = buttons.indexOf(b)
-                idx < model.items.size && model.items[idx].isActive
-            }
-            activeButton?.let {
-                val scrollX = (it.left - 48.dp).coerceAtLeast(0)
-                modeTrackScroll.smoothScrollTo(scrollX, 0)
+        // Auto-scroll only when active mode changes and user is not dragging
+        val activeItem = model.items.firstOrNull { it.isActive }
+        val activeModeId = activeItem?.modeId
+        if (activeModeId != null && activeModeId != lastAutoScrolledActiveMode && !modeTrackScrollGuard.isScrolling) {
+            lastAutoScrolledActiveMode = activeModeId
+            modeTrackScroll.post {
+                val activeButton = buttons.firstOrNull { b ->
+                    val idx = buttons.indexOf(b)
+                    idx < model.items.size && model.items[idx].isActive
+                }
+                activeButton?.let {
+                    val viewWidth = modeTrackScroll.width
+                    val chipCenter = it.left + it.width / 2
+                    val scrollX = (chipCenter - viewWidth / 2).coerceAtLeast(0)
+                    modeTrackScroll.smoothScrollTo(scrollX, 0)
+                }
             }
         }
     }

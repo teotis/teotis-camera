@@ -1,8 +1,20 @@
 package com.opencamera.app
 
+import android.view.Surface
 import com.opencamera.app.i18n.AppTextResolver
 import com.opencamera.core.session.PreviewRatio
 import com.opencamera.core.session.SessionState
+
+internal enum class CockpitDisplayOrientation {
+    PORTRAIT,
+    LANDSCAPE_LEFT,
+    LANDSCAPE_RIGHT
+}
+
+internal data class CockpitOrientationRenderModel(
+    val orientation: CockpitDisplayOrientation,
+    val controlRotationDegrees: Float
+)
 
 internal data class TopStatusRenderModel(
     val appName: String,
@@ -56,7 +68,10 @@ internal data class CameraCockpitRenderModel(
     val modeTrack: ModeTrackRenderModel,
     val bottomCockpit: BottomCockpitRenderModel,
     val previewRatioChip: PreviewRatioChipRenderModel,
-    val activePanelRoute: CockpitPanelRoute = CockpitPanelRoute.None
+    val activePanelRoute: CockpitPanelRoute = CockpitPanelRoute.None,
+    val orientation: CockpitOrientationRenderModel = CockpitOrientationRenderModel(
+        CockpitDisplayOrientation.PORTRAIT, 0f
+    )
 )
 
 internal fun cameraCockpitRenderModel(
@@ -75,7 +90,7 @@ internal fun cameraCockpitRenderModel(
             appName = "OpenCamera",
             modeLabel = primary.modeLabel,
             statusText = primary.statusText,
-            labEntryLabel = text.settingsEntry()
+            labEntryLabel = text.colorLabEntry()
         ),
         rightRail = RightRailRenderModel(
             entries = listOf(
@@ -85,19 +100,9 @@ internal fun cameraCockpitRenderModel(
                     isActive = activeRoute is CockpitPanelRoute.FilterLab
                 ),
                 RightRailEntryRenderModel(
-                    route = CockpitPanelRoute.LensLab,
-                    label = text.lensLabEntry(),
-                    isActive = activeRoute is CockpitPanelRoute.LensLab
-                ),
-                RightRailEntryRenderModel(
                     route = CockpitPanelRoute.QuickBubble,
                     label = text.quickLauncher(),
                     isActive = activeRoute is CockpitPanelRoute.QuickBubble
-                ),
-                RightRailEntryRenderModel(
-                    route = CockpitPanelRoute.Settings(),
-                    label = text.settingsEntry(),
-                    isActive = activeRoute is CockpitPanelRoute.Settings
                 ),
                 RightRailEntryRenderModel(
                     route = CockpitPanelRoute.DevConsole,
@@ -133,4 +138,18 @@ internal fun cameraCockpitRenderModel(
         ),
         activePanelRoute = activeRoute
     )
+}
+
+internal fun orientationRenderModel(displayRotation: Int): CockpitOrientationRenderModel {
+    return when (displayRotation) {
+        Surface.ROTATION_90 -> CockpitOrientationRenderModel(
+            CockpitDisplayOrientation.LANDSCAPE_LEFT, 90f
+        )
+        Surface.ROTATION_270 -> CockpitOrientationRenderModel(
+            CockpitDisplayOrientation.LANDSCAPE_RIGHT, -90f
+        )
+        else -> CockpitOrientationRenderModel(
+            CockpitDisplayOrientation.PORTRAIT, 0f
+        )
+    }
 }

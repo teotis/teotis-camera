@@ -207,6 +207,49 @@ class CameraCockpitRenderModelTest {
         assertEquals(PreviewRatio.RATIO_16_9, cockpit.previewRatioChip.ratio)
     }
 
+    // --- orientation render model tests ---
+
+    @Test
+    fun `orientation render model returns portrait for ROTATION_0`() {
+        // Surface.ROTATION_0 = 0
+        val model = orientationRenderModel(0)
+        assertEquals(CockpitDisplayOrientation.PORTRAIT, model.orientation)
+        assertEquals(0f, model.controlRotationDegrees)
+    }
+
+    @Test
+    fun `orientation render model returns landscape left for ROTATION_90`() {
+        // Surface.ROTATION_90 = 1
+        val model = orientationRenderModel(1)
+        assertEquals(CockpitDisplayOrientation.LANDSCAPE_LEFT, model.orientation)
+        assertEquals(90f, model.controlRotationDegrees)
+    }
+
+    @Test
+    fun `orientation render model returns landscape right for ROTATION_270`() {
+        // Surface.ROTATION_270 = 3
+        val model = orientationRenderModel(3)
+        assertEquals(CockpitDisplayOrientation.LANDSCAPE_RIGHT, model.orientation)
+        assertEquals(-90f, model.controlRotationDegrees)
+    }
+
+    @Test
+    fun `orientation render model returns portrait for ROTATION_180`() {
+        // Surface.ROTATION_180 = 2
+        val model = orientationRenderModel(2)
+        assertEquals(CockpitDisplayOrientation.PORTRAIT, model.orientation)
+        assertEquals(0f, model.controlRotationDegrees)
+    }
+
+    @Test
+    fun `cockpit render model defaults to portrait orientation`() {
+        val state = defaultSessionState()
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(CockpitDisplayOrientation.PORTRAIT, cockpit.orientation.orientation)
+        assertEquals(0f, cockpit.orientation.controlRotationDegrees)
+    }
+
     private fun defaultSessionState(
         activeMode: ModeId = ModeId.PHOTO,
         availableModes: List<ModeId> = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),

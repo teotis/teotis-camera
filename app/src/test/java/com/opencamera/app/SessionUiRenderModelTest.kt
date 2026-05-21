@@ -1218,6 +1218,42 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `mode track labels are short and stable`() {
+        val availableModes = listOf(
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
+            ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+        )
+        val state = defaultSessionState(availableModes = availableModes)
+        val model = modeTrackRenderModel(state, TestAppTextResolver())
+
+        model.items.forEach { item ->
+            assertTrue(
+                item.trackLabel.length <= 4,
+                "Mode track label '${item.trackLabel}' should be at most 4 chars for ${item.modeId}"
+            )
+        }
+        val labels = model.items.map { it.trackLabel }
+        assertEquals(labels.size, labels.toSet().size, "All mode track labels must be unique")
+    }
+
+    @Test
+    fun `active mode track item has distinct visual state`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.NIGHT,
+            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
+        )
+        val model = modeTrackRenderModel(state, TestAppTextResolver())
+
+        val active = model.items.first { it.modeId == ModeId.NIGHT }
+        val inactive = model.items.first { it.modeId == ModeId.PHOTO }
+
+        assertTrue(active.isActive)
+        assertFalse(inactive.isActive)
+        assertTrue(active.isAvailable)
+        assertTrue(inactive.isAvailable)
+    }
+
+    @Test
     fun `save as custom button label is localized via text resolver`() {
         val customResolver = object : TestAppTextResolver() {
             override fun saveAsCustom(): String = "保存为自定义"
@@ -1482,5 +1518,24 @@ class SessionUiRenderModelTest {
             "Selected item should contain family label: ${selectedItem!!.supportingText}")
         assertTrue(selectedItem!!.supportingText.contains("Selected default"),
             "Selected item should contain selected badge: ${selectedItem!!.supportingText}")
+    }
+
+    @Test
+    fun `quick button labels fit within 96dp button width without ellipsis`() {
+        // Quick buttons are 96dp wide at ~13sp. Chinese labels must stay ≤ 2 chars.
+        val quickLabels = listOf(
+            "网格",   // button_quick_grid
+            "画质",   // button_quick_flash
+            "画幅",   // button_quick_ratio
+            "实况",   // button_quick_live
+            "定时",   // button_quick_timer
+            "更多",   // button_quick_more
+        )
+        quickLabels.forEach { label ->
+            assertTrue(
+                label.length <= 2,
+                "Quick button label '$label' exceeds 2 chars and may ellipsize in 96dp button"
+            )
+        }
     }
 }

@@ -160,19 +160,22 @@ class PreviewOverlayView @JvmOverloads constructor(
         }
     }
 
-    private fun activeFrameRectOrFullView(): RectF {
+    private val frameHorizontalPaddingPx: Float get() = 12f * density
+
+    private fun activeContentGeometry(): PreviewContentGeometry {
         val frameRatio = renderModel.frame?.ratio
             ?: renderModel.effectModel?.frameGuideline?.ratio
-        return if (frameRatio != null) {
-            computePreviewFrameRect(
-                viewWidth = width,
-                viewHeight = height,
-                ratioWidth = frameRatio.width,
-                ratioHeight = frameRatio.height
-            )
-        } else {
-            RectF(0f, 0f, width.toFloat(), height.toFloat())
-        }
+        return previewContentGeometry(
+            viewWidth = width,
+            viewHeight = height,
+            ratioWidth = frameRatio?.width ?: 0,
+            ratioHeight = frameRatio?.height ?: 0,
+            horizontalPaddingPx = frameHorizontalPaddingPx
+        )
+    }
+
+    private fun activeFrameRectOrFullView(): RectF {
+        return activeContentGeometry().activeFrameRect
     }
 
     private fun drawGrid(
@@ -234,12 +237,13 @@ class PreviewOverlayView @JvmOverloads constructor(
     private fun drawFrameGuideline(canvas: Canvas, spec: FrameGuidelineSpec) {
         frameGuidelinePaint.color = spec.borderColor
         frameGuidelinePaint.alpha = (spec.borderAlpha * 255).toInt().coerceIn(0, 255)
-        val rect = computePreviewFrameRect(
+        val rect = previewContentGeometry(
             viewWidth = width,
             viewHeight = height,
             ratioWidth = spec.ratio.width,
-            ratioHeight = spec.ratio.height
-        )
+            ratioHeight = spec.ratio.height,
+            horizontalPaddingPx = frameHorizontalPaddingPx
+        ).activeFrameRect
         canvas.drawRect(rect, frameGuidelinePaint)
     }
 
@@ -278,13 +282,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
-        val rect = computePreviewFrameRect(
-            viewWidth = width,
-            viewHeight = height,
-            ratioWidth = frame.ratio.width,
-            ratioHeight = frame.ratio.height,
-            horizontalPaddingPx = 12f * density
-        )
+        val rect = activeContentGeometry().activeFrameRect
         if (frame.dimOutsideFrame) {
             val outsidePath = android.graphics.Path().apply {
                 fillType = android.graphics.Path.FillType.EVEN_ODD
@@ -299,6 +297,71 @@ class PreviewOverlayView @JvmOverloads constructor(
 }
 
 internal enum class PreviewDisplayOrientation { PORTRAIT, LANDSCAPE }
+
+/**
+ * Single source of truth for preview overlay geometry.
+ *
+ * [contentRect] describes the actual preview content area (full view for fillCenter).
+ * [activeFrameRect] describes the captured frame inside [contentRect].
+ *
+ * All overlay components (grid, frame outline, dim region, tap-to-focus)
+ * must read from this helper instead of computing independent rects.
+ */
+internal data class PreviewContentGeometry(
+    val viewWidth: Int,
+    val viewHeight: Int,
+    val contentRect: RectF,
+    val activeFrameRect: RectF
+) {
+    val frameCenterX: Float get() = activeFrameRect.centerX()
+    val frameCenterY: Float get() = activeFrameRect.centerY()
+    val contentCenterX: Float get() = contentRect.centerX()
+    val contentCenterY: Float get() = contentRect.centerY()
+}
+
+/**
+ * Build [PreviewContentGeometry] for the given view dimensions and optional frame ratio.
+ *
+ * When [ratioWidth] / [ratioHeight] are both > 0 the active frame is a centered
+ * sub-rect of [contentRect] matching that ratio. Otherwise the active frame
+ * equals [contentRect] (full-view capture).
+ *
+ * [horizontalPaddingPx], [topInsetPx], [bottomInsetPx] shrink the content rect
+ * symmetrically before the frame ratio is applied. They represent UI chrome
+ * (e.g. horizontal safe-area padding) that must not be treated as imaging area.
+ */
+internal fun previewContentGeometry(
+    viewWidth: Int,
+    viewHeight: Int,
+    ratioWidth: Int = 0,
+    ratioHeight: Int = 0,
+    horizontalPaddingPx: Float = 0f,
+    topInsetPx: Float = 0f,
+    bottomInsetPx: Float = 0f
+): PreviewContentGeometry {
+    val contentRect = RectF(
+        horizontalPaddingPx,
+        topInsetPx,
+        (viewWidth - horizontalPaddingPx).coerceAtLeast(0f),
+        (viewHeight - bottomInsetPx).coerceAtLeast(0f)
+    )
+    val activeFrameRect = if (ratioWidth > 0 && ratioHeight > 0) {
+        val fr = computeFrameRect(
+            viewWidth, viewHeight,
+            ratioWidth, ratioHeight,
+            horizontalPaddingPx, topInsetPx, bottomInsetPx
+        )
+        RectF(fr.left, fr.top, fr.right, fr.bottom)
+    } else {
+        RectF(contentRect)
+    }
+    return PreviewContentGeometry(
+        viewWidth = viewWidth,
+        viewHeight = viewHeight,
+        contentRect = contentRect,
+        activeFrameRect = activeFrameRect
+    )
+}
 
 internal data class OrientedFrameRatio(
     val orientedWidth: Int,
