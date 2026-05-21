@@ -35,6 +35,7 @@ import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.WatermarkTemplate
+import com.opencamera.core.settings.applyColorLab
 import com.opencamera.core.settings.liveWatermarkMetadataTags
 import com.opencamera.core.settings.watermarkStyleFor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -319,11 +320,13 @@ private class PhotoModeController(
 
     private fun buildEffectSpec(flashMode: FlashMode): EffectSpec {
         val filter = selectedFilter
+        val colorLabSpec = context.settingsSnapshot.persisted.photo.colorLabSpec
+        val adjustedRenderSpec = filter.renderSpec?.applyColorLab(colorLabSpec)
         val selectedWatermarkTemplate = selectedWatermarkTemplate()
         val watermarkStyle = context.settingsSnapshot.persisted.photo
             .watermarkStyleFor(selectedWatermarkTemplate.id)
         return EffectSpec(listOf(
-            FilterEffect(filter.id, filter.renderSpec),
+            FilterEffect(filter.id, adjustedRenderSpec),
             WatermarkEffect(
                 templateId = selectedWatermarkTemplate.id,
                 tokens = mapOf(
