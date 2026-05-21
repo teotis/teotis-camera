@@ -1111,6 +1111,10 @@ class DefaultCameraSession(
             trace.record("capture.feedback.snapshot.skipped", "shotId=$shotId,active=${activeShot?.shotId}")
             return
         }
+        if (captureFeedbackPolicyFor(activeShot) == CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA) {
+            trace.record("capture.feedback.snapshot.suppressed", "shotId=$shotId,reason=watermark-final-output")
+            return
+        }
         updateState(
             pendingCaptureFeedback = CaptureFeedbackPreview(
                 shotId = shotId,

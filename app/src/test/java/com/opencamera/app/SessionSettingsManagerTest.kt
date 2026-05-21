@@ -52,6 +52,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SessionSettingsManagerTest {
@@ -466,8 +467,8 @@ class SessionSettingsManagerTest {
         val snapshot = manager.loadSnapshot()
         val profile = snapshot.catalog.filterProfileOrNull("photo-original")
         assertNotNull(profile)
-        assertEquals(10, profile.renderSpec.brightnessShift)
-        assertEquals(-3, profile.renderSpec.tintShift)
-        assertEquals(0.15f, profile.renderSpec.warmBoost)
+        assertEquals(10, profile?.renderSpec?.brightnessShift)
+        assertEquals(-3, profile?.renderSpec?.tintShift)
+        assertEquals(0.15f, profile?.renderSpec?.warmBoost)
     }
 }

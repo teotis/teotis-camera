@@ -69,6 +69,21 @@ enum class PreviewRatio(val tagValue: String, val label: String) {
     }
 }
 
+enum class CaptureFeedbackPolicy {
+    ALLOW_PREVIEW_BITMAP,
+    SUPPRESS_UNTIL_SAVED_MEDIA
+}
+
+internal fun captureFeedbackPolicyFor(shot: ShotRequest): CaptureFeedbackPolicy {
+    val watermarkText = shot.saveRequest.metadata.watermarkText?.trim().orEmpty()
+    val template = shot.saveRequest.metadata.customTags["watermarkTemplate"].orEmpty()
+    return when {
+        watermarkText.isEmpty() -> CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP
+        template == "classic-overlay" -> CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP
+        else -> CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA
+    }
+}
+
 data class PermissionState(
     val cameraGranted: Boolean = false,
     val microphoneGranted: Boolean = false

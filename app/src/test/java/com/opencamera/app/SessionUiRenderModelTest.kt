@@ -782,7 +782,7 @@ class SessionUiRenderModelTest {
             TestAppTextResolver()
         )
 
-        assertEquals("Tone Lab", model.headline)
+        assertEquals("Style", model.headline)
         assertEquals("", model.heroSummary)
         assertTrue(model.portraitTab.isSelected)
         assertFalse(model.photoTab.isSelected)

@@ -3234,6 +3234,100 @@ class DefaultCameraSessionTest {
         assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.PreviewSnapshot)
     }
 
+    @Test
+    fun `watermark expanded frame suppresses raw capture feedback`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        val watermarkedShot = shot.copy(
+            saveRequest = shot.saveRequest.copy(
+                metadata = shot.saveRequest.metadata.copy(
+                    watermarkText = "OpenCamera",
+                    customTags = shot.saveRequest.metadata.customTags + ("watermarkTemplate" to "travel-polaroid")
+                )
+            )
+        )
+        session.dispatch(SessionIntent.ShotStarted(watermarkedShot))
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = watermarkedShot.shotId,
+                outputPath = "/tmp/raw-feedback.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.suppressed" })
+    }
+
+    @Test
+    fun `watermark with classic-overlay template accepts capture feedback`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        val overlayShot = shot.copy(
+            saveRequest = shot.saveRequest.copy(
+                metadata = shot.saveRequest.metadata.copy(
+                    watermarkText = "OpenCamera",
+                    customTags = shot.saveRequest.metadata.customTags + ("watermarkTemplate" to "classic-overlay")
+                )
+            )
+        )
+        session.dispatch(SessionIntent.ShotStarted(overlayShot))
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = overlayShot.shotId,
+                outputPath = "/tmp/overlay-feedback.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNotNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertEquals(overlayShot.shotId, session.state.value.presentation.pendingCaptureFeedback?.shotId)
+        assertEquals("/tmp/overlay-feedback.jpg", session.state.value.presentation.pendingCaptureFeedback?.outputPath)
+        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.updated" })
+    }
+
+    @Test
+    fun `watermark without template suppresses raw capture feedback`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        val watermarkedShot = shot.copy(
+            saveRequest = shot.saveRequest.copy(
+                metadata = shot.saveRequest.metadata.copy(
+                    watermarkText = "OpenCamera"
+                )
+            )
+        )
+        session.dispatch(SessionIntent.ShotStarted(watermarkedShot))
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = watermarkedShot.shotId,
+                outputPath = "/tmp/raw-feedback-no-template.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.suppressed" })
+    }
+
     private fun createSession(
         trace: InMemorySessionTrace,
         testScope: TestScope,
