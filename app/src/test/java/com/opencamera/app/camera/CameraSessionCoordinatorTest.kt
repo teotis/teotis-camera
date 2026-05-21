@@ -804,6 +804,36 @@ class CameraSessionCoordinatorTest {
         assertEquals(nightGraph, adapter.boundGraph())
     }
 
+    @Test
+    fun `capture feedback snapshot event is forwarded to session intent`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        adapter.emit(
+            DeviceEvent.CaptureFeedbackSnapshotAvailable(
+                shotId = "shot-1",
+                outputPath = "/tmp/feedback.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        val expectedIntent = SessionIntent.CaptureFeedbackSnapshotUpdated(
+            shotId = "shot-1",
+            outputPath = "/tmp/feedback.jpg"
+        )
+        assertTrue(
+            session.recordedIntents.contains(expectedIntent),
+            "Expected CaptureFeedbackSnapshotUpdated intent but got: ${session.recordedIntents}"
+        )
+    }
+
     private class FakeCameraSession(
         initialState: SessionState = defaultSessionState()
     ) : CameraSession {

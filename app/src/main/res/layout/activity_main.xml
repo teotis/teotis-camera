@@ -953,10 +953,19 @@
                     android:layout_weight="1" />
             </LinearLayout>
 
-            <LinearLayout
+            <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
+                android:text="@string/filter_section_filters"
+                android:textColor="@color/oc_text_secondary"
+                android:textSize="@dimen/text_size_section_title"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/bg_settings_card"
                 android:orientation="vertical"
                 android:padding="@dimen/space_16">
@@ -986,6 +995,15 @@
                     android:paddingVertical="12dp"
                     android:textAlignment="viewStart" />
             </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/filter_section_palette"
+                android:textColor="@color/oc_text_secondary"
+                android:textSize="@dimen/text_size_section_title"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:id="@+id/filterAdjustmentPanel"
@@ -1024,6 +1042,15 @@
                     android:layout_marginTop="10dp"
                     android:textColor="@color/oc_text_secondary"
                     android:textSize="@dimen/text_size_status" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/filter_section_advanced"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_section_title"
+                    android:textStyle="bold" />
 
                 <LinearLayout
                     android:id="@+id/filterAdvancedControls"

@@ -2866,6 +2866,204 @@ class DefaultCameraSessionTest {
         assertEquals(listOf("event2", "event3", "event4"), trace.snapshot().map { it.name })
     }
 
+    @Test
+    fun `capture feedback snapshot is accepted when shot is active`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = shot.shotId,
+                outputPath = "/tmp/feedback-a.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNotNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertEquals(shot.shotId, session.state.value.presentation.pendingCaptureFeedback?.shotId)
+        assertEquals("/tmp/feedback-a.jpg", session.state.value.presentation.pendingCaptureFeedback?.outputPath)
+        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.updated" })
+    }
+
+    @Test
+    fun `capture feedback snapshot is ignored for unknown shotId`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = "wrong-shot-id",
+                outputPath = "/tmp/feedback-b.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.skipped" })
+    }
+
+    @Test
+    fun `capture feedback snapshot is ignored when no active shot`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = "ghost-shot",
+                outputPath = "/tmp/feedback-c.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.skipped" })
+    }
+
+    @Test
+    fun `shot completed clears capture feedback preview`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = shot.shotId,
+                outputPath = "/tmp/feedback-d.jpg"
+            )
+        )
+        advanceUntilIdle()
+        assertNotNull(session.state.value.presentation.pendingCaptureFeedback)
+
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/photo-d.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia(
+                        "Pictures/OpenCamera/photo-d.jpg",
+                        "file:///tmp/photo-d.jpg"
+                    ),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.SavedMedia)
+        assertEquals("Pictures/OpenCamera/photo-d.jpg", session.state.value.previewThumbnailPath)
+    }
+
+    @Test
+    fun `shot failed clears capture feedback preview`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = shot.shotId,
+                outputPath = "/tmp/feedback-e.jpg"
+            )
+        )
+        advanceUntilIdle()
+        assertNotNull(session.state.value.presentation.pendingCaptureFeedback)
+
+        session.dispatch(
+            SessionIntent.ShotFailed(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                reason = "camera error"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertEquals(CaptureStatus.FAILED, session.state.value.captureStatus)
+    }
+
+    @Test
+    fun `shot started clears stale capture feedback`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shotA = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shotA))
+
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = shotA.shotId,
+                outputPath = "/tmp/feedback-f.jpg"
+            )
+        )
+        advanceUntilIdle()
+        assertNotNull(session.state.value.presentation.pendingCaptureFeedback)
+
+        // Complete first shot so a new shot can start
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shotA.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/photo-f.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia(
+                        "Pictures/OpenCamera/photo-f.jpg",
+                        "file:///tmp/photo-f.jpg"
+                    ),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        advanceUntilIdle()
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+
+        // Start a second shot; stale feedback from previous shot should already be gone
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shotB = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shotB))
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+    }
+
     private fun createSession(
         trace: InMemorySessionTrace,
         testScope: TestScope,

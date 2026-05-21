@@ -206,7 +206,7 @@ class MainActivity : AppCompatActivity() {
     private var latestSessionState: SessionState? = null
     private var selectedWatermarkDetailTemplateId: String? = null
     private var selectedFilterLabFamilyOverride: FilterLabFamily? = null
-    private var isFilterAdjustmentVisible = false
+    private var isFilterAdjustmentVisible = true
     private var filterAdjustmentMode = FilterAdjustmentMode.LIGHT
     private var lightPaletteBaseSpec: FilterRenderSpec? = null
     private lateinit var gestureRouter: GestureRouter
@@ -407,6 +407,7 @@ class MainActivity : AppCompatActivity() {
             selectedWatermarkDetailTemplateId = null
             selectedFilterLabFamilyOverride = null
             isFilterAdjustmentVisible = false
+            lightPaletteBaseSpec = null
             selectedSettingsTab = SettingsTab.COMMON
             renderPanelVisibility()
             renderDevConsoleVisibility()
@@ -424,10 +425,13 @@ class MainActivity : AppCompatActivity() {
                 CockpitPanelRoute.FilterLab
             }
             if (activePanelRoute is CockpitPanelRoute.FilterLab) {
+                isFilterAdjustmentVisible = true
+                maybeAutoPrepareFilter()
                 renderLatestFilterLab()
             } else {
                 selectedFilterLabFamilyOverride = null
                 isFilterAdjustmentVisible = false
+                lightPaletteBaseSpec = null
             }
             renderPanelVisibility()
         }
@@ -458,6 +462,7 @@ class MainActivity : AppCompatActivity() {
             activePanelRoute = CockpitPanelRoute.None
             selectedFilterLabFamilyOverride = null
             isFilterAdjustmentVisible = false
+            lightPaletteBaseSpec = null
             renderPanelVisibility()
         }
         buttonDevEntry.setOnClickListener {
@@ -1111,7 +1116,7 @@ class MainActivity : AppCompatActivity() {
                     isAllCaps = false
                     isEnabled = model.editingEnabled && item.nextAction != null
                     setOnClickListener {
-                        isFilterAdjustmentVisible = false
+                        isFilterAdjustmentVisible = true
                         item.nextAction?.let(::applySettingsAction)
                     }
                 }
@@ -1474,6 +1479,7 @@ class MainActivity : AppCompatActivity() {
                 if (activePanelRoute is CockpitPanelRoute.FilterLab) {
                     selectedFilterLabFamilyOverride = null
                     isFilterAdjustmentVisible = false
+                    lightPaletteBaseSpec = null
                 }
                 activePanelRoute = CockpitPanelRoute.None
                 renderPanelVisibility()
@@ -1567,7 +1573,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectFilterLabFamily(family: FilterLabFamily) {
         selectedFilterLabFamilyOverride = family
-        isFilterAdjustmentVisible = false
+        isFilterAdjustmentVisible = true
+        lightPaletteBaseSpec = null
+        maybeAutoPrepareFilter()
         renderLatestFilterLab()
     }
 
@@ -1586,6 +1594,9 @@ class MainActivity : AppCompatActivity() {
             adjustmentMode = filterAdjustmentMode
         )
         latestFilterLabRenderModel = model
+        if (isFilterAdjustmentVisible && lightPaletteBaseSpec == null) {
+            lightPaletteBaseSpec = model.adjustmentPanel.renderSpec
+        }
         renderFilterLabPage(model)
     }
 
@@ -1621,6 +1632,20 @@ class MainActivity : AppCompatActivity() {
                 family = control.family,
                 sourceProfileId = sourceProfileId
             )
+        }
+    }
+
+    private fun maybeAutoPrepareFilter() {
+        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
+        if (!panel.needsAutoPrepare) return
+        val profileId = panel.selectedProfileId ?: return
+        val family = latestFilterLabRenderModel?.adjustControl?.family ?: return
+        lifecycleScope.launch {
+            container.sessionSettingsManager.prepareFilterForAdjustment(
+                family = family,
+                sourceProfileId = profileId
+            )
+            renderLatestFilterLab()
         }
     }
 
@@ -1672,6 +1697,7 @@ class MainActivity : AppCompatActivity() {
         if (!panel.isVisible || panel.mode != FilterAdjustmentMode.LIGHT) {
             return
         }
+        if (panel.needsAutoPrepare) return
         val baseSpec = lightPaletteBaseSpec ?: panel.renderSpec
         lifecycleScope.launch {
             container.sessionSettingsManager.updateCustomFilterRenderSpec(
