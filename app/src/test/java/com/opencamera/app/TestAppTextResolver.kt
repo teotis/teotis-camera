@@ -267,6 +267,69 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun settingsSummaryWatermarkTemplates(): String = "watermark templates"
     override fun settingsSummaryMsBundle(): String = "ms bundle"
     override fun settingsSummaryProManualDraft(): String = "Pro manual draft"
+
+    // Settings joiners
+    override fun settingsJoinerGrid(): String = "Grid "
+    override fun settingsJoinerShutterSound(): String = " | Shutter sound "
+    override fun settingsJoinerSelfieMirror(): String = " | Selfie mirror "
+    override fun settingsJoinerFilter(): String = "Filter "
+    override fun settingsJoinerPortrait(): String = " | Portrait "
+    override fun settingsJoinerWatermark(): String = " | Watermark "
+    override fun settingsJoinerLive(): String = " | Live "
+    override fun settingsJoinerTimer(): String = " | Timer "
+    override fun settingsJoinerMic(): String = " | Mic "
+
+    // Settings page
+    override fun settingsPageSupporting(): String = "Quick defaults with explicit supported, degraded, and staged capability hints."
+    override fun gridSupportLabel(count: Int): String = "Cycle $count layouts"
+    override fun portraitTuningLabel(): String = "Open profile + beauty + bokeh tuning"
+    override fun watermarkTuningLabel(count: Int): String = "Open selector + per-template tuning; $count templates"
+    override fun liveSupportLabel(durationMs: Int, watermarkBehavior: String): String = "Saved default only; $durationMs ms bundle | dynamic watermark $watermarkBehavior"
+    override fun degradedResolutionLabel(saved: String, active: String): String = "Saved as $saved, active graph uses $active"
+    override fun degradedFramerateLabel(saved: String, active: String): String = "Saved as $saved, active graph uses $active"
+    override fun degradedDynamicFpsLabel(saved: String, active: String): String = "Saved as $saved, active graph uses $active"
+    override fun degradedAudioLabel(saved: String, active: String): String = "Saved as $saved, active graph uses $active"
+    override fun videoFilterSeedCountLabel(count: Int): String = "Saved filter seed; $count looks staged"
+    override fun catalogFooterStillWatermark(): String = "Still watermark templates now flow into metadata and photo rendering."
+    override fun catalogFooterManualStaged(): String = "Manual drafts and Live/video defaults remain staged in the same settings spine."
+    override fun catalogFooterProManualPrefix(): String = " | Pro manual draft "
+
+    // Watermark selector
+    override fun watermarkSelectorSupporting(): String = "Watermark selection sits one level below Lens Lab. Pick the active template here, then enter the template-specific style page to edit."
+    override fun watermarkSelectorDefaultPrefix(): String = "Default "
+    override fun watermarkSelectorTemplatesStaged(count: Int): String = " templates staged"
+    override fun watermarkSelectorCurrentDefault(): String = " | Current default"
+    override fun watermarkEditAttrsFrame(): String = "Placement, scale, opacity, background"
+    override fun watermarkEditAttrsClassic(): String = "Placement, scale, opacity"
+    override fun watermarkSelectorFooterSupported(): String = "Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages."
+    override fun watermarkSelectorFooterUnsupported(): String = "Still capture is unavailable on this device, so Watermark Lab stays read-only."
+
+    // Watermark detail
+    override fun watermarkDetailSupportingSelected(): String = "This is the active default watermark. Changes here will affect the next static photo rendered with this template."
+    override fun watermarkDetailSupportingNotSelected(): String = "This template is not yet the current default. Adjust here first, then switch from the selector page when ready."
+    override fun watermarkDetailFooterFrame(): String = "Frame border rendering is live for static-photo export."
+    override fun watermarkDetailFooterOverlay(): String = "Classic overlay stays inside the source image without an expanded border."
+    override fun watermarkDetailTokensPrefix(): String = "Tokens: "
+
+    // Watermark attribute prefixes
+    override fun watermarkAttrPlacementPrefix(): String = "Placement "
+    override fun watermarkAttrScalePrefix(): String = "Scale "
+    override fun watermarkAttrOpacityPrefix(): String = "Opacity "
+    override fun watermarkAttrBackgroundPrefix(): String = "Background "
+    override fun watermarkTemplateExpandedFrame(): String = "Expanded frame"
+    override fun watermarkTemplateClassicOverlay(): String = "Classic overlay"
+
+    // Portrait lab
+    override fun portraitLabSupporting(): String = "Portrait product controls sit one level below Lens Lab. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster."
+    override fun portraitLabJoinerBeauty(): String = "Beauty "
+    override fun portraitLabJoinerBokeh(): String = "Bokeh "
+    override fun portraitLabFooter(): String = "Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5."
+
+    // Pro controls
+    override fun proControlsSupportingEditable(): String = "Upper-layer manual draft is currently editable; each control indicates its status: Applied, Saved-only, or Temporarily unsupported."
+    override fun proControlsSupportingReadonly(): String = "Draft changes allowed, but this device currently holds all controls in saved-only or temporarily-unsupported state."
+    override fun proControlsFinishCaptureHint(): String = "Finish the current capture before editing."
+
     override fun availabilityLabel(value: SettingsControlAvailability): String = when (value) {
         SettingsControlAvailability.SUPPORTED -> "Supported"
         SettingsControlAvailability.DEGRADED -> "Degraded"

@@ -1013,7 +1013,7 @@ internal fun sessionSettingsPageRenderModel(
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.resolutionDegraded ->
                         text.degradedResolutionLabel(selectedVideoSpec.resolution.label, activeVideoSpec.resolution.label)
-                    else -> supportCountLabel(videoConstraints.resolutions.size)
+                    else -> text.supportCount(videoConstraints.resolutions.size)
                 },
                 nextAction = if (supportsVideoRecording) {
                     nextListValueOrNull(
@@ -1041,7 +1041,7 @@ internal fun sessionSettingsPageRenderModel(
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.frameRateDegraded ->
                         text.degradedFramerateLabel(selectedVideoSpec.frameRate.label, activeVideoSpec.frameRate.label)
-                    else -> supportCountLabel(videoConstraints.frameRatesFor(activeVideoSpec.resolution).size)
+                    else -> text.supportCount(videoConstraints.frameRatesFor(activeVideoSpec.resolution).size)
                 },
                 nextAction = if (supportsVideoRecording) {
                     nextListValueOrNull(
@@ -1073,7 +1073,7 @@ internal fun sessionSettingsPageRenderModel(
                     resolvedVideoSelection.dynamicPolicyDegraded ->
                         text.degradedDynamicFpsLabel(selectedVideoSpec.dynamicFpsPolicy.label, activeVideoSpec.dynamicFpsPolicy.label)
                     else ->
-                        supportCountLabel(videoConstraints.dynamicPolicies.size)
+                        text.supportCount(videoConstraints.dynamicPolicies.size)
                 },
                 nextAction = if (supportsVideoRecording) {
                     nextListValueOrNull(
@@ -1106,7 +1106,7 @@ internal fun sessionSettingsPageRenderModel(
                     resolvedVideoSelection.audioProfileDegraded ->
                         text.degradedAudioLabel(selectedVideoSpec.audioProfile.label, activeVideoSpec.audioProfile.label)
                     else ->
-                        supportCountLabel(videoConstraints.audioProfiles.size)
+                        text.supportCount(videoConstraints.audioProfiles.size)
                 },
                 nextAction = if (supportsVideoRecording && supportsAudioRecording) {
                     nextListValueOrNull(
@@ -1501,7 +1501,7 @@ internal fun watermarkLabSelectorRenderModel(
                     append(" | ")
                     append(text.tokensLabel())
                     append(" ")
-                    append(template.tokenKeys.prettyWatermarkTokens())
+                    append(template.tokenKeys.prettyWatermarkTokens(text))
                     append(" | ")
                     append(text.watermarkAttrPlacementPrefix())
                     append(style.textPlacement.label)
@@ -1673,7 +1673,7 @@ internal fun watermarkLabDetailRenderModel(
         },
         footer = buildString {
             append(text.watermarkDetailTokensPrefix())
-            append(template.tokenKeys.prettyWatermarkTokens())
+            append(template.tokenKeys.prettyWatermarkTokens(text))
             append(". ")
             append(
                 if (template.supportsFrameBorder) {
@@ -1966,19 +1966,17 @@ private fun watermarkTemplateLabel(
     return templates.firstOrNull { it.id == templateId }?.label ?: templateId
 }
 
-private fun Set<String>.prettyWatermarkTokens(): String {
+private fun Set<String>.prettyWatermarkTokens(text: AppTextResolver): String {
     return sorted().joinToString(separator = ", ") { token ->
         when (token) {
-            "camera-params" -> "Camera Params"
-            "datetime" -> "Date/Time"
-            "location" -> "Location"
-            "model" -> "Model"
+            "camera-params" -> text.watermarkTokenCameraParams()
+            "datetime" -> text.watermarkTokenDateTime()
+            "location" -> text.watermarkTokenLocation()
+            "model" -> text.watermarkTokenModel()
             else -> token.replace('-', ' ').replaceFirstChar(Char::titlecase)
         }
     }
 }
-
-private fun supportCountLabel(count: Int): String = "$count options"
 
 internal fun defaultFilterLabFamily(activeMode: ModeId): FilterLabFamily {
     return when (activeMode) {

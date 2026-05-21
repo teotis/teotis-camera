@@ -1198,7 +1198,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderQuickBubble(settingsPage: SessionSettingsPageRenderModel) {
         val grid = settingsPage.commonSection.gridMode
-        buttonQuickGrid.text = "${getString(R.string.button_quick_grid)}\n${grid.value}"
+        buttonQuickGrid.text = "${getString(R.string.button_quick_grid)} ${grid.value}"
         buttonQuickGrid.isEnabled = grid.isInteractive
 
         buttonQuickFlash.text = getString(R.string.button_quick_flash)
@@ -1217,11 +1217,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         val live = settingsPage.photoSection.livePhoto
-        buttonQuickLivePhoto.text = "${getString(R.string.button_quick_live)}\n${live.value}"
+        buttonQuickLivePhoto.text = "${getString(R.string.button_quick_live)} ${live.value}"
         buttonQuickLivePhoto.isEnabled = live.isInteractive
 
         val timer = settingsPage.photoSection.countdown
-        buttonQuickTimer.text = "${getString(R.string.button_quick_timer)}\n${timer.value}"
+        buttonQuickTimer.text = "${getString(R.string.button_quick_timer)} ${timer.value}"
         buttonQuickTimer.isEnabled = timer.isInteractive
 
         buttonQuickMore.text = getString(R.string.button_quick_more)

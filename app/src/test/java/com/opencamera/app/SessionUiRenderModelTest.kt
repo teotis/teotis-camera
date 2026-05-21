@@ -382,7 +382,7 @@ class SessionUiRenderModelTest {
         assertTrue(model.isVisible)
         assertEquals(SettingsControlAvailability.DEGRADED, model.isoControl.availability)
         assertEquals("Saved only", model.isoControl.supportLabel)
-        assertTrue(model.supportingText.contains("仅保存或暂时不支持"))
+        assertTrue(model.supportingText.contains("saved-only or temporarily-unsupported"))
         assertTrue(model.summary.contains("stay saved-only"))
     }
 
@@ -613,7 +613,7 @@ class SessionUiRenderModelTest {
         assertTrue(selected.isSelected)
         assertEquals(null, selected.useAction)
         assertTrue(selected.supportingText.contains("Current default"))
-        assertTrue(selected.editButtonLabel?.contains("Placement, scale, opacity, background") == true)
+        assertEquals("Open Style Page", selected.editButtonLabel)
         assertEquals(
             PersistedSettingsAction.UpdatePhotoWatermarkTemplate("classic-overlay"),
             classic.useAction
