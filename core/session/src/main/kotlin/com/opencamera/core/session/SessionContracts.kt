@@ -5,6 +5,7 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.media.CaptureFeedbackPreview
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotPlan
@@ -161,6 +162,7 @@ sealed interface SessionIntent {
     data object StillCaptureQualityToggled : SessionIntent
     data object StillCaptureResolutionToggled : SessionIntent
     data object PreviewRatioToggled : SessionIntent
+    data class FrameRatioSelected(val ratio: FrameRatio) : SessionIntent
     data class DeviceCapabilitiesUpdated(val capabilities: DeviceCapabilities) : SessionIntent
     data class PermissionsUpdated(
         val cameraGranted: Boolean,

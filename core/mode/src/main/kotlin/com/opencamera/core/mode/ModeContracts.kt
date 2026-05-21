@@ -136,6 +136,7 @@ sealed interface ModeIntent {
     data object SecondaryActionPressed : ModeIntent
     data object TertiaryActionPressed : ModeIntent
     data object ProActionPressed : ModeIntent
+    data class FrameRatioSelected(val ratio: FrameRatio) : ModeIntent
 }
 
 sealed interface ModeSessionEvent {

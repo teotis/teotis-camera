@@ -76,12 +76,23 @@
 - 现有第 `6` 阶段功能闭环无需继续扩写；后续若回到 feature 侧，应单独获得新的阶段授权。
 - 最近新增的产品化设计输入已归纳为三份可交付 spec：统一手势入口、模式轨道/快门/变焦 cockpit、PreviewRenderEngine / Filter / Watermark 管线；后续实施应优先遵循这三份设计稿的边界，不要回退到老工程式的大型单体 View 或全局协议中心。
 - `OpenCamera UI/Interaction 2.0` 统一设计资料已沉淀到 [`codex/v2_ui`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui)：包含主界面 cockpit 线框、视觉系统、交互语法、功能便利性分层、统一面板与 labs、参考图资料包和多模态延期视觉审查。后续 UI 落地 agent 应优先按这些 Markdown 规格执行；参考 PNG 只作为视觉资料，不替代文字规格。
+- `OpenCamera Capability Kernel 2.0` 统一设计资料已沉淀到 [`codex/capability_kernel_v2`](/Volumes/Extreme_SSD/project/codex_camera/codex/capability_kernel_v2)：核心判断是本应用不是厂商系统相机，不能依赖 native cache / ISP-BSP 协同 / 私有算法引擎，因此 2.0 要在不破坏 `Mode Plugin / Session Kernel / Device Adapter / Media Pipeline` 四层主链路的前提下，把能力图谱、帧流缓冲、ShotGraph/算法管线、Live/时序媒体、资源治理、模式集成和可观测验证拆成可并行落地的上层能力内核方案；涉及成片视觉、截图、录屏和画质判断的工作已单独隔离到多模态延期文档。
 - `2026-05-22` 真机最新版 APK 反馈已拆成 5 份可交给非多模态 agent 的落地方案：首次授权后预览恢复、零延时缩略图反馈、窄横向变焦条、画幅/预览 cockpit、色调调色板可发现性；需要看截图/录屏/视觉对比的事项单独隔离到多模态延期清单。
 - `2026-05-22` 最新版 APK 第二轮真机反馈已按相近问题合并为 3 份非多模态实施方案和 1 份多模态延期 QA：媒体输出/滤镜/缩略图、面板入口信息架构、中文文案与窄屏布局、多模态视觉和成片验收。后续落地应优先处理媒体保存失败和面板 IA，因为它们会同时影响“滤镜成片”和“缩略图回退”的可验证性。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-22：Camera Capability Kernel 2.0 设计资料沉淀
+
+- 目标：围绕“通用相机 App 无法依赖厂商 native/ISP/BSP 私有能力，应尽量开放底层可得数据并在 App 层做创造性处理”的产品/架构判断，形成可直接交给多个非多模态 agent 并行落地的 2.0 能力内核方案。
+- 核心结果：
+  [`codex/capability_kernel_v2/00_capability_kernel_v2_index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/capability_kernel_v2/00_capability_kernel_v2_index.md) 明确 2.0 不另起隐藏内核，而是在既有四层主链路内增加能力图谱、帧流、算法、资源和验证治理；
+  [`01_capability_contract_and_graph.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/capability_kernel_v2/01_capability_contract_and_graph.md) 到 [`07_observability_test_and_agent_handoff.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/capability_kernel_v2/07_observability_test_and_agent_handoff.md) 分别拆分 capability graph、frame stream/buffer、ShotGraph/algorithm pipeline、Live/temporal media、resource scheduler、mode integration、observability/test/agent handoff；
+  [`90_multimodal_deferred_capability_qa.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/capability_kernel_v2/90_multimodal_deferred_capability_qa.md) 单独隔离滤镜成片、夜景/多帧、人像虚化、Live motion、缩略图录屏和预览效果等需要多模态或人工视觉判断的事项。
+- 验证：本轮只新增方案文档，未改运行时代码；已交叉阅读 `codex/plan.md`、`codex/prompt.md`、`codex/documentation.md`、`core:session/device/media/mode/effect` contracts、`CameraXCaptureAdapter`、现有 UI 2.0 文档和近期 agent plans，并用 `rg` 检查文档清单与占位词。
+- 结论：该资料包是后续能力内核 2.0 的设计/施工入口，不构成 stage transition 授权；后续实现仍应先落当前高优先级 1.0 bug 修复，再按 contracts -> frame data exposure -> algorithm pipeline -> mode integration -> resource governance 的顺序推进。
 
 ## 2026-05-22：最新版 APK 第二轮真机反馈方案文档
 

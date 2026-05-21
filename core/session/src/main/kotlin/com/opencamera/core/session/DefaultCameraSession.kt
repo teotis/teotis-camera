@@ -152,6 +152,7 @@ class DefaultCameraSession(
             SessionIntent.StillCaptureQualityToggled -> handleStillCaptureQualityToggled()
             SessionIntent.StillCaptureResolutionToggled -> handleStillCaptureResolutionToggled()
             SessionIntent.PreviewRatioToggled -> handlePreviewRatioToggled()
+            is SessionIntent.FrameRatioSelected -> handleModeIntent(ModeIntent.FrameRatioSelected(intent.ratio))
             is SessionIntent.DeviceCapabilitiesUpdated -> handleDeviceCapabilitiesUpdated(
                 intent.capabilities
             )
@@ -735,6 +736,9 @@ class DefaultCameraSession(
 
                             ModeIntent.ProActionPressed ->
                                 "Stop recording before changing Pro variant"
+
+                            is ModeIntent.FrameRatioSelected ->
+                                "停止录制后才能切换画幅"
 
                             ModeIntent.ShutterPressed ->
                                 _state.value.lastAction
