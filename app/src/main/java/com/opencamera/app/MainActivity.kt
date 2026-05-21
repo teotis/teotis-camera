@@ -789,7 +789,7 @@ class MainActivity : AppCompatActivity() {
         lensFacingButton.isEnabled = controls.lensFacingEnabled
         captureOutput.text = sessionCaptureOutputText(state, sessionUiStrings())
         renderZoomCapsules(controls)
-        renderQuickBubble()
+        renderQuickBubble(settingsPage)
         buttonDevEntry.isVisible = com.opencamera.app.BuildConfig.DEBUG
         val devLogModel = devLogRenderModel(
             state = state,
@@ -1176,12 +1176,22 @@ class MainActivity : AppCompatActivity() {
         renderPanelVisibility()
     }
 
-    private fun renderQuickBubble() {
-        buttonQuickGrid.text = getString(R.string.button_quick_grid)
+    private fun renderQuickBubble(settingsPage: SessionSettingsPageRenderModel) {
+        val grid = settingsPage.commonSection.gridMode
+        buttonQuickGrid.text = "${getString(R.string.button_quick_grid)}\n${grid.value}"
+        buttonQuickGrid.isEnabled = grid.isInteractive
+
         buttonQuickFlash.text = getString(R.string.button_quick_flash)
         buttonQuickRatio.text = getString(R.string.button_quick_ratio)
-        buttonQuickLivePhoto.text = getString(R.string.button_quick_live)
-        buttonQuickTimer.text = getString(R.string.button_quick_timer)
+
+        val live = settingsPage.photoSection.livePhoto
+        buttonQuickLivePhoto.text = "${getString(R.string.button_quick_live)}\n${live.value}"
+        buttonQuickLivePhoto.isEnabled = live.isInteractive
+
+        val timer = settingsPage.photoSection.countdown
+        buttonQuickTimer.text = "${getString(R.string.button_quick_timer)}\n${timer.value}"
+        buttonQuickTimer.isEnabled = timer.isInteractive
+
         buttonQuickMore.text = getString(R.string.button_quick_more)
     }
 
@@ -1490,12 +1500,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun applySettingsAction(action: PersistedSettingsAction) {
         lifecycleScope.launch {
-            container.sessionSettingsManager.apply(action)
+            val result = container.sessionSettingsManager.apply(action)
+            if (result is SessionSettingsApplyResult.BlockedByActiveShot) {
+                Toast.makeText(this@MainActivity, "拍摄进行中，无法更改设置", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     private fun applySettingsControlAction(control: SettingsControlRenderModel?) {
-        control?.nextAction?.let(::applySettingsAction)
+        if (control == null) {
+            Toast.makeText(this, "设置尚未加载", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val action = control.nextAction
+        if (action == null) {
+            Toast.makeText(this, "当前模式不支持此操作", Toast.LENGTH_SHORT).show()
+            return
+        }
+        applySettingsAction(action)
     }
 
     private fun openPortraitLab() {

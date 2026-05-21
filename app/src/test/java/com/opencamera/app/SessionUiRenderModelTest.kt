@@ -87,9 +87,7 @@ class SessionUiRenderModelTest {
         val model = sessionControlsRenderModel(state, strings)
 
         assertEquals("Switch to Front", model.lensFacingButtonLabel)
-        assertEquals("Zoom 2.0x", model.zoomButtonLabel)
         assertTrue(model.lensFacingEnabled)
-        assertTrue(model.zoomEnabled)
     }
 
     @Test
@@ -108,9 +106,7 @@ class SessionUiRenderModelTest {
         val model = sessionControlsRenderModel(state, strings)
 
         assertEquals("Single Lens", model.lensFacingButtonLabel)
-        assertEquals("Zoom N/A", model.zoomButtonLabel)
         assertFalse(model.lensFacingEnabled)
-        assertFalse(model.zoomEnabled)
     }
 
     @Test
@@ -766,7 +762,7 @@ class SessionUiRenderModelTest {
         assertTrue(model.currentFilterSummary.contains("Current default Portrait Original"))
         assertTrue(model.saveCustomControl.isEnabled)
         assertEquals("portrait-original", model.saveCustomControl.sourceProfileId)
-        assertTrue(model.footer.contains("独立色调实验室优先交付"))
+        assertTrue(model.footer.contains("Independent Tone Lab prioritized"))
     }
 
     @Test
@@ -1100,7 +1096,6 @@ class SessionUiRenderModelTest {
         val controls = sessionControlsRenderModel(state, strings)
 
         assertTrue(controls.zoomCapsules.isNotEmpty())
-        assertTrue(controls.zoomEnabled)
         assertTrue(controls.lensFacingEnabled)
     }
 

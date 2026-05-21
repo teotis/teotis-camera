@@ -52,9 +52,9 @@
     <string name="button_debug_entry">⋯</string>
     <string name="button_debug_close">关闭调试</string>
     <string name="button_quick_grid">网格</string>
-    <string name="button_quick_flash">闪光灯</string>
+    <string name="button_quick_flash">画质</string>
     <string name="button_quick_more">更多</string>
-    <string name="button_quick_ratio">比例</string>
+    <string name="button_quick_ratio">分辨率</string>
     <string name="button_quick_live">实况</string>
     <string name="button_quick_timer">定时</string>
     <string name="button_more_controls">更多</string>

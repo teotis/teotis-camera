@@ -77,9 +77,7 @@ internal data class ZoomCapsuleRenderModel(
 
 internal data class SessionControlsRenderModel(
     val lensFacingButtonLabel: String,
-    val zoomButtonLabel: String,
     val lensFacingEnabled: Boolean,
-    val zoomEnabled: Boolean,
     val zoomCapsules: List<ZoomCapsuleRenderModel>,
     val isZoomCapsuleRowVisible: Boolean
 )
@@ -395,9 +393,7 @@ internal fun sessionControlsRenderModel(
 ): SessionControlsRenderModel {
     return SessionControlsRenderModel(
         lensFacingButtonLabel = lensFacingButtonLabel(state, strings),
-        zoomButtonLabel = zoomButtonLabel(state, strings),
         lensFacingEnabled = state.activeDeviceCapabilities.availableLensFacings.size > 1,
-        zoomEnabled = state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported,
         zoomCapsules = zoomCapsuleModels(state),
         isZoomCapsuleRowVisible = state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported
     )
