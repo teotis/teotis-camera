@@ -106,6 +106,17 @@ open class AppTextResolver(private val context: Context?) {
     open fun singleLens(): String = str(R.string.button_single_lens, "Single Lens")
     open fun tone(): String = str(R.string.button_palette_entry, "Tone")
 
+    // Editing hints
+    open fun lensLabEditingEnabled(): String = "Changes save instantly and refresh the active mode defaults."
+    open fun lensLabEditingDisabled(): String = "Finish the current capture before changing saved defaults."
+    open fun portraitLabEditingEnabled(): String = "Portrait defaults save instantly and apply to the next portrait capture metadata and lightweight render pass."
+    open fun portraitLabEditingDisabled(): String = "Finish the current capture before changing portrait product defaults."
+    open fun watermarkSelectorEditingEnabled(): String = "Default template changes save instantly. Each template keeps its own placement, scale, opacity, and frame background preset."
+    open fun watermarkSelectorEditingDisabled(): String = "Finish the current capture before changing watermark defaults."
+    open fun filterLabEditingEnabled(): String = "Selected family defaults save instantly and refresh the active mode when relevant."
+    open fun filterLabEditingDisabled(): String = "Finish the current capture before changing filter defaults."
+    open fun statusCustomBadge(): String = " | Custom"
+
     // Filter advanced control labels
     open fun filterCtrlExposure(): String = str(R.string.filter_ctrl_exposure, "Exposure")
     open fun filterCtrlSoftGlow(): String = str(R.string.filter_ctrl_soft_glow, "Soft Glow")

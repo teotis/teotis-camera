@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var previewView: PreviewView
     private lateinit var previewOverlayView: PreviewOverlayView
+    private lateinit var panelDismissScrim: View
     private lateinit var titleText: TextView
     private lateinit var permissionStatus: TextView
     private lateinit var buttonSettingsEntry: Button
@@ -134,7 +135,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonFilterModeToggle: Button
     private lateinit var filterPaletteSummary: TextView
     private lateinit var filterPaletteHint: TextView
-    private lateinit var filterPaletteSurface: View
+    private lateinit var filterPaletteSurface: FilterPaletteView
     private lateinit var filterAdvancedControls: LinearLayout
     private lateinit var buttonAdvancedExposure: Button
     private lateinit var buttonAdvancedSoftGlow: Button
@@ -222,6 +223,7 @@ class MainActivity : AppCompatActivity() {
 
         previewView = findViewById(R.id.cameraPreview)
         previewOverlayView = findViewById(R.id.previewOverlay)
+        panelDismissScrim = findViewById(R.id.panelDismissScrim)
         titleText = findViewById(R.id.titleText)
         permissionStatus = findViewById(R.id.permissionStatus)
         buttonSettingsEntry = findViewById(R.id.buttonSettingsEntry)
@@ -361,6 +363,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindActions() {
+        panelDismissScrim.setOnClickListener {
+            isSettingsPanelVisible = false
+            isFilterPanelVisible = false
+            isQuickBubblePanelVisible = false
+            isDevConsoleVisible = false
+            currentSettingsSubpage = SettingsSubpage.ROOT
+            selectedWatermarkDetailTemplateId = null
+            selectedFilterLabFamilyOverride = null
+            isFilterAdjustmentVisible = false
+            renderPanelVisibility()
+            renderDevConsoleVisibility()
+        }
         buttonSettingsEntry.setOnClickListener {
             isSettingsPanelVisible = !isSettingsPanelVisible
             if (isSettingsPanelVisible) {
@@ -604,7 +618,9 @@ class MainActivity : AppCompatActivity() {
         buttonAdvancedTintShift.setOnClickListener {
             applyAdvancedFilterControl(FilterAdvancedControl.TINT_SHIFT)
         }
-        filterPaletteSurface.setOnTouchListener(::handleFilterPaletteTouch)
+        filterPaletteSurface.setOnPaletteTouchListener { colorAxis, toneAxis ->
+            handleFilterPaletteTouch(colorAxis, toneAxis)
+        }
     }
 
     private fun bindGestureRouter() {
@@ -831,7 +847,7 @@ class MainActivity : AppCompatActivity() {
                     0,
                     R.style.Widget_OpenCamera_CompactButton
                 ).apply {
-                    text = "Use This Template"
+                    text = getString(R.string.button_use_this_template)
                     isAllCaps = false
                     isEnabled = model.editingEnabled
                     setOnClickListener { applySettingsAction(action) }
@@ -1005,7 +1021,7 @@ class MainActivity : AppCompatActivity() {
                     0,
                     R.style.Widget_OpenCamera_CompactButton
                 ).apply {
-                    text = "Use This Look"
+                    text = getString(R.string.button_use_this_look)
                     isAllCaps = false
                     isEnabled = model.editingEnabled && item.nextAction != null
                     setOnClickListener {
@@ -1073,6 +1089,8 @@ class MainActivity : AppCompatActivity() {
     private fun renderPanelVisibility() {
         settingsPanel.isVisible = isSettingsPanelVisible
         filterPanel.isVisible = isFilterPanelVisible
+        val anyPanelOpen = isSettingsPanelVisible || isFilterPanelVisible || isQuickBubblePanelVisible || isDevConsoleVisible
+        panelDismissScrim.isVisible = anyPanelOpen
         val showRoot = isSettingsPanelVisible && currentSettingsSubpage == SettingsSubpage.ROOT
         val showPortraitLab =
             isSettingsPanelVisible && currentSettingsSubpage == SettingsSubpage.PORTRAIT_LAB
@@ -1402,31 +1420,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleFilterPaletteTouch(view: View, event: MotionEvent): Boolean {
-        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return false
-        val profileId = panel.selectedProfileId ?: return false
+    private fun handleFilterPaletteTouch(colorAxis: Float, toneAxis: Float) {
+        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
+        val profileId = panel.selectedProfileId ?: return
         if (!panel.isVisible || panel.mode != FilterAdjustmentMode.LIGHT) {
-            return false
+            return
         }
-        return when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN,
-            MotionEvent.ACTION_MOVE,
-            MotionEvent.ACTION_UP -> {
-                val width = view.width.takeIf { it > 0 } ?: return false
-                val height = view.height.takeIf { it > 0 } ?: return false
-                val colorAxis = ((event.x / width).coerceIn(0f, 1f) * 2f) - 1f
-                val toneAxis = (1f - (event.y / height).coerceIn(0f, 1f)) * 2f - 1f
-                val baseSpec = lightPaletteBaseSpec ?: panel.renderSpec
-                lifecycleScope.launch {
-                    container.sessionSettingsManager.updateCustomFilterRenderSpec(
-                        filterProfileId = profileId,
-                        renderSpec = baseSpec.applyLightPalette(colorAxis, toneAxis)
-                    )
-                }
-                true
-            }
-
-            else -> false
+        val baseSpec = lightPaletteBaseSpec ?: panel.renderSpec
+        lifecycleScope.launch {
+            container.sessionSettingsManager.updateCustomFilterRenderSpec(
+                filterProfileId = profileId,
+                renderSpec = baseSpec.applyLightPalette(colorAxis, toneAxis)
+            )
         }
     }
 

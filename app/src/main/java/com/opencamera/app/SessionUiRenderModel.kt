@@ -103,18 +103,17 @@ internal data class SessionSettingsRenderModel(
     val manualDraftSummary: String
 )
 
-internal enum class SettingsControlAvailability(
-    val label: String
-) {
-    SUPPORTED("Supported"),
-    DEGRADED("Degraded"),
-    UNSUPPORTED("Unsupported")
+internal enum class SettingsControlAvailability {
+    SUPPORTED,
+    DEGRADED,
+    UNSUPPORTED
 }
 
 internal data class SettingsControlRenderModel(
     val label: String,
     val value: String,
     val availability: SettingsControlAvailability = SettingsControlAvailability.SUPPORTED,
+    val availabilityLabel: String = "",
     val supportLabel: String? = null,
     val nextAction: PersistedSettingsAction? = null
 ) {
@@ -127,7 +126,7 @@ internal data class SettingsControlRenderModel(
             append('\n')
             append(value)
             append('\n')
-            append(availability.label)
+            append(availabilityLabel.ifEmpty { availability.name.lowercase().replaceFirstChar(Char::titlecase) })
             supportLabel?.let {
                 append(" • ")
                 append(it)
@@ -176,6 +175,7 @@ internal data class FeatureCatalogControlRenderModel(
     val label: String,
     val value: String,
     val availability: SettingsControlAvailability = SettingsControlAvailability.SUPPORTED,
+    val availabilityLabel: String = "",
     val supportLabel: String? = null,
     val nextAction: FeatureCatalogAction? = null
 ) {
@@ -188,7 +188,7 @@ internal data class FeatureCatalogControlRenderModel(
             append('\n')
             append(value)
             append('\n')
-            append(availability.label)
+            append(availabilityLabel.ifEmpty { availability.name.lowercase().replaceFirstChar(Char::titlecase) })
             supportLabel?.let {
                 append(" • ")
                 append(it)
@@ -779,19 +779,19 @@ internal fun sessionSettingsPageRenderModel(
         .resolveVideoSpec(selectedVideoSpec)
     val activeVideoSpec = resolvedVideoSelection.applied
     return SessionSettingsPageRenderModel(
-        headline = "Lens Lab",
+        headline = text.lensLab(),
         supportingText = "Quick defaults with explicit supported, degraded, and staged capability hints.",
         heroSummary = "${renderModel.commonSummary} • ${renderModel.photoSummary}",
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
-            "Changes save instantly and refresh the active mode defaults."
+            text.lensLabEditingEnabled()
         } else {
-            "Finish the current capture before changing saved defaults."
+            text.lensLabEditingDisabled()
         },
         commonSection = CommonSettingsSectionRenderModel(
             summary = renderModel.commonSummary,
             gridMode = SettingsControlRenderModel(
-                label = "Composition grid",
+                label = text.compositionGridLabel(),
                 value = settings.common.gridMode.label,
                 supportLabel = "Cycle ${CompositionGridMode.entries.size} layouts",
                 nextAction = PersistedSettingsAction.UpdateGridMode(
@@ -799,15 +799,15 @@ internal fun sessionSettingsPageRenderModel(
                 )
             ),
             shutterSound = SettingsControlRenderModel(
-                label = "Shutter tone",
-                value = onOffLabel(settings.common.shutterSoundEnabled),
+                label = text.shutterToneLabel(),
+                value = onOffLabel(settings.common.shutterSoundEnabled, text),
                 nextAction = PersistedSettingsAction.UpdateShutterSoundEnabled(
                     !settings.common.shutterSoundEnabled
                 )
             ),
             selfieMirror = SettingsControlRenderModel(
-                label = "Selfie mirror",
-                value = onOffLabel(settings.common.selfieMirrorEnabled),
+                label = text.selfieMirrorLabel(),
+                value = onOffLabel(settings.common.selfieMirrorEnabled, text),
                 nextAction = PersistedSettingsAction.UpdateSelfieMirrorEnabled(
                     !settings.common.selfieMirrorEnabled
                 )
@@ -816,7 +816,7 @@ internal fun sessionSettingsPageRenderModel(
         photoSection = PhotoSettingsSectionRenderModel(
             summary = renderModel.photoSummary,
             defaultFilter = SettingsControlRenderModel(
-                label = "Default photo filter",
+                label = text.defaultPhotoFilterLabel(),
                 value = photoFilterLabel(settings.photo.defaultFilterProfileId, photoFilters),
                 availability = if (supportsStillCapture && photoFilters.isNotEmpty()) {
                     SettingsControlAvailability.SUPPORTED
@@ -824,9 +824,9 @@ internal fun sessionSettingsPageRenderModel(
                     SettingsControlAvailability.UNSUPPORTED
                 },
                 supportLabel = if (photoFilters.isNotEmpty()) {
-                    "${photoFilters.size} curated looks"
+                    text.looksCount(photoFilters.size)
                 } else {
-                    "No compatible filters"
+                    text.noCompatibleFilters()
                 },
                 nextAction = if (supportsStillCapture) {
                     nextListValueOrNull(
@@ -838,7 +838,7 @@ internal fun sessionSettingsPageRenderModel(
                 }
             ),
             portraitLab = SettingsControlRenderModel(
-                label = "Portrait Lab",
+                label = text.portraitLabSettingLabel(),
                 value = buildString {
                     append(settings.photo.portraitProfile.label)
                     append(" / ")
@@ -854,12 +854,12 @@ internal fun sessionSettingsPageRenderModel(
                 supportLabel = if (supportsStillCapture) {
                     "Open profile + beauty + bokeh tuning"
                 } else {
-                    "Still capture unavailable on this device"
+                    text.stillCaptureUnavailable()
                 },
                 nextAction = null
             ),
             watermarkTemplate = SettingsControlRenderModel(
-                label = "Watermark Lab",
+                label = text.watermarkLabSettingLabel(),
                 value = watermarkTemplateLabel(
                     settings.photo.defaultWatermarkTemplateId,
                     watermarkTemplates
@@ -872,15 +872,15 @@ internal fun sessionSettingsPageRenderModel(
                 supportLabel = if (supportsStillCapture && watermarkTemplates.isNotEmpty()) {
                     "Open selector + per-template tuning; ${watermarkTemplates.size} templates"
                 } else if (!supportsStillCapture) {
-                    "Still capture unavailable on this device"
+                    text.stillCaptureUnavailable()
                 } else {
-                    "No watermark templates available"
+                    text.noWatermarkTemplates()
                 },
                 nextAction = null
             ),
             livePhoto = SettingsControlRenderModel(
-                label = "Live photo default",
-                value = onOffLabel(settings.photo.livePhotoEnabledByDefault),
+                label = text.livePhotoDefaultLabel(),
+                value = onOffLabel(settings.photo.livePhotoEnabledByDefault, text),
                 availability = if (supportsStillCapture) {
                     SettingsControlAvailability.DEGRADED
                 } else {
@@ -889,7 +889,7 @@ internal fun sessionSettingsPageRenderModel(
                 supportLabel = if (supportsStillCapture) {
                     "Saved default only; ${catalog.liveMediaBundleDraft.motionDurationMillis} ms bundle | dynamic watermark ${catalog.liveMediaBundleDraft.watermarkMotionBehavior.label}"
                 } else {
-                    "Still capture unavailable on this device"
+                    text.stillCaptureUnavailable()
                 },
                 nextAction = if (supportsStillCapture) {
                     PersistedSettingsAction.UpdateLivePhotoDefault(
@@ -900,7 +900,7 @@ internal fun sessionSettingsPageRenderModel(
                 }
             ),
             countdown = SettingsControlRenderModel(
-                label = "Countdown",
+                label = text.countdownLabel(),
                 value = settings.photo.countdownDuration.label,
                 availability = if (supportsStillCapture) {
                     SettingsControlAvailability.SUPPORTED
@@ -908,9 +908,9 @@ internal fun sessionSettingsPageRenderModel(
                     SettingsControlAvailability.UNSUPPORTED
                 },
                 supportLabel = if (supportsStillCapture) {
-                    "${catalog.countdownOptions.size} presets"
+                    text.presetsCount(catalog.countdownOptions.size)
                 } else {
-                    "Still capture unavailable on this device"
+                    text.stillCaptureUnavailable()
                 },
                 nextAction = if (supportsStillCapture) {
                     nextListValueOrNull(
@@ -925,7 +925,7 @@ internal fun sessionSettingsPageRenderModel(
         videoSection = VideoSettingsSectionRenderModel(
             summary = renderModel.videoSummary,
             resolution = SettingsControlRenderModel(
-                label = "Resolution",
+                label = text.resolutionLabel(),
                 value = selectedVideoSpec.resolution.label,
                 availability = when {
                     !supportsVideoRecording -> SettingsControlAvailability.UNSUPPORTED
@@ -934,7 +934,7 @@ internal fun sessionSettingsPageRenderModel(
                     else -> SettingsControlAvailability.SUPPORTED
                 },
                 supportLabel = when {
-                    !supportsVideoRecording -> "Video recording unavailable on this device"
+                    !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.resolutionDegraded ->
                         "Saved as ${selectedVideoSpec.resolution.label}, active graph uses ${activeVideoSpec.resolution.label}"
                     else -> supportCountLabel(videoConstraints.resolutions.size)
@@ -953,7 +953,7 @@ internal fun sessionSettingsPageRenderModel(
                 }
             ),
             frameRate = SettingsControlRenderModel(
-                label = "Frame rate",
+                label = text.frameRateLabel(),
                 value = selectedVideoSpec.frameRate.label,
                 availability = when {
                     !supportsVideoRecording -> SettingsControlAvailability.UNSUPPORTED
@@ -962,7 +962,7 @@ internal fun sessionSettingsPageRenderModel(
                     else -> SettingsControlAvailability.SUPPORTED
                 },
                 supportLabel = when {
-                    !supportsVideoRecording -> "Video recording unavailable on this device"
+                    !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.frameRateDegraded ->
                         "Saved as ${selectedVideoSpec.frameRate.label}, active graph uses ${activeVideoSpec.frameRate.label}"
                     else -> supportCountLabel(videoConstraints.frameRatesFor(activeVideoSpec.resolution).size)
@@ -984,7 +984,7 @@ internal fun sessionSettingsPageRenderModel(
                 }
             ),
             dynamicFps = SettingsControlRenderModel(
-                label = "Dynamic fps",
+                label = text.dynamicFpsLabel(),
                 value = selectedVideoSpec.dynamicFpsPolicy.label,
                 availability = when {
                     !supportsVideoRecording -> SettingsControlAvailability.UNSUPPORTED
@@ -993,7 +993,7 @@ internal fun sessionSettingsPageRenderModel(
                     else -> SettingsControlAvailability.SUPPORTED
                 },
                 supportLabel = when {
-                    !supportsVideoRecording -> "Video recording unavailable on this device"
+                    !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.dynamicPolicyDegraded ->
                         "Saved as ${selectedVideoSpec.dynamicFpsPolicy.label}, active graph uses ${activeVideoSpec.dynamicFpsPolicy.label}"
                     else ->
@@ -1015,7 +1015,7 @@ internal fun sessionSettingsPageRenderModel(
                 }
             ),
             audioProfile = SettingsControlRenderModel(
-                label = "Audio scene",
+                label = text.audioSceneLabel(),
                 value = selectedVideoSpec.audioProfile.label,
                 availability = when {
                     !supportsVideoRecording || !supportsAudioRecording ->
@@ -1025,8 +1025,8 @@ internal fun sessionSettingsPageRenderModel(
                     else -> SettingsControlAvailability.SUPPORTED
                 },
                 supportLabel = when {
-                    !supportsVideoRecording -> "Video recording unavailable on this device"
-                    !supportsAudioRecording -> "Microphone capture unavailable on this device"
+                    !supportsVideoRecording -> text.videoRecordingUnavailable()
+                    !supportsAudioRecording -> text.microphoneUnavailable()
                     resolvedVideoSelection.audioProfileDegraded ->
                         "Saved as ${selectedVideoSpec.audioProfile.label}, active graph uses ${activeVideoSpec.audioProfile.label}"
                     else ->
@@ -1046,7 +1046,7 @@ internal fun sessionSettingsPageRenderModel(
                 }
             ),
             defaultFilter = SettingsControlRenderModel(
-                label = "Video filter seed",
+                label = text.videoFilterSeedLabel(),
                 value = videoFilterLabel(settings.video.defaultFilterProfileId, videoFilters),
                 availability = if (supportsVideoRecording) {
                     SettingsControlAvailability.DEGRADED
@@ -1056,7 +1056,7 @@ internal fun sessionSettingsPageRenderModel(
                 supportLabel = if (supportsVideoRecording) {
                     "Saved filter seed only; ${videoFilters.size} looks staged"
                 } else {
-                    "Video recording unavailable on this device"
+                    text.videoRecordingUnavailable()
                 },
                 nextAction = if (supportsVideoRecording) {
                     nextListValueOrNull(
@@ -1121,26 +1121,29 @@ internal fun runtimeProControlsRenderModel(
             }
         },
         rawControl = FeatureCatalogControlRenderModel(
-            label = "RAW",
-            value = onOffLabel(draft.rawEnabled),
+            label = text.rawLabel(),
+            value = onOffLabel(draft.rawEnabled, text),
             availability = manualCapabilities.raw.toSettingsAvailability(),
+            availabilityLabel = text.availabilityLabel(manualCapabilities.raw.toSettingsAvailability()),
             supportLabel = manualCapabilities.raw.manualSupportLabel(),
             nextAction = FeatureCatalogAction.UpdateManualRawEnabled(!draft.rawEnabled)
                 .takeIf { isVisible && editingEnabled }
         ),
         isoControl = FeatureCatalogControlRenderModel(
-            label = "ISO",
+            label = text.isoLabel(),
             value = draft.iso?.toString() ?: "Auto",
             availability = manualCapabilities.iso.toSettingsAvailability(),
+            availabilityLabel = text.availabilityLabel(manualCapabilities.iso.toSettingsAvailability()),
             supportLabel = manualCapabilities.iso.manualSupportLabel(),
             nextAction = nextListValueOrNull(draft.iso, MANUAL_ISO_OPTIONS)
                 ?.let(FeatureCatalogAction::UpdateManualIso)
                 ?.takeIf { isVisible && editingEnabled }
         ),
         shutterControl = FeatureCatalogControlRenderModel(
-            label = "Shutter",
+            label = text.shutterLabel(),
             value = draft.shutterSpeedMillis?.let { "${it}ms" } ?: "Auto",
             availability = manualCapabilities.shutter.toSettingsAvailability(),
+            availabilityLabel = text.availabilityLabel(manualCapabilities.shutter.toSettingsAvailability()),
             supportLabel = manualCapabilities.shutter.manualSupportLabel(),
             nextAction = nextListValueOrNull(
                 draft.shutterSpeedMillis,
@@ -1149,9 +1152,10 @@ internal fun runtimeProControlsRenderModel(
                 ?.takeIf { isVisible && editingEnabled }
         ),
         exposureControl = FeatureCatalogControlRenderModel(
-            label = "EV",
+            label = text.evLabel(),
             value = draft.exposureCompensationSteps?.let(::manualEvLabel) ?: "Auto",
             availability = manualCapabilities.exposureCompensation.toSettingsAvailability(),
+            availabilityLabel = text.availabilityLabel(manualCapabilities.exposureCompensation.toSettingsAvailability()),
             supportLabel = manualCapabilities.exposureCompensation.manualSupportLabel(),
             nextAction = nextListValueOrNull(
                 draft.exposureCompensationSteps,
@@ -1160,10 +1164,11 @@ internal fun runtimeProControlsRenderModel(
                 ?.takeIf { isVisible && editingEnabled }
         ),
         focusControl = FeatureCatalogControlRenderModel(
-            label = "Focus",
+            label = text.focusLabel(),
             value = draft.focusDistanceDiopters?.let { String.format(Locale.US, "%.1fD", it) }
                 ?: "Auto",
             availability = manualCapabilities.focusDistance.toSettingsAvailability(),
+            availabilityLabel = text.availabilityLabel(manualCapabilities.focusDistance.toSettingsAvailability()),
             supportLabel = manualCapabilities.focusDistance.manualSupportLabel(),
             nextAction = nextListValueOrNull(
                 draft.focusDistanceDiopters,
@@ -1172,9 +1177,10 @@ internal fun runtimeProControlsRenderModel(
                 ?.takeIf { isVisible && editingEnabled }
         ),
         apertureControl = FeatureCatalogControlRenderModel(
-            label = "Aperture",
+            label = text.apertureLabel(),
             value = draft.apertureFNumber?.let { "f/${manualOneDecimal(it)}" } ?: "Auto",
             availability = manualCapabilities.aperture.toSettingsAvailability(),
+            availabilityLabel = text.availabilityLabel(manualCapabilities.aperture.toSettingsAvailability()),
             supportLabel = manualCapabilities.aperture.manualSupportLabel(),
             nextAction = nextListValueOrNull(
                 draft.apertureFNumber,
@@ -1183,9 +1189,10 @@ internal fun runtimeProControlsRenderModel(
                 ?.takeIf { isVisible && editingEnabled }
         ),
         whiteBalanceControl = FeatureCatalogControlRenderModel(
-            label = "WB",
+            label = text.wbLabel(),
             value = draft.whiteBalanceKelvin?.let { "${it}K" } ?: "Auto",
             availability = manualCapabilities.whiteBalance.toSettingsAvailability(),
+            availabilityLabel = text.availabilityLabel(manualCapabilities.whiteBalance.toSettingsAvailability()),
             supportLabel = manualCapabilities.whiteBalance.manualSupportLabel(),
             nextAction = nextListValueOrNull(
                 draft.whiteBalanceKelvin,
@@ -1286,18 +1293,19 @@ internal fun portraitLabPageRenderModel(
         },
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
-            "Portrait defaults save instantly and apply to the next portrait capture metadata and lightweight render pass."
+            text.portraitLabEditingEnabled()
         } else {
-            "Finish the current capture before changing portrait product defaults."
+            text.portraitLabEditingDisabled()
         },
         profileControl = SettingsControlRenderModel(
-            label = "Portrait profile",
+            label = text.portraitProfileLabel(),
             value = settings.photo.portraitProfile.label,
             availability = availability,
+            availabilityLabel = text.availabilityLabel(availability),
             supportLabel = if (supportsStillCapture) {
                 "${PortraitProfile.entries.size} product profiles"
             } else {
-                "Still capture unavailable on this device"
+                text.stillCaptureUnavailable()
             },
             nextAction = if (supportsStillCapture) {
                 PersistedSettingsAction.UpdatePortraitProfile(
@@ -1308,13 +1316,14 @@ internal fun portraitLabPageRenderModel(
             }
         ),
         beautyPresetControl = SettingsControlRenderModel(
-            label = "Beauty preset",
+            label = text.beautyPresetLabel(),
             value = settings.photo.portraitBeautyPreset.label,
             availability = availability,
+            availabilityLabel = text.availabilityLabel(availability),
             supportLabel = if (supportsStillCapture) {
                 "${PortraitBeautyPreset.entries.size} plans"
             } else {
-                "Still capture unavailable on this device"
+                text.stillCaptureUnavailable()
             },
             nextAction = if (supportsStillCapture) {
                 PersistedSettingsAction.UpdatePortraitBeautyPreset(
@@ -1328,13 +1337,14 @@ internal fun portraitLabPageRenderModel(
             }
         ),
         beautyStrengthControl = SettingsControlRenderModel(
-            label = "Beauty strength",
+            label = text.beautyStrengthLabel(),
             value = settings.photo.portraitBeautyStrength.label,
             availability = availability,
+            availabilityLabel = text.availabilityLabel(availability),
             supportLabel = if (supportsStillCapture) {
                 "${PortraitBeautyStrength.entries.size} levels"
             } else {
-                "Still capture unavailable on this device"
+                text.stillCaptureUnavailable()
             },
             nextAction = if (supportsStillCapture) {
                 PersistedSettingsAction.UpdatePortraitBeautyStrength(
@@ -1348,13 +1358,14 @@ internal fun portraitLabPageRenderModel(
             }
         ),
         bokehEffectControl = SettingsControlRenderModel(
-            label = "Bokeh effect",
+            label = text.bokehEffectLabel(),
             value = settings.photo.portraitBokehEffect.label,
             availability = availability,
+            availabilityLabel = text.availabilityLabel(availability),
             supportLabel = if (supportsStillCapture) {
                 "${PortraitBokehEffect.entries.size} rendering feels"
             } else {
-                "Still capture unavailable on this device"
+                text.stillCaptureUnavailable()
             },
             nextAction = if (supportsStillCapture) {
                 PersistedSettingsAction.UpdatePortraitBokehEffect(
@@ -1392,9 +1403,9 @@ internal fun watermarkLabSelectorRenderModel(
         },
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
-            "Default template changes save instantly. Each template keeps its own placement, scale, opacity, and frame background preset."
+            text.watermarkSelectorEditingEnabled()
         } else {
-            "Finish the current capture before changing watermark defaults."
+            text.watermarkSelectorEditingDisabled()
         },
         items = catalog.watermarkTemplates.map { template ->
             val style = settings.photo.watermarkStyleFor(template.id)
@@ -1428,7 +1439,7 @@ internal fun watermarkLabSelectorRenderModel(
                 },
                 editButtonLabel = if (supportsStillCapture) {
                     buildString {
-                        append("Open Style Page")
+                        append(text.openStylePage())
                         append('\n')
                         append(template.label)
                         append('\n')
@@ -1499,13 +1510,14 @@ internal fun watermarkLabDetailRenderModel(
             "Finish the current capture before changing watermark styles."
         },
         placementControl = SettingsControlRenderModel(
-            label = "Text placement",
+            label = text.textPlacementLabel(),
             value = style.textPlacement.label,
             availability = controlAvailability,
+            availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
                 "${WatermarkTextPlacement.entries.size} placements"
             } else {
-                "Still capture unavailable on this device"
+                text.stillCaptureUnavailable()
             },
             nextAction = if (supportsStillCapture) {
                 PersistedSettingsAction.UpdateWatermarkTextPlacement(
@@ -1517,13 +1529,14 @@ internal fun watermarkLabDetailRenderModel(
             }
         ),
         textScaleControl = SettingsControlRenderModel(
-            label = "Text scale",
+            label = text.textScaleLabel(),
             value = style.textScale.label,
             availability = controlAvailability,
+            availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
                 "${WatermarkTextScale.entries.size} steps"
             } else {
-                "Still capture unavailable on this device"
+                text.stillCaptureUnavailable()
             },
             nextAction = if (supportsStillCapture) {
                 PersistedSettingsAction.UpdateWatermarkTextScale(
@@ -1535,13 +1548,14 @@ internal fun watermarkLabDetailRenderModel(
             }
         ),
         textOpacityControl = SettingsControlRenderModel(
-            label = "Text opacity",
+            label = text.textOpacityLabel(),
             value = style.textOpacity.label,
             availability = controlAvailability,
+            availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
                 "${WatermarkTextOpacity.entries.size} steps"
             } else {
-                "Still capture unavailable on this device"
+                text.stillCaptureUnavailable()
             },
             nextAction = if (supportsStillCapture) {
                 PersistedSettingsAction.UpdateWatermarkTextOpacity(
@@ -1554,13 +1568,13 @@ internal fun watermarkLabDetailRenderModel(
         ),
         frameBackgroundControl = if (template.supportsFrameBorder) {
             SettingsControlRenderModel(
-                label = "Frame background",
+                label = text.frameBackgroundLabel(),
                 value = style.frameBackground.label,
                 availability = controlAvailability,
                 supportLabel = if (supportsStillCapture) {
                     "${WatermarkFrameBackground.entries.size} moods"
                 } else {
-                    "Still capture unavailable on this device"
+                    text.stillCaptureUnavailable()
                 },
                 nextAction = if (supportsStillCapture) {
                     PersistedSettingsAction.UpdateWatermarkFrameBackground(
@@ -1604,6 +1618,7 @@ internal fun filterLabPageRenderModel(
     val editingEnabled = state.activeShot == null && state.countdownRemainingSeconds == null
     val family = filterLabFamilyState(
         state = state,
+        text = text,
         selectedFamily = selectedFamily
     )
     val currentProfile = family.filters.firstOrNull { profile -> profile.id == family.currentFilterId }
@@ -1632,13 +1647,13 @@ internal fun filterLabPageRenderModel(
         rosterText = family.filters.joinToString(separator = "\n") { profile ->
             val marker = if (profile.id == family.currentFilterId) "•" else "·"
             val customBadge = if (profile.builtIn) "" else " | Custom"
-            "$marker ${profile.label}${customBadge} | ${profile.renderSpec?.compactSummary() ?: "Renderer pending"}"
+            "$marker ${profile.label}${customBadge} | ${profile.renderSpec?.compactSummary() ?: text.rendererPending()}"
         },
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
-            "Selected family defaults save instantly and refresh the active mode when relevant."
+            text.filterLabEditingEnabled()
         } else {
-            "Finish the current capture before changing filter defaults."
+            text.filterLabEditingDisabled()
         },
         photoTab = filterLabTabRenderModel(
             family = FilterLabFamily.PHOTO,
@@ -1666,7 +1681,7 @@ internal fun filterLabPageRenderModel(
         ),
         adjustControl = FilterLabAdjustRenderModel(
             buttonLabel = buildString {
-                append("Adjust Selected")
+                append(text.adjustSelected())
                 append('\n')
                 append(currentFilterLabel)
                 append('\n')
@@ -1689,7 +1704,7 @@ internal fun filterLabPageRenderModel(
                 filterProfileId = profile.id,
                 title = profile.label,
                 supportingText = buildString {
-                    append(profile.renderSpec?.compactSummary() ?: "Renderer pending")
+                    append(profile.renderSpec?.compactSummary() ?: text.rendererPending())
                     if (!profile.builtIn) {
                         append(" | Custom")
                     }
@@ -1705,7 +1720,7 @@ internal fun filterLabPageRenderModel(
                 },
                 adjustButtonLabel = if (isSelected) {
                     buildString {
-                        append("Adjust Selected")
+                        append(text.adjustSelected())
                         append('\n')
                         append(profile.label)
                         append('\n')
@@ -1729,9 +1744,9 @@ internal fun filterLabPageRenderModel(
             selectedProfileLabel = currentFilterLabel,
             renderSpec = currentRenderSpec,
             modeToggleLabel = if (adjustmentMode == FilterAdjustmentMode.LIGHT) {
-                "Switch to Advanced"
+                text.switchToAdvanced()
             } else {
-                "Switch to Light"
+                text.switchToLight()
             },
             lightPalette = FilterLightPaletteRenderModel(
                 summary = currentRenderSpec.lightPaletteSummary(),
@@ -1745,7 +1760,7 @@ internal fun filterLabPageRenderModel(
                         append('\n')
                         append(currentRenderSpec.levelLabel(control))
                         append('\n')
-                        append("Tap to cycle")
+                        append(text.tapToCycleLabel())
                     }
                 )
             }
@@ -1760,14 +1775,14 @@ internal fun filterLabPageRenderModel(
             },
             supportLabel = when {
                 !family.supported -> family.unsupportedReason
-                family.filters.isEmpty() -> "No compatible looks"
+                family.filters.isEmpty() -> text.noCompatibleLooks()
                 else -> "${family.filters.size} looks | import/export deferred"
             },
             nextAction = cycleAction
         ),
         saveCustomControl = FilterLabSaveCustomRenderModel(
             buttonLabel = buildString {
-                append("Save as Custom")
+                append(text.saveAsCustom())
                 append('\n')
                 append(currentFilterLabel)
                 append('\n')
@@ -1849,7 +1864,7 @@ private fun StringBuilder.appendPipelineNotes(presentation: SessionPresentationS
     append(presentation.latestPipelineNotes.joinToString())
 }
 
-private fun onOffLabel(enabled: Boolean): String = if (enabled) "On" else "Off"
+private fun onOffLabel(enabled: Boolean, text: AppTextResolver): String = text.onOff(enabled)
 
 private fun photoFilterLabel(
     filterId: String,
@@ -2065,6 +2080,7 @@ private data class FilterLabFamilyState(
 
 private fun filterLabFamilyState(
     state: SessionState,
+    text: AppTextResolver,
     selectedFamily: FilterLabFamily
 ): FilterLabFamilyState {
     val settings = state.settings.persisted
@@ -2072,41 +2088,41 @@ private fun filterLabFamilyState(
     return when (selectedFamily) {
         FilterLabFamily.PHOTO -> FilterLabFamilyState(
             family = selectedFamily,
-            label = selectedFamily.label,
+            label = text.filterFamilyPhoto(),
             currentFilterId = settings.photo.defaultFilterProfileId,
             filters = catalog.photoSettingsFilterProfiles(),
             supported = state.activeDeviceCapabilities.supportsStillCapture,
-            unsupportedReason = "Still capture unavailable on this device",
+            unsupportedReason = text.stillCaptureUnavailable(),
             updateAction = PersistedSettingsAction::UpdatePhotoFilter
         )
 
         FilterLabFamily.HUMANISTIC -> FilterLabFamilyState(
             family = selectedFamily,
-            label = selectedFamily.label,
+            label = text.filterFamilyHumanistic(),
             currentFilterId = settings.photo.defaultHumanisticFilterProfileId,
             filters = catalog.filterProfilesFor(FilterProfileCategory.HUMANISTIC, includeCustom = true),
             supported = state.activeDeviceCapabilities.supportsStillCapture,
-            unsupportedReason = "Still capture unavailable on this device",
+            unsupportedReason = text.stillCaptureUnavailable(),
             updateAction = PersistedSettingsAction::UpdateHumanisticFilter
         )
 
         FilterLabFamily.PORTRAIT -> FilterLabFamilyState(
             family = selectedFamily,
-            label = selectedFamily.label,
+            label = text.filterFamilyPortrait(),
             currentFilterId = settings.photo.defaultPortraitFilterProfileId,
             filters = catalog.filterProfilesFor(FilterProfileCategory.PORTRAIT, includeCustom = true),
             supported = state.activeDeviceCapabilities.supportsStillCapture,
-            unsupportedReason = "Still capture unavailable on this device",
+            unsupportedReason = text.stillCaptureUnavailable(),
             updateAction = PersistedSettingsAction::UpdatePortraitFilter
         )
 
         FilterLabFamily.VIDEO -> FilterLabFamilyState(
             family = selectedFamily,
-            label = selectedFamily.label,
+            label = text.filterFamilyVideo(),
             currentFilterId = settings.video.defaultFilterProfileId,
             filters = catalog.videoSettingsFilterProfiles(),
             supported = state.activeDeviceCapabilities.supportsVideoRecording,
-            unsupportedReason = "Video recording unavailable on this device",
+            unsupportedReason = text.videoRecordingUnavailable(),
             updateAction = PersistedSettingsAction::UpdateVideoFilter
         )
     }

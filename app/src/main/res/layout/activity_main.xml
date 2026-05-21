@@ -34,6 +34,20 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Panel dismiss scrim: transparent overlay that dismisses panels on outside tap -->
+    <View
+        android:id="@+id/panelDismissScrim"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#00000000"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- Layer 2: Top lightweight status area -->
     <View
         android:id="@+id/topScrim"
@@ -915,12 +929,11 @@
                     android:textColor="#D9E6F7"
                     android:textSize="13sp" />
 
-                <View
+                <com.opencamera.app.FilterPaletteView
                     android:id="@+id/filterPaletteSurface"
                     android:layout_width="match_parent"
                     android:layout_height="180dp"
-                    android:layout_marginTop="12dp"
-                    android:background="#33506B86" />
+                    android:layout_marginTop="12dp" />
 
                 <TextView
                     android:id="@+id/filterPaletteHint"
