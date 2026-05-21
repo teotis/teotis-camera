@@ -812,6 +812,7 @@ internal fun sessionSettingsRenderModel(
                     text.lockedFps()
                 }
             )
+            append(" | ")
             append(text.settingsJoinerFilter())
             append(videoFilterLabel)
         },
