@@ -89,7 +89,7 @@
   [`2026-05-22-first-launch-permission-preview-recovery.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-first-launch-permission-preview-recovery.md) 聚焦首次授权后预览失败，建议补齐 coordinator pending bind，避免权限弹窗生命周期造成 `BindPreview` effect 被静默丢弃；
   [`2026-05-22-zero-latency-thumbnail-feedback.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-zero-latency-thumbnail-feedback.md) 将预览截图定义为 transient capture feedback，而不是 saved-media thumbnail；
   [`2026-05-22-zoom-strip-interaction.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-zoom-strip-interaction.md) 收敛为窄横向、数字点位、精确 `ApplyZoomRatio` 的变焦条；
-  [`2026-05-22-preview-aspect-ratio-cockpit.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-preview-aspect-ratio-cockpit.md) 区分成片画幅、预览 viewport/mask 与底部 cockpit safe area；
+  [`2026-05-22-preview-aspect-ratio-cockpit.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-preview-aspect-ratio-cockpit.md) 已补强为中文落地版，明确真实画幅链路隐藏、`PreviewRatioToggled` 仅改状态不改视觉/成片的断点，并给出直接画幅选项、预览遮罩和成片裁切的同源方案；
   [`2026-05-22-tone-palette-discoverability.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-tone-palette-discoverability.md) 让已有 `FilterPaletteView` 从隐藏的 adjust 流程变成 `色调 -> 调色板` 的首屏可发现工具；
   [`2026-05-22-multimodal-deferred-items.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-multimodal-deferred-items.md) 单独收纳截图标注、录屏时序、真实预览视觉对比和调色板可见性评审。
 - 验证：本轮为方案文档交付，未改运行时代码；已用仓内文档和当前实现路径交叉定位对应 owner 与验证入口。
