@@ -1289,6 +1289,77 @@ class SessionUiRenderModelTest {
         assertEquals("镜头实验室", visibleEntries[2].label)
     }
 
+    @Test
+    fun `filter lab adjustment panel is visible by default`() {
+        val model = filterLabPageRenderModel(
+            state = defaultSessionState(),
+            text = TestAppTextResolver()
+        )
+
+        assertTrue(model.adjustmentPanel.isVisible)
+        assertEquals(FilterAdjustmentMode.LIGHT, model.adjustmentPanel.mode)
+    }
+
+    @Test
+    fun `built-in filter shows auto-prepare hint on palette`() {
+        val model = filterLabPageRenderModel(
+            state = defaultSessionState(activeMode = ModeId.PORTRAIT),
+            text = TestAppTextResolver(),
+            selectedFamily = FilterLabFamily.PORTRAIT
+        )
+
+        assertTrue(model.adjustmentPanel.isVisible)
+        assertTrue(model.adjustmentPanel.needsAutoPrepare)
+        assertTrue(model.adjustmentPanel.lightPalette.supportingText.contains("Drag palette to save as custom"))
+    }
+
+    @Test
+    fun `custom filter does not need auto-prepare`() {
+        val state = defaultSessionState().copy(
+            settings = defaultSessionState().settings.copy(
+                persisted = defaultSessionState().settings.persisted.copy(
+                    photo = defaultSessionState().settings.persisted.photo.copy(
+                        defaultPortraitFilterProfileId = "custom-portrait-original-1"
+                    )
+                ),
+                catalog = defaultSessionState().settings.catalog.withImportedFilterProfile(
+                    com.opencamera.core.settings.FilterProfile(
+                        id = "custom-portrait-original-1",
+                        label = "Portrait Original Custom 1",
+                        category = com.opencamera.core.settings.FilterProfileCategory.CUSTOM,
+                        builtIn = false,
+                        renderSpec = com.opencamera.core.settings.FilterRenderSpec()
+                    )
+                )
+            ),
+            activeMode = ModeId.PORTRAIT
+        )
+
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            selectedFamily = FilterLabFamily.PORTRAIT
+        )
+
+        assertTrue(model.adjustmentPanel.isVisible)
+        assertFalse(model.adjustmentPanel.needsAutoPrepare)
+        assertTrue(model.adjustmentPanel.lightPalette.supportingText.contains("Horizontal swipe"))
+    }
+
+    @Test
+    fun `advanced mode shows 12 controls`() {
+        val model = filterLabPageRenderModel(
+            state = defaultSessionState(activeMode = ModeId.PORTRAIT),
+            text = TestAppTextResolver(),
+            selectedFamily = FilterLabFamily.PORTRAIT,
+            adjustmentMode = FilterAdjustmentMode.ADVANCED
+        )
+
+        assertTrue(model.adjustmentPanel.isVisible)
+        assertEquals(FilterAdjustmentMode.ADVANCED, model.adjustmentPanel.mode)
+        assertEquals(12, model.adjustmentPanel.advancedControls.size)
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",
