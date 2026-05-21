@@ -79,10 +79,24 @@
 - `OpenCamera Capability Kernel 2.0` 统一设计资料已沉淀到 [`codex/capability_kernel_v2`](/Volumes/Extreme_SSD/project/codex_camera/codex/capability_kernel_v2)：核心判断是本应用不是厂商系统相机，不能依赖 native cache / ISP-BSP 协同 / 私有算法引擎，因此 2.0 要在不破坏 `Mode Plugin / Session Kernel / Device Adapter / Media Pipeline` 四层主链路的前提下，把能力图谱、帧流缓冲、ShotGraph/算法管线、Live/时序媒体、资源治理、模式集成和可观测验证拆成可并行落地的上层能力内核方案；涉及成片视觉、截图、录屏和画质判断的工作已单独隔离到多模态延期文档。
 - `2026-05-22` 真机最新版 APK 反馈已拆成 5 份可交给非多模态 agent 的落地方案：首次授权后预览恢复、零延时缩略图反馈、窄横向变焦条、画幅/预览 cockpit、色调调色板可发现性；需要看截图/录屏/视觉对比的事项单独隔离到多模态延期清单。
 - `2026-05-22` 最新版 APK 第二轮真机反馈已按相近问题合并为 3 份非多模态实施方案和 1 份多模态延期 QA：媒体输出/滤镜/缩略图、面板入口信息架构、中文文案与窄屏布局、多模态视觉和成片验收。后续落地应优先处理媒体保存失败和面板 IA，因为它们会同时影响“滤镜成片”和“缩略图回退”的可验证性。
+- `2026-05-22` 最新版 APK 第三轮真机反馈已新增总索引、5 份非多模态实施方案和 1 份多模态视觉 QA：水印缩略图首帧反馈、横屏/网格/画幅几何、面板状态去重、风格与镜头实验室 IA、快门按钮视觉刷新，以及需要截图/录屏/保存 JPEG 对比的多模态验收。后续并行落地时优先从水印缩略图和面板状态去重开始，避免先做大 IA 时继续放大已有反馈错觉和重复信息。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-22：最新版 APK 第三轮真机反馈方案文档
+
+- 目标：把用户对最新版 APK 的 8 个真机问题按相近根因合并，形成可直接转给非多模态 agent 的 Markdown 落地方案，并把涉及截图审美、横屏真实观感、网格参考、快门按钮手感和保存图视觉对比的事项隔离给多模态 agent。
+- 核心结果：
+  [`2026-05-22-third-real-device-feedback-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-third-real-device-feedback-index.md) 建立第三轮反馈总索引、问题映射、依赖顺序和全局验证口径；
+  [`2026-05-22-watermarked-thumbnail-first-feedback.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-watermarked-thumbnail-first-feedback.md) 将“缩略图无水印跳变有水印”定位到 `pendingCaptureFeedback` 早于 `PhotoWatermarkPostProcessor`，要求由 session 根据 shot metadata 抑制或生成可信反馈；
+  [`2026-05-22-landscape-grid-frame-ratio-geometry.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-landscape-grid-frame-ratio-geometry.md) 合并横屏、构图网格和画幅几何，要求 `PreviewOverlayView` 用 active frame rect 画网格，并按显示方向调整 4:3/16:9 长边；
+  [`2026-05-22-panel-state-deduplication.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-panel-state-deduplication.md) 要求去掉设置页和二级面板 header/footer 的状态合集，让子项自己展示当前值和支持状态；
+  [`2026-05-22-style-and-color-lab-ia.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-style-and-color-lab-ia.md) 将用户提出的“风格 vs 色彩/调色”拆成 `风格` 与 `镜头实验室` 两个产品面，并约束预览和成片仍走既有 effect/media pipeline；
+  [`2026-05-22-shutter-button-visual-refresh.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-shutter-button-visual-refresh.md) 给出文本可执行的 shutter drawable/state 更新，避免按钮内文字裁切；
+  [`2026-05-22-third-feedback-multimodal-visual-qa.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-third-feedback-multimodal-visual-qa.md) 单独收纳需要多模态能力的真实屏幕和保存图验收。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读当前 UI/session/media 实现、近期 agent plans 和用户截图现象，并用 `rg` 检查新增文档无明显占位词。
 
 ## 2026-05-22：Camera Capability Kernel 2.0 设计资料沉淀
 
