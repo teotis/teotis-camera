@@ -3299,7 +3299,7 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `watermark without template suppresses raw capture feedback`() = runTest {
+    fun `watermark with non-overlay template suppresses raw capture feedback`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace, this)
 
@@ -3311,7 +3311,9 @@ class DefaultCameraSessionTest {
         val watermarkedShot = shot.copy(
             saveRequest = shot.saveRequest.copy(
                 metadata = shot.saveRequest.metadata.copy(
-                    watermarkText = "OpenCamera"
+                    watermarkText = "OpenCamera",
+                    customTags = shot.saveRequest.metadata.customTags
+                        .filterKeys { it != "watermarkTemplate" } + ("watermarkTemplate" to "frame-expand")
                 )
             )
         )
@@ -3319,7 +3321,7 @@ class DefaultCameraSessionTest {
         session.dispatch(
             SessionIntent.CaptureFeedbackSnapshotUpdated(
                 shotId = watermarkedShot.shotId,
-                outputPath = "/tmp/raw-feedback-no-template.jpg"
+                outputPath = "/tmp/raw-feedback-non-overlay.jpg"
             )
         )
         advanceUntilIdle()
