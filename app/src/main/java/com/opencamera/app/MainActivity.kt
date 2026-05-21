@@ -403,8 +403,15 @@ class MainActivity : AppCompatActivity() {
             buttonFilterEntry,
             buttonQuickLauncher,
             buttonLensLabEntry,
-            buttonDevEntry
+            buttonDevEntry,
+            shutterButton,
+            lensFacingButton
         ).forEach { it.rotation = degrees }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyControlRotationForDisplay()
     }
 
     override fun onStart() {
@@ -885,6 +892,7 @@ class MainActivity : AppCompatActivity() {
         settingsVideoSummary.text = model.videoSection.summary
         settingsVideoSummary.isVisible = model.videoSection.summary.isNotEmpty()
         settingsCatalogFooter.text = model.catalogFooter
+        settingsCatalogFooter.isVisible = model.catalogFooter.isNotEmpty()
         settingsEditingHint.text = model.editingHint
         renderSettingsControl(buttonGridMode, model.commonSection.gridMode, model.editingEnabled)
         renderSettingsControl(buttonShutterSound, model.commonSection.shutterSound, model.editingEnabled)

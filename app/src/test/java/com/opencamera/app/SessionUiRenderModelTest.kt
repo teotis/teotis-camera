@@ -538,15 +538,7 @@ class SessionUiRenderModelTest {
             ),
             model.videoSection.resolution.nextAction
         )
-        assertTrue(
-            model.catalogFooter.contains("Still watermark templates now flow into metadata and photo rendering.")
-        )
-        assertTrue(
-            model.catalogFooter.contains("Pro manual draft RAW Off | ISO Auto | S Auto | WB Auto.")
-        )
-        assertTrue(
-            model.catalogFooter.contains("Manual drafts and Live/video defaults remain staged in the same settings spine.")
-        )
+        assertEquals("", model.catalogFooter)
     }
 
     @Test
@@ -557,6 +549,13 @@ class SessionUiRenderModelTest {
         assertEquals("", model.photoSection.summary)
         assertEquals("", model.videoSection.summary)
         assertEquals("Composition grid", model.commonSection.gridMode.label)
+    }
+
+    @Test
+    fun `settings page does not aggregate child states in footer`() {
+        val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
+        assertTrue(model.catalogFooter.isBlank())
+        assertFalse(model.catalogFooter.contains("|"))
     }
 
     @Test

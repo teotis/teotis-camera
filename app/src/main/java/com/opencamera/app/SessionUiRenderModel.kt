@@ -1165,16 +1165,7 @@ internal fun sessionSettingsPageRenderModel(
                 }
             )
         ),
-        catalogFooter = buildString {
-            append(renderModel.catalogSummary)
-            append(" ")
-            append(text.catalogFooterStillWatermark())
-            append(text.catalogFooterProManualPrefix())
-            append(renderModel.manualDraftSummary)
-            append(".")
-            append(" ")
-            append(text.catalogFooterManualStaged())
-        }
+        catalogFooter = ""
     )
 }
 
