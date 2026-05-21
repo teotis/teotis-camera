@@ -75,10 +75,24 @@
 - 第二优先级是把当前默认 perf budget 接到真实设备/机型阈值矩阵；在没有额外口径和真机的前提下，继续细化只会把默认阈值写死。
 - 现有第 `6` 阶段功能闭环无需继续扩写；后续若回到 feature 侧，应单独获得新的阶段授权。
 - 最近新增的产品化设计输入已归纳为三份可交付 spec：统一手势入口、模式轨道/快门/变焦 cockpit、PreviewRenderEngine / Filter / Watermark 管线；后续实施应优先遵循这三份设计稿的边界，不要回退到老工程式的大型单体 View 或全局协议中心。
+- `OpenCamera UI/Interaction 2.0` 统一设计资料已沉淀到 [`codex/v2_ui`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui)：包含主界面 cockpit 线框、视觉系统、交互语法、功能便利性分层、统一面板与 labs、参考图资料包和多模态延期视觉审查。后续 UI 落地 agent 应优先按这些 Markdown 规格执行；参考 PNG 只作为视觉资料，不替代文字规格。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-21：OpenCamera UI/Interaction 2.0 设计资料沉淀
+
+- 目标：在 1.0 问题修复包之外，形成面向 `UI美观性 / 交互直观性 / 相机功能使用方便性` 的 2.0 统一设计资料，方便后续非多模态 agent 直接落地。
+- 核心结果：
+  [`codex/v2_ui/00_v2_ui_index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui/00_v2_ui_index.md) 建立总索引、实施阶段、验收标准和 1.0 修复包衔接；
+  [`codex/v2_ui/01_camera_cockpit_wireframes.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui/01_camera_cockpit_wireframes.md) 到 [`05_panel_system_and_labs.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui/05_panel_system_and_labs.md) 分别定义 cockpit 线框、视觉系统、交互语法、功能分层和统一面板/labs；
+  [`codex/v2_ui/06_reference_image_pack.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui/06_reference_image_pack.md) 与 [`codex/v2_ui/reference_images`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui/reference_images) 沉淀 5 张 1080x1920 PNG 参考图和可复现生成脚本；
+  [`codex/v2_ui/90_multimodal_deferred_visual_review.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/v2_ui/90_multimodal_deferred_visual_review.md) 单独隔离截图标注、真实设备视觉 QA、参考图对比、图标/动效审查等需要多模态能力的工作。
+- 验证：
+  使用 Pillow 打开并确认 5 张参考 PNG 均为 `1080x1920 RGB`；
+  文件清单确认 `codex/v2_ui` 下新增 `9` 个 Markdown 文档、`5` 张 PNG 和 `1` 个生成脚本。
+- 结论：2.0 当前先作为设计/施工规格沉淀，不改变 Stage 7 架构和运行时代码；后续实现应按 2.0 IA Skeleton、Visual Components、Feature Convenience 三轮推进。
 
 ## 2026-04-13：第 `7` 阶段第一轮
 
