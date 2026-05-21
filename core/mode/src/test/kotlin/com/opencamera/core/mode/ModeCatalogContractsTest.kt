@@ -45,7 +45,7 @@ class ModeCatalogContractsTest {
             "Flash, frame ratio, Live default, watermark",
             photoDeclaration.declaredSubfeatures
         )
-        assertEquals("Humanistic Street", humanisticDeclaration.defaultStyleLabel)
+        assertEquals("Humanistic Original", humanisticDeclaration.defaultStyleLabel)
         assertEquals(
             "Street styles, Pro variant, frame ratio, Live default, timer, watermark",
             humanisticDeclaration.declaredSubfeatures

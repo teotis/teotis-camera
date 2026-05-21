@@ -564,6 +564,20 @@ private class PortraitModeController(
     companion object {
         private val DEFAULT_PORTRAIT_STYLES = listOf(
             PortraitStyle(
+                id = "portrait-original",
+                label = "Portrait Original",
+                bokehStrength = 1.8f,
+                subjectTracking = true,
+                renderSpec = defaultFilterRenderSpecOrNull("portrait-original")
+            ),
+            PortraitStyle(
+                id = "portrait-vivid",
+                label = "Portrait Vivid",
+                bokehStrength = 2.0f,
+                subjectTracking = true,
+                renderSpec = defaultFilterRenderSpecOrNull("portrait-vivid")
+            ),
+            PortraitStyle(
                 id = "portrait-blue",
                 label = "Portrait Blue",
                 bokehStrength = 2.1f,
@@ -583,20 +597,6 @@ private class PortraitModeController(
                 bokehStrength = 1.7f,
                 subjectTracking = false,
                 renderSpec = defaultFilterRenderSpecOrNull("portrait-ccd")
-            ),
-            PortraitStyle(
-                id = "portrait-vivid",
-                label = "Portrait Vivid",
-                bokehStrength = 2.0f,
-                subjectTracking = true,
-                renderSpec = defaultFilterRenderSpecOrNull("portrait-vivid")
-            ),
-            PortraitStyle(
-                id = "portrait-original",
-                label = "Portrait Original",
-                bokehStrength = 1.8f,
-                subjectTracking = true,
-                renderSpec = defaultFilterRenderSpecOrNull("portrait-original")
             ),
             PortraitStyle(
                 id = "portrait-chasing-light",

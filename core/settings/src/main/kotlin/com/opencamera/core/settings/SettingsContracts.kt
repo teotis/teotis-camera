@@ -561,7 +561,7 @@ data class CommonSettings(
 
 data class PhotoSettings(
     val defaultFilterProfileId: String = "photo-vivid",
-    val defaultHumanisticFilterProfileId: String = "humanistic-street",
+    val defaultHumanisticFilterProfileId: String = "humanistic-original",
     val defaultPortraitFilterProfileId: String = "portrait-original",
     val portraitProfile: PortraitProfile = PortraitProfile.NATIVE,
     val portraitBeautyPreset: PortraitBeautyPreset = PortraitBeautyPreset.AUTHENTIC,

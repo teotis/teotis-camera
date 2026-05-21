@@ -789,7 +789,7 @@ class MainActivity : AppCompatActivity() {
         maybePlayShutterSound(state)
 
         val shutterLabel = when (state.recordingStatus) {
-            RecordingStatus.IDLE -> state.modeSnapshot.uiSpec.shutterLabel
+            RecordingStatus.IDLE -> ""
             RecordingStatus.REQUESTING -> getString(R.string.button_recording_starting)
             RecordingStatus.RECORDING -> getString(R.string.button_recording_stop)
             RecordingStatus.STOPPING -> getString(R.string.button_recording_saving)
