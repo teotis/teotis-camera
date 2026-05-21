@@ -2,11 +2,18 @@
 
 > **For agentic workers:** This is a text-only IA and routing handoff. It does not require judging screenshots. Use `rtk` for shell commands.
 
-**Goal:** Restore the requested top-right `色彩实验室`/`镜头实验室` entry and reduce the current right-side rail confusion.
+**Goal:** Restore the top-bar `色彩实验室` and `设置` entries, remove lab/settings confusion from the side rail, and keep the title area clean.
 
 ## Problem Statement
 
-The user expected the top-right lab entry to return, but the latest APK still exposes lab-like functions as a right-side rail. The rail now mixes concepts:
+The latest product direction is:
+
+- the top-left title area shows only the app name,
+- the top middle-right entry opens `色彩实验室`,
+- the top far-right entry opens `设置`,
+- the side rail contains only shooting-surface utilities.
+
+The latest APK still exposes lab/settings-like functions through a confusing right-side rail. The rail currently mixes concepts:
 
 - style/filter,
 - quick controls,
@@ -16,9 +23,10 @@ The user expected the top-right lab entry to return, but the latest APK still ex
 This makes the cockpit hard to scan and conflicts with the requested split:
 
 - `风格`: style/filter/bokeh-like look selection.
-- `色彩实验室` or `镜头实验室`: palette/color tuning that affects preview and saved output.
+- `色彩实验室`: a compact post-render color module that affects preview and saved output.
 - `快捷`: short one-hop camera controls.
 - `设置`: broader persistent settings.
+- `Dev`: always available as a first-class dev/diagnostics entry; do not hide it only because a build is "release-like" unless product policy later changes.
 
 ## Current Code Facts
 
@@ -29,34 +37,46 @@ This makes the cockpit hard to scan and conflicts with the requested split:
 
 ## Required Behavior
 
-- Top-right entry should be restored as the lab entry:
-  - Preferred visible label: `色彩实验室` if the product meaning is color tuning.
-  - Alternative label: `镜头实验室` if the existing product direction keeps lens experiments broader.
-  - Choose one label and use it consistently across XML, render model, and panel title.
-- Right rail should only contain high-frequency one-tap utilities:
+- Top bar:
+  - left: app name only, such as `OpenCamera`.
+  - remove the current `· 模式名` suffix from `titleText`.
+  - middle-right: `色彩实验室`.
+  - far-right: `设置`.
+- Side rail should only contain shooting-surface utilities:
   - `风格`
   - `快捷`
-  - optionally dev entry when debug-visible
-- Do not put both `色彩实验室` and `镜头实验室` in the right rail.
-- `设置` should be a settings entry, not mislabeled as lens/lab.
-- `风格` and lab panels must not open identical content.
+  - `Dev`
+- Do not put `色彩实验室` or `设置` in the side rail.
+- Do not use `镜头实验室` for this round; the product label is `色彩实验室`.
+- `风格` and `色彩实验室` panels must not open identical content.
+- `Dev` remains visible according to product request; do not treat it as a debug-build-only item in this IA pass.
 
 ## Recommended IA
 
 Use this structure for the next APK:
 
 - Top panel:
-  - left/center: app title or current mode status
-  - right: `色彩实验室` entry
+  - left: app name only
+  - middle-right: `色彩实验室`
+  - far-right: `设置`
 - Right rail:
   - `风格`
   - `快捷`
-  - hidden `Dev` only when applicable
+  - `Dev`
 - Bottom/cockpit:
   - lens-facing button remains true camera lens switch
   - shutter and mode track unchanged except for their own plans
 - Settings:
   - broad persistent settings only
+- Style panel:
+  - preset style list,
+  - filter list,
+  - each style/filter supports one strength control.
+- Color Lab panel:
+  - one two-dimensional palette, inspired by Apple photographic styles and vivo blueprint palette,
+  - horizontal axis: color tendency,
+  - vertical axis: tone/shadow-highlight relationship,
+  - no exposed professional parameter list.
 
 ## Implementation Plan
 
@@ -68,7 +88,7 @@ Low-churn option:
 - Keep `CockpitPanelRoute.LensLab` internally for color/lab.
 - Ensure visible labels are:
   - `FilterLab` -> `风格`
-  - `LensLab` -> `色彩实验室` or `镜头实验室`
+  - `LensLab` -> `色彩实验室`
 
 Cleaner option:
 
@@ -85,12 +105,20 @@ sealed class CockpitPanelRoute {
 
 Only take the cleaner option if the owner can update tests and avoid broad churn.
 
-### Step 2: Restore top-right lab button
+### Step 2: Rebuild the top bar
 
-Use the existing `buttonSettingsEntry` slot or create a clearly named replacement:
+Replace the current single hidden top-right settings button with two explicit top-bar actions:
 
-- Rename XML id only if the integration owner can update all references.
-- Otherwise reuse `buttonSettingsEntry` as a top-right lab button temporarily but update comments/tests so it no longer behaves like settings.
+- `buttonColorLabEntry` near the middle-right.
+- `buttonSettingsEntry` as the far-right action.
+
+Also change title rendering:
+
+```kotlin
+titleText.text = getString(R.string.app_name)
+```
+
+Do not append `· ${modeName}` after the app name.
 
 Preferred:
 
@@ -101,9 +129,16 @@ Preferred:
     android:layout_width="wrap_content"
     android:layout_height="32dp"
     android:text="@string/button_color_lab_entry" />
+
+<Button
+    android:id="@+id/buttonSettingsEntry"
+    style="@style/Widget.OpenCamera.PillButton"
+    android:layout_width="wrap_content"
+    android:layout_height="32dp"
+    android:text="@string/button_settings_entry" />
 ```
 
-In `MainActivity.renderPanelVisibility()`, remove the unconditional `GONE` behavior and set active alpha/selection based on the lab route.
+In `MainActivity.renderPanelVisibility()`, remove the unconditional `buttonSettingsEntry.visibility = View.GONE`. Set active alpha/selection for both top actions based on `ColorLab/LensLab` and `Settings` routes.
 
 ### Step 3: Reduce right rail buttons
 
@@ -112,39 +147,58 @@ In XML and binding:
 - Keep `buttonFilterEntry` as `风格`.
 - Keep `buttonQuickLauncher` as `快捷`.
 - Remove or hide `buttonLensLabEntry` from the right rail after the top lab entry works.
+- Keep `buttonDevEntry` visible according to product policy.
 - Do not use `button_lens_rail` to mean `设置`.
+- Do not put `色彩实验室` in the side rail.
 
 In `CameraCockpitRenderModel`, make `rightRail.entries` match real XML:
 
 - `StyleLab/FilterLab`
 - `QuickBubble`
-- `DevConsole` hidden
+- `DevConsole`
 
-Do not include `Settings` in right rail unless there is a real visible settings button.
+Do not include `Settings` or `ColorLab/LensLab` in right rail.
 
 ### Step 4: Split panel role at render time
 
 When lab route is active:
 
-- Header title must be `色彩实验室`/`镜头实验室`.
-- Primary content should be palette/color tuning, not the same list as `风格`.
-- If existing implementation must share `filterPanel`, hide style-only rows for lab route and hide palette-only rows for style route.
+- Header title must be `色彩实验室`.
+- Primary content should be a compact two-dimensional palette, not the same list as `风格`.
+- The palette is a post-render module:
+  - horizontal axis: color tendency, roughly cool/warm, hue shift, and natural vibrance;
+  - vertical axis: tone, roughly shadow/highlight contrast and midtone lift/depth;
+  - output maps to one render spec consumed by preview and saved output.
+- Do not expose a professional list of `white balance / color temperature / highlights / shadows / saturation / sharpness / vignette / grain` as separate buttons in this panel.
+- If existing implementation must share `filterPanel`, hide style-only rows for lab route and replace advanced-control rows with the palette surface.
+
+When style route is active:
+
+- Show preset style list.
+- Show filter list.
+- Each preset/filter supports one strength control.
+- Do not expose separate bokeh, light spot, vignette, soft glow, grain, or similar effect components as independent rows; those should be folded into style presets where needed.
 
 Acceptance:
 
 - Tapping `风格` opens style/filter choice.
-- Tapping top-right lab opens palette/color adjustment.
+- Tapping top middle-right `色彩实验室` opens the two-dimensional palette.
+- Tapping top far-right `设置` opens settings.
 - Tapping `快捷` opens quick controls.
-- No visible rail item says `设置` unless it opens settings.
+- Side rail contains `风格`, `快捷`, and `Dev`, but not `设置` or `色彩实验室`.
+- Title text does not contain `· 模式名`.
 
 ### Step 5: Tests
 
 Add or update render-model tests:
 
-- top status/lab entry label is `色彩实验室` or `镜头实验室`.
-- right rail entries do not contain `Settings`.
+- top status/title label is app name only.
+- top actions include `色彩实验室` and `设置`.
+- right rail entries do not contain `Settings` or `ColorLab/LensLab`.
 - right rail entries contain `风格` and `快捷`.
+- right rail entries contain visible `Dev`.
 - `FilterLab/StyleLab` and `LensLab/ColorLab` expose different panel role flags.
+- `ColorLab/LensLab` primary panel role is two-dimensional palette, not advanced parameter list.
 
 ## Files To Inspect Or Modify
 
@@ -160,7 +214,7 @@ Add or update render-model tests:
 
 ## Non-Goals
 
-- Do not implement new color science in this IA pass.
+- Do not implement full Apple-style semantic segmentation or a large 3D LUT matrix in this IA pass.
 - Do not move CameraX/device behavior.
 - Do not make right rail a catch-all settings drawer.
 

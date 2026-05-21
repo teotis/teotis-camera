@@ -64,18 +64,21 @@ Fail examples:
 - grid lines divide dimmed/non-imaging area,
 - frame mask shifts when rotating device without changing ratio.
 
-### Right rail and top lab entry
+### Top bar, side rail, and lab entry
 
 Pass criteria:
 
-- top-right lab entry is visible and clearly labeled.
-- right rail is short and understandable.
-- `风格`, `快捷`, and lab do not feel like duplicate entries.
+- top-left title shows only the app name, without `· 模式名`.
+- top middle-right `色彩实验室` is visible and clearly labeled.
+- top far-right `设置` is visible and clearly labeled.
+- side rail is short and understandable: `风格`, `快捷`, and `Dev`.
+- `风格`, `快捷`, `Dev`, `色彩实验室`, and `设置` do not feel like duplicate entries.
 
 Fail examples:
 
-- `色彩实验室`/`镜头实验室` still appears only as side rail,
-- right rail contains settings/lab/style labels that compete,
+- `色彩实验室` still appears only as side rail,
+- right rail contains settings/lab labels that compete,
+- title still shows `OpenCamera · 拍照` or similar mode suffix,
 - two different entries open visually identical panels.
 
 ### Quick panel and secondary panels

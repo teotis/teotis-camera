@@ -9,7 +9,7 @@ The latest APK was tested again on a real device. The user reported:
 1. Landscape interaction is still poor. The preferred direction is to keep the overall UI topology stable, while rotating button glyphs/text so controls still read as upright in landscape.
 2. The real imaging area appears lower than the preview area.
 3. Mode-track text should be more prominent and clearer.
-4. The top-right `色彩实验室` entry still has not been restored. Instead, the function became a right-side rail entry. The right-side rail is now confusing and needs cleanup.
+4. The `色彩实验室` entry still has not been restored in the top bar. It should sit in the top middle-right area, while the top far-right action is `设置`. The side rail is confusing and needs cleanup.
 5. The quick sub-panel layout is weak and text is ellipsized.
 6. Left/secondary panels are too large, obscure other controls, and some content exceeds the visible layout.
 7. The mode track is not sensitive or accurate enough; false taps happen often.
@@ -24,6 +24,7 @@ This fourth round overlaps with earlier plans but narrows the priority to what w
 - `floatingUtilityGroup` currently contains `buttonFilterEntry`, `buttonQuickLauncher`, `buttonLensLabEntry`, and hidden dev entry.
 - `CameraCockpitRenderModel` still models right-rail entries for `FilterLab`, `LensLab`, `QuickBubble`, `Settings`, and hidden `DevConsole`, while `activity_main.xml` only has concrete rail buttons for filter, quick, lens, and dev.
 - `buttonSettingsEntry` remains in the top panel XML but `MainActivity.renderPanelVisibility()` forces it `GONE`.
+- `MainActivity.render()` currently sets `titleText` to `OpenCamera · ${modeName}`; the new product direction is app name only.
 - `quickBubblePanel` is a vertical fixed-width group. Buttons are mostly `64dp x 44dp`; dynamic labels such as `网格 ${value}`, `实况 ${value}`, and `定时 ${value}` can truncate.
 - `filterPanel` is a bottom-constrained `NestedScrollView` with `layout_height="wrap_content"` and no explicit top/bottom bounded height, so large content can cover too much of the cockpit.
 - `modeTrackScroll` contains `Button` chips using `wrap_content`. `bindModeTrack()` consumes touch manually with `20dp` slop and returns mixed `true/false` during move, which can make scroll/tap arbitration feel unreliable.
@@ -36,8 +37,8 @@ This fourth round overlaps with earlier plans but narrows the priority to what w
    - Provide non-multimodal geometry tests for the reported "imaging area lower than preview" class of bug.
 
 2. [Rail And Color Lab Entry Consolidation](./2026-05-22-rail-and-color-lab-entry-consolidation.md)
-   - Restore `色彩实验室`/`镜头实验室` as a top-right entry as requested.
-   - Reduce right-side rail to a small, predictable set of utilities.
+   - Restore `色彩实验室` as a top middle-right entry and `设置` as the top far-right entry.
+   - Reduce right-side rail to `风格 / 快捷 / Dev`.
    - Keep `风格` and color/palette tuning conceptually separate.
 
 3. [Quick And Secondary Panel Bounds](./2026-05-22-quick-and-secondary-panel-bounds.md)

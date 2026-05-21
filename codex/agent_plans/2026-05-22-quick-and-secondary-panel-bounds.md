@@ -24,11 +24,13 @@ These are layout contract failures and can be addressed textually.
 - `filterPanel` is a `NestedScrollView` with `layout_height="wrap_content"` and bottom constraint only.
 - `settingsPanel` is height `0dp` and constrained, but still uses a large full-width sheet.
 - `@dimen/panel_max_height` exists but is not consistently applied to secondary panels.
+- Product direction: quick panel no longer needs a `更多` action. Do not keep it as a visible quick item.
 
 ## Required Behavior
 
 - Quick-panel text must not ellipsize in Chinese on common 1080-wide devices.
 - Quick controls should show label and state separately or use compact state chips.
+- Quick panel should not contain `更多`.
 - Secondary panels must stay within the visible safe area.
 - Opening a panel must not hide the shutter, mode track, or essential close affordance.
 - Panels should be scrollable internally when content is long.
@@ -64,7 +66,6 @@ Better option:
   - `画幅`
   - `实况`
   - `定时`
-  - `更多`
 - Move current value into a small trailing chip or second line:
   - `网格\n三分`
   - `实况\n开`
@@ -95,6 +96,7 @@ Acceptance:
 - The quick panel does not overlap the shutter.
 - No quick label ellipsizes.
 - Frame-ratio row remains tappable at 44dp minimum height.
+- `buttonQuickMore` is removed or hidden and no longer consumes layout space.
 
 ### Step 3: Add panel max-height behavior
 
