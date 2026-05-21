@@ -1920,14 +1920,14 @@ private val KEY_EVENT_NAMES = setOf(
     "session.created", "session.booted", "session.stopped",
     "mode.switched", "lens.switched", "zoom.updated",
     "preview.first.frame", "preview.host.attached", "preview.host.detached",
-    "capture.photo", "capture.saved",
-    "recording.started", "recording.saved",
+    "capture.photo", "capture.saved", "capture.timing",
+    "recording.started", "recording.saved", "recording.timing",
     "permissions.updated", "device.capabilities.updated", "settings.updated"
 )
 
 private val CORE_EVENT_NAMES = setOf(
     "preview.binding.started", "preview.recovery.started", "preview.recovery.requested",
-    "preview.stopped", "preview.snapshot.updated",
+    "preview.stopped", "preview.snapshot.updated", "preview.snapshot.ignored",
     "capture.countdown.started", "capture.countdown.tick", "capture.countdown.completed",
     "capture.saving",
     "recording.requested",

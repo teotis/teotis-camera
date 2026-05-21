@@ -168,6 +168,36 @@ class DevLogRenderModelTest {
         assertTrue(allModel.title.startsWith("All Events"))
     }
 
+    @Test
+    fun `key tab shows timing events`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents + listOf(
+                SessionTraceEvent(11, "capture.timing", "shot=shot-1,device=245ms,postprocess=18ms,total=263ms", 11L),
+                SessionTraceEvent(12, "recording.timing", "shot=shot-2,device=--ms,postprocess=--ms,total=5230ms", 12L)
+            ),
+            isDebugBuild = true,
+            selectedTab = DevLogTab.KEY
+        )
+        assertTrue(model.content.contains("capture.timing"))
+        assertTrue(model.content.contains("recording.timing"))
+        assertTrue(model.content.contains("device=245ms"))
+        assertTrue(model.content.contains("total=263ms"))
+    }
+
+    @Test
+    fun `core tab shows preview snapshot ignored event`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents + listOf(
+                SessionTraceEvent(11, "preview.snapshot.ignored", "/tmp/preview-b.jpg", 11L)
+            ),
+            isDebugBuild = true,
+            selectedTab = DevLogTab.CORE
+        )
+        assertTrue(model.content.contains("preview.snapshot.ignored"))
+    }
+
     private fun defaultTestSessionState(): SessionState {
         return SessionState(
             lifecycle = SessionLifecycle.RUNNING,

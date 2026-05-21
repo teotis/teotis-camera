@@ -1043,6 +1043,11 @@ class DefaultCameraSession(
     }
 
     private fun handlePreviewSnapshotUpdated(source: ThumbnailSource) {
+        val hasSavedMediaThumbnail = _state.value.presentation.latestThumbnailSource is ThumbnailSource.SavedMedia
+        if (hasSavedMediaThumbnail) {
+            trace.record("preview.snapshot.ignored", source.outputPathOrNull().orEmpty())
+            return
+        }
         updateState(
             previewThumbnailPath = source.outputPathOrNull(),
             latestThumbnailSource = source
@@ -1228,6 +1233,27 @@ class DefaultCameraSession(
             if (result.mediaType == MediaType.PHOTO) "capture.saved" else "recording.saved",
             result.outputPath
         )
+        val t = result.timing
+        val requested = t.requestedAtElapsedMillis
+        val postCompleted = t.postProcessCompletedAtElapsedMillis
+        if (requested != null && postCompleted != null) {
+            val deviceStarted = t.deviceCaptureStartedAtElapsedMillis
+            val deviceCompleted = t.deviceCaptureCompletedAtElapsedMillis
+            val deviceMs = if (deviceStarted != null && deviceCompleted != null) {
+                "${deviceCompleted - deviceStarted}"
+            } else {
+                "--"
+            }
+            val postprocessMs = if (deviceCompleted != null) {
+                "${postCompleted - deviceCompleted}"
+            } else {
+                "--"
+            }
+            trace.record(
+                if (result.mediaType == MediaType.PHOTO) "capture.timing" else "recording.timing",
+                "shot=${result.shotId},device=${deviceMs}ms,postprocess=${postprocessMs}ms,total=${postCompleted - requested}ms"
+            )
+        }
     }
 
     private fun latestLivePhotoBundleFor(result: ShotResult): LivePhotoBundle? {

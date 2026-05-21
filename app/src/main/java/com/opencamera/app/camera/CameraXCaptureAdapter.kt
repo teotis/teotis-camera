@@ -89,6 +89,7 @@ import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
+import com.opencamera.core.media.ShotTiming
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
@@ -1148,21 +1149,23 @@ class CameraXCaptureAdapter(
     override fun boundGraph(): DeviceGraphSpec? = currentGraph
 
     private suspend fun executeShot(plan: ShotPlan) {
+        val requestedAt = SystemClock.elapsedRealtime()
         val resolvedCapabilities = currentGraph
             ?.let(::capabilitiesFor)
             ?: capabilities
         val deviceRequest = shotRequestTranslatorFactory(resolvedCapabilities).translate(plan)
         when (plan.request.shotKind) {
-            ShotKind.STILL_CAPTURE -> captureStillImage(plan, deviceRequest)
-            ShotKind.MULTI_FRAME_CAPTURE -> captureStillImage(plan, deviceRequest)
-            ShotKind.LIVE_PHOTO -> captureStillImage(plan, deviceRequest)
-            ShotKind.VIDEO_RECORDING -> startVideoRecording(plan, deviceRequest)
+            ShotKind.STILL_CAPTURE -> captureStillImage(plan, deviceRequest, requestedAt)
+            ShotKind.MULTI_FRAME_CAPTURE -> captureStillImage(plan, deviceRequest, requestedAt)
+            ShotKind.LIVE_PHOTO -> captureStillImage(plan, deviceRequest, requestedAt)
+            ShotKind.VIDEO_RECORDING -> startVideoRecording(plan, deviceRequest, requestedAt)
         }
     }
 
     private suspend fun captureStillImage(
         plan: ShotPlan,
-        deviceRequest: DeviceShotRequest
+        deviceRequest: DeviceShotRequest,
+        requestedAt: Long
     ) {
         ensureStillCaptureRequest(deviceRequest)
         val capture = imageCapture ?: error("ImageCapture is not bound")
@@ -1213,7 +1216,10 @@ class CameraXCaptureAdapter(
                         intermediateOutputPaths = execution.intermediateOutputPaths,
                         deviceDiagnostics = deviceRequest.diagnostics +
                             adapterManualDiagnostics +
-                            execution.diagnostics
+                            execution.diagnostics,
+                        requestedAtElapsedMillis = requestedAt,
+                        deviceCaptureStartedAtElapsedMillis = execution.deviceCaptureStartedAtElapsedMillis,
+                        deviceCaptureCompletedAtElapsedMillis = execution.deviceCaptureCompletedAtElapsedMillis
                     )
                 }.getOrElse { throwable ->
                     cleanupStillCaptureArtifacts(
@@ -1289,6 +1295,8 @@ class CameraXCaptureAdapter(
         val temporaryOutputs = MultiFrameTemporaryOutputTracker()
         var finalOutputPath: String? = null
         var finalOutputHandle: MediaOutputHandle? = null
+        var firstFrameDeviceCaptureStartedAt: Long = 0L
+        var lastFrameDeviceCaptureCompletedAt: Long = 0L
 
         try {
             executionPlan.steps.forEachIndexed { stepIndex, step ->
@@ -1308,6 +1316,10 @@ class CameraXCaptureAdapter(
                         return result
                     }
                     is PhotoCaptureOutcome.Success -> {
+                        if (stepIndex == 0) {
+                            firstFrameDeviceCaptureStartedAt = result.deviceCaptureStartedAtElapsedMillis
+                        }
+                        lastFrameDeviceCaptureCompletedAt = result.deviceCaptureCompletedAtElapsedMillis
                         if (step.outputRole == MultiFrameOutputRole.FINAL_OUTPUT) {
                             finalOutputPath = result.outputPath
                             finalOutputHandle = result.outputHandle
@@ -1337,7 +1349,9 @@ class CameraXCaptureAdapter(
             outputPath = resolvedFinalOutputPath,
             outputHandle = resolvedFinalOutputHandle,
             diagnostics = executionPlan.toExecutionDiagnostics(),
-            intermediateOutputPaths = temporaryOutputs.outputPaths()
+            intermediateOutputPaths = temporaryOutputs.outputPaths(),
+            deviceCaptureStartedAtElapsedMillis = firstFrameDeviceCaptureStartedAt,
+            deviceCaptureCompletedAtElapsedMillis = lastFrameDeviceCaptureCompletedAt
         )
     }
 
@@ -1346,15 +1360,19 @@ class CameraXCaptureAdapter(
         request: PhotoOutputRequest
     ): PhotoCaptureOutcome {
         return suspendCancellableCoroutine { continuation ->
+            val deviceCaptureStartedAt = SystemClock.elapsedRealtime()
             capture.takePicture(
                 request.outputOptions,
                 ContextCompat.getMainExecutor(context),
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                        val deviceCaptureCompletedAt = SystemClock.elapsedRealtime()
                         continuation.resume(
                             PhotoCaptureOutcome.Success(
                                 outputPath = request.outputPath,
-                                outputHandle = request.resolveOutputHandle(outputFileResults.savedUri)
+                                outputHandle = request.resolveOutputHandle(outputFileResults.savedUri),
+                                deviceCaptureStartedAtElapsedMillis = deviceCaptureStartedAt,
+                                deviceCaptureCompletedAtElapsedMillis = deviceCaptureCompletedAt
                             )
                         )
                     }
@@ -1422,7 +1440,10 @@ class CameraXCaptureAdapter(
         outputHandle: MediaOutputHandle = MediaOutputHandle(displayPath = outputPath),
         livePhotoBundle: LivePhotoBundle? = null,
         intermediateOutputPaths: List<String> = emptyList(),
-        deviceDiagnostics: List<String> = emptyList()
+        deviceDiagnostics: List<String> = emptyList(),
+        requestedAtElapsedMillis: Long = 0L,
+        deviceCaptureStartedAtElapsedMillis: Long = 0L,
+        deviceCaptureCompletedAtElapsedMillis: Long = 0L
     ) {
         val rawResult = shotExecutor.resultFor(
             saveTask = plan.saveTask,
@@ -1431,10 +1452,39 @@ class CameraXCaptureAdapter(
             livePhotoBundle = livePhotoBundle,
             intermediateOutputPaths = intermediateOutputPaths
         ).copy(
-            pipelineNotes = deviceDiagnostics
+            pipelineNotes = deviceDiagnostics,
+            timing = ShotTiming(
+                requestedAtElapsedMillis = requestedAtElapsedMillis,
+                deviceCaptureStartedAtElapsedMillis = deviceCaptureStartedAtElapsedMillis,
+                deviceCaptureCompletedAtElapsedMillis = deviceCaptureCompletedAtElapsedMillis
+            )
         )
         val processedResult = mediaPostProcessor.process(rawResult)
-        _events.emit(DeviceEvent.ShotCompleted(processedResult))
+        val postProcessCompletedAt = SystemClock.elapsedRealtime()
+        val timedResult = processedResult.copy(
+            timing = processedResult.timing.copy(
+                postProcessCompletedAtElapsedMillis = postProcessCompletedAt
+            )
+        )
+        val timingNotes = buildList {
+            val t = timedResult.timing
+            val deviceStarted = t.deviceCaptureStartedAtElapsedMillis
+            val deviceCompleted = t.deviceCaptureCompletedAtElapsedMillis
+            val requested = t.requestedAtElapsedMillis
+            if (deviceStarted != null && deviceCompleted != null && deviceStarted > 0 && deviceCompleted > 0) {
+                add("timing:device=${deviceCompleted - deviceStarted}ms")
+            }
+            if (deviceCompleted != null && deviceCompleted > 0) {
+                add("timing:postprocess=${postProcessCompletedAt - deviceCompleted}ms")
+            }
+            if (requested != null && requested > 0) {
+                add("timing:total=${postProcessCompletedAt - requested}ms")
+            }
+        }
+        val resultWithTiming = timedResult.copy(
+            pipelineNotes = timedResult.pipelineNotes + timingNotes
+        )
+        _events.emit(DeviceEvent.ShotCompleted(resultWithTiming))
     }
 
     private suspend fun emitShotFailure(
@@ -1590,7 +1640,8 @@ class CameraXCaptureAdapter(
 
     private suspend fun startVideoRecording(
         plan: ShotPlan,
-        deviceRequest: DeviceShotRequest
+        deviceRequest: DeviceShotRequest,
+        requestedAt: Long
     ) {
         check(activeRecording == null) { "Video recording already in progress" }
         val currentVideoGraph = currentGraph ?: error("Video graph is not bound")
@@ -1660,7 +1711,8 @@ class CameraXCaptureAdapter(
                                     outputHandle = request.resolveOutputHandle(
                                         event.outputResults.outputUri
                                     ),
-                                    deviceDiagnostics = deviceRequest.diagnostics + runtimeDiagnostics
+                                    deviceDiagnostics = deviceRequest.diagnostics + runtimeDiagnostics,
+                                    requestedAtElapsedMillis = requestedAt
                                 )
                             }
                         }
@@ -2178,7 +2230,9 @@ class CameraXCaptureAdapter(
             val outputHandle: MediaOutputHandle,
             val diagnostics: List<String> = emptyList(),
             val intermediateOutputPaths: List<String> = emptyList(),
-            val livePhotoBundle: LivePhotoBundle? = null
+            val livePhotoBundle: LivePhotoBundle? = null,
+            val deviceCaptureStartedAtElapsedMillis: Long = 0L,
+            val deviceCaptureCompletedAtElapsedMillis: Long = 0L
         ) : PhotoCaptureOutcome
 
         data class Failure(

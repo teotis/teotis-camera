@@ -278,6 +278,13 @@ data class MediaOutputHandle(
     }
 }
 
+data class ShotTiming(
+    val requestedAtElapsedMillis: Long? = null,
+    val deviceCaptureStartedAtElapsedMillis: Long? = null,
+    val deviceCaptureCompletedAtElapsedMillis: Long? = null,
+    val postProcessCompletedAtElapsedMillis: Long? = null
+)
+
 data class ShotResult(
     val shotId: String,
     val mediaType: MediaType,
@@ -289,7 +296,8 @@ data class ShotResult(
     val metadata: MediaMetadata,
     val livePhotoBundle: LivePhotoBundle? = null,
     val intermediateOutputPaths: List<String> = emptyList(),
-    val pipelineNotes: List<String> = emptyList()
+    val pipelineNotes: List<String> = emptyList(),
+    val timing: ShotTiming = ShotTiming()
 )
 
 fun ThumbnailSource.outputPathOrNull(): String? {

@@ -474,6 +474,54 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `preview snapshot after saved media does not overwrite thumbnail`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(
+            SessionIntent.PreviewSnapshotUpdated(
+                ThumbnailSource.PreviewSnapshot("/tmp/preview-a.jpg")
+            )
+        )
+        advanceUntilIdle()
+        assertEquals("/tmp/preview-a.jpg", session.state.value.previewThumbnailPath)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/photo-a.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia(
+                        "Pictures/OpenCamera/photo-a.jpg",
+                        "file:///tmp/photo-a.jpg"
+                    ),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        advanceUntilIdle()
+        assertEquals("Pictures/OpenCamera/photo-a.jpg", session.state.value.previewThumbnailPath)
+
+        session.dispatch(
+            SessionIntent.PreviewSnapshotUpdated(
+                ThumbnailSource.PreviewSnapshot("/tmp/preview-b.jpg")
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals("Pictures/OpenCamera/photo-a.jpg", session.state.value.previewThumbnailPath)
+        assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.SavedMedia)
+    }
+
+    @Test
     fun `photo countdown delays shot execution and blocks settings updates until completion`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
