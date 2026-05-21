@@ -74,6 +74,10 @@ class PreviewOverlayView @JvmOverloads constructor(
         typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
     }
 
+    private var vignetteGradient: android.graphics.RadialGradient? = null
+    private var vignetteOverlayRect: RectF? = null
+    private var lastVignetteKey: Float = -1f
+
     private var renderModel = PreviewOverlayRenderModel(
         gridMode = CompositionGridMode.OFF,
         isGridVisible = false,
@@ -94,7 +98,37 @@ class PreviewOverlayView @JvmOverloads constructor(
         }
         renderModel = model
         visibility = if (model.isVisible) VISIBLE else GONE
+        prepareVignetteCache(model)
         invalidate()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        prepareVignetteCache(renderModel)
+    }
+
+    private fun prepareVignetteCache(model: PreviewOverlayRenderModel) {
+        val overlay = model.effectModel?.filterOverlay
+        if (overlay == null || overlay.vignetteStrength <= 0f || width <= 0 || height <= 0) {
+            vignetteGradient = null
+            vignetteOverlayRect = null
+            lastVignetteKey = -1f
+            return
+        }
+        val cx = width / 2f
+        val cy = height / 2f
+        val radius = min(width, height) * 0.7f
+        val vignetteKey = overlay.vignetteStrength
+        if (vignetteKey != lastVignetteKey || vignetteGradient == null) {
+            vignetteGradient = android.graphics.RadialGradient(
+                cx, cy, radius,
+                intArrayOf(Color.TRANSPARENT, Color.argb((overlay.vignetteStrength * 180).toInt(), 0, 0, 0)),
+                floatArrayOf(0.4f, 1f),
+                android.graphics.Shader.TileMode.CLAMP
+            )
+            lastVignetteKey = vignetteKey
+        }
+        vignetteOverlayRect = RectF(0f, 0f, width.toFloat(), height.toFloat())
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -168,17 +202,11 @@ class PreviewOverlayView @JvmOverloads constructor(
         filterOverlayPaint.alpha = (spec.tintAlpha * 255).toInt().coerceIn(0, 255)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), filterOverlayPaint)
 
-        if (spec.vignetteStrength > 0f) {
-            val cx = width / 2f
-            val cy = height / 2f
-            val radius = min(width, height) * 0.7f
-            vignettePaint.shader = android.graphics.RadialGradient(
-                cx, cy, radius,
-                intArrayOf(Color.TRANSPARENT, Color.argb((spec.vignetteStrength * 180).toInt(), 0, 0, 0)),
-                floatArrayOf(0.4f, 1f),
-                android.graphics.Shader.TileMode.CLAMP
-            )
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), vignettePaint)
+        val gradient = vignetteGradient
+        val rect = vignetteOverlayRect
+        if (spec.vignetteStrength > 0f && gradient != null && rect != null) {
+            vignettePaint.shader = gradient
+            canvas.drawRect(rect, vignettePaint)
             vignettePaint.shader = null
         }
     }

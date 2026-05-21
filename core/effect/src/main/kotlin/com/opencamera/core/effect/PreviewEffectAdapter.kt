@@ -26,7 +26,7 @@ class PreviewEffectAdapter {
         val spec = effect.renderSpec
         return FilterOverlaySpec(
             tintColor = resolveTintColor(spec),
-            tintAlpha = resolveTintAlpha(spec),
+            tintAlpha = resolveOverlayOpacity(spec),
             vignetteStrength = spec?.vignetteStrength ?: 0f,
             warmthShift = (spec?.warmthShift ?: 0).toFloat()
         )
@@ -58,7 +58,7 @@ class PreviewEffectAdapter {
         return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
     }
 
-    private fun resolveTintAlpha(spec: FilterRenderSpec?): Float {
+    private fun resolveOverlayOpacity(spec: FilterRenderSpec?): Float {
         val saturation = spec?.saturation ?: 1f
         val contrast = spec?.contrast ?: 1f
         return ((2f - saturation) * 0.15f + (contrast - 1f) * 0.1f)
