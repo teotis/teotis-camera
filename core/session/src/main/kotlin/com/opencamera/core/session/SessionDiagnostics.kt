@@ -1,5 +1,6 @@
 package com.opencamera.core.session
 
+import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.mode.ModeId
 
 enum class PreviewStartCategory(
@@ -58,7 +59,8 @@ data class SessionDebugDump(
     val lastError: String?,
     val perfSnapshot: PerfSnapshot,
     val recoveryTrace: RecoveryTraceSnapshot,
-    val recentEvents: List<SessionTraceEvent>
+    val recentEvents: List<SessionTraceEvent>,
+    val resourceDiagnostics: ResourceDiagnosticsSnapshot? = null
 )
 
 fun SessionState.toPerfSnapshot(): PerfSnapshot {
@@ -110,7 +112,8 @@ fun buildSessionDebugDump(
     state: SessionState,
     traceEvents: List<SessionTraceEvent>,
     recentEventLimit: Int = 12,
-    recoveryEventLimit: Int = 8
+    recoveryEventLimit: Int = 8,
+    resourceDiagnostics: ResourceDiagnosticsSnapshot? = null
 ): SessionDebugDump {
     return SessionDebugDump(
         lifecycle = state.lifecycle,
@@ -126,7 +129,8 @@ fun buildSessionDebugDump(
             traceEvents = traceEvents,
             maxEvents = recoveryEventLimit
         ),
-        recentEvents = traceEvents.takeLast(recentEventLimit)
+        recentEvents = traceEvents.takeLast(recentEventLimit),
+        resourceDiagnostics = resourceDiagnostics
     )
 }
 

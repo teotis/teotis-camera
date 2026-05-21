@@ -1,9 +1,12 @@
 package com.opencamera.core.session
 
+import com.opencamera.core.device.CapabilityGraphReport
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.media.CameraPerformanceClass
+import com.opencamera.core.media.CameraThermalState
 import com.opencamera.core.media.CaptureFeedbackPreview
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LivePhotoBundle
@@ -112,6 +115,7 @@ data class SessionState(
     val previewMetrics: PreviewMetrics,
     val settings: SessionSettingsSnapshot = SessionSettingsSnapshot(),
     val activeEffectSpec: EffectSpec = EffectSpec.EMPTY,
+    val activeCapabilityReport: CapabilityGraphReport? = null,
     val previewRatio: PreviewRatio = PreviewRatio.FULL,
     val presentation: SessionPresentationState = SessionPresentationState()
 ) {
@@ -141,6 +145,9 @@ data class SessionState(
 
     val latestPipelineNotes: List<String>
         get() = presentation.latestPipelineNotes
+
+    val capabilityPipelineNotes: List<String>
+        get() = activeCapabilityReport?.pipelineNotes ?: emptyList()
 
     val lastError: String?
         get() = presentation.lastError
@@ -195,6 +202,8 @@ sealed interface SessionIntent {
         val mediaType: MediaType,
         val reason: String
     ) : SessionIntent
+    data class ThermalStateChanged(val thermalState: CameraThermalState) : SessionIntent
+    data class PerformanceClassChanged(val performanceClass: CameraPerformanceClass) : SessionIntent
 }
 
 sealed interface SessionEffect {

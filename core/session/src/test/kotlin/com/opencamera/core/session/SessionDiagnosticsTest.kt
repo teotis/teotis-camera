@@ -3,6 +3,9 @@ package com.opencamera.core.session
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.media.CameraPerformanceClass
+import com.opencamera.core.media.CameraThermalState
+import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.ModeId
@@ -189,6 +192,55 @@ class SessionDiagnosticsTest {
         assertEquals(1000L, previewStartWatchdogMillis("session settings updated"))
         assertEquals(1200L, previewStartWatchdogMillis("unknown reason"))
         assertEquals(1200L, previewStartWatchdogMillis(null))
+    }
+
+    @Test
+    fun `session debug dump includes resource diagnostics when provided`() {
+        val state = defaultSessionState()
+        val resourceDiag = ResourceDiagnosticsSnapshot(
+            thermalState = CameraThermalState.WARM,
+            performanceClass = CameraPerformanceClass.MID,
+            memoryBudgetBytes = 256L * 1024 * 1024,
+            activeAlgorithmJobs = 1,
+            maxConcurrentAlgorithmJobs = 2,
+            featureDegradations = mapOf("live" to "degraded:max-frames"),
+            pipelineNotes = listOf("resource:class=mid", "resource:thermal=warm")
+        )
+        val dump = buildSessionDebugDump(
+            state = state,
+            traceEvents = emptyList(),
+            resourceDiagnostics = resourceDiag
+        )
+        assertEquals(resourceDiag, dump.resourceDiagnostics)
+    }
+
+    @Test
+    fun `session debug dump has null resource diagnostics by default`() {
+        val state = defaultSessionState()
+        val dump = buildSessionDebugDump(state = state, traceEvents = emptyList())
+        assertNull(dump.resourceDiagnostics)
+    }
+
+    @Test
+    fun `resource diagnostics renderable in dev log without raw frame data`() {
+        val resourceDiag = ResourceDiagnosticsSnapshot(
+            thermalState = CameraThermalState.HOT,
+            performanceClass = CameraPerformanceClass.LOW,
+            memoryBudgetBytes = 128L * 1024 * 1024,
+            activeAlgorithmJobs = 2,
+            maxConcurrentAlgorithmJobs = 1,
+            featureDegradations = mapOf("night" to "degraded:frame-count-3"),
+            pipelineNotes = listOf(
+                "resource:class=low",
+                "resource:thermal=hot",
+                "resource:analysis-fps=0",
+                "resource:algorithm-queue=busy",
+                "resource:night=degraded:frame-count-3"
+            )
+        )
+        val notes = resourceDiag.pipelineNotes
+        assertTrue(notes.all { it.startsWith("resource:") })
+        assertTrue(notes.none { it.contains("frame-data") || it.contains("pixel") || it.contains("byte") })
     }
 
     private fun defaultSessionState(

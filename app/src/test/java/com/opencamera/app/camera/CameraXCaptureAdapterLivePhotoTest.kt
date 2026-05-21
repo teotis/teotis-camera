@@ -1,6 +1,9 @@
 package com.opencamera.app.camera
 
+import com.opencamera.core.media.LiveBundleStatus
+import com.opencamera.core.media.LiveMotionSource
 import com.opencamera.core.media.LivePhotoBundle
+import com.opencamera.core.media.LiveTemporalWindow
 import com.opencamera.core.media.MediaOutputHandle
 import java.io.File
 import java.nio.file.Files
@@ -226,6 +229,197 @@ class CameraXCaptureAdapterLivePhotoTest {
             assertTrue(sidecarFile.exists())
             val payload = sidecarFile.readText()
             assertTrue(payload.contains("\"stillPath\""))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cleanup when primary still missing still deletes motion and sidecar`() {
+        val tempDir = Files.createTempDirectory("live-cleanup-missing-still").toFile()
+        try {
+            val motionFile = File(tempDir, "capture.live.mp4").apply { writeText("motion") }
+            val sidecarFile = File(tempDir, "capture.live.json").apply { writeText("sidecar") }
+
+            val deletedPaths = cleanupStillCaptureArtifacts(
+                outputPath = File(tempDir, "nonexistent.jpg").absolutePath,
+                outputHandle = MediaOutputHandle(
+                    displayPath = File(tempDir, "nonexistent.jpg").absolutePath,
+                    filePath = File(tempDir, "nonexistent.jpg").absolutePath
+                ),
+                livePhotoBundle = LivePhotoBundle(
+                    stillPath = File(tempDir, "nonexistent.jpg").absolutePath,
+                    motionPath = motionFile.absolutePath,
+                    sidecarPath = sidecarFile.absolutePath,
+                    motionDurationMillis = 1_500,
+                    motionMimeType = "video/mp4",
+                    sidecarMimeType = "application/json"
+                ),
+                intermediateOutputPaths = emptyList(),
+                deleteContentUri = {}
+            )
+
+            assertFalse(motionFile.exists())
+            assertFalse(sidecarFile.exists())
+            assertTrue(deletedPaths.contains(motionFile.absolutePath))
+            assertTrue(deletedPaths.contains(sidecarFile.absolutePath))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cleanup when sidecar missing still deletes still and motion`() {
+        val tempDir = Files.createTempDirectory("live-cleanup-missing-sidecar").toFile()
+        try {
+            val stillFile = File(tempDir, "capture.jpg").apply { writeText("still") }
+            val motionFile = File(tempDir, "capture.live.mp4").apply { writeText("motion") }
+
+            val deletedPaths = cleanupStillCaptureArtifacts(
+                outputPath = stillFile.absolutePath,
+                outputHandle = MediaOutputHandle(
+                    displayPath = stillFile.absolutePath,
+                    filePath = stillFile.absolutePath
+                ),
+                livePhotoBundle = LivePhotoBundle(
+                    stillPath = stillFile.absolutePath,
+                    motionPath = motionFile.absolutePath,
+                    sidecarPath = File(tempDir, "nonexistent.live.json").absolutePath,
+                    motionDurationMillis = 1_500,
+                    motionMimeType = "video/mp4",
+                    sidecarMimeType = "application/json"
+                ),
+                intermediateOutputPaths = emptyList(),
+                deleteContentUri = {}
+            )
+
+            assertFalse(stillFile.exists())
+            assertFalse(motionFile.exists())
+            assertTrue(deletedPaths.contains(stillFile.absolutePath))
+            assertTrue(deletedPaths.contains(motionFile.absolutePath))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cleanup when motion missing still deletes still and sidecar`() {
+        val tempDir = Files.createTempDirectory("live-cleanup-missing-motion").toFile()
+        try {
+            val stillFile = File(tempDir, "capture.jpg").apply { writeText("still") }
+            val sidecarFile = File(tempDir, "capture.live.json").apply { writeText("sidecar") }
+
+            val deletedPaths = cleanupStillCaptureArtifacts(
+                outputPath = stillFile.absolutePath,
+                outputHandle = MediaOutputHandle(
+                    displayPath = stillFile.absolutePath,
+                    filePath = stillFile.absolutePath
+                ),
+                livePhotoBundle = LivePhotoBundle(
+                    stillPath = stillFile.absolutePath,
+                    motionPath = File(tempDir, "nonexistent.live.mp4").absolutePath,
+                    sidecarPath = sidecarFile.absolutePath,
+                    motionDurationMillis = 1_500,
+                    motionMimeType = "video/mp4",
+                    sidecarMimeType = "application/json"
+                ),
+                intermediateOutputPaths = emptyList(),
+                deleteContentUri = {}
+            )
+
+            assertFalse(stillFile.exists())
+            assertFalse(sidecarFile.exists())
+            assertTrue(deletedPaths.contains(stillFile.absolutePath))
+            assertTrue(deletedPaths.contains(sidecarFile.absolutePath))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `cleanup with null live photo bundle handles gracefully`() {
+        val tempDir = Files.createTempDirectory("live-cleanup-null-bundle").toFile()
+        try {
+            val stillFile = File(tempDir, "capture.jpg").apply { writeText("still") }
+            val intermediateFile = File(tempDir, "frame_0.jpg").apply { writeText("temp") }
+
+            val deletedPaths = cleanupStillCaptureArtifacts(
+                outputPath = stillFile.absolutePath,
+                outputHandle = MediaOutputHandle(
+                    displayPath = stillFile.absolutePath,
+                    filePath = stillFile.absolutePath
+                ),
+                livePhotoBundle = null,
+                intermediateOutputPaths = listOf(intermediateFile.absolutePath),
+                deleteContentUri = {}
+            )
+
+            assertFalse(stillFile.exists())
+            assertFalse(intermediateFile.exists())
+            assertTrue(deletedPaths.contains(stillFile.absolutePath))
+            assertTrue(deletedPaths.contains(intermediateFile.absolutePath))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `sidecar payload includes temporal window and status fields`() {
+        val tempDir = Files.createTempDirectory("live-sidecar-temporal").toFile()
+        try {
+            val sidecarFile = File(tempDir, "capture.live.json")
+            val bundle = LivePhotoBundle(
+                stillPath = File(tempDir, "capture.jpg").absolutePath,
+                motionPath = File(tempDir, "capture.live.mp4").absolutePath,
+                sidecarPath = sidecarFile.absolutePath,
+                motionDurationMillis = 1_500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json",
+                bundleStatus = LiveBundleStatus.COMPLETE,
+                temporalWindow = LiveTemporalWindow(
+                    requestedDurationMillis = 1_500,
+                    preShutterMillis = 1_200,
+                    postShutterMillis = 300,
+                    frameCount = 45,
+                    source = LiveMotionSource.PREVIEW_RING_BUFFER
+                )
+            )
+
+            materializeLivePhotoSidecar(bundle)
+
+            val payload = sidecarFile.readText()
+            assertTrue(payload.contains("\"bundleStatus\": \"complete\""))
+            assertTrue(payload.contains("\"temporalWindow\""))
+            assertTrue(payload.contains("\"requestedDurationMillis\": 1500"))
+            assertTrue(payload.contains("\"preShutterMillis\": 1200"))
+            assertTrue(payload.contains("\"postShutterMillis\": 300"))
+            assertTrue(payload.contains("\"frameCount\": 45"))
+            assertTrue(payload.contains("\"source\": \"preview_ring_buffer\""))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `sidecar payload omits temporal window when null`() {
+        val tempDir = Files.createTempDirectory("live-sidecar-no-window").toFile()
+        try {
+            val sidecarFile = File(tempDir, "capture.live.json")
+            val bundle = LivePhotoBundle(
+                stillPath = File(tempDir, "capture.jpg").absolutePath,
+                motionPath = File(tempDir, "capture.live.mp4").absolutePath,
+                sidecarPath = sidecarFile.absolutePath,
+                motionDurationMillis = 1_500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json",
+                bundleStatus = LiveBundleStatus.COMPLETE
+            )
+
+            materializeLivePhotoSidecar(bundle)
+
+            val payload = sidecarFile.readText()
+            assertTrue(payload.contains("\"bundleStatus\": \"complete\""))
+            assertFalse(payload.contains("\"temporalWindow\""))
         } finally {
             tempDir.deleteRecursively()
         }

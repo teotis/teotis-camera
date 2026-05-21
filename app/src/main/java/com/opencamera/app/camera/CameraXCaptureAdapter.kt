@@ -80,6 +80,9 @@ import com.opencamera.core.settings.VideoSpecConstraints
 import com.opencamera.core.media.CompositeMediaPostProcessor
 import com.opencamera.core.media.FlashMode as CaptureFlashMode
 import com.opencamera.core.media.LivePhotoBundle
+import com.opencamera.core.media.LiveMotionSource
+import com.opencamera.core.media.LiveTemporalPlannerInput
+import com.opencamera.core.media.planLiveTemporalAssembly
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaOutputHandle
@@ -450,6 +453,21 @@ internal fun buildLivePhotoSidecarPayload(
         append(",\n")
         append("  \"sidecarMimeType\": ")
         append(jsonStringLiteral(bundle.sidecarMimeType))
+        bundle.temporalWindow?.let { window ->
+            append(",\n")
+            append("  \"temporalWindow\": {\n")
+            append("    \"requestedDurationMillis\": ${window.requestedDurationMillis},\n")
+            append("    \"preShutterMillis\": ${window.preShutterMillis},\n")
+            append("    \"postShutterMillis\": ${window.postShutterMillis},\n")
+            append("    \"frameCount\": ${window.frameCount},\n")
+            append("    \"source\": ")
+            append(jsonStringLiteral(window.source.name.lowercase()))
+            append("\n")
+            append("  }")
+        }
+        append(",\n")
+        append("  \"bundleStatus\": ")
+        append(jsonStringLiteral(bundle.bundleStatus.name.lowercase().replace('_', '-')))
         append("\n")
         append("}")
     }
@@ -1245,11 +1263,23 @@ class CameraXCaptureAdapter(
         return when (val result = captureSinglePhoto(capture, request)) {
             is PhotoCaptureOutcome.Failure -> result
             is PhotoCaptureOutcome.Success -> {
+                val resolvedSpec = plan.saveTask.livePhotoSpec
+                    ?: com.opencamera.core.media.LivePhotoCaptureSpec()
+                val temporalPlan = planLiveTemporalAssembly(
+                    LiveTemporalPlannerInput(
+                        captureSpec = resolvedSpec,
+                        availableSource = LiveMotionSource.METADATA_ONLY,
+                        ringBufferDepthMillis = 0,
+                        postShutterBudgetMillis = 0
+                    )
+                )
                 val livePhotoBundle = createLivePhotoBundle(
                     stillPath = result.outputPath,
                     stillOutputHandle = result.outputHandle,
                     relativePath = plan.saveTask.saveRequest.relativePath,
-                    livePhotoSpec = plan.saveTask.livePhotoSpec
+                    livePhotoSpec = plan.saveTask.livePhotoSpec,
+                    bundleStatus = temporalPlan.expectedBundleStatus,
+                    temporalWindow = temporalPlan.temporalWindow
                 )
                 val sidecarResult = runCatching {
                     materializeLivePhotoSidecar(
@@ -1546,7 +1576,9 @@ class CameraXCaptureAdapter(
         stillPath: String,
         stillOutputHandle: MediaOutputHandle,
         relativePath: String,
-        livePhotoSpec: com.opencamera.core.media.LivePhotoCaptureSpec?
+        livePhotoSpec: com.opencamera.core.media.LivePhotoCaptureSpec?,
+        bundleStatus: com.opencamera.core.media.LiveBundleStatus = com.opencamera.core.media.LiveBundleStatus.COMPLETE,
+        temporalWindow: com.opencamera.core.media.LiveTemporalWindow? = null
     ): LivePhotoBundle {
         val resolvedSpec = livePhotoSpec ?: com.opencamera.core.media.LivePhotoCaptureSpec()
         val baseName = stillPath
@@ -1597,7 +1629,9 @@ class CameraXCaptureAdapter(
             sidecarMimeType = resolvedSpec.sidecarMimeType,
             motionHandle = motionHandle,
             sidecarHandle = sidecarHandle,
-            thumbnailHandle = stillOutputHandle
+            thumbnailHandle = stillOutputHandle,
+            bundleStatus = bundleStatus,
+            temporalWindow = temporalWindow
         )
     }
 

@@ -15,6 +15,7 @@ import com.opencamera.core.device.recoveryReason
 import com.opencamera.core.media.CaptureFeedbackPreview
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.LivePhotoBundle
+import com.opencamera.core.media.isTemporalMedia
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotRequest
@@ -52,7 +53,9 @@ class DefaultCameraSession(
     private val defaultMode: ModeId = ModeId.PHOTO,
     private val settingsSnapshot: SessionSettingsSnapshot = SessionSettingsSnapshot(),
     private val shotExecutor: ShotExecutor = ShotExecutor(),
-    private val effectCapabilityResolver: com.opencamera.core.effect.EffectCapabilityResolver? = null
+    private val effectCapabilityResolver: com.opencamera.core.effect.EffectCapabilityResolver? = null,
+    private val capabilityGraphResolver: com.opencamera.core.effect.CapabilityGraphResolver? = null,
+    private val capabilityRequirements: () -> List<com.opencamera.core.device.CapabilityRequirement> = { emptyList() }
 ) : CameraSession {
     private val intentChannel = Channel<SessionIntent>(Channel.UNLIMITED)
     private val supportedModes = registry.supportedModes(baseDeviceCapabilities)
@@ -186,6 +189,8 @@ class DefaultCameraSession(
                 mediaType = intent.mediaType,
                 reason = intent.reason
             )
+            is SessionIntent.ThermalStateChanged -> trace.record("intent.thermal", intent.thermalState.toString())
+            is SessionIntent.PerformanceClassChanged -> trace.record("intent.performance", intent.performanceClass.toString())
         }
     }
 
@@ -1267,7 +1272,7 @@ class DefaultCameraSession(
                 else -> result.thumbnailSource
             },
             lastAction = if (result.mediaType == MediaType.PHOTO) {
-                if (result.livePhotoBundle != null) {
+                if (result.livePhotoBundle?.isTemporalMedia() == true) {
                     "Live photo saved"
                 } else {
                     "Photo saved"
@@ -1324,7 +1329,7 @@ class DefaultCameraSession(
 
     private fun latestLivePhotoBundleFor(result: ShotResult): LivePhotoBundle? {
         return if (result.mediaType == MediaType.PHOTO) {
-            result.livePhotoBundle
+            result.livePhotoBundle?.takeIf { it.isTemporalMedia() }
         } else {
             _state.value.latestLivePhotoBundle
         }
@@ -1497,6 +1502,7 @@ class DefaultCameraSession(
         previewMetrics: PreviewMetrics = _state.value.previewMetrics,
         settings: SessionSettingsSnapshot = _state.value.settings,
         activeEffectSpec: com.opencamera.core.effect.EffectSpec = _state.value.activeEffectSpec,
+        activeCapabilityReport: com.opencamera.core.device.CapabilityGraphReport? = _state.value.activeCapabilityReport,
         previewRatio: PreviewRatio = _state.value.previewRatio,
         countdownRemainingSeconds: Int? = _state.value.presentation.countdownRemainingSeconds,
         previewThumbnailPath: String? = _state.value.presentation.previewThumbnailPath,
@@ -1527,6 +1533,7 @@ class DefaultCameraSession(
             previewMetrics = previewMetrics,
             settings = settings,
             activeEffectSpec = activeEffectSpec,
+            activeCapabilityReport = activeCapabilityReport,
             previewRatio = previewRatio,
             presentation = _state.value.presentation.copy(
                 countdownRemainingSeconds = countdownRemainingSeconds,
@@ -1709,6 +1716,18 @@ class DefaultCameraSession(
                         updateState(activeEffectSpec = report.effectiveSpec)
                     } else {
                         updateState(activeEffectSpec = spec)
+                    }
+                    val graphResolver = capabilityGraphResolver
+                    if (graphResolver != null) {
+                        val requirements = capabilityRequirements()
+                        if (requirements.isNotEmpty()) {
+                            val graphReport = graphResolver.resolve(
+                                featureId = currentController.id.name.lowercase(),
+                                requirements = requirements,
+                                effectSpec = spec
+                            )
+                            updateState(activeCapabilityReport = graphReport)
+                        }
                     }
                 },
                 settingsSnapshotProvider = { sessionSettingsSnapshot }

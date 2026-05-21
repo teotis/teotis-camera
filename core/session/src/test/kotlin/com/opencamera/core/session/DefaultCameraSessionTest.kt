@@ -10,7 +10,10 @@ import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.FlashMode
+import com.opencamera.core.media.LiveBundleStatus
+import com.opencamera.core.media.LiveMotionSource
 import com.opencamera.core.media.LivePhotoBundle
+import com.opencamera.core.media.LiveTemporalWindow
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
@@ -1411,6 +1414,104 @@ class DefaultCameraSessionTest {
         assertEquals("Live photo saved", session.state.value.lastAction)
         assertEquals("Pictures/OpenCamera/live.live.mp4", session.state.value.latestLivePhotoBundle?.motionPath)
         assertEquals("Pictures/OpenCamera/live.jpg", session.state.value.latestCapturePath)
+    }
+
+    @Test
+    fun `live photo completion with still-only fallback does not store bundle`() = runTest {
+        val session = createSession(
+            trace = InMemorySessionTrace(),
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(livePhotoEnabledByDefault = true)
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = "shot-still-only",
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/still.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/still.jpg"),
+                    metadata = MediaMetadata(),
+                    livePhotoBundle = LivePhotoBundle(
+                        stillPath = "Pictures/OpenCamera/still.jpg",
+                        motionPath = "Pictures/OpenCamera/still.live.mp4",
+                        sidecarPath = "Pictures/OpenCamera/still.live.json",
+                        motionDurationMillis = 1_500,
+                        motionMimeType = "video/mp4",
+                        sidecarMimeType = "application/vnd.opencamera.live+json",
+                        bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK
+                    )
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals("Photo saved", session.state.value.lastAction)
+        assertNull(session.state.value.latestLivePhotoBundle)
+    }
+
+    @Test
+    fun `live photo completion with degraded motion still stores bundle`() = runTest {
+        val session = createSession(
+            trace = InMemorySessionTrace(),
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(livePhotoEnabledByDefault = true)
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = "shot-degraded",
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/degraded.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/degraded.jpg"),
+                    metadata = MediaMetadata(),
+                    livePhotoBundle = LivePhotoBundle(
+                        stillPath = "Pictures/OpenCamera/degraded.jpg",
+                        motionPath = "Pictures/OpenCamera/degraded.live.mp4",
+                        sidecarPath = "Pictures/OpenCamera/degraded.live.json",
+                        motionDurationMillis = 1_500,
+                        motionMimeType = "video/mp4",
+                        sidecarMimeType = "application/vnd.opencamera.live+json",
+                        bundleStatus = LiveBundleStatus.DEGRADED_MOTION,
+                        temporalWindow = LiveTemporalWindow(
+                            requestedDurationMillis = 1_500,
+                            preShutterMillis = 0,
+                            postShutterMillis = 800,
+                            frameCount = 24,
+                            source = LiveMotionSource.POST_SHUTTER_FRAMES
+                        )
+                    )
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals("Live photo saved", session.state.value.lastAction)
+        assertNotNull(session.state.value.latestLivePhotoBundle)
+        assertEquals(LiveBundleStatus.DEGRADED_MOTION, session.state.value.latestLivePhotoBundle?.bundleStatus)
     }
 
     @Test
@@ -3137,7 +3238,9 @@ class DefaultCameraSessionTest {
         trace: InMemorySessionTrace,
         testScope: TestScope,
         deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
-        settingsSnapshot: SessionSettingsSnapshot = SessionSettingsSnapshot()
+        settingsSnapshot: SessionSettingsSnapshot = SessionSettingsSnapshot(),
+        capabilityGraphResolver: com.opencamera.core.effect.CapabilityGraphResolver? = null,
+        capabilityRequirements: () -> List<com.opencamera.core.device.CapabilityRequirement> = { emptyList() }
     ): DefaultCameraSession {
         var shotIndex = 0
         return DefaultCameraSession(
@@ -3148,7 +3251,9 @@ class DefaultCameraSessionTest {
             baseDeviceCapabilities = deviceCapabilities,
             scope = TestScope(StandardTestDispatcher(testScope.testScheduler)),
             settingsSnapshot = settingsSnapshot,
-            shotExecutor = ShotExecutor(idGenerator = { "shot-${++shotIndex}" })
+            shotExecutor = ShotExecutor(idGenerator = { "shot-${++shotIndex}" }),
+            capabilityGraphResolver = capabilityGraphResolver,
+            capabilityRequirements = capabilityRequirements
         )
     }
 
@@ -3161,4 +3266,75 @@ class DefaultCameraSessionTest {
         ProModePlugin(),
         VideoModePlugin()
     )
+
+    // --- Capability Graph Resolver integration ---
+
+    @Test
+    fun `activeCapabilityReport remains null when resolver is null`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        assertNull(session.state.value.activeCapabilityReport)
+    }
+
+    @Test
+    fun `activeCapabilityReport remains null when requirements are empty`() = runTest {
+        val trace = InMemorySessionTrace()
+        val resolver = com.opencamera.core.effect.CapabilityGraphResolver(
+            deviceCapabilities = DeviceCapabilities.DEFAULT,
+            mediaProcessors = com.opencamera.core.media.MediaProcessorAvailability.ALL_AVAILABLE
+        )
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            capabilityGraphResolver = resolver,
+            capabilityRequirements = { emptyList() }
+        )
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        assertNull(session.state.value.activeCapabilityReport)
+    }
+
+    @Test
+    fun `activeCapabilityReport is populated when resolver and requirements provided`() = runTest {
+        val trace = InMemorySessionTrace()
+        val resolver = com.opencamera.core.effect.CapabilityGraphResolver(
+            deviceCapabilities = DeviceCapabilities.DEFAULT,
+            mediaProcessors = com.opencamera.core.media.MediaProcessorAvailability.ALL_AVAILABLE
+        )
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            capabilityGraphResolver = resolver,
+            capabilityRequirements = {
+                listOf(
+                    com.opencamera.core.device.CapabilityRequirement(
+                        id = "still",
+                        kind = com.opencamera.core.device.CapabilityRequirementKind.STILL_CAPTURE,
+                        requiredFor = setOf(com.opencamera.core.device.CapabilityUseSite.CAPTURE)
+                    )
+                )
+            }
+        )
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        val report = session.state.value.activeCapabilityReport
+        assertNotNull(report)
+        assertEquals(1, report.resolved.size)
+        assertEquals("still", report.resolved.first().requirement.id)
+    }
+
+    @Test
+    fun `capabilityPipelineNotes returns empty when no report`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        assertTrue(session.state.value.capabilityPipelineNotes.isEmpty())
+    }
 }

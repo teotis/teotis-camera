@@ -278,4 +278,125 @@ class ShotExecutorTest {
             tempDir.deleteRecursively()
         }
     }
+
+    @Test
+    fun `live photo with complete temporal window emits all temporal status notes`() = runTest {
+        val executor = ShotExecutor(idGenerator = { "shot-live-complete" })
+        val plan = executor.plan(CaptureStrategy.LivePhoto())
+        val result = PipelineMetadataPostProcessor().process(
+            executor.resultFor(
+                saveTask = plan.saveTask,
+                outputPath = "Pictures/OpenCamera/live.jpg",
+                livePhotoBundle = LivePhotoBundle(
+                    stillPath = "Pictures/OpenCamera/live.jpg",
+                    motionPath = "Pictures/OpenCamera/live.live.mp4",
+                    sidecarPath = "Pictures/OpenCamera/live.live.json",
+                    motionDurationMillis = 1_500,
+                    motionMimeType = "video/mp4",
+                    sidecarMimeType = "application/vnd.opencamera.live+json",
+                    bundleStatus = LiveBundleStatus.COMPLETE,
+                    temporalWindow = LiveTemporalWindow(
+                        requestedDurationMillis = 1_500,
+                        preShutterMillis = 1_200,
+                        postShutterMillis = 300,
+                        frameCount = 45,
+                        source = LiveMotionSource.PREVIEW_RING_BUFFER
+                    )
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("live:status=complete"))
+        assertTrue(result.pipelineNotes.contains("live:source=preview-ring-buffer"))
+        assertTrue(result.pipelineNotes.contains("live:frames=45"))
+        assertTrue(result.pipelineNotes.contains("live:window=-1200ms,+300ms"))
+        assertTrue(result.pipelineNotes.contains("live:sidecar=app-private"))
+    }
+
+    @Test
+    fun `live photo with degraded motion emits degraded status note`() = runTest {
+        val executor = ShotExecutor(idGenerator = { "shot-live-degraded" })
+        val plan = executor.plan(CaptureStrategy.LivePhoto())
+        val result = PipelineMetadataPostProcessor().process(
+            executor.resultFor(
+                saveTask = plan.saveTask,
+                outputPath = "Pictures/OpenCamera/live.jpg",
+                livePhotoBundle = LivePhotoBundle(
+                    stillPath = "Pictures/OpenCamera/live.jpg",
+                    motionPath = "Pictures/OpenCamera/live.live.mp4",
+                    sidecarPath = "Pictures/OpenCamera/live.live.json",
+                    motionDurationMillis = 1_500,
+                    motionMimeType = "video/mp4",
+                    sidecarMimeType = "application/vnd.opencamera.live+json",
+                    bundleStatus = LiveBundleStatus.DEGRADED_MOTION,
+                    temporalWindow = LiveTemporalWindow(
+                        requestedDurationMillis = 1_500,
+                        preShutterMillis = 0,
+                        postShutterMillis = 800,
+                        frameCount = 24,
+                        source = LiveMotionSource.POST_SHUTTER_FRAMES
+                    )
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("live:status=degraded-motion"))
+        assertTrue(result.pipelineNotes.contains("live:source=post-shutter-frames"))
+    }
+
+    @Test
+    fun `live photo with still-only fallback emits fallback and degraded notes`() = runTest {
+        val executor = ShotExecutor(idGenerator = { "shot-live-fallback" })
+        val plan = executor.plan(CaptureStrategy.LivePhoto())
+        val result = PipelineMetadataPostProcessor().process(
+            executor.resultFor(
+                saveTask = plan.saveTask,
+                outputPath = "Pictures/OpenCamera/live.jpg",
+                livePhotoBundle = LivePhotoBundle(
+                    stillPath = "Pictures/OpenCamera/live.jpg",
+                    motionPath = "Pictures/OpenCamera/live.live.mp4",
+                    sidecarPath = "Pictures/OpenCamera/live.live.json",
+                    motionDurationMillis = 1_500,
+                    motionMimeType = "video/mp4",
+                    sidecarMimeType = "application/vnd.opencamera.live+json",
+                    bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK,
+                    temporalWindow = LiveTemporalWindow(
+                        requestedDurationMillis = 1_500,
+                        preShutterMillis = 0,
+                        postShutterMillis = 0,
+                        frameCount = 0,
+                        source = LiveMotionSource.METADATA_ONLY
+                    )
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("live:status=still-only-fallback"))
+        assertTrue(result.pipelineNotes.contains("live:degraded=metadata-only"))
+    }
+
+    @Test
+    fun `live photo with null temporal window omits source and frame notes`() = runTest {
+        val executor = ShotExecutor(idGenerator = { "shot-live-no-window" })
+        val plan = executor.plan(CaptureStrategy.LivePhoto())
+        val result = PipelineMetadataPostProcessor().process(
+            executor.resultFor(
+                saveTask = plan.saveTask,
+                outputPath = "Pictures/OpenCamera/live.jpg",
+                livePhotoBundle = LivePhotoBundle(
+                    stillPath = "Pictures/OpenCamera/live.jpg",
+                    motionPath = "Pictures/OpenCamera/live.live.mp4",
+                    sidecarPath = "Pictures/OpenCamera/live.live.json",
+                    motionDurationMillis = 1_500,
+                    motionMimeType = "video/mp4",
+                    sidecarMimeType = "application/vnd.opencamera.live+json"
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("live:status=complete"))
+        assertTrue(result.pipelineNotes.none { it.startsWith("live:source=") })
+        assertTrue(result.pipelineNotes.none { it.startsWith("live:frames=") })
+        assertTrue(result.pipelineNotes.none { it.startsWith("live:window=") })
+    }
 }
