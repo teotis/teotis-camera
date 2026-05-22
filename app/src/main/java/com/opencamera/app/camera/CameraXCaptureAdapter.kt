@@ -1050,6 +1050,8 @@ class CameraXCaptureAdapter(
     private var currentVideoSpec: VideoSpec? = null
     private var previewSnapshotGeneration: Int = 0
     private var suppressPreviewStateEvents = false
+    private var currentOutputRotation: com.opencamera.core.device.CameraOutputRotation =
+        com.opencamera.core.device.CameraOutputRotation.ROTATION_0
     private var firstFrameReportedForCurrentBind = false
     private var bindStartElapsedRealtimeNanos: Long = 0L
     private val _events = MutableSharedFlow<DeviceEvent>(extraBufferCapacity = 16)
@@ -1142,6 +1144,14 @@ class CameraXCaptureAdapter(
                 )
             }
         }
+    }
+
+    private fun applyOutputRotation(rotation: com.opencamera.core.device.CameraOutputRotation) {
+        if (rotation == currentOutputRotation) return
+        currentOutputRotation = rotation
+        val surfaceRotation = mapOutputRotationToSurface(rotation)
+        imageCapture?.targetRotation = surfaceRotation
+        videoCapture?.targetRotation = surfaceRotation
     }
 
     override suspend fun release() {
@@ -2543,4 +2553,13 @@ class CameraXCaptureAdapter(
     }
 
     private fun Uri?.takeUnlessEmpty(): Uri? = this?.takeUnless { it == Uri.EMPTY }
+}
+
+internal fun mapOutputRotationToSurface(
+    rotation: com.opencamera.core.device.CameraOutputRotation
+): Int = when (rotation) {
+    com.opencamera.core.device.CameraOutputRotation.ROTATION_0 -> android.view.Surface.ROTATION_0
+    com.opencamera.core.device.CameraOutputRotation.ROTATION_90 -> android.view.Surface.ROTATION_90
+    com.opencamera.core.device.CameraOutputRotation.ROTATION_180 -> android.view.Surface.ROTATION_180
+    com.opencamera.core.device.CameraOutputRotation.ROTATION_270 -> android.view.Surface.ROTATION_270
 }

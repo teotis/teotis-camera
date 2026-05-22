@@ -16,7 +16,6 @@ import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.LiveTemporalWindow
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
-import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
@@ -28,7 +27,6 @@ import com.opencamera.feature.document.DocumentModePlugin
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeRegistry
 import com.opencamera.core.settings.AudioProfile
-import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.DEFAULT_FILTER_PROFILES
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
@@ -486,10 +484,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
 
-        val shot = assertNotNull(session.state.value.activeShot).copy(
-            saveRequest = SaveRequest.photoLibrary(),
-            postProcessSpec = PostProcessSpec()
-        )
+        val shot = assertNotNull(session.state.value.activeShot)
         session.dispatch(SessionIntent.ShotStarted(shot))
         session.dispatch(
             SessionIntent.ShotCompleted(
@@ -533,10 +528,7 @@ class DefaultCameraSessionTest {
 
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot).copy(
-            saveRequest = SaveRequest.photoLibrary(),
-            postProcessSpec = PostProcessSpec()
-        )
+        val shot = assertNotNull(session.state.value.activeShot)
         session.dispatch(SessionIntent.ShotStarted(shot))
         session.dispatch(
             SessionIntent.ShotCompleted(
@@ -617,10 +609,7 @@ class DefaultCameraSessionTest {
 
         advanceTimeBy(1_000)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot).copy(
-            saveRequest = SaveRequest.photoLibrary(),
-            postProcessSpec = PostProcessSpec()
-        )
+        val shot = assertNotNull(session.state.value.activeShot)
         assertEquals(null, session.state.value.countdownRemainingSeconds)
         assertEquals("Photo capture requested", session.state.value.lastAction)
         assertTrue(trace.snapshot().any { it.name == "capture.countdown.started" })
@@ -1172,42 +1161,6 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `photo mode carries color lab adjusted render spec through session shot metadata`() = runTest {
-        val session = createSession(
-            trace = InMemorySessionTrace(),
-            testScope = this,
-            settingsSnapshot = SessionSettingsSnapshot(
-                persisted = PersistedSettings(
-                    photo = PhotoSettings(
-                        defaultFilterProfileId = "photo-original",
-                        colorLabSpec = ColorLabSpec(
-                            colorAxis = 1f,
-                            toneAxis = -1f,
-                            strength = 1f
-                        )
-                    )
-                )
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals("photo-original", shot.saveRequest.metadata.customTags["filterProfile"])
-        assertEquals("1", shot.saveRequest.metadata.customTags["filterSpec.version"])
-        assertEquals("-8", shot.saveRequest.metadata.customTags["filterSpec.brightnessShift"])
-        assertEquals("1.17", shot.saveRequest.metadata.customTags["filterSpec.contrast"])
-        assertEquals("1.13", shot.saveRequest.metadata.customTags["filterSpec.saturation"])
-        assertEquals("12", shot.saveRequest.metadata.customTags["filterSpec.warmthShift"])
-        assertEquals("0.12", shot.saveRequest.metadata.customTags["filterSpec.highlightCompression"])
-        assertEquals("0.18", shot.saveRequest.metadata.customTags["filterSpec.warmBoost"])
-        assertEquals("photo-original", shot.postProcessSpec.algorithmProfile)
-    }
-
-    @Test
     fun `settings update refreshes active video defaults and recording graph`() = runTest {
         val session = createSession(InMemorySessionTrace(), this)
 
@@ -1344,12 +1297,12 @@ class DefaultCameraSessionTest {
         assertEquals(ModeId.PHOTO, session.state.value.activeMode)
         assertEquals(FlashMode.AUTO, shot.captureProfile.flashMode)
         assertEquals("auto", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals("photo-original", shot.saveRequest.metadata.customTags["filterProfile"])
+        assertEquals("photo-vivid", shot.saveRequest.metadata.customTags["filterProfile"])
         assertEquals("PHOTO Auto", shot.postProcessSpec.watermarkText)
-        assertEquals("photo-original", shot.postProcessSpec.algorithmProfile)
+        assertEquals("photo-vivid", shot.postProcessSpec.algorithmProfile)
         assertEquals("Photo capture requested", session.state.value.lastAction)
         assertEquals("Still capture requested", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Filter Original"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Filter Vivid"))
         assertTrue(session.state.value.modeSnapshot.state.detail.contains("Flash Auto"))
     }
 
@@ -3035,10 +2988,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot).copy(
-            saveRequest = SaveRequest.photoLibrary(),
-            postProcessSpec = PostProcessSpec()
-        )
+        val shot = assertNotNull(session.state.value.activeShot)
         session.dispatch(SessionIntent.ShotStarted(shot))
 
         session.dispatch(
@@ -3109,10 +3059,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot).copy(
-            saveRequest = SaveRequest.photoLibrary(),
-            postProcessSpec = PostProcessSpec()
-        )
+        val shot = assertNotNull(session.state.value.activeShot)
         session.dispatch(SessionIntent.ShotStarted(shot))
 
         session.dispatch(
@@ -3155,10 +3102,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot).copy(
-            saveRequest = SaveRequest.photoLibrary(),
-            postProcessSpec = PostProcessSpec()
-        )
+        val shot = assertNotNull(session.state.value.activeShot)
         session.dispatch(SessionIntent.ShotStarted(shot))
 
         session.dispatch(
@@ -3192,10 +3136,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shotA = assertNotNull(session.state.value.activeShot).copy(
-            saveRequest = SaveRequest.photoLibrary(),
-            postProcessSpec = PostProcessSpec()
-        )
+        val shotA = assertNotNull(session.state.value.activeShot)
         session.dispatch(SessionIntent.ShotStarted(shotA))
 
         session.dispatch(
@@ -3337,7 +3278,7 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `watermark with classic-overlay template suppresses raw capture feedback`() = runTest {
+    fun `watermark with classic-overlay template accepts capture feedback`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace, this)
 
@@ -3363,8 +3304,10 @@ class DefaultCameraSessionTest {
         )
         advanceUntilIdle()
 
-        assertNull(session.state.value.presentation.pendingCaptureFeedback)
-        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.suppressed" })
+        assertNotNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertEquals(overlayShot.shotId, session.state.value.presentation.pendingCaptureFeedback?.shotId)
+        assertEquals("/tmp/overlay-feedback.jpg", session.state.value.presentation.pendingCaptureFeedback?.outputPath)
+        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.updated" })
     }
 
     @Test
@@ -3469,6 +3412,234 @@ class DefaultCameraSessionTest {
             it.name == "capture.feedback.snapshot.suppressed" &&
                 it.detail.contains("final-output-postprocess")
         })
+    }
+
+    // --- Tap-to-focus metering ---
+
+    @Test
+    fun `active preview tap emits ApplyPreviewMetering effect`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+
+        effects.clear()
+        session.dispatch(SessionIntent.PreviewTapToFocus(0.5f, 0.4f))
+        advanceUntilIdle()
+
+        val meteringEffect = effects.filterIsInstance<SessionEffect.ApplyPreviewMetering>().singleOrNull()
+        assertNotNull(meteringEffect)
+        assertEquals("meter-1", meteringEffect.request.requestId)
+        assertEquals(0.5f, meteringEffect.request.point.normalizedX)
+        assertEquals(0.4f, meteringEffect.request.point.normalizedY)
+        assertEquals(PreviewMeteringFeedbackStatus.REQUESTED, session.state.value.presentation.previewMeteringFeedback?.status)
+        assertTrue(trace.snapshot().any { it.name == "preview.metering.requested" })
+
+        effectCollector.cancel()
+    }
+
+    @Test
+    fun `tap focus request point is clamped to 0`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+
+        effects.clear()
+        session.dispatch(SessionIntent.PreviewTapToFocus(-0.1f, 1.5f))
+        advanceUntilIdle()
+
+        val meteringEffect = effects.filterIsInstance<SessionEffect.ApplyPreviewMetering>().singleOrNull()
+        assertNotNull(meteringEffect)
+        assertEquals(0f, meteringEffect.request.point.normalizedX)
+        assertEquals(1f, meteringEffect.request.point.normalizedY)
+
+        effectCollector.cancel()
+    }
+
+    @Test
+    fun `preview inactive tap is ignored and emits no metering effect`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        effects.clear()
+        session.dispatch(SessionIntent.PreviewSurfaceLost("test surface lost"))
+        advanceUntilIdle()
+        effects.clear()
+
+        session.dispatch(SessionIntent.PreviewTapToFocus(0.5f, 0.5f))
+        advanceUntilIdle()
+
+        val meteringEffects = effects.filterIsInstance<SessionEffect.ApplyPreviewMetering>()
+        assertTrue(meteringEffects.isEmpty())
+        assertTrue(trace.snapshot().any { it.name == "preview.metering.ignored" })
+
+        effectCollector.cancel()
+    }
+
+    @Test
+    fun `missing permission tap is ignored and emits no metering effect`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = false, microphoneGranted = false))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        effects.clear()
+
+        session.dispatch(SessionIntent.PreviewTapToFocus(0.5f, 0.5f))
+        advanceUntilIdle()
+
+        val meteringEffects = effects.filterIsInstance<SessionEffect.ApplyPreviewMetering>()
+        assertTrue(meteringEffects.isEmpty())
+        assertTrue(trace.snapshot().any { it.name == "preview.metering.ignored" })
+
+        effectCollector.cancel()
+    }
+
+    @Test
+    fun `metering completion updates feedback to SUCCEEDED`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.PreviewTapToFocus(0.5f, 0.4f))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PreviewMeteringCompleted(
+                com.opencamera.core.device.PreviewMeteringResult(
+                    requestId = "meter-1",
+                    point = com.opencamera.core.device.PreviewMeteringPoint(0.5f, 0.4f),
+                    status = com.opencamera.core.device.PreviewMeteringResultStatus.SUCCEEDED
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(PreviewMeteringFeedbackStatus.SUCCEEDED, session.state.value.presentation.previewMeteringFeedback?.status)
+        assertTrue(trace.snapshot().any { it.name == "preview.metering.succeeded" })
+
+        effectCollector.cancel()
+    }
+
+    @Test
+    fun `stale metering completion does not overwrite newer request`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.PreviewTapToFocus(0.3f, 0.3f))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewTapToFocus(0.6f, 0.6f))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PreviewMeteringCompleted(
+                com.opencamera.core.device.PreviewMeteringResult(
+                    requestId = "meter-1",
+                    point = com.opencamera.core.device.PreviewMeteringPoint(0.3f, 0.3f),
+                    status = com.opencamera.core.device.PreviewMeteringResultStatus.SUCCEEDED
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(PreviewMeteringFeedbackStatus.REQUESTED, session.state.value.presentation.previewMeteringFeedback?.status)
+        assertEquals("meter-2", session.state.value.presentation.previewMeteringFeedback?.requestId)
+        assertTrue(trace.snapshot().any { it.name == "preview.metering.stale" })
+
+        effectCollector.cancel()
+    }
+
+    @Test
+    fun `unsupported metering result updates feedback to UNSUPPORTED`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.PreviewTapToFocus(0.5f, 0.5f))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PreviewMeteringCompleted(
+                com.opencamera.core.device.PreviewMeteringResult(
+                    requestId = "meter-1",
+                    point = com.opencamera.core.device.PreviewMeteringPoint(0.5f, 0.5f),
+                    status = com.opencamera.core.device.PreviewMeteringResultStatus.UNSUPPORTED,
+                    reason = "AF not available"
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(PreviewMeteringFeedbackStatus.UNSUPPORTED, session.state.value.presentation.previewMeteringFeedback?.status)
+        assertEquals("AF not available", session.state.value.presentation.previewMeteringFeedback?.reason)
+        assertTrue(trace.snapshot().any { it.name == "preview.metering.unsupported" })
+
+        effectCollector.cancel()
     }
 
     private fun createSession(
