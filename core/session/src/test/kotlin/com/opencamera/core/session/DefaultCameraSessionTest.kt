@@ -376,7 +376,7 @@ class DefaultCameraSessionTest {
         )
         assertTrue(trace.snapshot().any { it.name == "preview.host.recovery.requested" })
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -416,7 +416,7 @@ class DefaultCameraSessionTest {
         )
         assertTrue(trace.snapshot().any { it.name == "preview.host.recovery.requested" })
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -451,7 +451,7 @@ class DefaultCameraSessionTest {
         assertNotNull(bindEffect)
         assertTrue(bindEffect.isRecovery)
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -3444,7 +3444,7 @@ class DefaultCameraSessionTest {
         assertEquals(PreviewMeteringFeedbackStatus.REQUESTED, session.state.value.presentation.previewMeteringFeedback?.status)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.requested" })
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -3472,7 +3472,7 @@ class DefaultCameraSessionTest {
         assertEquals(0f, meteringEffect.request.point.normalizedX)
         assertEquals(1f, meteringEffect.request.point.normalizedY)
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -3501,7 +3501,7 @@ class DefaultCameraSessionTest {
         assertTrue(meteringEffects.isEmpty())
         assertTrue(trace.snapshot().any { it.name == "preview.metering.ignored" })
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -3526,7 +3526,7 @@ class DefaultCameraSessionTest {
         assertTrue(meteringEffects.isEmpty())
         assertTrue(trace.snapshot().any { it.name == "preview.metering.ignored" })
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -3562,7 +3562,7 @@ class DefaultCameraSessionTest {
         assertEquals(PreviewMeteringFeedbackStatus.SUCCEEDED, session.state.value.presentation.previewMeteringFeedback?.status)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.succeeded" })
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -3601,7 +3601,7 @@ class DefaultCameraSessionTest {
         assertEquals("meter-2", session.state.value.presentation.previewMeteringFeedback?.requestId)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.stale" })
 
-        effectCollector.cancel()
+        
     }
 
     @Test
@@ -3639,7 +3639,117 @@ class DefaultCameraSessionTest {
         assertEquals("AF not available", session.state.value.presentation.previewMeteringFeedback?.reason)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.unsupported" })
 
-        effectCollector.cancel()
+        
+    }
+
+    // --- Output Rotation ---
+
+    @Test
+    fun `dispatching new rotation updates state and emits one update effect`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effects += it }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.OutputRotationChanged(com.opencamera.core.device.CameraOutputRotation.ROTATION_90))
+        advanceUntilIdle()
+
+        assertEquals(com.opencamera.core.device.CameraOutputRotation.ROTATION_90, session.state.value.outputRotation)
+        val rotationEffects = effects.filterIsInstance<SessionEffect.UpdateOutputRotation>()
+        assertEquals(1, rotationEffects.size)
+        assertEquals(com.opencamera.core.device.CameraOutputRotation.ROTATION_90, rotationEffects[0].rotation)
+        assertTrue(trace.snapshot().any { it.name == "orientation.output.changed" })
+        job.cancel()
+    }
+
+    @Test
+    fun `dispatching same rotation twice emits no duplicate effect`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effects += it }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.OutputRotationChanged(com.opencamera.core.device.CameraOutputRotation.ROTATION_90))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.OutputRotationChanged(com.opencamera.core.device.CameraOutputRotation.ROTATION_90))
+        advanceUntilIdle()
+
+        val rotationEffects = effects.filterIsInstance<SessionEffect.UpdateOutputRotation>()
+        assertEquals(1, rotationEffects.size)
+        assertTrue(trace.snapshot().any { it.name == "orientation.output.skipped" })
+        job.cancel()
+    }
+
+    @Test
+    fun `rotation change during active preview does not emit BindPreview`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effects += it }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+
+        effects.clear()
+
+        session.dispatch(SessionIntent.OutputRotationChanged(com.opencamera.core.device.CameraOutputRotation.ROTATION_270))
+        advanceUntilIdle()
+
+        assertFalse(effects.any { it is SessionEffect.BindPreview })
+        assertTrue(effects.any { it is SessionEffect.UpdateOutputRotation })
+        job.cancel()
+    }
+
+    @Test
+    fun `rotation change while recording does not stop active shot`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effects += it }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val videoShot = session.state.value.activeShot
+        assertNotNull(videoShot)
+
+        effects.clear()
+
+        session.dispatch(SessionIntent.OutputRotationChanged(com.opencamera.core.device.CameraOutputRotation.ROTATION_90))
+        advanceUntilIdle()
+
+        assertNotNull(session.state.value.activeShot)
+        assertFalse(effects.any { it is SessionEffect.StopActiveShot })
+        job.cancel()
     }
 
     private fun createSession(

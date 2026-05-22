@@ -1,5 +1,6 @@
 package com.opencamera.core.session
 
+import com.opencamera.core.device.CameraOutputRotation
 import com.opencamera.core.device.CapabilityGraphReport
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
@@ -149,6 +150,7 @@ data class SessionState(
     val activeEffectSpec: EffectSpec = EffectSpec.EMPTY,
     val activeCapabilityReport: CapabilityGraphReport? = null,
     val previewRatio: PreviewRatio = PreviewRatio.FULL,
+    val outputRotation: CameraOutputRotation = CameraOutputRotation.ROTATION_0,
     val presentation: SessionPresentationState = SessionPresentationState()
 ) {
     val countdownRemainingSeconds: Int?
@@ -238,6 +240,7 @@ sealed interface SessionIntent {
     data class PerformanceClassChanged(val performanceClass: CameraPerformanceClass) : SessionIntent
     data class PreviewTapToFocus(val normalizedX: Float, val normalizedY: Float) : SessionIntent
     data class PreviewMeteringCompleted(val result: com.opencamera.core.device.PreviewMeteringResult) : SessionIntent
+    data class OutputRotationChanged(val rotation: CameraOutputRotation) : SessionIntent
 }
 
 sealed interface SessionEffect {
@@ -255,6 +258,7 @@ sealed interface SessionEffect {
         val clearHost: Boolean
     ) : SessionEffect
     data class ApplyPreviewMetering(val request: com.opencamera.core.device.PreviewMeteringRequest) : SessionEffect
+    data class UpdateOutputRotation(val rotation: CameraOutputRotation) : SessionEffect
 }
 
 interface CameraSession {

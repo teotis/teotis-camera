@@ -1,5 +1,6 @@
 package com.opencamera.core.session
 
+import com.opencamera.core.device.CameraOutputRotation
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
@@ -201,6 +202,7 @@ class DefaultCameraSession(
             is SessionIntent.PerformanceClassChanged -> trace.record("intent.performance", intent.performanceClass.toString())
             is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
             is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
+            is SessionIntent.OutputRotationChanged -> handleOutputRotationChanged(intent.rotation)
         }
     }
 
@@ -1492,6 +1494,20 @@ class DefaultCameraSession(
 
     private fun countdownInProgress(): Boolean = pendingCountdownStrategy != null
 
+    private suspend fun handleOutputRotationChanged(rotation: CameraOutputRotation) {
+        if (rotation == _state.value.outputRotation) {
+            trace.record("orientation.output.skipped", "already=$rotation")
+            return
+        }
+        updateState(
+            outputRotation = rotation,
+            lastAction = "Output rotation set to $rotation",
+            lastError = null
+        )
+        trace.record("orientation.output.changed", rotation.name)
+        _effects.emit(SessionEffect.UpdateOutputRotation(rotation))
+    }
+
     private fun cancelPendingCountdown(reason: String) {
         pendingCountdownJob?.cancel()
         pendingCountdownJob = null
@@ -1598,6 +1614,7 @@ class DefaultCameraSession(
         activeEffectSpec: com.opencamera.core.effect.EffectSpec = _state.value.activeEffectSpec,
         activeCapabilityReport: com.opencamera.core.device.CapabilityGraphReport? = _state.value.activeCapabilityReport,
         previewRatio: PreviewRatio = _state.value.previewRatio,
+        outputRotation: CameraOutputRotation = _state.value.outputRotation,
         countdownRemainingSeconds: Int? = _state.value.presentation.countdownRemainingSeconds,
         previewThumbnailPath: String? = _state.value.presentation.previewThumbnailPath,
         latestThumbnailSource: ThumbnailSource? = _state.value.presentation.latestThumbnailSource,
@@ -1630,6 +1647,7 @@ class DefaultCameraSession(
             activeEffectSpec = activeEffectSpec,
             activeCapabilityReport = activeCapabilityReport,
             previewRatio = previewRatio,
+            outputRotation = outputRotation,
             presentation = _state.value.presentation.copy(
                 countdownRemainingSeconds = countdownRemainingSeconds,
                 previewThumbnailPath = previewThumbnailPath,
