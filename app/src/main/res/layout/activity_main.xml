@@ -273,7 +273,6 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="0dp"
-        android:background="@color/oc_surface_scrim_light"
         android:scrollbars="none"
         android:fadeScrollbars="false"
         android:clipToPadding="false"
