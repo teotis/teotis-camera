@@ -57,6 +57,9 @@
   `CameraSessionCoordinatorTest`
   `:app:assembleDebug`
 - 本轮通过：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest`
+  `./gradlew --no-daemon :app:assembleDebug`
   `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
   `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
   `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitorTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest --tests com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitorTest`
@@ -92,10 +95,26 @@
 - `2026-05-22` 第五轮真机反馈中可落地的高难/多模态 owner 修复已完成首个代码闭环：Color Lab 调色板触摸现在进入 persisted `ColorLabSpec` 写入链路并保持 reticle 即时反馈，Color Lab 页面隐藏 `进阶` 模式切换；右侧第一入口默认文案收敛为 `镜头/Lens`；Color Lab 摘要从原始坐标改为 `Warm / Deep Contrast` 等可理解语义；风格/设置面板不再泄漏 raw render spec 和英文 enum availability 文案。聚焦 UI 测试、`assembleDebug` 和 `verify_stage_7_observability.sh` 均已通过，最新 debug APK 位于 `/Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk`。
 - `2026-05-22` 真机发现“Color Lab 预览有效但成片不生效”后，已完成系统化调试和代码闭环：Color Lab/style metadata 在 session 侧本已能进入 `filterSpec.*`，真实高风险断点在 Android Q+ CameraX 保存结果可能不给 `savedUri`，导致 `MediaOutputHandle` 只有展示路径、所有成片后处理拿不到可编辑 `contentUri/filePath` 而跳过。[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 现会预创建 MediaStore still `contentUri` 并用 OutputStream 写入，`resolvePhotoOutputHandle()` 保证 CameraX 不返回 URI 时仍保留可编辑目标；[`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 锁定 Color Lab 合成后的 `filterSpec.*` 会进入拍摄 metadata，[`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 锁定预创建 URI 句柄合同。该修复同时降低滤镜、画幅裁切、水印、人像渲染、文档裁切、自拍镜像等 saved-photo 后处理被跳过的风险；视频录制仍只保证 metadata/filter profile 进入录制请求，成片视频滤镜不在当前 JPEG 后处理链路内。
 - `2026-05-22` 最新 vivo X300 真机反馈将问题升级为“预览/成片/缩略图三链路不一致”后，本轮已完成核心 containment + 几何绑定闭环：[`SessionContracts.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 的 `captureFeedbackPolicyFor()` 现在只允许纯净 no-postprocess shot 使用 raw preview feedback；凡 shot metadata/postprocess 表明存在 Color Lab/filter、非默认画幅裁切、水印或自拍镜像，都会抑制 `PreviewView.bitmap` 缩略反馈直到 `SavedMedia`，避免用户先看到与最终成片不一致的缩略图；[`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 已新增 Color Lab/filter 与 16:9 frame ratio 的红绿回归。Device 层，[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 已将 still/video 的 Preview 与 ImageCapture/VideoCapture 绑定改为 `UseCaseGroup + PreviewView.viewPort`，让 CameraX 尽量共享同一 viewport/crop contract，降低预览画幅与成片 sensor 区域差异。更大的 `RenderRecipe + GL PreviewRenderEngine` 非低耦合项已拆成 [`2026-05-22-render-recipe-preview-engine-handoff.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-render-recipe-preview-engine-handoff.md) 交给外部 agent 做纯 Kotlin contract/diagnostics/QA 清单；本轮不宣称已完成实时像素级 Color Lab 预览渲染，最终仍需新 APK 真机对比保存 JPEG 与录屏。
+- `2026-05-23` 最新真机反馈指出“成片画面区域并非主界面预览框区域”后，本轮已完成系统化调试和根因修复：[`PreviewOverlayView.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/PreviewOverlayView.kt) 原先用 `bottomInsetPx = 40dp` 和水平 padding 计算画幅框、网格和遮罩，把底部 cockpit/safe-area 混进了 active frame rect；但 [`PhotoFrameRatioPostProcessor.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessor.kt) 对保存 JPEG 做的是完整图像中心裁切，二者天然不同源。本轮移除成像几何中的 UI inset 入口，让 frame guideline、dim scrim、grid 全部以完整 `PreviewView` content rect 居中计算，并用 [`PreviewOverlayGeometryTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/PreviewOverlayGeometryTest.kt) 锁定 active capture frame 必须与 saved center crop 同中心；聚焦几何、后处理、render model 和 assemble 验证均已通过。后续仍需真机安装新 APK，用 `4:3 / 16:9 / 1:1` 保存 JPEG 与屏幕录屏做视觉复验。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-23：预览框与成片区域同源几何修复
+
+- 目标：处理最新真机实测发现的严重问题：保存照片的实际画面区域不是主界面预览画幅框所示区域。
+- 根因：
+  `PreviewOverlayView` 的画幅框、遮罩和网格把底部 cockpit inset 与水平 padding 当作成像区域约束，导致 active frame rect 在扣掉底部控制区后重新居中；而 `PhotoFrameRatioPostProcessor.computeCenterCropBounds()` 对保存 JPEG 始终按完整图像中心裁切。预览框和成片裁切使用了不同坐标系。
+- 核心结果：
+  [`PreviewOverlayView.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/PreviewOverlayView.kt) 删除成像几何里的 UI inset 入口，`previewContentGeometry()`、`computeFrameRect()`、`computePreviewFrameRect()` 只描述完整 `PreviewView` content rect；frame guideline、frame scrim 和 grid 共用该几何；
+  [`PreviewOverlayGeometryTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/PreviewOverlayGeometryTest.kt) 新增回归，锁定 active capture frame 必须居中在完整 preview content，旧的“respect horizontal padding”期望改为“ignore UI padding so it matches saved crop”。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest`
+  `rtk ./gradlew --no-daemon :app:assembleDebug`
+- 结论：
+  本轮修掉的是代码级根因：UI 安全区不再参与成像画幅计算。最终仍需新 APK 真机复验保存图，尤其是 16:9 和 1:1 在竖屏/横屏下的视觉一致性。
 
 ## 2026-05-22：预览/成片/缩略图一致性核心 containment
 

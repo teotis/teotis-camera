@@ -160,9 +160,6 @@ class PreviewOverlayView @JvmOverloads constructor(
         }
     }
 
-    private val frameHorizontalPaddingPx: Float get() = 12f * density
-    private val frameBottomInsetPx: Float get() = 40f * density
-
     private fun activeContentGeometry(): PreviewContentGeometry {
         val frameRatio = renderModel.frame?.ratio
             ?: renderModel.effectModel?.frameGuideline?.ratio
@@ -170,9 +167,7 @@ class PreviewOverlayView @JvmOverloads constructor(
             viewWidth = width,
             viewHeight = height,
             ratioWidth = frameRatio?.width ?: 0,
-            ratioHeight = frameRatio?.height ?: 0,
-            horizontalPaddingPx = frameHorizontalPaddingPx,
-            bottomInsetPx = if (frameRatio != null) frameBottomInsetPx else 0f
+            ratioHeight = frameRatio?.height ?: 0
         )
     }
 
@@ -243,9 +238,7 @@ class PreviewOverlayView @JvmOverloads constructor(
             viewWidth = width,
             viewHeight = height,
             ratioWidth = spec.ratio.width,
-            ratioHeight = spec.ratio.height,
-            horizontalPaddingPx = frameHorizontalPaddingPx,
-            bottomInsetPx = frameBottomInsetPx
+            ratioHeight = spec.ratio.height
         ).activeFrameRect
         canvas.drawRect(rect, frameGuidelinePaint)
     }
@@ -289,9 +282,7 @@ class PreviewOverlayView @JvmOverloads constructor(
             viewWidth = width,
             viewHeight = height,
             ratioWidth = frame.ratio.width,
-            ratioHeight = frame.ratio.height,
-            horizontalPaddingPx = frameHorizontalPaddingPx,
-            bottomInsetPx = frameBottomInsetPx
+            ratioHeight = frame.ratio.height
         ).activeFrameRect
         if (frame.dimOutsideFrame) {
             val outsidePath = android.graphics.Path().apply {
@@ -336,30 +327,26 @@ internal data class PreviewContentGeometry(
  * sub-rect of [contentRect] matching that ratio. Otherwise the active frame
  * equals [contentRect] (full-view capture).
  *
- * [horizontalPaddingPx], [topInsetPx], [bottomInsetPx] shrink the content rect
- * symmetrically before the frame ratio is applied. They represent UI chrome
- * (e.g. horizontal safe-area padding) that must not be treated as imaging area.
+ * UI chrome must not shrink this geometry. Toolbars and capture controls may
+ * overlap the preview, but the visible capture frame must stay centered in the
+ * same full preview content rect used by saved JPEG center-crop postprocessing.
  */
 internal fun previewContentGeometry(
     viewWidth: Int,
     viewHeight: Int,
     ratioWidth: Int = 0,
-    ratioHeight: Int = 0,
-    horizontalPaddingPx: Float = 0f,
-    topInsetPx: Float = 0f,
-    bottomInsetPx: Float = 0f
+    ratioHeight: Int = 0
 ): PreviewContentGeometry {
     val contentRect = RectF(
-        horizontalPaddingPx,
-        topInsetPx,
-        (viewWidth - horizontalPaddingPx).coerceAtLeast(0f),
-        (viewHeight - bottomInsetPx).coerceAtLeast(0f)
+        0f,
+        0f,
+        viewWidth.coerceAtLeast(0).toFloat(),
+        viewHeight.coerceAtLeast(0).toFloat()
     )
     val activeFrameRect = if (ratioWidth > 0 && ratioHeight > 0) {
         val fr = computeFrameRect(
             viewWidth, viewHeight,
-            ratioWidth, ratioHeight,
-            horizontalPaddingPx, topInsetPx, bottomInsetPx
+            ratioWidth, ratioHeight
         )
         RectF(fr.left, fr.top, fr.right, fr.bottom)
     } else {
@@ -412,15 +399,12 @@ internal fun computeFrameRect(
     viewWidth: Int,
     viewHeight: Int,
     ratioWidth: Int,
-    ratioHeight: Int,
-    horizontalPaddingPx: Float = 0f,
-    topInsetPx: Float = 0f,
-    bottomInsetPx: Float = 0f
+    ratioHeight: Int
 ): FrameRect {
-    val availableLeft = horizontalPaddingPx
-    val availableTop = topInsetPx
-    val availableRight = viewWidth - horizontalPaddingPx
-    val availableBottom = viewHeight - bottomInsetPx
+    val availableLeft = 0f
+    val availableTop = 0f
+    val availableRight = viewWidth.toFloat()
+    val availableBottom = viewHeight.toFloat()
     val availableWidth = (availableRight - availableLeft).coerceAtLeast(1f)
     val availableHeight = (availableBottom - availableTop).coerceAtLeast(1f)
     val orientation = if (viewWidth <= viewHeight) {
@@ -448,13 +432,9 @@ internal fun computePreviewFrameRect(
     viewWidth: Int,
     viewHeight: Int,
     ratioWidth: Int,
-    ratioHeight: Int,
-    horizontalPaddingPx: Float = 0f,
-    topInsetPx: Float = 0f,
-    bottomInsetPx: Float = 0f
+    ratioHeight: Int
 ): RectF {
-    val r = computeFrameRect(viewWidth, viewHeight, ratioWidth, ratioHeight,
-        horizontalPaddingPx, topInsetPx, bottomInsetPx)
+    val r = computeFrameRect(viewWidth, viewHeight, ratioWidth, ratioHeight)
     return RectF(r.left, r.top, r.right, r.bottom)
 }
 
