@@ -588,7 +588,8 @@ data class PhotoSettings(
     ),
     val livePhotoEnabledByDefault: Boolean = false,
     val countdownDuration: CountdownDuration = CountdownDuration.OFF,
-    val colorLabSpec: ColorLabSpec = ColorLabSpec()
+    val colorLabSpec: ColorLabSpec = ColorLabSpec(),
+    val styleStrength: Float = 1f
 )
 
 data class VideoSettings(
@@ -970,6 +971,7 @@ sealed interface PersistedSettingsAction {
     data class UpdateDefaultVideoSpec(val videoSpec: VideoSpec) : PersistedSettingsAction
     data class UpdateVideoFilter(val filterProfileId: String) : PersistedSettingsAction
     data class UpdateColorLabSpec(val spec: ColorLabSpec) : PersistedSettingsAction
+    data class UpdatePhotoStyleStrength(val strength: Float) : PersistedSettingsAction
 }
 
 fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings {
@@ -1063,6 +1065,10 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
 
         is PersistedSettingsAction.UpdateColorLabSpec -> copy(
             photo = photo.copy(colorLabSpec = action.spec.normalized())
+        )
+
+        is PersistedSettingsAction.UpdatePhotoStyleStrength -> copy(
+            photo = photo.copy(styleStrength = action.strength.coerceIn(0f, 1f))
         )
     }
 }
@@ -1197,6 +1203,29 @@ val DEFAULT_FILTER_PROFILES: List<FilterProfile> = listOf(
             saturation = 1.08f,
             warmthShift = 5,
             vignetteStrength = 0.08f
+        )
+    ),
+    builtInFilterProfile(
+        id = "photo-texture",
+        label = "Texture",
+        category = FilterProfileCategory.PHOTO,
+        renderSpec = renderSpec(
+            brightnessShift = -3,
+            contrast = 1.18f,
+            saturation = 0.82f,
+            warmthShift = 2,
+            grainStrength = 0.08f,
+            vignetteStrength = 0.08f
+        )
+    ),
+    builtInFilterProfile(
+        id = "photo-bw",
+        label = "B&W",
+        category = FilterProfileCategory.PHOTO,
+        renderSpec = renderSpec(
+            contrast = 1.12f,
+            saturation = 0f,
+            monochromeMix = 1f
         )
     ),
     builtInFilterProfile(

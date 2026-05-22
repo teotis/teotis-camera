@@ -35,6 +35,7 @@ object PersistedSettingsSerializer {
     private const val KEY_COLOR_LAB_TONE_AXIS = "photo.colorLab.toneAxis"
     private const val KEY_COLOR_LAB_STRENGTH = "photo.colorLab.strength"
     private const val KEY_COLOR_LAB_PRESET_ID = "photo.colorLab.presetId"
+    private const val KEY_PHOTO_STYLE_STRENGTH = "photo.styleStrength"
 
     fun toMap(settings: PersistedSettings): Map<String, String> {
         return linkedMapOf(
@@ -71,7 +72,8 @@ object PersistedSettingsSerializer {
             KEY_COLOR_LAB_COLOR_AXIS to settings.photo.colorLabSpec.colorAxis.toString(),
             KEY_COLOR_LAB_TONE_AXIS to settings.photo.colorLabSpec.toneAxis.toString(),
             KEY_COLOR_LAB_STRENGTH to settings.photo.colorLabSpec.strength.toString(),
-            KEY_COLOR_LAB_PRESET_ID to (settings.photo.colorLabSpec.presetId ?: "")
+            KEY_COLOR_LAB_PRESET_ID to (settings.photo.colorLabSpec.presetId ?: ""),
+            KEY_PHOTO_STYLE_STRENGTH to settings.photo.styleStrength.toString()
         )
     }
 
@@ -170,7 +172,9 @@ object PersistedSettingsSerializer {
                     toneAxis = values[KEY_COLOR_LAB_TONE_AXIS]?.toFloatOrNull() ?: 0f,
                     strength = values[KEY_COLOR_LAB_STRENGTH]?.toFloatOrNull() ?: 1f,
                     presetId = values[KEY_COLOR_LAB_PRESET_ID]?.takeIf { it.isNotBlank() }
-                ).normalized()
+                ).normalized(),
+                styleStrength = values[KEY_PHOTO_STYLE_STRENGTH]?.toFloatOrNull()?.coerceIn(0f, 1f)
+                    ?: defaults.photo.styleStrength
             ),
             video = VideoSettings(
                 defaultVideoSpec = VideoSpec(
