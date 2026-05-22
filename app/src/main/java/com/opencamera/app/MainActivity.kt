@@ -595,22 +595,28 @@ class MainActivity : AppCompatActivity() {
         }
         previewThumbnail.setOnClickListener {
             val presentation = latestSessionState?.presentation ?: return@setOnClickListener
-            val filePath = presentation.latestCapturePath
-                ?: presentation.latestVideoPath
-                ?: return@setOnClickListener
-            val file = File(filePath)
-            if (!file.exists()) {
+            val target = galleryOpenTargetFor(
+                source = presentation.latestThumbnailSource,
+                savedMediaType = presentation.latestSavedMediaType
+            ) ?: run {
                 Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-            val mimeType = when (presentation.latestSavedMediaType) {
-                com.opencamera.core.session.SavedMediaType.VIDEO -> "video/*"
-                com.opencamera.core.session.SavedMediaType.PHOTO -> "image/*"
-                null -> "image/*"
+
+            val uri = when (target.kind) {
+                GalleryOpenUriKind.CONTENT_URI -> Uri.parse(target.uri)
+                GalleryOpenUriKind.ABSOLUTE_FILE -> {
+                    val file = File(target.uri)
+                    if (!file.exists()) {
+                        Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+                }
             }
+
             val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, mimeType)
+                setDataAndType(uri, target.mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             runCatching { startActivity(intent) }.onFailure {
