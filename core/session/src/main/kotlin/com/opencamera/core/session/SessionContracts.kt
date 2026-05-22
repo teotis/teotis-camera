@@ -19,6 +19,7 @@ import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
+import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import kotlinx.coroutines.flow.Flow
@@ -79,7 +80,14 @@ enum class CaptureFeedbackPolicy {
 
 internal fun captureFeedbackPolicyFor(shot: ShotRequest): CaptureFeedbackPolicy {
     val recipe = RenderRecipe.from(shot)
-    return if (recipe.requiresFinalOutputPostprocess) {
+    val metadataFilterSpec = FilterRenderSpec.fromMetadataTags(shot.saveRequest.metadata.customTags)
+    val suppressRawFeedback = metadataFilterSpec.requiresTrustedSavedMedia(
+        profileId = recipe.filterProfileId
+    ) ||
+        recipe.frameRatio != null && recipe.frameRatio != FrameRatio.RATIO_4_3 ||
+        recipe.selfieMirror ||
+        recipe.watermarkTemplateId?.let { it != "classic-overlay" } == true
+    return if (suppressRawFeedback) {
         CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA
     } else {
         CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP
@@ -90,7 +98,7 @@ private fun FilterRenderSpec?.requiresTrustedSavedMedia(profileId: String?): Boo
     if (this == null) {
         return false
     }
-    if (profileId in LOW_RISK_PREVIEW_FILTER_PROFILES && this == defaultFilterRenderSpecOrNull(profileId)) {
+    if (profileId != null && profileId in LOW_RISK_PREVIEW_FILTER_PROFILES && this == defaultFilterRenderSpecOrNull(profileId)) {
         return false
     }
     return true
