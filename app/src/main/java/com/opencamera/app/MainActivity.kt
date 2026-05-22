@@ -63,6 +63,14 @@ class MainActivity : AppCompatActivity() {
     private val container: AppContainer
         get() = (application as OpenCameraApplication).container
 
+    private var orientationMonitor: CameraOrientationMonitor? = null
+    private var latestOrientationRenderModel: CameraOrientationRenderModel =
+        CameraOrientationRenderModel(
+            CameraPhysicalOrientation.PORTRAIT,
+            0f,
+            com.opencamera.core.device.CameraOutputRotation.ROTATION_0
+        )
+
     private var selectedSettingsTab = SettingsTab.COMMON
     private lateinit var previewView: PreviewView
     private lateinit var previewOverlayView: PreviewOverlayView
@@ -398,22 +406,25 @@ class MainActivity : AppCompatActivity() {
         bindGestureRouter()
         bindState()
         syncPermissionState()
-        applyControlRotationForDisplay()
+        initOrientationMonitor()
     }
 
-    private fun applyControlRotationForDisplay() {
-        val rotation = display?.rotation ?: android.view.Surface.ROTATION_0
-        val orientationModel = orientationRenderModel(rotation)
-        val degrees = orientationModel.controlRotationDegrees
+    private fun initOrientationMonitor() {
+        orientationMonitor = CameraOrientationMonitor(this) { model ->
+            latestOrientationRenderModel = model
+            renderOrientation(model)
+            dispatch(SessionIntent.OutputRotationChanged(model.outputRotation))
+        }
+    }
+
+    private fun renderOrientation(model: CameraOrientationRenderModel) {
+        val degrees = model.contentRotationDegrees
         listOf(
-            // Right rail utility buttons
             buttonFilterEntry,
             buttonQuickLauncher,
             buttonDevEntry,
-            // Bottom cockpit controls
             shutterButton,
             lensFacingButton,
-            // Quick panel text-bearing buttons
             buttonFrameRatio43,
             buttonFrameRatio169,
             buttonFrameRatio11,
@@ -421,13 +432,9 @@ class MainActivity : AppCompatActivity() {
         ).forEach { it.rotation = degrees }
     }
 
-    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
-        super.onConfigurationChanged(newConfig)
-        applyControlRotationForDisplay()
-    }
-
     override fun onStart() {
         super.onStart()
+        orientationMonitor?.enable()
         container.cameraCoordinator.attachPreviewHost(this, previewView)
         syncPermissionState()
         dispatch(SessionIntent.Boot)
@@ -437,6 +444,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        orientationMonitor?.disable()
         dispatch(SessionIntent.PreviewHostDetached("Activity moved to background"))
     }
 
