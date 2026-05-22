@@ -20,11 +20,9 @@ import android.util.Size
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraState
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
-import androidx.camera.core.UseCaseGroup
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
@@ -57,9 +55,6 @@ import com.opencamera.core.device.DeviceShotRequestTranslator
 import com.opencamera.core.device.DefaultDeviceShotRequestTranslator
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ManualControlCapabilityMatrix
-import com.opencamera.core.device.PreviewMeteringRequest
-import com.opencamera.core.device.PreviewMeteringResult
-import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlan
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlanner
@@ -111,7 +106,6 @@ import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import java.io.Closeable
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -403,18 +397,6 @@ internal fun cleanupStillCaptureArtifacts(
             intermediateOutputPaths = intermediateOutputPaths
         )
     )
-}
-
-internal fun resolvePhotoOutputHandle(
-    outputHandle: MediaOutputHandle,
-    savedUri: String?
-): MediaOutputHandle {
-    val resolvedContentUri = savedUri?.takeIf { it.isNotBlank() }
-    return if (resolvedContentUri == null) {
-        outputHandle
-    } else {
-        outputHandle.copy(contentUri = resolvedContentUri)
-    }
 }
 
 internal fun cleanupAbsoluteFilePaths(
@@ -1050,8 +1032,6 @@ class CameraXCaptureAdapter(
     private var currentVideoSpec: VideoSpec? = null
     private var previewSnapshotGeneration: Int = 0
     private var suppressPreviewStateEvents = false
-    private var currentOutputRotation: com.opencamera.core.device.CameraOutputRotation =
-        com.opencamera.core.device.CameraOutputRotation.ROTATION_0
     private var firstFrameReportedForCurrentBind = false
     private var bindStartElapsedRealtimeNanos: Long = 0L
     private val _events = MutableSharedFlow<DeviceEvent>(extraBufferCapacity = 16)
@@ -1129,29 +1109,19 @@ class CameraXCaptureAdapter(
                 )
             }
 
-            is DeviceCommand.ApplyPreviewMetering -> runCatching {
-                applyPreviewMetering(command.request)
-            }.onFailure { throwable ->
+            is DeviceCommand.ApplyPreviewMetering -> {
                 _events.emit(
                     DeviceEvent.PreviewMeteringCompleted(
-                        PreviewMeteringResult(
+                        com.opencamera.core.device.PreviewMeteringResult(
                             requestId = command.request.requestId,
-                            point = command.request.point.clamped(),
-                            status = PreviewMeteringResultStatus.FAILED,
-                            reason = throwable.message ?: "Preview metering failed"
+                            point = command.request.point,
+                            status = com.opencamera.core.device.PreviewMeteringResultStatus.UNSUPPORTED,
+                            reason = "CameraX FocusMeteringAction not yet implemented"
                         )
                     )
                 )
             }
         }
-    }
-
-    private fun applyOutputRotation(rotation: com.opencamera.core.device.CameraOutputRotation) {
-        if (rotation == currentOutputRotation) return
-        currentOutputRotation = rotation
-        val surfaceRotation = mapOutputRotationToSurface(rotation)
-        imageCapture?.targetRotation = surfaceRotation
-        videoCapture?.targetRotation = surfaceRotation
     }
 
     override suspend fun release() {
@@ -1206,89 +1176,6 @@ class CameraXCaptureAdapter(
         )
         val camera = boundCamera ?: return
         camera.cameraControl.setZoomRatio(normalizedZoomRatio).await()
-    }
-
-    private suspend fun applyPreviewMetering(request: PreviewMeteringRequest) {
-        withContext(Dispatchers.Main.immediate) {
-            val camera = boundCamera
-            val preview = boundPreviewView
-            if (camera == null || preview == null) {
-                _events.emit(
-                    DeviceEvent.PreviewMeteringCompleted(
-                        PreviewMeteringResult(
-                            requestId = request.requestId,
-                            point = request.point.clamped(),
-                            status = PreviewMeteringResultStatus.FAILED,
-                            reason = "Preview is not bound"
-                        )
-                    )
-                )
-                return@withContext
-            }
-
-            val point = request.point.clamped()
-            val pixel = previewMeteringPixelPoint(
-                normalizedX = point.normalizedX,
-                normalizedY = point.normalizedY,
-                viewWidth = preview.width,
-                viewHeight = preview.height
-            )
-            val meteringPoint = preview.meteringPointFactory.createPoint(pixel.x, pixel.y, 0.15f)
-
-            val focusAndAeAction = FocusMeteringAction.Builder(
-                meteringPoint,
-                FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
-            )
-                .setAutoCancelDuration(request.autoCancelMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
-                .build()
-
-            val aeOnlyAction = FocusMeteringAction.Builder(
-                meteringPoint,
-                FocusMeteringAction.FLAG_AE
-            )
-                .setAutoCancelDuration(request.autoCancelMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
-                .build()
-
-            val actionAndStatus = when {
-                camera.cameraInfo.isFocusMeteringSupported(focusAndAeAction) ->
-                    focusAndAeAction to PreviewMeteringResultStatus.SUCCEEDED
-
-                camera.cameraInfo.isFocusMeteringSupported(aeOnlyAction) ->
-                    aeOnlyAction to PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY
-
-                else -> null
-            }
-
-            if (actionAndStatus == null) {
-                _events.emit(
-                    DeviceEvent.PreviewMeteringCompleted(
-                        PreviewMeteringResult(
-                            requestId = request.requestId,
-                            point = point,
-                            status = PreviewMeteringResultStatus.UNSUPPORTED,
-                            reason = "Focus and exposure metering are unsupported"
-                        )
-                    )
-                )
-                return@withContext
-            }
-
-            val result = camera.cameraControl.startFocusAndMetering(actionAndStatus.first).await()
-            _events.emit(
-                DeviceEvent.PreviewMeteringCompleted(
-                    PreviewMeteringResult(
-                        requestId = request.requestId,
-                        point = point,
-                        status = actionAndStatus.second,
-                        reason = if (result.isFocusSuccessful || actionAndStatus.second != PreviewMeteringResultStatus.SUCCEEDED) {
-                            null
-                        } else {
-                            "Focus did not lock"
-                        }
-                    )
-                )
-            )
-        }
     }
 
     override fun boundGraph(): DeviceGraphSpec? = currentGraph
@@ -1524,7 +1411,6 @@ class CameraXCaptureAdapter(
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                         val deviceCaptureCompletedAt = SystemClock.elapsedRealtime()
-                        request.closeOutputStreamQuietly()
                         continuation.resume(
                             PhotoCaptureOutcome.Success(
                                 outputPath = request.outputPath,
@@ -1536,8 +1422,6 @@ class CameraXCaptureAdapter(
                     }
 
                     override fun onError(exception: ImageCaptureException) {
-                        request.closeOutputStreamQuietly()
-                        request.cleanupContentUris().forEach(::deleteContentUriQuietly)
                         continuation.resume(
                             PhotoCaptureOutcome.Failure(
                                 reason = exception.message ?: "Unknown image capture error",
@@ -1678,38 +1562,14 @@ class CameraXCaptureAdapter(
                 put(MediaStore.MediaColumns.MIME_TYPE, saveRequest.mimeType)
                 put(MediaStore.MediaColumns.RELATIVE_PATH, saveRequest.relativePath)
             }
-            val contentUri = context.contentResolver.insert(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                values
-            )
-            if (contentUri != null) {
-                val outputStream = context.contentResolver.openOutputStream(contentUri)
-                if (outputStream != null) {
-                    return PhotoOutputRequest(
-                        outputOptions = ImageCapture.OutputFileOptions.Builder(outputStream).build(),
-                        outputPath = outputPath,
-                        outputHandle = MediaOutputHandle(
-                            displayPath = outputPath,
-                            contentUri = contentUri.toString()
-                        ),
-                        outputStream = outputStream
-                    )
-                }
-                deleteContentUriQuietly(contentUri.toString())
-            }
-
-            val fallbackParent = context.getExternalFilesDir(null) ?: context.filesDir
-            val fallbackFile = File(fallbackParent, displayName).apply {
-                parentFile?.mkdirs()
-            }
             PhotoOutputRequest(
-                outputOptions = ImageCapture.OutputFileOptions.Builder(fallbackFile).build(),
-                outputPath = fallbackFile.absolutePath,
-                outputHandle = MediaOutputHandle(
-                    displayPath = fallbackFile.absolutePath,
-                    filePath = fallbackFile.absolutePath
-                ),
-                cleanupFile = fallbackFile
+                outputOptions = ImageCapture.OutputFileOptions.Builder(
+                    context.contentResolver,
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    values
+                ).build(),
+                outputPath = outputPath,
+                outputHandle = MediaOutputHandle(displayPath = outputPath)
             )
         } else {
             val outputDir = buildLegacyOutputDirectory(saveRequest).apply { mkdirs() }
@@ -2248,7 +2108,8 @@ class CameraXCaptureAdapter(
                 val camera = provider.bindToLifecycle(
                     lifecycleOwner,
                     selector,
-                    useCaseGroupFor(previewView, preview, capture)
+                    preview,
+                    capture
                 )
                 imageCapture = capture
                 videoCapture = null
@@ -2280,7 +2141,8 @@ class CameraXCaptureAdapter(
                 val camera = provider.bindToLifecycle(
                     lifecycleOwner,
                     selector,
-                    useCaseGroupFor(previewView, preview, capture)
+                    preview,
+                    capture
                 )
                 imageCapture = null
                 videoCapture = capture
@@ -2309,20 +2171,6 @@ class CameraXCaptureAdapter(
             observePreviewStream(previewView, lifecycleOwner)
         }
         suppressPreviewStateEvents = false
-    }
-
-    private fun useCaseGroupFor(
-        previewView: PreviewView,
-        preview: Preview,
-        capture: androidx.camera.core.UseCase
-    ): UseCaseGroup {
-        val builder = UseCaseGroup.Builder()
-            .addUseCase(preview)
-            .addUseCase(capture)
-        previewView.viewPort?.let { viewPort ->
-            builder.setViewPort(viewPort)
-        }
-        return builder.build()
     }
 
     private fun createImageCapture(
@@ -2476,16 +2324,17 @@ class CameraXCaptureAdapter(
         val outputOptions: ImageCapture.OutputFileOptions,
         val outputPath: String,
         val outputHandle: MediaOutputHandle,
-        val cleanupFile: File? = null,
-        val outputStream: Closeable? = null
+        val cleanupFile: File? = null
     ) {
         fun resolveOutputHandle(savedUri: Uri?): MediaOutputHandle {
-            return resolvePhotoOutputHandle(
-                outputHandle = outputHandle,
-                savedUri = savedUri
-                    ?.takeUnless { it == Uri.EMPTY }
-                    ?.toString()
-            )
+            val resolvedContentUri = savedUri
+                ?.takeUnless { it == Uri.EMPTY }
+                ?.toString()
+            return if (resolvedContentUri == null) {
+                outputHandle
+            } else {
+                outputHandle.copy(contentUri = resolvedContentUri)
+            }
         }
 
         fun cleanupPaths(): List<String> {
@@ -2494,18 +2343,6 @@ class CameraXCaptureAdapter(
                 outputHandle.filePath?.let(::add)
                 outputPath.takeIf { File(it).isAbsolute }?.let(::add)
             }.distinct()
-        }
-
-        fun cleanupContentUris(): List<String> {
-            return buildList {
-                outputHandle.contentUri?.let(::add)
-            }.distinct()
-        }
-
-        fun closeOutputStreamQuietly() {
-            runCatching {
-                outputStream?.close()
-            }
         }
     }
 
@@ -2553,13 +2390,4 @@ class CameraXCaptureAdapter(
     }
 
     private fun Uri?.takeUnlessEmpty(): Uri? = this?.takeUnless { it == Uri.EMPTY }
-}
-
-internal fun mapOutputRotationToSurface(
-    rotation: com.opencamera.core.device.CameraOutputRotation
-): Int = when (rotation) {
-    com.opencamera.core.device.CameraOutputRotation.ROTATION_0 -> android.view.Surface.ROTATION_0
-    com.opencamera.core.device.CameraOutputRotation.ROTATION_90 -> android.view.Surface.ROTATION_90
-    com.opencamera.core.device.CameraOutputRotation.ROTATION_180 -> android.view.Surface.ROTATION_180
-    com.opencamera.core.device.CameraOutputRotation.ROTATION_270 -> android.view.Surface.ROTATION_270
 }

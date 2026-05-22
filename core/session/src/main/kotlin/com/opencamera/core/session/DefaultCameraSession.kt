@@ -1473,49 +1473,6 @@ class DefaultCameraSession(
         )
     }
 
-    private suspend fun handlePreviewTapToFocus(normalizedX: Float, normalizedY: Float) {
-        val requestId = "metering-${++meteringCounter}"
-        val point = PreviewMeteringPoint(normalizedX, normalizedY).clamped()
-        updateState(
-            previewMeteringFeedback = PreviewMeteringFeedback(
-                requestId = requestId,
-                normalizedX = point.normalizedX,
-                normalizedY = point.normalizedY,
-                status = PreviewMeteringFeedbackStatus.REQUESTED
-            ),
-            lastAction = "Tap to focus requested"
-        )
-        _effects.emit(
-            SessionEffect.ApplyPreviewMetering(
-                PreviewMeteringRequest(
-                    requestId = requestId,
-                    point = point
-                )
-            )
-        )
-        trace.record("metering.requested", "$requestId:($normalizedX,$normalizedY)")
-    }
-
-    private suspend fun handlePreviewMeteringCompleted(result: PreviewMeteringResult) {
-        val feedbackStatus = when (result.status) {
-            PreviewMeteringResultStatus.SUCCEEDED -> PreviewMeteringFeedbackStatus.SUCCEEDED
-            PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY
-            PreviewMeteringResultStatus.FAILED -> PreviewMeteringFeedbackStatus.FAILED
-            PreviewMeteringResultStatus.UNSUPPORTED -> PreviewMeteringFeedbackStatus.UNSUPPORTED
-        }
-        updateState(
-            previewMeteringFeedback = PreviewMeteringFeedback(
-                requestId = result.requestId,
-                normalizedX = result.point.normalizedX,
-                normalizedY = result.point.normalizedY,
-                status = feedbackStatus,
-                reason = result.reason
-            ),
-            lastAction = "Metering ${result.status.name.lowercase()}"
-        )
-        trace.record("metering.completed", "${result.requestId}:${result.status}")
-    }
-
     private suspend fun handleInterruptedShotFailure(
         shot: ShotRequest,
         reason: String
