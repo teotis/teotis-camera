@@ -235,6 +235,42 @@ private fun ManualCaptureParams.isAutoRequest(): Boolean {
         whiteBalanceKelvin == null
 }
 
+data class PreviewMeteringPoint(
+    val normalizedX: Float,
+    val normalizedY: Float
+) {
+    fun clamped(): PreviewMeteringPoint = PreviewMeteringPoint(
+        normalizedX = normalizedX.coerceIn(0f, 1f),
+        normalizedY = normalizedY.coerceIn(0f, 1f)
+    )
+}
+
+enum class PreviewMeteringMode {
+    FOCUS_AND_AUTO_EXPOSURE,
+    AUTO_EXPOSURE_ONLY
+}
+
+data class PreviewMeteringRequest(
+    val requestId: String,
+    val point: PreviewMeteringPoint,
+    val mode: PreviewMeteringMode = PreviewMeteringMode.FOCUS_AND_AUTO_EXPOSURE,
+    val autoCancelMillis: Long = 3_000L
+)
+
+enum class PreviewMeteringResultStatus {
+    SUCCEEDED,
+    DEGRADED_AUTO_EXPOSURE_ONLY,
+    FAILED,
+    UNSUPPORTED
+}
+
+data class PreviewMeteringResult(
+    val requestId: String,
+    val point: PreviewMeteringPoint,
+    val status: PreviewMeteringResultStatus,
+    val reason: String? = null
+)
+
 data class PreviewConfig(
     val snapshotsEnabled: Boolean = true,
     val zoomRatio: Float = 1f
@@ -427,6 +463,7 @@ sealed interface DeviceCommand {
     data class ExecuteShot(val plan: ShotPlan) : DeviceCommand
     data class StopActiveShot(val shotId: String) : DeviceCommand
     data class UpdateZoomRatio(val zoomRatio: Float) : DeviceCommand
+    data class ApplyPreviewMetering(val request: PreviewMeteringRequest) : DeviceCommand
 }
 
 enum class DeviceRuntimeIssueKind {
@@ -494,4 +531,5 @@ sealed interface DeviceEvent {
         val shotId: String,
         val outputPath: String
     ) : DeviceEvent
+    data class PreviewMeteringCompleted(val result: PreviewMeteringResult) : DeviceEvent
 }

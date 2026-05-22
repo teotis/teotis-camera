@@ -5,6 +5,10 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PreviewMeteringPoint
+import com.opencamera.core.device.PreviewMeteringRequest
+import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.displayReason
@@ -86,6 +90,7 @@ class DefaultCameraSession(
     private var pendingCountdownStrategy: CaptureStrategy? = null
     private var pendingPreviewHostRecoveryReason: String? = null
     private var recordingWatchdogJob: Job? = null
+    private var meteringCounter: Int = 0
     private var currentController: ModeController = createController(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
@@ -194,6 +199,8 @@ class DefaultCameraSession(
             )
             is SessionIntent.ThermalStateChanged -> trace.record("intent.thermal", intent.thermalState.toString())
             is SessionIntent.PerformanceClassChanged -> trace.record("intent.performance", intent.performanceClass.toString())
+            is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
+            is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
         }
     }
 
@@ -1353,6 +1360,71 @@ class DefaultCameraSession(
         }
     }
 
+    private suspend fun handlePreviewTapToFocus(normalizedX: Float, normalizedY: Float) {
+        val point = PreviewMeteringPoint(normalizedX, normalizedY).clamped()
+        val snapshot = _state.value
+        if (snapshot.previewStatus != PreviewStatus.ACTIVE) {
+            trace.record(
+                "preview.metering.ignored",
+                "reason=preview-not-active,status=${snapshot.previewStatus}"
+            )
+            return
+        }
+        if (!snapshot.permissionState.cameraGranted || !snapshot.previewHostAvailable) {
+            trace.record(
+                "preview.metering.ignored",
+                "reason=permission-or-host-missing,granted=${snapshot.permissionState.cameraGranted},host=${snapshot.previewHostAvailable}"
+            )
+            return
+        }
+        meteringCounter++
+        val requestId = "meter-$meteringCounter"
+        val request = PreviewMeteringRequest(
+            requestId = requestId,
+            point = point
+        )
+        updateState(
+            previewMeteringFeedback = PreviewMeteringFeedback(
+                requestId = requestId,
+                normalizedX = point.normalizedX,
+                normalizedY = point.normalizedY,
+                status = PreviewMeteringFeedbackStatus.REQUESTED
+            )
+        )
+        _effects.emit(SessionEffect.ApplyPreviewMetering(request))
+        trace.record(
+            "preview.metering.requested",
+            "requestId=$requestId,x=${"%.2f".format(point.normalizedX)},y=${"%.2f".format(point.normalizedY)},mode=focus+ae"
+        )
+    }
+
+    private fun handlePreviewMeteringCompleted(result: PreviewMeteringResult) {
+        val currentFeedback = _state.value.presentation.previewMeteringFeedback
+        if (currentFeedback == null || currentFeedback.requestId != result.requestId) {
+            trace.record("preview.metering.stale", "resultId=${result.requestId},currentId=${currentFeedback?.requestId}")
+            return
+        }
+        val feedbackStatus = when (result.status) {
+            PreviewMeteringResultStatus.SUCCEEDED -> PreviewMeteringFeedbackStatus.SUCCEEDED
+            PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY
+            PreviewMeteringResultStatus.FAILED -> PreviewMeteringFeedbackStatus.FAILED
+            PreviewMeteringResultStatus.UNSUPPORTED -> PreviewMeteringFeedbackStatus.UNSUPPORTED
+        }
+        updateState(
+            previewMeteringFeedback = currentFeedback.copy(
+                status = feedbackStatus,
+                reason = result.reason
+            )
+        )
+        val traceLabel = when (result.status) {
+            PreviewMeteringResultStatus.SUCCEEDED -> "preview.metering.succeeded"
+            PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> "preview.metering.degraded"
+            PreviewMeteringResultStatus.FAILED -> "preview.metering.failed"
+            PreviewMeteringResultStatus.UNSUPPORTED -> "preview.metering.unsupported"
+        }
+        trace.record(traceLabel, "requestId=${result.requestId}")
+    }
+
     private suspend fun handleShotFailed(
         shotId: String,
         mediaType: MediaType,
@@ -1537,7 +1609,8 @@ class DefaultCameraSession(
         latestSavedMediaType: SavedMediaType? = _state.value.presentation.latestSavedMediaType,
         latestPipelineNotes: List<String> = _state.value.presentation.latestPipelineNotes,
         pendingCaptureFeedback: CaptureFeedbackPreview? = _state.value.presentation.pendingCaptureFeedback,
-        lastError: String? = _state.value.presentation.lastError
+        lastError: String? = _state.value.presentation.lastError,
+        previewMeteringFeedback: PreviewMeteringFeedback? = _state.value.presentation.previewMeteringFeedback
     ) {
         _state.value = _state.value.copy(
             lifecycle = lifecycle,
@@ -1569,7 +1642,8 @@ class DefaultCameraSession(
                 latestLivePhotoBundle = latestLivePhotoBundle,
                 latestSavedMediaType = latestSavedMediaType,
                 latestPipelineNotes = latestPipelineNotes,
-                lastError = lastError
+                lastError = lastError,
+                previewMeteringFeedback = previewMeteringFeedback
             )
         )
     }

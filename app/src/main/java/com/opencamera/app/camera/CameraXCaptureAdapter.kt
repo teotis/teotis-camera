@@ -1108,6 +1108,19 @@ class CameraXCaptureAdapter(
                     )
                 )
             }
+
+            is DeviceCommand.ApplyPreviewMetering -> {
+                _events.emit(
+                    DeviceEvent.PreviewMeteringCompleted(
+                        com.opencamera.core.device.PreviewMeteringResult(
+                            requestId = command.request.requestId,
+                            point = command.request.point,
+                            status = com.opencamera.core.device.PreviewMeteringResultStatus.UNSUPPORTED,
+                            reason = "CameraX FocusMeteringAction not yet implemented"
+                        )
+                    )
+                )
+            }
         }
     }
 

@@ -834,6 +834,55 @@ class CameraSessionCoordinatorTest {
         )
     }
 
+    @Test
+    fun `ApplyPreviewMetering effect forwards as DeviceCommand`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        val request = com.opencamera.core.device.PreviewMeteringRequest(
+            requestId = "meter-1",
+            point = com.opencamera.core.device.PreviewMeteringPoint(0.5f, 0.4f)
+        )
+        session.emitEffect(SessionEffect.ApplyPreviewMetering(request))
+        advanceUntilIdle()
+
+        assertTrue(adapter.recordedCommands.contains(DeviceCommand.ApplyPreviewMetering(request)))
+    }
+
+    @Test
+    fun `PreviewMeteringCompleted device event forwards as SessionIntent`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        val result = com.opencamera.core.device.PreviewMeteringResult(
+            requestId = "meter-1",
+            point = com.opencamera.core.device.PreviewMeteringPoint(0.5f, 0.4f),
+            status = com.opencamera.core.device.PreviewMeteringResultStatus.SUCCEEDED
+        )
+        adapter.emit(DeviceEvent.PreviewMeteringCompleted(result))
+        advanceUntilIdle()
+
+        assertTrue(
+            session.recordedIntents.contains(
+                SessionIntent.PreviewMeteringCompleted(result)
+            )
+        )
+    }
+
     private class FakeCameraSession(
         initialState: SessionState = defaultSessionState()
     ) : CameraSession {
