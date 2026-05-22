@@ -81,7 +81,7 @@ class CameraCockpitRenderModelTest {
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals(3, model.rightRail.entries.size)
-        assertEquals("Style", model.rightRail.entries[0].label)
+        assertEquals("Lens", model.rightRail.entries[0].label)
         assertEquals("Quick", model.rightRail.entries[1].label)
         assertEquals("DEV", model.rightRail.entries[2].label)
     }
@@ -254,7 +254,7 @@ class CameraCockpitRenderModelTest {
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         val styleEntry = model.rightRail.entries[0]
-        assertEquals("Style", styleEntry.label)
+        assertEquals("Lens", styleEntry.label)
         assertEquals(CockpitPanelRoute.StyleLab, styleEntry.route)
     }
 
@@ -274,6 +274,25 @@ class CameraCockpitRenderModelTest {
 
         assertTrue(filterModel.rightRail.entries[0].isActive)
         assertFalse(lensModel.rightRail.entries[0].isActive)
+    }
+
+    @Test
+    fun `cockpit render model includes both zoom strip and mode track`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.7f, 1f, 2f),
+                    defaultRatio = 1f
+                )
+            ),
+            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.zoomStrip.isVisible)
+        assertTrue(model.zoomStrip.chips.isNotEmpty())
+        assertTrue(model.modeTrack.items.isNotEmpty())
     }
 
     private fun defaultSessionState(

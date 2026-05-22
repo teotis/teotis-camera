@@ -62,8 +62,8 @@
         android:id="@+id/topPanel"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="@dimen/space_16"
-        android:layout_marginTop="8dp"
+        android:layout_marginHorizontal="@dimen/space_12"
+        android:layout_marginTop="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
@@ -77,6 +77,7 @@
             android:layout_weight="1"
             android:breakStrategy="simple"
             android:ellipsize="end"
+            android:includeFontPadding="false"
             android:maxLines="1"
             android:text="@string/app_name"
             android:textColor="@color/oc_text_primary"
@@ -85,29 +86,27 @@
 
         <Button
             android:id="@+id/buttonColorLabEntry"
-            style="@style/Widget.OpenCamera.PillButton"
+            style="@style/Widget.OpenCamera.TopActionChip"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:layout_marginStart="@dimen/space_4"
-            android:text="@string/button_color_lab_entry"
-            android:textSize="@dimen/text_size_status" />
+            android:text="@string/button_color_lab_entry" />
 
         <Button
             android:id="@+id/buttonSettingsEntry"
-            style="@style/Widget.OpenCamera.PillButton"
+            style="@style/Widget.OpenCamera.TopActionChipLight"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
-            android:layout_marginStart="@dimen/space_4"
-            android:text="@string/button_settings_entry"
-            android:textSize="@dimen/text_size_status" />
+            android:layout_marginStart="@dimen/space_2"
+            android:text="@string/button_settings_entry" />
     </LinearLayout>
 
     <TextView
         android:id="@+id/permissionStatus"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="@dimen/space_16"
-        android:layout_marginTop="8dp"
+        android:layout_marginHorizontal="@dimen/space_12"
+        android:layout_marginTop="4dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:text="@string/permission_pending"
@@ -156,10 +155,10 @@
             android:text="@string/button_dev_entry" />
     </LinearLayout>
 
-    <!-- Overlay: Quick Bubble tools -->
+    <!-- Overlay: Quick Panel Sheet -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/quickBubblePanel"
-        android:layout_width="wrap_content"
+        android:layout_width="260dp"
         android:layout_height="0dp"
         android:layout_marginEnd="74dp"
         android:clipToPadding="false"
@@ -171,81 +170,97 @@
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:padding="8dp">
 
-        <Button
-            android:id="@+id/buttonQuickGrid"
-            style="@style/Widget.OpenCamera.QuickBubbleButton"
-            android:layout_width="96dp"
-            android:layout_height="44dp" />
-
-        <Button
-            android:id="@+id/buttonQuickFlash"
-            style="@style/Widget.OpenCamera.QuickBubbleButton"
-            android:layout_width="96dp"
-            android:layout_height="44dp"
-            android:layout_marginTop="10dp" />
-
-        <TextView
-            android:id="@+id/frameRatioQuickTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/button_quick_ratio"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:gravity="center" />
-
-        <LinearLayout
-            android:id="@+id/frameRatioOptionRow"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center">
-
+            <!-- Grid row -->
             <Button
-                android:id="@+id/buttonFrameRatio43"
+                android:id="@+id/buttonQuickGrid"
                 style="@style/Widget.OpenCamera.QuickBubbleButton"
-                android:layout_width="48dp"
-                android:layout_height="36dp"
-                android:text="4:3"
-                android:textSize="11sp" />
+                android:layout_width="match_parent"
+                android:layout_height="40dp" />
 
+            <!-- Quality row -->
             <Button
-                android:id="@+id/buttonFrameRatio169"
+                android:id="@+id/buttonQuickFlash"
                 style="@style/Widget.OpenCamera.QuickBubbleButton"
-                android:layout_width="48dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="4dp"
-                android:text="16:9"
-                android:textSize="11sp" />
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp" />
 
+            <!-- Frame ratio row: title + segmented chips -->
+            <LinearLayout
+                android:id="@+id/frameRatioRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="6dp"
+                android:background="@color/oc_surface_scrim">
+
+                <TextView
+                    android:id="@+id/frameRatioQuickTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/button_quick_ratio"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    android:gravity="center" />
+
+                <LinearLayout
+                    android:id="@+id/frameRatioOptionRow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal"
+                    android:gravity="center">
+
+                    <Button
+                        android:id="@+id/buttonFrameRatio43"
+                        style="@style/Widget.OpenCamera.QuickBubbleButton"
+                        android:layout_width="56dp"
+                        android:layout_height="32dp"
+                        android:text="4:3"
+                        android:textSize="11sp" />
+
+                    <Button
+                        android:id="@+id/buttonFrameRatio169"
+                        style="@style/Widget.OpenCamera.QuickBubbleButton"
+                        android:layout_width="56dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:text="16:9"
+                        android:textSize="11sp" />
+
+                    <Button
+                        android:id="@+id/buttonFrameRatio11"
+                        style="@style/Widget.OpenCamera.QuickBubbleButton"
+                        android:layout_width="56dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="4dp"
+                        android:text="1:1"
+                        android:textSize="11sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Live row -->
             <Button
-                android:id="@+id/buttonFrameRatio11"
+                android:id="@+id/buttonQuickLivePhoto"
                 style="@style/Widget.OpenCamera.QuickBubbleButton"
-                android:layout_width="48dp"
-                android:layout_height="36dp"
-                android:layout_marginStart="4dp"
-                android:text="1:1"
-                android:textSize="11sp" />
-        </LinearLayout>
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp" />
 
-        <Button
-            android:id="@+id/buttonQuickLivePhoto"
-            style="@style/Widget.OpenCamera.QuickBubbleButton"
-            android:layout_width="96dp"
-            android:layout_height="44dp"
-            android:layout_marginTop="10dp" />
-
-        <Button
-            android:id="@+id/buttonQuickTimer"
-            style="@style/Widget.OpenCamera.QuickBubbleButton"
-            android:layout_width="96dp"
-            android:layout_height="44dp"
-            android:layout_marginTop="10dp" />
+            <!-- Timer row -->
+            <Button
+                android:id="@+id/buttonQuickTimer"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
@@ -254,12 +269,14 @@
         android:id="@+id/modeTrackScroll"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="@dimen/space_4"
+        android:layout_marginBottom="0dp"
+        android:background="@color/oc_surface_scrim_light"
         android:scrollbars="none"
         android:fadeScrollbars="false"
         android:clipToPadding="false"
         android:paddingHorizontal="@dimen/space_12"
-        app:layout_constraintBottom_toTopOf="@id/zoomCapsuleScroll"
+        android:paddingVertical="@dimen/space_4"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
@@ -1080,6 +1097,7 @@
                     android:textSize="@dimen/text_size_status" />
 
                 <TextView
+                    android:id="@+id/filterAdvancedTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
@@ -1351,26 +1369,6 @@
         </androidx.core.widget.NestedScrollView>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Zoom strip (positioned below mode track, above bottom cockpit) -->
-    <HorizontalScrollView
-        android:id="@+id/zoomCapsuleScroll"
-        android:layout_width="wrap_content"
-        android:layout_height="@dimen/zoom_strip_container_height"
-        android:layout_marginBottom="@dimen/space_4"
-        android:clipToPadding="false"
-        android:scrollbars="none"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
-
-        <LinearLayout
-            android:id="@+id/zoomCapsuleRow"
-            android:layout_width="wrap_content"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:paddingHorizontal="@dimen/space_8"
-            android:orientation="horizontal" />
-    </HorizontalScrollView>
 
     <!-- Layer 3: Bottom control strip (three-segment cockpit) -->
     <LinearLayout
@@ -1380,9 +1378,9 @@
         android:background="@drawable/bg_bottom_panel"
         android:orientation="vertical"
         android:paddingStart="@dimen/bottom_cockpit_padding_horizontal"
-        android:paddingTop="@dimen/space_8"
+        android:paddingTop="@dimen/space_4"
         android:paddingEnd="@dimen/bottom_cockpit_padding_horizontal"
-        android:paddingBottom="@dimen/space_16"
+        android:paddingBottom="@dimen/space_12"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -1399,11 +1397,29 @@
             android:textSize="@dimen/text_size_status"
             android:visibility="gone" />
 
+        <!-- Zoom strip: integrated into cockpit -->
+        <HorizontalScrollView
+            android:id="@+id/zoomCapsuleScroll"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/zoom_strip_container_height"
+            android:layout_marginTop="@dimen/space_4"
+            android:clipToPadding="false"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/zoomCapsuleRow"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingHorizontal="@dimen/space_8"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
         <!-- Main control row: Thumbnail | Shutter | Lens/Zoom -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="@dimen/space_4"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 

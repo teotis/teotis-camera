@@ -19,6 +19,31 @@
         <item name="cornerRadius">@dimen/radius_chip</item>
     </style>
 
+    <!-- Top bar translucent chip: no strong outline, semi-transparent fill -->
+    <style name="Widget.OpenCamera.TopActionChip" parent="Widget.MaterialComponents.Button.TextButton">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/oc_text_primary</item>
+        <item name="android:textSize">@dimen/text_size_status</item>
+        <item name="backgroundTint">@color/oc_surface_scrim_light</item>
+        <item name="cornerRadius">@dimen/radius_chip</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">@dimen/space_8</item>
+        <item name="android:paddingEnd">@dimen/space_8</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:includeFontPadding">false</item>
+    </style>
+
+    <!-- Lighter variant for secondary top actions (e.g. Settings) -->
+    <style name="Widget.OpenCamera.TopActionChipLight" parent="Widget.OpenCamera.TopActionChip">
+        <item name="android:textColor">@color/oc_text_secondary</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+    </style>
+
     <style name="Widget.OpenCamera.SettingsButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
         <item name="android:textAllCaps">false</item>
         <item name="android:textColor">@color/oc_text_primary</item>
@@ -33,7 +58,7 @@
 
     <style name="Widget.OpenCamera.ModeTrackButton" parent="Widget.MaterialComponents.Button.TextButton">
         <item name="android:textAllCaps">false</item>
-        <item name="android:textColor">@color/oc_text_secondary</item>
+        <item name="android:textColor">@color/oc_text_primary</item>
         <item name="android:textSize">@dimen/text_size_mode_chip</item>
         <item name="android:minWidth">@dimen/mode_chip_min_width</item>
         <item name="android:minHeight">@dimen/mode_chip_min_height</item>
@@ -48,7 +73,7 @@
     </style>
 
     <style name="Widget.OpenCamera.ModeTrackButton.Active">
-        <item name="android:textColor">@color/oc_text_primary</item>
+        <item name="android:textColor">@color/oc_accent</item>
         <item name="android:textStyle">bold</item>
         <item name="backgroundTint">@color/oc_surface_panel_alt</item>
     </style>

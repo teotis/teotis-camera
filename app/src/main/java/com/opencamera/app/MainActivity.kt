@@ -155,6 +155,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var filterPaletteSummary: TextView
     private lateinit var filterPaletteHint: TextView
     private lateinit var filterPaletteSurface: FilterPaletteView
+    private lateinit var filterAdvancedTitle: TextView
     private lateinit var filterAdvancedControls: LinearLayout
     private lateinit var buttonAdvancedExposure: Button
     private lateinit var buttonAdvancedSoftGlow: Button
@@ -331,6 +332,7 @@ class MainActivity : AppCompatActivity() {
         filterPaletteSummary = findViewById(R.id.filterPaletteSummary)
         filterPaletteHint = findViewById(R.id.filterPaletteHint)
         filterPaletteSurface = findViewById(R.id.filterPaletteSurface)
+        filterAdvancedTitle = findViewById(R.id.filterAdvancedTitle)
         filterAdvancedControls = findViewById(R.id.filterAdvancedControls)
         buttonAdvancedExposure = findViewById(R.id.buttonAdvancedExposure)
         buttonAdvancedSoftGlow = findViewById(R.id.buttonAdvancedSoftGlow)
@@ -691,7 +693,7 @@ class MainActivity : AppCompatActivity() {
             if (activePanelRoute is CockpitPanelRoute.ColorLab) {
                 lifecycleScope.launch {
                     container.sessionSettingsManager.apply(
-                        PersistedSettingsAction.UpdateColorLabSpec(ColorLabSpec())
+                        neutralColorLabAction()
                     )
                 }
             } else {
@@ -1122,7 +1124,12 @@ class MainActivity : AppCompatActivity() {
 
         // Show/hide adjustment panel based on panel role
         if (model.showAdjustmentPanel) {
-            renderAdjustmentPanel(model.adjustmentPanel, model.editingEnabled, model.showAdvancedControls)
+            renderAdjustmentPanel(
+                model.adjustmentPanel,
+                model.editingEnabled,
+                model.showAdvancedControls,
+                model.showModeToggle
+            )
         } else {
             filterAdjustmentPanel.isVisible = false
         }
@@ -1229,9 +1236,11 @@ class MainActivity : AppCompatActivity() {
     private fun renderAdjustmentPanel(
         model: FilterAdjustmentPanelRenderModel,
         editingEnabled: Boolean,
-        showAdvancedControls: Boolean = true
+        showAdvancedControls: Boolean = true,
+        showModeToggle: Boolean = true
     ) {
         filterAdjustmentPanel.isVisible = model.isVisible
+        buttonFilterModeToggle.isVisible = showModeToggle
         if (showAdvancedControls) {
             buttonFilterModeToggle.text = model.modeToggleLabel
             buttonFilterModeToggle.isEnabled = editingEnabled && model.selectedProfileId != null
@@ -1243,6 +1252,7 @@ class MainActivity : AppCompatActivity() {
         filterPaletteHint.text = model.lightPalette.supportingText
         filterPaletteSurface.isVisible = model.mode == FilterAdjustmentMode.LIGHT
         filterPaletteHint.isVisible = model.mode == FilterAdjustmentMode.LIGHT
+        filterAdvancedTitle.isVisible = showAdvancedControls
         filterAdvancedControls.isVisible = showAdvancedControls && model.mode == FilterAdjustmentMode.ADVANCED
         buttonAdvancedExposure.text = model.advancedControls.buttonLabel(FilterAdvancedControl.EXPOSURE)
         buttonAdvancedSoftGlow.text = model.advancedControls.buttonLabel(FilterAdvancedControl.SOFT_GLOW)
@@ -1291,35 +1301,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderQuickBubble(settingsPage: SessionSettingsPageRenderModel, text: AppTextResolver = AppTextResolver(this)) {
-        val grid = settingsPage.commonSection.gridMode
-        buttonQuickGrid.text = getString(R.string.button_quick_grid)
-        buttonQuickGrid.contentDescription = "${getString(R.string.button_quick_grid)} ${grid.value}"
-        buttonQuickGrid.isEnabled = grid.isInteractive
+        val state = latestSessionState ?: return
+        val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
 
-        buttonQuickFlash.text = getString(R.string.button_quick_flash)
-        latestSessionState?.let { state ->
-            val frameControl = frameRatioControlRenderModel(state, text)
-            buttonFrameRatio43.isEnabled = frameControl.isEnabled
-            buttonFrameRatio169.isEnabled = frameControl.isEnabled
-            buttonFrameRatio11.isEnabled = frameControl.isEnabled
-            frameControl.options.forEach { option ->
-                when (option.ratio) {
-                    FrameRatio.RATIO_4_3 -> buttonFrameRatio43.alpha = if (option.isSelected) 1f else 0.6f
-                    FrameRatio.RATIO_16_9 -> buttonFrameRatio169.alpha = if (option.isSelected) 1f else 0.6f
-                    FrameRatio.RATIO_1_1 -> buttonFrameRatio11.alpha = if (option.isSelected) 1f else 0.6f
-                }
+        buttonQuickGrid.text = "${sheet.gridRow.title} ${sheet.gridRow.value}"
+        buttonQuickGrid.isEnabled = sheet.gridRow.isEnabled
+
+        buttonQuickFlash.text = "${sheet.qualityRow.title} ${sheet.qualityRow.value}"
+        buttonQuickFlash.isEnabled = sheet.qualityRow.isEnabled
+
+        buttonFrameRatio43.isEnabled = sheet.frameRatioEnabled
+        buttonFrameRatio169.isEnabled = sheet.frameRatioEnabled
+        buttonFrameRatio11.isEnabled = sheet.frameRatioEnabled
+        sheet.frameRatioOptions.forEach { option ->
+            val button = when (option.ratio) {
+                FrameRatio.RATIO_4_3 -> buttonFrameRatio43
+                FrameRatio.RATIO_16_9 -> buttonFrameRatio169
+                FrameRatio.RATIO_1_1 -> buttonFrameRatio11
+            }
+            if (option.isSelected) {
+                button.alpha = 1f
+                button.setBackgroundResource(R.drawable.bg_quick_chip_selected)
+            } else {
+                button.alpha = 0.6f
+                button.background = null
             }
         }
 
-        val live = settingsPage.photoSection.livePhoto
-        buttonQuickLivePhoto.text = getString(R.string.button_quick_live)
-        buttonQuickLivePhoto.contentDescription = "${getString(R.string.button_quick_live)} ${live.value}"
-        buttonQuickLivePhoto.isEnabled = live.isInteractive
+        buttonQuickLivePhoto.text = "${sheet.liveRow.title} ${sheet.liveRow.value}"
+        buttonQuickLivePhoto.isEnabled = sheet.liveRow.isEnabled
 
-        val timer = settingsPage.photoSection.countdown
-        buttonQuickTimer.text = getString(R.string.button_quick_timer)
-        buttonQuickTimer.contentDescription = "${getString(R.string.button_quick_timer)} ${timer.value}"
-        buttonQuickTimer.isEnabled = timer.isInteractive
+        buttonQuickTimer.text = "${sheet.timerRow.title} ${sheet.timerRow.value}"
+        buttonQuickTimer.isEnabled = sheet.timerRow.isEnabled
     }
 
     private fun renderPanelVisibility() {
@@ -1473,15 +1486,15 @@ class MainActivity : AppCompatActivity() {
                 button.text = item.trackLabel
                 button.isEnabled = item.isAvailable
                 if (item.isActive) {
-                    button.setTextColor(ContextCompat.getColor(this, R.color.oc_text_primary))
+                    button.setTextColor(ContextCompat.getColor(this, R.color.oc_accent))
                     button.setTypeface(null, android.graphics.Typeface.BOLD)
-                    button.setBackgroundResource(R.drawable.bg_mode_track_active)
+                    button.setBackgroundResource(R.drawable.bg_mode_track_active_chip)
                     button.alpha = 1f
                 } else {
-                    button.setTextColor(ContextCompat.getColor(this, R.color.oc_text_secondary))
+                    button.setTextColor(ContextCompat.getColor(this, R.color.oc_text_primary))
                     button.setTypeface(null, android.graphics.Typeface.NORMAL)
                     button.background = null
-                    button.alpha = if (item.isAvailable) 0.82f else 0.42f
+                    button.alpha = if (item.isAvailable) 0.78f else 0.42f
                 }
             }
         }
@@ -1808,6 +1821,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleFilterPaletteTouch(colorAxis: Float, toneAxis: Float) {
+        if (activePanelRoute is CockpitPanelRoute.ColorLab) {
+            val persisted = latestSessionState?.settings?.persisted ?: return
+            filterPaletteSurface.updateReticle(colorAxis, toneAxis)
+            lifecycleScope.launch {
+                container.sessionSettingsManager.apply(
+                    colorLabPaletteUpdateAction(
+                        persisted = persisted,
+                        colorAxis = colorAxis,
+                        toneAxis = toneAxis
+                    )
+                )
+            }
+            return
+        }
         val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
         val profileId = panel.selectedProfileId ?: return
         if (!panel.isVisible || panel.mode != FilterAdjustmentMode.LIGHT) {
