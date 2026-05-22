@@ -105,6 +105,25 @@
 
 # 最近有效闭环
 
+## 2026-05-23：缩略图相册跳转与预览点按对焦/自动 EV 验收收口
+
+- 目标：复核其他 agent 对两张需求单的落地实现，修掉合并后阻断项，并给出可验收结论。
+- 根因与修复：
+  其他 agent 合并后在 `core/session` 留下 focus/EV 与输出旋转分支的冲突残留，且部分 session 测试丢失 `effectCollector.cancel()`，导致编译/协程泄漏型假失败；
+  `captureFeedbackPolicyFor()` 被扩大后把默认 `photo-original/photo-vivid` 低风险预览反馈也抑制，回退了零延时缩略图反馈；
+  `CameraXCaptureAdapterLivePhotoTest` 引用的 still output handle 合并 helper 缺失，导致 app 单测编译失败。
+- 核心结果：
+  [`SessionContracts.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 将 raw capture feedback 策略收敛为：默认低风险内置 photo filter 可继续即时反馈，Color Lab/filterSpec、非默认画幅、自拍镜像、非 classic-overlay 水印等待可信 saved media；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 恢复 focus/EV 与 host recovery 测试的 collector 生命周期，并同步默认 filter 期望到当前 `photo-original`；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 抽出 `resolvePhotoOutputHandle()`，生产 still capture 与 live-photo 测试共用 MediaStore `contentUri` 合并规则；
+  缩略图打开链路已走 `GalleryOpenTarget` / `latestThumbnailSource`，只打开官方 saved media；预览点按链路已从 `GestureAction.FocusAt` 接到 session/device/CameraX metering，并由 presentation feedback 驱动 reticle 渲染。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.GalleryOpenTargetTest --tests com.opencamera.app.ThumbnailRenderCommandTest --tests com.opencamera.app.PreviewTapFocusGeometryTest --tests com.opencamera.app.camera.PreviewMeteringActionPlannerTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `rtk ./scripts/verify_stage_7_observability.sh`
+- 结论：
+  本地代码验收通过；仍需真机 smoke 复验 Android 相册是否能打开最新 saved media，以及触摸预览区域时 AF/AE 行为是否符合具体机型 CameraX 支持能力。
+
 ## 2026-05-23：预览框与成片区域同源几何修复
 
 - 目标：处理最新真机实测发现的严重问题：保存照片的实际画面区域不是主界面预览画幅框所示区域。
