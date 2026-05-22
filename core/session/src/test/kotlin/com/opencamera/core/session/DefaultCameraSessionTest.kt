@@ -27,6 +27,7 @@ import com.opencamera.feature.document.DocumentModePlugin
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeRegistry
 import com.opencamera.core.settings.AudioProfile
+import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.DEFAULT_FILTER_PROFILES
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
@@ -1158,6 +1159,42 @@ class DefaultCameraSessionTest {
         assertEquals("1", shot.saveRequest.metadata.customTags["filterSpec.version"])
         assertEquals("7", shot.saveRequest.metadata.customTags["filterSpec.brightnessShift"])
         assertEquals("custom-amber-street", shot.postProcessSpec.algorithmProfile)
+    }
+
+    @Test
+    fun `photo mode carries color lab adjusted render spec through session shot metadata`() = runTest {
+        val session = createSession(
+            trace = InMemorySessionTrace(),
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(
+                        defaultFilterProfileId = "photo-original",
+                        colorLabSpec = ColorLabSpec(
+                            colorAxis = 1f,
+                            toneAxis = -1f,
+                            strength = 1f
+                        )
+                    )
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals("photo-original", shot.saveRequest.metadata.customTags["filterProfile"])
+        assertEquals("1", shot.saveRequest.metadata.customTags["filterSpec.version"])
+        assertEquals("-8", shot.saveRequest.metadata.customTags["filterSpec.brightnessShift"])
+        assertEquals("1.17", shot.saveRequest.metadata.customTags["filterSpec.contrast"])
+        assertEquals("1.13", shot.saveRequest.metadata.customTags["filterSpec.saturation"])
+        assertEquals("12", shot.saveRequest.metadata.customTags["filterSpec.warmthShift"])
+        assertEquals("0.12", shot.saveRequest.metadata.customTags["filterSpec.highlightCompression"])
+        assertEquals("0.18", shot.saveRequest.metadata.customTags["filterSpec.warmBoost"])
+        assertEquals("photo-original", shot.postProcessSpec.algorithmProfile)
     }
 
     @Test

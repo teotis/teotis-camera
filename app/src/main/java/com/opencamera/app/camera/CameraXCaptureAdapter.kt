@@ -106,6 +106,7 @@ import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import java.io.Closeable
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -397,6 +398,18 @@ internal fun cleanupStillCaptureArtifacts(
             intermediateOutputPaths = intermediateOutputPaths
         )
     )
+}
+
+internal fun resolvePhotoOutputHandle(
+    outputHandle: MediaOutputHandle,
+    savedUri: String?
+): MediaOutputHandle {
+    val resolvedContentUri = savedUri?.takeIf { it.isNotBlank() }
+    return if (resolvedContentUri == null) {
+        outputHandle
+    } else {
+        outputHandle.copy(contentUri = resolvedContentUri)
+    }
 }
 
 internal fun cleanupAbsoluteFilePaths(
@@ -1398,6 +1411,7 @@ class CameraXCaptureAdapter(
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                         val deviceCaptureCompletedAt = SystemClock.elapsedRealtime()
+                        request.closeOutputStreamQuietly()
                         continuation.resume(
                             PhotoCaptureOutcome.Success(
                                 outputPath = request.outputPath,
@@ -1409,6 +1423,8 @@ class CameraXCaptureAdapter(
                     }
 
                     override fun onError(exception: ImageCaptureException) {
+                        request.closeOutputStreamQuietly()
+                        request.cleanupContentUris().forEach(::deleteContentUriQuietly)
                         continuation.resume(
                             PhotoCaptureOutcome.Failure(
                                 reason = exception.message ?: "Unknown image capture error",
@@ -1549,14 +1565,38 @@ class CameraXCaptureAdapter(
                 put(MediaStore.MediaColumns.MIME_TYPE, saveRequest.mimeType)
                 put(MediaStore.MediaColumns.RELATIVE_PATH, saveRequest.relativePath)
             }
+            val contentUri = context.contentResolver.insert(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                values
+            )
+            if (contentUri != null) {
+                val outputStream = context.contentResolver.openOutputStream(contentUri)
+                if (outputStream != null) {
+                    return PhotoOutputRequest(
+                        outputOptions = ImageCapture.OutputFileOptions.Builder(outputStream).build(),
+                        outputPath = outputPath,
+                        outputHandle = MediaOutputHandle(
+                            displayPath = outputPath,
+                            contentUri = contentUri.toString()
+                        ),
+                        outputStream = outputStream
+                    )
+                }
+                deleteContentUriQuietly(contentUri.toString())
+            }
+
+            val fallbackParent = context.getExternalFilesDir(null) ?: context.filesDir
+            val fallbackFile = File(fallbackParent, displayName).apply {
+                parentFile?.mkdirs()
+            }
             PhotoOutputRequest(
-                outputOptions = ImageCapture.OutputFileOptions.Builder(
-                    context.contentResolver,
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    values
-                ).build(),
-                outputPath = outputPath,
-                outputHandle = MediaOutputHandle(displayPath = outputPath)
+                outputOptions = ImageCapture.OutputFileOptions.Builder(fallbackFile).build(),
+                outputPath = fallbackFile.absolutePath,
+                outputHandle = MediaOutputHandle(
+                    displayPath = fallbackFile.absolutePath,
+                    filePath = fallbackFile.absolutePath
+                ),
+                cleanupFile = fallbackFile
             )
         } else {
             val outputDir = buildLegacyOutputDirectory(saveRequest).apply { mkdirs() }
@@ -2311,17 +2351,16 @@ class CameraXCaptureAdapter(
         val outputOptions: ImageCapture.OutputFileOptions,
         val outputPath: String,
         val outputHandle: MediaOutputHandle,
-        val cleanupFile: File? = null
+        val cleanupFile: File? = null,
+        val outputStream: Closeable? = null
     ) {
         fun resolveOutputHandle(savedUri: Uri?): MediaOutputHandle {
-            val resolvedContentUri = savedUri
-                ?.takeUnless { it == Uri.EMPTY }
-                ?.toString()
-            return if (resolvedContentUri == null) {
-                outputHandle
-            } else {
-                outputHandle.copy(contentUri = resolvedContentUri)
-            }
+            return resolvePhotoOutputHandle(
+                outputHandle = outputHandle,
+                savedUri = savedUri
+                    ?.takeUnless { it == Uri.EMPTY }
+                    ?.toString()
+            )
         }
 
         fun cleanupPaths(): List<String> {
@@ -2330,6 +2369,18 @@ class CameraXCaptureAdapter(
                 outputHandle.filePath?.let(::add)
                 outputPath.takeIf { File(it).isAbsolute }?.let(::add)
             }.distinct()
+        }
+
+        fun cleanupContentUris(): List<String> {
+            return buildList {
+                outputHandle.contentUri?.let(::add)
+            }.distinct()
+        }
+
+        fun closeOutputStreamQuietly() {
+            runCatching {
+                outputStream?.close()
+            }
         }
     }
 
