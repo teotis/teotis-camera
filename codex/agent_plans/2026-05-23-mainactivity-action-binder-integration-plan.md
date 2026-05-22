@@ -27,7 +27,7 @@
 
 - Preserve every current click behavior.
 - Keep all session runtime changes going through `SessionIntent`.
-- Keep settings changes going through `SessionSettingsManager.apply(...)` or existing manager methods.
+- Keep settings changes going through `SessionSettingsManager.apply(action)` or existing manager methods.
 - Keep Android-only operations, such as permission launch, `Toast`, `Intent.ACTION_VIEW`, FileProvider, and dev-log file export, outside renderers.
 - Binder can request actions through callbacks; it cannot directly own app container dependencies.
 
@@ -114,7 +114,14 @@ internal class MainActivityActionBinder(
     private val snapshot: () -> MainActivityUiSnapshot,
     private val callbacks: MainActivityActionCallbacks
 ) {
-    fun bind() { ... }
+    fun bind() {
+        bindPanelActions()
+        bindCaptureActions()
+        bindSettingsActions()
+        bindFilterActions()
+        bindModeTrack()
+        bindPreviewGestures()
+    }
 }
 ```
 
@@ -149,7 +156,7 @@ internal class GalleryLauncher(
 `MainActivity.openLatestGalleryMedia()` should:
 
 1. Read `latestSessionState?.presentation`.
-2. Resolve `galleryOpenTargetFor(...)`.
+2. Resolve the target with `galleryOpenTargetFor`.
 3. Call `GalleryLauncher.open(target)`.
 4. Show `R.string.gallery_open_failed` when no target or launch failure.
 
@@ -167,7 +174,7 @@ internal class PermissionUiController(
     private val permissionStatus: TextView,
     private val text: () -> AppTextResolver
 ) {
-    fun renderRequestPrompt(cameraGranted: Boolean, microphoneGranted: Boolean, launchRequest: () -> Unit) { ... }
+    fun renderRequestPrompt(cameraGranted: Boolean, microphoneGranted: Boolean, launchRequest: () -> Unit)
 }
 ```
 
@@ -233,7 +240,7 @@ Gesture behavior must remain:
 - Map gestures using `GesturePolicy`.
 - Normalize focus taps using `normalizedPreviewTapOrNull`.
 - Dispatch `SessionIntent.PreviewTapToFocus`.
-- Leave the existing placeholder behavior for exposure and assisted mode switch unchanged unless a separate plan exists.
+- Leave the existing no-op behavior for exposure and assisted mode switch unchanged unless a separate plan exists.
 
 ### Task 6: Collapse MainActivity to composition shell
 
@@ -260,7 +267,7 @@ override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
     views = MainActivityViews.bind(this)
-    renderer = MainActivityRenderer(...)
+    renderer = createMainActivityRenderer(views)
     actionBinder = MainActivityActionBinder(views, ::currentUiSnapshot, callbacks)
     actionBinder.bind()
     bindState()

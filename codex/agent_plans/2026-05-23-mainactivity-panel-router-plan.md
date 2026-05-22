@@ -197,7 +197,7 @@ val route = panelState.route
 val selectedTab = panelState.selectedSettingsTab
 ```
 
-`filterLabPageRenderModel(...)` should receive:
+The filter lab render-model call should receive:
 
 ```kotlin
 showAdjustmentPanel = panelState.isFilterAdjustmentVisible
@@ -223,4 +223,3 @@ rtk ./gradlew --no-daemon :app:assembleDebug
 - Do not move render functions yet.
 - Do not change panel layout, labels, or XML.
 - Do not change session state or settings storage.
-

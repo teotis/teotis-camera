@@ -215,7 +215,7 @@ internal data class BottomCockpitViews(
 )
 ```
 
-Then add:
+Then add a `MainActivityViews.bind(activity)` factory. The factory should move the exact current `findViewById` assignments out of `MainActivity.onCreate()` and into the matching groups. Example for the preview group:
 
 ```kotlin
 internal data class MainActivityViews(
@@ -231,15 +231,22 @@ internal data class MainActivityViews(
 ) {
     companion object {
         fun bind(activity: AppCompatActivity): MainActivityViews {
+            val preview = PreviewViews(
+                previewView = activity.findViewById(R.id.cameraPreview),
+                overlayView = activity.findViewById(R.id.previewOverlay),
+                thumbnail = activity.findViewById(R.id.previewThumbnail),
+                captureOutput = activity.findViewById(R.id.captureOutput)
+            )
             return MainActivityViews(
-                preview = PreviewViews(
-                    previewView = activity.findViewById(R.id.cameraPreview),
-                    overlayView = activity.findViewById(R.id.previewOverlay),
-                    thumbnail = activity.findViewById(R.id.previewThumbnail),
-                    captureOutput = activity.findViewById(R.id.captureOutput)
-                )
-                // Fill the remaining groups by moving the exact current
-                // findViewById assignments from MainActivity.onCreate().
+                preview = preview,
+                topBar = bindTopBar(activity),
+                quickPanel = bindQuickPanel(activity),
+                settingsPanel = bindSettingsPanel(activity),
+                filterLab = bindFilterLab(activity),
+                devConsole = bindDevConsole(activity),
+                modeTrack = bindModeTrack(activity),
+                bottomCockpit = bindBottomCockpit(activity),
+                panelDismissScrim = activity.findViewById(R.id.panelDismissScrim)
             )
         }
     }
@@ -336,7 +343,12 @@ internal class MainActivityRenderer(
     private val filterLab: FilterLabPanelRenderer,
     private val devConsole: DevConsoleRenderer
 ) {
-    fun render(snapshot: MainActivityRenderSnapshot) { ... }
+    fun render(snapshot: MainActivityRenderSnapshot) {
+        cockpit.render(snapshot)
+        settings.render(snapshot)
+        filterLab.render(snapshot)
+        devConsole.render(snapshot)
+    }
 }
 ```
 
