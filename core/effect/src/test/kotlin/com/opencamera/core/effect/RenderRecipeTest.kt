@@ -53,7 +53,7 @@ class RenderRecipeTest {
     }
 
     @Test
-    fun `FilterEffect without renderSpec but with profileId does not require final postprocess`() {
+    fun `FilterEffect without renderSpec but with profileId triggers postprocess`() {
         val spec = EffectSpec(
             listOf(
                 FilterEffect(profileId = "neutral", renderSpec = null)
@@ -61,7 +61,7 @@ class RenderRecipeTest {
         )
         val recipe = RenderRecipe.from(spec)
 
-        assertFalse(recipe.requiresFinalOutputPostprocess)
+        assertTrue(recipe.requiresFinalOutputPostprocess)
         assertEquals("neutral", recipe.filterProfileId)
         assertNull(recipe.filterRenderSpec)
     }

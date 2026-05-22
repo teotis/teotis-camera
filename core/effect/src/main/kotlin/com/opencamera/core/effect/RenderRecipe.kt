@@ -13,7 +13,8 @@ data class RenderRecipe(
     val selfieMirror: Boolean
 ) {
     val requiresFinalOutputPostprocess: Boolean
-        get() = filterRenderSpec != null ||
+        get() = !filterProfileId.isNullOrBlank() ||
+            filterRenderSpec != null ||
             frameRatio != null && frameRatio != FrameRatio.RATIO_4_3 ||
             !watermarkText.isNullOrBlank() ||
             !watermarkTemplateId.isNullOrBlank() ||

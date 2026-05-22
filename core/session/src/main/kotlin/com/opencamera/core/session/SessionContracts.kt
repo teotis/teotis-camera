@@ -20,6 +20,7 @@ import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.settings.SessionSettingsSnapshot
+import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -84,6 +85,18 @@ internal fun captureFeedbackPolicyFor(shot: ShotRequest): CaptureFeedbackPolicy 
         CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP
     }
 }
+
+private fun FilterRenderSpec?.requiresTrustedSavedMedia(profileId: String?): Boolean {
+    if (this == null) {
+        return false
+    }
+    if (profileId in LOW_RISK_PREVIEW_FILTER_PROFILES && this == defaultFilterRenderSpecOrNull(profileId)) {
+        return false
+    }
+    return true
+}
+
+private val LOW_RISK_PREVIEW_FILTER_PROFILES = setOf("photo-original", "photo-vivid")
 
 enum class PreviewMeteringFeedbackStatus {
     REQUESTED,
