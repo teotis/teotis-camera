@@ -471,6 +471,7 @@ sealed interface DeviceCommand {
     data class StopActiveShot(val shotId: String) : DeviceCommand
     data class UpdateZoomRatio(val zoomRatio: Float) : DeviceCommand
     data class ApplyPreviewMetering(val request: PreviewMeteringRequest) : DeviceCommand
+    data class UpdateOutputRotation(val rotation: CameraOutputRotation) : DeviceCommand
 }
 
 enum class DeviceRuntimeIssueKind {

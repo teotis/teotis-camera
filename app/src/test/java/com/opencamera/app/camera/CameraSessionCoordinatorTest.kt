@@ -807,6 +807,30 @@ class CameraSessionCoordinatorTest {
     }
 
     @Test
+    fun `UpdateOutputRotation effect forwards as DeviceCommand`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        session.emitEffect(
+            SessionEffect.UpdateOutputRotation(com.opencamera.core.device.CameraOutputRotation.ROTATION_90)
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            adapter.recordedCommands.contains(
+                DeviceCommand.UpdateOutputRotation(com.opencamera.core.device.CameraOutputRotation.ROTATION_90)
+            )
+        )
+    }
+
+    @Test
     fun `capture feedback snapshot event is forwarded to session intent`() = runTest {
         val session = FakeCameraSession()
         val adapter = FakeCameraDeviceAdapter()

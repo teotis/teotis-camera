@@ -85,6 +85,9 @@ class CameraSessionCoordinator(
             is SessionEffect.ApplyPreviewMetering -> cameraAdapter.dispatch(
                 DeviceCommand.ApplyPreviewMetering(effect.request)
             )
+            is SessionEffect.UpdateOutputRotation -> cameraAdapter.dispatch(
+                DeviceCommand.UpdateOutputRotation(effect.rotation)
+            )
         }
     }
 
