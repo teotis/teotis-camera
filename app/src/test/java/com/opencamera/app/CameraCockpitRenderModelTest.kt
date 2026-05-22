@@ -97,7 +97,7 @@ class CameraCockpitRenderModelTest {
     @Test
     fun `right rail marks active route`() {
         val state = defaultSessionState()
-        val activeRoute = CockpitPanelRoute.FilterLab
+        val activeRoute = CockpitPanelRoute.StyleLab
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, activeRoute)
 
         assertTrue(model.rightRail.entries[0].isActive)
@@ -249,17 +249,17 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `FilterLab route maps to Style label in right rail`() {
+    fun `StyleLab route maps to Style label in right rail`() {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         val styleEntry = model.rightRail.entries[0]
         assertEquals("Style", styleEntry.label)
-        assertEquals(CockpitPanelRoute.FilterLab, styleEntry.route)
+        assertEquals(CockpitPanelRoute.StyleLab, styleEntry.route)
     }
 
     @Test
-    fun `LensLab route maps to Color Lab label in top bar`() {
+    fun `ColorLab route maps to Color Lab label in top bar`() {
         val state = defaultSessionState()
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
@@ -267,10 +267,10 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `FilterLab and LensLab routes are distinct`() {
+    fun `StyleLab and ColorLab routes are distinct`() {
         val state = defaultSessionState()
-        val filterModel = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, CockpitPanelRoute.FilterLab)
-        val lensModel = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, CockpitPanelRoute.LensLab)
+        val filterModel = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, CockpitPanelRoute.StyleLab)
+        val lensModel = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, CockpitPanelRoute.ColorLab)
 
         assertTrue(filterModel.rightRail.entries[0].isActive)
         assertFalse(lensModel.rightRail.entries[0].isActive)

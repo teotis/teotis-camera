@@ -2050,7 +2050,11 @@ class DefaultCameraSessionTest {
 
     @Test
     fun `night mode cycles profiles and emits multi frame shot plan`() = runTest {
-        val session = createSession(InMemorySessionTrace(), this)
+        val session = createSession(
+            InMemorySessionTrace(),
+            this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
+        )
 
         session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
         session.dispatch(SessionIntent.Boot)
@@ -2084,6 +2088,7 @@ class DefaultCameraSessionTest {
         val session = createSession(
             trace = InMemorySessionTrace(),
             testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true),
             settingsSnapshot = SessionSettingsSnapshot(
                 persisted = PersistedSettings(
                     photo = PhotoSettings(
@@ -2115,7 +2120,11 @@ class DefaultCameraSessionTest {
 
     @Test
     fun `night mode keeps multi frame plan while applying tertiary frame ratio`() = runTest {
-        val session = createSession(InMemorySessionTrace(), this)
+        val session = createSession(
+            InMemorySessionTrace(),
+            this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
+        )
 
         session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
         session.dispatch(SessionIntent.Boot)
@@ -2136,6 +2145,7 @@ class DefaultCameraSessionTest {
         val session = createSession(
             trace = InMemorySessionTrace(),
             testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true),
             settingsSnapshot = SessionSettingsSnapshot(
                 catalog = FeatureCatalog(
                     manualCaptureDraft = ManualCaptureParams(
@@ -2881,7 +2891,11 @@ class DefaultCameraSessionTest {
     @Test
     fun `night multi frame permission loss clears stale diagnostics and records capture failure trace`() = runTest {
         val trace = InMemorySessionTrace()
-        val session = createSession(trace, this)
+        val session = createSession(
+            trace,
+            this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
+        )
 
         session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
         session.dispatch(SessionIntent.Boot)

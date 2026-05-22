@@ -41,7 +41,6 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun livePhoto(): String = "Live"
     override fun timer(): String = "Timer"
     override fun flash(): String = "Flash"
-    override fun lensLab(): String = "Lens Lab"
     override fun filterLab(): String = "Tone Lab"
     override fun portraitLab(): String = "Portrait Lab"
     override fun watermarkLab(): String = "Watermark Lab"
@@ -57,7 +56,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun moreControls(): String = "More"
     override fun stopSession(): String = "Stop Session"
     override fun restartSession(): String = "Restart Session"
-    override fun closeSettings(): String = "Close Lens Lab"
+    override fun closeSettings(): String = "Close Settings"
     override fun closeFilter(): String = "Close Filter Lab"
     override fun permissionPending(): String = "Camera permission is required before preview can start."
     override fun permissionGranted(): String = "Camera permission granted. Preview is ready."
@@ -91,9 +90,8 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun singleLens(): String = "Single Lens"
     override fun tone(): String = "Tone"
     override fun styleEntry(): String = "Style"
-    override fun lensLabEntry(): String = "Lens Lab"
     override fun stylePanelTitle(): String = "Style"
-    override fun lensLabPanelTitle(): String = "Lens Lab"
+    override fun colorLabPanelTitle(): String = "Color Lab"
     override fun useThisStyle(): String = "Use Style"
     override fun paletteSectionTitle(): String = "Palette"
     override fun lensLabEditingEnabled(): String = "Changes save instantly and refresh the active mode defaults."
@@ -303,7 +301,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun catalogFooterProManualPrefix(): String = " | Pro manual draft "
 
     // Watermark selector
-    override fun watermarkSelectorSupporting(): String = "Watermark selection sits one level below Lens Lab. Pick the active template here, then enter the template-specific style page to edit."
+    override fun watermarkSelectorSupporting(): String = "Watermark selection sits one level below Settings. Pick the active template here, then enter the template-specific style page to edit."
     override fun watermarkSelectorDefaultPrefix(): String = "Default "
     override fun watermarkSelectorTemplatesStaged(count: Int): String = " templates staged"
     override fun watermarkSelectorCurrentDefault(): String = " | Current default"
@@ -328,7 +326,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun watermarkTemplateClassicOverlay(): String = "Classic overlay"
 
     // Portrait lab
-    override fun portraitLabSupporting(): String = "Portrait product controls sit one level below Lens Lab. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster."
+    override fun portraitLabSupporting(): String = "Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster."
     override fun portraitLabJoinerBeauty(): String = "Beauty "
     override fun portraitLabJoinerBokeh(): String = "Bokeh "
     override fun portraitLabFooter(): String = "Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5."

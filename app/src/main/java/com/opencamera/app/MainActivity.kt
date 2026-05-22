@@ -442,12 +442,12 @@ class MainActivity : AppCompatActivity() {
             renderDevConsoleVisibility()
         }
         buttonColorLabEntry.setOnClickListener {
-            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.LensLab) {
+            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.ColorLab) {
                 CockpitPanelRoute.None
             } else {
-                CockpitPanelRoute.LensLab
+                CockpitPanelRoute.ColorLab
             }
-            if (activePanelRoute is CockpitPanelRoute.LensLab) {
+            if (activePanelRoute is CockpitPanelRoute.ColorLab) {
                 isFilterAdjustmentVisible = true
                 maybeAutoPrepareFilter()
                 renderLatestFilterLab()
@@ -462,12 +462,12 @@ class MainActivity : AppCompatActivity() {
             toggleSettingsPanel()
         }
         buttonFilterEntry.setOnClickListener {
-            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.FilterLab) {
+            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.StyleLab) {
                 CockpitPanelRoute.None
             } else {
-                CockpitPanelRoute.FilterLab
+                CockpitPanelRoute.StyleLab
             }
-            if (activePanelRoute is CockpitPanelRoute.FilterLab) {
+            if (activePanelRoute is CockpitPanelRoute.StyleLab) {
                 isFilterAdjustmentVisible = true
                 maybeAutoPrepareFilter()
                 renderLatestFilterLab()
@@ -688,7 +688,7 @@ class MainActivity : AppCompatActivity() {
             saveCurrentFilterAsCustom(latestFilterLabRenderModel?.saveCustomControl)
         }
         buttonFilterModeToggle.setOnClickListener {
-            if (activePanelRoute is CockpitPanelRoute.LensLab) {
+            if (activePanelRoute is CockpitPanelRoute.ColorLab) {
                 lifecycleScope.launch {
                     container.sessionSettingsManager.apply(
                         PersistedSettingsAction.UpdateColorLabSpec(ColorLabSpec())
@@ -806,15 +806,15 @@ class MainActivity : AppCompatActivity() {
             state = state,
             text = text,
             selectedFamily = selectedFilterLabFamily(state),
-            panelRole = if (activePanelRoute is CockpitPanelRoute.LensLab) {
-                StyleAndColorLabRole.LENS_LAB
+            panelRole = if (activePanelRoute is CockpitPanelRoute.ColorLab) {
+                StyleAndColorLabRole.COLOR_LAB
             } else {
                 StyleAndColorLabRole.STYLE
             },
             showAdjustmentPanel = isFilterAdjustmentVisible,
             adjustmentMode = filterAdjustmentMode
         )
-        if (activePanelRoute is CockpitPanelRoute.LensLab) {
+        if (activePanelRoute is CockpitPanelRoute.ColorLab) {
             val colorLabModel = colorLabPanelRenderModel(state, text)
             filterPaletteSurface.updateReticle(colorLabModel.colorAxis, colorLabModel.toneAxis)
         }
@@ -1325,7 +1325,7 @@ class MainActivity : AppCompatActivity() {
     private fun renderPanelVisibility() {
         val route = activePanelRoute
         settingsPanel.isVisible = route.isSettingsOpen
-        filterPanel.isVisible = route is CockpitPanelRoute.FilterLab || route is CockpitPanelRoute.LensLab
+        filterPanel.isVisible = route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.ColorLab
         panelDismissScrim.isVisible = route.isAnyPanelOpen
 
         val subpage = (route as? CockpitPanelRoute.Settings)?.subpage
@@ -1335,9 +1335,9 @@ class MainActivity : AppCompatActivity() {
         settingsWatermarkDetailContent.isVisible = subpage == SettingsSubpage.WATERMARK_DETAIL
         buttonSettingsBack.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
 
-        buttonColorLabEntry.alpha = if (route is CockpitPanelRoute.LensLab) 1f else 0.92f
+        buttonColorLabEntry.alpha = if (route is CockpitPanelRoute.ColorLab) 1f else 0.92f
         buttonSettingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
-        buttonFilterEntry.alpha = if (route is CockpitPanelRoute.FilterLab) 1f else 0.92f
+        buttonFilterEntry.alpha = if (route is CockpitPanelRoute.StyleLab) 1f else 0.92f
         quickBubblePanel.isVisible = route is CockpitPanelRoute.QuickBubble
         buttonQuickLauncher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
     }
@@ -1582,11 +1582,11 @@ class MainActivity : AppCompatActivity() {
                 renderLatestSettingsSurfaces()
                 renderPanelVisibility()
             }
-            CockpitPanelRoute.FilterLab,
-            CockpitPanelRoute.LensLab,
+            CockpitPanelRoute.StyleLab,
+            CockpitPanelRoute.ColorLab,
             CockpitPanelRoute.DevConsole,
             CockpitPanelRoute.QuickBubble -> {
-                if (activePanelRoute is CockpitPanelRoute.FilterLab || activePanelRoute is CockpitPanelRoute.LensLab) {
+                if (activePanelRoute is CockpitPanelRoute.StyleLab || activePanelRoute is CockpitPanelRoute.ColorLab) {
                     selectedFilterLabFamilyOverride = null
                     isFilterAdjustmentVisible = false
                     lightPaletteBaseSpec = null
@@ -1701,8 +1701,8 @@ class MainActivity : AppCompatActivity() {
             state = state,
             text = text,
             selectedFamily = selectedFilterLabFamily(state),
-            panelRole = if (activePanelRoute is CockpitPanelRoute.LensLab) {
-                StyleAndColorLabRole.LENS_LAB
+            panelRole = if (activePanelRoute is CockpitPanelRoute.ColorLab) {
+                StyleAndColorLabRole.COLOR_LAB
             } else {
                 StyleAndColorLabRole.STYLE
             },

@@ -58,7 +58,6 @@ open class AppTextResolver(private val context: Context?) {
     open fun livePhoto(): String = str(R.string.button_quick_live, "Live")
     open fun timer(): String = str(R.string.button_quick_timer, "Timer")
     open fun flash(): String = str(R.string.button_quick_flash, "Flash")
-    open fun lensLab(): String = str(R.string.button_settings_entry, "Lens Lab")
     open fun settingsEntry(): String = str(R.string.button_settings_entry, "Settings")
     open fun filterLab(): String = str(R.string.button_filter_entry, "Filter Lab")
     open fun portraitLab(): String = str(R.string.button_portrait_mode, "Portrait Lab")
@@ -109,10 +108,9 @@ open class AppTextResolver(private val context: Context?) {
     open fun singleLens(): String = str(R.string.button_single_lens, "Single Lens")
     open fun tone(): String = str(R.string.button_palette_entry, "Tone")
     open fun styleEntry(): String = str(R.string.button_style_entry, "Style")
-    open fun lensLabEntry(): String = str(R.string.button_lens_lab_entry, "Lens Lab")
     open fun colorLabEntry(): String = str(R.string.button_color_lab_entry, "Color Lab")
     open fun stylePanelTitle(): String = str(R.string.style_panel_title, "Style")
-    open fun lensLabPanelTitle(): String = str(R.string.lens_lab_panel_title, "Lens Lab")
+    open fun colorLabPanelTitle(): String = str(R.string.color_lab_panel_title, "Color Lab")
     open fun useThisStyle(): String = str(R.string.button_use_this_style, "Use Style")
     open fun paletteSectionTitle(): String = str(R.string.filter_section_palette, "Palette")
 
@@ -426,7 +424,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun catalogFooterProManualPrefix(): String = str(R.string.settings_page_pro_manual_prefix, " | Pro manual draft ")
 
     // Watermark selector
-    open fun watermarkSelectorSupporting(): String = str(R.string.watermark_selector_supporting, "Watermark selection sits one level below Lens Lab. Pick the active template here, then enter the template-specific style page to edit.")
+    open fun watermarkSelectorSupporting(): String = str(R.string.watermark_selector_supporting, "Watermark selection sits one level below Settings. Pick the active template here, then enter the template-specific style page to edit.")
     open fun watermarkSelectorDefaultPrefix(): String = str(R.string.watermark_selector_default_prefix, "Default ")
     open fun watermarkSelectorTemplatesStaged(count: Int): String = String.format(str(R.string.watermark_selector_templates_staged, " templates staged"), count)
     open fun watermarkSelectorCurrentDefault(): String = str(R.string.watermark_selector_current_default, " | Current default")
@@ -451,7 +449,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun watermarkTemplateClassicOverlay(): String = str(R.string.watermark_template_classic_overlay, "Classic overlay")
 
     // Portrait lab
-    open fun portraitLabSupporting(): String = str(R.string.portrait_lab_supporting, "Portrait product controls sit one level below Lens Lab. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.")
+    open fun portraitLabSupporting(): String = str(R.string.portrait_lab_supporting, "Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.")
     open fun portraitLabJoinerBeauty(): String = str(R.string.portrait_lab_joiner_beauty, "Beauty ")
     open fun portraitLabJoinerBokeh(): String = str(R.string.portrait_lab_joiner_bokeh, "Bokeh ")
     open fun portraitLabFooter(): String = str(R.string.portrait_lab_footer, "Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5.")

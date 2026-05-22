@@ -33,11 +33,11 @@
     <string name="button_color_lab_reset">重置色彩</string>
     <string name="button_lens_rail">设置</string>
     <string name="button_settings_close">关闭设置</string>
+    <string name="button_back">返回</string>
     <string name="button_filter_entry">色调</string>
     <string name="button_style_entry">风格</string>
-    <string name="button_lens_lab_entry">镜头实验室</string>
     <string name="style_panel_title">风格</string>
-    <string name="lens_lab_panel_title">镜头实验室</string>
+    <string name="color_lab_panel_title">色彩实验室</string>
     <string name="button_use_this_style">使用此风格</string>
     <string name="button_filter_close">关闭色调</string>
     <string name="permission_pending">需要相机权限才能开始预览。</string>
@@ -326,7 +326,7 @@
     <string name="settings_page_pro_manual_prefix"> | 专业手动草稿</string>
 
     <!-- Watermark selector -->
-    <string name="watermark_selector_supporting">水印选择位于镜头实验室下一级。在此选择活跃模板，然后进入模板专属样式页面进行编辑。</string>
+    <string name="watermark_selector_supporting">水印选择位于设置下一级。在此选择活跃模板，然后进入模板专属样式页面进行编辑。</string>
     <string name="watermark_selector_default_prefix">默认</string>
     <string name="watermark_selector_templates_staged"> 个模板已暂存</string>
     <string name="watermark_selector_current_default"> | 当前默认</string>
@@ -351,7 +351,7 @@
     <string name="watermark_template_classic_overlay">经典叠加</string>
 
     <!-- Portrait lab -->
-    <string name="portrait_lab_supporting">人像产品调节位于镜头实验室下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。</string>
+    <string name="portrait_lab_supporting">人像产品调节位于设置下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。</string>
     <string name="portrait_lab_joiner_beauty">美颜</string>
     <string name="portrait_lab_joiner_bokeh">散景</string>
     <string name="portrait_lab_footer">色调实验室仍负责人像色彩风格选择。人像实验室仅管理 6B-5 中引入的产品配置、美颜方案/强度和轻量散景渲染元数据。</string>

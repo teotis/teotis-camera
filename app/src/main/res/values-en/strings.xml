@@ -33,11 +33,11 @@
     <string name="button_color_lab_reset">Reset Color</string>
     <string name="button_lens_rail">Settings</string>
     <string name="button_settings_close">Close Settings</string>
+    <string name="button_back">Back</string>
     <string name="button_filter_entry">Tone Lab</string>
     <string name="button_style_entry">Style</string>
-    <string name="button_lens_lab_entry">Lens Lab</string>
     <string name="style_panel_title">Style</string>
-    <string name="lens_lab_panel_title">Lens Lab</string>
+    <string name="color_lab_panel_title">Color Lab</string>
     <string name="button_use_this_style">Use Style</string>
     <string name="button_filter_close">Close Tone Lab</string>
     <string name="permission_pending">Camera permission is required before preview can start.</string>
@@ -328,7 +328,7 @@
     <string name="settings_page_pro_manual_prefix"> | Pro manual draft </string>
 
     <!-- Watermark selector -->
-    <string name="watermark_selector_supporting">Watermark selection sits one level below Lens Lab. Pick the active template here, then enter the template-specific style page to edit.</string>
+    <string name="watermark_selector_supporting">Watermark selection sits one level below Settings. Pick the active template here, then enter the template-specific style page to edit.</string>
     <string name="watermark_selector_default_prefix">Default </string>
     <string name="watermark_selector_templates_staged"> templates staged</string>
     <string name="watermark_selector_current_default"> | Current default</string>
@@ -353,7 +353,7 @@
     <string name="watermark_template_classic_overlay">Classic overlay</string>
 
     <!-- Portrait lab -->
-    <string name="portrait_lab_supporting">Portrait product controls sit one level below Lens Lab. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.</string>
+    <string name="portrait_lab_supporting">Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.</string>
     <string name="portrait_lab_joiner_beauty">Beauty </string>
     <string name="portrait_lab_joiner_bokeh">Bokeh </string>
     <string name="portrait_lab_footer">Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5.</string>

@@ -86,10 +86,25 @@
 - `2026-05-22` `OpenCamera 2.0 准入综合审查` 已按用户要求升级为可直接分发的 Markdown 任务包：总控方案总结了历史用户需求、友商对标口径、项目定位、2.0 gate 判据和 `GO / CONDITIONAL GO / NO GO` 规则；高难 10% 与多模态限定任务单独收纳到 [`2026-05-22-v2-readiness-hard10-multimodal.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-v2-readiness-hard10-multimodal.md)；A-F 六组非多模态任务分别覆盖 UI 静态自洽、交互流、功能可用、IO 链路、稳定观测和发布门禁汇总。当前主控初判是在缺少最新 APK 截图/录屏/保存媒体/真机日志前不能宣称 `GO`，应先按 `CONDITIONAL GO` 审查流程采证；若拍照/录像/保存/权限恢复任一金路径被 D 组判 P0，则转 `NO GO`。
 - `2026-05-22` 本轮 2.0 准入审查问题已按解决成本重新分层：低成本立即修复项沉淀到 [`2026-05-22-v2-readiness-low-cost-fixes.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-v2-readiness-low-cost-fixes.md)，覆盖 i18n/硬编码文案、风格/色彩实验室命名映射、侧栏遗留设置资源、humanistic 旧期望测试、disabled 状态提示、权限永久拒绝引导和 render model 测试缺口；中成本立即修复项沉淀到 [`2026-05-22-v2-readiness-medium-cost-fixes.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-v2-readiness-medium-cost-fixes.md)，覆盖后处理失败可观测、orphaned shot failure、首次缩略图 fallback、RAW/多帧/Live 显式降级和连续变焦语义收敛；高成本决策项沉淀到 [`2026-05-22-v2-readiness-high-cost-decision-items.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-v2-readiness-high-cost-decision-items.md)，包括真实 RAW/DNG、真实夜景多帧、Live motion、视频帧级水印、provider death 真机专项、thermal/长稳/perf 矩阵和多模态成片 QA，需等待用户决策后再进入实现。
 - `2026-05-22` 用户处理低/中成本项后，主控复审已沉淀到 [`V2-Readiness-Post-Fix-Review.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/V2-Readiness-Post-Fix-Review.md)：RAW 已显式降级为 saved-only，多帧夜景默认能力已关闭并具备单帧 fallback，后处理失败 notes/degraded 文案、orphaned shot failure trace 和 Live still-only fallback 语义均有进展；UI/render、media、device focused tests 通过。但 `:core:session:test` 与 `verify_stage_7_observability.sh` 仍被 5 个 Night multi-frame 旧期望测试阻断，`activity_main.xml` 仍有 `android:text="Back"` 硬编码，`FilterLab/LensLab` 内部路由名仍未真正收敛为 `StyleLab/ColorLab`。当前判定为 `CONDITIONAL NO GO`，下一步应先同步 Night 测试到默认单帧 fallback / 显式 multi-frame capability 两条路径，再重跑 Stage 7。
+- `2026-05-22` 剩余本地阻断已由 Codex 直接收敛并完成复验，最终本地门禁复审沉淀到 [`V2-Readiness-Final-Local-Gate-Review.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/V2-Readiness-Final-Local-Gate-Review.md)，根目录发布门禁报告同步更新为 [`V2-Readiness-Release-Gate-Report.md`](/Volumes/Extreme_SSD/project/codex_camera/V2-Readiness-Release-Gate-Report.md)：Night 多帧正向测试已显式声明 `supportsNightMultiFrame=true`，默认能力仍保持单帧 fallback；`Back` 硬编码已改为 `@string/button_back`；内部路由和角色名已收敛为 `StyleLab / ColorLab / COLOR_LAB`；可见 IA 文案中的 `Lens Lab / 镜头实验室` 残留已清理；`core:session` focused tests、UI focused tests 和 `verify_stage_7_observability.sh` 均通过。当前结论升级为 `CONDITIONAL GO - LOCAL/TEXT GATE`，最终整体 `GO` 仍依赖真机/多模态证据和高成本能力决策。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-22：2.0 剩余本地阻断清理与最终本地门禁复验
+
+- 目标：处理上一轮 2.0 准入复审遗留的本地阻断，直到本地代码、文本链路和自动化 gate 达标。
+- 核心结果：
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 中验证 Night multi-frame 的测试显式传入 `DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)`，与默认单帧 fallback 产品契约对齐；
+  [`CockpitPanelRoute.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/CockpitPanelRoute.kt)、[`MainActivity.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/MainActivity.kt)、[`CameraCockpitRenderModel.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/CameraCockpitRenderModel.kt)、[`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 与 [`GestureGuard.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/gesture/GestureGuard.kt) 已把 `FilterLab / LensLab` 语义收敛为 `StyleLab / ColorLab`，角色枚举同步为 `COLOR_LAB`；
+  [`activity_main.xml`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/res/layout/activity_main.xml)、[`strings.xml`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/res/values/strings.xml) 与 [`values-en/strings.xml`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/res/values-en/strings.xml) 清理 `Back` 硬编码和 `Lens Lab / 镜头实验室` 可见文案残留；
+  [`V2-Readiness-Release-Gate-Report.md`](/Volumes/Extreme_SSD/project/codex_camera/V2-Readiness-Release-Gate-Report.md) 与 [`V2-Readiness-Final-Local-Gate-Review.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/V2-Readiness-Final-Local-Gate-Review.md) 已把最新结论更新为 `CONDITIONAL GO - LOCAL/TEXT GATE`。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest --tests com.opencamera.core.session.SessionDiagnosticsTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.CameraCockpitRenderModelTest --tests com.opencamera.app.CockpitPanelRouteTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.gesture.GestureGuardTest`
+  `rtk ./scripts/verify_stage_7_observability.sh`
+- 结论：本地自动化和文本侧 2.0 cleanup gate 已达标；整体 2.0 最终 `GO` 仍需真机截图/录屏/保存媒体、provider/thermal/长稳日志和高成本能力决策。
 
 ## 2026-05-22：人文入口并入拍照风格，模式栏顺序收敛
 

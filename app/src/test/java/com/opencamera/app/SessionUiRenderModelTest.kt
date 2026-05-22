@@ -1351,7 +1351,7 @@ class SessionUiRenderModelTest {
         assertEquals("Quick", visibleEntries[1].label)
         assertEquals("DEV", visibleEntries[2].label)
 
-        assertTrue(visibleEntries[0].route is CockpitPanelRoute.FilterLab)
+        assertTrue(visibleEntries[0].route is CockpitPanelRoute.StyleLab)
         assertTrue(visibleEntries[1].route is CockpitPanelRoute.QuickBubble)
         assertTrue(visibleEntries[2].route is CockpitPanelRoute.DevConsole)
     }
@@ -1496,19 +1496,19 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `lens lab shows adjustment panel but not filter items and family tabs`() {
+    fun `color lab shows adjustment panel but not filter items and family tabs`() {
         val state = defaultSessionState()
         val model = filterLabPageRenderModel(
             state = state,
             text = TestAppTextResolver(),
-            panelRole = StyleAndColorLabRole.LENS_LAB
+            panelRole = StyleAndColorLabRole.COLOR_LAB
         )
 
-        assertEquals(StyleAndColorLabRole.LENS_LAB, model.panelRole)
+        assertEquals(StyleAndColorLabRole.COLOR_LAB, model.panelRole)
         assertFalse(model.showFamilyTabs)
         assertFalse(model.showFilterItems)
         assertTrue(model.showAdjustmentPanel)
-        assertEquals("Lens Lab", model.headline)
+        assertEquals("Color Lab", model.headline)
     }
 
     @Test
@@ -1597,12 +1597,12 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `lens lab filter page does not show advanced controls`() {
+    fun `color lab filter page does not show advanced controls`() {
         val state = defaultSessionState()
         val model = filterLabPageRenderModel(
             state = state,
             text = TestAppTextResolver(),
-            panelRole = StyleAndColorLabRole.LENS_LAB
+            panelRole = StyleAndColorLabRole.COLOR_LAB
         )
 
         assertFalse(model.showAdvancedControls)

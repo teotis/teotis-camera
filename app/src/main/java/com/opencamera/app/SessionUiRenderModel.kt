@@ -363,7 +363,7 @@ internal data class FilterAdjustmentPanelRenderModel(
 
 internal enum class StyleAndColorLabRole {
     STYLE,
-    LENS_LAB
+    COLOR_LAB
 }
 
 internal data class ColorLabPanelRenderModel(
@@ -1754,7 +1754,7 @@ internal fun filterLabPageRenderModel(
     return FilterLabPageRenderModel(
         headline = when (panelRole) {
             StyleAndColorLabRole.STYLE -> text.stylePanelTitle()
-            StyleAndColorLabRole.LENS_LAB -> text.lensLabPanelTitle()
+            StyleAndColorLabRole.COLOR_LAB -> text.colorLabPanelTitle()
         },
         supportingText = text.filterLabSupportingText(),
         heroSummary = "",
@@ -1779,7 +1779,7 @@ internal fun filterLabPageRenderModel(
         panelRole = panelRole,
         showFamilyTabs = panelRole == StyleAndColorLabRole.STYLE,
         showFilterItems = panelRole == StyleAndColorLabRole.STYLE,
-        showAdjustmentPanel = panelRole == StyleAndColorLabRole.LENS_LAB,
+        showAdjustmentPanel = panelRole == StyleAndColorLabRole.COLOR_LAB,
         showAdvancedControls = false,
         photoTab = filterLabTabRenderModel(
             family = FilterLabFamily.PHOTO,

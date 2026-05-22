@@ -98,9 +98,9 @@ internal fun cameraCockpitRenderModel(
         rightRail = RightRailRenderModel(
             entries = listOf(
                 RightRailEntryRenderModel(
-                    route = CockpitPanelRoute.FilterLab,
+                    route = CockpitPanelRoute.StyleLab,
                     label = text.styleEntry(),
-                    isActive = activeRoute is CockpitPanelRoute.FilterLab
+                    isActive = activeRoute is CockpitPanelRoute.StyleLab
                 ),
                 RightRailEntryRenderModel(
                     route = CockpitPanelRoute.QuickBubble,

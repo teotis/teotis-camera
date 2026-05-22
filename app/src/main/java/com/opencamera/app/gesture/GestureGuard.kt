@@ -13,7 +13,7 @@ class GestureGuard {
     fun isGestureAllowed(zone: GestureZone, state: GestureGuardState): Boolean {
         val panel = state.activePanel
         if (panel.isSettingsOpen) return false
-        if (panel is CockpitPanelRoute.FilterLab) {
+        if (panel is CockpitPanelRoute.StyleLab) {
             return zone == GestureZone.SECONDARY_PANEL
         }
         if (panel is CockpitPanelRoute.DevConsole) return false
@@ -24,7 +24,7 @@ class GestureGuard {
     fun isHorizontalScrollAllowed(state: GestureGuardState): Boolean {
         val panel = state.activePanel
         return !panel.isSettingsOpen &&
-               panel !is CockpitPanelRoute.FilterLab &&
+               panel !is CockpitPanelRoute.StyleLab &&
                !state.isFilterAdjustmentActive
     }
 }

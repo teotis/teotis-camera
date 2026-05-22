@@ -29,8 +29,8 @@ class CockpitPanelRouteTest {
     }
 
     @Test
-    fun `FilterLab route is a panel but not settings`() {
-        val route = CockpitPanelRoute.FilterLab
+    fun `StyleLab route is a panel but not settings`() {
+        val route = CockpitPanelRoute.StyleLab
         assertTrue(route.isAnyPanelOpen)
         assertFalse(route.isSettingsOpen)
     }
@@ -59,8 +59,8 @@ class CockpitPanelRouteTest {
     }
 
     @Test
-    fun `FilterLab and QuickBubble are distinct routes`() {
-        val a: CockpitPanelRoute = CockpitPanelRoute.FilterLab
+    fun `StyleLab and QuickBubble are distinct routes`() {
+        val a: CockpitPanelRoute = CockpitPanelRoute.StyleLab
         val b: CockpitPanelRoute = CockpitPanelRoute.QuickBubble
         assertFalse(a == b)
     }
