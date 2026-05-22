@@ -233,7 +233,7 @@ Gesture behavior must remain:
 - Map gestures using `GesturePolicy`.
 - Normalize focus taps using `normalizedPreviewTapOrNull`.
 - Dispatch `SessionIntent.PreviewTapToFocus`.
-- Leave exposure and assisted mode switch TODOs unchanged unless a separate plan exists.
+- Leave the existing placeholder behavior for exposure and assisted mode switch unchanged unless a separate plan exists.
 
 ### Task 6: Collapse MainActivity to composition shell
 
@@ -288,4 +288,3 @@ If Gradle reports transient Kotlin/build-directory errors under `~/.codex-build/
 - Do not change settings persistence semantics.
 - Do not change route IA, visible labels, or gestures.
 - Do not add new feature behavior while extracting action binding.
-

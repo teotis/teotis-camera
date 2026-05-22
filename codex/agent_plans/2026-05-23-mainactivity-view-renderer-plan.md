@@ -70,12 +70,149 @@ internal data class TopBarViews(
 ```
 
 ```kotlin
-internal data class QuickPanelViews(...)
-internal data class SettingsPanelViews(...)
-internal data class FilterLabViews(...)
-internal data class DevConsoleViews(...)
-internal data class ModeTrackViews(...)
-internal data class BottomCockpitViews(...)
+internal data class QuickPanelViews(
+    val panel: androidx.core.widget.NestedScrollView,
+    val grid: Button,
+    val quality: Button,
+    val frame43: Button,
+    val frame169: Button,
+    val frame11: Button,
+    val livePhoto: Button,
+    val timer: Button,
+    val launcher: Button
+)
+
+internal data class SettingsPanelViews(
+    val panel: androidx.core.widget.NestedScrollView,
+    val close: Button,
+    val back: Button,
+    val rootContent: LinearLayout,
+    val portraitLabContent: LinearLayout,
+    val watermarkSelectorContent: LinearLayout,
+    val watermarkDetailContent: LinearLayout,
+    val headline: TextView,
+    val supportingText: TextView,
+    val heroSummary: TextView,
+    val commonSummary: TextView,
+    val photoSummary: TextView,
+    val videoSummary: TextView,
+    val catalogFooter: TextView,
+    val editingHint: TextView,
+    val tabCommon: Button,
+    val tabPhoto: Button,
+    val tabVideo: Button,
+    val commonSection: LinearLayout,
+    val photoSection: LinearLayout,
+    val videoSection: LinearLayout,
+    val gridMode: Button,
+    val shutterSound: Button,
+    val selfieMirror: Button,
+    val photoFilter: Button,
+    val photoPortraitLab: Button,
+    val photoWatermark: Button,
+    val photoLive: Button,
+    val photoTimer: Button,
+    val videoResolution: Button,
+    val videoFrameRate: Button,
+    val videoDynamicFps: Button,
+    val videoAudio: Button,
+    val videoFilter: Button,
+    val portraitHeadline: TextView,
+    val portraitSupportingText: TextView,
+    val portraitHeroSummary: TextView,
+    val portraitEditingHint: TextView,
+    val portraitProfile: Button,
+    val portraitBeautyPreset: Button,
+    val portraitBeautyStrength: Button,
+    val portraitBokehEffect: Button,
+    val portraitFooter: TextView,
+    val watermarkSelectorHeadline: TextView,
+    val watermarkSelectorSupportingText: TextView,
+    val watermarkSelectorHeroSummary: TextView,
+    val watermarkSelectorList: LinearLayout,
+    val watermarkSelectorEditingHint: TextView,
+    val watermarkSelectorFooter: TextView,
+    val watermarkDetailHeadline: TextView,
+    val watermarkDetailSupportingText: TextView,
+    val watermarkDetailHeroSummary: TextView,
+    val watermarkDetailEditingHint: TextView,
+    val watermarkPlacement: Button,
+    val watermarkTextScale: Button,
+    val watermarkTextOpacity: Button,
+    val watermarkFrameBackground: Button,
+    val watermarkDetailFooter: TextView
+)
+
+internal data class FilterLabViews(
+    val panel: androidx.core.widget.NestedScrollView,
+    val close: Button,
+    val headline: TextView,
+    val supportingText: TextView,
+    val heroSummary: TextView,
+    val currentSummary: TextView,
+    val sectionFiltersTitle: TextView,
+    val selectionCard: LinearLayout,
+    val selectionList: LinearLayout,
+    val editingHint: TextView,
+    val footer: TextView,
+    val photoTab: Button,
+    val humanisticTab: Button,
+    val portraitTab: Button,
+    val videoTab: Button,
+    val saveCustom: Button,
+    val sectionPaletteTitle: TextView,
+    val adjustmentPanel: LinearLayout,
+    val modeToggle: Button,
+    val paletteSummary: TextView,
+    val paletteHint: TextView,
+    val paletteSurface: FilterPaletteView,
+    val advancedTitle: TextView,
+    val advancedControls: LinearLayout,
+    val advancedExposure: Button,
+    val advancedSoftGlow: Button,
+    val advancedHalo: Button,
+    val advancedGrain: Button,
+    val advancedSharpness: Button,
+    val advancedVignette: Button,
+    val advancedHighlights: Button,
+    val advancedShadows: Button,
+    val advancedWarmBoost: Button,
+    val advancedCoolBoost: Button,
+    val advancedTemperatureShift: Button,
+    val advancedTintShift: Button
+)
+
+internal data class DevConsoleViews(
+    val entry: Button,
+    val panel: com.google.android.material.card.MaterialCardView,
+    val tabKey: Button,
+    val tabCore: Button,
+    val tabError: Button,
+    val tabAll: Button,
+    val title: TextView,
+    val summary: TextView,
+    val content: TextView,
+    val export: Button,
+    val close: Button
+)
+
+internal data class ModeTrackViews(
+    val scroll: android.widget.HorizontalScrollView,
+    val photo: Button,
+    val night: Button,
+    val portrait: Button,
+    val pro: Button,
+    val video: Button,
+    val document: Button,
+    val humanistic: Button
+)
+
+internal data class BottomCockpitViews(
+    val shutter: Button,
+    val lensFacing: Button,
+    val zoomScroll: android.widget.HorizontalScrollView,
+    val zoomRow: LinearLayout
+)
 ```
 
 Then add:
@@ -100,8 +237,9 @@ internal data class MainActivityViews(
                     overlayView = activity.findViewById(R.id.previewOverlay),
                     thumbnail = activity.findViewById(R.id.previewThumbnail),
                     captureOutput = activity.findViewById(R.id.captureOutput)
-                ),
-                ...
+                )
+                // Fill the remaining groups by moving the exact current
+                // findViewById assignments from MainActivity.onCreate().
             )
         }
     }
@@ -335,4 +473,3 @@ rtk ./scripts/verify_stage_7_observability.sh
 - Do not change UI copy, layout hierarchy, colors, or dimensions.
 - Do not change `SessionUiRenderModel` behavior.
 - Do not change gesture or click binding yet unless compilation requires a narrow callback.
-
