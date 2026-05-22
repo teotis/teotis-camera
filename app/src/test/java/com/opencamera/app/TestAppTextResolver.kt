@@ -53,6 +53,10 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun devTabError(): String = "Error"
     override fun devTabAll(): String = "All"
     override fun quickLauncher(): String = "Quick"
+    override fun quickGrid(): String = "Grid"
+    override fun quickQuality(): String = "Quality"
+    override fun quickLive(): String = "Live"
+    override fun quickTimer(): String = "Timer"
     override fun moreControls(): String = "More"
     override fun stopSession(): String = "Stop Session"
     override fun restartSession(): String = "Restart Session"
@@ -365,9 +369,9 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun colorToneSummary(colorAxis: Float, toneAxis: Float): String = "Color: ${"%.2f".format(colorAxis)}, Tone: ${"%.2f".format(toneAxis)}"
 
     override fun availabilityLabel(value: SettingsControlAvailability): String = when (value) {
-        SettingsControlAvailability.SUPPORTED -> "Supported"
-        SettingsControlAvailability.DEGRADED -> "Degraded"
-        SettingsControlAvailability.UNSUPPORTED -> "Unsupported"
+        SettingsControlAvailability.SUPPORTED -> "可用"
+        SettingsControlAvailability.DEGRADED -> "部分支持"
+        SettingsControlAvailability.UNSUPPORTED -> "不支持"
     }
     override fun languageDisplayName(settings: PersistedSettings): String = "English"
 

@@ -594,7 +594,7 @@ class SessionUiRenderModelTest {
         assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.photoSection.portraitLab.availability)
         assertFalse(supportedModel.photoSection.portraitLab.isInteractive)
         assertEquals(
-            "Live photo default\nOn\nDegraded • Saved default only; 1500 ms bundle | dynamic watermark Follow Frame Luma + Motion",
+            "Live photo default\nOn\n部分支持 • Saved default only; 1500 ms bundle | dynamic watermark Follow Frame Luma + Motion",
             supportedModel.photoSection.livePhoto.buttonLabel
         )
         assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.photoSection.watermarkTemplate.availability)
@@ -629,7 +629,7 @@ class SessionUiRenderModelTest {
         assertFalse(unsupportedModel.videoSection.resolution.isInteractive)
         assertEquals(null, unsupportedModel.videoSection.resolution.nextAction)
         assertEquals(
-            "Audio scene\nConcert\nUnsupported • Video recording unavailable on this device",
+            "Audio scene\nConcert\n不支持 • Video recording unavailable on this device",
             unsupportedModel.videoSection.audioProfile.buttonLabel
         )
     }
@@ -1328,11 +1328,11 @@ class SessionUiRenderModelTest {
     @Test
     fun `availability labels use dedicated strings not quality level labels`() {
         val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
-        assertTrue(model.photoSection.livePhoto.buttonLabel.contains("Degraded"))
-        assertTrue(model.photoSection.portraitLab.buttonLabel.contains("Degraded"))
-        assertTrue(model.photoSection.watermarkTemplate.buttonLabel.contains("Degraded"))
-        assertTrue(model.photoSection.countdown.buttonLabel.contains("Supported"))
-        assertTrue(model.videoSection.frameRate.buttonLabel.contains("Supported"))
+        assertTrue(model.photoSection.livePhoto.buttonLabel.contains("部分支持"))
+        assertTrue(model.photoSection.portraitLab.buttonLabel.contains("部分支持"))
+        assertTrue(model.photoSection.watermarkTemplate.buttonLabel.contains("部分支持"))
+        assertTrue(model.photoSection.countdown.buttonLabel.contains("可用"))
+        assertTrue(model.videoSection.frameRate.buttonLabel.contains("可用"))
         assertFalse(model.photoSection.livePhoto.buttonLabel.contains("Fast"))
         assertFalse(model.photoSection.livePhoto.buttonLabel.contains("Max"))
         assertFalse(model.videoSection.frameRate.buttonLabel.contains("Fast"))
@@ -1347,7 +1347,7 @@ class SessionUiRenderModelTest {
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
         assertEquals(3, visibleEntries.size)
-        assertEquals("Style", visibleEntries[0].label)
+        assertEquals("Lens", visibleEntries[0].label)
         assertEquals("Quick", visibleEntries[1].label)
         assertEquals("DEV", visibleEntries[2].label)
 
@@ -1370,7 +1370,7 @@ class SessionUiRenderModelTest {
     @Test
     fun `style entry label is Chinese via text resolver`() {
         val chineseResolver = object : TestAppTextResolver() {
-            override fun styleEntry(): String = "风格"
+            override fun styleEntry(): String = "镜头"
             override fun quickLauncher(): String = "快捷"
             override fun colorLabEntry(): String = "色彩实验室"
             override fun settingsEntry(): String = "设置"
@@ -1379,7 +1379,7 @@ class SessionUiRenderModelTest {
         val cockpit = cameraCockpitRenderModel(state, chineseResolver, strings)
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
-        assertEquals("风格", visibleEntries[0].label)
+        assertEquals("镜头", visibleEntries[0].label)
         assertEquals("快捷", visibleEntries[1].label)
         assertEquals("色彩实验室", cockpit.topStatus.labEntryLabel)
         assertEquals("设置", cockpit.topStatus.settingsEntryLabel)
@@ -1565,6 +1565,58 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `quick panel sheet exposes all five rows`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("Grid", sheet.gridRow.title)
+        assertEquals("Quality", sheet.qualityRow.title)
+        assertEquals("Frame", sheet.frameRatioRow.title)
+        assertEquals("Live", sheet.liveRow.title)
+        assertEquals("Timer", sheet.timerRow.title)
+    }
+
+    @Test
+    fun `quick panel sheet frame ratio options remain present when one is selected`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(3, sheet.frameRatioOptions.size)
+        val selected = sheet.frameRatioOptions.filter { it.isSelected }
+        assertEquals(1, selected.size)
+        assertTrue(sheet.frameRatioOptions.all { it.label.isNotBlank() })
+    }
+
+    @Test
+    fun `quick panel sheet frame ratio disabled for video mode`() {
+        val state = defaultSessionState(activeMode = ModeId.VIDEO)
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.frameRatioEnabled)
+        assertNotNull(sheet.frameRatioDisabledReason)
+        assertTrue(sheet.frameRatioOptions.all { !it.isEnabled })
+    }
+
+    @Test
+    fun `quick panel sheet frame ratio disabled during active shot`() {
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "test-shot",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.frameRatioEnabled)
+        assertNotNull(sheet.frameRatioDisabledReason)
+    }
+
+    @Test
     fun `color lab panel render model title is color lab`() {
         val state = defaultSessionState()
         val model = colorLabPanelRenderModel(state, TestAppTextResolver())
@@ -1609,6 +1661,52 @@ class SessionUiRenderModelTest {
         assertFalse(model.showFamilyTabs)
         assertFalse(model.showFilterItems)
         assertTrue(model.showAdjustmentPanel)
+    }
+
+    @Test
+    fun `color lab filter page does not show mode toggle button`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.COLOR_LAB
+        )
+
+        assertFalse(model.showModeToggle, "Color Lab should not show mode toggle / 进阶 button")
+    }
+
+    @Test
+    fun `style filter page shows mode toggle button`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+
+        assertTrue(model.showModeToggle, "Style Lab should show mode toggle button")
+    }
+
+    @Test
+    fun `color lab panel summary uses human readable format`() {
+        val spec = ColorLabSpec(colorAxis = 0.42f, toneAxis = -0.18f, strength = 0.8f)
+        val state = defaultSessionState(
+            persistedPhotoSettings = PhotoSettings(colorLabSpec = spec)
+        )
+        val model = colorLabPanelRenderModel(state, TestAppTextResolver())
+
+        assertTrue(
+            model.summary.contains("偏暖") || model.summary.contains("Warm"),
+            "Summary should describe warm color axis: ${model.summary}"
+        )
+        assertTrue(
+            model.summary.contains("加深") || model.summary.contains("Deep"),
+            "Summary should describe deep tone axis: ${model.summary}"
+        )
+        assertFalse(
+            model.summary.contains("Color:") && model.summary.contains("Tone:"),
+            "Summary should not be raw format like 'Color: X, Tone: Y': ${model.summary}"
+        )
     }
 
     @Test

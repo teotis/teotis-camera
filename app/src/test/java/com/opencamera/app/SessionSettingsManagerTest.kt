@@ -16,6 +16,7 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.settings.AudioProfile
+import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.FeatureCatalog
 import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
@@ -475,5 +476,52 @@ class SessionSettingsManagerTest {
         assertEquals(10, profile?.renderSpec?.brightnessShift)
         assertEquals(-3, profile?.renderSpec?.tintShift)
         assertEquals(0.15f, profile?.renderSpec?.warmBoost)
+    }
+
+    @Test
+    fun `apply UpdateColorLabSpec persists color lab axes and dispatches snapshot`() = runTest {
+        val session = FakeCameraSession()
+        val store = MapPersistedSettingsStore()
+        val catalogStore = MapFeatureCatalogStore()
+        val manager = SessionSettingsManager(
+            session = session,
+            store = store,
+            catalogStore = catalogStore
+        )
+
+        val spec = ColorLabSpec(colorAxis = 0.42f, toneAxis = -0.18f, strength = 0.8f)
+        val result = manager.apply(PersistedSettingsAction.UpdateColorLabSpec(spec))
+
+        assertEquals(SessionSettingsApplyResult.Applied, result)
+        val saved = store.load()
+        assertEquals(0.42f, saved.photo.colorLabSpec.colorAxis)
+        assertEquals(-0.18f, saved.photo.colorLabSpec.toneAxis)
+        assertEquals(0.8f, saved.photo.colorLabSpec.strength)
+        val intent = assertIs<SessionIntent.SettingsUpdated>(session.dispatched.single())
+        assertEquals(0.42f, intent.snapshot.persisted.photo.colorLabSpec.colorAxis)
+        assertEquals(-0.18f, intent.snapshot.persisted.photo.colorLabSpec.toneAxis)
+    }
+
+    @Test
+    fun `apply UpdateColorLabSpec normalizes out of range values`() = runTest {
+        val session = FakeCameraSession()
+        val store = MapPersistedSettingsStore()
+        val catalogStore = MapFeatureCatalogStore()
+        val manager = SessionSettingsManager(
+            session = session,
+            store = store,
+            catalogStore = catalogStore
+        )
+
+        val spec = ColorLabSpec(colorAxis = 2.0f, toneAxis = -3.0f, strength = 5.0f)
+        manager.apply(PersistedSettingsAction.UpdateColorLabSpec(spec))
+
+        val saved = store.load()
+        assertTrue(saved.photo.colorLabSpec.colorAxis in -1f..1f,
+            "colorAxis should be normalized to [-1,1]: ${saved.photo.colorLabSpec.colorAxis}")
+        assertTrue(saved.photo.colorLabSpec.toneAxis in -1f..1f,
+            "toneAxis should be normalized to [-1,1]: ${saved.photo.colorLabSpec.toneAxis}")
+        assertTrue(saved.photo.colorLabSpec.strength in 0f..1f,
+            "strength should be normalized to [0,1]: ${saved.photo.colorLabSpec.strength}")
     }
 }

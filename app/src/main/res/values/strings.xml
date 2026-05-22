@@ -78,7 +78,7 @@
     <string name="dev_export_log">导出日志</string>
     <string name="dev_close">关闭</string>
     <string name="dev_console_content_description">调试控制台</string>
-    <string name="button_palette_entry">色调</string>
+    <string name="button_palette_entry">镜头</string>
     <string name="button_quick_launcher">快捷</string>
     <string name="quick_bubble_panel_content_description">快捷相机控制</string>
     <string name="floating_utility_group_content_description">浮动相机工具</string>

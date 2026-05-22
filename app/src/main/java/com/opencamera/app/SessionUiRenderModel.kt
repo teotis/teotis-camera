@@ -122,6 +122,24 @@ internal data class FrameRatioControlRenderModel(
     val disabledReason: String?
 )
 
+internal data class QuickPanelRowRenderModel(
+    val title: String,
+    val value: String,
+    val isEnabled: Boolean,
+    val disabledReason: String? = null
+)
+
+internal data class QuickPanelSheetRenderModel(
+    val gridRow: QuickPanelRowRenderModel,
+    val qualityRow: QuickPanelRowRenderModel,
+    val frameRatioRow: QuickPanelRowRenderModel,
+    val frameRatioOptions: List<FrameRatioOptionRenderModel>,
+    val frameRatioEnabled: Boolean,
+    val frameRatioDisabledReason: String?,
+    val liveRow: QuickPanelRowRenderModel,
+    val timerRow: QuickPanelRowRenderModel
+)
+
 internal data class SessionSettingsRenderModel(
     val commonSummary: String,
     val photoSummary: String,
@@ -403,6 +421,7 @@ internal data class FilterLabPageRenderModel(
     val showFilterItems: Boolean = true,
     val showAdjustmentPanel: Boolean = true,
     val showAdvancedControls: Boolean = true,
+    val showModeToggle: Boolean = true,
     val styleStrength: Float = 1f,
     val updateStyleStrengthAction: PersistedSettingsAction? = null,
     val photoTab: FilterLabTabRenderModel,
@@ -545,6 +564,50 @@ internal fun frameRatioControlRenderModel(state: SessionState, text: AppTextReso
         isVisible = true,
         isEnabled = enabled,
         disabledReason = reason
+    )
+}
+
+internal fun quickPanelSheetRenderModel(
+    state: SessionState,
+    text: AppTextResolver,
+    strings: SessionUiStrings
+): QuickPanelSheetRenderModel {
+    val settingsPage = sessionSettingsPageRenderModel(state, text)
+    val grid = settingsPage.commonSection.gridMode
+    val live = settingsPage.photoSection.livePhoto
+    val timer = settingsPage.photoSection.countdown
+    val frameControl = frameRatioControlRenderModel(state, text)
+
+    return QuickPanelSheetRenderModel(
+        gridRow = QuickPanelRowRenderModel(
+            title = text.quickGrid(),
+            value = grid.value,
+            isEnabled = grid.isInteractive
+        ),
+        qualityRow = QuickPanelRowRenderModel(
+            title = text.quickQuality(),
+            value = strings.buttonStillFast,
+            isEnabled = true
+        ),
+        frameRatioRow = QuickPanelRowRenderModel(
+            title = text.frameRatioTitle(),
+            value = frameControl.currentLabel,
+            isEnabled = frameControl.isEnabled,
+            disabledReason = frameControl.disabledReason
+        ),
+        frameRatioOptions = frameControl.options,
+        frameRatioEnabled = frameControl.isEnabled,
+        frameRatioDisabledReason = frameControl.disabledReason,
+        liveRow = QuickPanelRowRenderModel(
+            title = text.quickLive(),
+            value = live.value,
+            isEnabled = live.isInteractive
+        ),
+        timerRow = QuickPanelRowRenderModel(
+            title = text.quickTimer(),
+            value = timer.value,
+            isEnabled = timer.isInteractive
+        )
     )
 }
 
@@ -940,6 +1003,8 @@ internal fun sessionSettingsPageRenderModel(
             gridMode = SettingsControlRenderModel(
                 label = text.compositionGridLabel(),
                 value = settings.common.gridMode.label,
+                availability = SettingsControlAvailability.SUPPORTED,
+                availabilityLabel = text.availabilityLabel(SettingsControlAvailability.SUPPORTED),
                 supportLabel = text.gridSupportLabel(CompositionGridMode.entries.size),
                 nextAction = PersistedSettingsAction.UpdateGridMode(
                     nextListValue(settings.common.gridMode, CompositionGridMode.entries.toList())
@@ -970,6 +1035,11 @@ internal fun sessionSettingsPageRenderModel(
                 } else {
                     SettingsControlAvailability.UNSUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(if (supportsStillCapture && photoFilters.isNotEmpty()) {
+                    SettingsControlAvailability.SUPPORTED
+                } else {
+                    SettingsControlAvailability.UNSUPPORTED
+                }),
                 supportLabel = if (photoFilters.isNotEmpty()) {
                     text.looksCount(photoFilters.size)
                 } else {
@@ -998,6 +1068,11 @@ internal fun sessionSettingsPageRenderModel(
                 } else {
                     SettingsControlAvailability.UNSUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(if (supportsStillCapture) {
+                    SettingsControlAvailability.DEGRADED
+                } else {
+                    SettingsControlAvailability.UNSUPPORTED
+                }),
                 supportLabel = if (supportsStillCapture) {
                     text.portraitTuningLabel()
                 } else {
@@ -1016,6 +1091,11 @@ internal fun sessionSettingsPageRenderModel(
                 } else {
                     SettingsControlAvailability.UNSUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(if (supportsStillCapture && watermarkTemplates.isNotEmpty()) {
+                    SettingsControlAvailability.DEGRADED
+                } else {
+                    SettingsControlAvailability.UNSUPPORTED
+                }),
                 supportLabel = if (supportsStillCapture && watermarkTemplates.isNotEmpty()) {
                     text.watermarkTuningLabel(watermarkTemplates.size)
                 } else if (!supportsStillCapture) {
@@ -1033,6 +1113,11 @@ internal fun sessionSettingsPageRenderModel(
                 } else {
                     SettingsControlAvailability.UNSUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(if (supportsStillCapture) {
+                    SettingsControlAvailability.DEGRADED
+                } else {
+                    SettingsControlAvailability.UNSUPPORTED
+                }),
                 supportLabel = if (supportsStillCapture) {
                     text.liveSupportLabel(catalog.liveMediaBundleDraft.motionDurationMillis.toInt(), catalog.liveMediaBundleDraft.watermarkMotionBehavior.label)
                 } else {
@@ -1054,6 +1139,11 @@ internal fun sessionSettingsPageRenderModel(
                 } else {
                     SettingsControlAvailability.UNSUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(if (supportsStillCapture) {
+                    SettingsControlAvailability.SUPPORTED
+                } else {
+                    SettingsControlAvailability.UNSUPPORTED
+                }),
                 supportLabel = if (supportsStillCapture) {
                     text.presetsCount(catalog.countdownOptions.size)
                 } else {
@@ -1080,6 +1170,12 @@ internal fun sessionSettingsPageRenderModel(
                         SettingsControlAvailability.DEGRADED
                     else -> SettingsControlAvailability.SUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(when {
+                    !supportsVideoRecording -> SettingsControlAvailability.UNSUPPORTED
+                    resolvedVideoSelection.resolutionDegraded ->
+                        SettingsControlAvailability.DEGRADED
+                    else -> SettingsControlAvailability.SUPPORTED
+                }),
                 supportLabel = when {
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.resolutionDegraded ->
@@ -1108,6 +1204,12 @@ internal fun sessionSettingsPageRenderModel(
                         SettingsControlAvailability.DEGRADED
                     else -> SettingsControlAvailability.SUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(when {
+                    !supportsVideoRecording -> SettingsControlAvailability.UNSUPPORTED
+                    resolvedVideoSelection.frameRateDegraded ->
+                        SettingsControlAvailability.DEGRADED
+                    else -> SettingsControlAvailability.SUPPORTED
+                }),
                 supportLabel = when {
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.frameRateDegraded ->
@@ -1139,6 +1241,12 @@ internal fun sessionSettingsPageRenderModel(
                         SettingsControlAvailability.DEGRADED
                     else -> SettingsControlAvailability.SUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(when {
+                    !supportsVideoRecording -> SettingsControlAvailability.UNSUPPORTED
+                    resolvedVideoSelection.dynamicPolicyDegraded ->
+                        SettingsControlAvailability.DEGRADED
+                    else -> SettingsControlAvailability.SUPPORTED
+                }),
                 supportLabel = when {
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     resolvedVideoSelection.dynamicPolicyDegraded ->
@@ -1171,6 +1279,13 @@ internal fun sessionSettingsPageRenderModel(
                         SettingsControlAvailability.DEGRADED
                     else -> SettingsControlAvailability.SUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(when {
+                    !supportsVideoRecording || !supportsAudioRecording ->
+                        SettingsControlAvailability.UNSUPPORTED
+                    resolvedVideoSelection.audioProfileDegraded ->
+                        SettingsControlAvailability.DEGRADED
+                    else -> SettingsControlAvailability.SUPPORTED
+                }),
                 supportLabel = when {
                     !supportsVideoRecording -> text.videoRecordingUnavailable()
                     !supportsAudioRecording -> text.microphoneUnavailable()
@@ -1200,6 +1315,11 @@ internal fun sessionSettingsPageRenderModel(
                 } else {
                     SettingsControlAvailability.UNSUPPORTED
                 },
+                availabilityLabel = text.availabilityLabel(if (supportsVideoRecording) {
+                    SettingsControlAvailability.DEGRADED
+                } else {
+                    SettingsControlAvailability.UNSUPPORTED
+                }),
                 supportLabel = if (supportsVideoRecording) {
                     text.videoFilterSeedCountLabel(videoFilters.size)
                 } else {
@@ -1781,6 +1901,7 @@ internal fun filterLabPageRenderModel(
         showFilterItems = panelRole == StyleAndColorLabRole.STYLE,
         showAdjustmentPanel = panelRole == StyleAndColorLabRole.COLOR_LAB,
         showAdvancedControls = false,
+        showModeToggle = panelRole == StyleAndColorLabRole.STYLE,
         photoTab = filterLabTabRenderModel(
             family = FilterLabFamily.PHOTO,
             currentFilterId = settings.photo.defaultFilterProfileId,
