@@ -85,3 +85,57 @@ data class ShotGraph(
     val outputNodes: List<OutputNode>,
     val diagnostics: List<String> = emptyList()
 )
+
+fun ShotGraph.primaryStillNode(): CaptureNode? =
+    captureNodes.firstOrNull { it.role == CaptureNodeRole.PRIMARY_STILL }
+
+fun ShotGraph.primaryVideoNode(): CaptureNode? =
+    captureNodes.firstOrNull { it.role == CaptureNodeRole.PRIMARY_VIDEO }
+
+fun ShotGraph.temporaryFrameNode(): CaptureNode? =
+    captureNodes.firstOrNull { it.role == CaptureNodeRole.TEMPORARY_FRAME }
+
+fun ShotGraph.requiresAlgorithm(type: AlgorithmType): Boolean =
+    algorithmNodes.any { it.type == type }
+
+fun ShotGraph.validateConsistency(shotKind: ShotKind): List<String> {
+    val errors = mutableListOf<String>()
+    when (shotKind) {
+        ShotKind.VIDEO_RECORDING -> {
+            if (primaryVideoNode() == null) {
+                errors.add("VIDEO_RECORDING requires PRIMARY_VIDEO node")
+            }
+        }
+        ShotKind.STILL_CAPTURE -> {
+            if (primaryStillNode() == null) {
+                errors.add("STILL_CAPTURE requires PRIMARY_STILL node")
+            }
+            if (temporaryFrameNode() != null) {
+                errors.add("STILL_CAPTURE must not have TEMPORARY_FRAME node")
+            }
+        }
+        ShotKind.MULTI_FRAME_CAPTURE -> {
+            if (primaryStillNode() == null) {
+                errors.add("MULTI_FRAME_CAPTURE requires PRIMARY_STILL node")
+            }
+            if (temporaryFrameNode() == null) {
+                errors.add("MULTI_FRAME_CAPTURE requires TEMPORARY_FRAME node")
+            }
+            if (!requiresAlgorithm(AlgorithmType.MULTI_FRAME_MERGE)) {
+                errors.add("MULTI_FRAME_CAPTURE requires MULTI_FRAME_MERGE algorithm")
+            }
+        }
+        ShotKind.LIVE_PHOTO -> {
+            if (primaryStillNode() == null) {
+                errors.add("LIVE_PHOTO requires PRIMARY_STILL node")
+            }
+            if (captureNodes.none { it.role == CaptureNodeRole.MOTION_SEGMENT }) {
+                errors.add("LIVE_PHOTO requires MOTION_SEGMENT node")
+            }
+            if (!requiresAlgorithm(AlgorithmType.LIVE_ASSEMBLE)) {
+                errors.add("LIVE_PHOTO requires LIVE_ASSEMBLE algorithm")
+            }
+        }
+    }
+    return errors
+}

@@ -1,5 +1,6 @@
 package com.opencamera.core.device
 
+import com.opencamera.core.media.CaptureNodeRole
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
@@ -8,6 +9,7 @@ import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.media.primaryVideoNode
 import com.opencamera.core.settings.ManualCaptureParams
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -253,6 +255,37 @@ class DefaultDeviceShotRequestTranslatorTest {
         assertTrue(request.torchEnabled)
         assertTrue("device:template=video-recording" in request.diagnostics)
         assertTrue("device:torch=on" in request.diagnostics)
+    }
+
+    @Test
+    fun `video translation proves primary video graph node exists`() {
+        val plan = ShotExecutor(idGenerator = { "shot-video-graph" }).plan(
+            CaptureStrategy.VideoRecording()
+        )
+
+        assertTrue(plan.graph.primaryVideoNode() != null)
+
+        val request = translator.translate(plan)
+
+        assertEquals(CaptureTemplate.VIDEO_RECORDING, request.template)
+        assertTrue("device:graph=capture-topology" in request.diagnostics)
+    }
+
+    @Test
+    fun `multi frame translation uses graph temp frame count`() {
+        val plan = ShotExecutor(idGenerator = { "shot-night-graph" }).plan(
+            CaptureStrategy.MultiFrame(
+                captureProfile = CaptureProfile(
+                    frameCount = 8,
+                    longExposureMillis = 1200L
+                )
+            )
+        )
+
+        val request = translator.translate(plan)
+
+        assertEquals(8, request.frameCount)
+        assertTrue("device:graph=capture-topology" in request.diagnostics)
     }
 
     @Test

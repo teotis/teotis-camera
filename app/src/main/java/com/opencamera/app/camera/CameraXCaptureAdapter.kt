@@ -94,6 +94,9 @@ import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
 import com.opencamera.core.media.ShotTiming
+import com.opencamera.core.media.primaryStillNode
+import com.opencamera.core.media.primaryVideoNode
+import com.opencamera.core.media.temporaryFrameNode
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
@@ -1210,11 +1213,12 @@ class CameraXCaptureAdapter(
             ?.let(::capabilitiesFor)
             ?: capabilities
         val deviceRequest = shotRequestTranslatorFactory(resolvedCapabilities).translate(plan)
-        when (plan.request.shotKind) {
-            ShotKind.STILL_CAPTURE -> captureStillImage(plan, deviceRequest, requestedAt)
-            ShotKind.MULTI_FRAME_CAPTURE -> captureStillImage(plan, deviceRequest, requestedAt)
-            ShotKind.LIVE_PHOTO -> captureStillImage(plan, deviceRequest, requestedAt)
-            ShotKind.VIDEO_RECORDING -> startVideoRecording(plan, deviceRequest, requestedAt)
+        val graph = plan.graph
+        when {
+            graph.primaryVideoNode() != null -> startVideoRecording(plan, deviceRequest, requestedAt)
+            graph.temporaryFrameNode() != null -> captureStillImage(plan, deviceRequest, requestedAt)
+            graph.primaryStillNode() != null -> captureStillImage(plan, deviceRequest, requestedAt)
+            else -> error("ShotGraph has no executable capture node for ${plan.request.shotId}")
         }
     }
 
