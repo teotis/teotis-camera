@@ -2353,14 +2353,7 @@ class CameraXCaptureAdapter(
         val cleanupFile: File? = null
     ) {
         fun resolveOutputHandle(savedUri: Uri?): MediaOutputHandle {
-            val resolvedContentUri = savedUri
-                ?.takeUnless { it == Uri.EMPTY }
-                ?.toString()
-            return if (resolvedContentUri == null) {
-                outputHandle
-            } else {
-                outputHandle.copy(contentUri = resolvedContentUri)
-            }
+            return resolvePhotoOutputHandle(outputHandle, savedUri)
         }
 
         fun cleanupPaths(): List<String> {
@@ -2416,6 +2409,20 @@ class CameraXCaptureAdapter(
     }
 
     private fun Uri?.takeUnlessEmpty(): Uri? = this?.takeUnless { it == Uri.EMPTY }
+}
+
+internal fun resolvePhotoOutputHandle(
+    outputHandle: MediaOutputHandle,
+    savedUri: Uri?
+): MediaOutputHandle {
+    val resolvedContentUri = savedUri
+        ?.takeUnless { it == Uri.EMPTY }
+        ?.toString()
+    return if (resolvedContentUri == null) {
+        outputHandle
+    } else {
+        outputHandle.copy(contentUri = resolvedContentUri)
+    }
 }
 
 internal fun mapOutputRotationToSurface(
