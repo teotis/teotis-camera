@@ -8,9 +8,11 @@
 
 | Result | Count |
 | --- | --- |
-| Pass | 32 |
+| Pass | 33 |
 | Risk | 3 |
-| Fail | 2 |
+| Fail | 0 |
+| 已屏蔽 | 1 |
+| 已取消 | 1 |
 
 ## Feature Matrix
 
@@ -75,7 +77,7 @@
 | EV | RuntimeProControlsRenderModel | ManualControlSupport.APPLY | Camera2Interop exposure compensation | 同上 | SUPPORTED | Pass |
 | AF | RuntimeProControlsRenderModel | ManualControlSupport.APPLY | Camera2Interop CONTROL_AF_MODE_OFF + LENS_FOCUS_DISTANCE | 同上 | SUPPORTED | Pass |
 | AWB/WB | RuntimeProControlsRenderModel | ManualControlSupport.SAVED_ONLY | Saved to metadata only, not enforced at capture | CameraXCaptureAdapterManualRequestTest | SAVED_ONLY (DEGRADED) | Pass |
-| RAW | RuntimeProControlsRenderModel | rawEnabled flag | No DNG output; flag persisted to metadata only | CameraXCaptureAdapterManualRequestTest | FLAG ONLY (UNSUPPORTED) | Fail |
+| RAW | RuntimeProControlsRenderModel | rawEnabled flag | No DNG output; UI 显示 "Degraded • Saved only" | CameraXCaptureAdapterManualRequestTest, SessionUiRenderModelTest | SAVED_ONLY (DEGRADED) | Pass(SAVED_ONLY) |
 | 光圈 | RuntimeProControlsRenderModel | ManualControlSupport.APPLY | Camera2Interop LENS_APERTURE | CameraXCaptureAdapterManualRequestTest | SUPPORTED | Pass |
 
 ### 媒体后处理
@@ -87,8 +89,8 @@
 | 自拍镜像 | SessionSettingsPageRenderModel | selfieMirrorEnabled | PhotoSelfieMirrorPostProcessor Matrix preScale horizontal flip | PhotoSelfieMirrorPostProcessorTest | SUPPORTED | Pass |
 | 文档裁切 | DocumentModePlugin | DocumentEffect.autoCrop | DocumentAutoCropPostProcessor luminance-based edge detection | DocumentAutoCropPostProcessorTest | SUPPORTED | Pass |
 | 人像渲染 | PortraitLabPageRenderModel | PortraitEffect (depth/focus renderPath + beauty + bokeh) | PortraitRenderPostProcessor scale-blur + elliptical focus blending; fallback to focus when segmentation unavailable | PortraitRenderPostProcessorTest | SUPPORTED/DEGRADED | Pass |
-| 多帧合并 | NightModePlugin | MultiFrameMergeStrategy | MultiFrameMergePlaceholderPostProcessor (logs inputs + deletes temps, no real merge) | MultiFrameMergeAlgorithmProcessorTest | PLACEHOLDER (UNSUPPORTED) | Fail |
-| 视频水印字幕 | VideoModePlugin | VideoWatermarkSubtitlePostProcessor | SRT file generation via MediaMetadataRetriever | VideoWatermarkSubtitlePostProcessorTest | SUPPORTED (sidecar only) | Pass |
+| 多帧合并 | NightModePlugin | MultiFrameMergeStrategy | 已屏蔽：supportsNightMultiFrame 默认 false，降级为单帧增亮 | MultiFrameMergeAlgorithmProcessorTest | 已屏蔽（待集成算法） | 已屏蔽 |
+| 视频水印字幕 | VideoModePlugin | VideoWatermarkSubtitlePostProcessor | 已取消：功能已移除 | N/A | 已取消 | 已取消 |
 
 ### 诊断
 
@@ -99,23 +101,27 @@
 
 ## P0/P1 Feature Defects
 
-### P0 — 假入口（入口可见但无真实执行）
+### 已决策缺陷
 
-#### 1. RAW 输出是假入口
+#### 1. RAW 输出 — 决策：暂不实现，显式降级
 
-- **现象**: `RuntimeProControlsRenderModel` 中 RAW 有 on/off toggle，`rawEnabled` 持久化到 `ManualCaptureParams`，序列化到 metadata tag `manualDraftRaw`。
-- **实际**: `ManualControlCapabilityMatrix.raw` 默认 `SAVED_ONLY`，`FilteredManualCaptureParams` 在 capability 非 `APPLY` 时 strip 为 `false`。CameraXCaptureAdapter 从未配置 RAW stream 或 `CAPTURE_MODE_MAXIMIZE_QUALITY` + DNG 输出。
-- **影响**: 用户开启 RAW 后得到的仍是 JPEG，无 DNG 文件生成。UI 未标注当前状态为 "SAVED_ONLY"。
-- **建议**: 要么实现 Camera2 RAW capture (ImageReader + DNG)，要么在 UI 中明确标注 "仅记录设置" 或 "即将支持"。
-- **代码位置**: `DeviceContracts.kt:61-68` (CAMERA2_INTEROP_DEFAULT), `CameraXCaptureAdapter.kt:304-340` (applyCamera2ManualCaptureConfig), `SessionUiRenderModel.kt:1211-1333` (RuntimeProControlsRenderModel)
+- **状态**: 已解决（UI 层面）
+- **决策**: 暂不实现 DNG 输出；UI 已显式标注 "Degraded • Saved only"
+- **现状**: `ManualControlCapabilityMatrix.raw` 默认 `SAVED_ONLY`，render model 已设置 `availability = DEGRADED`、`supportLabel = "Saved only"`，`buttonLabel` 渲染为 `"RAW\nOn\nDegraded • Saved only"`，`manualSupportSummary` 包含 "RAW / WB stay saved-only"
+- **后续计划**: 实现 Camera2 RAW capture (ImageReader + DNG)
 
-#### 2. 多帧合并是占位符
+#### 2. 多帧合并 — 决策：暂不实现，屏蔽能力
 
-- **现象**: Night 模式在 `supportsNightMultiFrame=true` 时发射 `CaptureStrategy.MultiFrame` (6/8/12 frames)，UI 展示帧数和三脚架检测。
-- **实际**: `MultiFrameMergePlaceholderPostProcessor` 只记录输入帧路径并删除临时文件，无真实合并算法。效果等同于单帧。
-- **影响**: Night 模式多帧拍摄的降噪/HDR 效果不存在。用户期望的"夜景增强"实际为单帧亮度提升。
-- **建议**: 集成真实多帧合并算法（如 Google HDR+ 或自研对齐+融合），或在 UI 降级提示"算法集成中"。
-- **代码位置**: `MediaPipelineContracts.kt` (MultiFrameMergePlaceholderPostProcessor), `NightModePlugin.kt` (multi-frame profiles)
+- **状态**: 已屏蔽
+- **决策**: `DeviceCapabilities.supportsNightMultiFrame` 默认值改为 `false`，Night 模式自动降级为单帧增亮（Balanced/Warm profiles）
+- **现状**: Night 模式使用 `CaptureStrategy.SingleFrame`，UI 文案切换为 "Scenery brightening"，capturePath 为 "single-frame-fallback"
+- **后续计划**: 集成真实多帧合并算法后恢复 `supportsNightMultiFrame = true`
+
+#### 3. 视频帧级水印 — 决策：取消
+
+- **状态**: 已取消
+- **决策**: 取消视频水印功能，移除 `VideoWatermarkSubtitlePostProcessor` 及所有引用
+- **影响**: Video mode 不再生成 SRT 字幕 sidecar，`PostProcessSpec.watermarkText` 在录像时为 null
 
 ### P1 — 功能降级未告知
 
@@ -139,12 +145,11 @@
 
 | 功能 | 当前语义 | 期望语义 | Gap |
 | --- | --- | --- | --- |
-| RAW | `SAVED_ONLY` — flag 保存到 metadata，无 DNG | `UNSUPPORTED` 或真实 RAW 输出 | 用户无法区分 "RAW 已启用" 和 "RAW 未生效" |
+| RAW | `SAVED_ONLY` — UI 已标注 "Degraded • Saved only" | 真实 RAW 输出 | 暂不实现，已显式降级 |
 | Live Photo | `STILL_ONLY_FALLBACK` — sidecar 有结构但 frameCount=0 | `DEGRADED_MOTION` 或 `COMPLETE` | 用户无法得知 Live Photo 未录制运动 |
-| 多帧合并 | Placeholder — 记录输入后删除 | 真实合并或 `UNSUPPORTED` | Night 模式展示帧数但实际无合并效果 |
+| 多帧合并 | 已屏蔽 — `supportsNightMultiFrame = false` | 真实合并算法 | 待集成算法后恢复 |
 | 连续变焦 | `CONTINUOUS` 定义但检测永不返回 | 检测返回 `CONTINUOUS` 或移除枚举 | 潜在的死代码和未定义行为 |
 | WB | `SAVED_ONLY` — 保存到 EXIF 但不应用 | `APPLY` 或 UI 标注 "仅记录" | 用户设置 WB 后预览和成片色温不变 |
-| 视频水印 | Sidecar SRT 字幕文件 | 帧级渲染或 sidecar | 视频无视觉水印，仅有字幕 sidecar |
 
 ## Recommended Regression Tests
 
