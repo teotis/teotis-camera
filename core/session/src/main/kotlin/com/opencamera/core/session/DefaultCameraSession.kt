@@ -5,6 +5,10 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PreviewMeteringPoint
+import com.opencamera.core.device.PreviewMeteringRequest
+import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.displayReason
@@ -86,6 +90,7 @@ class DefaultCameraSession(
     private var pendingCountdownStrategy: CaptureStrategy? = null
     private var pendingPreviewHostRecoveryReason: String? = null
     private var recordingWatchdogJob: Job? = null
+    private var meteringCounter: Int = 0
     private var currentController: ModeController = createController(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
@@ -194,6 +199,8 @@ class DefaultCameraSession(
             )
             is SessionIntent.ThermalStateChanged -> trace.record("intent.thermal", intent.thermalState.toString())
             is SessionIntent.PerformanceClassChanged -> trace.record("intent.performance", intent.performanceClass.toString())
+            is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
+            is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
         }
     }
 
@@ -1399,6 +1406,49 @@ class DefaultCameraSession(
             if (mediaType == MediaType.PHOTO) "capture.failed" else "recording.failed",
             "$shotId:$reason"
         )
+    }
+
+    private suspend fun handlePreviewTapToFocus(normalizedX: Float, normalizedY: Float) {
+        val requestId = "metering-${++meteringCounter}"
+        val point = PreviewMeteringPoint(normalizedX, normalizedY).clamped()
+        updateState(
+            previewMeteringFeedback = PreviewMeteringFeedback(
+                requestId = requestId,
+                normalizedX = point.normalizedX,
+                normalizedY = point.normalizedY,
+                status = PreviewMeteringFeedbackStatus.REQUESTED
+            ),
+            lastAction = "Tap to focus requested"
+        )
+        _effects.emit(
+            SessionEffect.ApplyPreviewMetering(
+                PreviewMeteringRequest(
+                    requestId = requestId,
+                    point = point
+                )
+            )
+        )
+        trace.record("metering.requested", "$requestId:($normalizedX,$normalizedY)")
+    }
+
+    private suspend fun handlePreviewMeteringCompleted(result: PreviewMeteringResult) {
+        val feedbackStatus = when (result.status) {
+            PreviewMeteringResultStatus.SUCCEEDED -> PreviewMeteringFeedbackStatus.SUCCEEDED
+            PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY
+            PreviewMeteringResultStatus.FAILED -> PreviewMeteringFeedbackStatus.FAILED
+            PreviewMeteringResultStatus.UNSUPPORTED -> PreviewMeteringFeedbackStatus.UNSUPPORTED
+        }
+        updateState(
+            previewMeteringFeedback = PreviewMeteringFeedback(
+                requestId = result.requestId,
+                normalizedX = result.point.normalizedX,
+                normalizedY = result.point.normalizedY,
+                status = feedbackStatus,
+                reason = result.reason
+            ),
+            lastAction = "Metering ${result.status.name.lowercase()}"
+        )
+        trace.record("metering.completed", "${result.requestId}:${result.status}")
     }
 
     private suspend fun handleInterruptedShotFailure(

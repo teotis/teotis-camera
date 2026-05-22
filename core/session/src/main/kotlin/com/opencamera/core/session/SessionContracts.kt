@@ -84,6 +84,22 @@ internal fun captureFeedbackPolicyFor(shot: ShotRequest): CaptureFeedbackPolicy 
     }
 }
 
+enum class PreviewMeteringFeedbackStatus {
+    REQUESTED,
+    SUCCEEDED,
+    DEGRADED_AUTO_EXPOSURE_ONLY,
+    FAILED,
+    UNSUPPORTED
+}
+
+data class PreviewMeteringFeedback(
+    val requestId: String,
+    val normalizedX: Float,
+    val normalizedY: Float,
+    val status: PreviewMeteringFeedbackStatus,
+    val reason: String? = null
+)
+
 data class PermissionState(
     val cameraGranted: Boolean = false,
     val microphoneGranted: Boolean = false
@@ -110,7 +126,8 @@ data class SessionPresentationState(
     val latestLivePhotoBundle: LivePhotoBundle? = null,
     val latestSavedMediaType: SavedMediaType? = null,
     val latestPipelineNotes: List<String> = emptyList(),
-    val lastError: String? = null
+    val lastError: String? = null,
+    val previewMeteringFeedback: PreviewMeteringFeedback? = null
 )
 
 data class SessionState(
@@ -219,6 +236,8 @@ sealed interface SessionIntent {
     ) : SessionIntent
     data class ThermalStateChanged(val thermalState: CameraThermalState) : SessionIntent
     data class PerformanceClassChanged(val performanceClass: CameraPerformanceClass) : SessionIntent
+    data class PreviewTapToFocus(val normalizedX: Float, val normalizedY: Float) : SessionIntent
+    data class PreviewMeteringCompleted(val result: com.opencamera.core.device.PreviewMeteringResult) : SessionIntent
 }
 
 sealed interface SessionEffect {
@@ -235,6 +254,7 @@ sealed interface SessionEffect {
         val reason: String,
         val clearHost: Boolean
     ) : SessionEffect
+    data class ApplyPreviewMetering(val request: com.opencamera.core.device.PreviewMeteringRequest) : SessionEffect
 }
 
 interface CameraSession {
