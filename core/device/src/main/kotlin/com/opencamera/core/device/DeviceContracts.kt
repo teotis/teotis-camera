@@ -110,7 +110,7 @@ data class DeviceCapabilities(
     val manualControlCapabilities: ManualControlCapabilityMatrix? = null,
     val supportsDocumentScanEnhancement: Boolean = true,
     val supportsPortraitDepthEffect: Boolean = true,
-    val supportsNightMultiFrame: Boolean = true,
+    val supportsNightMultiFrame: Boolean = false,
     val supportsFlashControl: Boolean = true,
     val availableLensFacings: Set<LensFacing> = setOf(LensFacing.BACK),
     val availableStillCaptureOutputSizes: List<StillCaptureOutputSize> = emptyList(),
