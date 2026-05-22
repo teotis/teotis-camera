@@ -11,6 +11,13 @@ import com.opencamera.core.settings.ManualCaptureParams
 import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
 
+enum class CameraOutputRotation {
+    ROTATION_0,
+    ROTATION_90,
+    ROTATION_180,
+    ROTATION_270
+}
+
 enum class LensFacing {
     BACK,
     FRONT
