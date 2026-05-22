@@ -6,6 +6,12 @@
 
 This file captures the hardest 10% and all visual/multimodal work from the vivo X300 recording review. Text-only agents can implement the linked packages, but final acceptance requires this review loop.
 
+The current baseline review has been completed and written to:
+
+- [`../Fifth-Recording-Hard10-Multimodal-QA-Report.md`](../Fifth-Recording-Hard10-Multimodal-QA-Report.md)
+
+Use that report as the authoritative P0/P1 issue ledger and recheck protocol for the next APK.
+
 ## Why This Is The Hard Part
 
 The remaining 2.0 gaps are not only code correctness. They are about whether the app feels like a camera:
@@ -96,6 +102,12 @@ Produce a final Markdown report with:
 - issue-by-issue status: `Pass / Risk / Fail`,
 - remaining blockers grouped as P0/P1/P2,
 - explicit final verdict: `GO`, `CONDITIONAL GO`, or `NO GO`.
+
+Baseline output already exists:
+
+- `NO GO for visual/product 2.0 acceptance`
+- P0: Color Lab persistence, fragmented bottom cockpit, unstable quick frame-ratio visibility
+- P1: top-bar clipping/hierarchy, right-rail label, engineering copy leakage, Dev dominance, frame geometry arbitration
 
 ## Non-Goals
 
