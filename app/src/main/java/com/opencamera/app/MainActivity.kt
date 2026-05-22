@@ -64,6 +64,7 @@ class MainActivity : AppCompatActivity() {
         get() = (application as OpenCameraApplication).container
 
     private var orientationMonitor: CameraOrientationMonitor? = null
+    private val contentRotator = OrientationContentRotator()
     private var latestOrientationRenderModel: CameraOrientationRenderModel =
         CameraOrientationRenderModel(
             CameraPhysicalOrientation.PORTRAIT,
@@ -410,16 +411,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initOrientationMonitor() {
-        orientationMonitor = CameraOrientationMonitor(this) { model ->
-            latestOrientationRenderModel = model
-            renderOrientation(model)
-            dispatch(SessionIntent.OutputRotationChanged(model.outputRotation))
-        }
-    }
-
-    private fun renderOrientation(model: CameraOrientationRenderModel) {
-        val degrees = model.contentRotationDegrees
-        listOf(
+        contentRotator.register(
             buttonFilterEntry,
             buttonQuickLauncher,
             buttonDevEntry,
@@ -429,7 +421,16 @@ class MainActivity : AppCompatActivity() {
             buttonFrameRatio169,
             buttonFrameRatio11,
             buttonGridMode
-        ).forEach { it.rotation = degrees }
+        )
+        orientationMonitor = CameraOrientationMonitor(this) { model ->
+            latestOrientationRenderModel = model
+            renderOrientation(model)
+            dispatch(SessionIntent.OutputRotationChanged(model.outputRotation))
+        }
+    }
+
+    private fun renderOrientation(model: CameraOrientationRenderModel) {
+        contentRotator.applyRotation(model.contentRotationDegrees)
     }
 
     override fun onStart() {
