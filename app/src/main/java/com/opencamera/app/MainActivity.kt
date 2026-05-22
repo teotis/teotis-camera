@@ -73,142 +73,145 @@ class MainActivity : AppCompatActivity() {
         )
 
     private var selectedSettingsTab = SettingsTab.COMMON
-    private lateinit var previewView: PreviewView
-    private lateinit var previewOverlayView: PreviewOverlayView
-    private lateinit var panelDismissScrim: View
-    private lateinit var titleText: TextView
-    private lateinit var permissionStatus: TextView
-    private lateinit var buttonColorLabEntry: Button
-    private lateinit var buttonSettingsEntry: Button
-    private lateinit var buttonFilterEntry: Button
-    private lateinit var buttonQuickGrid: Button
-    private lateinit var buttonQuickFlash: Button
-    private lateinit var buttonFrameRatio43: Button
-    private lateinit var buttonFrameRatio169: Button
-    private lateinit var buttonFrameRatio11: Button
-    private lateinit var buttonQuickLivePhoto: Button
-    private lateinit var buttonQuickTimer: Button
-    private lateinit var buttonQuickLauncher: Button
-    private lateinit var quickBubblePanel: androidx.core.widget.NestedScrollView
-    private lateinit var settingsPanel: androidx.core.widget.NestedScrollView
-    private lateinit var filterPanel: androidx.core.widget.NestedScrollView
-    private lateinit var buttonSettingsBack: Button
-    private lateinit var settingsRootContent: LinearLayout
-    private lateinit var settingsPortraitLabContent: LinearLayout
-    private lateinit var settingsWatermarkSelectorContent: LinearLayout
-    private lateinit var settingsWatermarkDetailContent: LinearLayout
-    private lateinit var settingsHeadline: TextView
-    private lateinit var settingsSupportingText: TextView
-    private lateinit var settingsHeroSummary: TextView
-    private lateinit var settingsCommonSummary: TextView
-    private lateinit var settingsPhotoSummary: TextView
-    private lateinit var settingsVideoSummary: TextView
-    private lateinit var settingsCatalogFooter: TextView
-    private lateinit var settingsEditingHint: TextView
-    private lateinit var portraitLabHeadline: TextView
-    private lateinit var portraitLabSupportingText: TextView
-    private lateinit var portraitLabHeroSummary: TextView
-    private lateinit var portraitLabEditingHint: TextView
-    private lateinit var buttonPortraitProfile: Button
-    private lateinit var buttonPortraitBeautyPreset: Button
-    private lateinit var buttonPortraitBeautyStrength: Button
-    private lateinit var buttonPortraitBokehEffect: Button
-    private lateinit var portraitLabFooter: TextView
-    private lateinit var watermarkSelectorHeadline: TextView
-    private lateinit var watermarkSelectorSupportingText: TextView
-    private lateinit var watermarkSelectorHeroSummary: TextView
-    private lateinit var watermarkSelectorList: LinearLayout
-    private lateinit var watermarkSelectorEditingHint: TextView
-    private lateinit var watermarkSelectorFooter: TextView
-    private lateinit var watermarkDetailHeadline: TextView
-    private lateinit var watermarkDetailSupportingText: TextView
-    private lateinit var watermarkDetailHeroSummary: TextView
-    private lateinit var watermarkDetailEditingHint: TextView
-    private lateinit var buttonWatermarkPlacement: Button
-    private lateinit var buttonWatermarkTextScale: Button
-    private lateinit var buttonWatermarkTextOpacity: Button
-    private lateinit var buttonWatermarkFrameBackground: Button
-    private lateinit var watermarkDetailFooter: TextView
-    private lateinit var buttonGridMode: Button
-    private lateinit var buttonShutterSound: Button
-    private lateinit var buttonSelfieMirror: Button
-    private lateinit var buttonPhotoFilter: Button
-    private lateinit var buttonPhotoPortraitLab: Button
-    private lateinit var buttonPhotoWatermark: Button
-    private lateinit var buttonPhotoLive: Button
-    private lateinit var buttonPhotoTimer: Button
-    private lateinit var buttonVideoResolution: Button
-    private lateinit var buttonVideoFrameRate: Button
-    private lateinit var buttonVideoDynamicFps: Button
-    private lateinit var buttonVideoAudio: Button
-    private lateinit var buttonVideoFilter: Button
-    private lateinit var buttonCloseSettings: Button
-    private lateinit var buttonSettingsTabCommon: Button
-    private lateinit var buttonSettingsTabPhoto: Button
-    private lateinit var buttonSettingsTabVideo: Button
-    private lateinit var settingsCommonSection: LinearLayout
-    private lateinit var settingsPhotoSection: LinearLayout
-    private lateinit var settingsVideoSection: LinearLayout
-    private lateinit var filterHeadline: TextView
-    private lateinit var filterSupportingText: TextView
-    private lateinit var filterHeroSummary: TextView
-    private lateinit var filterCurrentSummary: TextView
-    private lateinit var filterSectionFiltersTitle: TextView
-    private lateinit var filterSelectionCard: LinearLayout
-    private lateinit var filterSelectionList: LinearLayout
-    private lateinit var filterEditingHint: TextView
-    private lateinit var filterFooter: TextView
-    private lateinit var buttonFilterPhotoTab: Button
-    private lateinit var buttonFilterHumanisticTab: Button
-    private lateinit var buttonFilterPortraitTab: Button
-    private lateinit var buttonFilterVideoTab: Button
-    private lateinit var buttonFilterSaveCustom: Button
-    private lateinit var filterSectionPaletteTitle: TextView
-    private lateinit var filterAdjustmentPanel: LinearLayout
-    private lateinit var buttonFilterModeToggle: Button
-    private lateinit var filterPaletteSummary: TextView
-    private lateinit var filterPaletteHint: TextView
-    private lateinit var filterPaletteSurface: FilterPaletteView
-    private lateinit var filterAdvancedTitle: TextView
-    private lateinit var filterAdvancedControls: LinearLayout
-    private lateinit var buttonAdvancedExposure: Button
-    private lateinit var buttonAdvancedSoftGlow: Button
-    private lateinit var buttonAdvancedHalo: Button
-    private lateinit var buttonAdvancedGrain: Button
-    private lateinit var buttonAdvancedSharpness: Button
-    private lateinit var buttonAdvancedVignette: Button
-    private lateinit var buttonAdvancedHighlights: Button
-    private lateinit var buttonAdvancedShadows: Button
-    private lateinit var buttonAdvancedWarmBoost: Button
-    private lateinit var buttonAdvancedCoolBoost: Button
-    private lateinit var buttonAdvancedTemperatureShift: Button
-    private lateinit var buttonAdvancedTintShift: Button
-    private lateinit var buttonCloseFilter: Button
-    private lateinit var captureOutput: TextView
-    private lateinit var previewThumbnail: ImageView
-    private lateinit var zoomCapsuleScroll: android.widget.HorizontalScrollView
-    private lateinit var modeTrackScroll: android.widget.HorizontalScrollView
-    private lateinit var zoomCapsuleRow: LinearLayout
-    private lateinit var buttonDevEntry: Button
-    private lateinit var devConsolePanel: com.google.android.material.card.MaterialCardView
-    private lateinit var buttonDevTabKey: Button
-    private lateinit var buttonDevTabCore: Button
-    private lateinit var buttonDevTabError: Button
-    private lateinit var buttonDevTabAll: Button
-    private lateinit var devConsoleTitle: TextView
-    private lateinit var devConsoleSummary: TextView
-    private lateinit var devConsoleContent: TextView
-    private lateinit var buttonDevExport: Button
-    private lateinit var buttonDevClose: Button
-    private lateinit var shutterButton: Button
-    private lateinit var lensFacingButton: Button
-    private lateinit var photoModeButton: Button
-    private lateinit var documentModeButton: Button
-    private lateinit var nightModeButton: Button
-    private lateinit var humanisticModeButton: Button
-    private lateinit var portraitModeButton: Button
-    private lateinit var proModeButton: Button
-    private lateinit var videoModeButton: Button
+    private lateinit var views: MainActivityViews
+
+    // Compatibility accessors for view groups
+    private val previewView: PreviewView get() = views.preview.previewView
+    private val previewOverlayView: PreviewOverlayView get() = views.preview.overlayView
+    private val previewThumbnail: ImageView get() = views.preview.thumbnail
+    private val captureOutput: TextView get() = views.preview.captureOutput
+    private val titleText: TextView get() = views.topBar.titleText
+    private val permissionStatus: TextView get() = views.topBar.permissionStatus
+    private val buttonColorLabEntry: Button get() = views.topBar.colorLabEntry
+    private val buttonSettingsEntry: Button get() = views.topBar.settingsEntry
+    private val buttonFilterEntry: Button get() = views.topBar.filterEntry
+    private val panelDismissScrim: View get() = views.panelDismissScrim
+    private val quickBubblePanel get() = views.quickPanel.panel
+    private val buttonQuickGrid: Button get() = views.quickPanel.grid
+    private val buttonQuickFlash: Button get() = views.quickPanel.flash
+    private val buttonFrameRatio43: Button get() = views.quickPanel.frame43
+    private val buttonFrameRatio169: Button get() = views.quickPanel.frame169
+    private val buttonFrameRatio11: Button get() = views.quickPanel.frame11
+    private val buttonQuickLivePhoto: Button get() = views.quickPanel.livePhoto
+    private val buttonQuickTimer: Button get() = views.quickPanel.timer
+    private val buttonQuickLauncher: Button get() = views.quickPanel.launcher
+    private val settingsPanel get() = views.settingsPanel.panel
+    private val buttonCloseSettings: Button get() = views.settingsPanel.close
+    private val buttonSettingsBack: Button get() = views.settingsPanel.back
+    private val settingsRootContent: LinearLayout get() = views.settingsPanel.rootContent
+    private val settingsPortraitLabContent: LinearLayout get() = views.settingsPanel.portraitLabContent
+    private val settingsWatermarkSelectorContent: LinearLayout get() = views.settingsPanel.watermarkSelectorContent
+    private val settingsWatermarkDetailContent: LinearLayout get() = views.settingsPanel.watermarkDetailContent
+    private val settingsHeadline: TextView get() = views.settingsPanel.headline
+    private val settingsSupportingText: TextView get() = views.settingsPanel.supportingText
+    private val settingsHeroSummary: TextView get() = views.settingsPanel.heroSummary
+    private val settingsCommonSummary: TextView get() = views.settingsPanel.commonSummary
+    private val settingsPhotoSummary: TextView get() = views.settingsPanel.photoSummary
+    private val settingsVideoSummary: TextView get() = views.settingsPanel.videoSummary
+    private val settingsCatalogFooter: TextView get() = views.settingsPanel.catalogFooter
+    private val settingsEditingHint: TextView get() = views.settingsPanel.editingHint
+    private val buttonSettingsTabCommon: Button get() = views.settingsPanel.tabCommon
+    private val buttonSettingsTabPhoto: Button get() = views.settingsPanel.tabPhoto
+    private val buttonSettingsTabVideo: Button get() = views.settingsPanel.tabVideo
+    private val settingsCommonSection: LinearLayout get() = views.settingsPanel.commonSection
+    private val settingsPhotoSection: LinearLayout get() = views.settingsPanel.photoSection
+    private val settingsVideoSection: LinearLayout get() = views.settingsPanel.videoSection
+    private val buttonGridMode: Button get() = views.settingsPanel.gridMode
+    private val buttonShutterSound: Button get() = views.settingsPanel.shutterSound
+    private val buttonSelfieMirror: Button get() = views.settingsPanel.selfieMirror
+    private val buttonPhotoFilter: Button get() = views.settingsPanel.photoFilter
+    private val buttonPhotoPortraitLab: Button get() = views.settingsPanel.photoPortraitLab
+    private val buttonPhotoWatermark: Button get() = views.settingsPanel.photoWatermark
+    private val buttonPhotoLive: Button get() = views.settingsPanel.photoLive
+    private val buttonPhotoTimer: Button get() = views.settingsPanel.photoTimer
+    private val buttonVideoResolution: Button get() = views.settingsPanel.videoResolution
+    private val buttonVideoFrameRate: Button get() = views.settingsPanel.videoFrameRate
+    private val buttonVideoDynamicFps: Button get() = views.settingsPanel.videoDynamicFps
+    private val buttonVideoAudio: Button get() = views.settingsPanel.videoAudio
+    private val buttonVideoFilter: Button get() = views.settingsPanel.videoFilter
+    private val portraitLabHeadline: TextView get() = views.settingsPanel.portraitHeadline
+    private val portraitLabSupportingText: TextView get() = views.settingsPanel.portraitSupportingText
+    private val portraitLabHeroSummary: TextView get() = views.settingsPanel.portraitHeroSummary
+    private val portraitLabEditingHint: TextView get() = views.settingsPanel.portraitEditingHint
+    private val buttonPortraitProfile: Button get() = views.settingsPanel.portraitProfile
+    private val buttonPortraitBeautyPreset: Button get() = views.settingsPanel.portraitBeautyPreset
+    private val buttonPortraitBeautyStrength: Button get() = views.settingsPanel.portraitBeautyStrength
+    private val buttonPortraitBokehEffect: Button get() = views.settingsPanel.portraitBokehEffect
+    private val portraitLabFooter: TextView get() = views.settingsPanel.portraitFooter
+    private val watermarkSelectorHeadline: TextView get() = views.settingsPanel.watermarkSelectorHeadline
+    private val watermarkSelectorSupportingText: TextView get() = views.settingsPanel.watermarkSelectorSupportingText
+    private val watermarkSelectorHeroSummary: TextView get() = views.settingsPanel.watermarkSelectorHeroSummary
+    private val watermarkSelectorList: LinearLayout get() = views.settingsPanel.watermarkSelectorList
+    private val watermarkSelectorEditingHint: TextView get() = views.settingsPanel.watermarkSelectorEditingHint
+    private val watermarkSelectorFooter: TextView get() = views.settingsPanel.watermarkSelectorFooter
+    private val watermarkDetailHeadline: TextView get() = views.settingsPanel.watermarkDetailHeadline
+    private val watermarkDetailSupportingText: TextView get() = views.settingsPanel.watermarkDetailSupportingText
+    private val watermarkDetailHeroSummary: TextView get() = views.settingsPanel.watermarkDetailHeroSummary
+    private val watermarkDetailEditingHint: TextView get() = views.settingsPanel.watermarkDetailEditingHint
+    private val buttonWatermarkPlacement: Button get() = views.settingsPanel.watermarkPlacement
+    private val buttonWatermarkTextScale: Button get() = views.settingsPanel.watermarkTextScale
+    private val buttonWatermarkTextOpacity: Button get() = views.settingsPanel.watermarkTextOpacity
+    private val buttonWatermarkFrameBackground: Button get() = views.settingsPanel.watermarkFrameBackground
+    private val watermarkDetailFooter: TextView get() = views.settingsPanel.watermarkDetailFooter
+    private val filterPanel get() = views.filterLab.panel
+    private val buttonCloseFilter: Button get() = views.filterLab.close
+    private val filterHeadline: TextView get() = views.filterLab.headline
+    private val filterSupportingText: TextView get() = views.filterLab.supportingText
+    private val filterHeroSummary: TextView get() = views.filterLab.heroSummary
+    private val filterCurrentSummary: TextView get() = views.filterLab.currentSummary
+    private val filterSectionFiltersTitle: TextView get() = views.filterLab.sectionFiltersTitle
+    private val filterSelectionCard: LinearLayout get() = views.filterLab.selectionCard
+    private val filterSelectionList: LinearLayout get() = views.filterLab.selectionList
+    private val filterEditingHint: TextView get() = views.filterLab.editingHint
+    private val filterFooter: TextView get() = views.filterLab.footer
+    private val buttonFilterPhotoTab: Button get() = views.filterLab.photoTab
+    private val buttonFilterHumanisticTab: Button get() = views.filterLab.humanisticTab
+    private val buttonFilterPortraitTab: Button get() = views.filterLab.portraitTab
+    private val buttonFilterVideoTab: Button get() = views.filterLab.videoTab
+    private val buttonFilterSaveCustom: Button get() = views.filterLab.saveCustom
+    private val filterSectionPaletteTitle: TextView get() = views.filterLab.sectionPaletteTitle
+    private val filterAdjustmentPanel: LinearLayout get() = views.filterLab.adjustmentPanel
+    private val buttonFilterModeToggle: Button get() = views.filterLab.modeToggle
+    private val filterPaletteSummary: TextView get() = views.filterLab.paletteSummary
+    private val filterPaletteHint: TextView get() = views.filterLab.paletteHint
+    private val filterPaletteSurface: FilterPaletteView get() = views.filterLab.paletteSurface
+    private val filterAdvancedTitle: TextView get() = views.filterLab.advancedTitle
+    private val filterAdvancedControls: LinearLayout get() = views.filterLab.advancedControls
+    private val buttonAdvancedExposure: Button get() = views.filterLab.advancedExposure
+    private val buttonAdvancedSoftGlow: Button get() = views.filterLab.advancedSoftGlow
+    private val buttonAdvancedHalo: Button get() = views.filterLab.advancedHalo
+    private val buttonAdvancedGrain: Button get() = views.filterLab.advancedGrain
+    private val buttonAdvancedSharpness: Button get() = views.filterLab.advancedSharpness
+    private val buttonAdvancedVignette: Button get() = views.filterLab.advancedVignette
+    private val buttonAdvancedHighlights: Button get() = views.filterLab.advancedHighlights
+    private val buttonAdvancedShadows: Button get() = views.filterLab.advancedShadows
+    private val buttonAdvancedWarmBoost: Button get() = views.filterLab.advancedWarmBoost
+    private val buttonAdvancedCoolBoost: Button get() = views.filterLab.advancedCoolBoost
+    private val buttonAdvancedTemperatureShift: Button get() = views.filterLab.advancedTemperatureShift
+    private val buttonAdvancedTintShift: Button get() = views.filterLab.advancedTintShift
+    private val buttonDevEntry: Button get() = views.devConsole.entry
+    private val devConsolePanel get() = views.devConsole.panel
+    private val buttonDevTabKey: Button get() = views.devConsole.tabKey
+    private val buttonDevTabCore: Button get() = views.devConsole.tabCore
+    private val buttonDevTabError: Button get() = views.devConsole.tabError
+    private val buttonDevTabAll: Button get() = views.devConsole.tabAll
+    private val devConsoleTitle: TextView get() = views.devConsole.title
+    private val devConsoleSummary: TextView get() = views.devConsole.summary
+    private val devConsoleContent: TextView get() = views.devConsole.content
+    private val buttonDevExport: Button get() = views.devConsole.export
+    private val buttonDevClose: Button get() = views.devConsole.close
+    private val modeTrackScroll get() = views.modeTrack.scroll
+    private val photoModeButton: Button get() = views.modeTrack.photo
+    private val nightModeButton: Button get() = views.modeTrack.night
+    private val portraitModeButton: Button get() = views.modeTrack.portrait
+    private val proModeButton: Button get() = views.modeTrack.pro
+    private val videoModeButton: Button get() = views.modeTrack.video
+    private val documentModeButton: Button get() = views.modeTrack.document
+    private val humanisticModeButton: Button get() = views.modeTrack.humanistic
+    private val shutterButton: Button get() = views.bottomCockpit.shutter
+    private val lensFacingButton: Button get() = views.bottomCockpit.lensFacing
+    private val zoomCapsuleScroll get() = views.bottomCockpit.zoomScroll
+    private val zoomCapsuleRow: LinearLayout get() = views.bottomCockpit.zoomRow
     private val shutterClickSound = MediaActionSound()
     private var lastRequestedThumbnailUri: String? = null
     private var lastPlayedShutterSoundShotId: String? = null
@@ -253,142 +256,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        previewView = findViewById(R.id.cameraPreview)
-        previewOverlayView = findViewById(R.id.previewOverlay)
-        panelDismissScrim = findViewById(R.id.panelDismissScrim)
-        titleText = findViewById(R.id.titleText)
-        permissionStatus = findViewById(R.id.permissionStatus)
-        buttonColorLabEntry = findViewById(R.id.buttonColorLabEntry)
-        buttonSettingsEntry = findViewById(R.id.buttonSettingsEntry)
-        buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
-        buttonQuickGrid = findViewById(R.id.buttonQuickGrid)
-        buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
-        buttonFrameRatio43 = findViewById(R.id.buttonFrameRatio43)
-        buttonFrameRatio169 = findViewById(R.id.buttonFrameRatio169)
-        buttonFrameRatio11 = findViewById(R.id.buttonFrameRatio11)
-        buttonQuickLivePhoto = findViewById(R.id.buttonQuickLivePhoto)
-        buttonQuickTimer = findViewById(R.id.buttonQuickTimer)
-        buttonQuickLauncher = findViewById(R.id.buttonQuickLauncher)
-        quickBubblePanel = findViewById(R.id.quickBubblePanel)
-        settingsPanel = findViewById(R.id.settingsPanel)
-        filterPanel = findViewById(R.id.filterPanel)
-        buttonSettingsBack = findViewById(R.id.buttonSettingsBack)
-        settingsRootContent = findViewById(R.id.settingsRootContent)
-        settingsPortraitLabContent = findViewById(R.id.settingsPortraitLabContent)
-        settingsWatermarkSelectorContent = findViewById(R.id.settingsWatermarkSelectorContent)
-        settingsWatermarkDetailContent = findViewById(R.id.settingsWatermarkDetailContent)
-        settingsHeadline = findViewById(R.id.settingsHeadline)
-        settingsSupportingText = findViewById(R.id.settingsSupportingText)
-        settingsHeroSummary = findViewById(R.id.settingsHeroSummary)
-        settingsCommonSummary = findViewById(R.id.settingsCommonSummary)
-        settingsPhotoSummary = findViewById(R.id.settingsPhotoSummary)
-        settingsVideoSummary = findViewById(R.id.settingsVideoSummary)
-        settingsCatalogFooter = findViewById(R.id.settingsCatalogFooter)
-        settingsEditingHint = findViewById(R.id.settingsEditingHint)
-        portraitLabHeadline = findViewById(R.id.portraitLabHeadline)
-        portraitLabSupportingText = findViewById(R.id.portraitLabSupportingText)
-        portraitLabHeroSummary = findViewById(R.id.portraitLabHeroSummary)
-        portraitLabEditingHint = findViewById(R.id.portraitLabEditingHint)
-        buttonPortraitProfile = findViewById(R.id.buttonPortraitProfile)
-        buttonPortraitBeautyPreset = findViewById(R.id.buttonPortraitBeautyPreset)
-        buttonPortraitBeautyStrength = findViewById(R.id.buttonPortraitBeautyStrength)
-        buttonPortraitBokehEffect = findViewById(R.id.buttonPortraitBokehEffect)
-        portraitLabFooter = findViewById(R.id.portraitLabFooter)
-        watermarkSelectorHeadline = findViewById(R.id.watermarkSelectorHeadline)
-        watermarkSelectorSupportingText = findViewById(R.id.watermarkSelectorSupportingText)
-        watermarkSelectorHeroSummary = findViewById(R.id.watermarkSelectorHeroSummary)
-        watermarkSelectorList = findViewById(R.id.watermarkSelectorList)
-        watermarkSelectorEditingHint = findViewById(R.id.watermarkSelectorEditingHint)
-        watermarkSelectorFooter = findViewById(R.id.watermarkSelectorFooter)
-        watermarkDetailHeadline = findViewById(R.id.watermarkDetailHeadline)
-        watermarkDetailSupportingText = findViewById(R.id.watermarkDetailSupportingText)
-        watermarkDetailHeroSummary = findViewById(R.id.watermarkDetailHeroSummary)
-        watermarkDetailEditingHint = findViewById(R.id.watermarkDetailEditingHint)
-        buttonWatermarkPlacement = findViewById(R.id.buttonWatermarkPlacement)
-        buttonWatermarkTextScale = findViewById(R.id.buttonWatermarkTextScale)
-        buttonWatermarkTextOpacity = findViewById(R.id.buttonWatermarkTextOpacity)
-        buttonWatermarkFrameBackground = findViewById(R.id.buttonWatermarkFrameBackground)
-        watermarkDetailFooter = findViewById(R.id.watermarkDetailFooter)
-        buttonGridMode = findViewById(R.id.buttonGridMode)
-        buttonShutterSound = findViewById(R.id.buttonShutterSound)
-        buttonSelfieMirror = findViewById(R.id.buttonSelfieMirror)
-        buttonPhotoFilter = findViewById(R.id.buttonPhotoFilter)
-        buttonPhotoPortraitLab = findViewById(R.id.buttonPhotoPortraitLab)
-        buttonPhotoWatermark = findViewById(R.id.buttonPhotoWatermark)
-        buttonPhotoLive = findViewById(R.id.buttonPhotoLive)
-        buttonPhotoTimer = findViewById(R.id.buttonPhotoTimer)
-        buttonVideoResolution = findViewById(R.id.buttonVideoResolution)
-        buttonVideoFrameRate = findViewById(R.id.buttonVideoFrameRate)
-        buttonVideoDynamicFps = findViewById(R.id.buttonVideoDynamicFps)
-        buttonVideoAudio = findViewById(R.id.buttonVideoAudio)
-        buttonVideoFilter = findViewById(R.id.buttonVideoFilter)
-        buttonCloseSettings = findViewById(R.id.buttonCloseSettings)
-        buttonSettingsTabCommon = findViewById(R.id.buttonSettingsTabCommon)
-        buttonSettingsTabPhoto = findViewById(R.id.buttonSettingsTabPhoto)
-        buttonSettingsTabVideo = findViewById(R.id.buttonSettingsTabVideo)
-        settingsCommonSection = findViewById(R.id.settingsCommonSection)
-        settingsPhotoSection = findViewById(R.id.settingsPhotoSection)
-        settingsVideoSection = findViewById(R.id.settingsVideoSection)
-        filterHeadline = findViewById(R.id.filterHeadline)
-        filterSupportingText = findViewById(R.id.filterSupportingText)
-        filterHeroSummary = findViewById(R.id.filterHeroSummary)
-        filterCurrentSummary = findViewById(R.id.filterCurrentSummary)
-        filterSectionFiltersTitle = findViewById(R.id.filterSectionFiltersTitle)
-        filterSelectionCard = findViewById(R.id.filterSelectionCard)
-        filterSelectionList = findViewById(R.id.filterSelectionList)
-        filterEditingHint = findViewById(R.id.filterEditingHint)
-        filterFooter = findViewById(R.id.filterFooter)
-        buttonFilterPhotoTab = findViewById(R.id.buttonFilterPhotoTab)
-        buttonFilterHumanisticTab = findViewById(R.id.buttonFilterHumanisticTab)
-        buttonFilterPortraitTab = findViewById(R.id.buttonFilterPortraitTab)
-        buttonFilterVideoTab = findViewById(R.id.buttonFilterVideoTab)
-        buttonFilterSaveCustom = findViewById(R.id.buttonFilterSaveCustom)
-        filterSectionPaletteTitle = findViewById(R.id.filterSectionPaletteTitle)
-        filterAdjustmentPanel = findViewById(R.id.filterAdjustmentPanel)
-        buttonFilterModeToggle = findViewById(R.id.buttonFilterModeToggle)
-        filterPaletteSummary = findViewById(R.id.filterPaletteSummary)
-        filterPaletteHint = findViewById(R.id.filterPaletteHint)
-        filterPaletteSurface = findViewById(R.id.filterPaletteSurface)
-        filterAdvancedTitle = findViewById(R.id.filterAdvancedTitle)
-        filterAdvancedControls = findViewById(R.id.filterAdvancedControls)
-        buttonAdvancedExposure = findViewById(R.id.buttonAdvancedExposure)
-        buttonAdvancedSoftGlow = findViewById(R.id.buttonAdvancedSoftGlow)
-        buttonAdvancedHalo = findViewById(R.id.buttonAdvancedHalo)
-        buttonAdvancedGrain = findViewById(R.id.buttonAdvancedGrain)
-        buttonAdvancedSharpness = findViewById(R.id.buttonAdvancedSharpness)
-        buttonAdvancedVignette = findViewById(R.id.buttonAdvancedVignette)
-        buttonAdvancedHighlights = findViewById(R.id.buttonAdvancedHighlights)
-        buttonAdvancedShadows = findViewById(R.id.buttonAdvancedShadows)
-        buttonAdvancedWarmBoost = findViewById(R.id.buttonAdvancedWarmBoost)
-        buttonAdvancedCoolBoost = findViewById(R.id.buttonAdvancedCoolBoost)
-        buttonAdvancedTemperatureShift = findViewById(R.id.buttonAdvancedTemperatureShift)
-        buttonAdvancedTintShift = findViewById(R.id.buttonAdvancedTintShift)
-        buttonCloseFilter = findViewById(R.id.buttonCloseFilter)
-        captureOutput = findViewById(R.id.captureOutput)
-        previewThumbnail = findViewById(R.id.previewThumbnail)
-        shutterButton = findViewById(R.id.buttonShutter)
-        lensFacingButton = findViewById(R.id.buttonLensFacing)
-        photoModeButton = findViewById(R.id.buttonPhotoMode)
-        documentModeButton = findViewById(R.id.buttonDocumentMode)
-        nightModeButton = findViewById(R.id.buttonNightMode)
-        humanisticModeButton = findViewById(R.id.buttonHumanisticMode)
-        portraitModeButton = findViewById(R.id.buttonPortraitMode)
-        proModeButton = findViewById(R.id.buttonProMode)
-        videoModeButton = findViewById(R.id.buttonVideoMode)
-        zoomCapsuleScroll = findViewById(R.id.zoomCapsuleScroll)
-        modeTrackScroll = findViewById(R.id.modeTrackScroll)
-        zoomCapsuleRow = findViewById(R.id.zoomCapsuleRow)
-        buttonDevEntry = findViewById(R.id.buttonDevEntry)
-        devConsolePanel = findViewById(R.id.devConsolePanel)
-        buttonDevTabKey = findViewById(R.id.buttonDevTabKey)
-        buttonDevTabCore = findViewById(R.id.buttonDevTabCore)
-        buttonDevTabError = findViewById(R.id.buttonDevTabError)
-        buttonDevTabAll = findViewById(R.id.buttonDevTabAll)
-        devConsoleTitle = findViewById(R.id.devConsoleTitle)
-        devConsoleSummary = findViewById(R.id.devConsoleSummary)
-        devConsoleContent = findViewById(R.id.devConsoleContent)
-        buttonDevExport = findViewById(R.id.buttonDevExport)
-        buttonDevClose = findViewById(R.id.buttonDevClose)
+        views = MainActivityViews.bind(this)
         devLogExporter = DevLogExporter(this)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.topPanel)) { v, insets ->
