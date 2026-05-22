@@ -35,7 +35,7 @@ import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PhotoSettings
-import com.opencamera.core.settings.applyColorLab
+import com.opencamera.core.settings.renderStyleColorSpec
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.filterProfilesFor
@@ -279,8 +279,13 @@ private class PortraitModeController(
     private fun buildEffectSpec(): EffectSpec {
         val style = currentStyle()
         val portraitSettings = portraitSettings()
-        val colorLabSpec = context.settingsSnapshot.persisted.photo.colorLabSpec
-        val adjustedRenderSpec = style.renderSpec?.applyColorLab(colorLabSpec)
+        val photoSettings = context.settingsSnapshot.persisted.photo
+        val adjustedRenderSpec = renderStyleColorSpec(
+            profileId = style.id,
+            baseRenderSpec = style.renderSpec,
+            colorLabSpec = photoSettings.colorLabSpec,
+            styleStrength = photoSettings.styleStrength
+        )
         return EffectSpec(listOf(
             FilterEffect(style.id, adjustedRenderSpec),
             PortraitEffect(

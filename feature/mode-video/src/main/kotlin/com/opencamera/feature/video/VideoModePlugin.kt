@@ -31,7 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.VideoResolution
-import com.opencamera.core.settings.applyColorLab
+import com.opencamera.core.settings.renderStyleColorSpec
 
 class VideoModePlugin : CameraModePlugin {
     override val id: ModeId = ModeId.VIDEO
@@ -241,8 +241,13 @@ private class VideoModeController(
 
     private fun buildEffectSpec(): EffectSpec {
         val filter = selectedFilter()
-        val colorLabSpec = context.settingsSnapshot.persisted.photo.colorLabSpec
-        val adjustedRenderSpec = filter.renderSpec?.applyColorLab(colorLabSpec)
+        val photoSettings = context.settingsSnapshot.persisted.photo
+        val adjustedRenderSpec = renderStyleColorSpec(
+            profileId = filter.id,
+            baseRenderSpec = filter.renderSpec,
+            colorLabSpec = photoSettings.colorLabSpec,
+            styleStrength = photoSettings.styleStrength
+        )
         return EffectSpec(listOf(
             FilterEffect(filter.id, adjustedRenderSpec)
         ))

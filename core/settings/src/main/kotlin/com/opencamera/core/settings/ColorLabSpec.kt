@@ -97,6 +97,23 @@ fun FilterRenderSpec.applyColorLab(spec: ColorLabSpec): FilterRenderSpec {
     return spec.applyTo(this)
 }
 
+fun renderStyleColorSpec(
+    profileId: String,
+    baseRenderSpec: FilterRenderSpec?,
+    colorLabSpec: ColorLabSpec,
+    styleStrength: Float
+): FilterRenderSpec? {
+    val base = baseRenderSpec ?: return null
+    return StyleColorPipeline.render(
+        StyleColorPipelineRequest(
+            styleProfileId = profileId,
+            baseRenderSpec = base,
+            colorLabSpec = colorLabSpec,
+            styleStrength = styleStrength
+        )
+    ).finalRenderSpec
+}
+
 private fun FilterRenderSpec.resolveExclusiveWarmCoolBoosts(
     adjustments: ColorLabAdjustments
 ): FilterRenderSpec {
