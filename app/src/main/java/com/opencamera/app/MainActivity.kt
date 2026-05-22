@@ -758,7 +758,19 @@ class MainActivity : AppCompatActivity() {
             when (val action = gesturePolicy.map(event, activeMode, currentZoom)) {
                 is GestureAction.DispatchSession -> dispatch(action.intent)
                 is GestureAction.FocusAt -> {
-                    // TODO: focus/metering tap-to-focus integration
+                    val tap = normalizedPreviewTapOrNull(
+                        tapX = action.x,
+                        tapY = action.y,
+                        viewWidth = previewView.width,
+                        viewHeight = previewView.height,
+                        activeFrameRect = previewOverlayView.currentActiveFrameRectOrNull()
+                    ) ?: return@GestureRouter
+                    dispatch(
+                        SessionIntent.PreviewTapToFocus(
+                            normalizedX = tap.x,
+                            normalizedY = tap.y
+                        )
+                    )
                 }
                 is GestureAction.ShowExposureHint -> {
                     // TODO: exposure adjustment via vertical scroll

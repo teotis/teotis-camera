@@ -178,6 +178,13 @@ class PreviewOverlayView @JvmOverloads constructor(
         return activeContentGeometry().activeFrameRect
     }
 
+    internal fun currentActiveFrameRectOrNull(): RectF? {
+        val hasFrame = renderModel.frame?.ratio != null
+            || renderModel.effectModel?.frameGuideline?.ratio != null
+        if (!hasFrame) return null
+        return activeContentGeometry().activeFrameRect
+    }
+
     private fun drawGrid(
         canvas: Canvas,
         gridMode: CompositionGridMode
