@@ -37,6 +37,7 @@ import java.io.File
 
 enum class SettingsTab { COMMON, PHOTO, VIDEO }
 
+@Suppress("EXPOSED_PARAMETER_TYPE")
 class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private val container: AppContainer
         get() = (application as OpenCameraApplication).container
@@ -352,6 +353,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
+    @Suppress("EXPOSED_PARAMETER_TYPE")
     override fun applySettingsControl(control: SettingsControlRenderModel?) {
         val text = AppTextResolver(this)
         if (control == null) {
@@ -449,6 +451,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
+    @Suppress("EXPOSED_PARAMETER_TYPE")
     override fun saveCurrentFilterAsCustom(control: FilterLabSaveCustomRenderModel?) {
         val sourceProfileId = control?.sourceProfileId ?: return
         if (!control.isEnabled) return
@@ -457,6 +460,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
+    @Suppress("EXPOSED_PARAMETER_TYPE")
     override fun openSelectedFilterAdjustment(control: FilterLabAdjustRenderModel?) {
         val sourceProfileId = control?.sourceProfileId ?: return
         if (!control.isEnabled) return
@@ -471,6 +475,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
+    @Suppress("EXPOSED_PARAMETER_TYPE")
     override fun applyAdvancedFilterControl(control: FilterAdvancedControl) {
         val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
         val profileId = panel.selectedProfileId ?: return
@@ -506,6 +511,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
+    @Suppress("EXPOSED_PARAMETER_TYPE")
     override fun selectFilterLabFamily(family: FilterLabFamily) {
         selectedFilterLabFamilyOverride = family
         isFilterAdjustmentVisible = true
