@@ -1954,15 +1954,15 @@ class DefaultCameraSessionTest {
 
         val shot = assertNotNull(session.state.value.activeShot)
         assertEquals(ModeId.HUMANISTIC, session.state.value.activeMode)
-        assertEquals("humanistic-portrait", shot.saveRequest.metadata.customTags["style"])
+        assertEquals("humanistic-vivid", shot.saveRequest.metadata.customTags["style"])
         assertEquals("humanistic", shot.saveRequest.metadata.customTags["mode"])
         assertEquals("humanistic", shot.saveRequest.metadata.customTags["modeDisplay"])
-        assertEquals("portrait-original", shot.saveRequest.metadata.customTags["algorithmProfile"])
+        assertEquals("photo-vivid", shot.saveRequest.metadata.customTags["algorithmProfile"])
         assertEquals("16:9", shot.saveRequest.metadata.customTags["frameRatio"])
-        assertEquals("portrait-original", shot.postProcessSpec.algorithmProfile)
+        assertEquals("photo-vivid", shot.postProcessSpec.algorithmProfile)
         assertEquals("Humanistic", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
         assertEquals("Humanistic capture requested", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Default style Humanistic Portrait"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Default style Humanistic Vivid"))
         assertTrue(
             session.state.value.modeSnapshot.state.detail.contains(
                 "Subfeatures style, frame ratio, Live default, timer, and watermark"
@@ -2040,7 +2040,7 @@ class DefaultCameraSessionTest {
         assertEquals("assisted", shot.saveRequest.metadata.customTags["controlMode"])
         assertEquals("unsupported", shot.saveRequest.metadata.customTags["manualDraftState"])
         assertEquals(true, shot.captureProfile.manualCaptureParams?.rawEnabled)
-        assertEquals("photo-chasing-light-pro-assist", shot.postProcessSpec.algorithmProfile)
+        assertEquals("photo-original-pro-assist", shot.postProcessSpec.algorithmProfile)
         assertEquals("Pro Assist", shot.postProcessSpec.exifOverrides["HumanisticVariant"])
         assertEquals("Exit Pro Assist", session.state.value.modeSnapshot.uiSpec.proActionLabel)
         assertTrue(

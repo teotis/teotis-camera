@@ -53,7 +53,8 @@ internal data class BottomCockpitRenderModel(
     val isShutterEnabled: Boolean,
     val isRecording: Boolean,
     val lensButtonLabel: String,
-    val lensButtonEnabled: Boolean
+    val lensButtonEnabled: Boolean,
+    val disabledReason: String? = null
 )
 
 internal data class PreviewRatioChipRenderModel(
@@ -130,7 +131,8 @@ internal fun cameraCockpitRenderModel(
             isShutterEnabled = state.modeSnapshot.state.isShutterEnabled,
             isRecording = state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE,
             lensButtonLabel = controls.lensFacingButtonLabel,
-            lensButtonEnabled = controls.lensFacingEnabled
+            lensButtonEnabled = controls.lensFacingEnabled,
+            disabledReason = captureDisabledReason(state, text)
         ),
         previewRatioChip = PreviewRatioChipRenderModel(
             label = state.previewRatio.label,

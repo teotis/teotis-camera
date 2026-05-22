@@ -63,6 +63,8 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun permissionGranted(): String = "Camera permission granted. Preview is ready."
     override fun permissionCameraOnly(): String = "Camera granted. Video recording will be silent until microphone permission is granted."
     override fun permissionDenied(): String = "Camera permission denied. Tap shutter to request it again."
+    override fun permissionPermanentlyDenied(): String = "Camera permission permanently denied. Please enable it in system settings."
+    override fun permissionOpenSettings(): String = "Open Settings"
     override fun outputWaiting(): String = "No photo captured yet."
     override fun outputSavedPrefix(): String = "Last photo:"
     override fun outputVideoPrefix(): String = "Last video:"
@@ -335,6 +337,34 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun proControlsSupportingEditable(): String = "Upper-layer manual draft is currently editable; each control indicates its status: Applied, Saved-only, or Temporarily unsupported."
     override fun proControlsSupportingReadonly(): String = "Draft changes allowed, but this device currently holds all controls in saved-only or temporarily-unsupported state."
     override fun proControlsFinishCaptureHint(): String = "Finish the current capture before editing."
+
+    // Disabled reasons
+    override fun disabledCountdown(): String = "Countdown in progress"
+    override fun disabledSavingPhoto(): String = "Saving previous photo"
+    override fun disabledPreparingRecording(): String = "Preparing to record"
+    override fun disabledRecording(): String = "Unavailable during recording"
+    override fun disabledStoppingRecording(): String = "Stopping and saving"
+    override fun disabledPreviewRecovering(): String = "Camera recovering"
+    override fun disabledPermission(): String = "Camera permission required"
+
+    // Frame ratio control
+    override fun frameRatioTitle(): String = "Frame"
+    override fun disabledFrameRatioUnsupportedMode(): String = "Frame ratio not supported in current mode"
+    override fun disabledFrameRatioActiveShot(): String = "Wait for current capture to finish"
+    override fun disabledFrameRatioCountdown(): String = "Wait for countdown to finish"
+
+    // Recording status
+    override fun statusRecordingStarting(): String = "Starting…"
+    override fun statusRecordingActive(): String = "Recording"
+    override fun statusRecordingSaving(): String = "Saving…"
+
+    // Settings blocked
+    override fun settingsBlockedByCapture(): String = "Capture in progress, settings locked"
+    override fun settingsNotLoaded(): String = "Settings not loaded yet"
+    override fun settingsActionUnsupported(): String = "Action not supported in current mode"
+
+    // Color lab summary
+    override fun colorToneSummary(colorAxis: Float, toneAxis: Float): String = "Color: ${"%.2f".format(colorAxis)}, Tone: ${"%.2f".format(toneAxis)}"
 
     override fun availabilityLabel(value: SettingsControlAvailability): String = when (value) {
         SettingsControlAvailability.SUPPORTED -> "Supported"

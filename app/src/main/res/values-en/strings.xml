@@ -44,6 +44,8 @@
     <string name="permission_granted">Camera permission granted. Preview is ready.</string>
     <string name="permission_camera_only">Camera granted. Video recording will be silent until microphone permission is granted.</string>
     <string name="permission_denied">Camera permission denied. Tap shutter to request it again.</string>
+    <string name="permission_permanently_denied">Camera permission permanently denied. Please enable it in system settings.</string>
+    <string name="permission_open_settings">Open Settings</string>
     <string name="output_waiting">No photo captured yet.</string>
     <string name="output_saved_prefix">Last photo:</string>
     <string name="output_video_prefix">Last video:</string>
@@ -241,6 +243,17 @@
     <string name="disabled_permission">Camera permission required</string>
     <string name="disabled_unsupported">Unavailable on this device</string>
     <string name="disabled_capture_in_progress">Capture in progress</string>
+    <string name="label_frame_ratio_title">Frame</string>
+    <string name="disabled_frame_ratio_unsupported_mode">Frame ratio not supported in current mode</string>
+    <string name="disabled_frame_ratio_active_shot">Wait for current capture to finish</string>
+    <string name="disabled_frame_ratio_countdown">Wait for countdown to finish</string>
+    <string name="status_recording_starting">Starting…</string>
+    <string name="status_recording_active">Recording</string>
+    <string name="status_recording_saving">Saving…</string>
+    <string name="settings_blocked_by_capture">Capture in progress, settings locked</string>
+    <string name="settings_not_loaded">Settings not loaded yet</string>
+    <string name="settings_action_unsupported">Action not supported in current mode</string>
+    <string name="format_color_tone">Color: %.2f, Tone: %.2f</string>
     <string name="watermark_detail_editing_enabled">Template-specific styles save instantly and stay attached to this watermark preset.</string>
     <string name="watermark_detail_editing_disabled">Finish the current capture before changing watermark styles.</string>
     <string name="lens_lab_editing_enabled">Changes save instantly and refresh the active mode defaults.</string>

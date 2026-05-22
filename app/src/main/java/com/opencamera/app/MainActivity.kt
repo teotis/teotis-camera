@@ -69,7 +69,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var permissionStatus: TextView
     private lateinit var buttonColorLabEntry: Button
     private lateinit var buttonSettingsEntry: Button
-    private lateinit var buttonLensLabEntry: Button
     private lateinit var buttonFilterEntry: Button
     private lateinit var buttonQuickGrid: Button
     private lateinit var buttonQuickFlash: Button
@@ -246,7 +245,6 @@ class MainActivity : AppCompatActivity() {
         permissionStatus = findViewById(R.id.permissionStatus)
         buttonColorLabEntry = findViewById(R.id.buttonColorLabEntry)
         buttonSettingsEntry = findViewById(R.id.buttonSettingsEntry)
-        buttonLensLabEntry = findViewById(R.id.buttonLensLabEntry)
         buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
         buttonQuickGrid = findViewById(R.id.buttonQuickGrid)
         buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
@@ -401,7 +399,6 @@ class MainActivity : AppCompatActivity() {
             // Right rail utility buttons
             buttonFilterEntry,
             buttonQuickLauncher,
-            buttonLensLabEntry,
             buttonDevEntry,
             // Bottom cockpit controls
             shutterButton,
@@ -463,23 +460,6 @@ class MainActivity : AppCompatActivity() {
         }
         buttonSettingsEntry.setOnClickListener {
             toggleSettingsPanel()
-        }
-        buttonLensLabEntry.setOnClickListener {
-            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.LensLab) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.LensLab
-            }
-            if (activePanelRoute is CockpitPanelRoute.LensLab) {
-                isFilterAdjustmentVisible = true
-                maybeAutoPrepareFilter()
-                renderLatestFilterLab()
-            } else {
-                selectedFilterLabFamilyOverride = null
-                isFilterAdjustmentVisible = false
-                lightPaletteBaseSpec = null
-            }
-            renderPanelVisibility()
         }
         buttonFilterEntry.setOnClickListener {
             activePanelRoute = if (activePanelRoute is CockpitPanelRoute.FilterLab) {
@@ -1310,7 +1290,7 @@ class MainActivity : AppCompatActivity() {
         renderPanelVisibility()
     }
 
-    private fun renderQuickBubble(settingsPage: SessionSettingsPageRenderModel) {
+    private fun renderQuickBubble(settingsPage: SessionSettingsPageRenderModel, text: AppTextResolver = AppTextResolver(this)) {
         val grid = settingsPage.commonSection.gridMode
         buttonQuickGrid.text = getString(R.string.button_quick_grid)
         buttonQuickGrid.contentDescription = "${getString(R.string.button_quick_grid)} ${grid.value}"
@@ -1318,7 +1298,7 @@ class MainActivity : AppCompatActivity() {
 
         buttonQuickFlash.text = getString(R.string.button_quick_flash)
         latestSessionState?.let { state ->
-            val frameControl = frameRatioControlRenderModel(state)
+            val frameControl = frameRatioControlRenderModel(state, text)
             buttonFrameRatio43.isEnabled = frameControl.isEnabled
             buttonFrameRatio169.isEnabled = frameControl.isEnabled
             buttonFrameRatio11.isEnabled = frameControl.isEnabled
@@ -1549,13 +1529,15 @@ class MainActivity : AppCompatActivity() {
             }
 
             else -> {
-                permissionStatus.text = getString(R.string.permission_pending)
-                permissionLauncher.launch(
-                    arrayOf(
-                        Manifest.permission.CAMERA,
-                        Manifest.permission.RECORD_AUDIO
-                    )
-                )
+                val text = AppTextResolver(this)
+                permissionStatus.text = text.permissionPermanentlyDenied()
+                permissionStatus.visibility = View.VISIBLE
+                permissionStatus.setOnClickListener {
+                    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                }
             }
         }
     }
@@ -1648,19 +1630,20 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = container.sessionSettingsManager.apply(action)
             if (result is SessionSettingsApplyResult.BlockedByActiveShot) {
-                Toast.makeText(this@MainActivity, "拍摄进行中，无法更改设置", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, AppTextResolver(this@MainActivity).settingsBlockedByCapture(), Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun applySettingsControlAction(control: SettingsControlRenderModel?) {
+        val text = AppTextResolver(this)
         if (control == null) {
-            Toast.makeText(this, "设置尚未加载", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, text.settingsNotLoaded(), Toast.LENGTH_SHORT).show()
             return
         }
         val action = control.nextAction
         if (action == null) {
-            Toast.makeText(this, "当前模式不支持此操作", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, text.settingsActionUnsupported(), Toast.LENGTH_SHORT).show()
             return
         }
         applySettingsAction(action)

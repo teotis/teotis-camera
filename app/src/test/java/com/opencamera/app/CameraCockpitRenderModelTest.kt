@@ -248,6 +248,34 @@ class CameraCockpitRenderModelTest {
         assertEquals(0f, cockpit.orientation.controlRotationDegrees)
     }
 
+    @Test
+    fun `FilterLab route maps to Style label in right rail`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        val styleEntry = model.rightRail.entries[0]
+        assertEquals("Style", styleEntry.label)
+        assertEquals(CockpitPanelRoute.FilterLab, styleEntry.route)
+    }
+
+    @Test
+    fun `LensLab route maps to Color Lab label in top bar`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("Color Lab", model.topStatus.labEntryLabel)
+    }
+
+    @Test
+    fun `FilterLab and LensLab routes are distinct`() {
+        val state = defaultSessionState()
+        val filterModel = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, CockpitPanelRoute.FilterLab)
+        val lensModel = cameraCockpitRenderModel(state, TestAppTextResolver(), strings, CockpitPanelRoute.LensLab)
+
+        assertTrue(filterModel.rightRail.entries[0].isActive)
+        assertFalse(lensModel.rightRail.entries[0].isActive)
+    }
+
     private fun defaultSessionState(
         activeMode: ModeId = ModeId.PHOTO,
         availableModes: List<ModeId> = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),

@@ -13,6 +13,7 @@ import com.opencamera.core.media.CameraThermalState
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.media.LivePhotoBundle
+import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotKind
@@ -61,6 +62,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SessionUiRenderModelTest {
@@ -1636,5 +1638,111 @@ class SessionUiRenderModelTest {
 
         assertEquals(0.5f, model.styleStrength)
         assertNotNull(model.updateStyleStrengthAction as? PersistedSettingsAction.UpdatePhotoStyleStrength)
+    }
+
+    @Test
+    fun `primary status shows recording starting`() {
+        val state = defaultSessionState().copy(
+            recordingStatus = RecordingStatus.REQUESTING
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("Starting…"))
+    }
+
+    @Test
+    fun `primary status shows recording active`() {
+        val state = defaultSessionState().copy(
+            recordingStatus = RecordingStatus.RECORDING
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("Recording"))
+    }
+
+    @Test
+    fun `primary status shows saving`() {
+        val state = defaultSessionState().copy(
+            recordingStatus = RecordingStatus.STOPPING
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("Saving…"))
+    }
+
+    @Test
+    fun `primary status shows capture status when not idle`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.SAVING
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("Saving"))
+    }
+
+    @Test
+    fun `frame ratio control disabled for unsupported mode`() {
+        val state = defaultSessionState(activeMode = ModeId.VIDEO)
+        val model = frameRatioControlRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.isEnabled)
+        assertEquals("Frame ratio not supported in current mode", model.disabledReason)
+    }
+
+    @Test
+    fun `frame ratio control disabled during active shot`() {
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "test-shot",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(
+                    relativePath = "Pictures/Test",
+                    fileNamePrefix = "TEST",
+                    metadata = MediaMetadata()
+                ),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        val model = frameRatioControlRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.isEnabled)
+        assertEquals("Wait for current capture to finish", model.disabledReason)
+    }
+
+    @Test
+    fun `capture disabled reason returns null when idle`() {
+        val state = defaultSessionState()
+        val reason = captureDisabledReason(state, TestAppTextResolver())
+
+        assertNull(reason)
+    }
+
+    @Test
+    fun `capture disabled reason returns saving photo`() {
+        val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING)
+        val reason = captureDisabledReason(state, TestAppTextResolver())
+
+        assertEquals("Saving previous photo", reason)
+    }
+
+    @Test
+    fun `capture disabled reason returns recording`() {
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
+        val reason = captureDisabledReason(state, TestAppTextResolver())
+
+        assertEquals("Unavailable during recording", reason)
+    }
+
+    @Test
+    fun `capture disabled reason returns permission required`() {
+        val state = defaultSessionState().copy(
+            permissionState = PermissionState(cameraGranted = false, microphoneGranted = false)
+        )
+        val reason = captureDisabledReason(state, TestAppTextResolver())
+
+        assertEquals("Camera permission required", reason)
     }
 }

@@ -44,6 +44,8 @@
     <string name="permission_granted">相机权限已授予，预览就绪。</string>
     <string name="permission_camera_only">相机已授权。在授予麦克风权限前，视频录制将静音。</string>
     <string name="permission_denied">相机权限被拒绝。点击快门重新请求。</string>
+    <string name="permission_permanently_denied">相机权限已被永久拒绝。请前往系统设置手动开启。</string>
+    <string name="permission_open_settings">打开设置</string>
     <string name="output_waiting">暂无照片。</string>
     <string name="output_saved_prefix">最近照片：</string>
     <string name="output_video_prefix">最近视频：</string>
@@ -243,6 +245,17 @@
     <string name="disabled_permission">需要相机权限</string>
     <string name="disabled_unsupported">当前设备不支持</string>
     <string name="disabled_capture_in_progress">拍摄进行中，暂不能更改</string>
+    <string name="label_frame_ratio_title">画幅</string>
+    <string name="disabled_frame_ratio_unsupported_mode">当前模式不支持画幅</string>
+    <string name="disabled_frame_ratio_active_shot">等待当前拍摄完成后才能切换画幅</string>
+    <string name="disabled_frame_ratio_countdown">倒计时结束后才能切换画幅</string>
+    <string name="status_recording_starting">启动录制中…</string>
+    <string name="status_recording_active">录制中</string>
+    <string name="status_recording_saving">保存中…</string>
+    <string name="settings_blocked_by_capture">拍摄进行中，无法更改设置</string>
+    <string name="settings_not_loaded">设置尚未加载</string>
+    <string name="settings_action_unsupported">当前模式不支持此操作</string>
+    <string name="format_color_tone">Color: %.2f, Tone: %.2f</string>
     <string name="watermark_detail_editing_enabled">模板专属样式即时保存，并保持与此水印预设关联。</string>
     <string name="watermark_detail_editing_disabled">完成当前拍摄后才可以更改水印样式。</string>
     <string name="lens_lab_editing_enabled">更改即时保存并刷新当前模式默认值。</string>

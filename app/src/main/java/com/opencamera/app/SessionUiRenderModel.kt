@@ -385,7 +385,7 @@ internal fun colorLabPanelRenderModel(
         colorAxis = spec.colorAxis,
         toneAxis = spec.toneAxis,
         strength = spec.strength,
-        summary = "Color: ${"%.2f".format(spec.colorAxis)}, Tone: ${"%.2f".format(spec.toneAxis)}",
+        summary = text.colorToneSummary(spec.colorAxis, spec.toneAxis),
         resetAction = PersistedSettingsAction.UpdateColorLabSpec(ColorLabSpec())
     )
 }
@@ -453,6 +453,17 @@ internal data class PrimaryStatusRenderModel(
     val statusText: String
 )
 
+internal fun captureDisabledReason(state: SessionState, text: AppTextResolver): String? {
+    if (!state.permissionState.cameraGranted) return text.disabledPermission()
+    if (state.previewStatus == PreviewStatus.RECOVERING) return text.disabledPreviewRecovering()
+    if (state.countdownRemainingSeconds != null) return text.disabledCountdown()
+    if (state.activeShot != null && state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
+    if (state.recordingStatus == RecordingStatus.RECORDING) return text.disabledRecording()
+    if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
+    if (state.captureStatus == CaptureStatus.SAVING) return text.disabledSavingPhoto()
+    return null
+}
+
 internal fun sessionControlsRenderModel(
     state: SessionState,
     strings: SessionUiStrings
@@ -509,19 +520,19 @@ private val stillModesWithFrameRatio = setOf(
     ModeId.PRO
 )
 
-internal fun frameRatioControlRenderModel(state: SessionState): FrameRatioControlRenderModel {
+internal fun frameRatioControlRenderModel(state: SessionState, text: AppTextResolver): FrameRatioControlRenderModel {
     val current = state.activeEffectSpec.find<FrameEffect>()?.ratio ?: FrameRatio.RATIO_4_3
     val isSupportedMode = state.activeMode in stillModesWithFrameRatio
     val isBusy = state.activeShot != null || state.countdownRemainingSeconds != null
     val enabled = isSupportedMode && !isBusy
     val reason = when {
-        !isSupportedMode -> "当前模式不支持画幅"
-        state.activeShot != null -> "等待当前拍摄完成后才能切换画幅"
-        state.countdownRemainingSeconds != null -> "倒计时结束后才能切换画幅"
+        !isSupportedMode -> text.disabledFrameRatioUnsupportedMode()
+        state.activeShot != null -> text.disabledFrameRatioActiveShot()
+        state.countdownRemainingSeconds != null -> text.disabledFrameRatioCountdown()
         else -> null
     }
     return FrameRatioControlRenderModel(
-        title = "画幅",
+        title = text.frameRatioTitle(),
         currentLabel = current.label,
         options = FrameRatio.entries.map { ratio ->
             FrameRatioOptionRenderModel(
@@ -672,9 +683,9 @@ internal fun primaryStatusRenderModel(
         }
         state.countdownRemainingSeconds?.let { append(" · ${it}s") }
         when (state.recordingStatus) {
-            RecordingStatus.REQUESTING -> append(" · Starting...")
-            RecordingStatus.RECORDING -> append(" · Recording")
-            RecordingStatus.STOPPING -> append(" · Saving...")
+            RecordingStatus.REQUESTING -> append(" · ${text.statusRecordingStarting()}")
+            RecordingStatus.RECORDING -> append(" · ${text.statusRecordingActive()}")
+            RecordingStatus.STOPPING -> append(" · ${text.statusRecordingSaving()}")
             RecordingStatus.IDLE -> Unit
         }
     }

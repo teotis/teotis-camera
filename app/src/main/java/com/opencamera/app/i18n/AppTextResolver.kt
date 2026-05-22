@@ -81,6 +81,8 @@ open class AppTextResolver(private val context: Context?) {
     open fun permissionGranted(): String = str(R.string.permission_granted, "Camera permission granted. Preview is ready.")
     open fun permissionCameraOnly(): String = str(R.string.permission_camera_only, "Camera granted. Video recording will be silent until microphone permission is granted.")
     open fun permissionDenied(): String = str(R.string.permission_denied, "Camera permission denied. Tap shutter to request it again.")
+    open fun permissionPermanentlyDenied(): String = str(R.string.permission_permanently_denied, "Camera permission permanently denied. Please enable it in system settings.")
+    open fun permissionOpenSettings(): String = str(R.string.permission_open_settings, "Open Settings")
     open fun outputWaiting(): String = str(R.string.output_waiting, "No photo captured yet.")
     open fun outputSavedPrefix(): String = str(R.string.output_saved_prefix, "Last photo:")
     open fun outputVideoPrefix(): String = str(R.string.output_video_prefix, "Last video:")
@@ -457,6 +459,35 @@ open class AppTextResolver(private val context: Context?) {
     open fun proControlsSupportingEditable(): String = str(R.string.pro_controls_supporting_editable, "Upper-layer manual draft is currently editable; each control indicates its status: Applied, Saved-only, or Temporarily unsupported.")
     open fun proControlsSupportingReadonly(): String = str(R.string.pro_controls_supporting_readonly, "Draft changes allowed, but this device currently holds all controls in saved-only or temporarily-unsupported state.")
     open fun proControlsFinishCaptureHint(): String = str(R.string.pro_controls_finish_capture_hint, "Finish the current capture before editing.")
+
+    // Disabled reasons
+    open fun disabledCountdown(): String = str(R.string.disabled_countdown, "Countdown in progress")
+    open fun disabledSavingPhoto(): String = str(R.string.disabled_saving_photo, "Saving previous photo")
+    open fun disabledPreparingRecording(): String = str(R.string.disabled_preparing_recording, "Preparing to record")
+    open fun disabledRecording(): String = str(R.string.disabled_recording, "Unavailable during recording")
+    open fun disabledStoppingRecording(): String = str(R.string.disabled_stopping_recording, "Stopping and saving")
+    open fun disabledPreviewRecovering(): String = str(R.string.disabled_preview_recovering, "Camera recovering")
+    open fun disabledPermission(): String = str(R.string.disabled_permission, "Camera permission required")
+
+    // Frame ratio control
+    open fun frameRatioTitle(): String = str(R.string.label_frame_ratio_title, "Frame")
+    open fun disabledFrameRatioUnsupportedMode(): String = str(R.string.disabled_frame_ratio_unsupported_mode, "Frame ratio not supported in current mode")
+    open fun disabledFrameRatioActiveShot(): String = str(R.string.disabled_frame_ratio_active_shot, "Wait for current capture to finish")
+    open fun disabledFrameRatioCountdown(): String = str(R.string.disabled_frame_ratio_countdown, "Wait for countdown to finish")
+
+    // Recording status
+    open fun statusRecordingStarting(): String = str(R.string.status_recording_starting, "Starting…")
+    open fun statusRecordingActive(): String = str(R.string.status_recording_active, "Recording")
+    open fun statusRecordingSaving(): String = str(R.string.status_recording_saving, "Saving…")
+
+    // Settings blocked
+    open fun settingsBlockedByCapture(): String = str(R.string.settings_blocked_by_capture, "Capture in progress, settings locked")
+    open fun settingsNotLoaded(): String = str(R.string.settings_not_loaded, "Settings not loaded yet")
+    open fun settingsActionUnsupported(): String = str(R.string.settings_action_unsupported, "Action not supported in current mode")
+
+    // Color lab summary
+    open fun colorToneSummary(colorAxis: Float, toneAxis: Float): String =
+        String.format(str(R.string.format_color_tone, "Color: %.2f, Tone: %.2f"), colorAxis, toneAxis)
 
     open fun languageDisplayName(settings: PersistedSettings): String = when (settings.common.appLanguage) {
         AppLanguage.ZH -> str(R.string.app_name, "OpenCamera")
