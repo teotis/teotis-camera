@@ -376,7 +376,7 @@ class DefaultCameraSessionTest {
         )
         assertTrue(trace.snapshot().any { it.name == "preview.host.recovery.requested" })
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -416,7 +416,7 @@ class DefaultCameraSessionTest {
         )
         assertTrue(trace.snapshot().any { it.name == "preview.host.recovery.requested" })
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -451,7 +451,7 @@ class DefaultCameraSessionTest {
         assertNotNull(bindEffect)
         assertTrue(bindEffect.isRecovery)
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -3444,7 +3444,7 @@ class DefaultCameraSessionTest {
         assertEquals(PreviewMeteringFeedbackStatus.REQUESTED, session.state.value.presentation.previewMeteringFeedback?.status)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.requested" })
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -3472,7 +3472,7 @@ class DefaultCameraSessionTest {
         assertEquals(0f, meteringEffect.request.point.normalizedX)
         assertEquals(1f, meteringEffect.request.point.normalizedY)
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -3501,7 +3501,7 @@ class DefaultCameraSessionTest {
         assertTrue(meteringEffects.isEmpty())
         assertTrue(trace.snapshot().any { it.name == "preview.metering.ignored" })
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -3526,7 +3526,7 @@ class DefaultCameraSessionTest {
         assertTrue(meteringEffects.isEmpty())
         assertTrue(trace.snapshot().any { it.name == "preview.metering.ignored" })
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -3562,7 +3562,7 @@ class DefaultCameraSessionTest {
         assertEquals(PreviewMeteringFeedbackStatus.SUCCEEDED, session.state.value.presentation.previewMeteringFeedback?.status)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.succeeded" })
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -3601,7 +3601,7 @@ class DefaultCameraSessionTest {
         assertEquals("meter-2", session.state.value.presentation.previewMeteringFeedback?.requestId)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.stale" })
 
-        
+        effectCollector.cancel()
     }
 
     @Test
@@ -3639,7 +3639,7 @@ class DefaultCameraSessionTest {
         assertEquals("AF not available", session.state.value.presentation.previewMeteringFeedback?.reason)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.unsupported" })
 
-        
+        effectCollector.cancel()
     }
 
     // --- Output Rotation ---
