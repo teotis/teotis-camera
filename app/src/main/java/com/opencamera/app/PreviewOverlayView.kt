@@ -75,7 +75,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private val frameScrimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(116, 0, 0, 0)
+        color = Color.argb(70, 0, 0, 0)
         style = Paint.Style.FILL
     }
 
@@ -161,6 +161,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private val frameHorizontalPaddingPx: Float get() = 12f * density
+    private val frameBottomInsetPx: Float get() = 40f * density
 
     private fun activeContentGeometry(): PreviewContentGeometry {
         val frameRatio = renderModel.frame?.ratio
@@ -170,7 +171,8 @@ class PreviewOverlayView @JvmOverloads constructor(
             viewHeight = height,
             ratioWidth = frameRatio?.width ?: 0,
             ratioHeight = frameRatio?.height ?: 0,
-            horizontalPaddingPx = frameHorizontalPaddingPx
+            horizontalPaddingPx = frameHorizontalPaddingPx,
+            bottomInsetPx = if (frameRatio != null) frameBottomInsetPx else 0f
         )
     }
 
@@ -242,7 +244,8 @@ class PreviewOverlayView @JvmOverloads constructor(
             viewHeight = height,
             ratioWidth = spec.ratio.width,
             ratioHeight = spec.ratio.height,
-            horizontalPaddingPx = frameHorizontalPaddingPx
+            horizontalPaddingPx = frameHorizontalPaddingPx,
+            bottomInsetPx = frameBottomInsetPx
         ).activeFrameRect
         canvas.drawRect(rect, frameGuidelinePaint)
     }
@@ -282,7 +285,14 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
-        val rect = activeContentGeometry().activeFrameRect
+        val rect = previewContentGeometry(
+            viewWidth = width,
+            viewHeight = height,
+            ratioWidth = frame.ratio.width,
+            ratioHeight = frame.ratio.height,
+            horizontalPaddingPx = frameHorizontalPaddingPx,
+            bottomInsetPx = frameBottomInsetPx
+        ).activeFrameRect
         if (frame.dimOutsideFrame) {
             val outsidePath = android.graphics.Path().apply {
                 fillType = android.graphics.Path.FillType.EVEN_ODD

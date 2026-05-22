@@ -223,6 +223,7 @@
                         style="@style/Widget.OpenCamera.QuickBubbleButton"
                         android:layout_width="56dp"
                         android:layout_height="32dp"
+                        android:paddingHorizontal="6dp"
                         android:text="4:3"
                         android:textSize="11sp" />
 
@@ -232,6 +233,7 @@
                         android:layout_width="56dp"
                         android:layout_height="32dp"
                         android:layout_marginStart="4dp"
+                        android:paddingHorizontal="6dp"
                         android:text="16:9"
                         android:textSize="11sp" />
 
@@ -241,6 +243,7 @@
                         android:layout_width="56dp"
                         android:layout_height="32dp"
                         android:layout_marginStart="4dp"
+                        android:paddingHorizontal="6dp"
                         android:text="1:1"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -275,7 +278,7 @@
         android:fadeScrollbars="false"
         android:clipToPadding="false"
         android:paddingHorizontal="@dimen/space_12"
-        android:paddingVertical="@dimen/space_4"
+        android:paddingVertical="@dimen/space_2"
         app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -1007,6 +1010,7 @@
             </LinearLayout>
 
             <TextView
+                android:id="@+id/filterSectionFiltersTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
@@ -1050,6 +1054,7 @@
             </LinearLayout>
 
             <TextView
+                android:id="@+id/filterSectionPaletteTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"

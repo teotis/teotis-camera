@@ -103,7 +103,8 @@ internal data class PreviewOverlayRenderModel(
 internal data class PreviewFrameRenderModel(
     val ratio: FrameRatio,
     val label: String,
-    val dimOutsideFrame: Boolean
+    val dimOutsideFrame: Boolean,
+    val bottomInsetPx: Float = 0f
 )
 
 internal data class FrameRatioOptionRenderModel(

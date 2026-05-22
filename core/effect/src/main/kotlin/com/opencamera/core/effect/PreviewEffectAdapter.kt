@@ -45,7 +45,7 @@ class PreviewEffectAdapter {
         return FrameGuidelineSpec(
             ratio = effect.ratio,
             borderColor = COLOR_WHITE,
-            borderAlpha = 0.4f
+            borderAlpha = 0.25f
         )
     }
 

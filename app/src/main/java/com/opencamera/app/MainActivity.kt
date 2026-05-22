@@ -142,6 +142,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var filterSupportingText: TextView
     private lateinit var filterHeroSummary: TextView
     private lateinit var filterCurrentSummary: TextView
+    private lateinit var filterSectionFiltersTitle: TextView
     private lateinit var filterSelectionList: LinearLayout
     private lateinit var filterEditingHint: TextView
     private lateinit var filterFooter: TextView
@@ -150,6 +151,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonFilterPortraitTab: Button
     private lateinit var buttonFilterVideoTab: Button
     private lateinit var buttonFilterSaveCustom: Button
+    private lateinit var filterSectionPaletteTitle: TextView
     private lateinit var filterAdjustmentPanel: LinearLayout
     private lateinit var buttonFilterModeToggle: Button
     private lateinit var filterPaletteSummary: TextView
@@ -319,6 +321,7 @@ class MainActivity : AppCompatActivity() {
         filterSupportingText = findViewById(R.id.filterSupportingText)
         filterHeroSummary = findViewById(R.id.filterHeroSummary)
         filterCurrentSummary = findViewById(R.id.filterCurrentSummary)
+        filterSectionFiltersTitle = findViewById(R.id.filterSectionFiltersTitle)
         filterSelectionList = findViewById(R.id.filterSelectionList)
         filterEditingHint = findViewById(R.id.filterEditingHint)
         filterFooter = findViewById(R.id.filterFooter)
@@ -327,6 +330,7 @@ class MainActivity : AppCompatActivity() {
         buttonFilterPortraitTab = findViewById(R.id.buttonFilterPortraitTab)
         buttonFilterVideoTab = findViewById(R.id.buttonFilterVideoTab)
         buttonFilterSaveCustom = findViewById(R.id.buttonFilterSaveCustom)
+        filterSectionPaletteTitle = findViewById(R.id.filterSectionPaletteTitle)
         filterAdjustmentPanel = findViewById(R.id.filterAdjustmentPanel)
         buttonFilterModeToggle = findViewById(R.id.buttonFilterModeToggle)
         filterPaletteSummary = findViewById(R.id.filterPaletteSummary)
@@ -1116,13 +1120,16 @@ class MainActivity : AppCompatActivity() {
             renderFilterSelectionList(model)
             renderSaveCustomControl(model.saveCustomControl, model.editingEnabled)
             filterCurrentSummary.isVisible = true
+            filterSectionFiltersTitle.isVisible = true
         } else {
             filterSelectionList.removeAllViews()
             filterCurrentSummary.isVisible = false
+            filterSectionFiltersTitle.isVisible = false
             buttonFilterSaveCustom.isVisible = false
         }
 
         // Show/hide adjustment panel based on panel role
+        filterSectionPaletteTitle.isVisible = model.showAdjustmentPanel
         if (model.showAdjustmentPanel) {
             renderAdjustmentPanel(
                 model.adjustmentPanel,
