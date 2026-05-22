@@ -46,6 +46,8 @@ import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.renderUriOrNull
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.catalogProfile
+import com.opencamera.core.session.PreviewMeteringFeedback
+import com.opencamera.core.session.PreviewMeteringFeedbackStatus
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.RecordingStatus
@@ -847,6 +849,9 @@ class MainActivity : AppCompatActivity() {
         renderWatermarkLabDetailPage(watermarkDetailPage)
         renderFilterLabPage(filterLabPage)
         previewOverlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter))
+        previewOverlayView.updateFocusReticle(
+            state.presentation.previewMeteringFeedback?.toFocusReticleRenderModel()
+        )
         previewView.scaleX = if (
             state.activeDeviceGraph.preferredLensFacing == LensFacing.FRONT &&
             state.settings.persisted.common.selfieMirrorEnabled
@@ -1907,5 +1912,19 @@ class MainActivity : AppCompatActivity() {
         control: FilterAdvancedControl
     ): String {
         return first { item -> item.control == control }.buttonLabel
+    }
+
+    private fun PreviewMeteringFeedback.toFocusReticleRenderModel(): FocusReticleRenderModel {
+        return FocusReticleRenderModel(
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
+            status = when (status) {
+                PreviewMeteringFeedbackStatus.REQUESTED -> FocusReticleStatus.REQUESTED
+                PreviewMeteringFeedbackStatus.SUCCEEDED -> FocusReticleStatus.SUCCEEDED
+                PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> FocusReticleStatus.DEGRADED
+                PreviewMeteringFeedbackStatus.FAILED -> FocusReticleStatus.FAILED
+                PreviewMeteringFeedbackStatus.UNSUPPORTED -> FocusReticleStatus.UNSUPPORTED
+            }
+        )
     }
 }
