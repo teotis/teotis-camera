@@ -34,8 +34,7 @@ class PhotoWatermarkPostProcessorTest {
             editor.invocations.single().target
         )
         assertEquals("travel-polaroid", editor.invocations.single().templateId)
-        assertTrue(result.pipelineNotes.contains("watermark:rendered"))
-        assertTrue(result.pipelineNotes.contains("watermark:template:travel-polaroid"))
+        assertTrue(result.pipelineNotes.contains("watermark:rendered:travel-polaroid"))
     }
 
     @Test

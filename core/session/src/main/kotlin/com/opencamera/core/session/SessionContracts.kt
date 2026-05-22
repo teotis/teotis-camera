@@ -5,6 +5,7 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.RenderRecipe
 import com.opencamera.core.media.CameraPerformanceClass
 import com.opencamera.core.media.CameraThermalState
 import com.opencamera.core.media.CaptureFeedbackPreview
@@ -75,22 +76,8 @@ enum class CaptureFeedbackPolicy {
 }
 
 internal fun captureFeedbackPolicyFor(shot: ShotRequest): CaptureFeedbackPolicy {
-    val watermarkText = shot.saveRequest.metadata.watermarkText?.trim().orEmpty()
-    val template = shot.saveRequest.metadata.customTags["watermarkTemplate"].orEmpty()
-    val hasFilterRenderSpec = shot.saveRequest.metadata.customTags.keys.any { it.startsWith("filterSpec.") }
-    val hasAlgorithmRender = shot.postProcessSpec.algorithmProfile?.isNotBlank() == true ||
-        shot.saveRequest.metadata.algorithmProfile?.isNotBlank() == true ||
-        hasFilterRenderSpec
-    val frameRatio = shot.saveRequest.metadata.customTags["frameRatio"].orEmpty()
-    val requiresFrameCrop = frameRatio.isNotBlank() && frameRatio != "4:3"
-    val requiresFinalWatermark = watermarkText.isNotEmpty() || template.isNotEmpty()
-    val requiresSelfieMirror = shot.saveRequest.metadata.customTags["selfieMirrorApply"].toBoolean()
-    return if (
-        hasAlgorithmRender ||
-        requiresFrameCrop ||
-        requiresFinalWatermark ||
-        requiresSelfieMirror
-    ) {
+    val recipe = RenderRecipe.from(shot)
+    return if (recipe.requiresFinalOutputPostprocess) {
         CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA
     } else {
         CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP

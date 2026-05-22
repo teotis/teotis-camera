@@ -132,8 +132,7 @@ internal class PhotoWatermarkPostProcessor(
                     is PhotoWatermarkEditorResult.Applied -> {
                         result.withPipelineNotes(
                             *buildList {
-                                add("watermark:rendered")
-                                add("watermark:template:${work.templateId}")
+                                add("watermark:rendered:${work.templateId}")
                                 renderResult.warning?.let { add("watermark:warning:$it") }
                             }.toTypedArray()
                         )
