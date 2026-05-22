@@ -1344,12 +1344,12 @@ class DefaultCameraSessionTest {
         assertEquals(ModeId.PHOTO, session.state.value.activeMode)
         assertEquals(FlashMode.AUTO, shot.captureProfile.flashMode)
         assertEquals("auto", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals("photo-vivid", shot.saveRequest.metadata.customTags["filterProfile"])
+        assertEquals("photo-original", shot.saveRequest.metadata.customTags["filterProfile"])
         assertEquals("PHOTO Auto", shot.postProcessSpec.watermarkText)
-        assertEquals("photo-vivid", shot.postProcessSpec.algorithmProfile)
+        assertEquals("photo-original", shot.postProcessSpec.algorithmProfile)
         assertEquals("Photo capture requested", session.state.value.lastAction)
         assertEquals("Still capture requested", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Filter Vivid"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Filter Original"))
         assertTrue(session.state.value.modeSnapshot.state.detail.contains("Flash Auto"))
     }
 

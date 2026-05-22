@@ -1352,11 +1352,19 @@ class MainActivity : AppCompatActivity() {
         buttonQuickTimer.isEnabled = sheet.timerRow.isEnabled
     }
 
+    private var lastRenderedPanelRoute: CockpitPanelRoute = CockpitPanelRoute.None
+
     private fun renderPanelVisibility() {
         val route = activePanelRoute
+        val routeChanged = route != lastRenderedPanelRoute
+        lastRenderedPanelRoute = route
         settingsPanel.isVisible = route.isSettingsOpen
         filterPanel.isVisible = route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.ColorLab
         panelDismissScrim.isVisible = route.isAnyPanelOpen
+        if (routeChanged) {
+            if (settingsPanel.isVisible) settingsPanel.scrollTo(0, 0)
+            if (filterPanel.isVisible) filterPanel.scrollTo(0, 0)
+        }
 
         val subpage = (route as? CockpitPanelRoute.Settings)?.subpage
         settingsRootContent.isVisible = route.isSettingsOpen && (subpage == null || subpage == SettingsSubpage.ROOT)
@@ -1413,9 +1421,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderDevConsoleVisibility() {
         val isDevVisible = activePanelRoute is CockpitPanelRoute.DevConsole
+        val wasVisible = devConsolePanel.isVisible
         devConsolePanel.isVisible = isDevVisible
         buttonDevEntry.alpha = if (isDevVisible) 1f else 0.78f
         if (isDevVisible) {
+            if (!wasVisible) {
+                (devConsolePanel.getChildAt(0) as? androidx.core.widget.NestedScrollView)?.scrollTo(0, 0)
+            }
             renderDevConsole()
         }
     }
