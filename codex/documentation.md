@@ -91,10 +91,28 @@
 - `2026-05-22` 高难 10% / 多模态基线报告已完成并沉淀到 [`Fifth-Recording-Hard10-Multimodal-QA-Report.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/Fifth-Recording-Hard10-Multimodal-QA-Report.md)：已抽取 9 张关键证据帧和 contact sheet，P0 定为 Color Lab 直接操控失效、底部 cockpit 视觉割裂、快捷画幅交互不可靠；P1 定为顶部栏裁切/层级、右栏语义、工程文案泄漏、Dev 过强、预览/画幅几何仍需视觉仲裁。该报告同时定义了下一版 vivo X300 录屏复验协议，后续非多模态 agent 完成实现包后，应由多模态 owner 按该协议重新判定 `GO / CONDITIONAL GO / NO GO`。
 - `2026-05-22` 第五轮真机反馈中可落地的高难/多模态 owner 修复已完成首个代码闭环：Color Lab 调色板触摸现在进入 persisted `ColorLabSpec` 写入链路并保持 reticle 即时反馈，Color Lab 页面隐藏 `进阶` 模式切换；右侧第一入口默认文案收敛为 `镜头/Lens`；Color Lab 摘要从原始坐标改为 `Warm / Deep Contrast` 等可理解语义；风格/设置面板不再泄漏 raw render spec 和英文 enum availability 文案。聚焦 UI 测试、`assembleDebug` 和 `verify_stage_7_observability.sh` 均已通过，最新 debug APK 位于 `/Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk`。
 - `2026-05-22` 真机发现“Color Lab 预览有效但成片不生效”后，已完成系统化调试和代码闭环：Color Lab/style metadata 在 session 侧本已能进入 `filterSpec.*`，真实高风险断点在 Android Q+ CameraX 保存结果可能不给 `savedUri`，导致 `MediaOutputHandle` 只有展示路径、所有成片后处理拿不到可编辑 `contentUri/filePath` 而跳过。[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 现会预创建 MediaStore still `contentUri` 并用 OutputStream 写入，`resolvePhotoOutputHandle()` 保证 CameraX 不返回 URI 时仍保留可编辑目标；[`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 锁定 Color Lab 合成后的 `filterSpec.*` 会进入拍摄 metadata，[`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 锁定预创建 URI 句柄合同。该修复同时降低滤镜、画幅裁切、水印、人像渲染、文档裁切、自拍镜像等 saved-photo 后处理被跳过的风险；视频录制仍只保证 metadata/filter profile 进入录制请求，成片视频滤镜不在当前 JPEG 后处理链路内。
+- `2026-05-22` 最新 vivo X300 真机反馈将问题升级为“预览/成片/缩略图三链路不一致”后，本轮已完成核心 containment + 几何绑定闭环：[`SessionContracts.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 的 `captureFeedbackPolicyFor()` 现在只允许纯净 no-postprocess shot 使用 raw preview feedback；凡 shot metadata/postprocess 表明存在 Color Lab/filter、非默认画幅裁切、水印或自拍镜像，都会抑制 `PreviewView.bitmap` 缩略反馈直到 `SavedMedia`，避免用户先看到与最终成片不一致的缩略图；[`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 已新增 Color Lab/filter 与 16:9 frame ratio 的红绿回归。Device 层，[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 已将 still/video 的 Preview 与 ImageCapture/VideoCapture 绑定改为 `UseCaseGroup + PreviewView.viewPort`，让 CameraX 尽量共享同一 viewport/crop contract，降低预览画幅与成片 sensor 区域差异。更大的 `RenderRecipe + GL PreviewRenderEngine` 非低耦合项已拆成 [`2026-05-22-render-recipe-preview-engine-handoff.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-render-recipe-preview-engine-handoff.md) 交给外部 agent 做纯 Kotlin contract/diagnostics/QA 清单；本轮不宣称已完成实时像素级 Color Lab 预览渲染，最终仍需新 APK 真机对比保存 JPEG 与录屏。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-22：预览/成片/缩略图一致性核心 containment
+
+- 目标：处理 vivo X300 最新真机反馈中的三个严重问题：Color Lab 预览与成片不一致、预览预期成像区域与实际成片区域差异大、缩略图必须与最终颜色/画幅/水印基本一致。
+- 根因：
+  当前预览是 CameraX 原始流 + `PreviewOverlayView` Canvas 叠层，成片是 JPEG postprocessor，缩略图则来自 `PreviewView.bitmap`；三者没有共享同一个 render truth。短期最危险的是 raw preview feedback 被 UI 当成最终成片反馈展示。
+- 核心结果：
+  [`SessionContracts.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 扩大 `captureFeedbackPolicyFor()`，只允许无 filter/Color Lab、无非默认 frame crop、无 watermark、无 selfie mirror 的纯净 shot 使用 raw preview feedback；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 的抑制 trace reason 收敛为 `final-output-postprocess`，覆盖所有最终输出后处理差异；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 在 still/video bind 时改用 `UseCaseGroup`，并在 `PreviewView.viewPort` 可用时设置 shared viewport，推动 Preview 与 ImageCapture/VideoCapture 使用同一 CameraX crop contract；
+  [`2026-05-22-render-recipe-preview-engine-handoff.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-render-recipe-preview-engine-handoff.md) 将低耦合后续任务拆给外部 agent：RenderRecipe 合约、诊断 notes、vivo X300 QA 清单。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:assembleDebug`
+  `rtk ./scripts/verify_stage_7_observability.sh`
+- 结论：
+  本轮解决的是“不要展示错误反馈”和“CameraX 预览/拍照共享 viewport”的核心 containment；仍未完成像素级实时 Color Lab 预览渲染。最终 2.0 `GO` 仍需真机安装最新 APK 后，用保存 JPEG、录屏和 pipeline notes 验证。
 
 ## 2026-05-22：Color Lab 预览/成片一致性修复
 

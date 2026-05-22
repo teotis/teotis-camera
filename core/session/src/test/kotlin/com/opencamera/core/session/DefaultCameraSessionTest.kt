@@ -16,6 +16,7 @@ import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.LiveTemporalWindow
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
@@ -485,7 +486,10 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
 
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot).copy(
+            saveRequest = SaveRequest.photoLibrary(),
+            postProcessSpec = PostProcessSpec()
+        )
         session.dispatch(SessionIntent.ShotStarted(shot))
         session.dispatch(
             SessionIntent.ShotCompleted(
@@ -529,7 +533,10 @@ class DefaultCameraSessionTest {
 
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot).copy(
+            saveRequest = SaveRequest.photoLibrary(),
+            postProcessSpec = PostProcessSpec()
+        )
         session.dispatch(SessionIntent.ShotStarted(shot))
         session.dispatch(
             SessionIntent.ShotCompleted(
@@ -610,7 +617,10 @@ class DefaultCameraSessionTest {
 
         advanceTimeBy(1_000)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot).copy(
+            saveRequest = SaveRequest.photoLibrary(),
+            postProcessSpec = PostProcessSpec()
+        )
         assertEquals(null, session.state.value.countdownRemainingSeconds)
         assertEquals("Photo capture requested", session.state.value.lastAction)
         assertTrue(trace.snapshot().any { it.name == "capture.countdown.started" })
@@ -3025,7 +3035,10 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot).copy(
+            saveRequest = SaveRequest.photoLibrary(),
+            postProcessSpec = PostProcessSpec()
+        )
         session.dispatch(SessionIntent.ShotStarted(shot))
 
         session.dispatch(
@@ -3096,7 +3109,10 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot).copy(
+            saveRequest = SaveRequest.photoLibrary(),
+            postProcessSpec = PostProcessSpec()
+        )
         session.dispatch(SessionIntent.ShotStarted(shot))
 
         session.dispatch(
@@ -3139,7 +3155,10 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot).copy(
+            saveRequest = SaveRequest.photoLibrary(),
+            postProcessSpec = PostProcessSpec()
+        )
         session.dispatch(SessionIntent.ShotStarted(shot))
 
         session.dispatch(
@@ -3173,7 +3192,10 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.ShutterPressed)
         runCurrent()
-        val shotA = assertNotNull(session.state.value.activeShot)
+        val shotA = assertNotNull(session.state.value.activeShot).copy(
+            saveRequest = SaveRequest.photoLibrary(),
+            postProcessSpec = PostProcessSpec()
+        )
         session.dispatch(SessionIntent.ShotStarted(shotA))
 
         session.dispatch(
@@ -3315,7 +3337,7 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `watermark with classic-overlay template accepts capture feedback`() = runTest {
+    fun `watermark with classic-overlay template suppresses raw capture feedback`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace, this)
 
@@ -3341,10 +3363,8 @@ class DefaultCameraSessionTest {
         )
         advanceUntilIdle()
 
-        assertNotNull(session.state.value.presentation.pendingCaptureFeedback)
-        assertEquals(overlayShot.shotId, session.state.value.presentation.pendingCaptureFeedback?.shotId)
-        assertEquals("/tmp/overlay-feedback.jpg", session.state.value.presentation.pendingCaptureFeedback?.outputPath)
-        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.updated" })
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.suppressed" })
     }
 
     @Test
@@ -3377,6 +3397,78 @@ class DefaultCameraSessionTest {
 
         assertNull(session.state.value.presentation.pendingCaptureFeedback)
         assertTrue(trace.snapshot().any { it.name == "capture.feedback.snapshot.suppressed" })
+    }
+
+    @Test
+    fun `color lab filtered photo suppresses raw capture feedback`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        val filteredShot = shot.copy(
+            saveRequest = shot.saveRequest.copy(
+                metadata = shot.saveRequest.metadata.copy(
+                    customTags = shot.saveRequest.metadata.customTags + mapOf(
+                        "filterProfile" to "photo-original",
+                        "filterSpec.version" to "1",
+                        "filterSpec.warmthShift" to "12",
+                        "filterSpec.contrast" to "1.17"
+                    )
+                )
+            )
+        )
+        session.dispatch(SessionIntent.ShotStarted(filteredShot))
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = filteredShot.shotId,
+                outputPath = "/tmp/raw-feedback-filtered.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertTrue(trace.snapshot().any {
+            it.name == "capture.feedback.snapshot.suppressed" &&
+                it.detail.contains("final-output-postprocess")
+        })
+    }
+
+    @Test
+    fun `non default frame ratio suppresses raw capture feedback`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        val framedShot = shot.copy(
+            saveRequest = shot.saveRequest.copy(
+                metadata = shot.saveRequest.metadata.copy(
+                    customTags = shot.saveRequest.metadata.customTags
+                        .filterKeys { it != "frameRatio" } + ("frameRatio" to "16:9")
+                )
+            )
+        )
+        session.dispatch(SessionIntent.ShotStarted(framedShot))
+        session.dispatch(
+            SessionIntent.CaptureFeedbackSnapshotUpdated(
+                shotId = framedShot.shotId,
+                outputPath = "/tmp/raw-feedback-frame.jpg"
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.pendingCaptureFeedback)
+        assertTrue(trace.snapshot().any {
+            it.name == "capture.feedback.snapshot.suppressed" &&
+                it.detail.contains("final-output-postprocess")
+        })
     }
 
     private fun createSession(

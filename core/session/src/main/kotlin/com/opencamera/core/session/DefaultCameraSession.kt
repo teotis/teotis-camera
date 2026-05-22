@@ -1115,7 +1115,7 @@ class DefaultCameraSession(
             return
         }
         if (captureFeedbackPolicyFor(activeShot) == CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA) {
-            trace.record("capture.feedback.snapshot.suppressed", "shotId=$shotId,reason=watermark-final-output")
+            trace.record("capture.feedback.snapshot.suppressed", "shotId=$shotId,reason=final-output-postprocess")
             return
         }
         updateState(

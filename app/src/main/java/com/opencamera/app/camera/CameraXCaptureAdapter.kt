@@ -23,6 +23,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCaseGroup
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
@@ -2135,8 +2136,7 @@ class CameraXCaptureAdapter(
                 val camera = provider.bindToLifecycle(
                     lifecycleOwner,
                     selector,
-                    preview,
-                    capture
+                    useCaseGroupFor(previewView, preview, capture)
                 )
                 imageCapture = capture
                 videoCapture = null
@@ -2168,8 +2168,7 @@ class CameraXCaptureAdapter(
                 val camera = provider.bindToLifecycle(
                     lifecycleOwner,
                     selector,
-                    preview,
-                    capture
+                    useCaseGroupFor(previewView, preview, capture)
                 )
                 imageCapture = null
                 videoCapture = capture
@@ -2198,6 +2197,20 @@ class CameraXCaptureAdapter(
             observePreviewStream(previewView, lifecycleOwner)
         }
         suppressPreviewStateEvents = false
+    }
+
+    private fun useCaseGroupFor(
+        previewView: PreviewView,
+        preview: Preview,
+        capture: androidx.camera.core.UseCase
+    ): UseCaseGroup {
+        val builder = UseCaseGroup.Builder()
+            .addUseCase(preview)
+            .addUseCase(capture)
+        previewView.viewPort?.let { viewPort ->
+            builder.setViewPort(viewPort)
+        }
+        return builder.build()
     }
 
     private fun createImageCapture(
