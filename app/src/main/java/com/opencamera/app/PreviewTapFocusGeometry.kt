@@ -40,3 +40,16 @@ internal fun normalizedPreviewTapOrNull(
     activeFrameRight = activeFrameRect.right,
     activeFrameBottom = activeFrameRect.bottom
 )
+
+/** Convenience for callers that may hold a nullable [RectF]. */
+internal fun normalizedPreviewTapOrNull(
+    tapX: Float,
+    tapY: Float,
+    viewWidth: Int,
+    viewHeight: Int,
+    activeFrameRect: RectF?
+): NormalizedPreviewTap? = if (activeFrameRect != null) {
+    normalizedPreviewTapOrNull(tapX, tapY, viewWidth, viewHeight, activeFrameRect)
+} else {
+    normalizedPreviewTapOrNull(tapX, tapY, viewWidth, viewHeight)
+}
