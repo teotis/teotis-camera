@@ -3,6 +3,7 @@ package com.opencamera.core.session
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceRuntimeIssue
+import com.opencamera.core.device.asCapabilityGraphQuery
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.RecordingQualityPreset
@@ -3757,8 +3758,8 @@ class DefaultCameraSessionTest {
         testScope: TestScope,
         deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         settingsSnapshot: SessionSettingsSnapshot = SessionSettingsSnapshot(),
-        capabilityGraphResolver: com.opencamera.core.effect.CapabilityGraphResolver? = null,
-        capabilityRequirements: () -> List<com.opencamera.core.device.CapabilityRequirement> = { emptyList() }
+        capabilityGraphResolver: com.opencamera.core.capability.CapabilityGraphResolver? = null,
+        capabilityRequirements: () -> List<com.opencamera.core.capability.CapabilityRequirement> = { emptyList() }
     ): DefaultCameraSession {
         var shotIndex = 0
         return DefaultCameraSession(
@@ -3800,8 +3801,8 @@ class DefaultCameraSessionTest {
     @Test
     fun `activeCapabilityReport remains null when requirements are empty`() = runTest {
         val trace = InMemorySessionTrace()
-        val resolver = com.opencamera.core.effect.CapabilityGraphResolver(
-            deviceCapabilities = DeviceCapabilities.DEFAULT,
+        val resolver = com.opencamera.core.capability.CapabilityGraphResolver(
+            deviceQuery = DeviceCapabilities.DEFAULT.asCapabilityGraphQuery(),
             mediaProcessors = com.opencamera.core.media.MediaProcessorAvailability.ALL_AVAILABLE
         )
         val session = createSession(
@@ -3819,8 +3820,8 @@ class DefaultCameraSessionTest {
     @Test
     fun `activeCapabilityReport is populated when resolver and requirements provided`() = runTest {
         val trace = InMemorySessionTrace()
-        val resolver = com.opencamera.core.effect.CapabilityGraphResolver(
-            deviceCapabilities = DeviceCapabilities.DEFAULT,
+        val resolver = com.opencamera.core.capability.CapabilityGraphResolver(
+            deviceQuery = DeviceCapabilities.DEFAULT.asCapabilityGraphQuery(),
             mediaProcessors = com.opencamera.core.media.MediaProcessorAvailability.ALL_AVAILABLE
         )
         val session = createSession(
@@ -3829,10 +3830,10 @@ class DefaultCameraSessionTest {
             capabilityGraphResolver = resolver,
             capabilityRequirements = {
                 listOf(
-                    com.opencamera.core.device.CapabilityRequirement(
+                    com.opencamera.core.capability.CapabilityRequirement(
                         id = "still",
-                        kind = com.opencamera.core.device.CapabilityRequirementKind.STILL_CAPTURE,
-                        requiredFor = setOf(com.opencamera.core.device.CapabilityUseSite.CAPTURE)
+                        kind = com.opencamera.core.capability.CapabilityRequirementKind.STILL_CAPTURE,
+                        requiredFor = setOf(com.opencamera.core.capability.CapabilityUseSite.CAPTURE)
                     )
                 )
             }

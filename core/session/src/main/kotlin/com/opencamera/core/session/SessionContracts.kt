@@ -1,7 +1,7 @@
 package com.opencamera.core.session
 
 import com.opencamera.core.device.CameraOutputRotation
-import com.opencamera.core.device.CapabilityGraphReport
+import com.opencamera.core.capability.CapabilityGraphReport
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue

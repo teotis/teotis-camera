@@ -1,6 +1,6 @@
 package com.opencamera.core.mode
 
-import com.opencamera.core.device.CapabilityRequirementKind
+import com.opencamera.core.capability.CapabilityRequirementKind
 
 data class ModeProductDeclaration(
     val modeId: ModeId,

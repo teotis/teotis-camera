@@ -7,7 +7,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:settings"))
+    implementation(project(":core:effect"))
     implementation(project(":core:media"))
+    implementation(project(":core:settings"))
     testImplementation(kotlin("test"))
 }

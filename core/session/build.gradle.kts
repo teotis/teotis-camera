@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":core:media"))
     implementation(project(":core:mode"))
     implementation(project(":core:effect"))
+    implementation(project(":core:capability"))
     implementation(project(":core:settings"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 

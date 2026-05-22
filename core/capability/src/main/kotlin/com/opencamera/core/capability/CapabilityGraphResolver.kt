@@ -1,16 +1,14 @@
-package com.opencamera.core.effect
+package com.opencamera.core.capability
 
-import com.opencamera.core.device.CapabilityGraphReport
-import com.opencamera.core.device.CapabilityRequirement
-import com.opencamera.core.device.CapabilityRequirementKind
-import com.opencamera.core.device.CapabilityResolution
-import com.opencamera.core.device.CapabilitySupport
-import com.opencamera.core.device.DeviceCapabilities
-import com.opencamera.core.device.ManualControlSupport
+import com.opencamera.core.effect.DocumentEffect
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FilterEffect
+import com.opencamera.core.effect.PortraitEffect
+import com.opencamera.core.effect.WatermarkEffect
 import com.opencamera.core.media.MediaProcessorAvailability
 
 class CapabilityGraphResolver(
-    private val deviceCapabilities: DeviceCapabilities,
+    private val deviceQuery: CapabilityGraphDeviceQuery,
     private val mediaProcessors: MediaProcessorAvailability
 ) {
     fun resolve(
@@ -51,7 +49,7 @@ class CapabilityGraphResolver(
     }
 
     private fun resolveStillCapture(req: CapabilityRequirement): CapabilityResolution {
-        return if (deviceCapabilities.supportsStillCapture) {
+        return if (deviceQuery.supportsStillCapture()) {
             ok(req)
         } else {
             unsupported(req, "Device does not support still capture")
@@ -59,7 +57,7 @@ class CapabilityGraphResolver(
     }
 
     private fun resolveVideoRecording(req: CapabilityRequirement): CapabilityResolution {
-        return if (deviceCapabilities.supportsVideoRecording) {
+        return if (deviceQuery.supportsVideoRecording()) {
             ok(req)
         } else {
             unsupported(req, "Device does not support video recording")
@@ -67,7 +65,7 @@ class CapabilityGraphResolver(
     }
 
     private fun resolvePreviewFrameStream(req: CapabilityRequirement): CapabilityResolution {
-        return if (deviceCapabilities.supportsPreviewSnapshots) {
+        return if (deviceQuery.supportsPreviewSnapshots()) {
             ok(req)
         } else {
             degraded(req, "Preview snapshots unavailable, using direct capture only", req.fallbackIds.firstOrNull())
@@ -83,7 +81,7 @@ class CapabilityGraphResolver(
     }
 
     private fun resolveMultiFrameCapture(req: CapabilityRequirement): CapabilityResolution {
-        if (!deviceCapabilities.supportsNightMultiFrame) {
+        if (!deviceQuery.supportsNightMultiFrame()) {
             return degraded(req, "Night multi-frame not supported, single-frame fallback", "single-frame")
         }
         if (!mediaProcessors.multiFrameMergeAvailable) {
@@ -109,28 +107,21 @@ class CapabilityGraphResolver(
     }
 
     private fun resolveManualControl(req: CapabilityRequirement): CapabilityResolution {
-        val matrix = deviceCapabilities.resolvedManualControlCapabilities
-        val controls = listOf(
-            matrix.raw, matrix.iso, matrix.shutter,
-            matrix.exposureCompensation, matrix.focusDistance,
-            matrix.aperture, matrix.whiteBalance
-        )
+        val summary = deviceQuery.manualControlSummary()
         return when {
-            controls.any { it == ManualControlSupport.APPLY } -> ok(req)
-            controls.any { it == ManualControlSupport.SAVED_ONLY } ->
+            summary.hasAppliedControls -> ok(req)
+            summary.hasSavedOnlyControls ->
                 savedOnly(req, "Manual controls available as saved-only draft only")
             else -> unsupported(req, "Manual controls not available on this device")
         }
     }
 
     private fun resolveRawOutput(req: CapabilityRequirement): CapabilityResolution {
-        val matrix = deviceCapabilities.resolvedManualControlCapabilities
-        return when (matrix.raw) {
-            ManualControlSupport.APPLY -> ok(req)
-            ManualControlSupport.SAVED_ONLY ->
+        return when (deviceQuery.rawOutputSupport()) {
+            CapabilitySupport.SUPPORTED -> ok(req)
+            CapabilitySupport.SAVED_ONLY ->
                 savedOnly(req, "RAW saved as metadata draft only, not applied to capture")
-            ManualControlSupport.UNSUPPORTED ->
-                unsupported(req, "RAW output not available on this device")
+            else -> unsupported(req, "RAW output not available on this device")
         }
     }
 
@@ -169,7 +160,7 @@ class CapabilityGraphResolver(
         if (!mediaProcessors.portraitRenderAvailable) {
             return unsupported(req, "Portrait render processor unavailable")
         }
-        return if (deviceCapabilities.supportsPortraitDepthEffect) {
+        return if (deviceQuery.supportsPortraitDepth()) {
             ok(req)
         } else {
             degraded(req, "Depth effect not supported, using focus fallback", "focus-fallback")
@@ -185,7 +176,7 @@ class CapabilityGraphResolver(
         if (!mediaProcessors.documentProcessorAvailable) {
             return unsupported(req, "Document processor unavailable")
         }
-        return if (deviceCapabilities.supportsDocumentScanEnhancement) {
+        return if (deviceQuery.supportsDocumentGeometry()) {
             ok(req)
         } else {
             degraded(

@@ -62,8 +62,8 @@ class DefaultCameraSession(
     private val settingsSnapshot: SessionSettingsSnapshot = SessionSettingsSnapshot(),
     private val shotExecutor: ShotExecutor = ShotExecutor(),
     private val effectCapabilityResolver: com.opencamera.core.effect.EffectCapabilityResolver? = null,
-    private val capabilityGraphResolver: com.opencamera.core.effect.CapabilityGraphResolver? = null,
-    private val capabilityRequirements: () -> List<com.opencamera.core.device.CapabilityRequirement> = { emptyList() }
+    private val capabilityGraphResolver: com.opencamera.core.capability.CapabilityGraphResolver? = null,
+    private val capabilityRequirements: () -> List<com.opencamera.core.capability.CapabilityRequirement> = { emptyList() }
 ) : CameraSession {
     private val intentChannel = Channel<SessionIntent>(Channel.UNLIMITED)
     private val supportedModes = registry.supportedModes(baseDeviceCapabilities)
@@ -1612,7 +1612,7 @@ class DefaultCameraSession(
         previewMetrics: PreviewMetrics = _state.value.previewMetrics,
         settings: SessionSettingsSnapshot = _state.value.settings,
         activeEffectSpec: com.opencamera.core.effect.EffectSpec = _state.value.activeEffectSpec,
-        activeCapabilityReport: com.opencamera.core.device.CapabilityGraphReport? = _state.value.activeCapabilityReport,
+        activeCapabilityReport: com.opencamera.core.capability.CapabilityGraphReport? = _state.value.activeCapabilityReport,
         previewRatio: PreviewRatio = _state.value.previewRatio,
         outputRotation: CameraOutputRotation = _state.value.outputRotation,
         countdownRemainingSeconds: Int? = _state.value.presentation.countdownRemainingSeconds,
