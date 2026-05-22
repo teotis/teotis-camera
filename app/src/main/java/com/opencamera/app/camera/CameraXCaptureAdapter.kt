@@ -20,6 +20,7 @@ import android.util.Size
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraState
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -56,6 +57,9 @@ import com.opencamera.core.device.DeviceShotRequestTranslator
 import com.opencamera.core.device.DefaultDeviceShotRequestTranslator
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ManualControlCapabilityMatrix
+import com.opencamera.core.device.PreviewMeteringRequest
+import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlan
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlanner
@@ -1122,6 +1126,21 @@ class CameraXCaptureAdapter(
                     )
                 )
             }
+
+            is DeviceCommand.ApplyPreviewMetering -> runCatching {
+                applyPreviewMetering(command.request)
+            }.onFailure { throwable ->
+                _events.emit(
+                    DeviceEvent.PreviewMeteringCompleted(
+                        PreviewMeteringResult(
+                            requestId = command.request.requestId,
+                            point = command.request.point.clamped(),
+                            status = PreviewMeteringResultStatus.FAILED,
+                            reason = throwable.message ?: "Preview metering failed"
+                        )
+                    )
+                )
+            }
         }
     }
 
@@ -1177,6 +1196,89 @@ class CameraXCaptureAdapter(
         )
         val camera = boundCamera ?: return
         camera.cameraControl.setZoomRatio(normalizedZoomRatio).await()
+    }
+
+    private suspend fun applyPreviewMetering(request: PreviewMeteringRequest) {
+        withContext(Dispatchers.Main.immediate) {
+            val camera = boundCamera
+            val preview = boundPreviewView
+            if (camera == null || preview == null) {
+                _events.emit(
+                    DeviceEvent.PreviewMeteringCompleted(
+                        PreviewMeteringResult(
+                            requestId = request.requestId,
+                            point = request.point.clamped(),
+                            status = PreviewMeteringResultStatus.FAILED,
+                            reason = "Preview is not bound"
+                        )
+                    )
+                )
+                return@withContext
+            }
+
+            val point = request.point.clamped()
+            val pixel = previewMeteringPixelPoint(
+                normalizedX = point.normalizedX,
+                normalizedY = point.normalizedY,
+                viewWidth = preview.width,
+                viewHeight = preview.height
+            )
+            val meteringPoint = preview.meteringPointFactory.createPoint(pixel.x, pixel.y, 0.15f)
+
+            val focusAndAeAction = FocusMeteringAction.Builder(
+                meteringPoint,
+                FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+            )
+                .setAutoCancelDuration(request.autoCancelMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .build()
+
+            val aeOnlyAction = FocusMeteringAction.Builder(
+                meteringPoint,
+                FocusMeteringAction.FLAG_AE
+            )
+                .setAutoCancelDuration(request.autoCancelMillis, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .build()
+
+            val actionAndStatus = when {
+                camera.cameraInfo.isFocusMeteringSupported(focusAndAeAction) ->
+                    focusAndAeAction to PreviewMeteringResultStatus.SUCCEEDED
+
+                camera.cameraInfo.isFocusMeteringSupported(aeOnlyAction) ->
+                    aeOnlyAction to PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY
+
+                else -> null
+            }
+
+            if (actionAndStatus == null) {
+                _events.emit(
+                    DeviceEvent.PreviewMeteringCompleted(
+                        PreviewMeteringResult(
+                            requestId = request.requestId,
+                            point = point,
+                            status = PreviewMeteringResultStatus.UNSUPPORTED,
+                            reason = "Focus and exposure metering are unsupported"
+                        )
+                    )
+                )
+                return@withContext
+            }
+
+            val result = camera.cameraControl.startFocusAndMetering(actionAndStatus.first).await()
+            _events.emit(
+                DeviceEvent.PreviewMeteringCompleted(
+                    PreviewMeteringResult(
+                        requestId = request.requestId,
+                        point = point,
+                        status = actionAndStatus.second,
+                        reason = if (result.isFocusSuccessful || actionAndStatus.second != PreviewMeteringResultStatus.SUCCEEDED) {
+                            null
+                        } else {
+                            "Focus did not lock"
+                        }
+                    )
+                )
+            )
+        }
     }
 
     override fun boundGraph(): DeviceGraphSpec? = currentGraph

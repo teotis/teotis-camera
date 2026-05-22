@@ -12,6 +12,8 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.RecordingQualityPreset
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
@@ -897,6 +899,18 @@ class CameraSessionCoordinatorTest {
 
         override suspend fun dispatch(command: DeviceCommand) {
             recordedCommands += command
+            if (command is DeviceCommand.ApplyPreviewMetering) {
+                mutableEvents.emit(
+                    DeviceEvent.PreviewMeteringCompleted(
+                        PreviewMeteringResult(
+                            requestId = command.request.requestId,
+                            point = command.request.point.clamped(),
+                            status = PreviewMeteringResultStatus.SUCCEEDED,
+                            reason = null
+                        )
+                    )
+                )
+            }
         }
 
         override suspend fun release() = Unit
