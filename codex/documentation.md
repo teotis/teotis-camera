@@ -96,6 +96,7 @@
 - `2026-05-22` 真机发现“Color Lab 预览有效但成片不生效”后，已完成系统化调试和代码闭环：Color Lab/style metadata 在 session 侧本已能进入 `filterSpec.*`，真实高风险断点在 Android Q+ CameraX 保存结果可能不给 `savedUri`，导致 `MediaOutputHandle` 只有展示路径、所有成片后处理拿不到可编辑 `contentUri/filePath` 而跳过。[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 现会预创建 MediaStore still `contentUri` 并用 OutputStream 写入，`resolvePhotoOutputHandle()` 保证 CameraX 不返回 URI 时仍保留可编辑目标；[`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 锁定 Color Lab 合成后的 `filterSpec.*` 会进入拍摄 metadata，[`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 锁定预创建 URI 句柄合同。该修复同时降低滤镜、画幅裁切、水印、人像渲染、文档裁切、自拍镜像等 saved-photo 后处理被跳过的风险；视频录制仍只保证 metadata/filter profile 进入录制请求，成片视频滤镜不在当前 JPEG 后处理链路内。
 - `2026-05-22` 最新 vivo X300 真机反馈将问题升级为“预览/成片/缩略图三链路不一致”后，本轮已完成核心 containment + 几何绑定闭环：[`SessionContracts.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 的 `captureFeedbackPolicyFor()` 现在只允许纯净 no-postprocess shot 使用 raw preview feedback；凡 shot metadata/postprocess 表明存在 Color Lab/filter、非默认画幅裁切、水印或自拍镜像，都会抑制 `PreviewView.bitmap` 缩略反馈直到 `SavedMedia`，避免用户先看到与最终成片不一致的缩略图；[`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 已新增 Color Lab/filter 与 16:9 frame ratio 的红绿回归。Device 层，[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 已将 still/video 的 Preview 与 ImageCapture/VideoCapture 绑定改为 `UseCaseGroup + PreviewView.viewPort`，让 CameraX 尽量共享同一 viewport/crop contract，降低预览画幅与成片 sensor 区域差异。更大的 `RenderRecipe + GL PreviewRenderEngine` 非低耦合项已拆成 [`2026-05-22-render-recipe-preview-engine-handoff.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-render-recipe-preview-engine-handoff.md) 交给外部 agent 做纯 Kotlin contract/diagnostics/QA 清单；本轮不宣称已完成实时像素级 Color Lab 预览渲染，最终仍需新 APK 真机对比保存 JPEG 与录屏。
 - `2026-05-23` 最新真机反馈指出“成片画面区域并非主界面预览框区域”后，本轮已完成系统化调试和根因修复：[`PreviewOverlayView.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/PreviewOverlayView.kt) 原先用 `bottomInsetPx = 40dp` 和水平 padding 计算画幅框、网格和遮罩，把底部 cockpit/safe-area 混进了 active frame rect；但 [`PhotoFrameRatioPostProcessor.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessor.kt) 对保存 JPEG 做的是完整图像中心裁切，二者天然不同源。本轮移除成像几何中的 UI inset 入口，让 frame guideline、dim scrim、grid 全部以完整 `PreviewView` content rect 居中计算，并用 [`PreviewOverlayGeometryTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/PreviewOverlayGeometryTest.kt) 锁定 active capture frame 必须与 saved center crop 同中心；聚焦几何、后处理、render model 和 assemble 验证均已通过。后续仍需真机安装新 APK，用 `4:3 / 16:9 / 1:1` 保存 JPEG 与屏幕录屏做视觉复验。
+- `2026-05-23` vivo X300 复测进一步确认“偏离预览框”主要表现为横竖比例搞反：竖屏预览下的 `16:9` 画幅框按 `9:16` 显示，但 [`PhotoFrameRatioPostProcessor.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessor.kt) 仍按物理 `16:9` 裁 JPEG，导致竖图被裁成横向长图。本轮将 `computeCenterCropBounds()` 改为按解码图像方向定向解释画幅：竖图把 `4:3 / 16:9` 解释为 `3:4 / 9:16`，横图仍解释为 `4:3 / 16:9`；[`PhotoFrameRatioPostProcessorTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessorTest.kt) 已用红绿测试锁定 portrait `4:3` 不再被裁、portrait `16:9` 裁左右得到竖向 `9:16`。新 APK 已重新 `assembleDebug`，需要真机复验同一场景。
 
 ---
 
@@ -115,6 +116,21 @@
   `rtk ./gradlew --no-daemon :app:assembleDebug`
 - 结论：
   本轮修掉的是代码级根因：UI 安全区不再参与成像画幅计算。最终仍需新 APK 真机复验保存图，尤其是 16:9 和 1:1 在竖屏/横屏下的视觉一致性。
+
+## 2026-05-23：竖屏画幅保存横竖方向修复
+
+- 目标：处理 vivo X300 复测发现的继续偏离：竖屏预览框是竖向画幅，但保存 JPEG 变成横向较长。
+- 根因：
+  预览 overlay 的 `orientedFrameRatio()` 已经按屏幕/视图方向把 `16:9` 在竖屏显示为 `9:16`；但 `PhotoFrameRatioPostProcessor.computeCenterCropBounds()` 直接使用 `FrameRatio.width / height`，把 portrait 解码图也按 `16:9` 横向裁切。
+- 核心结果：
+  [`PhotoFrameRatioPostProcessor.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessor.kt) 新增方向感知 ratio 计算：当解码图 `width <= height` 时使用短边/长边比例，横图使用长边/短边比例；
+  [`PhotoFrameRatioPostProcessorTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessorTest.kt) 将 portrait `4:3` 期望改为不裁切，将 portrait `16:9` 期望改为裁左右得到 `9:16`。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
+  `rtk ./gradlew --no-daemon :app:assembleDebug`
+- 结论：
+  预览和保存后处理现在对 `4:3 / 16:9 / 1:1` 的横竖方向解释一致。下一轮真机请优先复验竖屏 `16:9`：成片应是竖向长图，不再是横向长图。
 
 ## 2026-05-22：预览/成片/缩略图一致性核心 containment
 

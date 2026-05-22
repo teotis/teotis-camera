@@ -75,7 +75,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private val frameScrimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(70, 0, 0, 0)
+        color = Color.argb(140, 0, 0, 0)
         style = Paint.Style.FILL
     }
 

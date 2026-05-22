@@ -133,28 +133,20 @@ class PhotoFrameRatioPostProcessorTest {
     @Test
     fun `compute center crop bounds handles portrait source 4_3 ratio`() {
         // Portrait photo: 3000w x 4000h (3:4 aspect)
-        // FrameRatio.RATIO_4_3 targetRatio = 4/3 = 1.333
-        // currentRatio = 3000/4000 = 0.75 < 1.333 => height-limited
-        // h = 3000 / 1.333 = 2250, top = (4000 - 2250) / 2 = 875
         val bounds = computeCenterCropBounds(
             width = 3000,
             height = 4000,
             frameRatio = FrameRatio.RATIO_4_3
         )
 
-        assertNotNull(bounds)
-        assertEquals(0, bounds.left)
-        assertEquals(875, bounds.top)
-        assertEquals(3000, bounds.right)
-        assertEquals(3125, bounds.bottom)
+        assertNull(bounds)
     }
 
     @Test
     fun `compute center crop bounds handles portrait source 16_9 ratio`() {
         // Portrait photo: 3000w x 4000h
-        // FrameRatio.RATIO_16_9 targetRatio = 16/9 = 1.778
-        // currentRatio = 0.75 < 1.778 => height-limited
-        // h = 3000 / 1.778 = 1687, top = (4000 - 1687) / 2 = 1156
+        // Visible preview frame is oriented as 9:16, so saved output must crop
+        // the sides to a portrait-tall frame instead of producing a landscape crop.
         val bounds = computeCenterCropBounds(
             width = 3000,
             height = 4000,
@@ -162,10 +154,10 @@ class PhotoFrameRatioPostProcessorTest {
         )
 
         assertNotNull(bounds)
-        assertEquals(0, bounds.left)
-        assertEquals(1156, bounds.top)
-        assertEquals(3000, bounds.right)
-        assertEquals(2844, bounds.bottom)
+        assertEquals(375, bounds.left)
+        assertEquals(0, bounds.top)
+        assertEquals(2625, bounds.right)
+        assertEquals(4000, bounds.bottom)
     }
 
     private fun photoResult(

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Surface tokens -->
-    <color name="oc_surface_scrim">#8C000000</color>
+    <color name="oc_surface_scrim">#00000000</color>
     <color name="oc_surface_scrim_light">#52000000</color>
-    <color name="oc_surface_panel">#E61B1F24</color>
+    <color name="oc_surface_panel">#8C000000</color>
     <color name="oc_surface_panel_alt">#CC242A30</color>
 
     <!-- Text tokens -->

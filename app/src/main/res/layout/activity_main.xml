@@ -963,7 +963,7 @@
                 android:id="@+id/filterHeroSummary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="6dp"
                 android:fontFamily="monospace"
                 android:textColor="@color/oc_accent"
                 android:textSize="@dimen/text_size_status" />
@@ -971,7 +971,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="10dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
@@ -1024,7 +1024,7 @@
                 android:id="@+id/filterSectionFiltersTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="10dp"
                 android:text="@string/filter_section_filters"
                 android:textColor="@color/oc_text_secondary"
                 android:textSize="@dimen/text_size_section_title"
@@ -1034,7 +1034,7 @@
                 android:id="@+id/filterSelectionCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_settings_card"
                 android:orientation="vertical"
                 android:padding="@dimen/space_16">
@@ -1069,7 +1069,7 @@
                 android:id="@+id/filterSectionPaletteTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="10dp"
                 android:text="@string/filter_section_palette"
                 android:textColor="@color/oc_text_secondary"
                 android:textSize="@dimen/text_size_section_title"
@@ -1079,7 +1079,7 @@
                 android:id="@+id/filterAdjustmentPanel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_settings_card"
                 android:orientation="vertical"
                 android:padding="@dimen/space_16"
@@ -1095,7 +1095,7 @@
                     android:id="@+id/filterPaletteSummary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="6dp"
                     android:textColor="@color/oc_text_secondary"
                     android:textSize="@dimen/text_size_control_value" />
 
@@ -1103,13 +1103,13 @@
                     android:id="@+id/filterPaletteSurface"
                     android:layout_width="match_parent"
                     android:layout_height="180dp"
-                    android:layout_marginTop="12dp" />
+                    android:layout_marginTop="6dp" />
 
                 <TextView
                     android:id="@+id/filterPaletteHint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="6dp"
                     android:textColor="@color/oc_text_secondary"
                     android:textSize="@dimen/text_size_status" />
 
@@ -1117,7 +1117,7 @@
                     android:id="@+id/filterAdvancedTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="10dp"
                     android:text="@string/filter_section_advanced"
                     android:textColor="@color/oc_text_secondary"
                     android:textSize="@dimen/text_size_section_title"
@@ -1127,7 +1127,7 @@
                     android:id="@+id/filterAdvancedControls"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="6dp"
                     android:orientation="vertical"
                     android:visibility="gone">
 
