@@ -19,15 +19,10 @@ import com.opencamera.core.device.resolvedZoomRatioSelection
 import com.opencamera.core.device.recoveryReason
 import com.opencamera.core.media.CaptureFeedbackPreview
 import com.opencamera.core.media.CaptureStrategy
-import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LivePhotoBundle
-import com.opencamera.core.media.hasPostProcessFailures
-import com.opencamera.core.media.isTemporalMedia
-import com.opencamera.core.media.postProcessFailureSummary
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotRequest
-import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
@@ -38,15 +33,12 @@ import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeIntent
 import com.opencamera.core.mode.ModeRuntimeState
 import com.opencamera.core.mode.ModeRegistry
-import com.opencamera.core.mode.ModeSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -87,10 +79,7 @@ class DefaultCameraSession(
     private var sessionStillCaptureResolutionPreset = initialStillCaptureResolutionPreset
     private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
     private var sessionSettingsSnapshot = settingsSnapshot
-    private var pendingCountdownJob: Job? = null
-    private var pendingCountdownStrategy: CaptureStrategy? = null
     private var pendingPreviewHostRecoveryReason: String? = null
-    private var recordingWatchdogJob: Job? = null
     private var meteringCounter: Int = 0
     private var currentController: ModeController = createController(
         modeId = initialMode,
@@ -131,6 +120,20 @@ class DefaultCameraSession(
 
     override val state = _state.asStateFlow()
     override val effects = _effects.asSharedFlow()
+
+    private val captureRecordingProcessor = CaptureRecordingSessionProcessor(
+        scope = scope,
+        state = _state,
+        effects = _effects,
+        trace = trace,
+        shotExecutor = shotExecutor,
+        currentController = { currentController },
+        resolvedActiveDeviceGraph = { resolvedActiveDeviceGraph() },
+        updateState = SessionStateUpdater { transform ->
+            _state.value = transform(_state.value)
+        },
+        dispatch = { intent -> dispatch(intent) }
+    )
 
     init {
         trace.record("session.created", "defaultMode=$defaultMode,initialMode=$initialMode")
@@ -211,18 +214,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun processCaptureRecordingIntent(intent: SessionIntent) {
-        when (intent) {
-            is SessionIntent.CountdownTick -> handleCountdownTick(intent.remainingSeconds)
-            SessionIntent.CountdownCompleted -> handleCountdownCompleted()
-            is SessionIntent.ShotStarted -> handleShotStarted(intent.shot)
-            is SessionIntent.ShotCompleted -> handleShotCompleted(intent.result)
-            is SessionIntent.ShotFailed -> handleShotFailed(
-                shotId = intent.shotId,
-                mediaType = intent.mediaType,
-                reason = intent.reason
-            )
-            else -> error("Unexpected capture recording intent: $intent")
-        }
+        captureRecordingProcessor.process(intent)
     }
 
     private fun processDiagnosticsIntent(intent: SessionIntent) {
@@ -265,22 +257,6 @@ class DefaultCameraSession(
         requestPreviewBinding(reason = "session boot", isRecovery = false)
     }
 
-    private fun startRecordingWatchdog(expectedStatus: RecordingStatus, timeoutMillis: Long) {
-        recordingWatchdogJob?.cancel()
-        recordingWatchdogJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
-            delay(timeoutMillis)
-            if (_state.value.recordingStatus == expectedStatus) {
-                trace.record("recording.watchdog.timeout", "status=$expectedStatus, timeout=${timeoutMillis}ms")
-                updateState(
-                    recordingStatus = RecordingStatus.IDLE,
-                    activeShot = null,
-                    lastAction = "Recording timed out after ${timeoutMillis}ms",
-                    lastError = "Recording state $expectedStatus timed out"
-                )
-            }
-        }
-    }
-
     private suspend fun handleShutdown() {
         if (_state.value.lifecycle == SessionLifecycle.STOPPED) {
             updateState(lastAction = "Session already stopped")
@@ -288,7 +264,7 @@ class DefaultCameraSession(
             return
         }
 
-        cancelPendingCountdown("Countdown cancelled because session stopped")
+        captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because session stopped")
         pendingPreviewHostRecoveryReason = null
         currentController.onExit()
         updateState(
@@ -308,7 +284,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleSwitchMode(modeId: ModeId) {
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before switching modes")
             trace.record("mode.switch.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
             return
@@ -374,7 +350,7 @@ class DefaultCameraSession(
             return
         }
 
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before updating settings")
             trace.record(
                 "settings.update.blocked",
@@ -420,7 +396,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleLensFacingToggled() {
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before switching lenses")
             trace.record("lens.switch.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
             return
@@ -471,7 +447,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleZoomRatioToggled() {
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before switching zoom")
             trace.record("zoom.switch.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
             return
@@ -531,7 +507,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleApplyZoomRatio(targetRatio: Float) {
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before switching zoom")
             trace.record("zoom.apply.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
             return
@@ -583,7 +559,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleStillCaptureQualityToggled() {
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before changing still quality")
             trace.record(
                 "still-quality.blocked",
@@ -629,7 +605,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleStillCaptureResolutionToggled() {
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before changing still resolution")
             trace.record(
                 "still-resolution.blocked",
@@ -716,7 +692,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handlePreviewRatioToggled() {
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "倒计时结束后才能切换预览比例")
             trace.record("preview-ratio.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
             return
@@ -749,7 +725,7 @@ class DefaultCameraSession(
             return
         }
 
-        if (countdownInProgress()) {
+        if (captureRecordingProcessor.countdownInProgress()) {
             updateState(lastAction = "Wait for countdown to finish before sending another command")
             trace.record("mode.intent.blocked", "countdown=${_state.value.countdownRemainingSeconds},intent=$intent")
             return
@@ -815,9 +791,9 @@ class DefaultCameraSession(
 
             is ModeSignal.SubmitCapture -> {
                 if (signal.countdownSeconds > 0) {
-                    startCaptureCountdown(signal.strategy, signal.countdownSeconds)
+                    captureRecordingProcessor.startCaptureCountdown(signal.strategy, signal.countdownSeconds)
                 } else {
-                    submitCaptureStrategy(signal.strategy)
+                    captureRecordingProcessor.submitCaptureStrategy(signal.strategy)
                 }
             }
 
@@ -836,7 +812,7 @@ class DefaultCameraSession(
                     recordingStatus = RecordingStatus.STOPPING,
                     lastAction = "Stopping video recording"
                 )
-                startRecordingWatchdog(RecordingStatus.STOPPING, 15_000L)
+                captureRecordingProcessor.startRecordingWatchdog(RecordingStatus.STOPPING, 15_000L)
                 _effects.emit(SessionEffect.StopActiveShot(stoppableShot.shotId))
                 trace.record("recording.stop.requested", "mode=${currentController.id}")
             }
@@ -852,31 +828,6 @@ class DefaultCameraSession(
             activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
             activeDeviceGraph = resolvedActiveDeviceGraph()
         )
-    }
-
-    private suspend fun handleCountdownTick(remainingSeconds: Int) {
-        if (!countdownInProgress()) {
-            return
-        }
-        updateState(
-            captureStatus = CaptureStatus.REQUESTED,
-            countdownRemainingSeconds = remainingSeconds,
-            lastAction = "Photo capture starts in ${remainingSeconds}s",
-            lastError = null
-        )
-        trace.record("capture.countdown.tick", "${remainingSeconds}s")
-    }
-
-    private suspend fun handleCountdownCompleted() {
-        val strategy = pendingCountdownStrategy ?: return
-        pendingCountdownStrategy = null
-        pendingCountdownJob = null
-        updateState(
-            countdownRemainingSeconds = null,
-            lastAction = "Countdown finished",
-            lastError = null
-        )
-        submitCaptureStrategy(strategy)
     }
 
     private suspend fun handleDeviceCapabilitiesUpdated(
@@ -963,13 +914,13 @@ class DefaultCameraSession(
             else -> _state.value.lastError
         }
 
-        if (!cameraGranted && countdownInProgress()) {
-            cancelPendingCountdown("Countdown cancelled because camera permission is missing")
+        if (!cameraGranted && captureRecordingProcessor.countdownInProgress()) {
+            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because camera permission is missing")
         }
 
         if (!cameraGranted && previousState.activeShot != null) {
             val activeShot = previousState.activeShot
-            handleInterruptedShotFailure(
+            captureRecordingProcessor.handleInterruptedShotFailure(
                 shot = activeShot,
                 reason = "Camera permission missing"
             )
@@ -1028,8 +979,8 @@ class DefaultCameraSession(
     }
 
     private suspend fun handlePreviewHostDetached(reason: String) {
-        if (countdownInProgress()) {
-            cancelPendingCountdown("Countdown cancelled because preview host detached")
+        if (captureRecordingProcessor.countdownInProgress()) {
+            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview host detached")
         }
         if (_state.value.lifecycle == SessionLifecycle.RUNNING) {
             pendingPreviewHostRecoveryReason = reason
@@ -1167,8 +1118,8 @@ class DefaultCameraSession(
     }
 
     private suspend fun handlePreviewSurfaceLost(reason: String) {
-        if (countdownInProgress()) {
-            cancelPendingCountdown("Countdown cancelled because preview surface was lost")
+        if (captureRecordingProcessor.countdownInProgress()) {
+            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview surface was lost")
         }
         if (_state.value.recordingStatus == RecordingStatus.RECORDING) {
             handlePreviewError("Preview surface lost during recording: $reason")
@@ -1185,8 +1136,8 @@ class DefaultCameraSession(
     }
 
     private suspend fun handlePreviewError(reason: String) {
-        if (countdownInProgress()) {
-            cancelPendingCountdown("Countdown cancelled because preview failed")
+        if (captureRecordingProcessor.countdownInProgress()) {
+            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview failed")
         }
         val shouldAttemptRecovery = shouldAttemptPreviewErrorRecovery()
         updateState(
@@ -1208,8 +1159,8 @@ class DefaultCameraSession(
     }
 
     private suspend fun handlePreviewRuntimeIssue(issue: DeviceRuntimeIssue) {
-        if (countdownInProgress()) {
-            cancelPendingCountdown("Countdown cancelled because preview failed")
+        if (captureRecordingProcessor.countdownInProgress()) {
+            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview failed")
         }
         val renderedReason = issue.displayReason()
         val recoveryWasActive = _state.value.previewStatus == PreviewStatus.RECOVERING
@@ -1244,8 +1195,8 @@ class DefaultCameraSession(
     }
 
     private fun handlePreviewStopped(reason: String) {
-        if (countdownInProgress()) {
-            cancelPendingCountdown("Countdown cancelled because preview stopped")
+        if (captureRecordingProcessor.countdownInProgress()) {
+            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview stopped")
         }
         val hasCameraPermission = _state.value.permissionState.cameraGranted
         updateState(
@@ -1255,140 +1206,6 @@ class DefaultCameraSession(
             lastError = if (hasCameraPermission) null else "Camera permission missing"
         )
         trace.record("preview.stopped", reason)
-    }
-
-    private suspend fun handleShotStarted(shot: ShotRequest) {
-        currentController.onSessionEvent(ModeSessionEvent.ShotStarted(shot))
-        updateState(
-            captureStatus = if (shot.mediaType == MediaType.PHOTO) {
-                CaptureStatus.SAVING
-            } else {
-                CaptureStatus.IDLE
-            },
-            recordingStatus = if (shot.mediaType == MediaType.VIDEO) {
-                RecordingStatus.RECORDING
-            } else {
-                RecordingStatus.IDLE
-            },
-            activeShot = shot,
-            countdownRemainingSeconds = null,
-            pendingCaptureFeedback = null,
-            modeSnapshot = currentController.snapshot.value,
-            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
-            activeDeviceGraph = resolvedActiveDeviceGraph(),
-            lastAction = if (shot.mediaType == MediaType.PHOTO) {
-                if (shot.livePhotoSpec != null) {
-                    "Saving Live photo bundle"
-                } else {
-                    "Saving captured photo"
-                }
-            } else {
-                "Video recording started"
-            },
-            lastError = null
-        )
-        if (shot.mediaType == MediaType.PHOTO) {
-            trace.record("capture.feedback.snapshot.requested", "shotId=${shot.shotId}")
-        }
-        trace.record(
-            if (shot.mediaType == MediaType.PHOTO) "capture.saving" else "recording.started",
-            "shot=${shot.shotId},mode=${currentController.id}"
-        )
-    }
-
-    private suspend fun handleShotCompleted(result: ShotResult) {
-        currentController.onSessionEvent(ModeSessionEvent.ShotCompleted(result))
-        updateState(
-            captureStatus = if (result.mediaType == MediaType.PHOTO) {
-                CaptureStatus.COMPLETED
-            } else {
-                CaptureStatus.IDLE
-            },
-            recordingStatus = RecordingStatus.IDLE,
-            activeShot = null,
-            countdownRemainingSeconds = null,
-            modeSnapshot = currentController.snapshot.value,
-            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
-            activeDeviceGraph = resolvedActiveDeviceGraph(),
-            previewThumbnailPath = result.thumbnailSource.outputPathOrNull()
-                ?: _state.value.previewThumbnailPath,
-            latestThumbnailSource = when (result.thumbnailSource) {
-                ThumbnailSource.None -> {
-                    val previous = _state.value.latestThumbnailSource
-                    if (previous == null || previous is ThumbnailSource.Pending) {
-                        ThumbnailSource.Pending
-                    } else {
-                        previous
-                    }
-                }
-                else -> result.thumbnailSource
-            },
-            lastAction = if (result.mediaType == MediaType.PHOTO) {
-                val hasFailures = result.hasPostProcessFailures()
-                when {
-                    result.livePhotoBundle?.bundleStatus == LiveBundleStatus.STILL_ONLY_FALLBACK ->
-                        "Live photo saved (still only)"
-                    result.livePhotoBundle?.isTemporalMedia() == true ->
-                        if (hasFailures) "Live photo saved (degraded)" else "Live photo saved"
-                    hasFailures -> "Photo saved (degraded)"
-                    else -> "Photo saved"
-                }
-            } else {
-                "Video saved"
-            },
-            latestCapturePath = if (result.mediaType == MediaType.PHOTO) {
-                result.outputPath
-            } else {
-                _state.value.latestCapturePath
-            },
-            latestVideoPath = if (result.mediaType == MediaType.VIDEO) {
-                result.outputPath
-            } else {
-                _state.value.latestVideoPath
-            },
-            latestLivePhotoBundle = latestLivePhotoBundleFor(result),
-            latestSavedMediaType = if (result.mediaType == MediaType.PHOTO) {
-                SavedMediaType.PHOTO
-            } else {
-                SavedMediaType.VIDEO
-            },
-            latestPipelineNotes = result.pipelineNotes,
-            pendingCaptureFeedback = null,
-            lastError = result.postProcessFailureSummary()
-        )
-        trace.record(
-            if (result.mediaType == MediaType.PHOTO) "capture.saved" else "recording.saved",
-            result.outputPath
-        )
-        val t = result.timing
-        val requested = t.requestedAtElapsedMillis
-        val postCompleted = t.postProcessCompletedAtElapsedMillis
-        if (requested != null && postCompleted != null) {
-            val deviceStarted = t.deviceCaptureStartedAtElapsedMillis
-            val deviceCompleted = t.deviceCaptureCompletedAtElapsedMillis
-            val deviceMs = if (deviceStarted != null && deviceCompleted != null) {
-                "${deviceCompleted - deviceStarted}"
-            } else {
-                "--"
-            }
-            val postprocessMs = if (deviceCompleted != null) {
-                "${postCompleted - deviceCompleted}"
-            } else {
-                "--"
-            }
-            trace.record(
-                if (result.mediaType == MediaType.PHOTO) "capture.timing" else "recording.timing",
-                "shot=${result.shotId},device=${deviceMs}ms,postprocess=${postprocessMs}ms,total=${postCompleted - requested}ms"
-            )
-        }
-    }
-
-    private fun latestLivePhotoBundleFor(result: ShotResult): LivePhotoBundle? {
-        return if (result.mediaType == MediaType.PHOTO) {
-            result.livePhotoBundle?.takeIf { it.isTemporalMedia() }
-        } else {
-            _state.value.latestLivePhotoBundle
-        }
     }
 
     private suspend fun handlePreviewTapToFocus(normalizedX: Float, normalizedY: Float) {
@@ -1456,73 +1273,6 @@ class DefaultCameraSession(
         trace.record(traceLabel, "requestId=${result.requestId}")
     }
 
-    private suspend fun handleShotFailed(
-        shotId: String,
-        mediaType: MediaType,
-        reason: String
-    ) {
-        val currentActiveShot = _state.value.activeShot
-        if (currentActiveShot == null) {
-            trace.record("shot.failed.orphaned", "shotId=$shotId,reason=$reason")
-            return
-        }
-        if (currentActiveShot.shotId != shotId) {
-            trace.record("shot.failed.duplicate", "$shotId:$reason")
-            return
-        }
-        currentController.onSessionEvent(
-            ModeSessionEvent.ShotFailed(
-                shotId = shotId,
-                mediaType = mediaType,
-                reason = reason
-            )
-        )
-        updateState(
-            captureStatus = if (mediaType == MediaType.PHOTO) {
-                CaptureStatus.FAILED
-            } else {
-                CaptureStatus.IDLE
-            },
-            recordingStatus = RecordingStatus.IDLE,
-            activeShot = null,
-            countdownRemainingSeconds = null,
-            modeSnapshot = currentController.snapshot.value,
-            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
-            activeDeviceGraph = resolvedActiveDeviceGraph(),
-            lastAction = if (mediaType == MediaType.PHOTO) {
-                "Photo capture failed"
-            } else {
-                "Video recording failed"
-            },
-            latestPipelineNotes = emptyList(),
-            pendingCaptureFeedback = null,
-            lastError = reason
-        )
-        trace.record(
-            if (mediaType == MediaType.PHOTO) "capture.failed" else "recording.failed",
-            "$shotId:$reason"
-        )
-    }
-
-    private suspend fun handleInterruptedShotFailure(
-        shot: ShotRequest,
-        reason: String
-    ) {
-        currentController.onSessionEvent(
-            ModeSessionEvent.ShotFailed(
-                shotId = shot.shotId,
-                mediaType = shot.mediaType,
-                reason = reason
-            )
-        )
-        trace.record(
-            if (shot.mediaType == MediaType.PHOTO) "capture.failed" else "recording.failed",
-            "${shot.shotId}:$reason"
-        )
-    }
-
-    private fun countdownInProgress(): Boolean = pendingCountdownStrategy != null
-
     private suspend fun handleOutputRotationChanged(rotation: CameraOutputRotation) {
         if (rotation == _state.value.outputRotation) {
             trace.record("orientation.output.skipped", "already=$rotation")
@@ -1535,94 +1285,6 @@ class DefaultCameraSession(
         )
         trace.record("orientation.output.changed", rotation.name)
         _effects.emit(SessionEffect.UpdateOutputRotation(rotation))
-    }
-
-    private fun cancelPendingCountdown(reason: String) {
-        pendingCountdownJob?.cancel()
-        pendingCountdownJob = null
-        pendingCountdownStrategy = null
-        updateState(
-            captureStatus = CaptureStatus.IDLE,
-            countdownRemainingSeconds = null,
-            lastAction = reason,
-            lastError = null
-        )
-        trace.record("capture.countdown.cancelled", reason)
-    }
-
-    private fun startCaptureCountdown(
-        strategy: CaptureStrategy,
-        countdownSeconds: Int
-    ) {
-        pendingCountdownJob?.cancel()
-        pendingCountdownStrategy = strategy
-        updateState(
-            captureStatus = CaptureStatus.REQUESTED,
-            countdownRemainingSeconds = countdownSeconds,
-            lastAction = "Photo capture starts in ${countdownSeconds}s",
-            lastError = null
-        )
-        trace.record("capture.countdown.started", "${countdownSeconds}s")
-        pendingCountdownJob = scope.launch {
-            for (remainingSeconds in countdownSeconds - 1 downTo 1) {
-                delay(1_000)
-                dispatch(SessionIntent.CountdownTick(remainingSeconds))
-            }
-            delay(1_000)
-            dispatch(SessionIntent.CountdownCompleted)
-        }
-    }
-
-    private suspend fun submitCaptureStrategy(strategy: CaptureStrategy) {
-        val plan = runCatching {
-            shotExecutor.plan(
-                strategy = strategy,
-                activeShot = _state.value.activeShot
-            )
-        }.map { createdPlan ->
-            enrichPlanWithStillOutputSize(createdPlan)
-        }.getOrElse { throwable ->
-            updateState(
-                captureStatus = CaptureStatus.IDLE,
-                countdownRemainingSeconds = null,
-                lastAction = throwable.message ?: "Failed to create shot plan",
-                lastError = throwable.message
-            )
-            trace.record("shot.plan.failed", throwable.message ?: "unknown")
-            return
-        }
-        updateState(
-            captureStatus = if (plan.request.mediaType == MediaType.PHOTO) {
-                CaptureStatus.REQUESTED
-            } else {
-                CaptureStatus.IDLE
-            },
-            recordingStatus = if (plan.request.mediaType == MediaType.VIDEO) {
-                RecordingStatus.REQUESTING
-            } else {
-                RecordingStatus.IDLE
-            },
-            activeShot = plan.request,
-            countdownRemainingSeconds = null,
-            lastAction = if (plan.request.mediaType == MediaType.PHOTO) {
-                "Photo capture requested"
-            } else {
-                "Video recording requested"
-            },
-            lastError = null
-        )
-        if (plan.request.mediaType == MediaType.VIDEO) {
-            startRecordingWatchdog(RecordingStatus.REQUESTING, 10_000L)
-        }
-        _effects.emit(SessionEffect.ExecuteShot(plan))
-        trace.record(
-            if (plan.request.mediaType == MediaType.PHOTO) {
-                "capture.photo"
-            } else {
-                "recording.requested"
-            },
-            "mode=${currentController.id},shot=${plan.request.shotId}"
-        )
     }
 
     private fun updateState(
@@ -1792,32 +1454,6 @@ class DefaultCameraSession(
     }
 
     private fun zoomLabel(zoomRatio: Float): String = "${normalizedZoomRatioValue(zoomRatio)}x"
-
-    private fun enrichPlanWithStillOutputSize(plan: com.opencamera.core.media.ShotPlan): com.opencamera.core.media.ShotPlan {
-        if (plan.request.mediaType != MediaType.PHOTO) {
-            return plan
-        }
-
-        val outputSize = _state.value.activeDeviceGraph.stillCapture.outputSize ?: return plan
-        val outputSizeLabel = "${outputSize.width}x${outputSize.height}"
-        val updatedSaveRequest = plan.request.saveRequest.copy(
-            metadata = plan.request.saveRequest.metadata.copy(
-                customTags = plan.request.saveRequest.metadata.customTags + mapOf(
-                    "stillOutputSize" to outputSizeLabel
-                )
-            )
-        )
-        val updatedRequest = plan.request.copy(
-            saveRequest = updatedSaveRequest
-        )
-        val updatedSaveTask = plan.saveTask.copy(
-            saveRequest = updatedSaveRequest
-        )
-        return plan.copy(
-            request = updatedRequest,
-            saveTask = updatedSaveTask
-        )
-    }
 
     private fun createController(
         modeId: ModeId,
