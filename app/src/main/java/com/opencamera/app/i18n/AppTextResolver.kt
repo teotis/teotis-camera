@@ -260,6 +260,7 @@ open class AppTextResolver(private val context: Context?) {
 
     // Pro controls attribute labels
     open fun rawLabel(): String = str(R.string.label_raw, "RAW")
+    open fun rawSavedOnlyValue(): String = str(R.string.raw_saved_only_value, "Record only")
     open fun isoLabel(): String = str(R.string.label_iso, "ISO")
     open fun shutterLabel(): String = str(R.string.label_shutter, "Shutter")
     open fun evLabel(): String = str(R.string.label_ev, "EV")

@@ -7,7 +7,6 @@ import com.opencamera.app.camera.AndroidPhotoSelfieMirrorEditor
 import com.opencamera.app.camera.AndroidPortraitRenderEditor
 import com.opencamera.app.camera.AndroidPhotoWatermarkEditor
 import com.opencamera.app.camera.AndroidPhotoAlgorithmEditor
-import com.opencamera.app.camera.AndroidVideoWatermarkSubtitleEditor
 import com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitor
 import com.opencamera.app.camera.CameraSessionCoordinator
 import com.opencamera.app.camera.CameraXCaptureAdapter
@@ -19,7 +18,6 @@ import com.opencamera.app.camera.PortraitRenderPostProcessor
 import com.opencamera.app.camera.PhotoAlgorithmPostProcessor
 import com.opencamera.app.camera.PhotoWatermarkPostProcessor
 import com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitor
-import com.opencamera.app.camera.VideoWatermarkSubtitlePostProcessor
 import com.opencamera.app.camera.device.CameraDeviceAdapter
 import com.opencamera.core.effect.CapabilityGraphResolver
 import com.opencamera.core.effect.EffectCapabilityResolver
@@ -79,9 +77,6 @@ class AppContainer(
             ),
             PhotoSelfieMirrorPostProcessor(
                 AndroidPhotoSelfieMirrorEditor(appContext)
-            ),
-            VideoWatermarkSubtitlePostProcessor(
-                AndroidVideoWatermarkSubtitleEditor(appContext)
             ),
             PipelineMetadataPostProcessor()
         )

@@ -1263,7 +1263,11 @@ internal fun runtimeProControlsRenderModel(
         },
         rawControl = FeatureCatalogControlRenderModel(
             label = text.rawLabel(),
-            value = onOffLabel(draft.rawEnabled, text),
+            value = if (manualCapabilities.raw == ManualControlSupport.SAVED_ONLY) {
+                text.rawSavedOnlyValue()
+            } else {
+                onOffLabel(draft.rawEnabled, text)
+            },
             availability = manualCapabilities.raw.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.raw.toSettingsAvailability()),
             supportLabel = manualCapabilities.raw.manualSupportLabel(text),

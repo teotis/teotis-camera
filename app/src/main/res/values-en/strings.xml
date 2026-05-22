@@ -119,6 +119,7 @@
     <string name="label_frame_background">Frame background</string>
     <string name="label_tokens">Tokens</string>
     <string name="label_raw">RAW</string>
+    <string name="raw_saved_only_value">Record only</string>
     <string name="label_iso">ISO</string>
     <string name="label_shutter">Shutter</string>
     <string name="label_ev">EV</string>

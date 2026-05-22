@@ -282,6 +282,7 @@ data class ShotPlan(
 
 sealed interface ThumbnailSource {
     data object None : ThumbnailSource
+    data object Pending : ThumbnailSource
     data class PreviewSnapshot(val outputPath: String) : ThumbnailSource
     data class SavedMedia(
         val outputPath: String,
@@ -331,6 +332,7 @@ data class ShotResult(
 fun ThumbnailSource.outputPathOrNull(): String? {
     return when (this) {
         ThumbnailSource.None -> null
+        ThumbnailSource.Pending -> null
         is ThumbnailSource.PreviewSnapshot -> outputPath
         is ThumbnailSource.SavedMedia -> outputPath
     }
@@ -339,11 +341,19 @@ fun ThumbnailSource.outputPathOrNull(): String? {
 fun ThumbnailSource.renderUriOrNull(): String? {
     return when (this) {
         ThumbnailSource.None -> null
-        is ThumbnailSource.PreviewSnapshot ->
-            outputPath.takeIf { File(it).isAbsolute }?.let { File(it).toURI().toString() }
+        ThumbnailSource.Pending -> null
+        is ThumbnailSource.PreviewSnapshot -> null
         is ThumbnailSource.SavedMedia ->
             renderUri ?: outputPath.takeIf { File(it).isAbsolute }?.let { File(it).toURI().toString() }
     }
+}
+
+fun ShotResult.hasPostProcessFailures(): Boolean =
+    pipelineNotes.any { it.contains(":failed:") }
+
+fun ShotResult.postProcessFailureSummary(): String? {
+    val failures = pipelineNotes.filter { it.contains(":failed:") }
+    return failures.takeIf { it.isNotEmpty() }?.joinToString("; ")
 }
 
 fun LivePhotoBundle.isTemporalMedia(): Boolean {
@@ -436,7 +446,16 @@ class PipelineMetadataPostProcessor : MediaPostProcessor {
             }
         }
 
-        val allNotes = deviceNotes + algorithmNotes + transactionNotes
+        val degradedNotes = buildList {
+            if ((result.pipelineNotes + transactionNotes).any { it == "merge:placeholder" }) {
+                add("degraded:multi-frame-placeholder")
+            }
+            if ((result.pipelineNotes + transactionNotes).any { it == "live:degraded=metadata-only" }) {
+                add("degraded:live-still-only")
+            }
+        }
+
+        val allNotes = deviceNotes + algorithmNotes + transactionNotes + degradedNotes
         if (allNotes.isEmpty()) {
             return result
         }
@@ -1099,10 +1118,16 @@ fun ShotResult.toTransactionResult(
         }
     }
 
+    val transactionStatus = if (hasPostProcessFailures()) {
+        MediaTransactionStatus.PARTIAL_SUCCESS
+    } else {
+        MediaTransactionStatus.SUCCESS
+    }
+
     return MediaSaveTransactionResult(
         primaryOutput = primaryHandle,
         artifacts = artifacts,
-        status = MediaTransactionStatus.SUCCESS,
+        status = transactionStatus,
         cleanupNotes = cleanupNotes
     )
 }

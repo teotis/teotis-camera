@@ -136,11 +136,11 @@ class SessionUiRenderModelTest {
         val state = defaultSessionState(
             latestSavedMediaType = SavedMediaType.VIDEO,
             latestVideoPath = "/tmp/clip.mp4",
-            latestPipelineNotes = listOf("video-watermark:subtitle-created", "torch:on")
+            latestPipelineNotes = listOf("torch:on")
         )
 
         assertEquals(
-            "Last video:\n/tmp/clip.mp4\nPipeline: video-watermark:subtitle-created, torch:on",
+            "Last video:\n/tmp/clip.mp4\nPipeline: torch:on",
             sessionCaptureOutputText(state, strings)
         )
     }

@@ -936,7 +936,7 @@ internal fun detectZoomRatioCapability(
         return fallback
     }
     return ZoomRatioCapability(
-        support = ZoomControlSupport.DISCRETE_PRESET,
+        support = ZoomControlSupport.CONTINUOUS,
         supportedRatios = normalizedRatios,
         defaultRatio = normalizedRatios.firstOrNull { it == 1f } ?: normalizedRatios.first()
     )

@@ -121,6 +121,7 @@
     <string name="label_frame_background">边框背景</string>
     <string name="label_tokens">标记</string>
     <string name="label_raw">RAW</string>
+    <string name="raw_saved_only_value">仅记录</string>
     <string name="label_iso">ISO</string>
     <string name="label_shutter">快门</string>
     <string name="label_ev">EV</string>

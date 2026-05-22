@@ -14,8 +14,11 @@ import com.opencamera.core.device.resolvedZoomRatioSelection
 import com.opencamera.core.device.recoveryReason
 import com.opencamera.core.media.CaptureFeedbackPreview
 import com.opencamera.core.media.CaptureStrategy
+import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LivePhotoBundle
+import com.opencamera.core.media.hasPostProcessFailures
 import com.opencamera.core.media.isTemporalMedia
+import com.opencamera.core.media.postProcessFailureSummary
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotRequest
@@ -1272,14 +1275,25 @@ class DefaultCameraSession(
             previewThumbnailPath = result.thumbnailSource.outputPathOrNull()
                 ?: _state.value.previewThumbnailPath,
             latestThumbnailSource = when (result.thumbnailSource) {
-                ThumbnailSource.None -> _state.value.latestThumbnailSource
+                ThumbnailSource.None -> {
+                    val previous = _state.value.latestThumbnailSource
+                    if (previous == null || previous is ThumbnailSource.Pending) {
+                        ThumbnailSource.Pending
+                    } else {
+                        previous
+                    }
+                }
                 else -> result.thumbnailSource
             },
             lastAction = if (result.mediaType == MediaType.PHOTO) {
-                if (result.livePhotoBundle?.isTemporalMedia() == true) {
-                    "Live photo saved"
-                } else {
-                    "Photo saved"
+                val hasFailures = result.hasPostProcessFailures()
+                when {
+                    result.livePhotoBundle?.bundleStatus == LiveBundleStatus.STILL_ONLY_FALLBACK ->
+                        "Live photo saved (still only)"
+                    result.livePhotoBundle?.isTemporalMedia() == true ->
+                        if (hasFailures) "Live photo saved (degraded)" else "Live photo saved"
+                    hasFailures -> "Photo saved (degraded)"
+                    else -> "Photo saved"
                 }
             } else {
                 "Video saved"
@@ -1302,7 +1316,7 @@ class DefaultCameraSession(
             },
             latestPipelineNotes = result.pipelineNotes,
             pendingCaptureFeedback = null,
-            lastError = null
+            lastError = result.postProcessFailureSummary()
         )
         trace.record(
             if (result.mediaType == MediaType.PHOTO) "capture.saved" else "recording.saved",
@@ -1345,7 +1359,11 @@ class DefaultCameraSession(
         reason: String
     ) {
         val currentActiveShot = _state.value.activeShot
-        if (currentActiveShot == null || currentActiveShot.shotId != shotId) {
+        if (currentActiveShot == null) {
+            trace.record("shot.failed.orphaned", "shotId=$shotId,reason=$reason")
+            return
+        }
+        if (currentActiveShot.shotId != shotId) {
             trace.record("shot.failed.duplicate", "$shotId:$reason")
             return
         }

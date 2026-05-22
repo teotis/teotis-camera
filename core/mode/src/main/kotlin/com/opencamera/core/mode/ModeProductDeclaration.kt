@@ -298,14 +298,7 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
                 kind = CapabilityRequirementKind.VIDEO_RECORDING,
                 unsupportedMessage = "Video mode requires video recording support"
             ),
-            requirements = listOf(
-                ModeCapabilityRequirement(
-                    id = "video-watermark",
-                    kind = CapabilityRequirementKind.WATERMARK_RENDER,
-                    isOptional = true,
-                    degradationDescription = "Video watermark unavailable; recording proceeds without watermark"
-                )
-            ),
+            requirements = emptyList(),
             strategyVariants = listOf(
                 ModeStrategyVariant(
                     id = "video-standard",

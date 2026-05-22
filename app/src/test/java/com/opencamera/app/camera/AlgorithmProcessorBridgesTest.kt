@@ -128,24 +128,6 @@ class AlgorithmProcessorBridgesTest {
         }
     }
 
-    private class RecordingVideoWatermarkEditor(
-        private val result: com.opencamera.app.camera.VideoWatermarkSubtitleEditorResult =
-            com.opencamera.app.camera.VideoWatermarkSubtitleEditorResult.Applied(
-                subtitlePath = "/tmp/sub.srt"
-            )
-    ) : com.opencamera.app.camera.VideoWatermarkSubtitleEditor {
-        var callCount = 0
-            private set
-
-        override suspend fun apply(
-            target: com.opencamera.app.camera.VideoWatermarkSubtitleTarget,
-            watermarkText: String
-        ): com.opencamera.app.camera.VideoWatermarkSubtitleEditorResult {
-            callCount++
-            return result
-        }
-    }
-
     // --- Helpers ---
 
     private fun sampleNode(
@@ -397,40 +379,5 @@ class AlgorithmProcessorBridgesTest {
             PhotoSelfieMirrorPostProcessor(it).toAlgorithmProcessor()
         }
         assertFalse(processor.canProcess(sampleRequest()))
-    }
-
-    // --- VideoWatermarkSubtitlePostProcessor bridge ---
-
-    @Test
-    fun `video watermark bridge type is WATERMARK_RENDER`() {
-        val processor = RecordingVideoWatermarkEditor().let {
-            VideoWatermarkSubtitlePostProcessor(it).toAlgorithmProcessor()
-        }
-        assertEquals(AlgorithmType.WATERMARK_RENDER, processor.type)
-    }
-
-    @Test
-    fun `video watermark canProcess true with video input and watermarkText`() {
-        val processor = RecordingVideoWatermarkEditor().let {
-            VideoWatermarkSubtitlePostProcessor(it).toAlgorithmProcessor()
-        }
-        assertTrue(processor.canProcess(sampleRequest(
-            watermarkText = "travel",
-            inputs = listOf(
-                MediaInputRef(
-                    path = "/tmp/video.mp4",
-                    handle = MediaOutputHandle(displayPath = "/tmp/video.mp4"),
-                    mimeType = "video/mp4"
-                )
-            )
-        )))
-    }
-
-    @Test
-    fun `video watermark canProcess false with image input`() {
-        val processor = RecordingVideoWatermarkEditor().let {
-            VideoWatermarkSubtitlePostProcessor(it).toAlgorithmProcessor()
-        }
-        assertFalse(processor.canProcess(sampleRequest(watermarkText = "travel")))
     }
 }

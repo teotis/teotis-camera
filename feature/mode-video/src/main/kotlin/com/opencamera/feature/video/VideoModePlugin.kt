@@ -172,10 +172,7 @@ private class VideoModeController(
             val activeGraph = currentDeviceGraph()
             val effectSpec = buildEffectSpec()
             val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
-            val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
-            val postProcessSpec = basePostProcess.copy(
-                watermarkText = videoWatermarkText()
-            )
+            val postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec)
             mutableSnapshot.value = buildSnapshot(
                 headline = "Recording requested",
                 detail = "Waiting for Session Kernel to start the ${resolvedVideoSpec.summaryLabel} recording task."
@@ -383,10 +380,6 @@ private class VideoModeController(
         } else {
             "Unified shot pipeline started the ${resolvedVideoSpec.summaryLabel} video recording task. Torch unavailable on this device."
         }
-    }
-
-    private fun videoWatermarkText(): String {
-        return "VIDEO Torch ${if (torchEnabled) "On" else "Off"}"
     }
 
     private fun currentDeviceGraph(): DeviceGraphSpec {

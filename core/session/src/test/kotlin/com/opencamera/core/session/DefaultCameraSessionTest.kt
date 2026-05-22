@@ -882,7 +882,6 @@ class DefaultCameraSessionTest {
         val shot = assertNotNull(session.state.value.activeShot)
         assertEquals("on", shot.saveRequest.metadata.customTags["torch"])
         assertEquals(true, shot.captureProfile.torchEnabled)
-        assertEquals("VIDEO Torch On", shot.postProcessSpec.watermarkText)
         session.dispatch(SessionIntent.ShotStarted(shot))
         advanceUntilIdle()
 
@@ -1000,7 +999,7 @@ class DefaultCameraSessionTest {
         val failedTraces = trace.snapshot().filter { it.name == "recording.failed" }
         assertEquals(1, failedTraces.size)
         assertTrue(failedTraces[0].detail.contains("Recording interrupted by lifecycle stop"))
-        assertTrue(trace.snapshot().any { it.name == "shot.failed.duplicate" })
+        assertTrue(trace.snapshot().any { it.name == "shot.failed.orphaned" })
     }
 
     @Test
@@ -1244,7 +1243,6 @@ class DefaultCameraSessionTest {
         val shot = assertNotNull(session.state.value.activeShot)
         assertEquals("off", shot.saveRequest.metadata.customTags["torch"])
         assertEquals(false, shot.captureProfile.torchEnabled)
-        assertEquals("VIDEO Torch Off", shot.postProcessSpec.watermarkText)
     }
 
     @Test
@@ -1457,7 +1455,7 @@ class DefaultCameraSessionTest {
         )
         advanceUntilIdle()
 
-        assertEquals("Photo saved", session.state.value.lastAction)
+        assertEquals("Live photo saved (still only)", session.state.value.lastAction)
         assertNull(session.state.value.latestLivePhotoBundle)
     }
 

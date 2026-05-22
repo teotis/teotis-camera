@@ -8,7 +8,6 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.ManualControlCapabilityMatrix
 import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.media.MediaProcessorAvailability
-import com.opencamera.core.settings.WatermarkStyleSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -292,32 +291,6 @@ class CapabilityGraphResolverTest {
         val report = r.resolve("pro", listOf(req))
 
         assertEquals(CapabilitySupport.SUPPORTED, report.resolutionFor("pro-raw")?.support)
-    }
-
-    // --- Video Watermark Sidecar ---
-
-    @Test
-    fun `watermark render supported when processor available`() {
-        val r = resolver()
-        val spec = EffectSpec(listOf(WatermarkEffect("t1", emptyMap(), WatermarkStyleSettings())))
-        val req = requirement("video-watermark", CapabilityRequirementKind.WATERMARK_RENDER)
-        val report = r.resolve("video", listOf(req), spec)
-
-        assertEquals(CapabilitySupport.SUPPORTED, report.resolutionFor("video-watermark")?.support)
-    }
-
-    @Test
-    fun `watermark render unsupported when processor unavailable`() {
-        val r = resolver(
-            processors = MediaProcessorAvailability.ALL_AVAILABLE.copy(
-                watermarkRenderAvailable = false
-            )
-        )
-        val spec = EffectSpec(listOf(WatermarkEffect("t1", emptyMap(), WatermarkStyleSettings())))
-        val req = requirement("video-watermark", CapabilityRequirementKind.WATERMARK_RENDER)
-        val report = r.resolve("video", listOf(req), spec)
-
-        assertEquals(CapabilitySupport.UNSUPPORTED, report.resolutionFor("video-watermark")?.support)
     }
 
     // --- Document Geometry ---

@@ -136,14 +136,3 @@ internal fun PhotoSelfieMirrorPostProcessor.toAlgorithmProcessor(): AlgorithmPro
         extractNotes = { result, _ -> extractNotesWithPrefix(result, "selfie-mirror:") }
     )
 }
-
-internal fun VideoWatermarkSubtitlePostProcessor.toAlgorithmProcessor(): AlgorithmProcessor {
-    return toAlgorithmProcessorBridge(
-        algorithmType = AlgorithmType.WATERMARK_RENDER,
-        canDecide = { req ->
-            req.metadata.watermarkText != null &&
-                req.inputs.any { it.mimeType.contains("video") }
-        },
-        extractNotes = { result, _ -> extractNotesWithPrefix(result, "video-subtitle:") }
-    )
-}
