@@ -82,6 +82,9 @@ class CameraSessionCoordinator(
                 reason = effect.reason,
                 clearHost = effect.clearHost
             )
+            is SessionEffect.ApplyPreviewMetering -> cameraAdapter.dispatch(
+                DeviceCommand.ApplyPreviewMetering(effect.request)
+            )
         }
     }
 
@@ -126,6 +129,9 @@ class CameraSessionCoordinator(
                     mediaType = event.mediaType,
                     reason = event.reason
                 )
+            )
+            is DeviceEvent.PreviewMeteringCompleted -> session.dispatch(
+                SessionIntent.PreviewMeteringCompleted(event.result)
             )
         }
     }
