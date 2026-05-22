@@ -403,6 +403,8 @@ internal data class FilterLabPageRenderModel(
     val showFilterItems: Boolean = true,
     val showAdjustmentPanel: Boolean = true,
     val showAdvancedControls: Boolean = true,
+    val styleStrength: Float = 1f,
+    val updateStyleStrengthAction: PersistedSettingsAction? = null,
     val photoTab: FilterLabTabRenderModel,
     val humanisticTab: FilterLabTabRenderModel,
     val portraitTab: FilterLabTabRenderModel,
@@ -1763,7 +1765,7 @@ internal fun filterLabPageRenderModel(
         showFamilyTabs = panelRole == StyleAndColorLabRole.STYLE,
         showFilterItems = panelRole == StyleAndColorLabRole.STYLE,
         showAdjustmentPanel = panelRole == StyleAndColorLabRole.LENS_LAB,
-        showAdvancedControls = panelRole == StyleAndColorLabRole.STYLE,
+        showAdvancedControls = false,
         photoTab = filterLabTabRenderModel(
             family = FilterLabFamily.PHOTO,
             currentFilterId = settings.photo.defaultFilterProfileId,
@@ -1911,6 +1913,10 @@ internal fun filterLabPageRenderModel(
             family = family.family,
             sourceProfileId = currentProfile?.id,
             isEnabled = currentProfile?.builtIn == true
+        ),
+        styleStrength = settings.photo.styleStrength,
+        updateStyleStrengthAction = PersistedSettingsAction.UpdatePhotoStyleStrength(
+            settings.photo.styleStrength.coerceIn(0f, 1f)
         ),
         footer = text.filterLabFooter()
     )

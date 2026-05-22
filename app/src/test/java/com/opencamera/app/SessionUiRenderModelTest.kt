@@ -255,7 +255,7 @@ class SessionUiRenderModelTest {
             )
         )
         assertTrue(summary.contains("Video defaults: 4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich"))
-        assertTrue(summary.contains("Catalog: 16 filters | 3 watermark templates | Live 1500 ms bundle"))
+        assertTrue(summary.contains("Catalog: 18 filters | 3 watermark templates | Live 1500 ms bundle"))
         assertTrue(summary.contains("Manual draft: RAW Off | ISO Auto | S Auto | WB Auto"))
         assertTrue(summary.contains("Action: Still resolution set to 4000x3000"))
     }
@@ -344,7 +344,7 @@ class SessionUiRenderModelTest {
             "4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich",
             model.videoSummary
         )
-        assertEquals("16 filters | 3 watermark templates | Live 1500 ms bundle", model.catalogSummary)
+        assertEquals("18 filters | 3 watermark templates | Live 1500 ms bundle", model.catalogSummary)
         assertEquals("RAW Off | ISO Auto | S Auto | WB Auto", model.manualDraftSummary)
     }
 
@@ -504,7 +504,7 @@ class SessionUiRenderModelTest {
             model.commonSection.gridMode.buttonLabel
         )
         assertEquals(
-            "Default photo filter\nPortrait Retro\nSupported • 16 curated looks",
+            "Default photo filter\nPortrait Retro\nSupported • 18 curated looks",
             model.photoSection.defaultFilter.buttonLabel
         )
         assertEquals(
@@ -1610,7 +1610,7 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `style filter page shows advanced controls`() {
+    fun `style filter page hides advanced controls`() {
         val state = defaultSessionState()
         val model = filterLabPageRenderModel(
             state = state,
@@ -1618,8 +1618,23 @@ class SessionUiRenderModelTest {
             panelRole = StyleAndColorLabRole.STYLE
         )
 
-        assertTrue(model.showAdvancedControls)
+        assertFalse(model.showAdvancedControls)
         assertTrue(model.showFamilyTabs)
         assertTrue(model.showFilterItems)
+    }
+
+    @Test
+    fun `style filter page carries style strength from persisted settings`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = PhotoSettings(styleStrength = 0.5f)
+        )
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+
+        assertEquals(0.5f, model.styleStrength)
+        assertNotNull(model.updateStyleStrengthAction as? PersistedSettingsAction.UpdatePhotoStyleStrength)
     }
 }
