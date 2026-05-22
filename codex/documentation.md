@@ -104,10 +104,32 @@
 - `2026-05-23` 用户新增两张需求单已拆成可交给多个非多模态 agent 的方案包：缩略图点击打开相册失败定位为 `MainActivity` 点击路径仍使用 `latestCapturePath/latestVideoPath + File.exists + FileProvider`，与当前 MediaStore `ThumbnailSource.SavedMedia.renderUri` 脱节；点击预览对焦/自动 EV 定位为手势层已有 `FocusAt` 但 session/device/CameraX 执行链路未接线。新增总索引 [`2026-05-23-thumbnail-gallery-focus-ev-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-thumbnail-gallery-focus-ev-index.md) 以及 5 份执行文档，分别覆盖缩略图 gallery open、tap focus session/device contract、CameraX AF+AE metering、UI reticle/routing 和集成验证；本轮只新增方案文档，未改运行时代码。
 - `2026-05-23` 横竖模式切换需求已沉淀为可交给非多模态 agent 的方案文档 [`2026-05-23-orientation-adaptive-camera-ui.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-orientation-adaptive-camera-ui.md)：核心产品决策是固定 camera cockpit 拓扑，不新增横屏专用布局，改为由物理方向 owner 驱动文字/方向性图案旋转，并把 CameraX output target rotation 通过 `SessionIntent -> SessionEffect -> DeviceCommand` 接入设备层；方案同时吸收 Android CameraX、Apple AVFoundation/Camera Control、OPPO Quick Button 和 vivo X300 Ultra 摄影握持/专业操控资料。本轮只新增方案文档并更新状态文档，未改运行时代码。
 - `2026-05-23` 外部 agent 提出的 `ShotExecutor / ShotGraph` 统一审查已完成核验并沉淀为非多模态执行方案包：结论认可“运行时 `ShotPlan` 与 2.0 `ShotGraph` 并存存在事实源漂移风险”，但不认可一次性删除 `ShotPlan`，因为它仍是 session effect、device command、CameraX adapter、video active plan、device translator 和 `ShotResult` 合成的运行时载体。新增总索引 [`2026-05-23-shot-pipeline-unification-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-pipeline-unification-index.md)，以及 [`2026-05-23-shot-graph-planning-source-of-truth.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-graph-planning-source-of-truth.md)、[`2026-05-23-shot-graph-device-execution-migration.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-graph-device-execution-migration.md) 两份顺序落地方案；本轮只新增方案文档，未改运行时代码。聚焦核验命令 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:media:test --tests com.opencamera.core.media.ShotExecutorTest --tests com.opencamera.core.media.AlgorithmProcessorTest --tests com.opencamera.core.media.AlgorithmJobSchedulerTest :core:mode:test --tests com.opencamera.core.mode.ModeCaptureStrategyGraphTest` 已通过。
+- `2026-05-23` 外部 agent 关于 mode controller 模板化重构的 `.tmp/mode-refactor/v2-*.md` 审查结论已完成仓内核验：重复问题仍成立，但执行口径修正为“先抽 `core/mode` 小 helper/delegate/reducer，不引入 `BaseModeController`”。新增总索引 [`2026-05-23-mode-controller-refactor-v2-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-controller-refactor-v2-index.md) 以及 4 份可交给非多模态 agent 的执行文档，分别覆盖 still capture graph helper、frame ratio delegate、Pro variant state 和 still shot session event reducer；这些包会改同一批 mode plugin 文件，后续应串行实施或由单一 integrator 合并并跑 Stage 7 gate。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-23：Mode Controller 模板化重构 V2 核验与方案文档
+
+- 目标：核验外部 agent 对 `.tmp/mode-refactor/v2-*.md` 的 4 步优化建议是否仍符合当前代码，并输出可直接交给非多模态 agent 的落地方案。
+- 核验结果：
+  6 个 still mode 的 `DeviceGraphSpec.stillCapture(...)`、5 个模式的 frame-ratio 列表/索引/选择、3 个模式的 Pro variant/manual draft 辅助逻辑、6 个 still mode 的 `onSessionEvent` 三分支重复仍存在；
+  不认可直接引入 `BaseModeController`，因为 capture strategy、metadata、postprocess 和 effect spec 仍是各模式最重差异；
+  外部 Step 4 的 headline-only 方案收益偏小，已修订为真正的 `reduceStillShotSessionEvent(...)` reducer；
+  方案还修正了测试依赖口径，要求 `core/mode` 新测试使用 `kotlin.test` / `runBlocking`，全部 shell 命令走 `rtk`。
+- 核心结果：
+  [`2026-05-23-mode-controller-refactor-v2-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-controller-refactor-v2-index.md) 建立核验结论、修正点、实施顺序和冲突边界；
+  [`2026-05-23-mode-refactor-still-capture-graph-helper.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-refactor-still-capture-graph-helper.md) 定义 `stillCaptureDeviceGraph(runtimeState)` 纯函数和 6 个 still controller 迁移；
+  [`2026-05-23-mode-refactor-frame-ratio-delegate.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-refactor-frame-ratio-delegate.md) 定义 `FrameRatioDelegate`，同时保留各模式现有 headline、event prefix 和 effect 更新；
+  [`2026-05-23-mode-refactor-pro-variant-state.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-refactor-pro-variant-state.md) 定义 `ProVariantState`，只收敛共享 Pro/manual 语义，不吞掉 Portrait/Night/Humanistic 的产品文案；
+  [`2026-05-23-mode-refactor-still-shot-session-event-reducer.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-refactor-still-shot-session-event-reducer.md) 定义 still photo session event reducer，并明确 Video 不参与。
+- 验证：
+  本轮只新增方案文档并更新状态文档，未改运行时代码；
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:mode:test` 已作为当前 helper 边界基线通过；
+  已用 `rtk rg` 检查新增方案文档无 `TODO / TBD / fill in / implement later / compileDebugKotlin` 占位词，且所有 Gradle 命令均以 `rtk ./gradlew` 形式出现。
+- 结论：
+  该优化可作为低风险代码健康任务执行，但不属于第 7 阶段稳定性最高优先级；若启动，应按 helper -> delegate -> state -> reducer 串行推进，避免多个 agent 同时改同一批 mode plugin 文件。
 
 ## 2026-05-23：MainActivity 职责下沉核验与方案文档
 
