@@ -65,8 +65,7 @@ class PreviewRecoverySessionProcessorTest {
         val state = MutableStateFlow(initialState)
         val effects = RecordingEffects()
         val trace = InMemorySessionTrace()
-        val stateUpdater = RecordingStateUpdater(state)
-        val mutations = RecordingMutations()
+        val mutations = RecordingMutations(state)
         var countdownActive = false
         val countdownCancellations = mutableListOf<String>()
 
@@ -74,7 +73,6 @@ class PreviewRecoverySessionProcessorTest {
             state = state,
             effects = effects,
             trace = trace,
-            updateState = stateUpdater,
             mutations = mutations,
             countdownInProgress = { countdownActive },
             cancelPendingCountdown = { reason -> countdownCancellations.add(reason) }
@@ -87,35 +85,70 @@ class PreviewRecoverySessionProcessorTest {
         fun allEffects(): List<SessionEffect> = effects.recorded.toList()
     }
 
-    private class RecordingStateUpdater(
+    private class RecordingMutations(
         private val flow: MutableStateFlow<SessionState>
-    ) : SessionStateUpdater {
-        override fun update(transform: (SessionState) -> SessionState) {
-            flow.value = transform(flow.value)
-        }
-    }
-
-    private class RecordingMutations : PreviewSessionMutations {
+    ) : PreviewSessionMutations {
         val calls = mutableListOf<String>()
 
         override fun updatePreviewBlocked(reason: String) {
             calls.add("blocked:$reason")
+            flow.value = flow.value.copy(
+                previewStatus = PreviewStatus.BLOCKED,
+                previewStatusDetail = reason,
+                presentation = flow.value.presentation.copy(
+                    lastAction = "Preview blocked",
+                    lastError = reason
+                )
+            )
         }
 
         override fun updatePreviewStarting(reason: String, isRecovery: Boolean) {
             calls.add("starting:$reason,recovery=$isRecovery")
+            flow.value = flow.value.copy(
+                previewStatus = if (isRecovery) PreviewStatus.RECOVERING else PreviewStatus.STARTING,
+                previewStatusDetail = reason,
+                presentation = flow.value.presentation.copy(
+                    lastAction = if (isRecovery) "Preview recovering" else "Preview starting",
+                    lastError = null
+                )
+            )
         }
 
         override fun updatePreviewActive(firstFrameLatencyMillis: Long) {
             calls.add("active:${firstFrameLatencyMillis}")
+            flow.value = flow.value.copy(
+                previewStatus = PreviewStatus.ACTIVE,
+                previewStatusDetail = null,
+                presentation = flow.value.presentation.copy(
+                    lastAction = "Preview active",
+                    lastError = null
+                )
+            )
         }
 
         override fun updatePreviewError(reason: String, action: String) {
             calls.add("error:$reason,action=$action")
+            flow.value = flow.value.copy(
+                previewStatus = PreviewStatus.ERROR,
+                previewStatusDetail = reason,
+                presentation = flow.value.presentation.copy(
+                    lastAction = action,
+                    lastError = reason
+                )
+            )
         }
 
         override fun updatePreviewStopped(reason: String) {
             calls.add("stopped:$reason")
+            val hasCameraPermission = flow.value.permissionState.cameraGranted
+            flow.value = flow.value.copy(
+                previewStatus = if (hasCameraPermission) PreviewStatus.IDLE else PreviewStatus.BLOCKED,
+                previewStatusDetail = reason,
+                presentation = flow.value.presentation.copy(
+                    lastAction = "Preview stopped",
+                    lastError = if (hasCameraPermission) null else "Camera permission missing"
+                )
+            )
         }
 
         override fun updatePreviewThumbnail(source: ThumbnailSource, generation: Int) {
@@ -132,6 +165,59 @@ class PreviewRecoverySessionProcessorTest {
 
         override fun updatePreviewMeteringCompleted(result: PreviewMeteringResult) {
             calls.add("meteringCompleted:${result.requestId}")
+        }
+
+        override fun updatePreviewHostAttached(lastAction: String) {
+            calls.add("hostAttached:$lastAction")
+            flow.value = flow.value.copy(
+                previewHostAvailable = true,
+                presentation = flow.value.presentation.copy(
+                    lastAction = lastAction,
+                    lastError = null
+                )
+            )
+        }
+
+        override fun updatePreviewHostDetached(reason: String, hasPermission: Boolean) {
+            calls.add("hostDetached:$reason,hasPermission=$hasPermission")
+            flow.value = flow.value.copy(
+                previewHostAvailable = false,
+                previewStatus = if (hasPermission) PreviewStatus.IDLE else PreviewStatus.BLOCKED,
+                previewStatusDetail = reason,
+                presentation = flow.value.presentation.copy(
+                    lastAction = "Preview host detached",
+                    lastError = if (hasPermission) null else "Camera permission missing"
+                )
+            )
+        }
+
+        override fun updatePreviewSurfaceLost(reason: String) {
+            calls.add("surfaceLost:$reason")
+            flow.value = flow.value.copy(
+                previewStatus = PreviewStatus.SURFACE_LOST,
+                previewStatusDetail = reason,
+                presentation = flow.value.presentation.copy(
+                    lastAction = "Preview surface lost",
+                    lastError = reason
+                )
+            )
+        }
+
+        override fun updatePreviewRuntimeError(detail: String, action: String) {
+            calls.add("runtimeError:$detail,action=$action")
+            flow.value = flow.value.copy(
+                previewStatus = PreviewStatus.ERROR,
+                previewStatusDetail = detail,
+                presentation = flow.value.presentation.copy(
+                    lastAction = action,
+                    lastError = detail
+                )
+            )
+        }
+
+        override fun updatePreviewMetrics(metrics: PreviewMetrics) {
+            calls.add("metrics:bind=${metrics.bindCount},recovery=${metrics.recoveryCount}")
+            flow.value = flow.value.copy(previewMetrics = metrics)
         }
     }
 
@@ -332,6 +418,16 @@ class PreviewRecoverySessionProcessorTest {
         harness.dispatch(SessionIntent.PreviewBindingStarted("test", false))
 
         assertTrue(harness.mutations.calls.contains("blocked:test"))
+    }
+
+    @Test
+    fun `PreviewBindingStarted records trace when blocked`() = runTest {
+        val harness = Harness(runningState().copy(
+            permissionState = PermissionState(cameraGranted = false)
+        ))
+        harness.dispatch(SessionIntent.PreviewBindingStarted("test", false))
+
+        assertTrue(harness.trace.snapshot().any { it.name == "preview.blocked" })
     }
 
     @Test

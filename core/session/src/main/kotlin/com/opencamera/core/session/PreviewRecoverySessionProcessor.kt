@@ -23,7 +23,6 @@ internal class PreviewRecoverySessionProcessor(
     private val state: MutableStateFlow<SessionState>,
     private val effects: MutableSharedFlow<SessionEffect>,
     private val trace: SessionTrace,
-    private val updateState: SessionStateUpdater,
     private val mutations: PreviewSessionMutations,
     private val countdownInProgress: () -> Boolean,
     private val cancelPendingCountdown: (String) -> Unit
@@ -57,19 +56,12 @@ internal class PreviewRecoverySessionProcessor(
             requestPreviewBinding(reason = "preview host reattached", isRecovery = false)
             return
         }
-        updateState.update {
-            it.copy(
-                previewHostAvailable = true,
-                presentation = it.presentation.copy(
-                    lastAction = if (pendingPreviewHostRecoveryReason != null) {
-                        "Preview host reattached"
-                    } else {
-                        "Preview host attached"
-                    },
-                    lastError = null
-                )
-            )
+        val lastAction = if (pendingPreviewHostRecoveryReason != null) {
+            "Preview host reattached"
+        } else {
+            "Preview host attached"
         }
+        mutations.updatePreviewHostAttached(lastAction)
         trace.record("preview.host.attached", "lifecycle=${state.value.lifecycle}")
         if (!requestPendingPreviewHostRecovery()) {
             requestPreviewBinding(reason = "preview host attached", isRecovery = false)
@@ -83,21 +75,7 @@ internal class PreviewRecoverySessionProcessor(
         if (state.value.lifecycle == SessionLifecycle.RUNNING) {
             pendingPreviewHostRecoveryReason = reason
         }
-        updateState.update {
-            it.copy(
-                previewHostAvailable = false,
-                previewStatus = if (it.permissionState.cameraGranted) {
-                    PreviewStatus.IDLE
-                } else {
-                    PreviewStatus.BLOCKED
-                },
-                previewStatusDetail = reason,
-                presentation = it.presentation.copy(
-                    lastAction = "Preview host detached",
-                    lastError = if (it.permissionState.cameraGranted) null else "Camera permission missing"
-                )
-            )
-        }
+        mutations.updatePreviewHostDetached(reason, state.value.permissionState.cameraGranted)
         trace.record("preview.host.detached", reason)
         requestPreviewUnbind(reason = reason, clearHost = true)
     }
@@ -128,20 +106,19 @@ internal class PreviewRecoverySessionProcessor(
     ) {
         if (!state.value.permissionState.cameraGranted) {
             mutations.updatePreviewBlocked(reason)
+            trace.record("preview.blocked", reason)
             return
         }
 
         val metrics = state.value.previewMetrics
         mutations.updatePreviewStarting(reason, isRecovery)
-        updateState.update {
-            it.copy(
-                previewMetrics = metrics.copy(
-                    bindCount = metrics.bindCount + 1,
-                    recoveryCount = metrics.recoveryCount + if (isRecovery) 1 else 0,
-                    lastStartReason = reason
-                )
+        mutations.updatePreviewMetrics(
+            metrics.copy(
+                bindCount = metrics.bindCount + 1,
+                recoveryCount = metrics.recoveryCount + if (isRecovery) 1 else 0,
+                lastStartReason = reason
             )
-        }
+        )
         trace.record(
             if (isRecovery) "preview.recovery.started" else "preview.binding.started",
             reason
@@ -159,15 +136,13 @@ internal class PreviewRecoverySessionProcessor(
             firstFrameLatencyMillis
         ).maxOrNull()
         mutations.updatePreviewActive(firstFrameLatencyMillis)
-        updateState.update {
-            it.copy(
-                previewMetrics = metrics.copy(
-                    lastFirstFrameLatencyMillis = firstFrameLatencyMillis,
-                    bestFirstFrameLatencyMillis = bestLatency,
-                    worstFirstFrameLatencyMillis = worstLatency
-                )
+        mutations.updatePreviewMetrics(
+            metrics.copy(
+                lastFirstFrameLatencyMillis = firstFrameLatencyMillis,
+                bestFirstFrameLatencyMillis = bestLatency,
+                worstFirstFrameLatencyMillis = worstLatency
             )
-        }
+        )
         trace.record("preview.first.frame", "${firstFrameLatencyMillis}ms")
     }
 
@@ -188,7 +163,7 @@ internal class PreviewRecoverySessionProcessor(
         trace.record("preview.snapshot.updated", source.outputPathOrNull().orEmpty())
     }
 
-    private suspend fun handleCaptureFeedbackSnapshotUpdated(shotId: String, outputPath: String) {
+    private fun handleCaptureFeedbackSnapshotUpdated(shotId: String, outputPath: String) {
         val activeShot = state.value.activeShot
         if (activeShot == null || activeShot.shotId != shotId) {
             trace.record("capture.feedback.snapshot.skipped", "shotId=$shotId,active=${activeShot?.shotId}")
@@ -212,16 +187,7 @@ internal class PreviewRecoverySessionProcessor(
             handlePreviewError("Preview surface lost during recording: $reason")
             return
         }
-        updateState.update {
-            it.copy(
-                previewStatus = PreviewStatus.SURFACE_LOST,
-                previewStatusDetail = reason,
-                presentation = it.presentation.copy(
-                    lastAction = "Preview surface lost",
-                    lastError = reason
-                )
-            )
-        }
+        mutations.updatePreviewSurfaceLost(reason)
         trace.record("preview.surface.lost", reason)
         requestPreviewBinding(reason = "recover after $reason", isRecovery = true)
     }
@@ -256,22 +222,14 @@ internal class PreviewRecoverySessionProcessor(
         val shouldAttemptRecovery = issue.isRecoverable &&
             !recoveryWasActive &&
             shouldAttemptPreviewErrorRecovery()
-        updateState.update {
-            it.copy(
-                previewStatus = PreviewStatus.ERROR,
-                previewStatusDetail = renderedReason,
-                presentation = it.presentation.copy(
-                    lastAction = when {
-                        recoveryWasActive && issue.isRecoverable -> "Preview recovery failed"
-                        recoveryWasActive -> "Preview recovery failed, manual intervention required"
-                        shouldAttemptRecovery -> "Preview runtime issue, attempting recovery"
-                        issue.isRecoverable -> "Preview runtime issue"
-                        else -> "Preview runtime issue, manual intervention required"
-                    },
-                    lastError = renderedReason
-                )
-            )
+        val action = when {
+            recoveryWasActive && issue.isRecoverable -> "Preview recovery failed"
+            recoveryWasActive -> "Preview recovery failed, manual intervention required"
+            shouldAttemptRecovery -> "Preview runtime issue, attempting recovery"
+            issue.isRecoverable -> "Preview runtime issue"
+            else -> "Preview runtime issue, manual intervention required"
         }
+        mutations.updatePreviewRuntimeError(renderedReason, action)
         trace.record(
             "preview.runtime.issue",
             "kind=${issue.kind.name},recoverable=${issue.isRecoverable},reason=${issue.reason}"
@@ -291,17 +249,7 @@ internal class PreviewRecoverySessionProcessor(
         if (countdownInProgress()) {
             cancelPendingCountdown("Countdown cancelled because preview stopped")
         }
-        val hasCameraPermission = state.value.permissionState.cameraGranted
-        updateState.update {
-            it.copy(
-                previewStatus = if (hasCameraPermission) PreviewStatus.IDLE else PreviewStatus.BLOCKED,
-                previewStatusDetail = reason,
-                presentation = it.presentation.copy(
-                    lastAction = "Preview stopped",
-                    lastError = if (hasCameraPermission) null else "Camera permission missing"
-                )
-            )
-        }
+        mutations.updatePreviewStopped(reason)
         trace.record("preview.stopped", reason)
     }
 

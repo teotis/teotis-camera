@@ -54,6 +54,26 @@ class PreviewSessionMutationsTest {
         override fun updatePreviewMeteringCompleted(result: PreviewMeteringResult) {
             calls.add("meteringCompleted:${result.requestId},status=${result.status}")
         }
+
+        override fun updatePreviewHostAttached(lastAction: String) {
+            calls.add("hostAttached:$lastAction")
+        }
+
+        override fun updatePreviewHostDetached(reason: String, hasPermission: Boolean) {
+            calls.add("hostDetached:$reason,hasPermission=$hasPermission")
+        }
+
+        override fun updatePreviewSurfaceLost(reason: String) {
+            calls.add("surfaceLost:$reason")
+        }
+
+        override fun updatePreviewRuntimeError(detail: String, action: String) {
+            calls.add("runtimeError:$detail,action=$action")
+        }
+
+        override fun updatePreviewMetrics(metrics: PreviewMetrics) {
+            calls.add("metrics:bind=${metrics.bindCount},recovery=${metrics.recoveryCount}")
+        }
     }
 
     @Test
@@ -151,7 +171,42 @@ class PreviewSessionMutationsTest {
     }
 
     @Test
-    fun `all nine methods are callable through interface`() {
+    fun `updatePreviewHostAttached records lastAction`() {
+        val mutations = RecordingMutations()
+        mutations.updatePreviewHostAttached("Preview host attached")
+        assertEquals(listOf("hostAttached:Preview host attached"), mutations.calls)
+    }
+
+    @Test
+    fun `updatePreviewHostDetached records reason and permission`() {
+        val mutations = RecordingMutations()
+        mutations.updatePreviewHostDetached("rotation", hasPermission = true)
+        assertEquals(listOf("hostDetached:rotation,hasPermission=true"), mutations.calls)
+    }
+
+    @Test
+    fun `updatePreviewSurfaceLost records reason`() {
+        val mutations = RecordingMutations()
+        mutations.updatePreviewSurfaceLost("surface destroyed")
+        assertEquals(listOf("surfaceLost:surface destroyed"), mutations.calls)
+    }
+
+    @Test
+    fun `updatePreviewRuntimeError records detail and action`() {
+        val mutations = RecordingMutations()
+        mutations.updatePreviewRuntimeError("camera disconnected", "Preview runtime issue, attempting recovery")
+        assertEquals(listOf("runtimeError:camera disconnected,action=Preview runtime issue, attempting recovery"), mutations.calls)
+    }
+
+    @Test
+    fun `updatePreviewMetrics records metrics`() {
+        val mutations = RecordingMutations()
+        mutations.updatePreviewMetrics(PreviewMetrics(bindCount = 3, recoveryCount = 1))
+        assertEquals(listOf("metrics:bind=3,recovery=1"), mutations.calls)
+    }
+
+    @Test
+    fun `all fourteen methods are callable through interface`() {
         val mutations: PreviewSessionMutations = RecordingMutations()
 
         mutations.updatePreviewBlocked("r")
@@ -165,7 +220,12 @@ class PreviewSessionMutationsTest {
         mutations.updatePreviewMeteringCompleted(
             PreviewMeteringResult("id", PreviewMeteringPoint(0f, 0f), PreviewMeteringResultStatus.FAILED)
         )
+        mutations.updatePreviewHostAttached("attached")
+        mutations.updatePreviewHostDetached("detached", true)
+        mutations.updatePreviewSurfaceLost("lost")
+        mutations.updatePreviewRuntimeError("error", "action")
+        mutations.updatePreviewMetrics(PreviewMetrics())
 
-        assertEquals(9, (mutations as RecordingMutations).calls.size)
+        assertEquals(14, (mutations as RecordingMutations).calls.size)
     }
 }
