@@ -1587,7 +1587,8 @@ class DefaultCameraSession(
         latestSavedMediaType: SavedMediaType? = _state.value.presentation.latestSavedMediaType,
         latestPipelineNotes: List<String> = _state.value.presentation.latestPipelineNotes,
         pendingCaptureFeedback: CaptureFeedbackPreview? = _state.value.presentation.pendingCaptureFeedback,
-        lastError: String? = _state.value.presentation.lastError
+        lastError: String? = _state.value.presentation.lastError,
+        previewMeteringFeedback: PreviewMeteringFeedback? = _state.value.presentation.previewMeteringFeedback
     ) {
         _state.value = _state.value.copy(
             lifecycle = lifecycle,
@@ -1619,7 +1620,8 @@ class DefaultCameraSession(
                 latestLivePhotoBundle = latestLivePhotoBundle,
                 latestSavedMediaType = latestSavedMediaType,
                 latestPipelineNotes = latestPipelineNotes,
-                lastError = lastError
+                lastError = lastError,
+                previewMeteringFeedback = previewMeteringFeedback
             )
         )
     }
