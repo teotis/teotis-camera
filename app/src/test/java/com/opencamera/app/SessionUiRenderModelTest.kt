@@ -1707,6 +1707,40 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `color lab filter page omits style only content`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.COLOR_LAB
+        )
+
+        assertEquals("", model.currentFilterSummary)
+        assertEquals("", model.rosterText)
+        assertEquals("", model.editingHint)
+        assertEquals("", model.footer)
+        assertTrue(model.filterItems.isEmpty(), "Color Lab should not carry hidden style filter rows")
+        assertFalse(model.saveCustomControl.isEnabled, "Color Lab should not expose style custom save state")
+    }
+
+    @Test
+    fun `color lab adjustment panel summarizes persisted color lab spec`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = PhotoSettings(
+                colorLabSpec = ColorLabSpec(colorAxis = 0.42f, toneAxis = -0.18f)
+            )
+        )
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.COLOR_LAB
+        )
+
+        assertEquals("Warm / Deep Contrast", model.adjustmentPanel.selectedProfileLabel)
+        assertEquals("", model.adjustmentPanel.lightPalette.summary)
+    }
+
+    @Test
     fun `style filter page shows mode toggle button`() {
         val state = defaultSessionState()
         val model = filterLabPageRenderModel(
@@ -1716,6 +1750,24 @@ class SessionUiRenderModelTest {
         )
 
         assertTrue(model.showModeToggle, "Style Lab should show mode toggle button")
+    }
+
+    @Test
+    fun `style filter family tabs use short family labels`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+
+        assertEquals("Photo", model.photoTab.label)
+        assertEquals("Humanistic", model.humanisticTab.label)
+        assertEquals("Portrait", model.portraitTab.label)
+        assertEquals("Video", model.videoTab.label)
+        listOf(model.photoTab, model.humanisticTab, model.portraitTab, model.videoTab).forEach { tab ->
+            assertFalse(tab.label.contains('\n'), "Family tab labels must fit one compact line: ${tab.label}")
+        }
     }
 
     @Test

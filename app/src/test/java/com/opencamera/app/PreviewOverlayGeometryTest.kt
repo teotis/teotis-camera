@@ -130,6 +130,19 @@ class PreviewOverlayGeometryTest {
         assertApprox(24f, rect.left)
     }
 
+    @Test
+    fun `active capture frame stays centered in full preview content despite bottom controls`() {
+        val rect = computeFrameRect(
+            viewWidth = 1080,
+            viewHeight = 2400,
+            ratioWidth = 4,
+            ratioHeight = 3,
+            bottomInsetPx = 120f
+        )
+
+        assertEquals(1200f, rect.centerY, 1f)
+    }
+
     // --- gridLinePositions tests ---
 
     @Test

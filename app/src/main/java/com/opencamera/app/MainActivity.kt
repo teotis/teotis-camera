@@ -143,6 +143,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var filterHeroSummary: TextView
     private lateinit var filterCurrentSummary: TextView
     private lateinit var filterSectionFiltersTitle: TextView
+    private lateinit var filterSelectionCard: LinearLayout
     private lateinit var filterSelectionList: LinearLayout
     private lateinit var filterEditingHint: TextView
     private lateinit var filterFooter: TextView
@@ -322,6 +323,7 @@ class MainActivity : AppCompatActivity() {
         filterHeroSummary = findViewById(R.id.filterHeroSummary)
         filterCurrentSummary = findViewById(R.id.filterCurrentSummary)
         filterSectionFiltersTitle = findViewById(R.id.filterSectionFiltersTitle)
+        filterSelectionCard = findViewById(R.id.filterSelectionCard)
         filterSelectionList = findViewById(R.id.filterSelectionList)
         filterEditingHint = findViewById(R.id.filterEditingHint)
         filterFooter = findViewById(R.id.filterFooter)
@@ -1119,10 +1121,12 @@ class MainActivity : AppCompatActivity() {
         if (model.showFilterItems) {
             renderFilterSelectionList(model)
             renderSaveCustomControl(model.saveCustomControl, model.editingEnabled)
+            filterSelectionCard.isVisible = true
             filterCurrentSummary.isVisible = true
             filterSectionFiltersTitle.isVisible = true
         } else {
             filterSelectionList.removeAllViews()
+            filterSelectionCard.isVisible = false
             filterCurrentSummary.isVisible = false
             filterSectionFiltersTitle.isVisible = false
             buttonFilterSaveCustom.isVisible = false
@@ -1149,6 +1153,9 @@ class MainActivity : AppCompatActivity() {
         model: FilterLabTabRenderModel
     ) {
         button.text = model.label
+        button.isSingleLine = true
+        button.maxLines = 1
+        button.ellipsize = android.text.TextUtils.TruncateAt.END
         button.isEnabled = !model.isSelected
         button.alpha = if (model.isSelected) 1f else 0.84f
     }
@@ -1255,7 +1262,10 @@ class MainActivity : AppCompatActivity() {
             buttonFilterModeToggle.text = getString(R.string.button_color_lab_reset)
             buttonFilterModeToggle.isEnabled = true
         }
-        filterPaletteSummary.text = "${model.selectedProfileLabel}\n${model.lightPalette.summary}"
+        filterPaletteSummary.text = listOf(
+            model.selectedProfileLabel,
+            model.lightPalette.summary
+        ).filter { value -> value.isNotBlank() }.joinToString(separator = "\n")
         filterPaletteHint.text = model.lightPalette.supportingText
         filterPaletteSurface.isVisible = model.mode == FilterAdjustmentMode.LIGHT
         filterPaletteHint.isVisible = model.mode == FilterAdjustmentMode.LIGHT
