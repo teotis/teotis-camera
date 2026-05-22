@@ -1878,17 +1878,11 @@ internal fun filterLabPageRenderModel(
         },
         supportingText = text.filterLabSupportingText(),
         heroSummary = "",
-        currentFilterSummary = buildString {
-            append(text.filterLabCurrentDefault(currentFilterLabel))
-            currentProfile?.renderSpec?.let { renderSpec ->
-                append(" | ")
-                append(renderSpec.compactSummary())
-            }
-        },
+        currentFilterSummary = text.filterLabCurrentDefault(currentFilterLabel),
         rosterText = family.filters.joinToString(separator = "\n") { profile ->
             val marker = if (profile.id == family.currentFilterId) "•" else "·"
             val customBadge = if (profile.builtIn) "" else text.statusCustomBadge()
-            "$marker ${profile.label}${customBadge} | ${profile.renderSpec?.compactSummary() ?: text.rendererPending()}"
+            "$marker ${profile.label}${customBadge}"
         },
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
@@ -2025,6 +2019,11 @@ internal fun filterLabPageRenderModel(
             } else {
                 SettingsControlAvailability.UNSUPPORTED
             },
+            availabilityLabel = text.availabilityLabel(if (family.supported && family.filters.isNotEmpty()) {
+                SettingsControlAvailability.SUPPORTED
+            } else {
+                SettingsControlAvailability.UNSUPPORTED
+            }),
             supportLabel = when {
                 !family.supported -> family.unsupportedReason
                 family.filters.isEmpty() -> text.noCompatibleLooks()

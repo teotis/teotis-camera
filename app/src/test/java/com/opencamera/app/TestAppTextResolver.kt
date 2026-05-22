@@ -93,7 +93,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun switchToBack(): String = "Switch to Back"
     override fun singleLens(): String = "Single Lens"
     override fun tone(): String = "Tone"
-    override fun styleEntry(): String = "Style"
+    override fun styleEntry(): String = "Lens"
     override fun stylePanelTitle(): String = "Style"
     override fun colorLabPanelTitle(): String = "Color Lab"
     override fun useThisStyle(): String = "Use Style"
@@ -366,7 +366,21 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun settingsActionUnsupported(): String = "Action not supported in current mode"
 
     // Color lab summary
-    override fun colorToneSummary(colorAxis: Float, toneAxis: Float): String = "Color: ${"%.2f".format(colorAxis)}, Tone: ${"%.2f".format(toneAxis)}"
+    override fun colorToneSummary(colorAxis: Float, toneAxis: Float): String {
+        val colorLabel = when {
+            colorAxis > 0.6f -> levelWarmPlus()
+            colorAxis > 0.08f -> levelWarm()
+            colorAxis < -0.6f -> levelCoolPlus()
+            colorAxis < -0.08f -> levelCool()
+            else -> colorNeutral()
+        }
+        val toneLabel = when {
+            toneAxis > 0.08f -> toneSoftLift()
+            toneAxis < -0.08f -> toneDeepContrast()
+            else -> toneBalanced()
+        }
+        return "$colorLabel / $toneLabel"
+    }
 
     override fun availabilityLabel(value: SettingsControlAvailability): String = when (value) {
         SettingsControlAvailability.SUPPORTED -> "可用"

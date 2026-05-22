@@ -502,23 +502,23 @@ class SessionUiRenderModelTest {
         assertEquals("", model.heroSummary)
         assertTrue(model.editingEnabled)
         assertEquals(
-            "Composition grid\n3x3\nSupported • Cycle 3 layouts",
+            "Composition grid\n3x3\n可用 • Cycle 3 layouts",
             model.commonSection.gridMode.buttonLabel
         )
         assertEquals(
-            "Default photo filter\nPortrait Retro\nSupported • 18 curated looks",
+            "Default photo filter\nPortrait Retro\n可用 • 18 curated looks",
             model.photoSection.defaultFilter.buttonLabel
         )
         assertEquals(
-            "Portrait Lab\nNative Portrait / Authentic / Natural\nDegraded • Open profile + beauty + bokeh tuning",
+            "Portrait Lab\nNative Portrait / Authentic / Natural\n部分支持 • Open profile + beauty + bokeh tuning",
             model.photoSection.portraitLab.buttonLabel
         )
         assertEquals(
-            "Watermark Lab\nTravel Polaroid\nDegraded • Open selector + per-template tuning; 3 templates",
+            "Watermark Lab\nTravel Polaroid\n部分支持 • Open selector + per-template tuning; 3 templates",
             model.photoSection.watermarkTemplate.buttonLabel
         )
         assertEquals(
-            "Resolution\n4K\nSupported • 4 options",
+            "Resolution\n4K\n可用 • 4 options",
             model.videoSection.resolution.buttonLabel
         )
         assertEquals(
@@ -808,7 +808,7 @@ class SessionUiRenderModelTest {
 
         assertTrue(model.humanisticTab.isSelected)
         assertEquals(
-            "Next Humanistic look\nHumanistic Street\nSupported • 5 looks | import/export deferred",
+            "Next Humanistic look\nHumanistic Street\n可用 • 5 looks | import/export deferred",
             model.cycleControl.buttonLabel
         )
         assertEquals(
@@ -1526,6 +1526,37 @@ class SessionUiRenderModelTest {
             assertTrue(item.supportingText.contains("Photo") || item.supportingText.contains("Humanistic"),
                 "Filter item supporting text should contain family label: ${item.supportingText}")
         }
+    }
+
+    @Test
+    fun `user-facing panels do not leak raw render spec internals`() {
+        val state = defaultSessionState()
+        val filterModel = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+        val settingsModel = sessionSettingsPageRenderModel(state, TestAppTextResolver())
+
+        val rawPatterns = listOf("B ", "C ", "S ", "W ", "Mono", "Vig", "Tint ", "Halo ")
+
+        // Filter lab currentFilterSummary must not contain raw params
+        rawPatterns.forEach { pattern ->
+            assertFalse(filterModel.currentFilterSummary.contains(pattern),
+                "currentFilterSummary should not contain raw pattern '$pattern': ${filterModel.currentFilterSummary}")
+        }
+
+        // Filter lab rosterText must not contain raw params
+        rawPatterns.forEach { pattern ->
+            assertFalse(filterModel.rosterText.contains(pattern),
+                "rosterText should not contain raw pattern '$pattern': ${filterModel.rosterText}")
+        }
+
+        // Settings page availability labels must use localized text, not English enum names
+        assertFalse(settingsModel.commonSection.gridMode.buttonLabel.contains("Supported"),
+            "Settings buttonLabel should not contain English 'Supported'")
+        assertFalse(settingsModel.photoSection.livePhoto.buttonLabel.contains("Degraded"),
+            "Settings buttonLabel should not contain English 'Degraded'")
     }
 
     @Test

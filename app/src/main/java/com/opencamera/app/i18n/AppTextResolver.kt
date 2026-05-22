@@ -111,7 +111,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun switchToBack(): String = str(R.string.button_switch_to_back, "Switch to Back")
     open fun singleLens(): String = str(R.string.button_single_lens, "Single Lens")
     open fun tone(): String = str(R.string.label_tone, "Tone")
-    open fun styleEntry(): String = str(R.string.button_style_entry, "Style")
+    open fun styleEntry(): String = str(R.string.button_palette_entry, "Lens")
     open fun colorLabEntry(): String = str(R.string.button_color_lab_entry, "Color Lab")
     open fun stylePanelTitle(): String = str(R.string.style_panel_title, "Style")
     open fun colorLabPanelTitle(): String = str(R.string.color_lab_panel_title, "Color Lab")
@@ -489,8 +489,21 @@ open class AppTextResolver(private val context: Context?) {
     open fun settingsActionUnsupported(): String = str(R.string.settings_action_unsupported, "Action not supported in current mode")
 
     // Color lab summary
-    open fun colorToneSummary(colorAxis: Float, toneAxis: Float): String =
-        String.format(str(R.string.format_color_tone, "Color: %.2f, Tone: %.2f"), colorAxis, toneAxis)
+    open fun colorToneSummary(colorAxis: Float, toneAxis: Float): String {
+        val colorLabel = when {
+            colorAxis > 0.6f -> levelWarmPlus()
+            colorAxis > 0.08f -> levelWarm()
+            colorAxis < -0.6f -> levelCoolPlus()
+            colorAxis < -0.08f -> levelCool()
+            else -> colorNeutral()
+        }
+        val toneLabel = when {
+            toneAxis > 0.08f -> toneSoftLift()
+            toneAxis < -0.08f -> toneDeepContrast()
+            else -> toneBalanced()
+        }
+        return "$colorLabel / $toneLabel"
+    }
 
     open fun languageDisplayName(settings: PersistedSettings): String = when (settings.common.appLanguage) {
         AppLanguage.ZH -> str(R.string.app_name, "OpenCamera")
