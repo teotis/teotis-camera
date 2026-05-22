@@ -147,17 +147,36 @@ class DefaultCameraSession(
 
     private suspend fun process(intent: SessionIntent) {
         trace.record("intent.received", intent.toString())
+        when (intent.owner()) {
+            SessionIntentOwner.LIFECYCLE -> processLifecycleIntent(intent)
+            SessionIntentOwner.MODE_CONTROL -> processModeControlIntent(intent)
+            SessionIntentOwner.PREVIEW_RECOVERY -> processPreviewRecoveryIntent(intent)
+            SessionIntentOwner.CAPTURE_RECORDING -> processCaptureRecordingIntent(intent)
+            SessionIntentOwner.DIAGNOSTICS -> processDiagnosticsIntent(intent)
+        }
+    }
+
+    private suspend fun processLifecycleIntent(intent: SessionIntent) {
         when (intent) {
             SessionIntent.Boot -> handleBoot()
             SessionIntent.Shutdown -> handleShutdown()
+            is SessionIntent.PermissionsUpdated -> handlePermissionsUpdated(
+                cameraGranted = intent.cameraGranted,
+                microphoneGranted = intent.microphoneGranted
+            )
+            is SessionIntent.DeviceCapabilitiesUpdated -> handleDeviceCapabilitiesUpdated(intent.capabilities)
+            else -> error("Unexpected lifecycle intent: $intent")
+        }
+    }
+
+    private suspend fun processModeControlIntent(intent: SessionIntent) {
+        when (intent) {
             is SessionIntent.SettingsUpdated -> handleSettingsUpdated(intent.snapshot)
             is SessionIntent.SwitchMode -> handleSwitchMode(intent.modeId)
             SessionIntent.ShutterPressed -> handleModeIntent(ModeIntent.ShutterPressed)
             SessionIntent.SecondaryActionPressed -> handleModeIntent(ModeIntent.SecondaryActionPressed)
             SessionIntent.TertiaryActionPressed -> handleModeIntent(ModeIntent.TertiaryActionPressed)
             SessionIntent.ProActionPressed -> handleModeIntent(ModeIntent.ProActionPressed)
-            is SessionIntent.CountdownTick -> handleCountdownTick(intent.remainingSeconds)
-            SessionIntent.CountdownCompleted -> handleCountdownCompleted()
             SessionIntent.LensFacingToggled -> handleLensFacingToggled()
             SessionIntent.ZoomRatioToggled -> handleZoomRatioToggled()
             is SessionIntent.ApplyZoomRatio -> handleApplyZoomRatio(intent.ratio)
@@ -165,32 +184,36 @@ class DefaultCameraSession(
             SessionIntent.StillCaptureResolutionToggled -> handleStillCaptureResolutionToggled()
             SessionIntent.PreviewRatioToggled -> handlePreviewRatioToggled()
             is SessionIntent.FrameRatioSelected -> handleModeIntent(ModeIntent.FrameRatioSelected(intent.ratio))
-            is SessionIntent.DeviceCapabilitiesUpdated -> handleDeviceCapabilitiesUpdated(
-                intent.capabilities
-            )
-            is SessionIntent.PermissionsUpdated -> handlePermissionsUpdated(
-                cameraGranted = intent.cameraGranted,
-                microphoneGranted = intent.microphoneGranted
-            )
+            is SessionIntent.OutputRotationChanged -> handleOutputRotationChanged(intent.rotation)
+            else -> error("Unexpected mode control intent: $intent")
+        }
+    }
+
+    private suspend fun processPreviewRecoveryIntent(intent: SessionIntent) {
+        when (intent) {
             SessionIntent.PreviewHostAttached -> handlePreviewHostAttached()
             is SessionIntent.PreviewHostDetached -> handlePreviewHostDetached(intent.reason)
             is SessionIntent.PreviewBindingStarted -> handlePreviewBindingStarted(
                 reason = intent.reason,
                 isRecovery = intent.isRecovery
             )
-            is SessionIntent.PreviewFirstFrameAvailable -> handlePreviewFirstFrameAvailable(
-                intent.firstFrameLatencyMillis
-            )
-            is SessionIntent.PreviewSnapshotUpdated -> handlePreviewSnapshotUpdated(
-                intent.source, intent.generation
-            )
-            is SessionIntent.CaptureFeedbackSnapshotUpdated -> handleCaptureFeedbackSnapshotUpdated(
-                intent.shotId, intent.outputPath
-            )
+            is SessionIntent.PreviewFirstFrameAvailable -> handlePreviewFirstFrameAvailable(intent.firstFrameLatencyMillis)
+            is SessionIntent.PreviewSnapshotUpdated -> handlePreviewSnapshotUpdated(intent.source, intent.generation)
+            is SessionIntent.CaptureFeedbackSnapshotUpdated -> handleCaptureFeedbackSnapshotUpdated(intent.shotId, intent.outputPath)
             is SessionIntent.PreviewSurfaceLost -> handlePreviewSurfaceLost(intent.reason)
             is SessionIntent.PreviewError -> handlePreviewError(intent.reason)
             is SessionIntent.PreviewRuntimeIssue -> handlePreviewRuntimeIssue(intent.issue)
             is SessionIntent.PreviewStopped -> handlePreviewStopped(intent.reason)
+            is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
+            is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
+            else -> error("Unexpected preview recovery intent: $intent")
+        }
+    }
+
+    private suspend fun processCaptureRecordingIntent(intent: SessionIntent) {
+        when (intent) {
+            is SessionIntent.CountdownTick -> handleCountdownTick(intent.remainingSeconds)
+            SessionIntent.CountdownCompleted -> handleCountdownCompleted()
             is SessionIntent.ShotStarted -> handleShotStarted(intent.shot)
             is SessionIntent.ShotCompleted -> handleShotCompleted(intent.result)
             is SessionIntent.ShotFailed -> handleShotFailed(
@@ -198,11 +221,17 @@ class DefaultCameraSession(
                 mediaType = intent.mediaType,
                 reason = intent.reason
             )
-            is SessionIntent.ThermalStateChanged -> trace.record("intent.thermal", intent.thermalState.toString())
-            is SessionIntent.PerformanceClassChanged -> trace.record("intent.performance", intent.performanceClass.toString())
-            is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
-            is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
-            is SessionIntent.OutputRotationChanged -> handleOutputRotationChanged(intent.rotation)
+            else -> error("Unexpected capture recording intent: $intent")
+        }
+    }
+
+    private fun processDiagnosticsIntent(intent: SessionIntent) {
+        when (intent) {
+            is SessionIntent.ThermalStateChanged ->
+                trace.record("intent.thermal", intent.thermalState.toString())
+            is SessionIntent.PerformanceClassChanged ->
+                trace.record("intent.performance", intent.performanceClass.toString())
+            else -> error("Unexpected diagnostics intent: $intent")
         }
     }
 
