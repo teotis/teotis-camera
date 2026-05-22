@@ -984,13 +984,13 @@ class SessionUiRenderModelTest {
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
-        assertEquals("Handheld", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
+        assertEquals("Balanced", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
         assertEquals(
-            "Scenery style, Pro variant, night fusion, frame ratio",
+            "Scenery style, Pro variant, brightening fallback, frame ratio",
             model.items.first { it.modeId == ModeId.NIGHT }.declaredSubfeatures
         )
         assertEquals(
-            "• Scenery | Default Handheld | Scenery style, Pro variant, night fusion, frame ratio",
+            "• Scenery | Default Balanced | Scenery style, Pro variant, brightening fallback, frame ratio",
             modeDirectoryText(state, TestAppTextResolver()).lineSequence().elementAt(1)
         )
     }

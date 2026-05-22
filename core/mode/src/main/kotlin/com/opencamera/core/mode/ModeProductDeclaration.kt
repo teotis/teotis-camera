@@ -298,7 +298,14 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
                 kind = CapabilityRequirementKind.VIDEO_RECORDING,
                 unsupportedMessage = "Video mode requires video recording support"
             ),
-            requirements = emptyList(),
+            requirements = listOf(
+                ModeCapabilityRequirement(
+                    id = "video-recording",
+                    kind = CapabilityRequirementKind.VIDEO_RECORDING,
+                    isOptional = true,
+                    degradationDescription = "Video recording not available"
+                )
+            ),
             strategyVariants = listOf(
                 ModeStrategyVariant(
                     id = "video-standard",
