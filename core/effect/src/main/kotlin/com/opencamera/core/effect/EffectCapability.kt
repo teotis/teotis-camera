@@ -1,7 +1,5 @@
 package com.opencamera.core.effect
 
-import com.opencamera.core.device.DeviceCapabilities
-
 enum class EffectSupport { SUPPORTED, DEGRADED, UNSUPPORTED }
 
 data class EffectCapabilityResult(
@@ -15,8 +13,22 @@ data class CapabilityReport(
     val effectiveSpec: EffectSpec
 )
 
+interface EffectCapabilityQuery {
+    fun supportsPortraitDepth(): Boolean
+    fun supportsDocumentGeometry(): Boolean
+    fun supportsManualControls(): Boolean
+
+    companion object {
+        val DefaultSupported = object : EffectCapabilityQuery {
+            override fun supportsPortraitDepth(): Boolean = true
+            override fun supportsDocumentGeometry(): Boolean = true
+            override fun supportsManualControls(): Boolean = true
+        }
+    }
+}
+
 class EffectCapabilityResolver(
-    private val deviceCapabilities: DeviceCapabilities
+    private val capabilities: EffectCapabilityQuery = EffectCapabilityQuery.DefaultSupported
 ) {
     fun resolve(spec: EffectSpec): CapabilityReport {
         val results = spec.entries.map { resolveEntry(it) }
@@ -41,7 +53,7 @@ class EffectCapabilityResolver(
     }
 
     private fun resolvePortrait(entry: PortraitEffect): EffectCapabilityResult {
-        return if (deviceCapabilities.supportsPortraitDepthEffect) {
+        return if (capabilities.supportsPortraitDepth()) {
             EffectCapabilityResult(entry, EffectSupport.SUPPORTED)
         } else {
             val degraded = entry.copy(renderPath = "focus")
@@ -54,7 +66,7 @@ class EffectCapabilityResolver(
     }
 
     private fun resolveDocument(entry: DocumentEffect): EffectCapabilityResult {
-        return if (deviceCapabilities.supportsDocumentScanEnhancement) {
+        return if (capabilities.supportsDocumentGeometry()) {
             EffectCapabilityResult(entry, EffectSupport.SUPPORTED)
         } else {
             val degraded = entry.copy(autoCrop = false, contrastProfile = null)

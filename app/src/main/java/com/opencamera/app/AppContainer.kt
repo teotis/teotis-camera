@@ -100,7 +100,9 @@ class AppContainer(
         mediaPostProcessor = mediaPostProcessor
     )
 
-    val effectCapabilityResolver = EffectCapabilityResolver(cameraAdapter.capabilities)
+    val effectCapabilityResolver = EffectCapabilityResolver(
+        cameraAdapter.capabilities.asEffectCapabilityQuery()
+    )
     val capabilityGraphResolver = CapabilityGraphResolver(
         deviceCapabilities = cameraAdapter.capabilities,
         mediaProcessors = MediaProcessorAvailability.ALL_AVAILABLE
