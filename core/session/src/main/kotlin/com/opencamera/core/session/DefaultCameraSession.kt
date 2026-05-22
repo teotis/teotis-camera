@@ -79,8 +79,6 @@ class DefaultCameraSession(
     private var sessionStillCaptureResolutionPreset = initialStillCaptureResolutionPreset
     private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
     private var sessionSettingsSnapshot = settingsSnapshot
-    private var pendingPreviewHostRecoveryReason: String? = null
-    private var meteringCounter: Int = 0
     private var currentController: ModeController = createController(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
