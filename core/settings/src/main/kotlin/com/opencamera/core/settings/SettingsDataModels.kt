@@ -182,7 +182,7 @@ data class CommonSettings(
 )
 
 data class PhotoSettings(
-    val defaultFilterProfileId: String = "photo-vivid",
+    val defaultFilterProfileId: String = "photo-original",
     val defaultHumanisticFilterProfileId: String = "humanistic-original",
     val defaultPortraitFilterProfileId: String = "portrait-original",
     val portraitProfile: PortraitProfile = PortraitProfile.NATIVE,
@@ -216,7 +216,7 @@ data class PhotoSettings(
 
 data class VideoSettings(
     val defaultVideoSpec: VideoSpec = VideoSpec(),
-    val defaultFilterProfileId: String = "photo-vivid"
+    val defaultFilterProfileId: String = "photo-original"
 )
 
 data class PersistedSettings(
