@@ -97,7 +97,6 @@ class PreviewOverlayView @JvmOverloads constructor(
     private val reticleTickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 2f * density
-        color = Color.rgb(255, 191, 0)
     }
 
     private var vignetteGradient: android.graphics.RadialGradient? = null
@@ -340,6 +339,7 @@ class PreviewOverlayView @JvmOverloads constructor(
             FocusReticleStatus.DEGRADED -> {
                 reticleRingPaint.color = Color.rgb(255, 191, 0)
                 canvas.drawCircle(cx, cy, radius, reticleRingPaint)
+                reticleTickPaint.color = Color.rgb(255, 191, 0)
                 // Short tick marks at cardinal positions
                 canvas.drawLine(cx, cy - radius - tickLength, cx, cy - radius, reticleTickPaint)
                 canvas.drawLine(cx, cy + radius, cx, cy + radius + tickLength, reticleTickPaint)
