@@ -80,7 +80,7 @@ internal class PreviewRecoverySessionProcessor(
         requestPreviewUnbind(reason = reason, clearHost = true)
     }
 
-    private suspend fun requestPendingPreviewHostRecovery(): Boolean {
+    suspend fun requestPendingPreviewHostRecovery(): Boolean {
         val hostRecoveryReason = pendingPreviewHostRecoveryReason ?: return false
         val snapshot = state.value
         if (
@@ -302,9 +302,9 @@ internal class PreviewRecoverySessionProcessor(
         trace.record(traceLabel, "requestId=${result.requestId}")
     }
 
-    // -- Helpers --
+    // -- Helpers (also called from DefaultCameraSession lifecycle handlers) --
 
-    private suspend fun requestPreviewBinding(
+    suspend fun requestPreviewBinding(
         reason: String,
         isRecovery: Boolean = false
     ) {
@@ -327,7 +327,7 @@ internal class PreviewRecoverySessionProcessor(
         )
     }
 
-    private suspend fun requestPreviewUnbind(
+    suspend fun requestPreviewUnbind(
         reason: String,
         clearHost: Boolean
     ) {

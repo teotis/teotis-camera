@@ -4,19 +4,15 @@ import com.opencamera.core.device.CameraOutputRotation
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
-import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.PreviewMeteringPoint
-import com.opencamera.core.device.PreviewMeteringRequest
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
-import com.opencamera.core.device.displayReason
 import com.opencamera.core.device.nextZoomRatio
 import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.device.resolvedZoomRatioSelection
-import com.opencamera.core.device.recoveryReason
 import com.opencamera.core.media.CaptureFeedbackPreview
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.LivePhotoBundle
@@ -133,6 +129,147 @@ class DefaultCameraSession(
         dispatch = { intent -> dispatch(intent) }
     )
 
+    private val previewSessionMutations = object : PreviewSessionMutations {
+        override fun updatePreviewBlocked(reason: String) {
+            updateState(
+                previewStatus = PreviewStatus.BLOCKED,
+                previewStatusDetail = reason,
+                lastAction = "Preview blocked until camera permission is granted",
+                lastError = "Camera permission missing"
+            )
+        }
+
+        override fun updatePreviewStarting(reason: String, isRecovery: Boolean) {
+            updateState(
+                previewStatus = if (isRecovery) PreviewStatus.RECOVERING else PreviewStatus.STARTING,
+                previewStatusDetail = reason,
+                lastAction = if (isRecovery) "Recovering preview" else "Starting preview",
+                lastError = null
+            )
+        }
+
+        override fun updatePreviewActive(firstFrameLatencyMillis: Long) {
+            updateState(
+                previewStatus = PreviewStatus.ACTIVE,
+                lastAction = "Preview active (${firstFrameLatencyMillis} ms first frame)",
+                lastError = null
+            )
+        }
+
+        override fun updatePreviewError(reason: String, action: String) {
+            updateState(
+                previewStatus = PreviewStatus.ERROR,
+                previewStatusDetail = reason,
+                lastAction = action,
+                lastError = reason
+            )
+        }
+
+        override fun updatePreviewStopped(reason: String) {
+            val hasCameraPermission = _state.value.permissionState.cameraGranted
+            updateState(
+                previewStatus = if (hasCameraPermission) PreviewStatus.IDLE else PreviewStatus.BLOCKED,
+                previewStatusDetail = reason,
+                lastAction = "Preview stopped",
+                lastError = if (hasCameraPermission) null else "Camera permission missing"
+            )
+        }
+
+        override fun updatePreviewThumbnail(source: ThumbnailSource, generation: Int) {
+            updateState(
+                previewThumbnailPath = source.outputPathOrNull(),
+                latestThumbnailSource = source,
+                previewSnapshotGeneration = generation
+            )
+        }
+
+        override fun updateCaptureFeedback(shotId: String, outputPath: String) {
+            updateState(
+                pendingCaptureFeedback = CaptureFeedbackPreview(
+                    shotId = shotId,
+                    outputPath = outputPath
+                ),
+                lastAction = "Capture feedback ready"
+            )
+        }
+
+        override fun updatePreviewMeteringRequested(requestId: String, point: PreviewMeteringPoint) {
+            updateState(
+                previewMeteringFeedback = PreviewMeteringFeedback(
+                    requestId = requestId,
+                    normalizedX = point.normalizedX,
+                    normalizedY = point.normalizedY,
+                    status = PreviewMeteringFeedbackStatus.REQUESTED
+                )
+            )
+        }
+
+        override fun updatePreviewMeteringCompleted(result: PreviewMeteringResult) {
+            val currentFeedback = _state.value.presentation.previewMeteringFeedback ?: return
+            val feedbackStatus = when (result.status) {
+                PreviewMeteringResultStatus.SUCCEEDED -> PreviewMeteringFeedbackStatus.SUCCEEDED
+                PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY
+                PreviewMeteringResultStatus.FAILED -> PreviewMeteringFeedbackStatus.FAILED
+                PreviewMeteringResultStatus.UNSUPPORTED -> PreviewMeteringFeedbackStatus.UNSUPPORTED
+            }
+            updateState(
+                previewMeteringFeedback = currentFeedback.copy(
+                    status = feedbackStatus,
+                    reason = result.reason
+                )
+            )
+        }
+
+        override fun updatePreviewHostAttached(lastAction: String) {
+            updateState(
+                previewHostAvailable = true,
+                lastAction = lastAction,
+                lastError = null
+            )
+        }
+
+        override fun updatePreviewHostDetached(reason: String, hasPermission: Boolean) {
+            updateState(
+                previewHostAvailable = false,
+                previewStatus = if (hasPermission) PreviewStatus.IDLE else PreviewStatus.BLOCKED,
+                previewStatusDetail = reason,
+                lastAction = "Preview host detached",
+                lastError = if (hasPermission) null else "Camera permission missing"
+            )
+        }
+
+        override fun updatePreviewSurfaceLost(reason: String) {
+            updateState(
+                previewStatus = PreviewStatus.SURFACE_LOST,
+                previewStatusDetail = reason,
+                lastAction = "Preview surface lost",
+                lastError = reason
+            )
+        }
+
+        override fun updatePreviewRuntimeError(detail: String, action: String) {
+            updateState(
+                previewStatus = PreviewStatus.ERROR,
+                previewStatusDetail = detail,
+                lastAction = action,
+                lastError = detail
+            )
+        }
+
+        override fun updatePreviewMetrics(metrics: PreviewMetrics) {
+            updateState(previewMetrics = metrics)
+        }
+    }
+
+    private val previewRecoveryProcessor = PreviewRecoverySessionProcessor(
+        state = _state,
+        effects = _effects,
+        trace = trace,
+        mutations = previewSessionMutations,
+        countdownInProgress = { captureRecordingProcessor.countdownInProgress() },
+        cancelPendingCountdown = { reason -> captureRecordingProcessor.cancelPendingCountdown(reason) }
+    )
+
     init {
         trace.record("session.created", "defaultMode=$defaultMode,initialMode=$initialMode")
         scope.launch {
@@ -191,24 +328,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun processPreviewRecoveryIntent(intent: SessionIntent) {
-        when (intent) {
-            SessionIntent.PreviewHostAttached -> handlePreviewHostAttached()
-            is SessionIntent.PreviewHostDetached -> handlePreviewHostDetached(intent.reason)
-            is SessionIntent.PreviewBindingStarted -> handlePreviewBindingStarted(
-                reason = intent.reason,
-                isRecovery = intent.isRecovery
-            )
-            is SessionIntent.PreviewFirstFrameAvailable -> handlePreviewFirstFrameAvailable(intent.firstFrameLatencyMillis)
-            is SessionIntent.PreviewSnapshotUpdated -> handlePreviewSnapshotUpdated(intent.source, intent.generation)
-            is SessionIntent.CaptureFeedbackSnapshotUpdated -> handleCaptureFeedbackSnapshotUpdated(intent.shotId, intent.outputPath)
-            is SessionIntent.PreviewSurfaceLost -> handlePreviewSurfaceLost(intent.reason)
-            is SessionIntent.PreviewError -> handlePreviewError(intent.reason)
-            is SessionIntent.PreviewRuntimeIssue -> handlePreviewRuntimeIssue(intent.issue)
-            is SessionIntent.PreviewStopped -> handlePreviewStopped(intent.reason)
-            is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
-            is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
-            else -> error("Unexpected preview recovery intent: $intent")
-        }
+        previewRecoveryProcessor.process(intent)
     }
 
     private suspend fun processCaptureRecordingIntent(intent: SessionIntent) {
@@ -252,7 +372,7 @@ class DefaultCameraSession(
             lastError = if (hasCameraPermission) null else "Camera permission missing"
         )
         trace.record("session.booted", "mode=${currentController.id}")
-        requestPreviewBinding(reason = "session boot", isRecovery = false)
+        previewRecoveryProcessor.requestPreviewBinding(reason = "session boot", isRecovery = false)
     }
 
     private suspend fun handleShutdown() {
@@ -263,7 +383,6 @@ class DefaultCameraSession(
         }
 
         captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because session stopped")
-        pendingPreviewHostRecoveryReason = null
         currentController.onExit()
         updateState(
             lifecycle = SessionLifecycle.STOPPED,
@@ -278,7 +397,7 @@ class DefaultCameraSession(
             lastAction = "Session stopped"
         )
         trace.record("session.stopped", "mode=${currentController.id}")
-        requestPreviewUnbind(reason = "Session stopped", clearHost = false)
+        previewRecoveryProcessor.requestPreviewUnbind(reason = "Session stopped", clearHost = false)
     }
 
     private suspend fun handleSwitchMode(modeId: ModeId) {
@@ -336,7 +455,7 @@ class DefaultCameraSession(
             lastError = null
         )
         trace.record("mode.switched", modeId.name)
-        requestPreviewBinding(reason = "mode switched to ${modeId.name.lowercase()}")
+        previewRecoveryProcessor.requestPreviewBinding(reason = "mode switched to ${modeId.name.lowercase()}")
     }
 
     private suspend fun handleSettingsUpdated(
@@ -390,7 +509,7 @@ class DefaultCameraSession(
                 append(snapshot.persisted.video.defaultVideoSpec.summaryLabel)
             }
         )
-        requestPreviewBinding(reason = "session settings updated")
+        previewRecoveryProcessor.requestPreviewBinding(reason = "session settings updated")
     }
 
     private suspend fun handleLensFacingToggled() {
@@ -441,7 +560,7 @@ class DefaultCameraSession(
             lastError = null
         )
         trace.record("lens.switched", nextLensFacing.name)
-        requestPreviewBinding(reason = "lens switched to ${nextLensFacing.name.lowercase()}")
+        previewRecoveryProcessor.requestPreviewBinding(reason = "lens switched to ${nextLensFacing.name.lowercase()}")
     }
 
     private suspend fun handleZoomRatioToggled() {
@@ -599,7 +718,7 @@ class DefaultCameraSession(
             lastError = null
         )
         trace.record("still-quality.updated", nextQuality.tagValue)
-        requestPreviewBinding(reason = "still quality updated to ${nextQuality.tagValue}")
+        previewRecoveryProcessor.requestPreviewBinding(reason = "still quality updated to ${nextQuality.tagValue}")
     }
 
     private suspend fun handleStillCaptureResolutionToggled() {
@@ -686,7 +805,7 @@ class DefaultCameraSession(
             nextOutputSize?.let { "${it.width}x${it.height}:${nextPreset.tagValue}" }
                 ?: nextPreset.tagValue
         )
-        requestPreviewBinding(reason = "still resolution updated to ${nextPreset.tagValue}")
+        previewRecoveryProcessor.requestPreviewBinding(reason = "still resolution updated to ${nextPreset.tagValue}")
     }
 
     private suspend fun handlePreviewRatioToggled() {
@@ -872,7 +991,7 @@ class DefaultCameraSession(
                 append(deviceCapabilities.supportsPreviewSnapshots)
             }
         )
-        requestPreviewBinding(reason = "device capabilities refreshed")
+        previewRecoveryProcessor.requestPreviewBinding(reason = "device capabilities refreshed")
     }
 
     private suspend fun handlePermissionsUpdated(
@@ -945,330 +1064,14 @@ class DefaultCameraSession(
         )
         when {
             !cameraGranted && previous.cameraGranted ->
-                requestPreviewUnbind(reason = "Camera permission missing", clearHost = false)
+                previewRecoveryProcessor.requestPreviewUnbind(reason = "Camera permission missing", clearHost = false)
 
             cameraGranted && !previous.cameraGranted -> {
-                if (!requestPendingPreviewHostRecovery()) {
-                    requestPreviewBinding(reason = "camera permission granted", isRecovery = false)
+                if (!previewRecoveryProcessor.requestPendingPreviewHostRecovery()) {
+                    previewRecoveryProcessor.requestPreviewBinding(reason = "camera permission granted", isRecovery = false)
                 }
             }
         }
-    }
-
-    private suspend fun handlePreviewHostAttached() {
-        if (_state.value.previewHostAvailable) {
-            trace.record("preview.host.attach.skipped", "already attached")
-            requestPreviewBinding(reason = "preview host reattached", isRecovery = false)
-            return
-        }
-        updateState(
-            previewHostAvailable = true,
-            lastAction = if (pendingPreviewHostRecoveryReason != null) {
-                "Preview host reattached"
-            } else {
-                "Preview host attached"
-            },
-            lastError = null
-        )
-        trace.record("preview.host.attached", "lifecycle=${_state.value.lifecycle}")
-        if (!requestPendingPreviewHostRecovery()) {
-            requestPreviewBinding(reason = "preview host attached", isRecovery = false)
-        }
-    }
-
-    private suspend fun handlePreviewHostDetached(reason: String) {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview host detached")
-        }
-        if (_state.value.lifecycle == SessionLifecycle.RUNNING) {
-            pendingPreviewHostRecoveryReason = reason
-        }
-        updateState(
-            previewHostAvailable = false,
-            previewStatus = if (_state.value.permissionState.cameraGranted) {
-                PreviewStatus.IDLE
-            } else {
-                PreviewStatus.BLOCKED
-            },
-            previewStatusDetail = reason,
-            lastAction = "Preview host detached",
-            lastError = if (_state.value.permissionState.cameraGranted) null else "Camera permission missing"
-        )
-        trace.record("preview.host.detached", reason)
-        requestPreviewUnbind(reason = reason, clearHost = true)
-    }
-
-    private suspend fun requestPendingPreviewHostRecovery(): Boolean {
-        val hostRecoveryReason = pendingPreviewHostRecoveryReason ?: return false
-        val snapshot = _state.value
-        if (
-            snapshot.lifecycle != SessionLifecycle.RUNNING ||
-            !snapshot.previewHostAvailable ||
-            !snapshot.permissionState.cameraGranted ||
-            snapshot.recordingStatus == RecordingStatus.RECORDING
-        ) {
-            return false
-        }
-        val recoveryReason = "recover after preview host detached: $hostRecoveryReason"
-        pendingPreviewHostRecoveryReason = null
-        trace.record("preview.host.recovery.requested", recoveryReason)
-        requestPreviewBinding(reason = recoveryReason, isRecovery = true)
-        return true
-    }
-
-    private fun handlePreviewBindingStarted(
-        reason: String,
-        isRecovery: Boolean
-    ) {
-        if (!_state.value.permissionState.cameraGranted) {
-            updateState(
-                previewStatus = PreviewStatus.BLOCKED,
-                previewStatusDetail = reason,
-                lastAction = "Preview blocked until camera permission is granted",
-                lastError = "Camera permission missing"
-            )
-            trace.record("preview.blocked", reason)
-            return
-        }
-
-        val metrics = _state.value.previewMetrics
-        updateState(
-            previewStatus = if (isRecovery) PreviewStatus.RECOVERING else PreviewStatus.STARTING,
-            previewStatusDetail = reason,
-            previewMetrics = metrics.copy(
-                bindCount = metrics.bindCount + 1,
-                recoveryCount = metrics.recoveryCount + if (isRecovery) 1 else 0,
-                lastStartReason = reason
-            ),
-            lastAction = if (isRecovery) {
-                "Recovering preview"
-            } else {
-                "Starting preview"
-            },
-            lastError = null
-        )
-        trace.record(
-            if (isRecovery) "preview.recovery.started" else "preview.binding.started",
-            reason
-        )
-    }
-
-    private fun handlePreviewFirstFrameAvailable(firstFrameLatencyMillis: Long) {
-        val metrics = _state.value.previewMetrics
-        val bestLatency = listOfNotNull(
-            metrics.bestFirstFrameLatencyMillis,
-            firstFrameLatencyMillis
-        ).minOrNull()
-        val worstLatency = listOfNotNull(
-            metrics.worstFirstFrameLatencyMillis,
-            firstFrameLatencyMillis
-        ).maxOrNull()
-        updateState(
-            previewStatus = PreviewStatus.ACTIVE,
-            previewMetrics = metrics.copy(
-                lastFirstFrameLatencyMillis = firstFrameLatencyMillis,
-                bestFirstFrameLatencyMillis = bestLatency,
-                worstFirstFrameLatencyMillis = worstLatency
-            ),
-            lastAction = "Preview active (${firstFrameLatencyMillis} ms first frame)",
-            lastError = null
-        )
-        trace.record("preview.first.frame", "${firstFrameLatencyMillis}ms")
-    }
-
-    private fun handlePreviewSnapshotUpdated(source: ThumbnailSource, generation: Int) {
-        val currentGen = _state.value.presentation.previewSnapshotGeneration
-        if (generation < currentGen) {
-            trace.record("preview.snapshot.stale", "gen=$generation,current=$currentGen")
-            return
-        }
-        val hasSavedMediaThumbnail = _state.value.presentation.latestThumbnailSource is ThumbnailSource.SavedMedia
-        if (hasSavedMediaThumbnail) {
-            trace.record("preview.snapshot.ignored", source.outputPathOrNull().orEmpty())
-            return
-        }
-        updateState(
-            previewThumbnailPath = source.outputPathOrNull(),
-            latestThumbnailSource = source,
-            previewSnapshotGeneration = generation
-        )
-        trace.record("preview.snapshot.updated", source.outputPathOrNull().orEmpty())
-    }
-
-    private fun handleCaptureFeedbackSnapshotUpdated(shotId: String, outputPath: String) {
-        val activeShot = _state.value.activeShot
-        if (activeShot == null || activeShot.shotId != shotId) {
-            trace.record("capture.feedback.snapshot.skipped", "shotId=$shotId,active=${activeShot?.shotId}")
-            return
-        }
-        if (captureFeedbackPolicyFor(activeShot) == CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA) {
-            trace.record("capture.feedback.snapshot.suppressed", "shotId=$shotId,reason=final-output-postprocess")
-            return
-        }
-        updateState(
-            pendingCaptureFeedback = CaptureFeedbackPreview(
-                shotId = shotId,
-                outputPath = outputPath
-            ),
-            lastAction = "Capture feedback ready"
-        )
-        trace.record("capture.feedback.snapshot.updated", "shotId=$shotId")
-    }
-
-    private suspend fun handlePreviewSurfaceLost(reason: String) {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview surface was lost")
-        }
-        if (_state.value.recordingStatus == RecordingStatus.RECORDING) {
-            handlePreviewError("Preview surface lost during recording: $reason")
-            return
-        }
-        updateState(
-            previewStatus = PreviewStatus.SURFACE_LOST,
-            previewStatusDetail = reason,
-            lastAction = "Preview surface lost",
-            lastError = reason
-        )
-        trace.record("preview.surface.lost", reason)
-        requestPreviewBinding(reason = "recover after $reason", isRecovery = true)
-    }
-
-    private suspend fun handlePreviewError(reason: String) {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview failed")
-        }
-        val shouldAttemptRecovery = shouldAttemptPreviewErrorRecovery()
-        updateState(
-            previewStatus = PreviewStatus.ERROR,
-            previewStatusDetail = reason,
-            lastAction = if (shouldAttemptRecovery) {
-                "Preview error, attempting recovery"
-            } else {
-                "Preview error"
-            },
-            lastError = reason
-        )
-        trace.record("preview.error", reason)
-        if (shouldAttemptRecovery) {
-            val recoveryReason = "recover after preview error: $reason"
-            trace.record("preview.recovery.requested", recoveryReason)
-            requestPreviewBinding(reason = recoveryReason, isRecovery = true)
-        }
-    }
-
-    private suspend fun handlePreviewRuntimeIssue(issue: DeviceRuntimeIssue) {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview failed")
-        }
-        val renderedReason = issue.displayReason()
-        val recoveryWasActive = _state.value.previewStatus == PreviewStatus.RECOVERING
-        val shouldAttemptRecovery = issue.isRecoverable &&
-            !recoveryWasActive &&
-            shouldAttemptPreviewErrorRecovery()
-        updateState(
-            previewStatus = PreviewStatus.ERROR,
-            previewStatusDetail = renderedReason,
-            lastAction = when {
-                recoveryWasActive && issue.isRecoverable -> "Preview recovery failed"
-                recoveryWasActive -> "Preview recovery failed, manual intervention required"
-                shouldAttemptRecovery -> "Preview runtime issue, attempting recovery"
-                issue.isRecoverable -> "Preview runtime issue"
-                else -> "Preview runtime issue, manual intervention required"
-            },
-            lastError = renderedReason
-        )
-        trace.record(
-            "preview.runtime.issue",
-            "kind=${issue.kind.name},recoverable=${issue.isRecoverable},reason=${issue.reason}"
-        )
-        if (recoveryWasActive) {
-            trace.record("preview.recovery.failed", renderedReason)
-        }
-        trace.record("preview.error", renderedReason)
-        if (shouldAttemptRecovery) {
-            val recoveryReason = issue.recoveryReason()
-            trace.record("preview.recovery.requested", recoveryReason)
-            requestPreviewBinding(reason = recoveryReason, isRecovery = true)
-        }
-    }
-
-    private fun handlePreviewStopped(reason: String) {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because preview stopped")
-        }
-        val hasCameraPermission = _state.value.permissionState.cameraGranted
-        updateState(
-            previewStatus = if (hasCameraPermission) PreviewStatus.IDLE else PreviewStatus.BLOCKED,
-            previewStatusDetail = reason,
-            lastAction = "Preview stopped",
-            lastError = if (hasCameraPermission) null else "Camera permission missing"
-        )
-        trace.record("preview.stopped", reason)
-    }
-
-    private suspend fun handlePreviewTapToFocus(normalizedX: Float, normalizedY: Float) {
-        val point = PreviewMeteringPoint(normalizedX, normalizedY).clamped()
-        val snapshot = _state.value
-        if (snapshot.previewStatus != PreviewStatus.ACTIVE) {
-            trace.record(
-                "preview.metering.ignored",
-                "reason=preview-not-active,status=${snapshot.previewStatus}"
-            )
-            return
-        }
-        if (!snapshot.permissionState.cameraGranted || !snapshot.previewHostAvailable) {
-            trace.record(
-                "preview.metering.ignored",
-                "reason=permission-or-host-missing,granted=${snapshot.permissionState.cameraGranted},host=${snapshot.previewHostAvailable}"
-            )
-            return
-        }
-        meteringCounter++
-        val requestId = "meter-$meteringCounter"
-        val request = PreviewMeteringRequest(
-            requestId = requestId,
-            point = point
-        )
-        updateState(
-            previewMeteringFeedback = PreviewMeteringFeedback(
-                requestId = requestId,
-                normalizedX = point.normalizedX,
-                normalizedY = point.normalizedY,
-                status = PreviewMeteringFeedbackStatus.REQUESTED
-            )
-        )
-        _effects.emit(SessionEffect.ApplyPreviewMetering(request))
-        trace.record(
-            "preview.metering.requested",
-            "requestId=$requestId,x=${"%.2f".format(point.normalizedX)},y=${"%.2f".format(point.normalizedY)},mode=focus+ae"
-        )
-    }
-
-    private fun handlePreviewMeteringCompleted(result: PreviewMeteringResult) {
-        val currentFeedback = _state.value.presentation.previewMeteringFeedback
-        if (currentFeedback == null || currentFeedback.requestId != result.requestId) {
-            trace.record("preview.metering.stale", "resultId=${result.requestId},currentId=${currentFeedback?.requestId}")
-            return
-        }
-        val feedbackStatus = when (result.status) {
-            PreviewMeteringResultStatus.SUCCEEDED -> PreviewMeteringFeedbackStatus.SUCCEEDED
-            PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY
-            PreviewMeteringResultStatus.FAILED -> PreviewMeteringFeedbackStatus.FAILED
-            PreviewMeteringResultStatus.UNSUPPORTED -> PreviewMeteringFeedbackStatus.UNSUPPORTED
-        }
-        updateState(
-            previewMeteringFeedback = currentFeedback.copy(
-                status = feedbackStatus,
-                reason = result.reason
-            )
-        )
-        val traceLabel = when (result.status) {
-            PreviewMeteringResultStatus.SUCCEEDED -> "preview.metering.succeeded"
-            PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> "preview.metering.degraded"
-            PreviewMeteringResultStatus.FAILED -> "preview.metering.failed"
-            PreviewMeteringResultStatus.UNSUPPORTED -> "preview.metering.unsupported"
-        }
-        trace.record(traceLabel, "requestId=${result.requestId}")
     }
 
     private suspend fun handleOutputRotationChanged(rotation: CameraOutputRotation) {
@@ -1355,54 +1158,10 @@ class DefaultCameraSession(
         )
     }
 
-    private suspend fun requestPreviewBinding(
-        reason: String,
-        isRecovery: Boolean = false
-    ) {
-        val snapshot = _state.value
-        if (
-            snapshot.lifecycle != SessionLifecycle.RUNNING ||
-            !snapshot.permissionState.cameraGranted ||
-            !snapshot.previewHostAvailable ||
-            snapshot.recordingStatus == RecordingStatus.RECORDING
-        ) {
-            return
-        }
-        _effects.emit(
-            SessionEffect.BindPreview(
-                modeId = snapshot.activeMode,
-                deviceGraph = snapshot.activeDeviceGraph,
-                reason = reason,
-                isRecovery = isRecovery
-            )
-        )
-    }
-
     private suspend fun requestZoomApply(zoomRatio: Float) {
         _effects.emit(
             SessionEffect.ApplyZoomRatio(
                 zoomRatio = normalizedZoomRatioValue(zoomRatio)
-            )
-        )
-    }
-
-    private fun shouldAttemptPreviewErrorRecovery(): Boolean {
-        val snapshot = _state.value
-        return snapshot.lifecycle == SessionLifecycle.RUNNING &&
-            snapshot.permissionState.cameraGranted &&
-            snapshot.previewHostAvailable &&
-            snapshot.recordingStatus != RecordingStatus.RECORDING &&
-            snapshot.activeShot == null
-    }
-
-    private suspend fun requestPreviewUnbind(
-        reason: String,
-        clearHost: Boolean
-    ) {
-        _effects.emit(
-            SessionEffect.UnbindPreview(
-                reason = reason,
-                clearHost = clearHost
             )
         )
     }
