@@ -241,6 +241,48 @@ class ShotExecutorTest {
     }
 
     @Test
+    fun `single frame plan carries graph with one primary still capture node`() {
+        val executor = ShotExecutor(idGenerator = { "shot-graph-photo" })
+        val plan = executor.plan(CaptureStrategy.SingleFrame())
+
+        assertEquals(1, plan.graph.captureNodes.size)
+        assertEquals(CaptureNodeRole.PRIMARY_STILL, plan.graph.captureNodes[0].role)
+        assertEquals(1, plan.graph.captureNodes[0].frameCount)
+    }
+
+    @Test
+    fun `toShotGraph returns the same graph as plan graph field`() {
+        val executor = ShotExecutor(idGenerator = { "shot-graph-compat" })
+        val plan = executor.plan(CaptureStrategy.SingleFrame())
+
+        assertEquals(plan.graph, plan.toShotGraph())
+    }
+
+    @Test
+    fun `video plan produces primary video capture and output nodes`() {
+        val executor = ShotExecutor(idGenerator = { "shot-graph-video" })
+        val plan = executor.plan(CaptureStrategy.VideoRecording())
+
+        assertEquals(1, plan.graph.captureNodes.size)
+        assertEquals(CaptureNodeRole.PRIMARY_VIDEO, plan.graph.captureNodes[0].role)
+        assertEquals(1, plan.graph.outputNodes.size)
+        assertEquals(MediaArtifactRole.PRIMARY_VIDEO, plan.graph.outputNodes[0].role)
+    }
+
+    @Test
+    fun `multi frame plan clamps graph temp frame count to at least 1`() {
+        val executor = ShotExecutor(idGenerator = { "shot-graph-multiframe" })
+        val plan = executor.plan(
+            CaptureStrategy.MultiFrame(
+                captureProfile = CaptureProfile(frameCount = 1)
+            )
+        )
+
+        val tempNode = plan.graph.captureNodes.first { it.role == CaptureNodeRole.TEMPORARY_FRAME }
+        assertTrue(tempNode.frameCount >= 1)
+    }
+
+    @Test
     fun `multi frame merge placeholder consumes intermediate outputs and appends merge notes`() = runTest {
         val executor = ShotExecutor(idGenerator = { "shot-night-merge" })
         val tempDir = createTempDir(prefix = "night-burst-")

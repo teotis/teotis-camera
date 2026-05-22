@@ -72,7 +72,8 @@ data class MediaSaveTask(
 
 data class ShotPlan(
     val request: ShotRequest,
-    val saveTask: MediaSaveTask
+    val saveTask: MediaSaveTask,
+    val graph: ShotGraph
 )
 
 sealed interface ThumbnailSource {

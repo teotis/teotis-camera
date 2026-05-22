@@ -2,6 +2,7 @@ package com.opencamera.core.media
 
 enum class CaptureNodeRole {
     PRIMARY_STILL,
+    PRIMARY_VIDEO,
     TEMPORARY_FRAME,
     PRE_SHUTTER_FRAME,
     MOTION_SEGMENT,

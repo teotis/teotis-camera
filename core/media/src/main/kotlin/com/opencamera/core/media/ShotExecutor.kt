@@ -42,7 +42,8 @@ class ShotExecutor(
                 postProcessSpec = request.postProcessSpec,
                 captureProfile = request.captureProfile,
                 livePhotoSpec = request.livePhotoSpec
-            )
+            ),
+            graph = ShotGraphBuilder.build(request)
         )
     }
 
