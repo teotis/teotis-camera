@@ -9,6 +9,6 @@ kotlin {
 dependencies {
     implementation(project(":core:effect"))
     implementation(project(":core:media"))
-    implementation(project(":core:settings"))
+    testImplementation(project(":core:settings"))
     testImplementation(kotlin("test"))
 }
