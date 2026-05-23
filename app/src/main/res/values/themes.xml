@@ -26,6 +26,8 @@
         <item name="android:textSize">@dimen/text_size_status</item>
         <item name="backgroundTint">@color/oc_surface_scrim_light</item>
         <item name="cornerRadius">@dimen/radius_chip</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
         <item name="android:insetLeft">0dp</item>
         <item name="android:insetRight">0dp</item>
         <item name="android:insetTop">0dp</item>
