@@ -76,6 +76,7 @@
 
 ## 下一步建议
 
+- `2026-05-24` 拍照模式 Live / Google Motion Photo 能力已归纳为 1 个总索引和 3 个可交给非多模态 agent 的实施方案：[`2026-05-24-live-motion-photo-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-index.md)、[`2026-05-24-live-motion-photo-preview-ring-buffer.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-preview-ring-buffer.md)、[`2026-05-24-live-motion-photo-google-container.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-google-container.md)、[`2026-05-24-live-motion-photo-session-integration.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-session-integration.md)。本轮只设计交接，不改运行时代码；方案明确先用预览低分辨率 ring buffer 作为 motion segment 来源，再写 Google Motion Photo JPEG container，最后接回 session/media/product 语义。该工作属于 feature / capability-kernel 增强，不是第 `7` 阶段 exit 必要项，落地前需要用户明确授权回 feature 侧。
 - `2026-05-24` 视频模式真机反馈已归纳为 1 个总索引和 2 个可交给非多模态 agent 的实施方案：[`2026-05-24-video-mode-real-device-feedback-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-mode-real-device-feedback-index.md)、[`2026-05-24-video-thumbnail-and-gallery-preload.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-thumbnail-and-gallery-preload.md)、[`2026-05-24-video-recording-elapsed-time.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-recording-elapsed-time.md)。本轮只设计交接，不改运行时代码；视频缩略图方案限定在 saved media 查询、视频首帧 materialize 和 gallery MIME 语义，录像时间方案限定在 session-owned elapsed presentation。视频滤镜/水印烧录、转码、内置播放器和长录稳定性阈值登记为非本轮范围。
 - `2026-05-24` 拍照模式新增产品需求已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-photo-low-light-brightness-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-photo-low-light-brightness-index.md) 将工作拆为低光/夜景 assist、快捷亮度调节和联合验证三份文档。核心口径是低光策略保持 `PHOTO` 模式内的 session-owned adaptive capture，不自动切到 `NIGHT/Scenery`；快捷亮度走 session/device preview EV，不把 Color Lab 的后处理亮度当作实时曝光；图标精修、阈值调参和真机画质判断登记为后续多模态/真机 QA。
 - 第 `7` 阶段若继续推进，最高优先级已切到 `provider death / provider restart 真信号` 这类更依赖平台和真机信号的项；当前仓内结构已允许继续挂接，但缺少可信验证来源。
@@ -113,6 +114,23 @@
 ---
 
 # 最近有效闭环
+
+## 2026-05-24：Photo Live / Google Motion Photo 实现方案
+
+- 目标：围绕用户提出的“拍照模式实况能力，使用 Google Motion 格式，以预览流作为短视频部分”的方向，分析当前工程实现路径，并产出可直接转交非多模态 agent 的 Markdown 方案文档。
+- 核心判断：
+  当前仓内 Live 不是空白能力，已有 `ShotKind.LIVE_PHOTO / CaptureStrategy.LivePhoto / LivePhotoBundle / LiveTemporalAssemblyPlanner / latestLivePhotoBundle` 等契约和测试；
+  真实缺口在 `CameraXCaptureAdapter.captureLivePhoto()` 仍硬编码 `LiveMotionSource.METADATA_ONLY`，只产生 still-only fallback 和 sidecar；
+  Google Motion Photo 当前官方格式应按 Motion Photo 1.0 的单文件 JPEG/HEIC/AVIF + appended video + Camera/Container XMP 处理，不应继续以旧 `MicroVideoOffset` 或旁路 `.live.json` 作为主兼容路径；
+  预览流 ring buffer 是适合 OpenCamera 的第一实现方向，但必须限定为低分辨率、有界、可降级、非 UI/SessionState payload。
+- 核心结果：
+  [`2026-05-24-live-motion-photo-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-index.md) 记录总目标、当前代码证据、Google Motion Photo 事实、拆包顺序、全局验收和阶段边界；
+  [`2026-05-24-live-motion-photo-preview-ring-buffer.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-preview-ring-buffer.md) 定义 `FrameRingBuffer`、CameraX `ImageAnalysis` 来源、选择窗口、诊断 notes 和纯测试入口；
+  [`2026-05-24-live-motion-photo-google-container.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-google-container.md) 定义 JPEG-based Google Motion Photo writer、XMP APP1 注入、MP4 append、MediaStore 替换/新建策略和 byte-fixture 测试；
+  [`2026-05-24-live-motion-photo-session-integration.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-session-integration.md) 定义 Mode Plugin / Session Kernel / Device Adapter / Media Pipeline 的集成边界、bundle 状态、UI 支持语义、测试矩阵和真机 smoke。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已用 `rtk rg` 对新增方案文档做占位词检查，并确认索引链接命中目标文档。
+- 结论：
+  该方案是 feature / capability-kernel 增强，不属于第 `7` 阶段稳定性 exit 的必要项；如果启动实现，应按 preview ring buffer -> Google Motion Photo container -> session integration 串行推进，避免在 motion source 和 container 格式尚未固定前改拍照主链。
 
 ## 2026-05-24：拍照低光/夜景策略与快捷亮度方案文档
 
