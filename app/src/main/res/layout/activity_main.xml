@@ -223,6 +223,7 @@
                         style="@style/Widget.OpenCamera.QuickBubbleButton"
                         android:layout_width="56dp"
                         android:layout_height="32dp"
+                        android:paddingHorizontal="6dp"
                         android:text="4:3"
                         android:textSize="11sp" />
 
@@ -232,6 +233,7 @@
                         android:layout_width="56dp"
                         android:layout_height="32dp"
                         android:layout_marginStart="4dp"
+                        android:paddingHorizontal="6dp"
                         android:text="16:9"
                         android:textSize="11sp" />
 
@@ -241,6 +243,7 @@
                         android:layout_width="56dp"
                         android:layout_height="32dp"
                         android:layout_marginStart="4dp"
+                        android:paddingHorizontal="6dp"
                         android:text="1:1"
                         android:textSize="11sp" />
                 </LinearLayout>
@@ -270,12 +273,11 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="0dp"
-        android:background="@color/oc_surface_scrim_light"
         android:scrollbars="none"
         android:fadeScrollbars="false"
         android:clipToPadding="false"
         android:paddingHorizontal="@dimen/space_12"
-        android:paddingVertical="@dimen/space_4"
+        android:paddingVertical="@dimen/space_2"
         app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -924,13 +926,13 @@
         android:layout_height="0dp"
         android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
         android:layout_marginTop="14dp"
-        android:layout_marginBottom="132dp"
+        android:layout_marginBottom="64dp"
         android:background="@drawable/bg_settings_panel"
         android:contentDescription="@string/filter_panel_content_description"
         android:fillViewport="true"
         android:padding="0dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
@@ -961,7 +963,7 @@
                 android:id="@+id/filterHeroSummary"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="6dp"
                 android:fontFamily="monospace"
                 android:textColor="@color/oc_accent"
                 android:textSize="@dimen/text_size_status" />
@@ -969,7 +971,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="10dp"
                 android:gravity="center"
                 android:orientation="horizontal">
 
@@ -979,7 +981,10 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="4dp"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true" />
 
                 <Button
                     android:id="@+id/buttonFilterHumanisticTab"
@@ -987,7 +992,10 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true" />
 
                 <Button
                     android:id="@+id/buttonFilterPortraitTab"
@@ -995,7 +1003,10 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="4dp"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true" />
 
                 <Button
                     android:id="@+id/buttonFilterVideoTab"
@@ -1003,22 +1014,27 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
-                    android:layout_weight="1" />
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true" />
             </LinearLayout>
 
             <TextView
+                android:id="@+id/filterSectionFiltersTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="10dp"
                 android:text="@string/filter_section_filters"
                 android:textColor="@color/oc_text_secondary"
                 android:textSize="@dimen/text_size_section_title"
                 android:textStyle="bold" />
 
             <LinearLayout
+                android:id="@+id/filterSelectionCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_settings_card"
                 android:orientation="vertical"
                 android:padding="@dimen/space_16">
@@ -1050,9 +1066,10 @@
             </LinearLayout>
 
             <TextView
+                android:id="@+id/filterSectionPaletteTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="10dp"
                 android:text="@string/filter_section_palette"
                 android:textColor="@color/oc_text_secondary"
                 android:textSize="@dimen/text_size_section_title"
@@ -1062,7 +1079,7 @@
                 android:id="@+id/filterAdjustmentPanel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_settings_card"
                 android:orientation="vertical"
                 android:padding="@dimen/space_16"
@@ -1078,7 +1095,7 @@
                     android:id="@+id/filterPaletteSummary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="6dp"
                     android:textColor="@color/oc_text_secondary"
                     android:textSize="@dimen/text_size_control_value" />
 
@@ -1086,13 +1103,13 @@
                     android:id="@+id/filterPaletteSurface"
                     android:layout_width="match_parent"
                     android:layout_height="180dp"
-                    android:layout_marginTop="12dp" />
+                    android:layout_marginTop="6dp" />
 
                 <TextView
                     android:id="@+id/filterPaletteHint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="6dp"
                     android:textColor="@color/oc_text_secondary"
                     android:textSize="@dimen/text_size_status" />
 
@@ -1100,7 +1117,7 @@
                     android:id="@+id/filterAdvancedTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="10dp"
                     android:text="@string/filter_section_advanced"
                     android:textColor="@color/oc_text_secondary"
                     android:textSize="@dimen/text_size_section_title"
@@ -1110,7 +1127,7 @@
                     android:id="@+id/filterAdvancedControls"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="6dp"
                     android:orientation="vertical"
                     android:visibility="gone">
 
@@ -1244,7 +1261,7 @@
         android:layout_height="0dp"
         android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
         android:layout_marginTop="14dp"
-        android:layout_marginBottom="12dp"
+        android:layout_marginBottom="64dp"
         android:visibility="gone"
         app:cardBackgroundColor="@color/oc_surface_panel"
         app:cardCornerRadius="@dimen/radius_panel_shell"

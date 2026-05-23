@@ -11,7 +11,7 @@ import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.MediaMetadata
-import com.opencamera.core.media.MediaType
+
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.StillCaptureQualityPreference
@@ -22,13 +22,15 @@ import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeIntent
 import com.opencamera.core.mode.ModeSessionEvent
+import com.opencamera.core.mode.StillShotSessionEventText
+import com.opencamera.core.mode.reduceStillShotSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
+import com.opencamera.core.mode.FrameRatioDelegate
 import com.opencamera.core.mode.captureAidMetadataTags
 import com.opencamera.core.mode.stillCaptureDeviceGraph
-import com.opencamera.core.mode.eventTag
 import com.opencamera.core.mode.label
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.toMetadataTags
@@ -51,13 +53,12 @@ class ProModePlugin : CameraModePlugin {
 private class ProModeController(
     private val context: ModeContext
 ) : ModeController {
-    private val frameRatios = listOf(
-        FrameRatio.RATIO_4_3,
-        FrameRatio.RATIO_16_9,
-        FrameRatio.RATIO_1_1
-    )
     private var presetIndex = 0
-    private var frameRatioIndex = 0
+    private val frameRatioDelegate = FrameRatioDelegate(
+        context = context,
+        modeEventPrefix = "pro",
+        effectSpecProvider = { buildEffectSpec() }
+    )
 
     private val uiSpec = ModeUiSpec(
         title = "Pro",
@@ -144,36 +145,21 @@ private class ProModeController(
     }
 
     override suspend fun onSessionEvent(event: ModeSessionEvent) {
-        when (event) {
-            is ModeSessionEvent.ShotStarted -> {
-                if (event.shot.mediaType != MediaType.PHOTO) {
-                    return
+        reduceStillShotSessionEvent(
+            event = event,
+            text = StillShotSessionEventText(
+                shotStartedHeadline = "Pro capture in progress",
+                shotCompletedHeadline = "Pro photo saved",
+                shotFailedHeadline = "Pro capture failed"
+            ),
+            updateSnapshot = { headline, detail ->
+                mutableSnapshot.value = if (detail == null) {
+                    buildSnapshot(headline = headline)
+                } else {
+                    buildSnapshot(headline = headline, detail = detail)
                 }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Pro capture in progress"
-                )
             }
-
-            is ModeSessionEvent.ShotCompleted -> {
-                if (event.result.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Pro photo saved",
-                    detail = event.result.outputPath
-                )
-            }
-
-            is ModeSessionEvent.ShotFailed -> {
-                if (event.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Pro capture failed",
-                    detail = event.reason
-                )
-            }
-        }
+        )
     }
 
     private suspend fun submitCurrentPreset(): ModeSignal {
@@ -312,32 +298,27 @@ private class ProModeController(
         }
     }
 
-    private suspend fun cycleFrameRatio(): ModeSignal {
-        frameRatioIndex = (frameRatioIndex + 1) % frameRatios.size
-        val frameRatio = currentFrameRatio()
-        context.eventSink("pro.frame-ratio.selected.${frameRatio.eventTag()}")
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (manualControlsEnabled()) {
+    private suspend fun cycleFrameRatio(): ModeSignal =
+        frameRatioDelegate.cycleFrameRatio(
+            snapshotHeadline = if (manualControlsEnabled()) {
                 "Frame ratio updated"
             } else {
                 "Assist frame ratio updated"
+            },
+            updateSnapshot = { headline ->
+                mutableSnapshot.value = buildSnapshot(headline = headline)
             }
         )
-        context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
-    }
 
-    private suspend fun selectFrameRatio(ratio: FrameRatio): ModeSignal {
-        val nextIndex = frameRatios.indexOf(ratio)
-        if (nextIndex < 0) return ModeSignal.ShowHint("当前模式不支持 ${ratio.label} 画幅")
-        frameRatioIndex = nextIndex
-        context.eventSink("pro.frame-ratio.selected.${ratio.eventTag()}")
-        mutableSnapshot.value = buildSnapshot(headline = "画幅已更新")
-        context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("画幅：${ratio.label}")
-    }
+    private suspend fun selectFrameRatio(ratio: FrameRatio): ModeSignal =
+        frameRatioDelegate.selectFrameRatio(
+            ratio = ratio,
+            updateSnapshot = { headline ->
+                mutableSnapshot.value = buildSnapshot(headline = headline)
+            }
+        )
 
-    private fun currentFrameRatio(): FrameRatio = frameRatios[frameRatioIndex]
+    private fun currentFrameRatio(): FrameRatio = frameRatioDelegate.currentFrameRatio()
     private fun runtimeState() = context.runtimeState()
 
     private data class ProPreset(

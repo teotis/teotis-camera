@@ -1,6 +1,6 @@
 package com.opencamera.core.mode
 
-import com.opencamera.core.device.CapabilityRequirementKind
+import com.opencamera.core.capability.CapabilityRequirementKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

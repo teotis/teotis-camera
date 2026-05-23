@@ -5,6 +5,9 @@ import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.media.primaryStillNode
+import com.opencamera.core.media.primaryVideoNode
+import com.opencamera.core.media.temporaryFrameNode
 import com.opencamera.core.settings.ManualCaptureParams
 
 data class DeviceShotRequest(
@@ -31,8 +34,13 @@ class DefaultDeviceShotRequestTranslator(
 ) : DeviceShotRequestTranslator {
     override fun translate(plan: ShotPlan): DeviceShotRequest {
         val request = plan.request
+        val graph = plan.graph
         return when (request.shotKind) {
             ShotKind.STILL_CAPTURE -> {
+                val stillNode = graph.primaryStillNode()
+                checkNotNull(stillNode) {
+                    "ShotGraph missing PRIMARY_STILL node for STILL_CAPTURE"
+                }
                 val resolvedFlashMode = resolveFlashMode(request.captureProfile.flashMode)
                 val stillCaptureQuality = request.captureProfile.stillCaptureQuality
                     ?: StillCaptureQualityPreference.LATENCY
@@ -50,6 +58,8 @@ class DefaultDeviceShotRequestTranslator(
                     manualControlCapabilities = deviceCapabilities.resolvedManualControlCapabilities,
                     diagnostics = buildList {
                         add("device:template=still-capture")
+                        add("device:graph=capture-topology")
+                        add("device:graph-node=${stillNode.id}")
                         add("device:capture-mode=${stillCaptureQuality.captureModeTag()}")
                         add("device:still-resolution=${stillCaptureResolutionPreset.tagValue}")
                         addManualDiagnostics(request.captureProfile.manualCaptureParams)
@@ -64,6 +74,10 @@ class DefaultDeviceShotRequestTranslator(
             ShotKind.MULTI_FRAME_CAPTURE -> translateMultiFrame(plan)
 
             ShotKind.LIVE_PHOTO -> {
+                val stillNode = graph.primaryStillNode()
+                checkNotNull(stillNode) {
+                    "ShotGraph missing PRIMARY_STILL node for LIVE_PHOTO"
+                }
                 val resolvedFlashMode = resolveFlashMode(request.captureProfile.flashMode)
                 val stillCaptureQuality = request.captureProfile.stillCaptureQuality
                     ?: StillCaptureQualityPreference.LATENCY
@@ -81,6 +95,8 @@ class DefaultDeviceShotRequestTranslator(
                     manualControlCapabilities = deviceCapabilities.resolvedManualControlCapabilities,
                     diagnostics = buildList {
                         add("device:template=still-capture")
+                        add("device:graph=capture-topology")
+                        add("device:graph-node=${stillNode.id}")
                         add("device:capture-mode=${stillCaptureQuality.captureModeTag()}")
                         add("device:still-resolution=${stillCaptureResolutionPreset.tagValue}")
                         add("device:live-photo=bundle")
@@ -98,6 +114,10 @@ class DefaultDeviceShotRequestTranslator(
             }
 
             ShotKind.VIDEO_RECORDING -> {
+                val videoNode = graph.primaryVideoNode()
+                checkNotNull(videoNode) {
+                    "ShotGraph missing PRIMARY_VIDEO node for VIDEO_RECORDING"
+                }
                 val resolvedTorchEnabled = resolveTorchEnabled(request.captureProfile.torchEnabled)
                 DeviceShotRequest(
                     shotId = request.shotId,
@@ -107,6 +127,8 @@ class DefaultDeviceShotRequestTranslator(
                     manualControlCapabilities = deviceCapabilities.resolvedManualControlCapabilities,
                     diagnostics = buildList {
                         add("device:template=video-recording")
+                        add("device:graph=capture-topology")
+                        add("device:graph-node=${videoNode.id}")
                         add("device:video=recorder")
                         addTorchDiagnostics(
                             requestedTorchEnabled = request.captureProfile.torchEnabled,
@@ -119,12 +141,28 @@ class DefaultDeviceShotRequestTranslator(
     }
 
     private fun translateMultiFrame(plan: ShotPlan): DeviceShotRequest {
+        val graph = plan.graph
+        val stillNode = graph.primaryStillNode()
+        checkNotNull(stillNode) {
+            "ShotGraph missing PRIMARY_STILL node for MULTI_FRAME_CAPTURE"
+        }
+        val tempNode = graph.temporaryFrameNode()
+        checkNotNull(tempNode) {
+            "ShotGraph missing TEMPORARY_FRAME node for MULTI_FRAME_CAPTURE"
+        }
+
         val captureProfile = plan.request.captureProfile
-        val normalizedFrameCount = captureProfile.frameCount.coerceAtLeast(1)
-        val interFrameDelayMillis = captureProfile.longExposureMillis
-            ?.div(normalizedFrameCount.toLong())
-            ?.coerceIn(60L, 240L)
-            ?: 80L
+        val graphFrameCount = tempNode.frameCount.coerceAtLeast(1)
+        val normalizedFrameCount = graphFrameCount
+        val graphInterFrameDelay = tempNode.timingPolicy.interFrameDelayMillis
+        val interFrameDelayMillis = if (graphInterFrameDelay > 0) {
+            graphInterFrameDelay
+        } else {
+            captureProfile.longExposureMillis
+                ?.div(normalizedFrameCount.toLong())
+                ?.coerceIn(60L, 240L)
+                ?: 80L
+        }
         val resolvedFlashMode = resolveFlashMode(captureProfile.flashMode)
         val stillCaptureQuality = captureProfile.stillCaptureQuality
             ?: StillCaptureQualityPreference.QUALITY
@@ -143,6 +181,8 @@ class DefaultDeviceShotRequestTranslator(
             interFrameDelayMillis = interFrameDelayMillis,
             diagnostics = buildList {
                 add("device:template=still-capture")
+                add("device:graph=capture-topology")
+                add("device:graph-node=${stillNode.id}")
                 add("device:capture-mode=${stillCaptureQuality.captureModeTag()}")
                 add("device:still-resolution=${stillCaptureResolutionPreset.tagValue}")
                 addManualDiagnostics(captureProfile.manualCaptureParams)

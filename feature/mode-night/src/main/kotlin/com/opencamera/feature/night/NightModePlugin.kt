@@ -11,7 +11,6 @@ import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.MediaMetadata
-import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.StillCaptureQualityPreference
@@ -22,13 +21,16 @@ import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeIntent
 import com.opencamera.core.mode.ModeSessionEvent
+import com.opencamera.core.mode.StillShotSessionEventText
+import com.opencamera.core.mode.reduceStillShotSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
+import com.opencamera.core.mode.FrameRatioDelegate
+import com.opencamera.core.mode.ProVariantState
 import com.opencamera.core.mode.captureAidMetadataTags
 import com.opencamera.core.mode.stillCaptureDeviceGraph
-import com.opencamera.core.mode.eventTag
 import com.opencamera.core.mode.label
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.compactSummary
@@ -52,14 +54,15 @@ class NightModePlugin : CameraModePlugin {
 private class NightModeController(
     private val context: ModeContext
 ) : ModeController {
-    private val frameRatios = listOf(
-        FrameRatio.RATIO_4_3,
-        FrameRatio.RATIO_16_9,
-        FrameRatio.RATIO_1_1
-    )
     private var profileIndex = 0
-    private var frameRatioIndex = 0
-    private var proVariantEnabled = false
+    private val frameRatioDelegate = FrameRatioDelegate(
+        context = context,
+        modeEventPrefix = "night",
+        effectSpecProvider = { buildEffectSpec() }
+    )
+    private val proVariantState = ProVariantState(context)
+    private val proVariantEnabled: Boolean
+        get() = proVariantState.isEnabled
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
@@ -139,36 +142,21 @@ private class NightModeController(
     }
 
     override suspend fun onSessionEvent(event: ModeSessionEvent) {
-        when (event) {
-            is ModeSessionEvent.ShotStarted -> {
-                if (event.shot.mediaType != MediaType.PHOTO) {
-                    return
+        reduceStillShotSessionEvent(
+            event = event,
+            text = StillShotSessionEventText(
+                shotStartedHeadline = "Scenery capture in progress",
+                shotCompletedHeadline = "Scenery photo saved",
+                shotFailedHeadline = "Scenery capture failed"
+            ),
+            updateSnapshot = { headline, detail ->
+                mutableSnapshot.value = if (detail == null) {
+                    buildSnapshot(headline = headline)
+                } else {
+                    buildSnapshot(headline = headline, detail = detail)
                 }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Scenery capture in progress"
-                )
             }
-
-            is ModeSessionEvent.ShotCompleted -> {
-                if (event.result.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Scenery photo saved",
-                    detail = event.result.outputPath
-                )
-            }
-
-            is ModeSessionEvent.ShotFailed -> {
-                if (event.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Scenery capture failed",
-                    detail = event.reason
-                )
-            }
-        }
+        )
     }
 
     private suspend fun submitCurrentProfile(): ModeSignal {
@@ -201,7 +189,7 @@ private class NightModeController(
                 put("SceneCaptureType", "Night")
                 put("NightProfile", profile.label)
                 if (proVariantEnabled) {
-                    put("NightVariant", if (manualControlsEnabled()) "Pro" else "Pro Assist")
+                    put("NightVariant", proVariantState.variantExifLabel())
                     put("ManualDraft", currentManualDraft().compactSummary())
                 }
                 profile.longExposureMillis?.let { put("ExposureTime", "${it}ms") }
@@ -223,13 +211,11 @@ private class NightModeController(
                     put("flash", flashMode.name.lowercase())
                     put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                     put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
-                    put("modeVariant", if (proVariantEnabled) "pro" else "standard")
+                    put("modeVariant", proVariantState.modeVariantTag())
                     put("watermarkModeName", "Scenery")
                     put("watermarkProfileName", profile.label)
                     if (proVariantEnabled) {
-                        put("controlMode", resolvedControlMode())
-                        put("manualDraftState", manualDraftState())
-                        putAll(currentManualDraft().toMetadataTags())
+                        putAll(proVariantState.metadataTags())
                     }
                     putAll(context.captureAidMetadataTags())
                     putAll(bridgeTags)
@@ -289,8 +275,8 @@ private class NightModeController(
     }
 
     private suspend fun toggleProVariant(): ModeSignal {
-        proVariantEnabled = !proVariantEnabled
-        context.eventSink("night.pro-variant.${if (proVariantEnabled) "entered" else "exited"}")
+        val result = proVariantState.toggle("Scenery")
+        context.eventSink("night.pro-variant.${result.eventSuffix}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (proVariantEnabled) {
                 if (manualControlsEnabled()) {
@@ -304,17 +290,7 @@ private class NightModeController(
                 "Scenery brightening active"
             }
         )
-        return ModeSignal.ShowHint(
-            if (proVariantEnabled) {
-                if (manualControlsEnabled()) {
-                    "Scenery Pro on"
-                } else {
-                    "Scenery Pro assist on"
-                }
-            } else {
-                "Scenery Pro off"
-            }
-        )
+        return result.signal
     }
 
     private fun buildSnapshot(
@@ -328,17 +304,7 @@ private class NightModeController(
                 shutterLabel = "Capture Scenery",
                 secondaryActionLabel = "Cycle Scenery Style",
                 tertiaryActionLabel = "Cycle Frame",
-                proActionLabel = if (proVariantEnabled) {
-                    if (manualControlsEnabled()) {
-                        "Exit Pro"
-                    } else {
-                        "Exit Pro Assist"
-                    }
-                } else if (manualControlsEnabled()) {
-                    "Enter Pro"
-                } else {
-                    "Enter Pro Assist"
-                }
+                proActionLabel = proVariantState.proActionLabel()
             ),
             state = ModeState(
                 headline = headline,
@@ -380,11 +346,7 @@ private class NightModeController(
         if (!proVariantEnabled) {
             return standardSummary
         }
-        val proSummary = if (manualControlsEnabled()) {
-            "Pro draft ${currentManualDraft().compactSummary()} armed for scenery capture."
-        } else {
-            "Pro assist keeps ${currentManualDraft().compactSummary()} as saved-only draft because manual controls are unavailable on this device."
-        }
+        val proSummary = proVariantState.summaryText("scenery capture")
         return "$standardSummary | $proSummary"
     }
 
@@ -399,48 +361,40 @@ private class NightModeController(
         }
     }
 
-    private suspend fun cycleFrameRatio(): ModeSignal {
-        frameRatioIndex = (frameRatioIndex + 1) % frameRatios.size
-        val frameRatio = currentFrameRatio()
-        context.eventSink("night.frame-ratio.selected.${frameRatio.eventTag()}")
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (multiFrameEnabled()) {
+    private suspend fun cycleFrameRatio(): ModeSignal =
+        frameRatioDelegate.cycleFrameRatio(
+            snapshotHeadline = if (multiFrameEnabled()) {
                 "Scenery frame updated"
             } else {
                 "Scenery assist frame updated"
+            },
+            updateSnapshot = { headline ->
+                mutableSnapshot.value = buildSnapshot(headline = headline)
             }
         )
-        context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
-    }
 
-    private suspend fun selectFrameRatio(ratio: FrameRatio): ModeSignal {
-        val nextIndex = frameRatios.indexOf(ratio)
-        if (nextIndex < 0) return ModeSignal.ShowHint("当前模式不支持 ${ratio.label} 画幅")
-        frameRatioIndex = nextIndex
-        context.eventSink("night.frame-ratio.selected.${ratio.eventTag()}")
-        mutableSnapshot.value = buildSnapshot(headline = "画幅已更新")
-        context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("画幅：${ratio.label}")
-    }
+    private suspend fun selectFrameRatio(ratio: FrameRatio): ModeSignal =
+        frameRatioDelegate.selectFrameRatio(
+            ratio = ratio,
+            updateSnapshot = { headline ->
+                mutableSnapshot.value = buildSnapshot(headline = headline)
+            }
+        )
 
-    private fun currentFrameRatio(): FrameRatio = frameRatios[frameRatioIndex]
+    private fun currentFrameRatio(): FrameRatio = frameRatioDelegate.currentFrameRatio()
     private fun runtimeState() = context.runtimeState()
     private fun manualControlsEnabled(): Boolean =
-        runtimeState().deviceCapabilities.supportsAppliedManualControls
-    private fun currentManualDraft() = context.settingsSnapshot.catalog.manualCaptureDraft
-    private fun currentManualDraftOrNull() = currentManualDraft().takeIf { proVariantEnabled }
-    private fun resolvedControlMode(): String = if (manualControlsEnabled()) "manual" else "assisted"
-    private fun manualDraftState(): String = if (manualControlsEnabled()) "metadata-draft" else "unsupported"
-    private fun resolvedAlgorithmProfile(base: String): String {
-        return if (!proVariantEnabled) {
-            base
-        } else if (manualControlsEnabled()) {
-            "${base}-pro"
-        } else {
-            "${base}-pro-assist"
-        }
-    }
+        proVariantState.manualControlsEnabled()
+    private fun currentManualDraft() =
+        proVariantState.currentManualDraft()
+    private fun currentManualDraftOrNull() =
+        proVariantState.currentManualDraftOrNull()
+    private fun resolvedControlMode(): String =
+        proVariantState.resolvedControlMode()
+    private fun manualDraftState(): String =
+        proVariantState.manualDraftState()
+    private fun resolvedAlgorithmProfile(base: String): String =
+        proVariantState.resolvedAlgorithmProfile(base)
 
     private data class NightProfile(
         val id: String,

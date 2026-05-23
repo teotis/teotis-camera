@@ -4,3 +4,6 @@ build/
 local.properties
 ._*
 .DS_Store
+
+# Git worktrees
+.worktrees/

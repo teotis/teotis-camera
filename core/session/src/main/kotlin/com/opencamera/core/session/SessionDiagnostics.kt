@@ -1,5 +1,6 @@
 package com.opencamera.core.session
 
+import com.opencamera.core.device.CameraOutputRotation
 import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.mode.ModeId
 
@@ -55,6 +56,7 @@ data class SessionDebugDump(
     val previewStatus: PreviewStatus,
     val captureStatus: CaptureStatus,
     val recordingStatus: RecordingStatus,
+    val outputRotation: CameraOutputRotation,
     val lastAction: String,
     val lastError: String?,
     val perfSnapshot: PerfSnapshot,
@@ -121,6 +123,7 @@ fun buildSessionDebugDump(
         previewStatus = state.previewStatus,
         captureStatus = state.captureStatus,
         recordingStatus = state.recordingStatus,
+        outputRotation = state.outputRotation,
         lastAction = state.lastAction,
         lastError = state.lastError,
         perfSnapshot = state.toPerfSnapshot(),
@@ -146,7 +149,9 @@ private val RECOVERY_TRACE_EVENT_NAMES = setOf(
     "preview.error",
     "preview.blocked",
     "preview.host.detached",
-    "preview.stopped"
+    "preview.stopped",
+    "orientation.output.changed",
+    "orientation.output.skipped"
 )
 
 private val RECOVERY_FAILURE_EVENT_NAMES = setOf(

@@ -14,20 +14,22 @@ import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeIntent
 import com.opencamera.core.mode.ModeSessionEvent
+import com.opencamera.core.mode.StillShotSessionEventText
+import com.opencamera.core.mode.reduceStillShotSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
+import com.opencamera.core.mode.FrameRatioDelegate
 import com.opencamera.core.mode.captureAidMetadataTags
 import com.opencamera.core.mode.stillCaptureDeviceGraph
-import com.opencamera.core.mode.eventTag
 import com.opencamera.core.mode.label
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LivePhotoCaptureSpec
-import com.opencamera.core.media.MediaType
+
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.StillCaptureQualityPreference
@@ -61,13 +63,12 @@ class PhotoModePlugin : CameraModePlugin {
 private class PhotoModeController(
     private val context: ModeContext
 ) : ModeController {
-    private val frameRatios = listOf(
-        FrameRatio.RATIO_4_3,
-        FrameRatio.RATIO_16_9,
-        FrameRatio.RATIO_1_1
-    )
     private var flashModeIndex = 0
-    private var frameRatioIndex = 0
+    private val frameRatioDelegate = FrameRatioDelegate(
+        context = context,
+        modeEventPrefix = "photo",
+        effectSpecProvider = { buildEffectSpec(currentFlashMode()) }
+    )
     private var selectedFilter = resolvedDefaultFilter()
 
     private val mutableSnapshot = MutableStateFlow(
@@ -221,39 +222,22 @@ private class PhotoModeController(
     }
 
     override suspend fun onSessionEvent(event: ModeSessionEvent) {
-        when (event) {
-            is ModeSessionEvent.ShotStarted -> {
-                if (event.shot.mediaType != MediaType.PHOTO) {
-                    return
+        reduceStillShotSessionEvent(
+            event = event,
+            text = StillShotSessionEventText(
+                shotStartedHeadline = "Photo capture in progress",
+                shotStartedDetail = "Unified shot pipeline accepted the photo save task.",
+                shotCompletedHeadline = "Photo saved",
+                shotFailedHeadline = "Photo capture failed"
+            ),
+            updateSnapshot = { headline, detail ->
+                mutableSnapshot.value = if (detail == null) {
+                    buildSnapshot(headline = headline)
+                } else {
+                    buildSnapshot(headline = headline, detail = detail)
                 }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Photo capture in progress",
-                    detail = "Unified shot pipeline accepted the photo save task."
-                )
             }
-
-            is ModeSessionEvent.ShotCompleted -> {
-                if (event.result.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Photo saved",
-                    detail = event.result.outputPath
-                )
-            }
-
-            is ModeSessionEvent.ShotFailed -> {
-                if (event.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Photo capture failed",
-                    detail = event.reason
-                )
-            }
-
-            else -> Unit
-        }
+        )
     }
 
     private suspend fun cycleFlashMode(): ModeSignal {
@@ -346,26 +330,21 @@ private class PhotoModeController(
         ))
     }
 
-    private suspend fun cycleFrameRatio(): ModeSignal {
-        frameRatioIndex = (frameRatioIndex + 1) % frameRatios.size
-        val frameRatio = currentFrameRatio()
-        context.eventSink("photo.frame-ratio.selected.${frameRatio.eventTag()}")
-        mutableSnapshot.value = buildSnapshot(
-            headline = "Frame ratio updated"
+    private suspend fun cycleFrameRatio(): ModeSignal =
+        frameRatioDelegate.cycleFrameRatio(
+            snapshotHeadline = "Frame ratio updated",
+            updateSnapshot = { headline ->
+                mutableSnapshot.value = buildSnapshot(headline = headline)
+            }
         )
-        context.onEffectSpecChanged(buildEffectSpec(currentFlashMode()))
-        return ModeSignal.ShowHint("Frame: ${frameRatio.label}")
-    }
 
-    private suspend fun selectFrameRatio(ratio: FrameRatio): ModeSignal {
-        val nextIndex = frameRatios.indexOf(ratio)
-        if (nextIndex < 0) return ModeSignal.ShowHint("当前模式不支持 ${ratio.label} 画幅")
-        frameRatioIndex = nextIndex
-        context.eventSink("photo.frame-ratio.selected.${ratio.eventTag()}")
-        mutableSnapshot.value = buildSnapshot(headline = "画幅已更新")
-        context.onEffectSpecChanged(buildEffectSpec(currentFlashMode()))
-        return ModeSignal.ShowHint("画幅：${ratio.label}")
-    }
+    private suspend fun selectFrameRatio(ratio: FrameRatio): ModeSignal =
+        frameRatioDelegate.selectFrameRatio(
+            ratio = ratio,
+            updateSnapshot = { headline ->
+                mutableSnapshot.value = buildSnapshot(headline = headline)
+            }
+        )
 
     private fun currentDeviceGraph(): DeviceGraphSpec =
         stillCaptureDeviceGraph(runtimeState())
@@ -380,7 +359,7 @@ private class PhotoModeController(
 
     private fun currentFlashSupported(): Boolean = runtimeState().deviceCapabilities.supportsFlashControl
     private fun currentFlashMode(): FlashMode = currentFlashModes()[flashModeIndex]
-    private fun currentFrameRatio(): FrameRatio = frameRatios[frameRatioIndex]
+    private fun currentFrameRatio(): FrameRatio = frameRatioDelegate.currentFrameRatio()
     private fun selectedWatermarkTemplate(): WatermarkTemplate {
         val persistedTemplateId = context.settingsSnapshot.persisted.photo.defaultWatermarkTemplateId
         return context.settingsSnapshot.catalog.watermarkTemplates.firstOrNull { template ->

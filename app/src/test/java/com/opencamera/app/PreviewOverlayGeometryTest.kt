@@ -117,17 +117,28 @@ class PreviewOverlayGeometryTest {
     }
 
     @Test
-    fun `frame respects horizontal padding`() {
+    fun `active capture frame is centered in full preview content`() {
         val rect = computeFrameRect(
             viewWidth = 1080,
             viewHeight = 1920,
             ratioWidth = 4,
-            ratioHeight = 3,
-            horizontalPaddingPx = 24f
+            ratioHeight = 3
         )
-        // Available width is 1080 - 48 = 1032
-        assertApprox(1032f, rect.width)
-        assertApprox(24f, rect.left)
+        assertApprox(1080f, rect.width)
+        assertApprox(0f, rect.left)
+        assertRectCentered(1080, 1920, rect)
+    }
+
+    @Test
+    fun `active capture frame stays centered in full preview content despite bottom controls`() {
+        val rect = computeFrameRect(
+            viewWidth = 1080,
+            viewHeight = 2400,
+            ratioWidth = 4,
+            ratioHeight = 3
+        )
+
+        assertEquals(1200f, rect.centerY, 1f)
     }
 
     // --- gridLinePositions tests ---

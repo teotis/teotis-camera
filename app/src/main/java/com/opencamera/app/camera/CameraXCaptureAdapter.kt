@@ -13,6 +13,7 @@ import android.media.CamcorderProfile
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
+import android.view.Surface
 import android.os.SystemClock
 import android.provider.MediaStore
 import android.util.Range
@@ -93,6 +94,9 @@ import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
 import com.opencamera.core.media.ShotTiming
+import com.opencamera.core.media.primaryStillNode
+import com.opencamera.core.media.primaryVideoNode
+import com.opencamera.core.media.temporaryFrameNode
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
@@ -1032,6 +1036,8 @@ class CameraXCaptureAdapter(
     private var currentVideoSpec: VideoSpec? = null
     private var previewSnapshotGeneration: Int = 0
     private var suppressPreviewStateEvents = false
+    private var currentOutputRotation: com.opencamera.core.device.CameraOutputRotation =
+        com.opencamera.core.device.CameraOutputRotation.ROTATION_0
     private var firstFrameReportedForCurrentBind = false
     private var bindStartElapsedRealtimeNanos: Long = 0L
     private val _events = MutableSharedFlow<DeviceEvent>(extraBufferCapacity = 16)
@@ -1108,7 +1114,41 @@ class CameraXCaptureAdapter(
                     )
                 )
             }
+
+            is DeviceCommand.ApplyPreviewMetering -> {
+                _events.emit(
+                    DeviceEvent.PreviewMeteringCompleted(
+                        com.opencamera.core.device.PreviewMeteringResult(
+                            requestId = command.request.requestId,
+                            point = command.request.point,
+                            status = com.opencamera.core.device.PreviewMeteringResultStatus.UNSUPPORTED,
+                            reason = "CameraX FocusMeteringAction not yet implemented"
+                        )
+                    )
+                )
+            }
+            is DeviceCommand.UpdateOutputRotation -> runCatching {
+                applyOutputRotation(command.rotation)
+            }.onFailure { throwable ->
+                _events.emit(
+                    DeviceEvent.RuntimeIssue(
+                        DeviceRuntimeIssue(
+                            kind = DeviceRuntimeIssueKind.CAMERA_RECOVERABLE,
+                            reason = "Failed to update output rotation: ${throwable.message}",
+                            isRecoverable = true
+                        )
+                    )
+                )
+            }
         }
+    }
+
+    private fun applyOutputRotation(rotation: com.opencamera.core.device.CameraOutputRotation) {
+        if (rotation == currentOutputRotation) return
+        currentOutputRotation = rotation
+        val surfaceRotation = mapOutputRotationToSurface(rotation)
+        imageCapture?.targetRotation = surfaceRotation
+        videoCapture?.targetRotation = surfaceRotation
     }
 
     override suspend fun release() {
@@ -1173,11 +1213,12 @@ class CameraXCaptureAdapter(
             ?.let(::capabilitiesFor)
             ?: capabilities
         val deviceRequest = shotRequestTranslatorFactory(resolvedCapabilities).translate(plan)
-        when (plan.request.shotKind) {
-            ShotKind.STILL_CAPTURE -> captureStillImage(plan, deviceRequest, requestedAt)
-            ShotKind.MULTI_FRAME_CAPTURE -> captureStillImage(plan, deviceRequest, requestedAt)
-            ShotKind.LIVE_PHOTO -> captureStillImage(plan, deviceRequest, requestedAt)
-            ShotKind.VIDEO_RECORDING -> startVideoRecording(plan, deviceRequest, requestedAt)
+        val graph = plan.graph
+        when {
+            graph.primaryVideoNode() != null -> startVideoRecording(plan, deviceRequest, requestedAt)
+            graph.temporaryFrameNode() != null -> captureStillImage(plan, deviceRequest, requestedAt)
+            graph.primaryStillNode() != null -> captureStillImage(plan, deviceRequest, requestedAt)
+            else -> error("ShotGraph has no executable capture node for ${plan.request.shotId}")
         }
     }
 
@@ -2124,6 +2165,7 @@ class CameraXCaptureAdapter(
                     .build()
                 val capture = VideoCapture.Builder(recorder)
                     .setTargetFrameRate(targetFrameRateRange(effectiveVideoSpec))
+                    .setTargetRotation(mapOutputRotationToSurface(currentOutputRotation))
                     .build()
                 val camera = provider.bindToLifecycle(
                     lifecycleOwner,
@@ -2191,6 +2233,7 @@ class CameraXCaptureAdapter(
         val builder = ImageCapture.Builder()
             .setCaptureMode(captureMode)
             .setResolutionSelector(resolutionSelector)
+            .setTargetRotation(mapOutputRotationToSurface(currentOutputRotation))
         manualCaptureConfig?.let { config ->
             applyCamera2ManualCaptureConfig(builder, config)
         }
@@ -2314,14 +2357,7 @@ class CameraXCaptureAdapter(
         val cleanupFile: File? = null
     ) {
         fun resolveOutputHandle(savedUri: Uri?): MediaOutputHandle {
-            val resolvedContentUri = savedUri
-                ?.takeUnless { it == Uri.EMPTY }
-                ?.toString()
-            return if (resolvedContentUri == null) {
-                outputHandle
-            } else {
-                outputHandle.copy(contentUri = resolvedContentUri)
-            }
+            return resolvePhotoOutputHandle(outputHandle, savedUri)
         }
 
         fun cleanupPaths(): List<String> {
@@ -2377,4 +2413,27 @@ class CameraXCaptureAdapter(
     }
 
     private fun Uri?.takeUnlessEmpty(): Uri? = this?.takeUnless { it == Uri.EMPTY }
+}
+
+internal fun resolvePhotoOutputHandle(
+    outputHandle: MediaOutputHandle,
+    savedUri: Uri?
+): MediaOutputHandle {
+    val resolvedContentUri = savedUri
+        ?.takeUnless { it == Uri.EMPTY }
+        ?.toString()
+    return if (resolvedContentUri == null) {
+        outputHandle
+    } else {
+        outputHandle.copy(contentUri = resolvedContentUri)
+    }
+}
+
+internal fun mapOutputRotationToSurface(
+    rotation: com.opencamera.core.device.CameraOutputRotation
+): Int = when (rotation) {
+    com.opencamera.core.device.CameraOutputRotation.ROTATION_0 -> Surface.ROTATION_0
+    com.opencamera.core.device.CameraOutputRotation.ROTATION_90 -> Surface.ROTATION_90
+    com.opencamera.core.device.CameraOutputRotation.ROTATION_180 -> Surface.ROTATION_180
+    com.opencamera.core.device.CameraOutputRotation.ROTATION_270 -> Surface.ROTATION_270
 }

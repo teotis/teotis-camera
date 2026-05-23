@@ -12,6 +12,8 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.RecordingQualityPreset
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
@@ -805,6 +807,30 @@ class CameraSessionCoordinatorTest {
     }
 
     @Test
+    fun `UpdateOutputRotation effect forwards as DeviceCommand`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        session.emitEffect(
+            SessionEffect.UpdateOutputRotation(com.opencamera.core.device.CameraOutputRotation.ROTATION_90)
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            adapter.recordedCommands.contains(
+                DeviceCommand.UpdateOutputRotation(com.opencamera.core.device.CameraOutputRotation.ROTATION_90)
+            )
+        )
+    }
+
+    @Test
     fun `capture feedback snapshot event is forwarded to session intent`() = runTest {
         val session = FakeCameraSession()
         val adapter = FakeCameraDeviceAdapter()
@@ -831,6 +857,55 @@ class CameraSessionCoordinatorTest {
         assertTrue(
             session.recordedIntents.contains(expectedIntent),
             "Expected CaptureFeedbackSnapshotUpdated intent but got: ${session.recordedIntents}"
+        )
+    }
+
+    @Test
+    fun `ApplyPreviewMetering effect forwards as DeviceCommand`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        val request = com.opencamera.core.device.PreviewMeteringRequest(
+            requestId = "meter-1",
+            point = com.opencamera.core.device.PreviewMeteringPoint(0.5f, 0.4f)
+        )
+        session.emitEffect(SessionEffect.ApplyPreviewMetering(request))
+        advanceUntilIdle()
+
+        assertTrue(adapter.recordedCommands.contains(DeviceCommand.ApplyPreviewMetering(request)))
+    }
+
+    @Test
+    fun `PreviewMeteringCompleted device event forwards as SessionIntent`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        val result = com.opencamera.core.device.PreviewMeteringResult(
+            requestId = "meter-1",
+            point = com.opencamera.core.device.PreviewMeteringPoint(0.5f, 0.4f),
+            status = com.opencamera.core.device.PreviewMeteringResultStatus.SUCCEEDED
+        )
+        adapter.emit(DeviceEvent.PreviewMeteringCompleted(result))
+        advanceUntilIdle()
+
+        assertTrue(
+            session.recordedIntents.contains(
+                SessionIntent.PreviewMeteringCompleted(result)
+            )
         )
     }
 
@@ -897,6 +972,18 @@ class CameraSessionCoordinatorTest {
 
         override suspend fun dispatch(command: DeviceCommand) {
             recordedCommands += command
+            if (command is DeviceCommand.ApplyPreviewMetering) {
+                mutableEvents.emit(
+                    DeviceEvent.PreviewMeteringCompleted(
+                        PreviewMeteringResult(
+                            requestId = command.request.requestId,
+                            point = command.request.point.clamped(),
+                            status = PreviewMeteringResultStatus.SUCCEEDED,
+                            reason = null
+                        )
+                    )
+                )
+            }
         }
 
         override suspend fun release() = Unit

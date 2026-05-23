@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grothendieck 架构分析 — codex_camera</title>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  themeVariables: {
+    fontSize: '16px',
+    primaryColor: '#334155',
+    primaryTextColor: '#e2e8f0',
+    primaryBorderColor: '#64748b',
+    lineColor: '#94a3b8',
+    secondaryColor: '#1e293b',
+    tertiaryColor: '#334155',
+    nodeBorder: '#64748b',
+    clusterBkg: '#1e293b',
+    clusterBorder: '#475569',
+    titleColor: '#e2e8f0',
+    edgeLabelBackground: '#1e293b'
+  }
+});
+</script>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-card-hover: #1e2130;
+  --bg-surface: #141620;
+  --text: #e2e8f0;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --border: #2a2d3a;
+  --accent-blue: #60a5fa;
+  --accent-green: #34d399;
+  --accent-red: #f87171;
+  --accent-yellow: #fbbf24;
+  --accent-purple: #a78bfa;
+  --accent-orange: #fb923c;
+  --badge-danger-bg: rgba(248,113,113,0.15);
+  --badge-danger-color: #f87171;
+  --badge-success-bg: rgba(52,211,153,0.15);
+  --badge-success-color: #34d399;
+  --badge-info-bg: rgba(96,165,250,0.15);
+  --badge-info-color: #60a5fa;
+  --badge-warn-bg: rgba(251,191,36,0.15);
+  --badge-warn-color: #fbbf24;
+  --badge-purple-bg: rgba(167,139,250,0.15);
+  --badge-purple-color: #a78bfa;
+  --topo-bg: #1a1a1a;
+  --topo-current-label-bg: rgba(248,81,73,0.15);
+  --topo-current-label-color: #f85149;
+  --topo-current-border: rgba(248,81,73,0.2);
+  --topo-elevated-label-bg: rgba(63,185,80,0.15);
+  --topo-elevated-label-color: #3fb950;
+  --topo-elevated-border: rgba(63,185,80,0.2);
+  --lb-backdrop: rgba(0,0,0,0.85);
+  --lb-content-bg: #1a1a1a;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f8f9fa;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f1f3f5;
+    --bg-surface: #f0f2f5;
+    --text: #1a1a2e;
+    --text-muted: #6b7280;
+    --text-dim: #9ca3af;
+    --border: #e5e7eb;
+    --topo-bg: #f0f0f0;
+    --topo-current-label-bg: rgba(220,53,69,0.1);
+    --topo-current-label-color: #dc3545;
+    --topo-current-border: rgba(220,53,69,0.15);
+    --topo-elevated-label-bg: rgba(25,135,84,0.1);
+    --topo-elevated-label-color: #198754;
+    --topo-elevated-border: rgba(25,135,84,0.15);
+    --lb-backdrop: rgba(255,255,255,0.92);
+    --lb-content-bg: #ffffff;
+  }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 15px;
+}
+/* Layout */
+.layout { display: flex; min-height: 100vh; }
+.toc {
+  position: fixed; top: 0; left: 0; width: 280px; height: 100vh;
+  background: var(--bg-surface); border-right: 1px solid var(--border);
+  overflow-y: auto; padding: 24px 16px; z-index: 100;
+}
+.toc-title { font-size: 13px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px; }
+.toc a {
+  display: block; padding: 6px 12px; margin: 2px 0; border-radius: 6px;
+  color: var(--text-muted); text-decoration: none; font-size: 13px; transition: all 0.2s;
+}
+.toc a:hover { background: var(--bg-card); color: var(--text); }
+.toc a.active { background: var(--badge-info-bg); color: var(--accent-blue); font-weight: 600; }
+.toc .indent { padding-left: 28px; font-size: 12px; }
+.main { margin-left: 280px; flex: 1; padding: 40px 48px 120px; max-width: 1200px; }
+/* Header */
+.hero { margin-bottom: 48px; }
+.hero h1 { font-size: 32px; font-weight: 800; margin-bottom: 8px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.hero .subtitle { font-size: 16px; color: var(--text-muted); margin-bottom: 24px; }
+.hero .meta { display: flex; gap: 12px; flex-wrap: wrap; }
+.meta-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+  border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid var(--border);
+}
+/* Sections */
+section { margin-bottom: 56px; }
+h2 { font-size: 24px; font-weight: 700; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+h3 { font-size: 18px; font-weight: 600; margin: 24px 0 12px; color: var(--accent-blue); }
+h4 { font-size: 15px; font-weight: 600; margin: 16px 0 8px; }
+p { margin-bottom: 12px; }
+/* Cards */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 24px; margin-bottom: 20px; transition: border-color 0.2s;
+}
+.card:hover { border-color: var(--accent-blue); }
+.card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.card-title { font-size: 17px; font-weight: 700; }
+/* Badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px;
+  border-radius: 12px; font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.badge-danger { background: var(--badge-danger-bg); color: var(--badge-danger-color); }
+.badge-success { background: var(--badge-success-bg); color: var(--badge-success-color); }
+.badge-info { background: var(--badge-info-bg); color: var(--badge-info-color); }
+.badge-warn { background: var(--badge-warn-bg); color: var(--badge-warn-color); }
+.badge-purple { background: var(--badge-purple-bg); color: var(--badge-purple-color); }
+/* Compare columns */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+.compare-col { padding: 16px; border-radius: 8px; }
+.compare-col.current { background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.15); }
+.compare-col.elevated { background: rgba(52,211,153,0.06); border: 1px solid rgba(52,211,153,0.15); }
+.compare-col h5 { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.compare-col.current h5 { color: var(--accent-red); }
+.compare-col.elevated h5 { color: var(--accent-green); }
+/* Topology diagrams */
+.topology-compare { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; }
+.topology-diagram { flex: 1; min-width: 340px; }
+.topology-diagram .mermaid { min-height: 380px; width: 100%; background: var(--topo-bg); }
+.topology-diagram .label { font-size: 14px; font-weight: 600; margin-bottom: 8px; padding: 4px 12px; border-radius: 4px; display: inline-block; }
+.topology-diagram.current .label { background: var(--topo-current-label-bg); color: var(--topo-current-label-color); }
+.topology-diagram.current .mermaid { border: 2px solid var(--topo-current-border); border-radius: 8px; padding: 16px; }
+.topology-diagram.elevated .label { background: var(--topo-elevated-label-bg); color: var(--topo-elevated-label-color); }
+.topology-diagram.elevated .mermaid { border: 2px solid var(--topo-elevated-border); border-radius: 8px; padding: 16px; }
+/* Lightbox */
+.lightbox { display: none; position: fixed; inset: 0; z-index: 9999; background: var(--lb-backdrop); cursor: pointer; }
+.lightbox.active { display: flex; align-items: center; justify-content: center; }
+.lightbox .mermaid { min-width: 700px; min-height: 500px; background: var(--lb-content-bg); border-radius: 8px; padding: 24px; }
+/* 2x2 Matrix */
+.matrix-container { position: relative; width: 100%; max-width: 700px; height: 500px; margin: 24px auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.matrix-axis-x { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--text-dim); font-weight: 600; }
+.matrix-axis-y { position: absolute; left: 16px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 12px; color: var(--text-dim); font-weight: 600; }
+.matrix-label-tl { position: absolute; top: 12px; left: 60px; font-size: 11px; color: var(--accent-yellow); font-weight: 600; }
+.matrix-label-tr { position: absolute; top: 12px; right: 20px; font-size: 11px; color: var(--accent-green); font-weight: 600; }
+.matrix-label-bl { position: absolute; bottom: 50px; left: 60px; font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.matrix-label-br { position: absolute; bottom: 50px; right: 20px; font-size: 11px; color: var(--accent-orange); font-weight: 600; }
+.matrix-dot {
+  position: absolute; width: 14px; height: 14px; border-radius: 50%;
+  transform: translate(-50%, -50%); cursor: pointer; transition: transform 0.2s; z-index: 2;
+}
+.matrix-dot:hover { transform: translate(-50%, -50%) scale(1.5); }
+.matrix-dot .tooltip {
+  display: none; position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 12px; white-space: nowrap; font-size: 12px; z-index: 10; pointer-events: none;
+}
+.matrix-dot:hover .tooltip { display: block; }
+.matrix-grid { position: absolute; inset: 40px 20px 60px 50px; }
+.matrix-grid .hline { position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--border); }
+.matrix-grid .vline { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px dashed var(--border); }
+/* Review system */
+.review-area { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.review-area textarea {
+  width: 100%; min-height: 60px; padding: 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-surface); color: var(--text); font-size: 13px; resize: vertical; font-family: inherit;
+}
+.review-controls { display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+.star-rating { display: flex; gap: 4px; }
+.star-rating .star { cursor: pointer; font-size: 20px; color: var(--text-dim); transition: color 0.15s; }
+.star-rating .star.filled { color: var(--accent-yellow); }
+.status-tags { display: flex; gap: 6px; }
+.status-tag {
+  padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text-muted); transition: all 0.2s;
+}
+.status-tag:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.status-tag.selected { background: var(--badge-info-bg); border-color: var(--accent-blue); color: var(--accent-blue); }
+/* FAB */
+.fab {
+  position: fixed; bottom: 32px; right: 32px; padding: 14px 24px; border-radius: 28px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); color: #fff;
+  font-size: 14px; font-weight: 700; border: none; cursor: pointer; z-index: 200;
+  box-shadow: 0 4px 20px rgba(96,165,250,0.3); transition: transform 0.2s;
+}
+.fab:hover { transform: scale(1.05); }
+/* Code */
+code {
+  background: var(--bg-surface); padding: 2px 6px; border-radius: 4px;
+  font-size: 13px; font-family: 'SF Mono', 'JetBrains Mono', monospace;
+}
+pre {
+  background: var(--bg-surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; overflow-x: auto; font-size: 13px; line-height: 1.5;
+  font-family: 'SF Mono', 'JetBrains Mono', monospace; margin: 12px 0;
+}
+/* Details */
+details { margin: 12px 0; }
+details summary {
+  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent-blue);
+  padding: 8px 0; list-style: none;
+}
+details summary::before { content: '[+] '; }
+details[open] summary::before { content: '[-] '; }
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+th { background: var(--bg-surface); padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid var(--border); }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+tr:hover td { background: var(--bg-card-hover); }
+/* Principle tag */
+.principle-tag {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
+  border-radius: 10px; font-size: 10px; font-weight: 700;
+  background: var(--badge-purple-bg); color: var(--badge-purple-color);
+}
+/* Toast */
+.toast {
+  position: fixed; bottom: 100px; right: 32px; padding: 12px 20px; border-radius: 10px;
+  background: var(--accent-green); color: #000; font-size: 14px; font-weight: 600;
+  z-index: 9998; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+/* Responsive */
+@media (max-width: 900px) {
+  .toc { display: none; }
+  .main { margin-left: 0; padding: 24px 16px; }
+  .compare { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- TOC -->
+<nav class="toc" id="toc">
+  <div class="toc-title">目录</div>
+  <a href="#overview">全局概览</a>
+  <a href="#matrix" class="indent">收益-成本矩阵</a>
+  <a href="#topology">架构拓扑总览</a>
+  <a href="#s1">1. 模式控制器模板化</a>
+  <a href="#s2" class="indent">Rising Sea + Motive</a>
+  <a href="#s3">2. Session 上帝类拆分</a>
+  <a href="#s4" class="indent">Sheaf / Local-to-Global</a>
+  <a href="#s5">3. 合同文件巨人症</a>
+  <a href="#s6" class="indent">Ruthless Generalization</a>
+  <a href="#s7">4. Effect-Device 依赖反转</a>
+  <a href="#s8" class="indent">Eliminate Boundaries</a>
+  <a href="#s9">5. ShotExecutor/ShotGraph 统一</a>
+  <a href="#s10" class="indent">Base Change</a>
+  <a href="#s11">6. MainActivity 职责下沉</a>
+  <a href="#s12" class="indent">Yoneda Perspective</a>
+  <a href="#s13">7. render() 纯函数管道</a>
+  <a href="#s14" class="indent">Functoriality</a>
+  <a href="#self-assess">自评与盲区</a>
+</nav>
+
+<!-- Main Content -->
+<div class="main">
+
+<!-- Hero -->
+<div class="hero">
+  <h1>Grothendieck 架构分析</h1>
+  <div class="subtitle">codex_camera — Android 相机应用架构深度审查</div>
+  <div class="meta">
+    <span class="meta-badge badge-info">118 文件</span>
+    <span class="meta-badge badge-info">3947 节点</span>
+    <span class="meta-badge badge-warn">7 个巨型文件</span>
+    <span class="meta-badge badge-success">MVI 单向数据流</span>
+    <span class="meta-badge badge-purple">11 条 Grothendieck 原则</span>
+  </div>
+</div>
+
+<!-- Overview Matrix -->
+<section id="overview">
+<h2>全局概览</h2>
+<p>codex_camera 是一个结构清晰的 Android 相机应用，采用 MVI/Elm 单向数据流架构，6 个 core 模块 + 7 个 mode 特性模块 + 1 个 app 层。核心设计决策（Session 状态机、Mode 插件化、Shot 生命周期模型）体现了良好的抽象意识。但随着功能增长，若干结构性债务正在积累：模式控制器 60-70% 的代码是结构性复制，5 个文件超过 1000 行，核心依赖图存在非自然边界。</p>
+<p>以下矩阵将所有优化建议按 <strong>预期收益</strong>（纵轴）和 <strong>重构成本</strong>（横轴）定位。右上角是最佳 ROI 区域。</p>
+
+<div class="matrix-container" id="matrix">
+  <div class="matrix-grid"><div class="hline"></div><div class="vline"></div></div>
+  <div class="matrix-axis-x">重构成本 →</div>
+  <div class="matrix-axis-y">预期收益 →</div>
+  <div class="matrix-label-tl">高收益 / 低成本</div>
+  <div class="matrix-label-tr">高收益 / 高成本</div>
+  <div class="matrix-label-bl">低收益 / 低成本</div>
+  <div class="matrix-label-br">低收益 / 高成本</div>
+  <!-- S1: 模式模板化 - 高收益, 中等成本 -->
+  <div class="matrix-dot" style="left:38%;top:18%;background:var(--accent-green);" onclick="document.getElementById('s1').scrollIntoView({behavior:'smooth'})">
+    <div class="tooltip">S1: 模式控制器模板化</div>
+  </div>
+  <!-- S3: 合同文件拆分 - 中高收益, 低成本 -->
+  <div class="matrix-dot" style="left:25%;top:30%;background:var(--accent-green);" onclick="document.getElementById('s5').scrollIntoView({behavior:'smooth'})">
+    <div class="tooltip">S3: 合同文件巨人症治理</div>
+  </div>
+  <!-- S2: Session 拆分 - 高收益, 高成本 -->
+  <div class="matrix-dot" style="left:72%;top:15%;background:var(--accent-orange);" onclick="document.getElementById('s3').scrollIntoView({behavior:'smooth'})">
+    <div class="tooltip">S2: Session 上帝类拆分</div>
+  </div>
+  <!-- S4: Effect-Device 依赖反转 - 中收益, 中成本 -->
+  <div class="matrix-dot" style="left:45%;top:42%;background:var(--accent-blue);" onclick="document.getElementById('s7').scrollIntoView({behavior:'smooth'})">
+    <div class="tooltip">S4: Effect-Device 依赖反转</div>
+  </div>
+  <!-- S5: ShotGraph 统一 - 中收益, 中高成本 -->
+  <div class="matrix-dot" style="left:55%;top:38%;background:var(--accent-blue);" onclick="document.getElementById('s9').scrollIntoView({behavior:'smooth'})">
+    <div class="tooltip">S5: ShotExecutor/ShotGraph 统一</div>
+  </div>
+  <!-- S6: MainActivity 下沉 - 高收益, 高成本 -->
+  <div class="matrix-dot" style="left:70%;top:22%;background:var(--accent-orange);" onclick="document.getElementById('s11').scrollIntoView({behavior:'smooth'})">
+    <div class="tooltip">S6: MainActivity 职责下沉</div>
+  </div>
+  <!-- S7: render 管道 - 中收益, 低成本 -->
+  <div class="matrix-dot" style="left:28%;top:48%;background:var(--accent-blue);" onclick="document.getElementById('s13').scrollIntoView({behavior:'smooth'})">
+    <div class="tooltip">S7: render() 纯函数管道化</div>
+  </div>
+</div>
+</section>
+
+<!-- Topology Overview -->
+<section id="topology">
+<h2>架构拓扑总览</h2>
+<p>左侧展示当前模块依赖拓扑（注意 effect → device 的耦合），右侧展示 Grothendieck "提升抽象层"后的理想拓扑。</p>
+<div class="topology-compare">
+  <div class="topology-diagram current">
+    <span class="label">Current Topology</span>
+    <div class="mermaid">
+flowchart TB
+  subgraph app["app layer"]
+    MA["MainActivity<br/>(1965 lines)"]
+    SRM["SessionUiRenderModel<br/>(2715 lines)"]
+    CXX["CameraXCaptureAdapter<br/>(2394 lines)"]
+    CSC["CameraSessionCoordinator"]
+  end
+  subgraph session["core/session"]
+    DCS["DefaultCameraSession<br/>(1981 lines)"]
+  end
+  subgraph mode["core/mode"]
+    MC["ModeController"]
+    MR["ModeRegistry"]
+  end
+  subgraph effect["core/effect"]
+    ES["EffectSpec"]
+    ECR["EffectCapabilityResolver"]
+    PEA["PreviewEffectAdapter"]
+  end
+  subgraph device["core/device"]
+    DC["DeviceCapabilities"]
+    DGS["DeviceGraphSpec"]
+    DSRT["DeviceShotRequestTranslator"]
+  end
+  subgraph media["core/media"]
+    MPC["MediaPipelineContracts<br/>(1134 lines)"]
+    SE["ShotExecutor"]
+    SG["ShotGraph 2.0"]
+  end
+  subgraph settings["core/settings"]
+    SC["SettingsContracts<br/>(1383 lines)"]
+  end
+  subgraph features["feature/mode-* x7"]
+    PMP["PhotoModePlugin"]
+    NMP["NightModePlugin"]
+    OTMP["...5 more plugins<br/>60-70% duplicated"]
+  end
+
+  MA --> DCS
+  MA --> SRM
+  CSC --> CXX
+  CSC --> DCS
+  DCS --> MC
+  DCS --> ES
+  DCS --> SE
+  MC --> ES
+  MC --> DGS
+  ECR --> DC
+  ES --> SC
+  CXX --> DSRT
+  CXX --> SE
+  MR --> PMP
+  MR --> NMP
+  MR --> OTMP
+  DSRT --> MPC
+  style ECR stroke:#f85149,stroke-width:3px
+  style DC stroke:#f85149,stroke-width:3px
+  style DCS stroke:#fbbf24,stroke-width:2px
+  style SRM stroke:#fbbf24,stroke-width:2px
+  style MPC stroke:#fbbf24,stroke-width:2px
+  style SC stroke:#fbbf24,stroke-width:2px
+    </div>
+  </div>
+  <div class="topology-diagram elevated">
+    <span class="label">Elevated Topology</span>
+    <div class="mermaid">
+flowchart TB
+  subgraph app2["app layer"]
+    MA2["MainActivity<br/>(slim host)"]
+    VM2["ModeViewModel /<br/>SessionViewModel"]
+    RRP2["RenderPipeline<br/>(composable)"]
+    CXX2["CameraXCaptureAdapter<br/>(unchanged)"]
+    CSC2["CameraSessionCoordinator"]
+  end
+  subgraph session2["core/session"]
+    SLC["SessionLifecycle"]
+    PM["PreviewManager"]
+    CM["CaptureManager"]
+    SM2["SettingsMiddleware"]
+  end
+  subgraph mode2["core/mode"]
+    BAC["BaseModeController<br/>(template)"]
+    FMP["FrameRatioDelegate"]
+    PVD["ProVariantDelegate"]
+    CDD["CurrentDeviceGraph<br/>extension"]
+  end
+  subgraph contracts2["core/contracts"]
+    CC["CameraContracts<br/>(slim enums)"]
+    MPC2["MediaContracts<br/>(slim)"]
+    SC2["SettingsContracts<br/>(split files)"]
+  end
+  subgraph pipeline["core/pipeline"]
+    UG["UnifiedGraph<br/>(ShotGraph only)"]
+    AP["AlgorithmProcessor"]
+  end
+  subgraph hw["core/hw"]
+    DC2["DeviceCapabilities"]
+    EC["EffectContracts"]
+    ECR2["EffectCapabilityResolver"]
+  end
+
+  MA2 --> VM2
+  VM2 --> SLC
+  RRP2 --> VM2
+  CSC2 --> CXX2
+  CSC2 --> SLC
+  SLC --> PM
+  SLC --> CM
+  SLC --> SM2
+  PM --> BAC
+  CM --> UG
+  BAC --> FMP
+  BAC --> PVD
+  BAC --> CDD
+  BAC --> EC
+  ECR2 -.->|reads| DC2
+  EC -.->|defines| CC
+  UG --> AP
+  style BAC stroke:#3fb950,stroke-width:3px
+  style UG stroke:#3fb950,stroke-width:3px
+  style SLC stroke:#3fb950,stroke-width:2px
+  style FMP stroke:#3fb950,stroke-width:2px
+  style PVD stroke:#3fb950,stroke-width:2px
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== S1: Mode Controller Template ===== -->
+<section id="s1">
+<h2 id="s2">S1: 模式控制器模板化</h2>
+<div class="card-header">
+  <span class="badge badge-success">高收益</span>
+  <span class="badge badge-warn">中等成本</span>
+  <span class="badge badge-info">高置信度</span>
+  <span class="principle-tag">Rising Sea</span>
+  <span class="principle-tag">Finding Absolute Motives</span>
+</div>
+
+<p>7 个 mode 插件中约 <strong>60-70% 的代码是结构性复制</strong>：相同的 <code>onEnter</code>/<code>onExit</code> 结构、相同的 <code>onSessionEvent</code> 分支、相同的 <code>cycleFrameRatio()</code> / <code>currentDeviceGraph()</code> / <code>toggleProVariant()</code> 方法。这是 Grothendieck 所说的 "同一事物的不同投影" — 它们都是 ModeController 的同一个 Motive 的不同实例化。</p>
+
+<h4>被复制的方法清单</h4>
+<table>
+<tr><th>方法</th><th>复制数</th><th>差异点</th></tr>
+<tr><td><code>cycleFrameRatio()</code> / <code>selectFrameRatio()</code> / <code>currentFrameRatio()</code></td><td>5 个模式</td><td>无差异，完全相同</td></tr>
+<tr><td><code>currentDeviceGraph()</code></td><td>6 个模式</td><td>无差异，完全相同</td></tr>
+<tr><td><code>onSessionEvent()</code> 分发逻辑</td><td>7 个模式</td><td>仅 MediaType 和字符串不同</td></tr>
+<tr><td><code>toggleProVariant()</code> + 相关 6 个方法</td><td>3 个模式</td><td>无差异，完全相同</td></tr>
+<tr><td><code>onEnter()</code> / <code>onExit()</code> 结构</td><td>7 个模式</td><td>仅事件字符串不同</td></tr>
+<tr><td><code>countdownDuration()</code></td><td>4 个模式</td><td>无差异</td></tr>
+<tr><td><code>livePhotoEnabledByDefault()</code> + <code>toCaptureSpec()</code></td><td>3 个模式</td><td>无差异</td></tr>
+</table>
+
+<div class="compare">
+  <div class="compare-col current">
+    <h5>现状：7 个独立的 400-600 行控制器</h5>
+    <pre>// 每个模式都重复这些方法：
+private fun runtimeState() = context.runtimeState()
+private fun currentDeviceGraph() = DeviceGraphSpec.stillCapture(
+    preferredLensFacing = runtimeState().lensFacing,
+    enablePreviewSnapshots = runtimeState().deviceCapabilities.supportsPreviewSnapshots,
+    qualityPreference = runtimeState().stillCaptureQuality,
+    resolutionPreset = runtimeState().stillCaptureResolutionPreset
+)
+// ... cycleFrameRatio(), selectFrameRatio(), currentFrameRatio()
+// ... toggleProVariant(), resolvedAlgorithmProfile(), ...
+// 总计 ~3200 行，其中 ~2000 行是复制</pre>
+  </div>
+  <div class="compare-col elevated">
+    <h5>目标：模板基类 + 委托组合</h5>
+    <pre>abstract class BaseModeController(
+    protected val context: ModeContext
+) : ModeController {
+
+    // 通用实现，子类只需覆盖差异点
+    protected val frameRatioDelegate = FrameRatioDelegate(context)
+    protected val proVariantDelegate = ProVariantDelegate(context)
+
+    override fun deviceGraph() = currentDeviceGraph()
+
+    override suspend fun onEnter() {
+        context.eventSink.emit("${id.name.lowercase()}.enter")
+        rebuildSnapshot()
+        context.onEffectSpecChanged(buildEffectSpec())
+    }
+
+    // 子类只需实现这些：
+    abstract fun buildEffectSpec(): EffectSpec
+    abstract fun resolveCaptureStrategy(): CaptureStrategy
+    abstract fun buildModeState(): ModeState
+}</pre>
+  </div>
+</div>
+
+<details>
+<summary>扩展：委托类设计</summary>
+<pre>// core/mode 模块新增
+class FrameRatioDelegate(private val context: ModeContext) {
+    private val availableRatios = listOf(
+        FrameRatio.RATIO_4_3, FrameRatio.RATIO_16_9, FrameRatio.RATIO_1_1
+    )
+    private var currentIndex = 0
+
+    fun current() = availableRatios[currentIndex]
+    fun cycle(): FrameRatio {
+        currentIndex = (currentIndex + 1) % availableRatios.size
+        return current()
+    }
+    fun select(ratio: FrameRatio): String? {
+        val idx = availableRatios.indexOf(ratio)
+        return if (idx >= 0) { currentIndex = idx; null }
+        else "当前模式不支持 ${ratio.label} 画幅"
+    }
+}
+
+class ProVariantDelegate(private val context: ModeContext) {
+    var isEnabled = false; private set
+    fun toggle(): Boolean { isEnabled = !isEnabled; return isEnabled }
+    fun resolvedProfile(base: String) =
+        if (isEnabled) "$base-pro" else base
+}</pre>
+</details>
+
+<div class="topology-compare">
+  <div class="topology-diagram current">
+    <span class="label">Current Topology</span>
+    <div class="mermaid">
+flowchart LR
+  subgraph modes["7 Mode Plugins"]
+    P1["PhotoMode<br/>(427 lines)"]
+    P2["NightMode<br/>(513 lines)"]
+    P3["PortraitMode<br/>(627 lines)"]
+    P4["HumanisticMode<br/>(542 lines)"]
+    P5["ProMode<br/>(415 lines)"]
+    P6["DocumentMode<br/>(337 lines)"]
+    P7["VideoMode<br/>(417 lines)"]
+  end
+  C1["cycleFrameRatio<br/>x5 copy"]
+  C2["currentDeviceGraph<br/>x6 copy"]
+  C3["onSessionEvent<br/>x7 copy"]
+  C4["toggleProVariant<br/>x3 copy"]
+
+  P1 --- C1
+  P2 --- C1
+  P3 --- C1
+  P4 --- C1
+  P5 --- C1
+  P1 --- C2
+  P2 --- C2
+  P3 --- C2
+  P4 --- C2
+  P5 --- C2
+  P6 --- C2
+  P1 --- C3
+  P2 --- C3
+  P3 --- C3
+  P4 --- C3
+  P5 --- C3
+  P6 --- C3
+  P7 --- C3
+  P2 --- C4
+  P3 --- C4
+  P4 --- C4
+    </div>
+  </div>
+  <div class="topology-diagram elevated">
+    <span class="label">Elevated Topology</span>
+    <div class="mermaid">
+flowchart LR
+  subgraph base["BaseModeController"]
+    TPL["Template Methods<br/>onEnter / onExit / handle"]
+    FRD["FrameRatioDelegate"]
+    PVD["ProVariantDelegate"]
+    CDG["currentDeviceGraph()"]
+    OSE["onSessionEvent()"]
+  end
+  subgraph concrete["Concrete Modes"]
+    CP["PhotoMode<br/>(~150 lines)"]
+    CN["NightMode<br/>(~200 lines)"]
+    CPT["PortraitMode<br/>(~250 lines)"]
+    CH["HumanisticMode<br/>(~200 lines)"]
+    CPRO["ProMode<br/>(~150 lines)"]
+    CD["DocumentMode<br/>(~120 lines)"]
+    CV["VideoMode<br/>(~180 lines)"]
+  end
+
+  CP --> TPL
+  CN --> TPL
+  CPT --> TPL
+  CH --> TPL
+  CPRO --> TPL
+  CD --> TPL
+  CV --> TPL
+  CP --> FRD
+  CN --> FRD
+  CPT --> FRD
+  CH --> FRD
+  CPRO --> FRD
+  CPT --> PVD
+  CH --> PVD
+  CN --> PVD
+    </div>
+  </div>
+</div>
+
+<div class="review-area" data-card="s1">
+  <textarea placeholder="评审意见..."></textarea>
+  <div class="review-controls">
+    <div class="star-rating" data-card="s1">
+      <span class="star" data-v="1">&#9733;</span><span class="star" data-v="2">&#9733;</span><span class="star" data-v="3">&#9733;</span><span class="star" data-v="4">&#9733;</span><span class="star" data-v="5">&#9733;</span>
+    </div>
+    <div class="status-tags">
+      <button class="status-tag" data-tag="agree">同意</button>
+      <button class="status-tag" data-tag="doubt">存疑</button>
+      <button class="status-tag" data-tag="exists">已存在/误报</button>
+      <button class="status-tag" data-tag="na">不适用</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== S2: Session God Class ===== -->
+<section id="s3">
+<h2 id="s4">S2: Session 上帝类拆分</h2>
+<div class="card-header">
+  <span class="badge badge-success">高收益</span>
+  <span class="badge badge-danger">高成本</span>
+  <span class="badge badge-warn">中等风险</span>
+  <span class="principle-tag">Sheaf / Local-to-Global</span>
+</div>
+
+<p><code>DefaultCameraSession.kt</code>（1981 行）是整个系统中最大的行为类。它在一个 <code>when</code> 块中路由 ~30 种 Intent，同时管理生命周期、模式切换、预览绑定/恢复、拍摄流程、录制看门狗、设备图解析和状态更新。这是经典的 "God Object" — Grothendieck 会说：<strong>这些职责应该通过 "局部一致性条件" 自动组合成全局行为，而不是由一个中央协调者逐一调度。</strong></p>
+
+<h4>当前 Session 承担的 7 种职责</h4>
+<table>
+<tr><th>#</th><th>职责</th><th>行数(估)</th><th>信号</th></tr>
+<tr><td>1</td><td>生命周期管理 (Boot/Shutdown)</td><td>~80</td><td>可独立</td></tr>
+<tr><td>2</td><td>模式切换 (SwitchMode)</td><td>~70</td><td>可独立</td></tr>
+<tr><td>3</td><td>预览绑定/恢复</td><td>~200</td><td>最大复杂度</td></tr>
+<tr><td>4</td><td>拍摄流程 (Countdown/Submit/Result)</td><td>~250</td><td>可独立</td></tr>
+<tr><td>5</td><td>录制管理 (Start/Stop/Watchdog)</td><td>~120</td><td>可独立</td></tr>
+<tr><td>6</td><td>设备图/变焦/分辨率解析</td><td>~100</td><td>纯函数</td></tr>
+<tr><td>7</td><td>状态更新 (updateState 30参数)</td><td>~80</td><td>核心</td></tr>
+</table>
+
+<div class="compare">
+  <div class="compare-col current">
+    <h5>现状：一个 1981 行的 when 路由器</h5>
+    <pre>// DefaultCameraSession.kt line 149
+private suspend fun process(intent: SessionIntent) {
+    when (intent) {
+        is SessionIntent.Boot -> handleBoot()
+        is SessionIntent.Shutdown -> handleShutdown()
+        is SessionIntent.SwitchMode -> handleSwitchMode(intent.modeId)
+        is SessionIntent.ShutterPressed -> handleModeIntent(...)
+        is SessionIntent.PreviewHostAttached -> ...
+        is SessionIntent.PreviewFirstFrameAvailable -> ...
+        is SessionIntent.ShotStarted -> handleShotStarted(...)
+        is SessionIntent.ShotCompleted -> handleShotCompleted(...)
+        is SessionIntent.PreviewSurfaceLost -> handlePreviewSurfaceLost()
+        is SessionIntent.PreviewError -> handlePreviewError(...)
+        // ... 20+ more cases
+    }
+}</pre>
+  </div>
+  <div class="compare-col elevated">
+    <h5>目标：分层中间件</h5>
+    <pre>// Session 变成薄壳 + 可组合的中间件链
+class DefaultCameraSession(
+    private val lifecycle: SessionLifecycleManager,
+    private val preview: PreviewBindManager,
+    private val capture: CaptureFlowManager,
+    private val recording: RecordingManager,
+    private val modeSwitch: ModeSwitchManager,
+    private val graphResolver: DeviceGraphResolver,
+) : CameraSession {
+
+    override suspend fun dispatch(intent: SessionIntent) {
+        // 中间件链：每个中间件处理自己关心的 Intent
+        val handled = lifecycle.process(intent)
+            || modeSwitch.process(intent)
+            || capture.process(intent)
+            || recording.process(intent)
+            || preview.process(intent)
+        // 未处理的 Intent 由默认逻辑处理
+    }
+}</pre>
+  </div>
+</div>
+
+<details>
+<summary>扩展：PreviewBindManager 提取方案</summary>
+<pre>// 提取预览绑定/恢复逻辑为独立 Manager
+class PreviewBindManager(
+    private val stateAccessor: () -> SessionState,
+    private val emitEffect: suspend (SessionEffect) -> Unit,
+    private val updateState: suspend (PartialState) -> Unit,
+    private val trace: SessionTrace,
+) {
+    private var pendingRecovery: String? = null
+
+    suspend fun process(intent: SessionIntent): Boolean = when (intent) {
+        is SessionIntent.PreviewHostAttached -> { requestBinding(); true }
+        is SessionIntent.PreviewHostDetached -> { handleDetach(); true }
+        is SessionIntent.PreviewSurfaceLost -> { attemptRecovery("surface_lost"); true }
+        is SessionIntent.PreviewError -> { attemptRecovery(intent.reason); true }
+        is SessionIntent.PreviewBindingStarted -> { handleBindingStarted(intent); true }
+        is SessionIntent.PreviewFirstFrameAvailable -> { handleFirstFrame(intent); true }
+        is SessionIntent.PreviewStopped -> { handleStopped(); true }
+        else -> false // 不处理，传给下一个中间件
+    }
+}</pre>
+</details>
+
+<div class="topology-compare">
+  <div class="topology-diagram current">
+    <span class="label">Current Topology</span>
+    <div class="mermaid">
+flowchart TB
+  SI["SessionIntent<br/>(30+ variants)"] --> P["process()<br/>single when block"]
+  P --> L["Lifecycle<br/>(Boot/Shutdown)"]
+  P --> M["Mode Switch"]
+  P --> PV["Preview Bind<br/>(attach/detach/recovery)"]
+  P --> C["Capture Flow<br/>(countdown/submit/result)"]
+  P --> R["Recording<br/>(start/stop/watchdog)"]
+  P --> G["Graph Resolution"]
+  P --> US["updateState()<br/>(30 params)"]
+  style P stroke:#fbbf24,stroke-width:3px
+    </div>
+  </div>
+  <div class="topology-diagram elevated">
+    <span class="label">Elevated Topology</span>
+    <div class="mermaid">
+flowchart TB
+  SI2["SessionIntent"] --> MW["Middleware Chain"]
+  MW --> LM["LifecycleManager"]
+  MW --> MSM["ModeSwitchManager"]
+  MW --> PBM["PreviewBindManager"]
+  MW --> CFM["CaptureFlowManager"]
+  MW --> RM["RecordingManager"]
+  MW --> DGR["DeviceGraphResolver"]
+  LM --> SS["SessionState"]
+  MSM --> SS
+  PBM --> SS
+  CFM --> SS
+  RM --> SS
+  DGR --> SS
+  SS --> SF["StateFlow"]
+  style MW stroke:#3fb950,stroke-width:3px
+  style SS stroke:#3fb950,stroke-width:2px
+    </div>
+  </div>
+</div>
+
+<div class="review-area" data-card="s3">
+  <textarea placeholder="评审意见..."></textarea>
+  <div class="review-controls">
+    <div class="star-rating" data-card="s3">
+      <span class="star" data-v="1">&#9733;</span><span class="star" data-v="2">&#9733;</span><span class="star" data-v="3">&#9733;</span><span class="star" data-v="4">&#9733;</span><span class="star" data-v="5">&#9733;</span>
+    </div>
+    <div class="status-tags">
+      <button class="status-tag" data-tag="agree">同意</button>
+      <button class="status-tag" data-tag="doubt">存疑</button>
+      <button class="status-tag" data-tag="exists">已存在/误报</button>
+      <button class="status-tag" data-tag="na">不适用</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== S3: Contract File Obesity ===== -->
+<section id="s5">
+<h2 id="s6">S3: 合同文件巨人症治理</h2>
+<div class="card-header">
+  <span class="badge badge-success">高收益</span>
+  <span class="badge badge-success">低成本</span>
+  <span class="badge badge-info">高置信度</span>
+  <span class="principle-tag">Ruthless Generalization</span>
+</div>
+
+<p>两个 "合同文件" 是项目中最大的文件：</p>
+<ul>
+  <li><code>SettingsContracts.kt</code>: <strong>1383 行</strong> — 枚举、数据类、Action Reducer、序列化编解码器、默认滤镜配置、水印模板全在一个文件</li>
+  <li><code>MediaPipelineContracts.kt</code>: <strong>1134 行</strong> — Shot 生命周期、ShotGraph 2.0、帧流合约、算法管道、媒体保存事务全在一个文件</li>
+</ul>
+
+<p>Grothendieck 的 Ruthless Generalization 要求我们问：<strong>这些内容真的属于同一个抽象吗？</strong> 答案是否定的 — 序列化逻辑不是合约，默认数据不是类型定义，Reducer 不是接口。它们被放在一起只是因为 "方便"，但这产生了隐性耦合：修改任何一部分都要重新编译整个文件的所有消费者。</p>
+
+<h4>拆分方案</h4>
+<table>
+<tr><th>原始文件</th><th>拆分目标</th><th>行数(估)</th></tr>
+<tr><td rowspan="5">SettingsContracts.kt<br/>(1383 行)</td><td>SettingsEnums.kt — 值类型枚举</td><td>~300</td></tr>
+<tr><td>SettingsDataModels.kt — Settings/Catalog 数据类</td><td>~150</td></tr>
+<tr><td>SettingsActions.kt — PersistedSettingsAction + Reducer</td><td>~120</td></tr>
+<tr><td>FilterProfileDefaults.kt — 默认滤镜配置</td><td>~250</td></tr>
+<tr><td>SettingsSerialization.kt — Codec/Serializer</td><td>~200</td></tr>
+<tr><td rowspan="4">MediaPipelineContracts.kt<br/>(1134 行)</td><td>ShotLifecycle.kt — ShotRequest/Plan/Result/Executor</td><td>~400</td></tr>
+<tr><td>ShotGraph.kt — ShotGraph 2.0 节点模型</td><td>~250</td></tr>
+<tr><td>FrameStreamContracts.kt — FrameDescriptor/Payload/Lease</td><td>~150</td></tr>
+<tr><td>MediaSaveContracts.kt — SaveTransaction/PostProcessor</td><td>~120</td></tr>
+</table>
+
+<div class="review-area" data-card="s5">
+  <textarea placeholder="评审意见..."></textarea>
+  <div class="review-controls">
+    <div class="star-rating" data-card="s5">
+      <span class="star" data-v="1">&#9733;</span><span class="star" data-v="2">&#9733;</span><span class="star" data-v="3">&#9733;</span><span class="star" data-v="4">&#9733;</span><span class="star" data-v="5">&#9733;</span>
+    </div>
+    <div class="status-tags">
+      <button class="status-tag" data-tag="agree">同意</button>
+      <button class="status-tag" data-tag="doubt">存疑</button>
+      <button class="status-tag" data-tag="exists">已存在/误报</button>
+      <button class="status-tag" data-tag="na">不适用</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== S4: Effect-Device Dependency ===== -->
+<section id="s7">
+<h2 id="s8">S4: Effect-Device 依赖反转</h2>
+<div class="card-header">
+  <span class="badge badge-info">中等收益</span>
+  <span class="badge badge-warn">中等成本</span>
+  <span class="principle-tag">Eliminate Artificial Boundaries</span>
+</div>
+
+<p>当前依赖图中，<code>core/effect</code> 直接依赖 <code>core/device</code>（通过 <code>EffectCapabilityResolver</code> 引用 <code>DeviceCapabilities</code>）。这创建了一条非自然的依赖路径：<code>effect → device → media → settings</code>，使得 effect 模块无法独立于设备层进行测试和演化。</p>
+
+<p>Grothendieck 会问：<strong>如果这条边不存在，系统会更简单还是更混乱？</strong> 答案是更简单 — effect 模块只关心 "这个 EffectSpec 是否被支持"，它不需要知道 DeviceCapabilities 的具体结构。</p>
+
+<div class="compare">
+  <div class="compare-col current">
+    <h5>现状：effect 直接引用 device</h5>
+    <pre>// core/effect/EffectCapability.kt
+class EffectCapabilityResolver {
+    fun resolve(
+        spec: EffectSpec,
+        capabilities: DeviceCapabilities  // <-- 直接依赖
+    ): CapabilityReport { ... }
+}
+// 依赖链：effect → device → media → settings</pre>
+  </div>
+  <div class="compare-col elevated">
+    <h5>目标：通过接口解耦</h5>
+    <pre>// core/effect 定义自己的能力查询接口
+interface EffectCapabilityQuery {
+    fun supportsPortraitDepth(): Boolean
+    fun supportsDocumentGeometry(): Boolean
+    fun supportsManualControls(): Boolean
+}
+
+// core/device 提供适配器
+class DeviceCapabilitiesEffectQuery(
+    private val caps: DeviceCapabilities
+) : EffectCapabilityQuery { ... }
+
+// 依赖反转：effect ← device (实现接口)</pre>
+  </div>
+</div>
+
+<div class="review-area" data-card="s7">
+  <textarea placeholder="评审意见..."></textarea>
+  <div class="review-controls">
+    <div class="star-rating" data-card="s7">
+      <span class="star" data-v="1">&#9733;</span><span class="star" data-v="2">&#9733;</span><span class="star" data-v="3">&#9733;</span><span class="star" data-v="4">&#9733;</span><span class="star" data-v="5">&#9733;</span>
+    </div>
+    <div class="status-tags">
+      <button class="status-tag" data-tag="agree">同意</button>
+      <button class="status-tag" data-tag="doubt">存疑</button>
+      <button class="status-tag" data-tag="exists">已存在/误报</button>
+      <button class="status-tag" data-tag="na">不适用</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== S5: ShotExecutor/ShotGraph Unification ===== -->
+<section id="s9">
+<h2 id="s10">S5: ShotExecutor / ShotGraph 统一</h2>
+<div class="card-header">
+  <span class="badge badge-info">中等收益</span>
+  <span class="badge badge-warn">中等成本</span>
+  <span class="badge badge-danger">中等风险</span>
+  <span class="principle-tag">Base Change</span>
+</div>
+
+<p><code>MediaPipelineContracts.kt</code> 中并存两套管道模型：</p>
+<ul>
+  <li><strong>ShotExecutor v1</strong>（line 497）：基于 <code>CaptureStrategy → ShotPlan → ShotResult</code> 的命令式管道</li>
+  <li><strong>ShotGraph 2.0</strong>（line 592）：基于 <code>CaptureNode → AlgorithmNode → OutputNode</code> 的有向图模型</li>
+</ul>
+<p><code>ShotPlan.toShotGraph()</code> 扩展函数（line 893）将 v1 转换为 v2，说明 v2 是 v1 的超集。Grothendieck 的 Base Change 原则告诉我们：当同一结构在不同 "基" 上有两种表现时，应该通过一个统一的 Base Change 函子来连接，而不是保留两套平行代码。</p>
+
+<div class="compare">
+  <div class="compare-col current">
+    <h5>现状：两套管道共存</h5>
+    <pre>// ShotExecutor (v1) - 命令式
+class ShotExecutor {
+    fun plan(strategy: CaptureStrategy): ShotPlan
+    fun resultFor(request: ShotRequest): ShotResult
+}
+
+// ShotGraph 2.0 - 图模型
+data class ShotGraph(
+    val captures: List&lt;CaptureNode&gt;,
+    val algorithms: List&lt;AlgorithmNode&gt;,
+    val outputs: List&lt;OutputNode&gt;
+)
+
+// 转换桥接
+fun ShotPlan.toShotGraph(): ShotGraph { ... }</pre>
+  </div>
+  <div class="compare-col elevated">
+    <h5>目标：ShotGraph 为唯一管道</h5>
+    <pre>// 统一为 ShotGraph，ShotPlan 变成简化构造器
+class UnifiedShotPipeline {
+    fun plan(strategy: CaptureStrategy): ShotGraph {
+        // 直接构建 ShotGraph，不再经过 ShotPlan 中间态
+        return ShotGraphBuilder(strategy).build()
+    }
+
+    fun execute(graph: ShotGraph): ShotResult {
+        // 按拓扑序执行节点
+        val captures = executeCaptures(graph.captures)
+        val processed = executeAlgorithms(graph.algorithms, captures)
+        return assembleResult(graph.outputs, processed)
+    }
+}</pre>
+  </div>
+</div>
+
+<div class="review-area" data-card="s9">
+  <textarea placeholder="评审意见..."></textarea>
+  <div class="review-controls">
+    <div class="star-rating" data-card="s9">
+      <span class="star" data-v="1">&#9733;</span><span class="star" data-v="2">&#9733;</span><span class="star" data-v="3">&#9733;</span><span class="star" data-v="4">&#9733;</span><span class="star" data-v="5">&#9733;</span>
+    </div>
+    <div class="status-tags">
+      <button class="status-tag" data-tag="agree">同意</button>
+      <button class="status-tag" data-tag="doubt">存疑</button>
+      <button class="status-tag" data-tag="exists">已存在/误报</button>
+      <button class="status-tag" data-tag="na">不适用</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== S6: MainActivity Responsibility Sink ===== -->
+<section id="s11">
+<h2 id="s12">S6: MainActivity 职责下沉</h2>
+<div class="card-header">
+  <span class="badge badge-success">高收益</span>
+  <span class="badge badge-danger">高成本</span>
+  <span class="badge badge-warn">中等风险</span>
+  <span class="principle-tag">Yoneda Perspective</span>
+</div>
+
+<p><code>MainActivity.kt</code>（~1965 行）承担了远超 Activity 职责的工作：它既做 <code>findViewById</code> 绑定（~100+ 视图引用），又做状态渲染（<code>render()</code> 调用 7 个 render model），又做手势分发，又管理面板路由状态（<code>activePanelRoute</code>），又持有 <code>latestSessionState</code> 等 UI 状态。</p>
+
+<p>Yoneda 引理告诉我们：<strong>一个对象完全由 "所有指向它的态射" 决定。</strong> 从调用者视角看，MainActivity 的 "态射"（被谁调用、传递什么数据）揭示了它实际上是 3 个不同对象的伪装：一个 ViewBinder、一个 StateRenderer、一个 PanelRouter。</p>
+
+<div class="compare">
+  <div class="compare-col current">
+    <h5>现状：Activity 是万能容器</h5>
+    <pre>class MainActivity : AppCompatActivity() {
+    // 100+ view references
+    private lateinit var shutterButton: Button
+    private lateinit var previewView: PreviewView
+    // ...
+
+    // UI state that should be in ViewModel
+    var activePanelRoute: CockpitPanelRoute = None
+    var latestSessionState: SessionState? = null
+    var latestSettingsPageRenderModel: ... = null
+
+    // 1965 lines: bindActions + bindState + render
+    // + bindGestureRouter + 50+ click handlers
+}</pre>
+  </div>
+  <div class="compare-col elevated">
+    <h5>目标：Activity 变成薄壳</h5>
+    <pre>class MainActivity : AppCompatActivity() {
+    private val viewModel: CameraViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        setContentView(R.layout.activity_main)
+        bindViews()
+        bindState()
+    }
+
+    private fun bindState() {
+        viewModel.uiState.collect { state ->
+            renderControls(state.controls)
+            renderOverlay(state.overlay)
+            renderPanel(state.panel)
+        }
+    }
+}
+// ~200 行，仅负责视图绑定和事件转发</pre>
+  </div>
+</div>
+
+<details>
+<summary>扩展：SessionUiRenderModel.kt (2715 行) 也需要治理</summary>
+<p><code>SessionUiRenderModel.kt</code> 是项目中最大的文件，包含 ~2715 行纯函数。这些函数从 <code>SessionState</code> 派生 UI 渲染模型。虽然它们是纯函数（无副作用），但集中在一个文件中导致：</p>
+<ul>
+  <li>任何 UI 变更都需要修改这个巨型文件</li>
+  <li>不同模式的渲染逻辑混杂在一起</li>
+  <li>函数间缺乏明确的内聚性边界</li>
+</ul>
+<p>建议按功能域拆分为独立的 RenderModel 文件：</p>
+<pre>
+SessionUiRenderModel.kt (2715行)
+  → ControlsRenderModel.kt       (~400行) — 快门/按钮状态
+  → SettingsPageRenderModel.kt   (~500行) — 设置页面
+  → FilterLabRenderModel.kt      (~400行) — 滤镜调色板
+  → PortraitLabRenderModel.kt    (~300行) — 人像美颜
+  → WatermarkLabRenderModel.kt   (~300行) — 水印配置
+  → ModeTrackRenderModel.kt      (~200行) — 模式切换轨道
+  → PreviewOverlayRenderModel.kt (~200行) — 预览覆盖层
+  → DevConsoleRenderModel.kt     (~200行) — 开发控制台
+</pre>
+</details>
+
+<div class="review-area" data-card="s11">
+  <textarea placeholder="评审意见..."></textarea>
+  <div class="review-controls">
+    <div class="star-rating" data-card="s11">
+      <span class="star" data-v="1">&#9733;</span><span class="star" data-v="2">&#9733;</span><span class="star" data-v="3">&#9733;</span><span class="star" data-v="4">&#9733;</span><span class="star" data-v="5">&#9733;</span>
+    </div>
+    <div class="status-tags">
+      <button class="status-tag" data-tag="agree">同意</button>
+      <button class="status-tag" data-tag="doubt">存疑</button>
+      <button class="status-tag" data-tag="exists">已存在/误报</button>
+      <button class="status-tag" data-tag="na">不适用</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== S7: Render Pipeline ===== -->
+<section id="s13">
+<h2 id="s14">S7: render() 纯函数管道化</h2>
+<div class="card-header">
+  <span class="badge badge-info">中等收益</span>
+  <span class="badge badge-success">低成本</span>
+  <span class="principle-tag">Functoriality</span>
+</div>
+
+<p>当前 <code>MainActivity.render()</code> 方法顺序调用 7 个 render model 构建函数，然后逐一应用到视图。这本质上是一个 <strong>渲染管道</strong>：<code>SessionState → [RenderModel1, RenderModel2, ...] → [ViewUpdate1, ViewUpdate2, ...]</code></p>
+
+<p>Grothendieck 的 Functoriality 原则要求：<strong>所有操作都应该是函子 — 它们应该自动保持现有结构。</strong> 当前的 render() 不是函子的，因为它将 "数据转换" 和 "视图应用" 混合在一起，且依赖 Activity 的可变状态（<code>activePanelRoute</code>、<code>latestSessionState</code> 等）。</p>
+
+<div class="compare">
+  <div class="compare-col current">
+    <h5>现状：混合转换和应用</h5>
+    <pre>private fun render(state: SessionState) {
+    latestSessionState = state  // 可变副作用
+    val controls = sessionControlsRenderModel(state, ...)
+    val settings = sessionSettingsPageRenderModel(state, ...)
+    val filter = filterLabPageRenderModel(state, ...)
+    // ... 7 个 render model
+
+    // 然后直接操作视图
+    renderControlsSurface(controls)
+    renderSettingsSurface(settings)
+    renderFilterSurface(filter)
+    // ... 每个 render 函数直接 findViewById 操作
+}</pre>
+  </div>
+  <div class="compare-col elevated">
+    <h5>目标：纯数据管道 + 单一应用点</h5>
+    <pre>// 纯函数：State → UI Model (无副作用)
+data class CameraUiModel(
+    val controls: ControlsModel,
+    val settings: SettingsModel,
+    val overlay: OverlayModel,
+    val panel: PanelState,
+    // ...
+)
+
+fun SessionState.toUiModel(localState: LocalState): CameraUiModel
+    = CameraUiModel(
+        controls = deriveControls(this),
+        settings = deriveSettings(this),
+        overlay = deriveOverlay(this),
+        panel = derivePanel(localState),
+    )
+
+// 单一应用点
+fun render(model: CameraUiModel) {
+    controlsView.apply(model.controls)
+    settingsView.apply(model.settings)
+    overlayView.apply(model.overlay)
+}</pre>
+  </div>
+</div>
+
+<div class="review-area" data-card="s13">
+  <textarea placeholder="评审意见..."></textarea>
+  <div class="review-controls">
+    <div class="star-rating" data-card="s13">
+      <span class="star" data-v="1">&#9733;</span><span class="star" data-v="2">&#9733;</span><span class="star" data-v="3">&#9733;</span><span class="star" data-v="4">&#9733;</span><span class="star" data-v="5">&#9733;</span>
+    </div>
+    <div class="status-tags">
+      <button class="status-tag" data-tag="agree">同意</button>
+      <button class="status-tag" data-tag="doubt">存疑</button>
+      <button class="status-tag" data-tag="exists">已存在/误报</button>
+      <button class="status-tag" data-tag="na">不适用</button>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- Self Assessment -->
+<section id="self-assess">
+<h2>自评与盲区</h2>
+<div class="card">
+<h4>分析置信度</h4>
+<table>
+<tr><th>建议</th><th>置信度</th><th>原因</th></tr>
+<tr><td>S1: 模式模板化</td><td><span class="badge badge-success">高</span></td><td>7 个文件逐行对比，复制模式确凿</td></tr>
+<tr><td>S2: Session 拆分</td><td><span class="badge badge-warn">中高</span></td><td>职责边界清晰，但中间件链引入需要验证性能</td></tr>
+<tr><td>S3: 合同文件拆分</td><td><span class="badge badge-success">高</span></td><td>纯粹的文件组织问题，风险极低</td></tr>
+<tr><td>S4: Effect-Device 解耦</td><td><span class="badge badge-warn">中</span></td><td>接口提取方案可行，但需评估 EffectCapabilityResolver 的其他调用者</td></tr>
+<tr><td>S5: ShotGraph 统一</td><td><span class="badge badge-warn">中</span></td><td>v1→v2 的迁移状态不完全清楚，可能有隐藏依赖</td></tr>
+<tr><td>S6: MainActivity 下沉</td><td><span class="badge badge-warn">中高</span></td><td>方向明确，但需要渐进式迁移策略</td></tr>
+<tr><td>S7: render 管道化</td><td><span class="badge badge-success">高</span></td><td>纯函数拆分，技术风险低</td></tr>
+</table>
+
+<h4>已知盲区</h4>
+<ul>
+  <li><strong>测试覆盖率</strong>：未深入分析测试覆盖情况。session 模块有测试，但 mode 模块的测试仅覆盖声明/降级，未覆盖控制器行为。</li>
+  <li><strong>CameraXCaptureAdapter (2394 行)</strong>：这是 app 层最大的文件，但因为它是 CameraX 的适配器，拆分收益受限于 CameraX API 的结构。未深入分析其内部是否可以进一步模块化。</li>
+  <li><strong>性能影响</strong>：中间件链、渲染管道化等方案的运行时性能影响未量化。对于相机应用，帧率和延迟敏感。</li>
+  <li><strong>业务演进方向</strong>：不了解团队未来 6 个月的功能规划。某些重构（如 S5 ShotGraph 统一）可能与正在进行的功能开发冲突。</li>
+  <li><strong>Compose 迁移计划</strong>：如果团队计划迁移到 Jetpack Compose，S6（MainActivity 下沉）的方案需要完全不同的策略。</li>
+</ul>
+</div>
+</section>
+
+</div><!-- .main -->
+</div><!-- .layout -->
+
+<!-- FAB -->
+<button class="fab" id="exportFab">导出评审反馈</button>
+<div class="toast" id="toast">已复制到剪贴板，可直接粘贴给 AI 进行下一轮深潜</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox"></div>
+
+<script>
+// ===== TOC scroll highlight =====
+const tocLinks = document.querySelectorAll('.toc a');
+const sections = [];
+tocLinks.forEach(link => {
+  const id = link.getAttribute('href').slice(1);
+  const el = document.getElementById(id);
+  if (el) sections.push({ id, el, link });
+});
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    const item = sections.find(s => s.el === entry.target);
+    if (item) {
+      if (entry.isIntersecting) {
+        tocLinks.forEach(l => l.classList.remove('active'));
+        item.link.classList.add('active');
+      }
+    }
+  });
+}, { rootMargin: '-80px 0px -60% 0px' });
+sections.forEach(s => observer.observe(s.el));
+
+// ===== Star Rating =====
+document.querySelectorAll('.star-rating').forEach(container => {
+  const stars = container.querySelectorAll('.star');
+  stars.forEach(star => {
+    star.addEventListener('click', () => {
+      const val = parseInt(star.dataset.v);
+      stars.forEach(s => s.classList.toggle('filled', parseInt(s.dataset.v) <= val));
+      container.dataset.rating = val;
+    });
+  });
+});
+
+// ===== Status Tags =====
+document.querySelectorAll('.status-tags').forEach(container => {
+  container.querySelectorAll('.status-tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      container.querySelectorAll('.status-tag').forEach(t => t.classList.remove('selected'));
+      tag.classList.add('selected');
+    });
+  });
+});
+
+// ===== Lightbox =====
+document.querySelectorAll('.topology-diagram').forEach(diagram => {
+  diagram.style.cursor = 'pointer';
+  diagram.addEventListener('click', () => {
+    const svg = diagram.querySelector('.mermaid svg');
+    if (!svg) return;
+    const clone = svg.cloneNode(true);
+    const lb = document.getElementById('lightbox');
+    lb.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'mermaid';
+    wrapper.style.cssText = 'min-width:700px;min-height:500px;background:var(--lb-content-bg);border-radius:8px;padding:24px;';
+    wrapper.appendChild(clone);
+    lb.appendChild(wrapper);
+    lb.classList.add('active');
+    const close = () => { lb.classList.remove('active'); lb.innerHTML = ''; };
+    lb.addEventListener('click', close);
+    document.addEventListener('keydown', function onEsc(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
+    });
+  });
+});
+
+// ===== Export FAB =====
+document.getElementById('exportFab').addEventListener('click', () => {
+  const cards = document.querySelectorAll('.review-area');
+  let md = '# Grothendieck 架构分析 — 评审反馈\n\n';
+  md += `日期: ${new Date().toISOString().split('T')[0]}\n\n`;
+
+  const titles = {
+    s1: 'S1: 模式控制器模板化',
+    s3: 'S2: Session 上帝类拆分',
+    s5: 'S3: 合同文件巨人症治理',
+    s7: 'S4: Effect-Device 依赖反转',
+    s9: 'S5: ShotExecutor/ShotGraph 统一',
+    s11: 'S6: MainActivity 职责下沉',
+    s13: 'S7: render() 纯函数管道化'
+  };
+
+  cards.forEach(card => {
+    const cardId = card.dataset.card;
+    const title = titles[cardId] || cardId;
+    const textarea = card.querySelector('textarea');
+    const rating = card.querySelector('.star-rating')?.dataset.rating || '未评';
+    const selectedTag = card.querySelector('.status-tag.selected');
+    const tag = selectedTag ? selectedTag.textContent : '未选';
+    const comment = textarea ? textarea.value.trim() : '';
+
+    if (comment || rating !== '未评' || tag !== '未选') {
+      md += `## ${title}\n`;
+      md += `- 评分: ${'★'.repeat(parseInt(rating) || 0)}${'☆'.repeat(5 - (parseInt(rating) || 0))} (${rating}/5)\n`;
+      md += `- 状态: ${tag}\n`;
+      if (comment) md += `- 评审意见: ${comment}\n`;
+      md += '\n';
+    }
+  });
+
+  md += '\n---\n\n';
+  md += '[Next Action Directive] Temporarily set aside Grothendieck\'s purely abstract perspective and return to the pragmatic engineering perspective of a frontline senior architect. Based on my review feedback above, please comprehensively evaluate these refactoring directions considering their \'short, medium, and long-term ROI\', \'implementation risks and costs\', and \'architectural impact on existing business\'. Help me identify the most practical and cost-effective entry points for implementation. Once a smooth transitional refactoring plan is formulated, please proceed directly to executing the concrete code modifications.';
+
+  navigator.clipboard.writeText(md).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = md;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  });
+});
+</script>
+</body>
+</html>

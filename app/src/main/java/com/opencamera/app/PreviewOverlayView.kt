@@ -75,7 +75,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private val frameScrimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(116, 0, 0, 0)
+        color = Color.argb(140, 0, 0, 0)
         style = Paint.Style.FILL
     }
 
@@ -89,9 +89,21 @@ class PreviewOverlayView @JvmOverloads constructor(
         typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
     }
 
+    private val reticleRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * density
+    }
+
+    private val reticleTickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * density
+    }
+
     private var vignetteGradient: android.graphics.RadialGradient? = null
     private var vignetteOverlayRect: RectF? = null
     private var lastVignetteKey: Float = -1f
+
+    private var focusReticle: FocusReticleRenderModel? = null
 
     private var renderModel = PreviewOverlayRenderModel(
         gridMode = CompositionGridMode.OFF,
@@ -114,6 +126,11 @@ class PreviewOverlayView @JvmOverloads constructor(
         renderModel = model
         visibility = if (model.isVisible) VISIBLE else GONE
         prepareVignetteCache(model)
+        invalidate()
+    }
+
+    internal fun updateFocusReticle(model: FocusReticleRenderModel?) {
+        focusReticle = model
         invalidate()
     }
 
@@ -158,9 +175,8 @@ class PreviewOverlayView @JvmOverloads constructor(
         if (renderModel.isCountdownVisible) {
             drawCountdown(canvas, renderModel.countdownLabel.orEmpty())
         }
+        drawFocusReticle(canvas)
     }
-
-    private val frameHorizontalPaddingPx: Float get() = 12f * density
 
     private fun activeContentGeometry(): PreviewContentGeometry {
         val frameRatio = renderModel.frame?.ratio
@@ -169,12 +185,18 @@ class PreviewOverlayView @JvmOverloads constructor(
             viewWidth = width,
             viewHeight = height,
             ratioWidth = frameRatio?.width ?: 0,
-            ratioHeight = frameRatio?.height ?: 0,
-            horizontalPaddingPx = frameHorizontalPaddingPx
+            ratioHeight = frameRatio?.height ?: 0
         )
     }
 
     private fun activeFrameRectOrFullView(): RectF {
+        return activeContentGeometry().activeFrameRect
+    }
+
+    internal fun currentActiveFrameRectOrNull(): RectF? {
+        val hasFrame = renderModel.frame?.ratio != null
+            || renderModel.effectModel?.frameGuideline?.ratio != null
+        if (!hasFrame) return null
         return activeContentGeometry().activeFrameRect
     }
 
@@ -241,8 +263,7 @@ class PreviewOverlayView @JvmOverloads constructor(
             viewWidth = width,
             viewHeight = height,
             ratioWidth = spec.ratio.width,
-            ratioHeight = spec.ratio.height,
-            horizontalPaddingPx = frameHorizontalPaddingPx
+            ratioHeight = spec.ratio.height
         ).activeFrameRect
         canvas.drawRect(rect, frameGuidelinePaint)
     }
@@ -282,7 +303,12 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
-        val rect = activeContentGeometry().activeFrameRect
+        val rect = previewContentGeometry(
+            viewWidth = width,
+            viewHeight = height,
+            ratioWidth = frame.ratio.width,
+            ratioHeight = frame.ratio.height
+        ).activeFrameRect
         if (frame.dimOutsideFrame) {
             val outsidePath = android.graphics.Path().apply {
                 fillType = android.graphics.Path.FillType.EVEN_ODD
@@ -293,6 +319,39 @@ class PreviewOverlayView @JvmOverloads constructor(
         }
         canvas.drawRect(rect, frameGuidelinePaint)
         canvas.drawText(frame.label, rect.left + 10f * density, rect.top + 20f * density, frameLabelPaint)
+    }
+
+    private fun drawFocusReticle(canvas: Canvas) {
+        val model = focusReticle ?: return
+        val cx = model.normalizedX.coerceIn(0f, 1f) * width
+        val cy = model.normalizedY.coerceIn(0f, 1f) * height
+        val radius = 24f * density
+        val tickLength = 8f * density
+
+        when (model.status) {
+            FocusReticleStatus.REQUESTED -> {
+                reticleRingPaint.color = Color.rgb(255, 191, 0)
+                canvas.drawCircle(cx, cy, radius, reticleRingPaint)
+            }
+            FocusReticleStatus.SUCCEEDED -> {
+                reticleRingPaint.color = Color.WHITE
+                canvas.drawCircle(cx, cy, radius, reticleRingPaint)
+            }
+            FocusReticleStatus.DEGRADED -> {
+                reticleRingPaint.color = Color.rgb(255, 191, 0)
+                canvas.drawCircle(cx, cy, radius, reticleRingPaint)
+                reticleTickPaint.color = Color.rgb(255, 191, 0)
+                // Short tick marks at cardinal positions
+                canvas.drawLine(cx, cy - radius - tickLength, cx, cy - radius, reticleTickPaint)
+                canvas.drawLine(cx, cy + radius, cx, cy + radius + tickLength, reticleTickPaint)
+                canvas.drawLine(cx - radius - tickLength, cy, cx - radius, cy, reticleTickPaint)
+                canvas.drawLine(cx + radius, cy, cx + radius + tickLength, cy, reticleTickPaint)
+            }
+            FocusReticleStatus.FAILED, FocusReticleStatus.UNSUPPORTED -> {
+                reticleRingPaint.color = Color.argb(128, 128, 128, 128)
+                canvas.drawCircle(cx, cy, radius, reticleRingPaint)
+            }
+        }
     }
 }
 
@@ -319,6 +378,20 @@ internal data class PreviewContentGeometry(
     val contentCenterY: Float get() = contentRect.centerY()
 }
 
+internal enum class FocusReticleStatus {
+    REQUESTED,
+    SUCCEEDED,
+    DEGRADED,
+    FAILED,
+    UNSUPPORTED
+}
+
+internal data class FocusReticleRenderModel(
+    val normalizedX: Float,
+    val normalizedY: Float,
+    val status: FocusReticleStatus
+)
+
 /**
  * Build [PreviewContentGeometry] for the given view dimensions and optional frame ratio.
  *
@@ -326,30 +399,26 @@ internal data class PreviewContentGeometry(
  * sub-rect of [contentRect] matching that ratio. Otherwise the active frame
  * equals [contentRect] (full-view capture).
  *
- * [horizontalPaddingPx], [topInsetPx], [bottomInsetPx] shrink the content rect
- * symmetrically before the frame ratio is applied. They represent UI chrome
- * (e.g. horizontal safe-area padding) that must not be treated as imaging area.
+ * UI chrome must not shrink this geometry. Toolbars and capture controls may
+ * overlap the preview, but the visible capture frame must stay centered in the
+ * same full preview content rect used by saved JPEG center-crop postprocessing.
  */
 internal fun previewContentGeometry(
     viewWidth: Int,
     viewHeight: Int,
     ratioWidth: Int = 0,
-    ratioHeight: Int = 0,
-    horizontalPaddingPx: Float = 0f,
-    topInsetPx: Float = 0f,
-    bottomInsetPx: Float = 0f
+    ratioHeight: Int = 0
 ): PreviewContentGeometry {
     val contentRect = RectF(
-        horizontalPaddingPx,
-        topInsetPx,
-        (viewWidth - horizontalPaddingPx).coerceAtLeast(0f),
-        (viewHeight - bottomInsetPx).coerceAtLeast(0f)
+        0f,
+        0f,
+        viewWidth.coerceAtLeast(0).toFloat(),
+        viewHeight.coerceAtLeast(0).toFloat()
     )
     val activeFrameRect = if (ratioWidth > 0 && ratioHeight > 0) {
         val fr = computeFrameRect(
             viewWidth, viewHeight,
-            ratioWidth, ratioHeight,
-            horizontalPaddingPx, topInsetPx, bottomInsetPx
+            ratioWidth, ratioHeight
         )
         RectF(fr.left, fr.top, fr.right, fr.bottom)
     } else {
@@ -402,15 +471,12 @@ internal fun computeFrameRect(
     viewWidth: Int,
     viewHeight: Int,
     ratioWidth: Int,
-    ratioHeight: Int,
-    horizontalPaddingPx: Float = 0f,
-    topInsetPx: Float = 0f,
-    bottomInsetPx: Float = 0f
+    ratioHeight: Int
 ): FrameRect {
-    val availableLeft = horizontalPaddingPx
-    val availableTop = topInsetPx
-    val availableRight = viewWidth - horizontalPaddingPx
-    val availableBottom = viewHeight - bottomInsetPx
+    val availableLeft = 0f
+    val availableTop = 0f
+    val availableRight = viewWidth.toFloat()
+    val availableBottom = viewHeight.toFloat()
     val availableWidth = (availableRight - availableLeft).coerceAtLeast(1f)
     val availableHeight = (availableBottom - availableTop).coerceAtLeast(1f)
     val orientation = if (viewWidth <= viewHeight) {
@@ -438,13 +504,9 @@ internal fun computePreviewFrameRect(
     viewWidth: Int,
     viewHeight: Int,
     ratioWidth: Int,
-    ratioHeight: Int,
-    horizontalPaddingPx: Float = 0f,
-    topInsetPx: Float = 0f,
-    bottomInsetPx: Float = 0f
+    ratioHeight: Int
 ): RectF {
-    val r = computeFrameRect(viewWidth, viewHeight, ratioWidth, ratioHeight,
-        horizontalPaddingPx, topInsetPx, bottomInsetPx)
+    val r = computeFrameRect(viewWidth, viewHeight, ratioWidth, ratioHeight)
     return RectF(r.left, r.top, r.right, r.bottom)
 }
 

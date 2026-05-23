@@ -129,6 +129,7 @@ class ModeCaptureStrategyGraphTest {
         )
 
         assertEquals(1, graph.captureNodes.size)
+        assertEquals(CaptureNodeRole.PRIMARY_VIDEO, graph.captureNodes[0].role)
         assertEquals("video/mp4", graph.captureNodes[0].requiredFormat.mimeType)
         assertEquals(1, graph.outputNodes.size)
         assertEquals(MediaArtifactRole.PRIMARY_VIDEO, graph.outputNodes[0].role)

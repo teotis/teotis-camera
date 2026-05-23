@@ -1,12 +1,9 @@
-package com.opencamera.core.effect
+package com.opencamera.core.capability
 
-import com.opencamera.core.device.CapabilityRequirement
-import com.opencamera.core.device.CapabilityRequirementKind
-import com.opencamera.core.device.CapabilitySupport
-import com.opencamera.core.device.CapabilityUseSite
-import com.opencamera.core.device.DeviceCapabilities
-import com.opencamera.core.device.ManualControlCapabilityMatrix
-import com.opencamera.core.device.ManualControlSupport
+import com.opencamera.core.effect.DocumentEffect
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FilterEffect
+import com.opencamera.core.effect.PortraitEffect
 import com.opencamera.core.media.MediaProcessorAvailability
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,6 +12,29 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class CapabilityGraphResolverTest {
+
+    private data class FakeCapabilityGraphDeviceQuery(
+        val still: Boolean = true,
+        val video: Boolean = true,
+        val previewSnapshots: Boolean = true,
+        val nightMultiFrame: Boolean = true,
+        val manualSummary: CapabilityManualControlSummary = CapabilityManualControlSummary(
+            hasAppliedControls = true,
+            hasSavedOnlyControls = false
+        ),
+        val rawSupport: CapabilitySupport = CapabilitySupport.SAVED_ONLY,
+        val portraitDepth: Boolean = true,
+        val documentGeometry: Boolean = true
+    ) : CapabilityGraphDeviceQuery {
+        override fun supportsStillCapture(): Boolean = still
+        override fun supportsVideoRecording(): Boolean = video
+        override fun supportsPreviewSnapshots(): Boolean = previewSnapshots
+        override fun supportsNightMultiFrame(): Boolean = nightMultiFrame
+        override fun manualControlSummary(): CapabilityManualControlSummary = manualSummary
+        override fun rawOutputSupport(): CapabilitySupport = rawSupport
+        override fun supportsPortraitDepth(): Boolean = portraitDepth
+        override fun supportsDocumentGeometry(): Boolean = documentGeometry
+    }
 
     private fun requirement(
         id: String,
@@ -29,7 +49,7 @@ class CapabilityGraphResolverTest {
     )
 
     private fun resolver(
-        device: DeviceCapabilities = DeviceCapabilities.DEFAULT,
+        device: FakeCapabilityGraphDeviceQuery = FakeCapabilityGraphDeviceQuery(),
         processors: MediaProcessorAvailability = MediaProcessorAvailability.ALL_AVAILABLE
     ) = CapabilityGraphResolver(device, processors)
 
@@ -89,7 +109,7 @@ class CapabilityGraphResolverTest {
     @Test
     fun `night multi-frame degraded when device does not support`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = false)
+            device = FakeCapabilityGraphDeviceQuery(nightMultiFrame = false)
         )
         val req = requirement("night-merge", CapabilityRequirementKind.MULTI_FRAME_CAPTURE)
         val report = r.resolve("night", listOf(req))
@@ -131,7 +151,7 @@ class CapabilityGraphResolverTest {
     @Test
     fun `portrait bokeh degraded with focus fallback when depth not supported`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(supportsPortraitDepthEffect = false)
+            device = FakeCapabilityGraphDeviceQuery(portraitDepth = false)
         )
         val spec = EffectSpec(listOf(PortraitEffect("p1", "depth", "light", "medium", "soft")))
         val req = requirement("portrait-bokeh", CapabilityRequirementKind.PORTRAIT_SEGMENTATION)
@@ -217,8 +237,11 @@ class CapabilityGraphResolverTest {
     @Test
     fun `manual control supported when APPLY controls exist`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(
-                manualControlCapabilities = ManualControlCapabilityMatrix.CAMERA2_INTEROP_DEFAULT
+            device = FakeCapabilityGraphDeviceQuery(
+                manualSummary = CapabilityManualControlSummary(
+                    hasAppliedControls = true,
+                    hasSavedOnlyControls = false
+                )
             )
         )
         val req = requirement("pro-manual", CapabilityRequirementKind.MANUAL_CONTROL)
@@ -230,8 +253,11 @@ class CapabilityGraphResolverTest {
     @Test
     fun `manual control saved only when no APPLY controls`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(
-                manualControlCapabilities = ManualControlCapabilityMatrix.SAVED_ONLY_DEFAULT
+            device = FakeCapabilityGraphDeviceQuery(
+                manualSummary = CapabilityManualControlSummary(
+                    hasAppliedControls = false,
+                    hasSavedOnlyControls = true
+                )
             )
         )
         val req = requirement("pro-manual", CapabilityRequirementKind.MANUAL_CONTROL)
@@ -242,17 +268,13 @@ class CapabilityGraphResolverTest {
 
     @Test
     fun `manual control unsupported when all controls unsupported`() {
-        val matrix = ManualControlCapabilityMatrix(
-            raw = ManualControlSupport.UNSUPPORTED,
-            iso = ManualControlSupport.UNSUPPORTED,
-            shutter = ManualControlSupport.UNSUPPORTED,
-            exposureCompensation = ManualControlSupport.UNSUPPORTED,
-            focusDistance = ManualControlSupport.UNSUPPORTED,
-            aperture = ManualControlSupport.UNSUPPORTED,
-            whiteBalance = ManualControlSupport.UNSUPPORTED
-        )
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(manualControlCapabilities = matrix)
+            device = FakeCapabilityGraphDeviceQuery(
+                manualSummary = CapabilityManualControlSummary(
+                    hasAppliedControls = false,
+                    hasSavedOnlyControls = false
+                )
+            )
         )
         val req = requirement("pro-manual", CapabilityRequirementKind.MANUAL_CONTROL)
         val report = r.resolve("pro", listOf(req))
@@ -263,9 +285,7 @@ class CapabilityGraphResolverTest {
     @Test
     fun `raw output saved only when raw is SAVED_ONLY`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(
-                manualControlCapabilities = ManualControlCapabilityMatrix.SAVED_ONLY_DEFAULT
-            )
+            device = FakeCapabilityGraphDeviceQuery(rawSupport = CapabilitySupport.SAVED_ONLY)
         )
         val req = requirement("pro-raw", CapabilityRequirementKind.RAW_OUTPUT)
         val report = r.resolve("pro", listOf(req))
@@ -275,17 +295,8 @@ class CapabilityGraphResolverTest {
 
     @Test
     fun `raw output supported when raw is APPLY`() {
-        val matrix = ManualControlCapabilityMatrix(
-            raw = ManualControlSupport.APPLY,
-            iso = ManualControlSupport.SAVED_ONLY,
-            shutter = ManualControlSupport.SAVED_ONLY,
-            exposureCompensation = ManualControlSupport.SAVED_ONLY,
-            focusDistance = ManualControlSupport.SAVED_ONLY,
-            aperture = ManualControlSupport.SAVED_ONLY,
-            whiteBalance = ManualControlSupport.SAVED_ONLY
-        )
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(manualControlCapabilities = matrix)
+            device = FakeCapabilityGraphDeviceQuery(rawSupport = CapabilitySupport.SUPPORTED)
         )
         val req = requirement("pro-raw", CapabilityRequirementKind.RAW_OUTPUT)
         val report = r.resolve("pro", listOf(req))
@@ -308,7 +319,7 @@ class CapabilityGraphResolverTest {
     @Test
     fun `document geometry degraded when enhancement not supported`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+            device = FakeCapabilityGraphDeviceQuery(documentGeometry = false)
         )
         val spec = EffectSpec(listOf(DocumentEffect(true, "high")))
         val req = requirement(
@@ -342,7 +353,7 @@ class CapabilityGraphResolverTest {
     @Test
     fun `mixed report reflects worst case in allApplied`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = false)
+            device = FakeCapabilityGraphDeviceQuery(nightMultiFrame = false)
         )
         val requirements = listOf(
             requirement("still", CapabilityRequirementKind.STILL_CAPTURE),
@@ -409,7 +420,7 @@ class CapabilityGraphResolverTest {
     @Test
     fun `still capture unsupported when device lacks support`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(supportsStillCapture = false)
+            device = FakeCapabilityGraphDeviceQuery(still = false)
         )
         val req = requirement("still", CapabilityRequirementKind.STILL_CAPTURE)
         val report = r.resolve("photo", listOf(req))
@@ -420,7 +431,7 @@ class CapabilityGraphResolverTest {
     @Test
     fun `video recording unsupported when device lacks support`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(supportsVideoRecording = false)
+            device = FakeCapabilityGraphDeviceQuery(video = false)
         )
         val req = requirement("video", CapabilityRequirementKind.VIDEO_RECORDING)
         val report = r.resolve("video", listOf(req))
@@ -431,7 +442,7 @@ class CapabilityGraphResolverTest {
     @Test
     fun `preview frame stream degraded when snapshots unavailable`() {
         val r = resolver(
-            device = DeviceCapabilities.DEFAULT.copy(supportsPreviewSnapshots = false)
+            device = FakeCapabilityGraphDeviceQuery(previewSnapshots = false)
         )
         val req = requirement(
             "preview-stream", CapabilityRequirementKind.PREVIEW_FRAME_STREAM,

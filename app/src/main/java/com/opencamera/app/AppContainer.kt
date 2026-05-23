@@ -19,7 +19,8 @@ import com.opencamera.app.camera.PhotoAlgorithmPostProcessor
 import com.opencamera.app.camera.PhotoWatermarkPostProcessor
 import com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitor
 import com.opencamera.app.camera.device.CameraDeviceAdapter
-import com.opencamera.core.effect.CapabilityGraphResolver
+import com.opencamera.core.capability.CapabilityGraphResolver
+import com.opencamera.core.device.asCapabilityGraphQuery
 import com.opencamera.core.effect.EffectCapabilityResolver
 import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.media.MediaProcessorAvailability
@@ -100,9 +101,11 @@ class AppContainer(
         mediaPostProcessor = mediaPostProcessor
     )
 
-    val effectCapabilityResolver = EffectCapabilityResolver(cameraAdapter.capabilities)
+    val effectCapabilityResolver = EffectCapabilityResolver(
+        cameraAdapter.capabilities.asEffectCapabilityQuery()
+    )
     val capabilityGraphResolver = CapabilityGraphResolver(
-        deviceCapabilities = cameraAdapter.capabilities,
+        deviceQuery = cameraAdapter.capabilities.asCapabilityGraphQuery(),
         mediaProcessors = MediaProcessorAvailability.ALL_AVAILABLE
     )
     val previewEffectAdapter = PreviewEffectAdapter()

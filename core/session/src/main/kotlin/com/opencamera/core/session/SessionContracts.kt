@@ -1,10 +1,12 @@
 package com.opencamera.core.session
 
-import com.opencamera.core.device.CapabilityGraphReport
+import com.opencamera.core.device.CameraOutputRotation
+import com.opencamera.core.capability.CapabilityGraphReport
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.RenderRecipe
 import com.opencamera.core.media.CameraPerformanceClass
 import com.opencamera.core.media.CameraThermalState
 import com.opencamera.core.media.CaptureFeedbackPreview
@@ -17,7 +19,9 @@ import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
+import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.SessionSettingsSnapshot
+import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -75,14 +79,48 @@ enum class CaptureFeedbackPolicy {
 }
 
 internal fun captureFeedbackPolicyFor(shot: ShotRequest): CaptureFeedbackPolicy {
-    val watermarkText = shot.saveRequest.metadata.watermarkText?.trim().orEmpty()
-    val template = shot.saveRequest.metadata.customTags["watermarkTemplate"].orEmpty()
-    return when {
-        watermarkText.isEmpty() -> CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP
-        template == "classic-overlay" -> CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP
-        else -> CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA
+    val recipe = RenderRecipe.from(shot)
+    val metadataFilterSpec = FilterRenderSpec.fromMetadataTags(shot.saveRequest.metadata.customTags)
+    val suppressRawFeedback = metadataFilterSpec.requiresTrustedSavedMedia(
+        profileId = recipe.filterProfileId
+    ) ||
+        recipe.frameRatio != null && recipe.frameRatio != FrameRatio.RATIO_4_3 ||
+        recipe.selfieMirror ||
+        recipe.watermarkTemplateId?.let { it != "classic-overlay" } == true
+    return if (suppressRawFeedback) {
+        CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA
+    } else {
+        CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP
     }
 }
+
+private fun FilterRenderSpec?.requiresTrustedSavedMedia(profileId: String?): Boolean {
+    if (this == null) {
+        return false
+    }
+    if (profileId != null && profileId in LOW_RISK_PREVIEW_FILTER_PROFILES && this == defaultFilterRenderSpecOrNull(profileId)) {
+        return false
+    }
+    return true
+}
+
+private val LOW_RISK_PREVIEW_FILTER_PROFILES = setOf("photo-original", "photo-vivid")
+
+enum class PreviewMeteringFeedbackStatus {
+    REQUESTED,
+    SUCCEEDED,
+    DEGRADED_AUTO_EXPOSURE_ONLY,
+    FAILED,
+    UNSUPPORTED
+}
+
+data class PreviewMeteringFeedback(
+    val requestId: String,
+    val normalizedX: Float,
+    val normalizedY: Float,
+    val status: PreviewMeteringFeedbackStatus,
+    val reason: String? = null
+)
 
 data class PermissionState(
     val cameraGranted: Boolean = false,
@@ -110,7 +148,8 @@ data class SessionPresentationState(
     val latestLivePhotoBundle: LivePhotoBundle? = null,
     val latestSavedMediaType: SavedMediaType? = null,
     val latestPipelineNotes: List<String> = emptyList(),
-    val lastError: String? = null
+    val lastError: String? = null,
+    val previewMeteringFeedback: PreviewMeteringFeedback? = null
 )
 
 data class SessionState(
@@ -132,6 +171,7 @@ data class SessionState(
     val activeEffectSpec: EffectSpec = EffectSpec.EMPTY,
     val activeCapabilityReport: CapabilityGraphReport? = null,
     val previewRatio: PreviewRatio = PreviewRatio.FULL,
+    val outputRotation: CameraOutputRotation = CameraOutputRotation.ROTATION_0,
     val presentation: SessionPresentationState = SessionPresentationState()
 ) {
     val countdownRemainingSeconds: Int?
@@ -219,6 +259,9 @@ sealed interface SessionIntent {
     ) : SessionIntent
     data class ThermalStateChanged(val thermalState: CameraThermalState) : SessionIntent
     data class PerformanceClassChanged(val performanceClass: CameraPerformanceClass) : SessionIntent
+    data class PreviewTapToFocus(val normalizedX: Float, val normalizedY: Float) : SessionIntent
+    data class PreviewMeteringCompleted(val result: com.opencamera.core.device.PreviewMeteringResult) : SessionIntent
+    data class OutputRotationChanged(val rotation: CameraOutputRotation) : SessionIntent
 }
 
 sealed interface SessionEffect {
@@ -235,6 +278,8 @@ sealed interface SessionEffect {
         val reason: String,
         val clearHost: Boolean
     ) : SessionEffect
+    data class ApplyPreviewMetering(val request: com.opencamera.core.device.PreviewMeteringRequest) : SessionEffect
+    data class UpdateOutputRotation(val rotation: CameraOutputRotation) : SessionEffect
 }
 
 interface CameraSession {

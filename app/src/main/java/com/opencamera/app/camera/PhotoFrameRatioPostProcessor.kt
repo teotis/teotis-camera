@@ -93,7 +93,11 @@ internal fun computeCenterCropBounds(
         return null
     }
 
-    val targetRatio = frameRatio.width.toDouble() / frameRatio.height.toDouble()
+    val targetRatio = orientedFrameRatioValue(
+        width = width,
+        height = height,
+        frameRatio = frameRatio
+    )
     val currentRatio = width.toDouble() / height.toDouble()
     if (abs(currentRatio - targetRatio) <= RATIO_TOLERANCE) {
         return null
@@ -115,6 +119,20 @@ internal fun computeCenterCropBounds(
             val top = ((height - croppedHeight) / 2).coerceAtLeast(0)
             CropBounds(0, top, width, top + croppedHeight)
         }
+    }
+}
+
+private fun orientedFrameRatioValue(
+    width: Int,
+    height: Int,
+    frameRatio: FrameRatio
+): Double {
+    val narrowSide = minOf(frameRatio.width, frameRatio.height).toDouble()
+    val wideSide = maxOf(frameRatio.width, frameRatio.height).toDouble()
+    return if (width <= height) {
+        narrowSide / wideSide
+    } else {
+        wideSide / narrowSide
     }
 }
 

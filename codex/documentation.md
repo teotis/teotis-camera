@@ -1,6 +1,7 @@
 # 当前状态
 
 - 里程碑：按用户当前轮授权，`6B-8` 已完成并允许进入下一阶段；当前 stage 已切换为第 `7` 阶段“稳定性治理与自动化补强”。
+- 产品 2.0 标准入口：[`Product-2.0-Standard.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/Product-2.0-Standard.md) 是后续判断 `2.0 / V2 / GO / NO GO / 真机验收 / 产品验收` 的规范基准；任何相关任务应先读该文档，再结合本状态页和最新真机/门禁报告判断。
 - 阶段进度：原第 `6` 阶段基线与追加包维持已完成/已冻结判断；第 `7` 阶段当前进度更新为 `80%`。
 - 架构口径更新：工程对外介绍、面试表述与高层总结统一采用“四层主链路 + 横切治理能力”的说法；四层主链路指 `Mode Plugin / Session Kernel / Device Adapter / Media Pipeline`，其中后处理归入媒体管线内部能力，稳定性 / 可观测性 / 恢复 / 自动化验证作为跨层治理能力描述，不再与主链路并列拆成独立业务层。
 - 当前阶段判断：第 `7` 阶段已经不再只有 `trace + metrics + PreviewError` 的半成品。当前仓内已建立 `diagnostics owner + runtime issue owner + recovery failure owner + zoom owner + thermal owner + background recovery owner + perf threshold owner + provider invalidation owner + preview startup stall watchdog owner` 的稳定性主链，但距离 stage exit checklist 仍有平台/真机侧缺口。
@@ -57,6 +58,9 @@
   `CameraSessionCoordinatorTest`
   `:app:assembleDebug`
 - 本轮通过：
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
+  `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest`
+  `./gradlew --no-daemon :app:assembleDebug`
   `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
   `./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest`
   `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitorTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest --tests com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitorTest`
@@ -90,10 +94,194 @@
 - `2026-05-22` vivo X300 真机录屏 `/Users/dingren/Downloads/飞书20260522-162635.mp4` 已完成第五轮多模态审查，结论是“本地 gate 已过，但真实 2.0 相机体验仍未达标”：顶部栏中文遮挡、按钮等权且边框风格不统一，Color Lab 调色板点击后回弹且 `进阶` 不应存在，右侧 `色调` 应改为 `镜头`，底部 zoom/mode/shutter 区域割裂，模式栏对比度不足，快捷面板应面板化且画幅选项不能消失，设置/风格面板仍暴露 `Supported` 与 raw render 参数。已新增第五轮总索引和 6 份任务包：[`2026-05-22-fifth-real-device-recording-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fifth-real-device-recording-index.md)、[`2026-05-22-fifth-color-lab-palette-persistence.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fifth-color-lab-palette-persistence.md)、[`2026-05-22-fifth-top-bar-and-rail-ia-polish.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fifth-top-bar-and-rail-ia-polish.md)、[`2026-05-22-fifth-bottom-cockpit-zoom-mode-track.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fifth-bottom-cockpit-zoom-mode-track.md)、[`2026-05-22-fifth-quick-panel-frame-ratio-sheet.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fifth-quick-panel-frame-ratio-sheet.md)、[`2026-05-22-fifth-panel-copy-engineering-cleanup.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fifth-panel-copy-engineering-cleanup.md) 与 [`2026-05-22-fifth-multimodal-hard10-qa.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-fifth-multimodal-hard10-qa.md)。最优先落地顺序是 Color Lab 持久化 -> 顶部/右栏 IA -> 底部 cockpit/mode track -> 快捷面板 -> 文案清理 -> 新 APK 多模态复验。
 - `2026-05-22` 高难 10% / 多模态基线报告已完成并沉淀到 [`Fifth-Recording-Hard10-Multimodal-QA-Report.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/Fifth-Recording-Hard10-Multimodal-QA-Report.md)：已抽取 9 张关键证据帧和 contact sheet，P0 定为 Color Lab 直接操控失效、底部 cockpit 视觉割裂、快捷画幅交互不可靠；P1 定为顶部栏裁切/层级、右栏语义、工程文案泄漏、Dev 过强、预览/画幅几何仍需视觉仲裁。该报告同时定义了下一版 vivo X300 录屏复验协议，后续非多模态 agent 完成实现包后，应由多模态 owner 按该协议重新判定 `GO / CONDITIONAL GO / NO GO`。
 - `2026-05-22` 第五轮真机反馈中可落地的高难/多模态 owner 修复已完成首个代码闭环：Color Lab 调色板触摸现在进入 persisted `ColorLabSpec` 写入链路并保持 reticle 即时反馈，Color Lab 页面隐藏 `进阶` 模式切换；右侧第一入口默认文案收敛为 `镜头/Lens`；Color Lab 摘要从原始坐标改为 `Warm / Deep Contrast` 等可理解语义；风格/设置面板不再泄漏 raw render spec 和英文 enum availability 文案。聚焦 UI 测试、`assembleDebug` 和 `verify_stage_7_observability.sh` 均已通过，最新 debug APK 位于 `/Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk`。
+- `2026-05-22` 真机发现“Color Lab 预览有效但成片不生效”后，已完成系统化调试和代码闭环：Color Lab/style metadata 在 session 侧本已能进入 `filterSpec.*`，真实高风险断点在 Android Q+ CameraX 保存结果可能不给 `savedUri`，导致 `MediaOutputHandle` 只有展示路径、所有成片后处理拿不到可编辑 `contentUri/filePath` 而跳过。[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 现会预创建 MediaStore still `contentUri` 并用 OutputStream 写入，`resolvePhotoOutputHandle()` 保证 CameraX 不返回 URI 时仍保留可编辑目标；[`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 锁定 Color Lab 合成后的 `filterSpec.*` 会进入拍摄 metadata，[`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 锁定预创建 URI 句柄合同。该修复同时降低滤镜、画幅裁切、水印、人像渲染、文档裁切、自拍镜像等 saved-photo 后处理被跳过的风险；视频录制仍只保证 metadata/filter profile 进入录制请求，成片视频滤镜不在当前 JPEG 后处理链路内。
+- `2026-05-22` 最新 vivo X300 真机反馈将问题升级为“预览/成片/缩略图三链路不一致”后，本轮已完成核心 containment + 几何绑定闭环：[`SessionContracts.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 的 `captureFeedbackPolicyFor()` 现在只允许纯净 no-postprocess shot 使用 raw preview feedback；凡 shot metadata/postprocess 表明存在 Color Lab/filter、非默认画幅裁切、水印或自拍镜像，都会抑制 `PreviewView.bitmap` 缩略反馈直到 `SavedMedia`，避免用户先看到与最终成片不一致的缩略图；[`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 已新增 Color Lab/filter 与 16:9 frame ratio 的红绿回归。Device 层，[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 已将 still/video 的 Preview 与 ImageCapture/VideoCapture 绑定改为 `UseCaseGroup + PreviewView.viewPort`，让 CameraX 尽量共享同一 viewport/crop contract，降低预览画幅与成片 sensor 区域差异。更大的 `RenderRecipe + GL PreviewRenderEngine` 非低耦合项已拆成 [`2026-05-22-render-recipe-preview-engine-handoff.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-render-recipe-preview-engine-handoff.md) 交给外部 agent 做纯 Kotlin contract/diagnostics/QA 清单；本轮不宣称已完成实时像素级 Color Lab 预览渲染，最终仍需新 APK 真机对比保存 JPEG 与录屏。
+- `2026-05-23` 最新真机反馈指出“成片画面区域并非主界面预览框区域”后，本轮已完成系统化调试和根因修复：[`PreviewOverlayView.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/PreviewOverlayView.kt) 原先用 `bottomInsetPx = 40dp` 和水平 padding 计算画幅框、网格和遮罩，把底部 cockpit/safe-area 混进了 active frame rect；但 [`PhotoFrameRatioPostProcessor.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessor.kt) 对保存 JPEG 做的是完整图像中心裁切，二者天然不同源。本轮移除成像几何中的 UI inset 入口，让 frame guideline、dim scrim、grid 全部以完整 `PreviewView` content rect 居中计算，并用 [`PreviewOverlayGeometryTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/PreviewOverlayGeometryTest.kt) 锁定 active capture frame 必须与 saved center crop 同中心；聚焦几何、后处理、render model 和 assemble 验证均已通过。后续仍需真机安装新 APK，用 `4:3 / 16:9 / 1:1` 保存 JPEG 与屏幕录屏做视觉复验。
+- `2026-05-23` vivo X300 复测进一步确认“偏离预览框”主要表现为横竖比例搞反：竖屏预览下的 `16:9` 画幅框按 `9:16` 显示，但 [`PhotoFrameRatioPostProcessor.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessor.kt) 仍按物理 `16:9` 裁 JPEG，导致竖图被裁成横向长图。本轮将 `computeCenterCropBounds()` 改为按解码图像方向定向解释画幅：竖图把 `4:3 / 16:9` 解释为 `3:4 / 9:16`，横图仍解释为 `4:3 / 16:9`；[`PhotoFrameRatioPostProcessorTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessorTest.kt) 已用红绿测试锁定 portrait `4:3` 不再被裁、portrait `16:9` 裁左右得到竖向 `9:16`。新 APK 已重新 `assembleDebug`，需要真机复验同一场景。
+- `2026-05-23` 外部 agent 提出的 `Effect-Device` 依赖反转问题已核验为成立，且实际缺口不止 `EffectCapabilityResolver(DeviceCapabilities)`：[`CapabilityGraphResolver.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/effect/src/main/kotlin/com/opencamera/core/effect/CapabilityGraphResolver.kt) 也在 `core:effect` 内直接引用 `DeviceCapabilities` 和 device-owned capability graph contracts，导致 `core:effect` 编译 classpath 包含 `:core:device`。新增总索引 [`2026-05-23-effect-device-dependency-inversion-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-effect-device-dependency-inversion-index.md) 与 3 份执行文档，建议先加 effect-owned `EffectCapabilityQuery`，再把 generic capability graph owner 移出 `core:effect/core:device`，最后用 Gradle dependency gate 证明 `core:effect` 不再依赖 `core:device`。本轮只新增方案文档，未改运行时代码。
+- `2026-05-23` 外部 agent 提出的 `DefaultCameraSession` 上帝类问题已核验为成立但需保守落地：[`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 当前约 1998 行，集中处理 37 类 `SessionIntent` 和 lifecycle / mode / preview recovery / capture-recording / graph resolution / presentation 多组职责；但不能按无 owner 的 `manager.process() || ...` 链条拆分，避免制造多个隐式 session kernel。新增总索引 [`2026-05-23-default-camera-session-split-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-default-camera-session-split-index.md) 与 5 份非多模态执行文档，建议按“纯图解析/选择策略 -> intent owner scaffold -> preview recovery -> capture/recording -> mode/device control”顺序渐进拆分，并保持 Stage 7 验证门禁。
+- `2026-05-23` 外部 agent 提出的 `MainActivity` 职责下沉问题已核验为成立且范围比“三个对象”更宽：[`MainActivity.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/MainActivity.kt) 当前 1974 行，包含 138 处 `findViewById`、84 处 `setOnClickListener`，同时承担 ViewBinder / StateRenderer / PanelRouter / ActionBinder / GestureBridge / PlatformShell。新增总索引 [`2026-05-23-mainactivity-thin-shell-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mainactivity-thin-shell-index.md) 与 3 份非多模态落地文档，建议先抽纯 `CockpitPanelRouter`，再抽 `MainActivityViews` 和 renderer surfaces，最后抽 `MainActivityActionBinder` 收口 Activity；明确不先引入大 ViewModel，避免制造第二个隐藏 session/UI kernel。本轮只新增方案文档，未改运行时代码。
+- `2026-05-23` 用户新增两张需求单已拆成可交给多个非多模态 agent 的方案包：缩略图点击打开相册失败定位为 `MainActivity` 点击路径仍使用 `latestCapturePath/latestVideoPath + File.exists + FileProvider`，与当前 MediaStore `ThumbnailSource.SavedMedia.renderUri` 脱节；点击预览对焦/自动 EV 定位为手势层已有 `FocusAt` 但 session/device/CameraX 执行链路未接线。新增总索引 [`2026-05-23-thumbnail-gallery-focus-ev-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-thumbnail-gallery-focus-ev-index.md) 以及 5 份执行文档，分别覆盖缩略图 gallery open、tap focus session/device contract、CameraX AF+AE metering、UI reticle/routing 和集成验证；本轮只新增方案文档，未改运行时代码。
+- `2026-05-23` 横竖模式切换需求已沉淀为可交给非多模态 agent 的方案文档 [`2026-05-23-orientation-adaptive-camera-ui.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-orientation-adaptive-camera-ui.md)：核心产品决策是固定 camera cockpit 拓扑，不新增横屏专用布局，改为由物理方向 owner 驱动文字/方向性图案旋转，并把 CameraX output target rotation 通过 `SessionIntent -> SessionEffect -> DeviceCommand` 接入设备层；方案同时吸收 Android CameraX、Apple AVFoundation/Camera Control、OPPO Quick Button 和 vivo X300 Ultra 摄影握持/专业操控资料。本轮只新增方案文档并更新状态文档，未改运行时代码。
+- `2026-05-23` 外部 agent 提出的 `ShotExecutor / ShotGraph` 统一审查已完成核验并沉淀为非多模态执行方案包：结论认可“运行时 `ShotPlan` 与 2.0 `ShotGraph` 并存存在事实源漂移风险”，但不认可一次性删除 `ShotPlan`，因为它仍是 session effect、device command、CameraX adapter、video active plan、device translator 和 `ShotResult` 合成的运行时载体。新增总索引 [`2026-05-23-shot-pipeline-unification-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-pipeline-unification-index.md)，以及 [`2026-05-23-shot-graph-planning-source-of-truth.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-graph-planning-source-of-truth.md)、[`2026-05-23-shot-graph-device-execution-migration.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-graph-device-execution-migration.md) 两份顺序落地方案；本轮只新增方案文档，未改运行时代码。聚焦核验命令 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:media:test --tests com.opencamera.core.media.ShotExecutorTest --tests com.opencamera.core.media.AlgorithmProcessorTest --tests com.opencamera.core.media.AlgorithmJobSchedulerTest :core:mode:test --tests com.opencamera.core.mode.ModeCaptureStrategyGraphTest` 已通过。
+- `2026-05-23` 外部 agent 关于 mode controller 模板化重构的 `.tmp/mode-refactor/v2-*.md` 审查结论已完成仓内核验：重复问题仍成立，但执行口径修正为“先抽 `core/mode` 小 helper/delegate/reducer，不引入 `BaseModeController`”。新增总索引 [`2026-05-23-mode-controller-refactor-v2-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-controller-refactor-v2-index.md) 以及 4 份可交给非多模态 agent 的执行文档，分别覆盖 still capture graph helper、frame ratio delegate、Pro variant state 和 still shot session event reducer；这些包会改同一批 mode plugin 文件，后续应串行实施或由单一 integrator 合并并跑 Stage 7 gate。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-23：Mode Controller 模板化重构 V2 核验与方案文档
+
+- 目标：核验外部 agent 对 `.tmp/mode-refactor/v2-*.md` 的 4 步优化建议是否仍符合当前代码，并输出可直接交给非多模态 agent 的落地方案。
+- 核验结果：
+  6 个 still mode 的 `DeviceGraphSpec.stillCapture(...)`、5 个模式的 frame-ratio 列表/索引/选择、3 个模式的 Pro variant/manual draft 辅助逻辑、6 个 still mode 的 `onSessionEvent` 三分支重复仍存在；
+  不认可直接引入 `BaseModeController`，因为 capture strategy、metadata、postprocess 和 effect spec 仍是各模式最重差异；
+  外部 Step 4 的 headline-only 方案收益偏小，已修订为真正的 `reduceStillShotSessionEvent(...)` reducer；
+  方案还修正了测试依赖口径，要求 `core/mode` 新测试使用 `kotlin.test` / `runBlocking`，全部 shell 命令走 `rtk`。
+- 核心结果：
+  [`2026-05-23-mode-controller-refactor-v2-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-controller-refactor-v2-index.md) 建立核验结论、修正点、实施顺序和冲突边界；
+  [`2026-05-23-mode-refactor-still-capture-graph-helper.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-refactor-still-capture-graph-helper.md) 定义 `stillCaptureDeviceGraph(runtimeState)` 纯函数和 6 个 still controller 迁移；
+  [`2026-05-23-mode-refactor-frame-ratio-delegate.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-refactor-frame-ratio-delegate.md) 定义 `FrameRatioDelegate`，同时保留各模式现有 headline、event prefix 和 effect 更新；
+  [`2026-05-23-mode-refactor-pro-variant-state.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-refactor-pro-variant-state.md) 定义 `ProVariantState`，只收敛共享 Pro/manual 语义，不吞掉 Portrait/Night/Humanistic 的产品文案；
+  [`2026-05-23-mode-refactor-still-shot-session-event-reducer.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-refactor-still-shot-session-event-reducer.md) 定义 still photo session event reducer，并明确 Video 不参与。
+- 验证：
+  本轮只新增方案文档并更新状态文档，未改运行时代码；
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:mode:test` 已作为当前 helper 边界基线通过；
+  已用 `rtk rg` 检查新增方案文档无 `TODO / TBD / fill in / implement later / compileDebugKotlin` 占位词，且所有 Gradle 命令均以 `rtk ./gradlew` 形式出现。
+- 结论：
+  该优化可作为低风险代码健康任务执行，但不属于第 7 阶段稳定性最高优先级；若启动，应按 helper -> delegate -> state -> reducer 串行推进，避免多个 agent 同时改同一批 mode plugin 文件。
+
+## 2026-05-23：MainActivity 职责下沉核验与方案文档
+
+- 目标：核验外部 agent 关于 `MainActivity.kt` 过大、职责下沉不足的审查结论，并输出可交给多个非多模态 agent 的落地方案。
+- 核心判断：
+  外部结论成立：`MainActivity.kt` 当前 1974 行，包含 138 处 `findViewById` 和 84 处 `setOnClickListener`，集中承担视图绑定、状态渲染、面板路由、动作绑定、手势桥接、权限/相册/声音等平台壳职责。
+  但风险边界需要修正：不应先引入大 `CameraViewModel`，因为项目已有 `Session Kernel`；第一步应抽被动 app-shell collaborator，避免把 UI 侧再做成第二个隐藏 runtime owner。
+- 核心结果：
+  [`2026-05-23-mainactivity-thin-shell-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mainactivity-thin-shell-index.md) 记录审查证据、架构决策、拆分顺序和全局验收；
+  [`2026-05-23-mainactivity-panel-router-plan.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mainactivity-panel-router-plan.md) 先抽纯 `CockpitPanelRouter / CockpitPanelUiState`，用 JVM 测试锁定 scrim、settings back、Android back、style/color lab 等 route 语义；
+  [`2026-05-23-mainactivity-view-renderer-plan.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mainactivity-view-renderer-plan.md) 规划 `MainActivityViews`、settings/filter/dev/cockpit renderer surfaces，把 bulk view fields 和 view application 从 Activity 中剥离；
+  [`2026-05-23-mainactivity-action-binder-integration-plan.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mainactivity-action-binder-integration-plan.md) 规划 `MainActivityActionBinder`、callback interface、gallery/permission platform helpers，最终让 Activity 收敛为 lifecycle/composition shell。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读 `codex/plan.md`、`codex/prompt.md`、`codex/documentation.md`、`MainActivity.kt`、`CockpitPanelRoute.kt`、`SessionUiRenderModel.kt`、`CameraCockpitRenderModel.kt`、`GalleryOpenTarget.kt`、`PreviewTapFocusGeometry.kt`、相关 gesture/panel/render model 测试和 `app/build.gradle.kts`。
+
+## 2026-05-23：Effect-Device 依赖反转核验与方案文档
+
+- 目标：核验外部 agent 关于 `core/effect` 直接依赖 `core/device` 的审查结论，并输出可交给多个非多模态 agent 的落地方案。
+- 核心判断：
+  外部结论成立，但原结论只点出了第一层：[`EffectCapability.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/effect/src/main/kotlin/com/opencamera/core/effect/EffectCapability.kt) 的 `EffectCapabilityResolver` 直接接收 `DeviceCapabilities`；
+  实际还存在第二层：[`CapabilityGraphResolver.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/effect/src/main/kotlin/com/opencamera/core/effect/CapabilityGraphResolver.kt) 位于 `core:effect`，同时导入 `DeviceCapabilities / ManualControlSupport / CapabilityGraphReport / CapabilityRequirement*` 等 device-owned 类型。
+  `rtk ./gradlew --no-daemon :core:effect:dependencies --configuration compileClasspath` 已确认 `:core:effect` compileClasspath 中存在 `project :core:device`。
+- 核心结果：
+  [`2026-05-23-effect-device-dependency-inversion-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-effect-device-dependency-inversion-index.md) 记录证据、目标拓扑、执行顺序和全局验收；
+  [`2026-05-23-effect-capability-query-contract.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-effect-capability-query-contract.md) 定义 `core:effect` 自有 `EffectCapabilityQuery` 与 `core:device` 的 `DeviceCapabilitiesEffectQuery` 适配器；
+  [`2026-05-23-capability-graph-ownership-cleanup.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-capability-graph-ownership-cleanup.md) 建议新增 `core:capability` 承接 generic graph contracts/resolver，并通过 `CapabilityGraphDeviceQuery` 避免 graph resolver 依赖具体 `DeviceCapabilities`；
+  [`2026-05-23-effect-device-inversion-verification.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-effect-device-inversion-verification.md) 定义源码 import gate、Gradle dependency gate、focused tests 与 Stage 7 gate。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读 `codex/plan.md`、`codex/prompt.md`、`codex/documentation.md`、`core/effect/build.gradle.kts`、`core/device/build.gradle.kts`、`EffectCapability.kt`、`CapabilityGraphResolver.kt`、`EffectCapabilityResolverTest.kt`、`CapabilityGraphResolverTest.kt`、`DeviceContracts.kt`、`CapabilityContracts.kt`、`AppContainer.kt` 与 `DefaultCameraSession.kt` 相关装配点。
+
+## 2026-05-23：DefaultCameraSession 上帝类拆分核验与方案文档
+
+- 目标：核验外部 agent 关于 `DefaultCameraSession` 上帝类的审查结论，并输出可交给多个非多模态 agent 的执行方案。
+- 核心判断：
+  外部结论成立：`DefaultCameraSession.kt` 当前约 1998 行，单类路由 37 类 `SessionIntent`，同时承担 lifecycle、mode control、preview recovery、capture/recording、device graph resolution、presentation update、trace/effect emission 等职责；这是高收益、高成本、中等风险的拆分对象。
+  但外部草图中的无 owner `process() || process()` 中间件链需要收敛为显式 `SessionIntentOwner` + 内部 processor + 单一 runtime context，否则会违反“不要创建第二个隐藏 session kernel”的项目规则。
+- 核心结果：
+  [`2026-05-23-default-camera-session-split-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-default-camera-session-split-index.md) 记录核验证据、架构约束、总拆分顺序和全局验收；
+  [`2026-05-23-session-split-01-device-graph-selection.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-01-device-graph-selection.md) 先抽纯 `SessionSelectionPolicy / SessionDeviceGraphResolver`；
+  [`2026-05-23-session-split-02-intent-ownership-scaffold.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-02-intent-ownership-scaffold.md) 建立 exhaustive intent ownership；
+  [`2026-05-23-session-split-03-preview-recovery-processor.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-03-preview-recovery-processor.md)、[`2026-05-23-session-split-04-capture-recording-processor.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-04-capture-recording-processor.md)、[`2026-05-23-session-split-05-mode-device-control-processor.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-05-mode-device-control-processor.md) 分别覆盖 Stage 7 高价值 preview recovery、capture/recording 和 mode/device control 行为剥离。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读 `codex/plan.md`、`codex/prompt.md`、`codex/documentation.md`、`DefaultCameraSession.kt`、`SessionContracts.kt`、`DefaultCameraSessionTest.kt` 与 `CameraSessionCoordinator.kt`。
+
+## 2026-05-23：缩略图相册跳转与预览点按对焦/自动 EV 验收收口
+
+- 目标：复核其他 agent 对两张需求单的落地实现，修掉合并后阻断项，并给出可验收结论。
+- 根因与修复：
+  其他 agent 合并后在 `core/session` 留下 focus/EV 与输出旋转分支的冲突残留，且部分 session 测试丢失 `effectCollector.cancel()`，导致编译/协程泄漏型假失败；
+  `captureFeedbackPolicyFor()` 被扩大后把默认 `photo-original/photo-vivid` 低风险预览反馈也抑制，回退了零延时缩略图反馈；
+  `CameraXCaptureAdapterLivePhotoTest` 引用的 still output handle 合并 helper 缺失，导致 app 单测编译失败。
+- 核心结果：
+  [`SessionContracts.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 将 raw capture feedback 策略收敛为：默认低风险内置 photo filter 可继续即时反馈，Color Lab/filterSpec、非默认画幅、自拍镜像、非 classic-overlay 水印等待可信 saved media；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 恢复 focus/EV 与 host recovery 测试的 collector 生命周期，并同步默认 filter 期望到当前 `photo-original`；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 抽出 `resolvePhotoOutputHandle()`，生产 still capture 与 live-photo 测试共用 MediaStore `contentUri` 合并规则；
+  缩略图打开链路已走 `GalleryOpenTarget` / `latestThumbnailSource`，只打开官方 saved media；预览点按链路已从 `GestureAction.FocusAt` 接到 session/device/CameraX metering，并由 presentation feedback 驱动 reticle 渲染。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.GalleryOpenTargetTest --tests com.opencamera.app.ThumbnailRenderCommandTest --tests com.opencamera.app.PreviewTapFocusGeometryTest --tests com.opencamera.app.camera.PreviewMeteringActionPlannerTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `rtk ./scripts/verify_stage_7_observability.sh`
+- 结论：
+  本地代码验收通过；仍需真机 smoke 复验 Android 相册是否能打开最新 saved media，以及触摸预览区域时 AF/AE 行为是否符合具体机型 CameraX 支持能力。
+
+## 2026-05-23：预览框与成片区域同源几何修复
+
+- 目标：处理最新真机实测发现的严重问题：保存照片的实际画面区域不是主界面预览画幅框所示区域。
+- 根因：
+  `PreviewOverlayView` 的画幅框、遮罩和网格把底部 cockpit inset 与水平 padding 当作成像区域约束，导致 active frame rect 在扣掉底部控制区后重新居中；而 `PhotoFrameRatioPostProcessor.computeCenterCropBounds()` 对保存 JPEG 始终按完整图像中心裁切。预览框和成片裁切使用了不同坐标系。
+- 核心结果：
+  [`PreviewOverlayView.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/PreviewOverlayView.kt) 删除成像几何里的 UI inset 入口，`previewContentGeometry()`、`computeFrameRect()`、`computePreviewFrameRect()` 只描述完整 `PreviewView` content rect；frame guideline、frame scrim 和 grid 共用该几何；
+  [`PreviewOverlayGeometryTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/PreviewOverlayGeometryTest.kt) 新增回归，锁定 active capture frame 必须居中在完整 preview content，旧的“respect horizontal padding”期望改为“ignore UI padding so it matches saved crop”。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest`
+  `rtk ./gradlew --no-daemon :app:assembleDebug`
+- 结论：
+  本轮修掉的是代码级根因：UI 安全区不再参与成像画幅计算。最终仍需新 APK 真机复验保存图，尤其是 16:9 和 1:1 在竖屏/横屏下的视觉一致性。
+
+## 2026-05-23：竖屏画幅保存横竖方向修复
+
+- 目标：处理 vivo X300 复测发现的继续偏离：竖屏预览框是竖向画幅，但保存 JPEG 变成横向较长。
+- 根因：
+  预览 overlay 的 `orientedFrameRatio()` 已经按屏幕/视图方向把 `16:9` 在竖屏显示为 `9:16`；但 `PhotoFrameRatioPostProcessor.computeCenterCropBounds()` 直接使用 `FrameRatio.width / height`，把 portrait 解码图也按 `16:9` 横向裁切。
+- 核心结果：
+  [`PhotoFrameRatioPostProcessor.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessor.kt) 新增方向感知 ratio 计算：当解码图 `width <= height` 时使用短边/长边比例，横图使用长边/短边比例；
+  [`PhotoFrameRatioPostProcessorTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessorTest.kt) 将 portrait `4:3` 期望改为不裁切，将 portrait `16:9` 期望改为裁左右得到 `9:16`。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
+  `rtk ./gradlew --no-daemon :app:assembleDebug`
+- 结论：
+  预览和保存后处理现在对 `4:3 / 16:9 / 1:1` 的横竖方向解释一致。下一轮真机请优先复验竖屏 `16:9`：成片应是竖向长图，不再是横向长图。
+
+## 2026-05-23：合同文件巨人症治理方案文档
+
+- 目标：核验外部 agent 关于 `SettingsContracts.kt` 与 `MediaPipelineContracts.kt` 的“合同文件巨人症”审查，并形成可交给非多模态 agent 的落地方案。
+- 核心判断：
+  外部结论大方向成立，两个文件分别为 `1382` 行和 `1133` 行，确实把值枚举、数据合同、action/reducer、默认 catalog、codec/serializer、执行器、postprocessor、ShotGraph、frame stream 和 save transaction 等不同抽象混在单文件里；
+  但需修正一点：`PersistedSettingsSerializer.kt` 已经独立存在，问题不是所有设置序列化仍在合同文件，而是滤镜分享 codec、导入 profile serializer、manual draft serializer、默认数据和 reducer 仍与合同类型混放。
+- 核心结果：
+  [`2026-05-23-contract-file-giantism-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-contract-file-giantism-index.md) 记录核验结论、Grothendieck 判断、执行顺序和全局门禁；
+  [`2026-05-23-settings-contract-split-plan.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-settings-contract-split-plan.md) 将 settings 拆为 enums、data models、catalog operations、actions/reducers、metadata/share codecs 和 defaults；
+  [`2026-05-23-media-pipeline-contract-split-plan.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-media-pipeline-contract-split-plan.md) 将 media 拆为 media types、live photo、shot lifecycle、postprocessors、shot executor、ShotGraph、algorithm processor、frame stream、graph planner 和 save transaction。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已核验目标文件行数、主要声明分布、相邻 settings/media 文件现状、关键引用面，以及无 `SettingsContractsKt / MediaPipelineContractsKt` 直接源码引用。
+
+## 2026-05-23：缩略图相册跳转与点击预览对焦/自动 EV 方案文档
+
+- 目标：按用户新增的两张需求单，形成可直接转给多个非多模态 agent 并行处理的 Markdown 方案包。
+- 核心判断：
+  缩略图打开失败不是保存链路本身的第一嫌疑，而是 UI 点击路径仍用 `latestCapturePath/latestVideoPath` 做 `File.exists()`，没有复用已经能渲染缩略图的 `ThumbnailSource.SavedMedia.renderUri`；
+  点击预览对焦的手势入口已经存在，缺口在 `GestureAction.FocusAt -> SessionIntent -> SessionEffect -> DeviceCommand -> CameraX FocusMeteringAction -> DeviceEvent -> session presentation` 这条正式主链路。
+- 核心结果：
+  [`2026-05-23-thumbnail-gallery-focus-ev-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-thumbnail-gallery-focus-ev-index.md) 建立总索引、并行拆分和冲突边界；
+  [`2026-05-23-thumbnail-gallery-open-fix.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-thumbnail-gallery-open-fix.md) 要求 gallery click 只打开官方 `SavedMedia`，优先使用 `content://`，绝不打开 pending feedback / preview snapshot；
+  [`2026-05-23-tap-focus-session-device-contract.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-tap-focus-session-device-contract.md) 定义 normalized metering request、session ephemeral feedback、effect/command/event 和 session/coordinator 测试；
+  [`2026-05-23-tap-focus-camerax-execution.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-tap-focus-camerax-execution.md) 约束 CameraX adapter 使用 `FocusMeteringAction.FLAG_AF | FLAG_AE`，在 AF+AE 不支持时尝试 AE-only degraded，不把 metering 失败误报成 preview bind failure；
+  [`2026-05-23-tap-focus-ui-reticle.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-tap-focus-ui-reticle.md) 约束 UI 只做坐标归一化、session intent 分发和 reticle 渲染，不直接调用 CameraX；
+  [`2026-05-23-focus-ev-integration-verification.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-focus-ev-integration-verification.md) 汇总 focused tests、Stage 7 gate 和非多模态真机 smoke。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读当前 `MainActivity.kt`、`ThumbnailSource`/`MediaOutputHandle`、`DefaultCameraSession.kt`、`DeviceContracts.kt`、`CameraSessionCoordinator.kt`、`CameraXCaptureAdapter.kt`、`GesturePolicy`/`GestureRouter`/`GestureGuard` 与现有缩略图/几何/Coordinator 测试。
+
+## 2026-05-22：预览/成片/缩略图一致性核心 containment
+
+- 目标：处理 vivo X300 最新真机反馈中的三个严重问题：Color Lab 预览与成片不一致、预览预期成像区域与实际成片区域差异大、缩略图必须与最终颜色/画幅/水印基本一致。
+- 根因：
+  当前预览是 CameraX 原始流 + `PreviewOverlayView` Canvas 叠层，成片是 JPEG postprocessor，缩略图则来自 `PreviewView.bitmap`；三者没有共享同一个 render truth。短期最危险的是 raw preview feedback 被 UI 当成最终成片反馈展示。
+- 核心结果：
+  [`SessionContracts.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt) 扩大 `captureFeedbackPolicyFor()`，只允许无 filter/Color Lab、无非默认 frame crop、无 watermark、无 selfie mirror 的纯净 shot 使用 raw preview feedback；
+  [`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 的抑制 trace reason 收敛为 `final-output-postprocess`，覆盖所有最终输出后处理差异；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 在 still/video bind 时改用 `UseCaseGroup`，并在 `PreviewView.viewPort` 可用时设置 shared viewport，推动 Preview 与 ImageCapture/VideoCapture 使用同一 CameraX crop contract；
+  [`2026-05-22-render-recipe-preview-engine-handoff.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-22-render-recipe-preview-engine-handoff.md) 将低耦合后续任务拆给外部 agent：RenderRecipe 合约、诊断 notes、vivo X300 QA 清单。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:assembleDebug`
+  `rtk ./scripts/verify_stage_7_observability.sh`
+- 结论：
+  本轮解决的是“不要展示错误反馈”和“CameraX 预览/拍照共享 viewport”的核心 containment；仍未完成像素级实时 Color Lab 预览渲染。最终 2.0 `GO` 仍需真机安装最新 APK 后，用保存 JPEG、录屏和 pipeline notes 验证。
+
+## 2026-05-22：Color Lab 预览/成片一致性修复
+
+- 目标：处理 vivo X300 真机发现的严重问题：Color Lab 看起来只影响预览，保存照片未生效；同时排查主要预览/成片链路是否存在同类断点，并确认 Color Lab 二级面板不暴露滤镜子项。
+- 根因：
+  `PhotoModePlugin / PortraitModePlugin / HumanisticModePlugin / VideoModePlugin` 的预览 effect spec 已通过 `renderStyleColorSpec()` 合入 `ColorLabSpec`；`EffectBridge.toMetadataTags()` 也会把合成后的 `FilterRenderSpec` 写入 `filterSpec.*`。真正高风险断点在 Android Q+ 设备保存路径：原 `createPhotoOutputRequest()` 使用 `ImageCapture.OutputFileOptions.Builder(ContentResolver, collection, values)`，但后续后处理只能依赖 CameraX 回调的 `savedUri`；当真机/ROM 回调未给出有效 URI 时，`ShotResult.outputHandle` 只有展示路径，`PhotoAlgorithmPostProcessor / PhotoFrameRatioPostProcessor / PhotoWatermarkPostProcessor / PortraitRenderPostProcessor / DocumentAutoCropPostProcessor / PhotoSelfieMirrorPostProcessor` 都会因缺少可编辑 target 而跳过。
+- 核心结果：
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `resolvePhotoOutputHandle()`，并让 Android Q+ still capture 先预创建 MediaStore `contentUri`、用 `ImageCapture.OutputFileOptions.Builder(outputStream)` 写入，确保成片后处理拿到稳定可编辑目标；capture error 时会清理预创建 URI；
+  [`DefaultCameraSessionTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/core/session/src/test/kotlin/com/opencamera/core/session/DefaultCameraSessionTest.kt) 新增 Color Lab capture metadata 回归，确认 `photo-original + ColorLabSpec(1,-1,1)` 会输出合成后的 `filterSpec.brightnessShift / contrast / saturation / warmthShift / highlightCompression / warmBoost`；
+  [`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 新增设备输出句柄回归，确认预创建 MediaStore still handle 在 CameraX 省略 `savedUri` 时仍保留 `contentUri`；
+  Color Lab 二级面板的“滤镜子项”在 render model 和 Activity 层已双重隐藏：`showFilterItems=false` 时清空 `filterSelectionList`、隐藏 current summary 和 save custom control；对应 `SessionUiRenderModelTest` 仍通过。
+- 链路审计结论：
+  JPEG saved-photo 链路中，滤镜/Color Lab、画幅裁切、水印、人像渲染、文档裁切、自拍镜像都依赖同一个可编辑 output handle，本轮修复的是共同设备层断点；metadata 到 postprocessor 的合约本身已成立。
+  Video 录制链路当前会写入 filter metadata，但没有等价 JPEG 后处理器，不能承诺“录制视频成片”应用 Color Lab；这属于后续视频滤镜渲染能力范围。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest.photo\ mode\ carries\ color\ lab\ adjusted\ render\ spec\ through\ session\ shot\ metadata`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoAlgorithmPostProcessorTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest.color\ lab\ shows\ adjustment\ panel\ but\ not\ filter\ items\ and\ family\ tabs`
 
 ## 2026-05-22：第五轮真机反馈首批可落地修复
 

@@ -12,7 +12,7 @@
     <dimen name="touch_target_min">44dp</dimen>
     <dimen name="touch_target_shutter">72dp</dimen>
     <dimen name="mode_chip_min_width">64dp</dimen>
-    <dimen name="mode_chip_min_height">48dp</dimen>
+    <dimen name="mode_chip_min_height">32dp</dimen>
     <dimen name="zoom_chip_min_width">36dp</dimen>
     <dimen name="zoom_chip_min_height">26dp</dimen>
 

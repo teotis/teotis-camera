@@ -103,7 +103,8 @@ internal data class PreviewOverlayRenderModel(
 internal data class PreviewFrameRenderModel(
     val ratio: FrameRatio,
     val label: String,
-    val dimOutsideFrame: Boolean
+    val dimOutsideFrame: Boolean,
+    val bottomInsetPx: Float = 0f
 )
 
 internal data class FrameRatioOptionRenderModel(
@@ -1853,13 +1854,15 @@ internal fun filterLabPageRenderModel(
     adjustmentMode: FilterAdjustmentMode = FilterAdjustmentMode.LIGHT
 ): FilterLabPageRenderModel {
     val settings = state.settings.persisted
-    val catalog = state.settings.catalog
     val editingEnabled = state.activeShot == null && state.countdownRemainingSeconds == null
     val family = filterLabFamilyState(
         state = state,
         text = text,
         selectedFamily = selectedFamily
     )
+    val isColorLab = panelRole == StyleAndColorLabRole.COLOR_LAB
+    val colorLabModel = colorLabPanelRenderModel(state, text)
+    val colorLabRenderSpec = FilterRenderSpec().applyColorLab(settings.photo.colorLabSpec)
     val currentProfile = family.filters.firstOrNull { profile -> profile.id == family.currentFilterId }
     val currentFilterLabel = currentProfile?.label ?: family.currentFilterId
     val currentRenderSpec = currentProfile?.renderSpec ?: FilterRenderSpec()
@@ -1878,14 +1881,20 @@ internal fun filterLabPageRenderModel(
         },
         supportingText = text.filterLabSupportingText(),
         heroSummary = "",
-        currentFilterSummary = text.filterLabCurrentDefault(currentFilterLabel),
-        rosterText = family.filters.joinToString(separator = "\n") { profile ->
-            val marker = if (profile.id == family.currentFilterId) "•" else "·"
-            val customBadge = if (profile.builtIn) "" else text.statusCustomBadge()
-            "$marker ${profile.label}${customBadge}"
+        currentFilterSummary = if (isColorLab) "" else text.filterLabCurrentDefault(currentFilterLabel),
+        rosterText = if (isColorLab) {
+            ""
+        } else {
+            family.filters.joinToString(separator = "\n") { profile ->
+                val marker = if (profile.id == family.currentFilterId) "•" else "·"
+                val customBadge = if (profile.builtIn) "" else text.statusCustomBadge()
+                "$marker ${profile.label}${customBadge}"
+            }
         },
         editingEnabled = editingEnabled,
-        editingHint = if (editingEnabled) {
+        editingHint = if (isColorLab) {
+            ""
+        } else if (editingEnabled) {
             text.filterLabEditingEnabled()
         } else {
             text.filterLabEditingDisabled()
@@ -1898,26 +1907,22 @@ internal fun filterLabPageRenderModel(
         showModeToggle = panelRole == StyleAndColorLabRole.STYLE,
         photoTab = filterLabTabRenderModel(
             family = FilterLabFamily.PHOTO,
-            currentFilterId = settings.photo.defaultFilterProfileId,
-            filters = catalog.photoSettingsFilterProfiles(),
+            familyLabel = text.filterFamilyPhoto(),
             selectedFamily = family.family
         ),
         humanisticTab = filterLabTabRenderModel(
             family = FilterLabFamily.HUMANISTIC,
-            currentFilterId = settings.photo.defaultHumanisticFilterProfileId,
-            filters = catalog.filterProfilesFor(FilterProfileCategory.HUMANISTIC, includeCustom = true),
+            familyLabel = text.filterFamilyHumanistic(),
             selectedFamily = family.family
         ),
         portraitTab = filterLabTabRenderModel(
             family = FilterLabFamily.PORTRAIT,
-            currentFilterId = settings.photo.defaultPortraitFilterProfileId,
-            filters = catalog.filterProfilesFor(FilterProfileCategory.PORTRAIT, includeCustom = true),
+            familyLabel = text.filterFamilyPortrait(),
             selectedFamily = family.family
         ),
         videoTab = filterLabTabRenderModel(
             family = FilterLabFamily.VIDEO,
-            currentFilterId = settings.video.defaultFilterProfileId,
-            filters = catalog.videoSettingsFilterProfiles(),
+            familyLabel = text.filterFamilyVideo(),
             selectedFamily = family.family
         ),
         adjustControl = FilterLabAdjustRenderModel(
@@ -1939,59 +1944,65 @@ internal fun filterLabPageRenderModel(
             isEnabled = editingEnabled && family.supported && currentProfile != null,
             willCreateCustomCopy = currentProfile?.builtIn == true
         ),
-        filterItems = family.filters.map { profile ->
-            val isSelected = profile.id == family.currentFilterId
-            FilterLabFilterItemRenderModel(
-                filterProfileId = profile.id,
-                title = profile.label,
-                supportingText = buildString {
-                    append(family.label)
-                    if (!profile.builtIn) {
-                        append(text.statusCustomBadge())
+        filterItems = if (isColorLab) {
+            emptyList()
+        } else {
+            family.filters.map { profile ->
+                val isSelected = profile.id == family.currentFilterId
+                FilterLabFilterItemRenderModel(
+                    filterProfileId = profile.id,
+                    title = profile.label,
+                    supportingText = buildString {
+                        append(family.label)
+                        if (!profile.builtIn) {
+                            append(text.statusCustomBadge())
+                        }
+                        if (isSelected) {
+                            append(text.filterLabSelectedDefault())
+                        }
+                    },
+                    isSelected = isSelected,
+                    nextAction = if (isSelected) {
+                        null
+                    } else {
+                        family.updateAction(profile.id)
+                    },
+                    adjustButtonLabel = if (isSelected) {
+                        buildString {
+                            append(text.adjustSelected())
+                            append('\n')
+                            append(profile.label)
+                            append('\n')
+                            append(
+                                if (profile.builtIn) {
+                                    text.readyEditableCopy()
+                                } else {
+                                    text.readyEditingCustom()
+                                }
+                            )
+                        }
+                    } else {
+                        null
                     }
-                    if (isSelected) {
-                        append(text.filterLabSelectedDefault())
-                    }
-                },
-                isSelected = isSelected,
-                nextAction = if (isSelected) {
-                    null
-                } else {
-                    family.updateAction(profile.id)
-                },
-                adjustButtonLabel = if (isSelected) {
-                    buildString {
-                        append(text.adjustSelected())
-                        append('\n')
-                        append(profile.label)
-                        append('\n')
-                        append(
-                            if (profile.builtIn) {
-                                text.readyEditableCopy()
-                            } else {
-                                text.readyEditingCustom()
-                            }
-                        )
-                    }
-                } else {
-                    null
-                }
-            )
+                )
+            }
         },
         adjustmentPanel = FilterAdjustmentPanelRenderModel(
-            isVisible = showAdjustmentPanel && currentProfile != null && family.supported,
+            isVisible = if (isColorLab) showAdjustmentPanel else showAdjustmentPanel && currentProfile != null && family.supported,
             mode = adjustmentMode,
-            selectedProfileId = currentProfile?.id,
-            selectedProfileLabel = currentFilterLabel,
-            renderSpec = currentRenderSpec,
+            selectedProfileId = if (isColorLab) null else currentProfile?.id,
+            selectedProfileLabel = if (isColorLab) colorLabModel.summary else currentFilterLabel,
+            renderSpec = if (isColorLab) colorLabRenderSpec else currentRenderSpec,
             modeToggleLabel = if (adjustmentMode == FilterAdjustmentMode.LIGHT) {
                 text.switchToAdvanced()
             } else {
                 text.switchToLight()
             },
             lightPalette = FilterLightPaletteRenderModel(
-                summary = currentRenderSpec.lightPaletteSummary(text),
-                supportingText = if (currentProfile?.builtIn == true) {
+                summary = if (isColorLab) "" else currentRenderSpec.lightPaletteSummary(text),
+                supportingText = if (isColorLab) {
+                    text.filterLabLightPaletteHint()
+                } else if (currentProfile?.builtIn == true) {
                     text.filterLabDragToCreateCustom()
                 } else {
                     text.filterLabLightPaletteHint()
@@ -2032,7 +2043,7 @@ internal fun filterLabPageRenderModel(
             nextAction = cycleAction
         ),
         saveCustomControl = FilterLabSaveCustomRenderModel(
-            buttonLabel = buildString {
+            buttonLabel = if (isColorLab) "" else buildString {
                 append(text.saveAsCustom())
                 append('\n')
                 append(currentFilterLabel)
@@ -2046,14 +2057,14 @@ internal fun filterLabPageRenderModel(
                 )
             },
             family = family.family,
-            sourceProfileId = currentProfile?.id,
-            isEnabled = currentProfile?.builtIn == true
+            sourceProfileId = if (isColorLab) null else currentProfile?.id,
+            isEnabled = !isColorLab && currentProfile?.builtIn == true
         ),
         styleStrength = settings.photo.styleStrength,
         updateStyleStrengthAction = PersistedSettingsAction.UpdatePhotoStyleStrength(
             settings.photo.styleStrength.coerceIn(0f, 1f)
         ),
-        footer = text.filterLabFooter()
+        footer = if (isColorLab) "" else text.filterLabFooter()
     )
 }
 
@@ -2406,14 +2417,13 @@ private fun filterLabFamilyState(
 
 private fun filterLabTabRenderModel(
     family: FilterLabFamily,
-    currentFilterId: String,
-    filters: List<FilterProfile>,
+    familyLabel: String,
     selectedFamily: FilterLabFamily
 ): FilterLabTabRenderModel {
-    val label = filters.firstOrNull { profile -> profile.id == currentFilterId }?.label ?: currentFilterId
+    val label = familyLabel.ifBlank { family.label }
     return FilterLabTabRenderModel(
         family = family,
-        label = "${family.label}\n$label",
+        label = label,
         isSelected = family == selectedFamily
     )
 }

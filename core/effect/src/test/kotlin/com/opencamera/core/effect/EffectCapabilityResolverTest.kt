@@ -1,6 +1,5 @@
 package com.opencamera.core.effect
 
-import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.WatermarkStyleSettings
 import kotlin.test.Test
@@ -8,11 +7,21 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+private data class FakeEffectCapabilityQuery(
+    val portraitDepth: Boolean = true,
+    val documentGeometry: Boolean = true,
+    val manualControls: Boolean = true
+) : EffectCapabilityQuery {
+    override fun supportsPortraitDepth(): Boolean = portraitDepth
+    override fun supportsDocumentGeometry(): Boolean = documentGeometry
+    override fun supportsManualControls(): Boolean = manualControls
+}
+
 class EffectCapabilityResolverTest {
 
     @Test
     fun `empty spec returns empty report`() {
-        val resolver = EffectCapabilityResolver(DeviceCapabilities.DEFAULT)
+        val resolver = EffectCapabilityResolver(FakeEffectCapabilityQuery())
         val report = resolver.resolve(EffectSpec.EMPTY)
 
         assertTrue(report.results.isEmpty())
@@ -23,7 +32,7 @@ class EffectCapabilityResolverTest {
     fun `filter effect is always supported`() {
         val filter = FilterEffect(profileId = "vivid", renderSpec = null)
         val spec = EffectSpec(listOf(filter))
-        val resolver = EffectCapabilityResolver(DeviceCapabilities.DEFAULT)
+        val resolver = EffectCapabilityResolver(FakeEffectCapabilityQuery())
 
         val report = resolver.resolve(spec)
 
@@ -40,7 +49,7 @@ class EffectCapabilityResolverTest {
             style = WatermarkStyleSettings()
         )
         val spec = EffectSpec(listOf(watermark))
-        val resolver = EffectCapabilityResolver(DeviceCapabilities.DEFAULT)
+        val resolver = EffectCapabilityResolver(FakeEffectCapabilityQuery())
 
         val report = resolver.resolve(spec)
 
@@ -59,8 +68,9 @@ class EffectCapabilityResolverTest {
             bokehEffect = "circle"
         )
         val spec = EffectSpec(listOf(portrait))
-        val caps = DeviceCapabilities.DEFAULT.copy(supportsPortraitDepthEffect = false)
-        val resolver = EffectCapabilityResolver(caps)
+        val resolver = EffectCapabilityResolver(
+            FakeEffectCapabilityQuery(portraitDepth = false)
+        )
 
         val report = resolver.resolve(spec)
 
@@ -80,7 +90,7 @@ class EffectCapabilityResolverTest {
             bokehEffect = "circle"
         )
         val spec = EffectSpec(listOf(portrait))
-        val resolver = EffectCapabilityResolver(DeviceCapabilities.DEFAULT)
+        val resolver = EffectCapabilityResolver(FakeEffectCapabilityQuery())
 
         val report = resolver.resolve(spec)
 
@@ -93,8 +103,9 @@ class EffectCapabilityResolverTest {
     fun `document effect degraded when scan not supported`() {
         val document = DocumentEffect(autoCrop = true, contrastProfile = "high")
         val spec = EffectSpec(listOf(document))
-        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
-        val resolver = EffectCapabilityResolver(caps)
+        val resolver = EffectCapabilityResolver(
+            FakeEffectCapabilityQuery(documentGeometry = false)
+        )
 
         val report = resolver.resolve(spec)
 
@@ -117,11 +128,9 @@ class EffectCapabilityResolverTest {
         )
         val document = DocumentEffect(autoCrop = true, contrastProfile = "high")
         val spec = EffectSpec(listOf(filter, portrait, document))
-        val caps = DeviceCapabilities.DEFAULT.copy(
-            supportsPortraitDepthEffect = false,
-            supportsDocumentScanEnhancement = false
+        val resolver = EffectCapabilityResolver(
+            FakeEffectCapabilityQuery(portraitDepth = false, documentGeometry = false)
         )
-        val resolver = EffectCapabilityResolver(caps)
 
         val report = resolver.resolve(spec)
 
