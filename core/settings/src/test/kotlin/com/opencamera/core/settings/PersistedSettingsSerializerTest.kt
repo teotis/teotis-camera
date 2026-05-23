@@ -2,6 +2,7 @@ package com.opencamera.core.settings
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PersistedSettingsSerializerTest {
@@ -268,5 +269,50 @@ class PersistedSettingsSerializerTest {
         )
 
         assertEquals(settings.photo.colorLabSpec, decoded.photo.colorLabSpec)
+    }
+
+    @Test
+    fun `default photo settings has low light night assist enabled`() {
+        val settings = PhotoSettings()
+        assertTrue(settings.lowLightNightAssistEnabled)
+    }
+
+    @Test
+    fun `reducer toggles low light night assist without affecting other fields`() {
+        val initial = PersistedSettings()
+        assertTrue(initial.photo.lowLightNightAssistEnabled)
+
+        val disabled = initial.reduce(
+            PersistedSettingsAction.UpdatePhotoLowLightNightAssistEnabled(false)
+        )
+        assertFalse(disabled.photo.lowLightNightAssistEnabled)
+        assertEquals(initial.photo.defaultFilterProfileId, disabled.photo.defaultFilterProfileId)
+        assertEquals(initial.photo.countdownDuration, disabled.photo.countdownDuration)
+        assertEquals(initial.common, disabled.common)
+        assertEquals(initial.video, disabled.video)
+
+        val reEnabled = disabled.reduce(
+            PersistedSettingsAction.UpdatePhotoLowLightNightAssistEnabled(true)
+        )
+        assertTrue(reEnabled.photo.lowLightNightAssistEnabled)
+    }
+
+    @Test
+    fun `serializer round trips low light night assist field`() {
+        val settings = PersistedSettings(
+            photo = PhotoSettings(lowLightNightAssistEnabled = false)
+        )
+
+        val serialized = PersistedSettingsSerializer.toMap(settings)
+        assertEquals("false", serialized["photo.lowLightNightAssistEnabled"])
+
+        val decoded = PersistedSettingsSerializer.fromMap(serialized)
+        assertFalse(decoded.photo.lowLightNightAssistEnabled)
+    }
+
+    @Test
+    fun `serializer falls back to enabled when low light key is missing`() {
+        val decoded = PersistedSettingsSerializer.fromMap(emptyMap())
+        assertTrue(decoded.photo.lowLightNightAssistEnabled)
     }
 }

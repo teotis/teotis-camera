@@ -42,6 +42,7 @@ sealed interface PersistedSettingsAction {
     data class UpdateVideoFilter(val filterProfileId: String) : PersistedSettingsAction
     data class UpdateColorLabSpec(val spec: ColorLabSpec) : PersistedSettingsAction
     data class UpdatePhotoStyleStrength(val strength: Float) : PersistedSettingsAction
+    data class UpdatePhotoLowLightNightAssistEnabled(val enabled: Boolean) : PersistedSettingsAction
 }
 
 fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings {
@@ -139,6 +140,10 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
 
         is PersistedSettingsAction.UpdatePhotoStyleStrength -> copy(
             photo = photo.copy(styleStrength = action.strength.coerceIn(0f, 1f))
+        )
+
+        is PersistedSettingsAction.UpdatePhotoLowLightNightAssistEnabled -> copy(
+            photo = photo.copy(lowLightNightAssistEnabled = action.enabled)
         )
     }
 }

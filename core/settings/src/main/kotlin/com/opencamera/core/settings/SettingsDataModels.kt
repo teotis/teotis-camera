@@ -169,7 +169,8 @@ data class PhotoSettings(
     val livePhotoEnabledByDefault: Boolean = false,
     val countdownDuration: CountdownDuration = CountdownDuration.OFF,
     val colorLabSpec: ColorLabSpec = ColorLabSpec(),
-    val styleStrength: Float = 1f
+    val styleStrength: Float = 1f,
+    val lowLightNightAssistEnabled: Boolean = true
 )
 
 data class VideoSettings(

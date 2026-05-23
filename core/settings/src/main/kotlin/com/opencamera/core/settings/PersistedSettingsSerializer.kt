@@ -36,6 +36,8 @@ object PersistedSettingsSerializer {
     private const val KEY_COLOR_LAB_STRENGTH = "photo.colorLab.strength"
     private const val KEY_COLOR_LAB_PRESET_ID = "photo.colorLab.presetId"
     private const val KEY_PHOTO_STYLE_STRENGTH = "photo.styleStrength"
+    private const val KEY_PHOTO_LOW_LIGHT_NIGHT_ASSIST =
+        "photo.lowLightNightAssistEnabled"
 
     fun toMap(settings: PersistedSettings): Map<String, String> {
         return linkedMapOf(
@@ -73,7 +75,8 @@ object PersistedSettingsSerializer {
             KEY_COLOR_LAB_TONE_AXIS to settings.photo.colorLabSpec.toneAxis.toString(),
             KEY_COLOR_LAB_STRENGTH to settings.photo.colorLabSpec.strength.toString(),
             KEY_COLOR_LAB_PRESET_ID to (settings.photo.colorLabSpec.presetId ?: ""),
-            KEY_PHOTO_STYLE_STRENGTH to settings.photo.styleStrength.toString()
+            KEY_PHOTO_STYLE_STRENGTH to settings.photo.styleStrength.toString(),
+            KEY_PHOTO_LOW_LIGHT_NIGHT_ASSIST to settings.photo.lowLightNightAssistEnabled.toString()
         )
     }
 
@@ -174,7 +177,11 @@ object PersistedSettingsSerializer {
                     presetId = values[KEY_COLOR_LAB_PRESET_ID]?.takeIf { it.isNotBlank() }
                 ).normalized(),
                 styleStrength = values[KEY_PHOTO_STYLE_STRENGTH]?.toFloatOrNull()?.coerceIn(0f, 1f)
-                    ?: defaults.photo.styleStrength
+                    ?: defaults.photo.styleStrength,
+                lowLightNightAssistEnabled = parseBoolean(
+                    values[KEY_PHOTO_LOW_LIGHT_NIGHT_ASSIST],
+                    defaults.photo.lowLightNightAssistEnabled
+                )
             ),
             video = VideoSettings(
                 defaultVideoSpec = VideoSpec(
