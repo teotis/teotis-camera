@@ -19,11 +19,11 @@ internal class MainActivityActionBinder(
     private val snapshot: () -> MainActivityUiSnapshot,
     private val callbacks: MainActivityActionCallbacks,
     private val hasPermission: (String) -> Boolean,
-    private val captureConfigDisabledReason: (SessionState) -> String?
+    private val captureConfigDisabledReason: (SessionState) -> String?,
+    private val modeTrackScrollGuard: ModeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
 ) {
     private val gesturePolicy = GesturePolicy()
     private val gestureGuard = GestureGuard()
-    private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
     private var gestureRouter: GestureRouter? = null
 
     fun bind() {

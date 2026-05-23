@@ -57,6 +57,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var latestSessionState: SessionState? = null
     private var lightPaletteBaseSpec: FilterRenderSpec? = null
 
+    // Shared scroll guard for mode track scroll-vs-tap disambiguation
+    private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
+
     // Renderers (initialized in onCreate after views)
     private lateinit var cockpitRenderer: CockpitSurfaceRenderer
     private lateinit var settingsRenderer: SettingsPanelRenderer
@@ -107,7 +110,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             snapshot = ::buildUiSnapshot,
             callbacks = this,
             hasPermission = ::hasPermission,
-            captureConfigDisabledReason = ::captureConfigDisabledReason
+            captureConfigDisabledReason = ::captureConfigDisabledReason,
+            modeTrackScrollGuard = modeTrackScrollGuard
         )
         actionBinder.bind()
         bindState()
@@ -125,7 +129,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             preview = views.preview,
             callbacks = CockpitCallbacks(
                 onZoomRatioSelected = { ratio -> dispatch(SessionIntent.ApplyZoomRatio(ratio)) }
-            )
+            ),
+            isModeTrackScrolling = modeTrackScrollGuard::isScrolling
         )
         settingsRenderer = SettingsPanelRenderer(
             this, views.settingsPanel,

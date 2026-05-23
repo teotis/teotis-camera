@@ -22,7 +22,8 @@ internal class CockpitSurfaceRenderer(
     private val bottomCockpit: BottomCockpitViews,
     private val modeTrack: ModeTrackViews,
     private val preview: PreviewViews,
-    private val callbacks: CockpitCallbacks
+    private val callbacks: CockpitCallbacks,
+    private val isModeTrackScrolling: () -> Boolean = { false }
 ) {
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
@@ -140,22 +141,6 @@ internal class CockpitSurfaceRenderer(
     }
 
     private var lastAutoScrolledActiveMode: com.opencamera.core.mode.ModeId? = null
-    private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
-
-    fun attachModeTrackTouch(
-        buttons: List<Pair<Button, com.opencamera.core.mode.ModeId>>,
-        onModeSelected: (com.opencamera.core.mode.ModeId) -> Unit
-    ) {
-        modeTrack.humanistic.visibility = View.GONE
-        modeTrack.humanistic.setOnClickListener(null)
-        modeTrackScrollGuard.attach(modeTrack.scroll)
-        buttons.forEach { (button, modeId) ->
-            button.setOnClickListener {
-                if (modeTrackScrollGuard.isScrolling) return@setOnClickListener
-                onModeSelected(modeId)
-            }
-        }
-    }
 
     fun renderModeTrack(model: ModeTrackRenderModel) {
         val buttons = listOf(
@@ -191,7 +176,7 @@ internal class CockpitSurfaceRenderer(
         }
         val activeItem = model.items.firstOrNull { it.isActive }
         val activeModeId = activeItem?.modeId
-        if (activeModeId != null && activeModeId != lastAutoScrolledActiveMode && !modeTrackScrollGuard.isScrolling) {
+        if (activeModeId != null && activeModeId != lastAutoScrolledActiveMode && !isModeTrackScrolling()) {
             lastAutoScrolledActiveMode = activeModeId
             modeTrack.scroll.post {
                 val activeButton = buttons.firstOrNull { b ->
@@ -207,6 +192,4 @@ internal class CockpitSurfaceRenderer(
             }
         }
     }
-
-    fun isModeTrackScrolling(): Boolean = modeTrackScrollGuard.isScrolling
 }
