@@ -17,10 +17,13 @@ import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.OcwmJpegContainer
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
+import com.opencamera.core.media.ReversibleWatermarkArchiveManifest
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.sha256Hex
 import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.WatermarkFrameBackground
 import com.opencamera.core.settings.WatermarkTextPlacement
@@ -171,6 +174,8 @@ internal class AndroidPhotoWatermarkEditor(
         val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
             ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
 
+        val originalWidth = decoded.width
+        val originalHeight = decoded.height
         val mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
         if (mutableBitmap !== decoded) {
             decoded.recycle()
@@ -203,8 +208,21 @@ internal class AndroidPhotoWatermarkEditor(
                 target = target,
                 preservedExif = preservedExif
             )
+
+            val visibleBytesAfterExif = readSourceBytes(target)
+            val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
+                originalBytes = sourceBytes,
+                visibleBytesAfterExifRestore = visibleBytesAfterExif,
+                templateId = templateId,
+                originalWidth = originalWidth,
+                originalHeight = originalHeight
+            )
+            if (archiveBytes != null) {
+                writeEncodedBytes(target, archiveBytes)
+            }
+
             PhotoWatermarkApplied(
-                warning = mergeWarnings(renderResult.warning, exifWarning)
+                warning = mergeWarnings(renderResult.warning, exifWarning, archiveWarning)
             )
         } catch (_: Throwable) {
             ProcessorEditorResult.Failed("render-exception")
@@ -303,9 +321,10 @@ internal class AndroidPhotoWatermarkEditor(
 
     private fun mergeWarnings(
         templateWarning: String?,
-        exifWarning: String?
+        exifWarning: String?,
+        archiveWarning: String? = null
     ): String? {
-        return listOfNotNull(templateWarning, exifWarning)
+        return listOfNotNull(templateWarning, exifWarning, archiveWarning)
             .takeIf { warnings -> warnings.isNotEmpty() }
             ?.joinToString(separator = ",")
     }
@@ -338,6 +357,48 @@ internal class AndroidPhotoWatermarkEditor(
             ExifInterface.TAG_GPS_TIMESTAMP,
             ExifInterface.TAG_GPS_DATESTAMP
         )
+    }
+}
+
+internal fun buildWatermarkArchive(
+    originalBytes: ByteArray,
+    visibleBytes: ByteArray,
+    templateId: String,
+    originalWidth: Int,
+    originalHeight: Int
+): OcwmJpegContainer.EmbeddedArchive? {
+    if (originalBytes.isEmpty() || visibleBytes.isEmpty()) return null
+    val manifest = ReversibleWatermarkArchiveManifest(
+        watermarkTemplateId = templateId,
+        visibleImageSha256 = sha256Hex(visibleBytes),
+        payloadSha256 = sha256Hex(originalBytes),
+        payloadLength = originalBytes.size.toLong(),
+        originalWidth = originalWidth,
+        originalHeight = originalHeight
+    )
+    return OcwmJpegContainer.EmbeddedArchive(manifest = manifest, payload = originalBytes)
+}
+
+internal fun embedArchiveAfterVisibleWrite(
+    originalBytes: ByteArray,
+    visibleBytesAfterExifRestore: ByteArray?,
+    templateId: String,
+    originalWidth: Int,
+    originalHeight: Int
+): Pair<ByteArray?, String?> {
+    if (originalBytes.isEmpty()) return null to "archive-input-empty"
+    if (visibleBytesAfterExifRestore == null) return null to "archive-visible-unavailable"
+    val archive = buildWatermarkArchive(
+        originalBytes = originalBytes,
+        visibleBytes = visibleBytesAfterExifRestore,
+        templateId = templateId,
+        originalWidth = originalWidth,
+        originalHeight = originalHeight
+    ) ?: return null to "archive-embed-failed"
+    return try {
+        OcwmJpegContainer.embedArchive(visibleBytesAfterExifRestore, archive) to null
+    } catch (_: Throwable) {
+        null to "archive-embed-failed"
     }
 }
 
@@ -633,9 +694,10 @@ private fun fitText(
 
 private fun mergeWarnings(
     templateWarning: String?,
-    exifWarning: String?
+    exifWarning: String?,
+    archiveWarning: String? = null
 ): String? {
-    return listOfNotNull(templateWarning, exifWarning)
+    return listOfNotNull(templateWarning, exifWarning, archiveWarning)
         .takeIf { warnings -> warnings.isNotEmpty() }
         ?.joinToString(separator = ",")
 }
