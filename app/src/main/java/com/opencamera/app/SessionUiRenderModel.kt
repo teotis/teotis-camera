@@ -1,27 +1,16 @@
 package com.opencamera.app
 
-import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.media.ResourceDiagnosticsSnapshot
-import com.opencamera.core.effect.EffectSpec
-import com.opencamera.core.effect.FrameEffect
-import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ManualControlCapabilityMatrix
 import com.opencamera.core.device.ManualControlSupport
-import com.opencamera.core.device.StillCaptureOutputSize
-import com.opencamera.core.device.ZoomRatioCapability
-import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.device.resolveVideoSpec
 import com.opencamera.core.mode.ModeId
-import com.opencamera.core.mode.modeDirectoryDeclaration
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
-import com.opencamera.core.session.SavedMediaType
-import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
 import com.opencamera.core.session.buildSessionDebugDump
-import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.CompositionGridMode
@@ -31,7 +20,6 @@ import com.opencamera.core.settings.FeatureCatalogAction
 import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
-import com.opencamera.core.settings.ManualCaptureParams
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.PhotoSettings
 import com.opencamera.core.settings.PortraitBeautyPreset

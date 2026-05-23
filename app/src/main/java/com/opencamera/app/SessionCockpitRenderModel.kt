@@ -2,14 +2,14 @@ package com.opencamera.app
 
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.StillCaptureOutputSize
-import com.opencamera.core.device.StillCaptureResolutionPreset
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LivePhotoBundle
-import com.opencamera.core.media.SavedMediaType
+import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.ModeId
+import com.opencamera.core.session.SavedMediaType
 import com.opencamera.core.mode.modeDirectoryDeclaration
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewStatus
@@ -513,10 +513,4 @@ private fun Set<StillCaptureResolutionPreset>.stillResolutionPresetSummary(): St
 
 private fun List<StillCaptureOutputSize>.stillCaptureOutputSizeSummary(): String {
     return this.take(4).joinToString(separator = "/") { it.label }
-}
-
-private fun displayedStillCaptureOutputSize(state: SessionState): StillCaptureOutputSize {
-    return state.activeDeviceGraph.stillCapture.outputSize
-        ?: state.activeDeviceCapabilities.availableStillCaptureOutputSizes.firstOrNull()
-        ?: StillCaptureOutputSize(width = 0, height = 0)
 }
