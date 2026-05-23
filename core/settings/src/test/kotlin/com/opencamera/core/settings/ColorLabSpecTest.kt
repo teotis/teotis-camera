@@ -43,29 +43,29 @@ class ColorLabSpecTest {
     fun `right color axis warms image without enabling cool boost`() {
         val result = ColorLabSpec(colorAxis = 1f, toneAxis = 0f).applyTo(FilterRenderSpec())
 
-        assertTrue(result.warmthShift > 0)
-        assertTrue(result.warmBoost > 0f)
+        assertTrue(result.warmthShift >= 18)
+        assertTrue(result.warmBoost >= 0.24f)
         assertEquals(0f, result.coolBoost)
-        assertTrue(result.saturation > 1f)
+        assertTrue(result.saturation >= 1.20f)
     }
 
     @Test
     fun `left color axis cools image without enabling warm boost`() {
         val result = ColorLabSpec(colorAxis = -1f, toneAxis = 0f).applyTo(FilterRenderSpec())
 
-        assertTrue(result.warmthShift < 0)
-        assertTrue(result.coolBoost > 0f)
+        assertTrue(result.warmthShift <= -18)
+        assertTrue(result.coolBoost >= 0.24f)
         assertEquals(0f, result.warmBoost)
-        assertTrue(result.saturation > 1f)
+        assertTrue(result.saturation >= 1.20f)
     }
 
     @Test
     fun `positive tone axis creates airy lifted tone`() {
         val result = ColorLabSpec(colorAxis = 0f, toneAxis = 1f).applyTo(FilterRenderSpec())
 
-        assertTrue(result.brightnessShift > 0)
-        assertTrue(result.contrast < 1f)
-        assertTrue(result.shadowLift > 0f)
+        assertTrue(result.brightnessShift >= 14)
+        assertTrue(result.contrast <= 0.84f)
+        assertTrue(result.shadowLift >= 0.24f)
         assertTrue(result.highlightCompression > 0f)
     }
 
@@ -73,10 +73,10 @@ class ColorLabSpecTest {
     fun `negative tone axis creates deep contrast tone`() {
         val result = ColorLabSpec(colorAxis = 0f, toneAxis = -1f).applyTo(FilterRenderSpec())
 
-        assertTrue(result.brightnessShift < 0)
-        assertTrue(result.contrast > 1f)
+        assertTrue(result.brightnessShift <= -12)
+        assertTrue(result.contrast >= 1.20f)
         assertEquals(0f, result.shadowLift)
-        assertTrue(result.highlightCompression > 0f)
+        assertTrue(result.highlightCompression >= 0.16f)
     }
 
     @Test
@@ -110,5 +110,27 @@ class ColorLabSpecTest {
         assertEquals(1f, mapping.spec.strength)
         assertEquals("warm-air", mapping.spec.presetId)
         assertTrue(mapping.description.contains("ColorLabSpec"))
+    }
+
+    @Test
+    fun `warm deep corner shows strong warmth contrast and saturation`() {
+        val result = ColorLabSpec(colorAxis = 1f, toneAxis = -1f).applyTo(FilterRenderSpec())
+
+        assertTrue(result.warmthShift >= 18)
+        assertTrue(result.warmBoost >= 0.24f)
+        assertTrue(result.contrast >= 1.20f)
+        assertTrue(result.saturation >= 1.20f)
+        assertEquals(0f, result.coolBoost)
+    }
+
+    @Test
+    fun `cool airy corner shows cool tone with shadow lift and brightness`() {
+        val result = ColorLabSpec(colorAxis = -1f, toneAxis = 1f).applyTo(FilterRenderSpec())
+
+        assertTrue(result.warmthShift <= -18)
+        assertTrue(result.coolBoost >= 0.24f)
+        assertTrue(result.brightnessShift >= 14)
+        assertTrue(result.shadowLift >= 0.24f)
+        assertEquals(0f, result.warmBoost)
     }
 }

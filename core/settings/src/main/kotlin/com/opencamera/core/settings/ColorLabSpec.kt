@@ -22,21 +22,21 @@ data class ColorLabSpec(
 
     fun toMapping(): ColorLabMapping {
         val spec = normalized()
-        val color = spec.colorAxis * spec.strength
-        val tone = spec.toneAxis * spec.strength
+        val color = signedPaletteCurve(spec.colorAxis) * spec.strength
+        val tone = signedPaletteCurve(spec.toneAxis) * spec.strength
         val colorMagnitude = abs(color)
         val airyTone = tone.coerceAtLeast(0f)
         val deepTone = (-tone).coerceAtLeast(0f)
         val adjustments = ColorLabAdjustments(
-            brightnessDelta = (airyTone * 10f - deepTone * 8f).roundToInt(),
-            contrastDelta = (-airyTone * 0.12f + deepTone * 0.16f),
-            saturationDelta = colorMagnitude * 0.14f - abs(tone) * 0.02f,
-            warmthDelta = (color * 12f).roundToInt(),
-            tintDelta = (-color * 3f).roundToInt(),
-            shadowLiftDelta = airyTone * 0.18f,
-            highlightCompressionDelta = (airyTone * 0.08f + deepTone * 0.12f),
-            warmBoostDelta = color.coerceAtLeast(0f) * 0.18f,
-            coolBoostDelta = (-color).coerceAtLeast(0f) * 0.18f
+            brightnessDelta = (airyTone * 16f - deepTone * 14f).roundToInt(),
+            contrastDelta = (-airyTone * 0.18f + deepTone * 0.24f),
+            saturationDelta = colorMagnitude * 0.24f - abs(tone) * 0.01f,
+            warmthDelta = (color * 20f).roundToInt(),
+            tintDelta = (-color * 6f).roundToInt(),
+            shadowLiftDelta = airyTone * 0.26f,
+            highlightCompressionDelta = (airyTone * 0.12f + deepTone * 0.18f),
+            warmBoostDelta = color.coerceAtLeast(0f) * 0.28f,
+            coolBoostDelta = (-color).coerceAtLeast(0f) * 0.28f
         )
         return ColorLabMapping(
             spec = spec,
@@ -60,21 +60,21 @@ data class ColorLabMapping(
             return base
         }
         return base.copy(
-            brightnessShift = (base.brightnessShift + adjustments.brightnessDelta).coerceIn(-24, 32),
-            contrast = (base.contrast + adjustments.contrastDelta).coerceIn(0.82f, 1.32f),
-            saturation = (base.saturation + adjustments.saturationDelta).coerceIn(0.72f, 1.38f),
-            warmthShift = (base.warmthShift + adjustments.warmthDelta).coerceIn(-24, 24),
-            tintShift = (base.tintShift + adjustments.tintDelta).coerceIn(-24, 24),
-            shadowLift = (base.shadowLift + adjustments.shadowLiftDelta).coerceIn(0f, 0.38f),
+            brightnessShift = (base.brightnessShift + adjustments.brightnessDelta).coerceIn(-40, 48),
+            contrast = (base.contrast + adjustments.contrastDelta).coerceIn(0.76f, 1.44f),
+            saturation = (base.saturation + adjustments.saturationDelta).coerceIn(0.64f, 1.56f),
+            warmthShift = (base.warmthShift + adjustments.warmthDelta).coerceIn(-32, 32),
+            tintShift = (base.tintShift + adjustments.tintDelta).coerceIn(-32, 32),
+            shadowLift = (base.shadowLift + adjustments.shadowLiftDelta).coerceIn(0f, 0.48f),
             highlightCompression = (base.highlightCompression + adjustments.highlightCompressionDelta)
-                .coerceIn(0f, 0.38f),
+                .coerceIn(0f, 0.48f),
             warmBoost = if (adjustments.warmBoostDelta > 0f) {
-                (base.warmBoost + adjustments.warmBoostDelta).coerceIn(0f, 0.38f)
+                (base.warmBoost + adjustments.warmBoostDelta).coerceIn(0f, 0.48f)
             } else {
                 base.warmBoost
             },
             coolBoost = if (adjustments.coolBoostDelta > 0f) {
-                (base.coolBoost + adjustments.coolBoostDelta).coerceIn(0f, 0.38f)
+                (base.coolBoost + adjustments.coolBoostDelta).coerceIn(0f, 0.48f)
             } else {
                 base.coolBoost
             }
@@ -113,6 +113,13 @@ fun renderStyleColorSpec(
             styleStrength = styleStrength
         )
     ).finalRenderSpec
+}
+
+private fun signedPaletteCurve(value: Float): Float {
+    val normalized = value.coerceIn(-1f, 1f)
+    val magnitude = abs(normalized)
+    val curved = magnitude.pow(0.85f)
+    return if (normalized < 0f) -curved else curved
 }
 
 private fun FilterRenderSpec.resolveExclusiveWarmCoolBoosts(
