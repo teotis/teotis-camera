@@ -211,7 +211,7 @@ internal class CaptureRecordingSessionProcessor(
         recordingElapsedJob?.cancel()
         recordingElapsedJob = null
         val startedAt = if (shot.mediaType == MediaType.VIDEO) {
-            android.os.SystemClock.elapsedRealtime()
+            System.nanoTime() / 1_000_000L
         } else {
             null
         }
@@ -260,7 +260,7 @@ internal class CaptureRecordingSessionProcessor(
                     if (current.activeShot?.shotId != shotId ||
                         current.recordingStatus != RecordingStatus.RECORDING
                     ) break
-                    val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
+                    val elapsed = startedAt?.let { System.nanoTime() / 1_000_000L - it } ?: 0L
                     updateState.update { s ->
                         s.copy(
                             presentation = s.presentation.copy(
