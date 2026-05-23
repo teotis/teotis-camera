@@ -512,7 +512,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             adjustmentMode = panelState.filterAdjustmentMode
         )
         latestFilterLabRenderModel = model
-        if (panelState.isFilterAdjustmentVisible && lightPaletteBaseSpec == null) {
+        if (panelState.isFilterAdjustmentVisible) {
             lightPaletteBaseSpec = model.adjustmentPanel.renderSpec
         }
         filterLabRenderer.renderPage(model)
