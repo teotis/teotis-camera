@@ -3,6 +3,8 @@ package com.opencamera.app.camera
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ThumbnailSource
@@ -18,7 +20,7 @@ class PhotoAlgorithmPostProcessorTest {
     @Test
     fun `recognized profile with content uri is rendered`() = runTest {
         val editor = FakePhotoAlgorithmEditor(
-            result = PhotoAlgorithmEditorResult.Applied()
+            result = PhotoAlgorithmApplied()
         )
         val processor = PhotoAlgorithmPostProcessor(editor)
         val result = processor.process(
@@ -34,7 +36,7 @@ class PhotoAlgorithmPostProcessorTest {
         assertEquals(1, editor.invocations.size)
         val invocation = editor.invocations.single()
         assertEquals(
-            PhotoAlgorithmTarget.ContentUri("content://media/external/images/media/88"),
+            ProcessorTarget.ContentUri("content://media/external/images/media/88"),
             invocation.target
         )
         assertEquals("document-whiteboard-scan", invocation.spec.profile)
@@ -44,7 +46,7 @@ class PhotoAlgorithmPostProcessorTest {
     @Test
     fun `missing algorithm profile leaves result untouched`() = runTest {
         val editor = FakePhotoAlgorithmEditor(
-            result = PhotoAlgorithmEditorResult.Applied()
+            result = PhotoAlgorithmApplied()
         )
         val processor = PhotoAlgorithmPostProcessor(editor)
         val input = photoResult(algorithmProfile = null)
@@ -57,7 +59,7 @@ class PhotoAlgorithmPostProcessorTest {
     @Test
     fun `unsupported profile is ignored without diagnostics`() = runTest {
         val editor = FakePhotoAlgorithmEditor(
-            result = PhotoAlgorithmEditorResult.Applied()
+            result = PhotoAlgorithmApplied()
         )
         val processor = PhotoAlgorithmPostProcessor(editor)
         val input = photoResult(algorithmProfile = "custom-unmapped-profile")
@@ -70,7 +72,7 @@ class PhotoAlgorithmPostProcessorTest {
     @Test
     fun `missing editable handle records diagnostic skip`() = runTest {
         val editor = FakePhotoAlgorithmEditor(
-            result = PhotoAlgorithmEditorResult.Applied()
+            result = PhotoAlgorithmApplied()
         )
         val processor = PhotoAlgorithmPostProcessor(editor)
         val result = processor.process(
@@ -89,7 +91,7 @@ class PhotoAlgorithmPostProcessorTest {
     @Test
     fun `editor failure is captured as pipeline diagnostic`() = runTest {
         val editor = FakePhotoAlgorithmEditor(
-            result = PhotoAlgorithmEditorResult.Failed("decode-failed")
+            result = ProcessorEditorResult.Failed("decode-failed")
         )
         val processor = PhotoAlgorithmPostProcessor(editor)
         val result = processor.process(
@@ -108,7 +110,7 @@ class PhotoAlgorithmPostProcessorTest {
     @Test
     fun `shared custom filter spec is rendered without built in algorithm mapping`() = runTest {
         val editor = FakePhotoAlgorithmEditor(
-            result = PhotoAlgorithmEditorResult.Applied()
+            result = PhotoAlgorithmApplied()
         )
         val processor = PhotoAlgorithmPostProcessor(editor)
         val result = processor.process(
@@ -167,7 +169,7 @@ class PhotoAlgorithmPostProcessorTest {
 
     @Test
     fun `custom vivid metadata from capture log is rendered`() = runTest {
-        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmEditorResult.Applied())
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
         val processor = PhotoAlgorithmPostProcessor(editor)
         val result = processor.process(
             photoResult(
@@ -224,21 +226,21 @@ class PhotoAlgorithmPostProcessorTest {
     }
 
     private class FakePhotoAlgorithmEditor(
-        private val result: PhotoAlgorithmEditorResult
+        private val result: ProcessorEditorResult
     ) : PhotoAlgorithmEditor {
         val invocations = mutableListOf<Invocation>()
 
         override suspend fun apply(
-            target: PhotoAlgorithmTarget,
+            target: ProcessorTarget,
             spec: PhotoAlgorithmSpec
-        ): PhotoAlgorithmEditorResult {
+        ): ProcessorEditorResult {
             invocations += Invocation(target, spec)
             return result
         }
     }
 
     private data class Invocation(
-        val target: PhotoAlgorithmTarget,
+        val target: ProcessorTarget,
         val spec: PhotoAlgorithmSpec
     )
 }

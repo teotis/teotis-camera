@@ -9,6 +9,8 @@ import com.opencamera.core.media.AlgorithmType
 import com.opencamera.core.media.MediaInputRef
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaOutputHandle
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
@@ -25,18 +27,17 @@ class AlgorithmProcessorBridgesTest {
     // --- Fake editors that record invocations ---
 
     private class RecordingPhotoAlgorithmEditor(
-        private val result: com.opencamera.app.camera.PhotoAlgorithmEditorResult =
-            com.opencamera.app.camera.PhotoAlgorithmEditorResult.Applied()
-    ) : com.opencamera.app.camera.PhotoAlgorithmEditor {
-        var lastTarget: com.opencamera.app.camera.PhotoAlgorithmTarget? = null
+        private val result: ProcessorEditorResult = PhotoAlgorithmApplied()
+    ) : PhotoAlgorithmEditor {
+        var lastTarget: ProcessorTarget? = null
             private set
         var callCount = 0
             private set
 
         override suspend fun apply(
-            target: com.opencamera.app.camera.PhotoAlgorithmTarget,
-            spec: com.opencamera.app.camera.PhotoAlgorithmSpec
-        ): com.opencamera.app.camera.PhotoAlgorithmEditorResult {
+            target: ProcessorTarget,
+            spec: PhotoAlgorithmSpec
+        ): ProcessorEditorResult {
             lastTarget = target
             callCount++
             return result
@@ -44,85 +45,80 @@ class AlgorithmProcessorBridgesTest {
     }
 
     private class RecordingWatermarkEditor(
-        private val result: com.opencamera.app.camera.PhotoWatermarkEditorResult =
-            com.opencamera.app.camera.PhotoWatermarkEditorResult.Applied()
-    ) : com.opencamera.app.camera.PhotoWatermarkEditor {
+        private val result: ProcessorEditorResult = PhotoWatermarkApplied()
+    ) : PhotoWatermarkEditor {
         var callCount = 0
             private set
 
         override suspend fun apply(
-            target: com.opencamera.app.camera.PhotoWatermarkTarget,
+            target: ProcessorTarget,
             metadata: MediaMetadata,
             watermarkText: String,
             templateId: String
-        ): com.opencamera.app.camera.PhotoWatermarkEditorResult {
+        ): ProcessorEditorResult {
             callCount++
             return result
         }
     }
 
     private class RecordingPortraitEditor(
-        private val result: com.opencamera.app.camera.PortraitRenderEditorResult =
-            com.opencamera.app.camera.PortraitRenderEditorResult.Applied()
-    ) : com.opencamera.app.camera.PortraitRenderEditor {
+        private val result: ProcessorEditorResult = PortraitRenderApplied()
+    ) : PortraitRenderEditor {
         var callCount = 0
             private set
 
         override suspend fun apply(
-            target: com.opencamera.app.camera.PortraitRenderTarget,
-            spec: com.opencamera.app.camera.PortraitRenderSpec
-        ): com.opencamera.app.camera.PortraitRenderEditorResult {
+            target: ProcessorTarget,
+            spec: PortraitRenderSpec
+        ): ProcessorEditorResult {
             callCount++
             return result
         }
     }
 
     private class RecordingDocumentEditor(
-        private val result: com.opencamera.app.camera.DocumentAutoCropEditorResult =
-            com.opencamera.app.camera.DocumentAutoCropEditorResult.Applied(
-                cropBounds = android.graphics.Rect(10, 10, 90, 90)
-            )
-    ) : com.opencamera.app.camera.DocumentAutoCropEditor {
+        private val result: ProcessorEditorResult = DocumentAutoCropApplied(
+            cropBounds = android.graphics.Rect(10, 10, 90, 90)
+        )
+    ) : DocumentAutoCropEditor {
         var callCount = 0
             private set
 
         override suspend fun apply(
-            target: com.opencamera.app.camera.DocumentAutoCropTarget
-        ): com.opencamera.app.camera.DocumentAutoCropEditorResult {
+            target: ProcessorTarget
+        ): ProcessorEditorResult {
             callCount++
             return result
         }
     }
 
     private class RecordingFrameRatioEditor(
-        private val result: com.opencamera.app.camera.PhotoFrameRatioEditorResult =
-            com.opencamera.app.camera.PhotoFrameRatioEditorResult.Applied(
-                frameRatio = com.opencamera.core.media.FrameRatio.RATIO_16_9,
-                cropBounds = com.opencamera.app.camera.CropBounds(0, 0, 100, 100)
-            )
-    ) : com.opencamera.app.camera.PhotoFrameRatioEditor {
+        private val result: ProcessorEditorResult = PhotoFrameRatioApplied(
+            frameRatio = com.opencamera.core.media.FrameRatio.RATIO_16_9,
+            cropBounds = CropBounds(0, 0, 100, 100)
+        )
+    ) : PhotoFrameRatioEditor {
         var callCount = 0
             private set
 
         override suspend fun apply(
-            target: com.opencamera.app.camera.PhotoFrameRatioTarget,
+            target: ProcessorTarget,
             frameRatio: com.opencamera.core.media.FrameRatio
-        ): com.opencamera.app.camera.PhotoFrameRatioEditorResult {
+        ): ProcessorEditorResult {
             callCount++
             return result
         }
     }
 
     private class RecordingSelfieMirrorEditor(
-        private val result: com.opencamera.app.camera.PhotoSelfieMirrorEditorResult =
-            com.opencamera.app.camera.PhotoSelfieMirrorEditorResult.Applied()
-    ) : com.opencamera.app.camera.PhotoSelfieMirrorEditor {
+        private val result: ProcessorEditorResult = PhotoSelfieMirrorApplied()
+    ) : PhotoSelfieMirrorEditor {
         var callCount = 0
             private set
 
         override suspend fun apply(
-            target: com.opencamera.app.camera.PhotoSelfieMirrorTarget
-        ): com.opencamera.app.camera.PhotoSelfieMirrorEditorResult {
+            target: ProcessorTarget
+        ): ProcessorEditorResult {
             callCount++
             return result
         }

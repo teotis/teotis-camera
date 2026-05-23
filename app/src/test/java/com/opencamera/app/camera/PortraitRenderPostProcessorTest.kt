@@ -5,6 +5,8 @@ import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.settings.PortraitBeautyPreset
 import com.opencamera.core.settings.PortraitBeautyStrength
@@ -21,7 +23,7 @@ class PortraitRenderPostProcessorTest {
     @Test
     fun `portrait depth render with content uri is applied`() = runTest {
         val editor = FakePortraitRenderEditor(
-            result = PortraitRenderEditorResult.Applied()
+            result = PortraitRenderApplied()
         )
         val processor = PortraitRenderPostProcessor(editor)
         val result = processor.process(
@@ -36,7 +38,7 @@ class PortraitRenderPostProcessorTest {
         assertEquals(1, editor.invocations.size)
         val invocation = editor.invocations.single()
         assertEquals(
-            PortraitRenderTarget.ContentUri("content://media/external/images/media/64"),
+            ProcessorTarget.ContentUri("content://media/external/images/media/64"),
             invocation.target
         )
         assertEquals(PortraitRenderMode.DEPTH, invocation.spec.mode)
@@ -47,7 +49,7 @@ class PortraitRenderPostProcessorTest {
     @Test
     fun `non portrait result is ignored`() = runTest {
         val editor = FakePortraitRenderEditor(
-            result = PortraitRenderEditorResult.Applied()
+            result = PortraitRenderApplied()
         )
         val processor = PortraitRenderPostProcessor(editor)
         val input = photoResult(mode = "photo")
@@ -60,7 +62,7 @@ class PortraitRenderPostProcessorTest {
     @Test
     fun `missing editable handle records diagnostic skip`() = runTest {
         val editor = FakePortraitRenderEditor(
-            result = PortraitRenderEditorResult.Applied()
+            result = PortraitRenderApplied()
         )
         val processor = PortraitRenderPostProcessor(editor)
         val result = processor.process(
@@ -78,7 +80,7 @@ class PortraitRenderPostProcessorTest {
     @Test
     fun `unsupported render path records diagnostic skip`() = runTest {
         val editor = FakePortraitRenderEditor(
-            result = PortraitRenderEditorResult.Applied()
+            result = PortraitRenderApplied()
         )
         val processor = PortraitRenderPostProcessor(editor)
         val result = processor.process(
@@ -92,7 +94,7 @@ class PortraitRenderPostProcessorTest {
     @Test
     fun `editor failure is captured as pipeline diagnostic`() = runTest {
         val editor = FakePortraitRenderEditor(
-            result = PortraitRenderEditorResult.Failed("decode-failed")
+            result = ProcessorEditorResult.Failed("decode-failed")
         )
         val processor = PortraitRenderPostProcessor(editor)
         val result = processor.process(
@@ -213,21 +215,21 @@ class PortraitRenderPostProcessorTest {
     }
 
     private class FakePortraitRenderEditor(
-        private val result: PortraitRenderEditorResult
+        private val result: ProcessorEditorResult
     ) : PortraitRenderEditor {
         val invocations = mutableListOf<Invocation>()
 
         override suspend fun apply(
-            target: PortraitRenderTarget,
+            target: ProcessorTarget,
             spec: PortraitRenderSpec
-        ): PortraitRenderEditorResult {
+        ): ProcessorEditorResult {
             invocations += Invocation(target, spec)
             return result
         }
     }
 
     private data class Invocation(
-        val target: PortraitRenderTarget,
+        val target: ProcessorTarget,
         val spec: PortraitRenderSpec
     )
 }

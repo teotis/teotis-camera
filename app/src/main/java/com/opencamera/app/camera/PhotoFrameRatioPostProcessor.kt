@@ -7,10 +7,14 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.media.FrameRatio
-import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
+import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.toProcessorTargetOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
@@ -19,37 +23,22 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-internal sealed interface PhotoFrameRatioWork {
-    data object None : PhotoFrameRatioWork
-    data class Crop(
-        val target: PhotoFrameRatioTarget,
-        val frameRatio: FrameRatio
-    ) : PhotoFrameRatioWork
+internal data class PhotoFrameRatioPayload(
+    val target: ProcessorTarget,
+    val frameRatio: FrameRatio
+)
 
-    data class DiagnosticSkip(val reason: String) : PhotoFrameRatioWork
-}
-
-internal sealed interface PhotoFrameRatioTarget {
-    data class FilePath(val path: String) : PhotoFrameRatioTarget
-    data class ContentUri(val value: String) : PhotoFrameRatioTarget
-}
-
-internal sealed interface PhotoFrameRatioEditorResult {
-    data class Applied(
-        val frameRatio: FrameRatio,
-        val cropBounds: CropBounds,
-        val warning: String? = null
-    ) : PhotoFrameRatioEditorResult
-
-    data class Skipped(val reason: String) : PhotoFrameRatioEditorResult
-    data class Failed(val reason: String) : PhotoFrameRatioEditorResult
-}
+internal data class PhotoFrameRatioApplied(
+    val frameRatio: FrameRatio,
+    val cropBounds: CropBounds,
+    val warning: String? = null
+) : ProcessorEditorResult
 
 internal interface PhotoFrameRatioEditor {
     suspend fun apply(
-        target: PhotoFrameRatioTarget,
+        target: ProcessorTarget,
         frameRatio: FrameRatio
-    ): PhotoFrameRatioEditorResult
+    ): ProcessorEditorResult
 }
 
 internal data class CropBounds(
@@ -62,26 +51,23 @@ internal data class CropBounds(
     fun height(): Int = bottom - top
 }
 
-internal fun decidePhotoFrameRatioWork(result: ShotResult): PhotoFrameRatioWork {
+internal fun decidePhotoFrameRatioWork(result: ShotResult): ProcessorWork<PhotoFrameRatioPayload> {
     if (result.mediaType != MediaType.PHOTO) {
-        return PhotoFrameRatioWork.None
+        return ProcessorWork.None
     }
     if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return PhotoFrameRatioWork.DiagnosticSkip("unsupported-mime")
+        return ProcessorWork.DiagnosticSkip("unsupported-mime")
     }
     val frameRatio = FrameRatio.fromTag(result.metadata.customTags["frameRatio"])
         ?: return if (result.metadata.customTags.containsKey("frameRatio")) {
-            PhotoFrameRatioWork.DiagnosticSkip("unsupported-frame-ratio")
+            ProcessorWork.DiagnosticSkip("unsupported-frame-ratio")
         } else {
-            PhotoFrameRatioWork.None
+            ProcessorWork.None
         }
-    val target = result.outputHandle.toPhotoFrameRatioTargetOrNull()
-        ?: return PhotoFrameRatioWork.DiagnosticSkip("missing-output-handle")
+    val target = result.outputHandle.toProcessorTargetOrNull()
+        ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
 
-    return PhotoFrameRatioWork.Crop(
-        target = target,
-        frameRatio = frameRatio
-    )
+    return ProcessorWork.Execute(PhotoFrameRatioPayload(target, frameRatio))
 }
 
 internal fun computeCenterCropBounds(
@@ -141,30 +127,33 @@ internal class PhotoFrameRatioPostProcessor(
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoFrameRatioWork(result)) {
-            PhotoFrameRatioWork.None -> result
-            is PhotoFrameRatioWork.DiagnosticSkip -> result.withPipelineNotes(
+            ProcessorWork.None -> result
+            is ProcessorWork.DiagnosticSkip -> result.addPipelineNotes(
                 "frame-ratio:skipped:${work.reason}"
             )
 
-            is PhotoFrameRatioWork.Crop -> {
-                when (val cropResult = editor.apply(work.target, work.frameRatio)) {
-                    is PhotoFrameRatioEditorResult.Applied -> {
+            is ProcessorWork.Execute -> {
+                val payload = work.payload
+                when (val cropResult = editor.apply(payload.target, payload.frameRatio)) {
+                    is PhotoFrameRatioApplied -> {
                         val bounds = cropResult.cropBounds
                         val notes = buildList {
                             add("frame-ratio:applied:${cropResult.frameRatio.tagValue}")
                             add("frame-ratio:bounds=${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}")
                             cropResult.warning?.let { add("frame-ratio:warning:$it") }
                         }
-                        result.withPipelineNotes(*notes.toTypedArray())
+                        result.addPipelineNotes(*notes.toTypedArray())
                     }
 
-                    is PhotoFrameRatioEditorResult.Skipped -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
                         "frame-ratio:skipped:${cropResult.reason}"
                     )
 
-                    is PhotoFrameRatioEditorResult.Failed -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
                         "frame-ratio:failed:${cropResult.reason}"
                     )
+
+                    else -> result
                 }
             }
         }
@@ -178,25 +167,25 @@ internal class AndroidPhotoFrameRatioEditor(
     private val contentResolver: ContentResolver = appContext.contentResolver
 
     override suspend fun apply(
-        target: PhotoFrameRatioTarget,
+        target: ProcessorTarget,
         frameRatio: FrameRatio
-    ): PhotoFrameRatioEditorResult = withContext(Dispatchers.IO) {
+    ): ProcessorEditorResult = withContext(Dispatchers.IO) {
         val sourceBytes = readSourceBytes(target)
-            ?: return@withContext PhotoFrameRatioEditorResult.Skipped("input-unavailable")
+            ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
-            return@withContext PhotoFrameRatioEditorResult.Skipped("empty-source")
+            return@withContext ProcessorEditorResult.Skipped("empty-source")
         }
 
         val preservedExif = readPreservedExif(sourceBytes)
         val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-            ?: return@withContext PhotoFrameRatioEditorResult.Failed("decode-failed")
+            ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
 
         try {
             val cropBounds = computeCenterCropBounds(
                 width = decoded.width,
                 height = decoded.height,
                 frameRatio = frameRatio
-            ) ?: return@withContext PhotoFrameRatioEditorResult.Skipped("already-matched")
+            ) ?: return@withContext ProcessorEditorResult.Skipped("already-matched")
 
             val cropped = Bitmap.createBitmap(
                 decoded,
@@ -213,42 +202,42 @@ internal class AndroidPhotoFrameRatioEditor(
             }
             cropped.recycle()
             if (!writeEncodedBytes(target, encodedBytes)) {
-                return@withContext PhotoFrameRatioEditorResult.Failed("output-unavailable")
+                return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
 
             val exifWarning = restorePreservedExif(target, preservedExif)
-            PhotoFrameRatioEditorResult.Applied(
+            PhotoFrameRatioApplied(
                 frameRatio = frameRatio,
                 cropBounds = cropBounds,
                 warning = exifWarning
             )
         } catch (_: Throwable) {
-            PhotoFrameRatioEditorResult.Failed("crop-exception")
+            ProcessorEditorResult.Failed("crop-exception")
         } finally {
             decoded.recycle()
         }
     }
 
-    private fun readSourceBytes(target: PhotoFrameRatioTarget): ByteArray? {
+    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
         return when (target) {
-            is PhotoFrameRatioTarget.FilePath -> {
+            is ProcessorTarget.FilePath -> {
                 val file = File(target.path)
                 if (!file.exists()) null else file.readBytes()
             }
 
-            is PhotoFrameRatioTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
             }
         }
     }
 
-    private fun writeEncodedBytes(target: PhotoFrameRatioTarget, bytes: ByteArray): Boolean {
+    private fun writeEncodedBytes(target: ProcessorTarget, bytes: ByteArray): Boolean {
         return when (target) {
-            is PhotoFrameRatioTarget.FilePath -> runCatching {
+            is ProcessorTarget.FilePath -> runCatching {
                 File(target.path).outputStream().use { it.write(bytes) }
             }.isSuccess
 
-            is PhotoFrameRatioTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openOutputStream(Uri.parse(target.value), "rwt")?.use { it.write(bytes) } != null
             }
         }
@@ -266,7 +255,7 @@ internal class AndroidPhotoFrameRatioEditor(
     }
 
     private fun restorePreservedExif(
-        target: PhotoFrameRatioTarget,
+        target: ProcessorTarget,
         preservedExif: Map<String, String>
     ): String? {
         if (preservedExif.isEmpty()) {
@@ -275,14 +264,14 @@ internal class AndroidPhotoFrameRatioEditor(
 
         val restored = runCatching {
             when (target) {
-                is PhotoFrameRatioTarget.FilePath -> {
+                is ProcessorTarget.FilePath -> {
                     ExifInterface(target.path).apply {
                         preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
                         saveAttributes()
                     }
                 }
 
-                is PhotoFrameRatioTarget.ContentUri -> {
+                is ProcessorTarget.ContentUri -> {
                     contentResolver.openFileDescriptor(Uri.parse(target.value), "rw")?.use { descriptor ->
                         ExifInterface(descriptor.fileDescriptor).apply {
                             preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
@@ -324,16 +313,6 @@ internal class AndroidPhotoFrameRatioEditor(
             ExifInterface.TAG_GPS_DATESTAMP
         )
     }
-}
-
-private fun MediaOutputHandle.toPhotoFrameRatioTargetOrNull(): PhotoFrameRatioTarget? {
-    contentUri?.let { return PhotoFrameRatioTarget.ContentUri(it) }
-    filePath?.let { return PhotoFrameRatioTarget.FilePath(it) }
-    return displayPath.takeIf { File(it).isAbsolute }?.let(PhotoFrameRatioTarget::FilePath)
-}
-
-private fun ShotResult.withPipelineNotes(vararg notes: String): ShotResult {
-    return copy(pipelineNotes = pipelineNotes + notes)
 }
 
 private const val RATIO_TOLERANCE = 0.01

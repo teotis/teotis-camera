@@ -6,10 +6,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
-import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
+import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.PhotoSettings
 import com.opencamera.core.settings.PortraitBeautyPreset
 import com.opencamera.core.settings.PortraitBeautyStrength
@@ -23,20 +27,10 @@ import java.io.File
 import kotlin.math.max
 import kotlin.math.sqrt
 
-internal sealed interface PortraitRenderWork {
-    data object None : PortraitRenderWork
-    data class Render(
-        val target: PortraitRenderTarget,
-        val spec: PortraitRenderSpec
-    ) : PortraitRenderWork
-
-    data class DiagnosticSkip(val reason: String) : PortraitRenderWork
-}
-
-internal sealed interface PortraitRenderTarget {
-    data class FilePath(val path: String) : PortraitRenderTarget
-    data class ContentUri(val value: String) : PortraitRenderTarget
-}
+internal data class PortraitRenderPayload(
+    val target: ProcessorTarget,
+    val spec: PortraitRenderSpec
+)
 
 internal enum class PortraitRenderMode {
     DEPTH,
@@ -63,37 +57,33 @@ internal data class PortraitRenderSpec(
     val backgroundBloom: Float
 )
 
-internal sealed interface PortraitRenderEditorResult {
-    data class Applied(val warning: String? = null) : PortraitRenderEditorResult
-    data class Skipped(val reason: String) : PortraitRenderEditorResult
-    data class Failed(val reason: String) : PortraitRenderEditorResult
-}
+internal data class PortraitRenderApplied(val warning: String? = null) : ProcessorEditorResult
 
 internal interface PortraitRenderEditor {
     suspend fun apply(
-        target: PortraitRenderTarget,
+        target: ProcessorTarget,
         spec: PortraitRenderSpec
-    ): PortraitRenderEditorResult
+    ): ProcessorEditorResult
 }
 
-internal fun decidePortraitRenderWork(result: ShotResult): PortraitRenderWork {
+internal fun decidePortraitRenderWork(result: ShotResult): ProcessorWork<PortraitRenderPayload> {
     if (result.mediaType != MediaType.PHOTO) {
-        return PortraitRenderWork.None
+        return ProcessorWork.None
     }
     if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return PortraitRenderWork.DiagnosticSkip("unsupported-mime")
+        return ProcessorWork.DiagnosticSkip("unsupported-mime")
     }
 
     val tags = result.metadata.customTags
     if (tags["mode"] != "portrait") {
-        return PortraitRenderWork.None
+        return ProcessorWork.None
     }
 
     val renderPath = tags["renderPath"]
         ?.trim()
         ?.lowercase()
         ?.takeIf(String::isNotEmpty)
-        ?: return PortraitRenderWork.DiagnosticSkip("missing-render-path")
+        ?: return ProcessorWork.DiagnosticSkip("missing-render-path")
     val bokehStrength = tags["bokehStrength"]?.toFloatOrNull()
     val subjectTracking = tags["subjectTracking"] == "true"
     val defaults = PhotoSettings()
@@ -109,14 +99,11 @@ internal fun decidePortraitRenderWork(result: ShotResult): PortraitRenderWork {
             ?: defaults.portraitBeautyStrength,
         bokehEffect = PortraitBokehEffect.fromStorageKey(tags["portraitBokehEffect"])
             ?: defaults.portraitBokehEffect
-    ) ?: return PortraitRenderWork.DiagnosticSkip("unsupported-render-path")
+    ) ?: return ProcessorWork.DiagnosticSkip("unsupported-render-path")
 
-    val target = result.outputHandle.toPortraitRenderTargetOrNull()
-        ?: return PortraitRenderWork.DiagnosticSkip("missing-output-handle")
-    return PortraitRenderWork.Render(
-        target = target,
-        spec = spec
-    )
+    val target = result.outputHandle.toProcessorTargetOrNull()
+        ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
+    return ProcessorWork.Execute(PortraitRenderPayload(target, spec))
 }
 
 internal fun resolvePortraitRenderSpec(
@@ -274,33 +261,36 @@ internal class PortraitRenderPostProcessor(
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePortraitRenderWork(result)) {
-            PortraitRenderWork.None -> result
-            is PortraitRenderWork.DiagnosticSkip -> result.withPortraitPipelineNotes(
+            ProcessorWork.None -> result
+            is ProcessorWork.DiagnosticSkip -> result.addPipelineNotes(
                 "portrait-render:skipped:${work.reason}"
             )
 
-            is PortraitRenderWork.Render -> {
-                when (val renderResult = editor.apply(work.target, work.spec)) {
-                    is PortraitRenderEditorResult.Applied -> {
+            is ProcessorWork.Execute -> {
+                val payload = work.payload
+                when (val renderResult = editor.apply(payload.target, payload.spec)) {
+                    is PortraitRenderApplied -> {
                         if (renderResult.warning == null) {
-                            result.withPortraitPipelineNotes(
-                                "portrait-render:applied:${work.spec.mode.name.lowercase()}"
+                            result.addPipelineNotes(
+                                "portrait-render:applied:${payload.spec.mode.name.lowercase()}"
                             )
                         } else {
-                            result.withPortraitPipelineNotes(
-                                "portrait-render:applied:${work.spec.mode.name.lowercase()}",
+                            result.addPipelineNotes(
+                                "portrait-render:applied:${payload.spec.mode.name.lowercase()}",
                                 "portrait-render:warning:${renderResult.warning}"
                             )
                         }
                     }
 
-                    is PortraitRenderEditorResult.Skipped -> result.withPortraitPipelineNotes(
+                    is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
                         "portrait-render:skipped:${renderResult.reason}"
                     )
 
-                    is PortraitRenderEditorResult.Failed -> result.withPortraitPipelineNotes(
+                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
                         "portrait-render:failed:${renderResult.reason}"
                     )
+
+                    else -> result
                 }
             }
         }
@@ -314,18 +304,18 @@ internal class AndroidPortraitRenderEditor(
     private val contentResolver: ContentResolver = appContext.contentResolver
 
     override suspend fun apply(
-        target: PortraitRenderTarget,
+        target: ProcessorTarget,
         spec: PortraitRenderSpec
-    ): PortraitRenderEditorResult = withContext(Dispatchers.IO) {
+    ): ProcessorEditorResult = withContext(Dispatchers.IO) {
         val sourceBytes = readSourceBytes(target)
-            ?: return@withContext PortraitRenderEditorResult.Skipped("input-unavailable")
+            ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
-            return@withContext PortraitRenderEditorResult.Skipped("empty-source")
+            return@withContext ProcessorEditorResult.Skipped("empty-source")
         }
 
         val preservedExif = readPreservedExif(sourceBytes)
         val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-            ?: return@withContext PortraitRenderEditorResult.Failed("decode-failed")
+            ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
         val mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
         if (mutableBitmap !== decoded) {
             decoded.recycle()
@@ -347,13 +337,13 @@ internal class AndroidPortraitRenderEditor(
                 output.toByteArray()
             }
             if (!writeEncodedBytes(target, encodedBytes)) {
-                return@withContext PortraitRenderEditorResult.Failed("output-unavailable")
+                return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
 
             val exifWarning = restorePreservedExif(target, preservedExif)
-            PortraitRenderEditorResult.Applied(exifWarning)
+            PortraitRenderApplied(exifWarning)
         } catch (_: Throwable) {
-            PortraitRenderEditorResult.Failed("render-exception")
+            ProcessorEditorResult.Failed("render-exception")
         } finally {
             blurredBitmap?.recycle()
             mutableBitmap.recycle()
@@ -483,29 +473,29 @@ internal class AndroidPortraitRenderEditor(
         original.setPixels(originalPixels, 0, width, 0, 0, width, height)
     }
 
-    private fun readSourceBytes(target: PortraitRenderTarget): ByteArray? {
+    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
         return when (target) {
-            is PortraitRenderTarget.FilePath -> {
+            is ProcessorTarget.FilePath -> {
                 val file = File(target.path)
                 if (!file.exists()) null else file.readBytes()
             }
 
-            is PortraitRenderTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
             }
         }
     }
 
     private fun writeEncodedBytes(
-        target: PortraitRenderTarget,
+        target: ProcessorTarget,
         encodedBytes: ByteArray
     ): Boolean {
         return when (target) {
-            is PortraitRenderTarget.FilePath -> runCatching {
+            is ProcessorTarget.FilePath -> runCatching {
                 File(target.path).outputStream().use { it.write(encodedBytes) }
             }.isSuccess
 
-            is PortraitRenderTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openOutputStream(Uri.parse(target.value), "rwt")?.use {
                     it.write(encodedBytes)
                 } != null
@@ -525,7 +515,7 @@ internal class AndroidPortraitRenderEditor(
     }
 
     private fun restorePreservedExif(
-        target: PortraitRenderTarget,
+        target: ProcessorTarget,
         preservedExif: Map<String, String>
     ): String? {
         if (preservedExif.isEmpty()) {
@@ -534,14 +524,14 @@ internal class AndroidPortraitRenderEditor(
 
         val restored = runCatching {
             when (target) {
-                is PortraitRenderTarget.FilePath -> {
+                is ProcessorTarget.FilePath -> {
                     ExifInterface(target.path).apply {
                         preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
                         saveAttributes()
                     }
                 }
 
-                is PortraitRenderTarget.ContentUri -> {
+                is ProcessorTarget.ContentUri -> {
                     contentResolver.openFileDescriptor(Uri.parse(target.value), "rw")?.use { descriptor ->
                         ExifInterface(descriptor.fileDescriptor).apply {
                             preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
@@ -583,16 +573,6 @@ internal class AndroidPortraitRenderEditor(
             ExifInterface.TAG_GPS_DATESTAMP
         )
     }
-}
-
-private fun MediaOutputHandle.toPortraitRenderTargetOrNull(): PortraitRenderTarget? {
-    contentUri?.let { return PortraitRenderTarget.ContentUri(it) }
-    filePath?.let { return PortraitRenderTarget.FilePath(it) }
-    return displayPath.takeIf { File(it).isAbsolute }?.let(PortraitRenderTarget::FilePath)
-}
-
-private fun ShotResult.withPortraitPipelineNotes(vararg notes: String): ShotResult {
-    return copy(pipelineNotes = pipelineNotes + notes)
 }
 
 private fun mixChannel(source: Float, target: Float, mix: Float): Float {

@@ -7,53 +7,39 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
-import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
+import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.toProcessorTargetOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-internal sealed interface PhotoSelfieMirrorWork {
-    data object None : PhotoSelfieMirrorWork
-    data class Mirror(
-        val target: PhotoSelfieMirrorTarget
-    ) : PhotoSelfieMirrorWork
-
-    data class DiagnosticSkip(val reason: String) : PhotoSelfieMirrorWork
-}
-
-internal sealed interface PhotoSelfieMirrorTarget {
-    data class FilePath(val path: String) : PhotoSelfieMirrorTarget
-    data class ContentUri(val value: String) : PhotoSelfieMirrorTarget
-}
-
-internal sealed interface PhotoSelfieMirrorEditorResult {
-    data class Applied(val warning: String? = null) : PhotoSelfieMirrorEditorResult
-    data class Skipped(val reason: String) : PhotoSelfieMirrorEditorResult
-    data class Failed(val reason: String) : PhotoSelfieMirrorEditorResult
-}
+internal data class PhotoSelfieMirrorApplied(val warning: String? = null) : ProcessorEditorResult
 
 internal interface PhotoSelfieMirrorEditor {
-    suspend fun apply(target: PhotoSelfieMirrorTarget): PhotoSelfieMirrorEditorResult
+    suspend fun apply(target: ProcessorTarget): ProcessorEditorResult
 }
 
-internal fun decidePhotoSelfieMirrorWork(result: ShotResult): PhotoSelfieMirrorWork {
+internal fun decidePhotoSelfieMirrorWork(result: ShotResult): ProcessorWork<ProcessorTarget> {
     if (result.mediaType != MediaType.PHOTO) {
-        return PhotoSelfieMirrorWork.None
+        return ProcessorWork.None
     }
     if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return PhotoSelfieMirrorWork.DiagnosticSkip("unsupported-mime")
+        return ProcessorWork.DiagnosticSkip("unsupported-mime")
     }
     if (!result.metadata.customTags["selfieMirrorApply"].toBoolean()) {
-        return PhotoSelfieMirrorWork.None
+        return ProcessorWork.None
     }
-    val target = result.outputHandle.toPhotoSelfieMirrorTargetOrNull()
-        ?: return PhotoSelfieMirrorWork.DiagnosticSkip("missing-output-handle")
-    return PhotoSelfieMirrorWork.Mirror(target)
+    val target = result.outputHandle.toProcessorTargetOrNull()
+        ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
+    return ProcessorWork.Execute(target)
 }
 
 internal class PhotoSelfieMirrorPostProcessor(
@@ -61,31 +47,33 @@ internal class PhotoSelfieMirrorPostProcessor(
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoSelfieMirrorWork(result)) {
-            PhotoSelfieMirrorWork.None -> result
-            is PhotoSelfieMirrorWork.DiagnosticSkip -> result.withPipelineNotes(
+            ProcessorWork.None -> result
+            is ProcessorWork.DiagnosticSkip -> result.addPipelineNotes(
                 "selfie-mirror:skipped:${work.reason}"
             )
 
-            is PhotoSelfieMirrorWork.Mirror -> {
-                when (val editorResult = editor.apply(work.target)) {
-                    is PhotoSelfieMirrorEditorResult.Applied -> {
+            is ProcessorWork.Execute -> {
+                when (val editorResult = editor.apply(work.payload)) {
+                    is PhotoSelfieMirrorApplied -> {
                         if (editorResult.warning == null) {
-                            result.withPipelineNotes("selfie-mirror:applied")
+                            result.addPipelineNotes("selfie-mirror:applied")
                         } else {
-                            result.withPipelineNotes(
+                            result.addPipelineNotes(
                                 "selfie-mirror:applied",
                                 "selfie-mirror:warning:${editorResult.warning}"
                             )
                         }
                     }
 
-                    is PhotoSelfieMirrorEditorResult.Skipped -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
                         "selfie-mirror:skipped:${editorResult.reason}"
                     )
 
-                    is PhotoSelfieMirrorEditorResult.Failed -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
                         "selfie-mirror:failed:${editorResult.reason}"
                     )
+
+                    else -> result
                 }
             }
         }
@@ -98,17 +86,17 @@ internal class AndroidPhotoSelfieMirrorEditor(
     private val appContext = context.applicationContext
     private val contentResolver: ContentResolver = appContext.contentResolver
 
-    override suspend fun apply(target: PhotoSelfieMirrorTarget): PhotoSelfieMirrorEditorResult =
+    override suspend fun apply(target: ProcessorTarget): ProcessorEditorResult =
         withContext(Dispatchers.IO) {
             val sourceBytes = readSourceBytes(target)
-                ?: return@withContext PhotoSelfieMirrorEditorResult.Skipped("input-unavailable")
+                ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
             if (sourceBytes.isEmpty()) {
-                return@withContext PhotoSelfieMirrorEditorResult.Skipped("empty-source")
+                return@withContext ProcessorEditorResult.Skipped("empty-source")
             }
 
             val preservedExif = readPreservedExif(sourceBytes)
             val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-                ?: return@withContext PhotoSelfieMirrorEditorResult.Failed("decode-failed")
+                ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
 
             try {
                 val mirrored = Bitmap.createBitmap(
@@ -128,38 +116,38 @@ internal class AndroidPhotoSelfieMirrorEditor(
                 }
                 mirrored.recycle()
                 if (!writeEncodedBytes(target, encodedBytes)) {
-                    return@withContext PhotoSelfieMirrorEditorResult.Failed("output-unavailable")
+                    return@withContext ProcessorEditorResult.Failed("output-unavailable")
                 }
 
                 val exifWarning = restorePreservedExif(target, preservedExif)
-                PhotoSelfieMirrorEditorResult.Applied(exifWarning)
+                PhotoSelfieMirrorApplied(exifWarning)
             } catch (_: Throwable) {
-                PhotoSelfieMirrorEditorResult.Failed("mirror-exception")
+                ProcessorEditorResult.Failed("mirror-exception")
             } finally {
                 decoded.recycle()
             }
         }
 
-    private fun readSourceBytes(target: PhotoSelfieMirrorTarget): ByteArray? {
+    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
         return when (target) {
-            is PhotoSelfieMirrorTarget.FilePath -> {
+            is ProcessorTarget.FilePath -> {
                 val file = File(target.path)
                 if (!file.exists()) null else file.readBytes()
             }
 
-            is PhotoSelfieMirrorTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
             }
         }
     }
 
-    private fun writeEncodedBytes(target: PhotoSelfieMirrorTarget, bytes: ByteArray): Boolean {
+    private fun writeEncodedBytes(target: ProcessorTarget, bytes: ByteArray): Boolean {
         return when (target) {
-            is PhotoSelfieMirrorTarget.FilePath -> runCatching {
+            is ProcessorTarget.FilePath -> runCatching {
                 File(target.path).outputStream().use { it.write(bytes) }
             }.isSuccess
 
-            is PhotoSelfieMirrorTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openOutputStream(Uri.parse(target.value), "rwt")?.use {
                     it.write(bytes)
                 } != null
@@ -177,7 +165,7 @@ internal class AndroidPhotoSelfieMirrorEditor(
     }
 
     private fun restorePreservedExif(
-        target: PhotoSelfieMirrorTarget,
+        target: ProcessorTarget,
         preservedExif: Map<String, String>
     ): String? {
         if (preservedExif.isEmpty()) {
@@ -186,8 +174,8 @@ internal class AndroidPhotoSelfieMirrorEditor(
 
         return runCatching {
             val exif = when (target) {
-                is PhotoSelfieMirrorTarget.FilePath -> ExifInterface(target.path)
-                is PhotoSelfieMirrorTarget.ContentUri -> {
+                is ProcessorTarget.FilePath -> ExifInterface(target.path)
+                is ProcessorTarget.ContentUri -> {
                     contentResolver.openFileDescriptor(Uri.parse(target.value), "rw")?.use { descriptor ->
                         ExifInterface(descriptor.fileDescriptor)
                     } ?: return "exif-open-failed"
@@ -217,16 +205,4 @@ internal class AndroidPhotoSelfieMirrorEditor(
             ExifInterface.TAG_IMAGE_LENGTH
         )
     }
-}
-
-private fun MediaOutputHandle.toPhotoSelfieMirrorTargetOrNull(): PhotoSelfieMirrorTarget? {
-    return when {
-        filePath != null -> filePath?.let(PhotoSelfieMirrorTarget::FilePath)
-        contentUri != null -> contentUri?.let(PhotoSelfieMirrorTarget::ContentUri)
-        else -> null
-    }
-}
-
-private fun ShotResult.withPipelineNotes(vararg notes: String): ShotResult {
-    return copy(pipelineNotes = pipelineNotes + notes)
 }

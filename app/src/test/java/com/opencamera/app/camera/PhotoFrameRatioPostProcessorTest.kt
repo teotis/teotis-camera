@@ -6,6 +6,8 @@ import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -18,7 +20,7 @@ class PhotoFrameRatioPostProcessorTest {
     @Test
     fun `jpeg with frame ratio tag is cropped through content uri`() = runTest {
         val editor = FakePhotoFrameRatioEditor(
-            result = PhotoFrameRatioEditorResult.Applied(
+            result = PhotoFrameRatioApplied(
                 frameRatio = FrameRatio.RATIO_16_9,
                 cropBounds = CropBounds(0, 120, 4000, 2380)
             )
@@ -37,7 +39,7 @@ class PhotoFrameRatioPostProcessorTest {
         assertEquals(1, editor.invocations.size)
         val invocation = editor.invocations.single()
         assertEquals(
-            PhotoFrameRatioTarget.ContentUri("content://media/external/images/media/99"),
+            ProcessorTarget.ContentUri("content://media/external/images/media/99"),
             invocation.target
         )
         assertEquals(FrameRatio.RATIO_16_9, invocation.frameRatio)
@@ -48,7 +50,7 @@ class PhotoFrameRatioPostProcessorTest {
     @Test
     fun `missing frame ratio tag leaves result untouched`() = runTest {
         val editor = FakePhotoFrameRatioEditor(
-            result = PhotoFrameRatioEditorResult.Skipped("already-matched")
+            result = ProcessorEditorResult.Skipped("already-matched")
         )
         val processor = PhotoFrameRatioPostProcessor(editor)
         val input = photoResult(frameRatio = null)
@@ -61,7 +63,7 @@ class PhotoFrameRatioPostProcessorTest {
     @Test
     fun `unsupported frame ratio tag records diagnostic`() = runTest {
         val editor = FakePhotoFrameRatioEditor(
-            result = PhotoFrameRatioEditorResult.Skipped("already-matched")
+            result = ProcessorEditorResult.Skipped("already-matched")
         )
         val processor = PhotoFrameRatioPostProcessor(editor)
         val result = processor.process(photoResult(frameRatio = "5:4"))
@@ -73,7 +75,7 @@ class PhotoFrameRatioPostProcessorTest {
     @Test
     fun `missing editable handle records diagnostic skip`() = runTest {
         val editor = FakePhotoFrameRatioEditor(
-            result = PhotoFrameRatioEditorResult.Skipped("already-matched")
+            result = ProcessorEditorResult.Skipped("already-matched")
         )
         val processor = PhotoFrameRatioPostProcessor(editor)
         val result = processor.process(
@@ -190,21 +192,21 @@ class PhotoFrameRatioPostProcessorTest {
     }
 
     private class FakePhotoFrameRatioEditor(
-        private val result: PhotoFrameRatioEditorResult
+        private val result: ProcessorEditorResult
     ) : PhotoFrameRatioEditor {
         val invocations = mutableListOf<Invocation>()
 
         override suspend fun apply(
-            target: PhotoFrameRatioTarget,
+            target: ProcessorTarget,
             frameRatio: FrameRatio
-        ): PhotoFrameRatioEditorResult {
+        ): ProcessorEditorResult {
             invocations += Invocation(target, frameRatio)
             return result
         }
     }
 
     private data class Invocation(
-        val target: PhotoFrameRatioTarget,
+        val target: ProcessorTarget,
         val frameRatio: FrameRatio
     )
 }

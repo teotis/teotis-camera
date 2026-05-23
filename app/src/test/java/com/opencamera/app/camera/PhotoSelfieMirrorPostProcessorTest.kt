@@ -5,6 +5,8 @@ import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -15,7 +17,7 @@ class PhotoSelfieMirrorPostProcessorTest {
     @Test
     fun `photo result with selfie mirror request is rendered`() = runTest {
         val editor = FakePhotoSelfieMirrorEditor(
-            result = PhotoSelfieMirrorEditorResult.Applied()
+            result = PhotoSelfieMirrorApplied()
         )
         val processor = PhotoSelfieMirrorPostProcessor(editor)
         val result = processor.process(
@@ -29,7 +31,7 @@ class PhotoSelfieMirrorPostProcessorTest {
 
         assertEquals(1, editor.invocations.size)
         assertEquals(
-            PhotoSelfieMirrorTarget.ContentUri("content://media/external/images/media/202"),
+            ProcessorTarget.ContentUri("content://media/external/images/media/202"),
             editor.invocations.single()
         )
         assertTrue(result.pipelineNotes.contains("selfie-mirror:applied"))
@@ -38,7 +40,7 @@ class PhotoSelfieMirrorPostProcessorTest {
     @Test
     fun `selfie mirror request without editable handle records diagnostic skip`() = runTest {
         val editor = FakePhotoSelfieMirrorEditor(
-            result = PhotoSelfieMirrorEditorResult.Applied()
+            result = PhotoSelfieMirrorApplied()
         )
         val processor = PhotoSelfieMirrorPostProcessor(editor)
         val result = processor.process(
@@ -56,7 +58,7 @@ class PhotoSelfieMirrorPostProcessorTest {
     @Test
     fun `selfie mirror disabled leaves result untouched`() = runTest {
         val editor = FakePhotoSelfieMirrorEditor(
-            result = PhotoSelfieMirrorEditorResult.Applied()
+            result = PhotoSelfieMirrorApplied()
         )
         val processor = PhotoSelfieMirrorPostProcessor(editor)
         val input = photoResult(
@@ -79,7 +81,7 @@ class PhotoSelfieMirrorPostProcessorTest {
     @Test
     fun `non photo result is ignored`() = runTest {
         val editor = FakePhotoSelfieMirrorEditor(
-            result = PhotoSelfieMirrorEditorResult.Applied()
+            result = PhotoSelfieMirrorApplied()
         )
         val processor = PhotoSelfieMirrorPostProcessor(editor)
         val input = photoResult(
@@ -127,11 +129,11 @@ class PhotoSelfieMirrorPostProcessorTest {
     }
 
     private class FakePhotoSelfieMirrorEditor(
-        private val result: PhotoSelfieMirrorEditorResult
+        private val result: ProcessorEditorResult
     ) : PhotoSelfieMirrorEditor {
-        val invocations = mutableListOf<PhotoSelfieMirrorTarget>()
+        val invocations = mutableListOf<ProcessorTarget>()
 
-        override suspend fun apply(target: PhotoSelfieMirrorTarget): PhotoSelfieMirrorEditorResult {
+        override suspend fun apply(target: ProcessorTarget): ProcessorEditorResult {
             invocations += target
             return result
         }

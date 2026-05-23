@@ -14,11 +14,14 @@ import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import androidx.exifinterface.media.ExifInterface
-import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.WatermarkFrameBackground
 import com.opencamera.core.settings.WatermarkTextPlacement
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +34,7 @@ import java.util.Locale
 internal sealed interface PhotoWatermarkWork {
     data object None : PhotoWatermarkWork
     data class Render(
-        val target: PhotoWatermarkTarget,
+        val target: ProcessorTarget,
         val metadata: MediaMetadata,
         val watermarkText: String,
         val templateId: String
@@ -41,17 +44,6 @@ internal sealed interface PhotoWatermarkWork {
         val reason: String,
         val templateId: String? = null
     ) : PhotoWatermarkWork
-}
-
-internal sealed interface PhotoWatermarkTarget {
-    data class FilePath(val path: String) : PhotoWatermarkTarget
-    data class ContentUri(val value: String) : PhotoWatermarkTarget
-}
-
-internal sealed interface PhotoWatermarkEditorResult {
-    data class Applied(val warning: String? = null) : PhotoWatermarkEditorResult
-    data class Skipped(val reason: String) : PhotoWatermarkEditorResult
-    data class Failed(val reason: String) : PhotoWatermarkEditorResult
 }
 
 internal data class ResolvedPhotoWatermarkTemplate(
@@ -71,13 +63,15 @@ internal data class PhotoWatermarkBitmapRenderResult(
     val warning: String? = null
 )
 
+internal data class PhotoWatermarkApplied(val warning: String? = null) : ProcessorEditorResult
+
 internal interface PhotoWatermarkEditor {
     suspend fun apply(
-        target: PhotoWatermarkTarget,
+        target: ProcessorTarget,
         metadata: MediaMetadata,
         watermarkText: String,
         templateId: String
-    ): PhotoWatermarkEditorResult
+    ): ProcessorEditorResult
 }
 
 internal fun decidePhotoWatermarkWork(result: ShotResult): PhotoWatermarkWork {
@@ -95,7 +89,7 @@ internal fun decidePhotoWatermarkWork(result: ShotResult): PhotoWatermarkWork {
         result.metadata.customTags[PHOTO_WATERMARK_TEMPLATE_KEY]
     )
 
-    val target = result.outputHandle.toPhotoWatermarkTargetOrNull()
+    val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return PhotoWatermarkWork.DiagnosticSkip(
             reason = "missing-output-handle",
             templateId = templateId
@@ -115,7 +109,7 @@ internal class PhotoWatermarkPostProcessor(
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoWatermarkWork(result)) {
             PhotoWatermarkWork.None -> result
-            is PhotoWatermarkWork.DiagnosticSkip -> result.withPipelineNotes(
+            is PhotoWatermarkWork.DiagnosticSkip -> result.addPipelineNotes(
                 *buildList {
                     work.templateId?.let { add("watermark:template:$it") }
                     add("watermark:skipped:${work.reason}")
@@ -129,8 +123,8 @@ internal class PhotoWatermarkPostProcessor(
                     watermarkText = work.watermarkText,
                     templateId = work.templateId
                 )) {
-                    is PhotoWatermarkEditorResult.Applied -> {
-                        result.withPipelineNotes(
+                    is PhotoWatermarkApplied -> {
+                        result.addPipelineNotes(
                             *buildList {
                                 add("watermark:rendered:${work.templateId}")
                                 renderResult.warning?.let { add("watermark:warning:$it") }
@@ -138,15 +132,17 @@ internal class PhotoWatermarkPostProcessor(
                         )
                     }
 
-                    is PhotoWatermarkEditorResult.Skipped -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
                         "watermark:template:${work.templateId}",
                         "watermark:skipped:${renderResult.reason}"
                     )
 
-                    is PhotoWatermarkEditorResult.Failed -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
                         "watermark:template:${work.templateId}",
                         "watermark:failed:${renderResult.reason}"
                     )
+
+                    else -> result
                 }
             }
         }
@@ -160,20 +156,20 @@ internal class AndroidPhotoWatermarkEditor(
     private val contentResolver: ContentResolver = appContext.contentResolver
 
     override suspend fun apply(
-        target: PhotoWatermarkTarget,
+        target: ProcessorTarget,
         metadata: MediaMetadata,
         watermarkText: String,
         templateId: String
-    ): PhotoWatermarkEditorResult = withContext(Dispatchers.IO) {
+    ): ProcessorEditorResult = withContext(Dispatchers.IO) {
         val sourceBytes = readSourceBytes(target)
-            ?: return@withContext PhotoWatermarkEditorResult.Skipped("input-unavailable")
+            ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
-            return@withContext PhotoWatermarkEditorResult.Skipped("empty-source")
+            return@withContext ProcessorEditorResult.Skipped("empty-source")
         }
 
         val preservedExif = readPreservedExif(sourceBytes)
         val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-            ?: return@withContext PhotoWatermarkEditorResult.Failed("decode-failed")
+            ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
 
         val mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
         if (mutableBitmap !== decoded) {
@@ -200,18 +196,18 @@ internal class AndroidPhotoWatermarkEditor(
                 output.toByteArray()
             }
             if (!writeEncodedBytes(target, encodedBytes)) {
-                return@withContext PhotoWatermarkEditorResult.Failed("output-unavailable")
+                return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
 
             val exifWarning = restorePreservedExif(
                 target = target,
                 preservedExif = preservedExif
             )
-            PhotoWatermarkEditorResult.Applied(
+            PhotoWatermarkApplied(
                 warning = mergeWarnings(renderResult.warning, exifWarning)
             )
         } catch (_: Throwable) {
-            PhotoWatermarkEditorResult.Failed("render-exception")
+            ProcessorEditorResult.Failed("render-exception")
         } finally {
             if (renderedBitmap != null && renderedBitmap !== mutableBitmap) {
                 renderedBitmap.recycle()
@@ -220,9 +216,9 @@ internal class AndroidPhotoWatermarkEditor(
         }
     }
 
-    private fun readSourceBytes(target: PhotoWatermarkTarget): ByteArray? {
+    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
         return when (target) {
-            is PhotoWatermarkTarget.FilePath -> {
+            is ProcessorTarget.FilePath -> {
                 val file = File(target.path)
                 if (!file.exists()) {
                     null
@@ -231,22 +227,22 @@ internal class AndroidPhotoWatermarkEditor(
                 }
             }
 
-            is PhotoWatermarkTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
             }
         }
     }
 
     private fun writeEncodedBytes(
-        target: PhotoWatermarkTarget,
+        target: ProcessorTarget,
         encodedBytes: ByteArray
     ): Boolean {
         return when (target) {
-            is PhotoWatermarkTarget.FilePath -> runCatching {
+            is ProcessorTarget.FilePath -> runCatching {
                 File(target.path).outputStream().use { it.write(encodedBytes) }
             }.isSuccess
 
-            is PhotoWatermarkTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openOutputStream(Uri.parse(target.value), "rwt")?.use {
                     it.write(encodedBytes)
                 } != null
@@ -266,7 +262,7 @@ internal class AndroidPhotoWatermarkEditor(
     }
 
     private fun restorePreservedExif(
-        target: PhotoWatermarkTarget,
+        target: ProcessorTarget,
         preservedExif: Map<String, String>
     ): String? {
         if (preservedExif.isEmpty()) {
@@ -275,14 +271,14 @@ internal class AndroidPhotoWatermarkEditor(
 
         val restored = runCatching {
             when (target) {
-                is PhotoWatermarkTarget.FilePath -> {
+                is ProcessorTarget.FilePath -> {
                     ExifInterface(target.path).apply {
                         applyPreservedExif(preservedExif)
                         saveAttributes()
                     }
                 }
 
-                is PhotoWatermarkTarget.ContentUri -> {
+                is ProcessorTarget.ContentUri -> {
                     contentResolver.openFileDescriptor(Uri.parse(target.value), "rw")?.use { descriptor ->
                         ExifInterface(descriptor.fileDescriptor).apply {
                             applyPreservedExif(preservedExif)
@@ -876,12 +872,3 @@ private fun formatCameraParams(exif: Map<String, String>): String? {
     return params.takeIf { it.isNotEmpty() }?.joinToString(separator = " • ")
 }
 
-private fun MediaOutputHandle.toPhotoWatermarkTargetOrNull(): PhotoWatermarkTarget? {
-    contentUri?.let { return PhotoWatermarkTarget.ContentUri(it) }
-    filePath?.let { return PhotoWatermarkTarget.FilePath(it) }
-    return displayPath.takeIf { File(it).isAbsolute }?.let(PhotoWatermarkTarget::FilePath)
-}
-
-private fun ShotResult.withPipelineNotes(vararg notes: String): ShotResult {
-    return copy(pipelineNotes = pipelineNotes + notes)
-}

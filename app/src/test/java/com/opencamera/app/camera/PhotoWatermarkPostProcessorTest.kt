@@ -5,6 +5,8 @@ import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -15,7 +17,7 @@ class PhotoWatermarkPostProcessorTest {
     @Test
     fun `photo result with watermark and content uri is rendered`() = runTest {
         val editor = FakePhotoWatermarkEditor(
-            result = PhotoWatermarkEditorResult.Applied()
+            result = PhotoWatermarkApplied()
         )
         val processor = PhotoWatermarkPostProcessor(editor)
         val result = processor.process(
@@ -30,7 +32,7 @@ class PhotoWatermarkPostProcessorTest {
 
         assertEquals(1, editor.invocations.size)
         assertEquals(
-            PhotoWatermarkTarget.ContentUri("content://media/external/images/media/101"),
+            ProcessorTarget.ContentUri("content://media/external/images/media/101"),
             editor.invocations.single().target
         )
         assertEquals("travel-polaroid", editor.invocations.single().templateId)
@@ -40,7 +42,7 @@ class PhotoWatermarkPostProcessorTest {
     @Test
     fun `missing watermark text leaves result untouched`() = runTest {
         val editor = FakePhotoWatermarkEditor(
-            result = PhotoWatermarkEditorResult.Applied()
+            result = PhotoWatermarkApplied()
         )
         val processor = PhotoWatermarkPostProcessor(editor)
         val input = photoResult(watermarkText = null)
@@ -53,7 +55,7 @@ class PhotoWatermarkPostProcessorTest {
     @Test
     fun `watermark without editable handle records diagnostic skip`() = runTest {
         val editor = FakePhotoWatermarkEditor(
-            result = PhotoWatermarkEditorResult.Applied()
+            result = PhotoWatermarkApplied()
         )
         val processor = PhotoWatermarkPostProcessor(editor)
         val result = processor.process(
@@ -74,7 +76,7 @@ class PhotoWatermarkPostProcessorTest {
     @Test
     fun `editor failure is captured as pipeline diagnostic`() = runTest {
         val editor = FakePhotoWatermarkEditor(
-            result = PhotoWatermarkEditorResult.Failed("decode-failed")
+            result = ProcessorEditorResult.Failed("decode-failed")
         )
         val processor = PhotoWatermarkPostProcessor(editor)
         val result = processor.process(
@@ -95,7 +97,7 @@ class PhotoWatermarkPostProcessorTest {
     @Test
     fun `non photo result is ignored`() = runTest {
         val editor = FakePhotoWatermarkEditor(
-            result = PhotoWatermarkEditorResult.Applied()
+            result = PhotoWatermarkApplied()
         )
         val processor = PhotoWatermarkPostProcessor(editor)
         val input = photoResult(
@@ -140,23 +142,23 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     private class FakePhotoWatermarkEditor(
-        private val result: PhotoWatermarkEditorResult
+        private val result: ProcessorEditorResult
     ) : PhotoWatermarkEditor {
         val invocations = mutableListOf<Invocation>()
 
         override suspend fun apply(
-            target: PhotoWatermarkTarget,
+            target: ProcessorTarget,
             metadata: MediaMetadata,
             watermarkText: String,
             templateId: String
-        ): PhotoWatermarkEditorResult {
+        ): ProcessorEditorResult {
             invocations += Invocation(target, watermarkText, templateId)
             return result
         }
     }
 
     private data class Invocation(
-        val target: PhotoWatermarkTarget,
+        val target: ProcessorTarget,
         val watermarkText: String,
         val templateId: String
     )

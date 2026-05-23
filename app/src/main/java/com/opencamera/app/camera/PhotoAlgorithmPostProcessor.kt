@@ -6,10 +6,14 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
-import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
+import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.FilterRenderSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,20 +24,10 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-internal sealed interface PhotoAlgorithmWork {
-    data object None : PhotoAlgorithmWork
-    data class Render(
-        val target: PhotoAlgorithmTarget,
-        val spec: PhotoAlgorithmSpec
-    ) : PhotoAlgorithmWork
-
-    data class DiagnosticSkip(val reason: String) : PhotoAlgorithmWork
-}
-
-internal sealed interface PhotoAlgorithmTarget {
-    data class FilePath(val path: String) : PhotoAlgorithmTarget
-    data class ContentUri(val value: String) : PhotoAlgorithmTarget
-}
+internal data class PhotoAlgorithmPayload(
+    val target: ProcessorTarget,
+    val spec: PhotoAlgorithmSpec
+)
 
 internal data class PhotoAlgorithmSpec(
     val profile: String,
@@ -54,25 +48,21 @@ internal data class PhotoAlgorithmSpec(
     val coolBoost: Float = 0f
 )
 
-internal sealed interface PhotoAlgorithmEditorResult {
-    data class Applied(val warning: String? = null) : PhotoAlgorithmEditorResult
-    data class Skipped(val reason: String) : PhotoAlgorithmEditorResult
-    data class Failed(val reason: String) : PhotoAlgorithmEditorResult
-}
+internal data class PhotoAlgorithmApplied(val warning: String? = null) : ProcessorEditorResult
 
 internal interface PhotoAlgorithmEditor {
     suspend fun apply(
-        target: PhotoAlgorithmTarget,
+        target: ProcessorTarget,
         spec: PhotoAlgorithmSpec
-    ): PhotoAlgorithmEditorResult
+    ): ProcessorEditorResult
 }
 
-internal fun decidePhotoAlgorithmWork(result: ShotResult): PhotoAlgorithmWork {
+internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAlgorithmPayload> {
     if (result.mediaType != MediaType.PHOTO) {
-        return PhotoAlgorithmWork.None
+        return ProcessorWork.None
     }
     if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return PhotoAlgorithmWork.DiagnosticSkip("unsupported-mime")
+        return ProcessorWork.DiagnosticSkip("unsupported-mime")
     }
     val profile = result.metadata.algorithmProfile
         ?.trim()
@@ -83,14 +73,11 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): PhotoAlgorithmWork {
             ?: profile
             ?: "shared-filter"
     ) ?: profile?.let(::resolvePhotoAlgorithmSpec)
-        ?: return PhotoAlgorithmWork.None
-    val target = result.outputHandle.toPhotoAlgorithmTargetOrNull()
-        ?: return PhotoAlgorithmWork.DiagnosticSkip("missing-output-handle")
+        ?: return ProcessorWork.None
+    val target = result.outputHandle.toProcessorTargetOrNull()
+        ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
 
-    return PhotoAlgorithmWork.Render(
-        target = target,
-        spec = spec
-    )
+    return ProcessorWork.Execute(PhotoAlgorithmPayload(target, spec))
 }
 
 private fun FilterRenderSpec.toPhotoAlgorithmSpec(profile: String): PhotoAlgorithmSpec {
@@ -119,33 +106,36 @@ internal class PhotoAlgorithmPostProcessor(
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoAlgorithmWork(result)) {
-            PhotoAlgorithmWork.None -> result
-            is PhotoAlgorithmWork.DiagnosticSkip -> result.withPipelineNotes(
+            ProcessorWork.None -> result
+            is ProcessorWork.DiagnosticSkip -> result.addPipelineNotes(
                 "algorithm-render:skipped:${work.reason}"
             )
 
-            is PhotoAlgorithmWork.Render -> {
-                when (val renderResult = editor.apply(work.target, work.spec)) {
-                    is PhotoAlgorithmEditorResult.Applied -> {
+            is ProcessorWork.Execute -> {
+                val payload = work.payload
+                when (val renderResult = editor.apply(payload.target, payload.spec)) {
+                    is PhotoAlgorithmApplied -> {
                         if (renderResult.warning == null) {
-                            result.withPipelineNotes(
-                                "algorithm-render:applied:${work.spec.profile}"
+                            result.addPipelineNotes(
+                                "algorithm-render:applied:${payload.spec.profile}"
                             )
                         } else {
-                            result.withPipelineNotes(
-                                "algorithm-render:applied:${work.spec.profile}",
+                            result.addPipelineNotes(
+                                "algorithm-render:applied:${payload.spec.profile}",
                                 "algorithm-render:warning:${renderResult.warning}"
                             )
                         }
                     }
 
-                    is PhotoAlgorithmEditorResult.Skipped -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
                         "algorithm-render:skipped:${renderResult.reason}"
                     )
 
-                    is PhotoAlgorithmEditorResult.Failed -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
                         "algorithm-render:failed:${renderResult.reason}"
                     )
+
+                    else -> result
                 }
             }
         }
@@ -159,18 +149,18 @@ internal class AndroidPhotoAlgorithmEditor(
     private val contentResolver: ContentResolver = appContext.contentResolver
 
     override suspend fun apply(
-        target: PhotoAlgorithmTarget,
+        target: ProcessorTarget,
         spec: PhotoAlgorithmSpec
-    ): PhotoAlgorithmEditorResult = withContext(Dispatchers.IO) {
+    ): ProcessorEditorResult = withContext(Dispatchers.IO) {
         val sourceBytes = readSourceBytes(target)
-            ?: return@withContext PhotoAlgorithmEditorResult.Skipped("input-unavailable")
+            ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
-            return@withContext PhotoAlgorithmEditorResult.Skipped("empty-source")
+            return@withContext ProcessorEditorResult.Skipped("empty-source")
         }
 
         val preservedExif = readPreservedExif(sourceBytes)
         val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-            ?: return@withContext PhotoAlgorithmEditorResult.Failed("decode-failed")
+            ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
         val mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
         if (mutableBitmap !== decoded) {
             decoded.recycle()
@@ -188,13 +178,13 @@ internal class AndroidPhotoAlgorithmEditor(
                 output.toByteArray()
             }
             if (!writeEncodedBytes(target, encodedBytes)) {
-                return@withContext PhotoAlgorithmEditorResult.Failed("output-unavailable")
+                return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
 
             val exifWarning = restorePreservedExif(target, preservedExif)
-            PhotoAlgorithmEditorResult.Applied(exifWarning)
+            PhotoAlgorithmApplied(exifWarning)
         } catch (_: Throwable) {
-            PhotoAlgorithmEditorResult.Failed("render-exception")
+            ProcessorEditorResult.Failed("render-exception")
         } finally {
             mutableBitmap.recycle()
         }
@@ -306,9 +296,9 @@ internal class AndroidPhotoAlgorithmEditor(
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
     }
 
-    private fun readSourceBytes(target: PhotoAlgorithmTarget): ByteArray? {
+    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
         return when (target) {
-            is PhotoAlgorithmTarget.FilePath -> {
+            is ProcessorTarget.FilePath -> {
                 val file = File(target.path)
                 if (!file.exists()) {
                     null
@@ -317,22 +307,22 @@ internal class AndroidPhotoAlgorithmEditor(
                 }
             }
 
-            is PhotoAlgorithmTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
             }
         }
     }
 
     private fun writeEncodedBytes(
-        target: PhotoAlgorithmTarget,
+        target: ProcessorTarget,
         encodedBytes: ByteArray
     ): Boolean {
         return when (target) {
-            is PhotoAlgorithmTarget.FilePath -> runCatching {
+            is ProcessorTarget.FilePath -> runCatching {
                 File(target.path).outputStream().use { it.write(encodedBytes) }
             }.isSuccess
 
-            is PhotoAlgorithmTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openOutputStream(Uri.parse(target.value), "rwt")?.use {
                     it.write(encodedBytes)
                 } != null
@@ -352,7 +342,7 @@ internal class AndroidPhotoAlgorithmEditor(
     }
 
     private fun restorePreservedExif(
-        target: PhotoAlgorithmTarget,
+        target: ProcessorTarget,
         preservedExif: Map<String, String>
     ): String? {
         if (preservedExif.isEmpty()) {
@@ -361,14 +351,14 @@ internal class AndroidPhotoAlgorithmEditor(
 
         val restored = runCatching {
             when (target) {
-                is PhotoAlgorithmTarget.FilePath -> {
+                is ProcessorTarget.FilePath -> {
                     ExifInterface(target.path).apply {
                         preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
                         saveAttributes()
                     }
                 }
 
-                is PhotoAlgorithmTarget.ContentUri -> {
+                is ProcessorTarget.ContentUri -> {
                     contentResolver.openFileDescriptor(Uri.parse(target.value), "rw")?.use { descriptor ->
                         ExifInterface(descriptor.fileDescriptor).apply {
                             preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
@@ -603,22 +593,6 @@ internal fun resolvePhotoAlgorithmSpec(profile: String): PhotoAlgorithmSpec? {
 
         else -> null
     }
-}
-
-private fun MediaOutputHandle.toPhotoAlgorithmTargetOrNull(): PhotoAlgorithmTarget? {
-    contentUri?.let { return PhotoAlgorithmTarget.ContentUri(it) }
-    filePath?.let { return PhotoAlgorithmTarget.FilePath(it) }
-    val absPath = if (File(displayPath).isAbsolute) {
-        displayPath
-    } else {
-        @Suppress("DEPRECATION")
-        File(android.os.Environment.getExternalStoragePublicDirectory(null), displayPath).absolutePath
-    }
-    return File(absPath).takeIf { it.exists() }?.absolutePath?.let(PhotoAlgorithmTarget::FilePath)
-}
-
-private fun ShotResult.withPipelineNotes(vararg notes: String): ShotResult {
-    return copy(pipelineNotes = pipelineNotes + notes)
 }
 
 private fun applyContrast(channel: Float, contrast: Float): Float {

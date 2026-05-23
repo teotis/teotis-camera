@@ -6,6 +6,8 @@ import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -18,7 +20,7 @@ class DocumentAutoCropPostProcessorTest {
     @Test
     fun `document jpeg with auto crop enabled is rendered`() = runTest {
         val editor = FakeDocumentAutoCropEditor(
-            result = DocumentAutoCropEditorResult.Applied(
+            result = DocumentAutoCropApplied(
                 cropBounds = Rect(12, 18, 132, 198)
             )
         )
@@ -34,7 +36,7 @@ class DocumentAutoCropPostProcessorTest {
 
         assertEquals(1, editor.invocations.size)
         assertEquals(
-            DocumentAutoCropTarget.ContentUri("content://media/external/images/media/57"),
+            ProcessorTarget.ContentUri("content://media/external/images/media/57"),
             editor.invocations.single()
         )
         assertTrue(result.pipelineNotes.contains("document:auto-crop:applied"))
@@ -44,7 +46,7 @@ class DocumentAutoCropPostProcessorTest {
     @Test
     fun `non document result leaves pipeline untouched`() = runTest {
         val editor = FakeDocumentAutoCropEditor(
-            result = DocumentAutoCropEditorResult.Applied(
+            result = DocumentAutoCropApplied(
                 cropBounds = Rect(0, 0, 10, 10)
             )
         )
@@ -59,7 +61,7 @@ class DocumentAutoCropPostProcessorTest {
     @Test
     fun `missing editable handle records diagnostic skip`() = runTest {
         val editor = FakeDocumentAutoCropEditor(
-            result = DocumentAutoCropEditorResult.Applied(
+            result = DocumentAutoCropApplied(
                 cropBounds = Rect(0, 0, 10, 10)
             )
         )
@@ -79,7 +81,7 @@ class DocumentAutoCropPostProcessorTest {
     @Test
     fun `editor failure is recorded as pipeline diagnostic`() = runTest {
         val editor = FakeDocumentAutoCropEditor(
-            result = DocumentAutoCropEditorResult.Failed("decode-failed")
+            result = ProcessorEditorResult.Failed("decode-failed")
         )
         val processor = DocumentAutoCropPostProcessor(editor)
         val result = processor.process(
@@ -148,11 +150,11 @@ class DocumentAutoCropPostProcessorTest {
     }
 
     private class FakeDocumentAutoCropEditor(
-        private val result: DocumentAutoCropEditorResult
+        private val result: ProcessorEditorResult
     ) : DocumentAutoCropEditor {
-        val invocations = mutableListOf<DocumentAutoCropTarget>()
+        val invocations = mutableListOf<ProcessorTarget>()
 
-        override suspend fun apply(target: DocumentAutoCropTarget): DocumentAutoCropEditorResult {
+        override suspend fun apply(target: ProcessorTarget): ProcessorEditorResult {
             invocations += target
             return result
         }

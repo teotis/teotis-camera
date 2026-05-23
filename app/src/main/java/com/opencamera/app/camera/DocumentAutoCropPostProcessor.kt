@@ -7,10 +7,14 @@ import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
-import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.ProcessorEditorResult
+import com.opencamera.core.media.ProcessorTarget
+import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.toProcessorTargetOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
@@ -19,49 +23,33 @@ import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 
-internal sealed interface DocumentAutoCropWork {
-    data object None : DocumentAutoCropWork
-    data class Crop(val target: DocumentAutoCropTarget) : DocumentAutoCropWork
-    data class DiagnosticSkip(val reason: String) : DocumentAutoCropWork
-}
-
-internal sealed interface DocumentAutoCropTarget {
-    data class FilePath(val path: String) : DocumentAutoCropTarget
-    data class ContentUri(val value: String) : DocumentAutoCropTarget
-}
-
-internal sealed interface DocumentAutoCropEditorResult {
-    data class Applied(
-        val cropBounds: Rect,
-        val warning: String? = null
-    ) : DocumentAutoCropEditorResult
-
-    data class Skipped(val reason: String) : DocumentAutoCropEditorResult
-    data class Failed(val reason: String) : DocumentAutoCropEditorResult
-}
+internal data class DocumentAutoCropApplied(
+    val cropBounds: Rect,
+    val warning: String? = null
+) : ProcessorEditorResult
 
 internal interface DocumentAutoCropEditor {
-    suspend fun apply(target: DocumentAutoCropTarget): DocumentAutoCropEditorResult
+    suspend fun apply(target: ProcessorTarget): ProcessorEditorResult
 }
 
-internal fun decideDocumentAutoCropWork(result: ShotResult): DocumentAutoCropWork {
+internal fun decideDocumentAutoCropWork(result: ShotResult): ProcessorWork<ProcessorTarget> {
     if (result.mediaType != MediaType.PHOTO) {
-        return DocumentAutoCropWork.None
+        return ProcessorWork.None
     }
     if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return DocumentAutoCropWork.DiagnosticSkip("unsupported-mime")
+        return ProcessorWork.DiagnosticSkip("unsupported-mime")
     }
     val tags = result.metadata.customTags
     if (tags["mode"] != "document") {
-        return DocumentAutoCropWork.None
+        return ProcessorWork.None
     }
     if (tags["autoCrop"] != "true") {
-        return DocumentAutoCropWork.None
+        return ProcessorWork.None
     }
 
-    val target = result.outputHandle.toDocumentAutoCropTargetOrNull()
-        ?: return DocumentAutoCropWork.DiagnosticSkip("missing-output-handle")
-    return DocumentAutoCropWork.Crop(target)
+    val target = result.outputHandle.toProcessorTargetOrNull()
+        ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
+    return ProcessorWork.Execute(target)
 }
 
 internal fun detectDocumentCropBounds(
@@ -139,30 +127,32 @@ internal class DocumentAutoCropPostProcessor(
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decideDocumentAutoCropWork(result)) {
-            DocumentAutoCropWork.None -> result
-            is DocumentAutoCropWork.DiagnosticSkip -> result.withPipelineNotes(
+            ProcessorWork.None -> result
+            is ProcessorWork.DiagnosticSkip -> result.addPipelineNotes(
                 "document:auto-crop:skipped:${work.reason}"
             )
 
-            is DocumentAutoCropWork.Crop -> {
-                when (val cropResult = editor.apply(work.target)) {
-                    is DocumentAutoCropEditorResult.Applied -> {
+            is ProcessorWork.Execute -> {
+                when (val cropResult = editor.apply(work.payload)) {
+                    is DocumentAutoCropApplied -> {
                         val bounds = cropResult.cropBounds
                         val notes = buildList {
                             add("document:auto-crop:applied")
                             add("document:auto-crop:bounds=${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}")
                             cropResult.warning?.let { add("document:auto-crop:warning:$it") }
                         }
-                        result.withPipelineNotes(*notes.toTypedArray())
+                        result.addPipelineNotes(*notes.toTypedArray())
                     }
 
-                    is DocumentAutoCropEditorResult.Skipped -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
                         "document:auto-crop:skipped:${cropResult.reason}"
                     )
 
-                    is DocumentAutoCropEditorResult.Failed -> result.withPipelineNotes(
+                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
                         "document:auto-crop:failed:${cropResult.reason}"
                     )
+
+                    else -> result
                 }
             }
         }
@@ -175,17 +165,17 @@ internal class AndroidDocumentAutoCropEditor(
     private val appContext = context.applicationContext
     private val contentResolver: ContentResolver = appContext.contentResolver
 
-    override suspend fun apply(target: DocumentAutoCropTarget): DocumentAutoCropEditorResult =
+    override suspend fun apply(target: ProcessorTarget): ProcessorEditorResult =
         withContext(Dispatchers.IO) {
             val sourceBytes = readSourceBytes(target)
-                ?: return@withContext DocumentAutoCropEditorResult.Skipped("input-unavailable")
+                ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
             if (sourceBytes.isEmpty()) {
-                return@withContext DocumentAutoCropEditorResult.Skipped("empty-source")
+                return@withContext ProcessorEditorResult.Skipped("empty-source")
             }
 
             val preservedExif = readPreservedExif(sourceBytes)
             val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-                ?: return@withContext DocumentAutoCropEditorResult.Failed("decode-failed")
+                ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
 
             try {
                 val cropBounds = detectDocumentCropBounds(
@@ -197,7 +187,7 @@ internal class AndroidDocumentAutoCropEditor(
                     val green = pixel ushr 8 and 0xFF
                     val blue = pixel and 0xFF
                     ((red * 299) + (green * 587) + (blue * 114)) / 1000
-                } ?: return@withContext DocumentAutoCropEditorResult.Skipped("bounds-not-found")
+                } ?: return@withContext ProcessorEditorResult.Skipped("bounds-not-found")
 
                 val cropped = Bitmap.createBitmap(
                     decoded,
@@ -214,41 +204,41 @@ internal class AndroidDocumentAutoCropEditor(
                 }
                 cropped.recycle()
                 if (!writeEncodedBytes(target, encodedBytes)) {
-                    return@withContext DocumentAutoCropEditorResult.Failed("output-unavailable")
+                    return@withContext ProcessorEditorResult.Failed("output-unavailable")
                 }
 
                 val exifWarning = restorePreservedExif(target, preservedExif)
-                DocumentAutoCropEditorResult.Applied(
+                DocumentAutoCropApplied(
                     cropBounds = cropBounds,
                     warning = exifWarning
                 )
             } catch (_: Throwable) {
-                DocumentAutoCropEditorResult.Failed("crop-exception")
+                ProcessorEditorResult.Failed("crop-exception")
             } finally {
                 decoded.recycle()
             }
         }
 
-    private fun readSourceBytes(target: DocumentAutoCropTarget): ByteArray? {
+    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
         return when (target) {
-            is DocumentAutoCropTarget.FilePath -> {
+            is ProcessorTarget.FilePath -> {
                 val file = File(target.path)
                 if (!file.exists()) null else file.readBytes()
             }
 
-            is DocumentAutoCropTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
             }
         }
     }
 
-    private fun writeEncodedBytes(target: DocumentAutoCropTarget, bytes: ByteArray): Boolean {
+    private fun writeEncodedBytes(target: ProcessorTarget, bytes: ByteArray): Boolean {
         return when (target) {
-            is DocumentAutoCropTarget.FilePath -> runCatching {
+            is ProcessorTarget.FilePath -> runCatching {
                 File(target.path).outputStream().use { it.write(bytes) }
             }.isSuccess
 
-            is DocumentAutoCropTarget.ContentUri -> {
+            is ProcessorTarget.ContentUri -> {
                 contentResolver.openOutputStream(Uri.parse(target.value), "rwt")?.use { it.write(bytes) } != null
             }
         }
@@ -266,7 +256,7 @@ internal class AndroidDocumentAutoCropEditor(
     }
 
     private fun restorePreservedExif(
-        target: DocumentAutoCropTarget,
+        target: ProcessorTarget,
         preservedExif: Map<String, String>
     ): String? {
         if (preservedExif.isEmpty()) {
@@ -274,14 +264,14 @@ internal class AndroidDocumentAutoCropEditor(
         }
         val restored = runCatching {
             when (target) {
-                is DocumentAutoCropTarget.FilePath -> {
+                is ProcessorTarget.FilePath -> {
                     ExifInterface(target.path).apply {
                         preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
                         saveAttributes()
                     }
                 }
 
-                is DocumentAutoCropTarget.ContentUri -> {
+                is ProcessorTarget.ContentUri -> {
                     contentResolver.openFileDescriptor(Uri.parse(target.value), "rw")?.use { descriptor ->
                         ExifInterface(descriptor.fileDescriptor).apply {
                             preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
@@ -372,12 +362,3 @@ private fun columnStats(
     )
 }
 
-private fun MediaOutputHandle.toDocumentAutoCropTargetOrNull(): DocumentAutoCropTarget? {
-    contentUri?.let { return DocumentAutoCropTarget.ContentUri(it) }
-    filePath?.let { return DocumentAutoCropTarget.FilePath(it) }
-    return displayPath.takeIf { File(it).isAbsolute }?.let(DocumentAutoCropTarget::FilePath)
-}
-
-private fun ShotResult.withPipelineNotes(vararg notes: String): ShotResult {
-    return copy(pipelineNotes = pipelineNotes + notes)
-}
