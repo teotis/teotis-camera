@@ -6,9 +6,6 @@ import android.content.pm.PackageManager
 import android.media.MediaActionSound
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
 import android.widget.Toast
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -288,431 +285,6 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     }
 
-    private fun renderSettingsPage(model: SessionSettingsPageRenderModel) {
-        views.settingsPanel.headline.text = model.headline
-        views.settingsPanel.supportingText.text = model.supportingText
-        views.settingsPanel.heroSummary.text = model.heroSummary
-        views.settingsPanel.heroSummary.isVisible = model.heroSummary.isNotEmpty()
-        views.settingsPanel.commonSummary.text = model.commonSection.summary
-        views.settingsPanel.commonSummary.isVisible = model.commonSection.summary.isNotEmpty()
-        views.settingsPanel.photoSummary.text = model.photoSection.summary
-        views.settingsPanel.photoSummary.isVisible = model.photoSection.summary.isNotEmpty()
-        views.settingsPanel.videoSummary.text = model.videoSection.summary
-        views.settingsPanel.videoSummary.isVisible = model.videoSection.summary.isNotEmpty()
-        views.settingsPanel.catalogFooter.text = model.catalogFooter
-        views.settingsPanel.catalogFooter.isVisible = model.catalogFooter.isNotEmpty()
-        views.settingsPanel.editingHint.text = model.editingHint
-        renderSettingsControl(views.settingsPanel.gridMode, model.commonSection.gridMode, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.shutterSound, model.commonSection.shutterSound, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.selfieMirror, model.commonSection.selfieMirror, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.photoFilter, model.photoSection.defaultFilter, model.editingEnabled)
-        views.settingsPanel.photoPortraitLab.text = model.photoSection.portraitLab.buttonLabel
-        views.settingsPanel.photoPortraitLab.isEnabled = model.editingEnabled &&
-            model.photoSection.portraitLab.availability != SettingsControlAvailability.UNSUPPORTED
-        views.settingsPanel.photoWatermark.text = model.photoSection.watermarkTemplate.buttonLabel
-        views.settingsPanel.photoWatermark.isEnabled = model.editingEnabled &&
-            model.photoSection.watermarkTemplate.availability != SettingsControlAvailability.UNSUPPORTED
-        renderSettingsControl(views.settingsPanel.photoLive, model.photoSection.livePhoto, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.photoTimer, model.photoSection.countdown, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.videoResolution, model.videoSection.resolution, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.videoFrameRate, model.videoSection.frameRate, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.videoDynamicFps, model.videoSection.dynamicFps, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.videoAudio, model.videoSection.audioProfile, model.editingEnabled)
-        renderSettingsControl(views.settingsPanel.videoFilter, model.videoSection.defaultFilter, model.editingEnabled)
-        renderSettingsTabs()
-        renderPanelVisibility()
-    }
-
-    private fun renderSettingsTabs() {
-        val selectedTab = panelState.selectedSettingsTab
-        views.settingsPanel.tabCommon.isEnabled = selectedTab != SettingsTab.COMMON
-        views.settingsPanel.tabPhoto.isEnabled = selectedTab != SettingsTab.PHOTO
-        views.settingsPanel.tabVideo.isEnabled = selectedTab != SettingsTab.VIDEO
-        views.settingsPanel.tabCommon.alpha = if (selectedTab == SettingsTab.COMMON) 1f else 0.84f
-        views.settingsPanel.tabPhoto.alpha = if (selectedTab == SettingsTab.PHOTO) 1f else 0.84f
-        views.settingsPanel.tabVideo.alpha = if (selectedTab == SettingsTab.VIDEO) 1f else 0.84f
-        views.settingsPanel.commonSection.isVisible = selectedTab == SettingsTab.COMMON
-        views.settingsPanel.photoSection.isVisible = selectedTab == SettingsTab.PHOTO
-        views.settingsPanel.videoSection.isVisible = selectedTab == SettingsTab.VIDEO
-    }
-
-    private fun renderPortraitLabPage(model: PortraitLabPageRenderModel) {
-        views.settingsPanel.portraitHeadline.text = model.headline
-        views.settingsPanel.portraitSupportingText.text = model.supportingText
-        views.settingsPanel.portraitHeroSummary.text = model.heroSummary
-        views.settingsPanel.portraitHeroSummary.isVisible = model.heroSummary.isNotEmpty()
-        views.settingsPanel.portraitEditingHint.text = model.editingHint
-        views.settingsPanel.portraitFooter.text = model.footer
-        renderSettingsControl(views.settingsPanel.portraitProfile, model.profileControl, model.editingEnabled)
-        renderSettingsControl(
-            views.settingsPanel.portraitBeautyPreset,
-            model.beautyPresetControl,
-            model.editingEnabled
-        )
-        renderSettingsControl(
-            views.settingsPanel.portraitBeautyStrength,
-            model.beautyStrengthControl,
-            model.editingEnabled
-        )
-        renderSettingsControl(
-            views.settingsPanel.portraitBokehEffect,
-            model.bokehEffectControl,
-            model.editingEnabled
-        )
-        renderPanelVisibility()
-    }
-
-    private fun renderWatermarkLabSelectorPage(model: WatermarkLabSelectorRenderModel) {
-        views.settingsPanel.watermarkSelectorHeadline.text = model.headline
-        views.settingsPanel.watermarkSelectorSupportingText.text = model.supportingText
-        views.settingsPanel.watermarkSelectorHeroSummary.text = model.heroSummary
-        views.settingsPanel.watermarkSelectorHeroSummary.isVisible = model.heroSummary.isNotEmpty()
-        views.settingsPanel.watermarkSelectorEditingHint.text = model.editingHint
-        views.settingsPanel.watermarkSelectorFooter.text = model.footer
-        views.settingsPanel.watermarkSelectorList.removeAllViews()
-        model.items.forEach { item ->
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundResource(R.drawable.bg_settings_card)
-                alpha = if (item.isSelected) 1f else 0.92f
-                setPadding(14.dp, 14.dp, 14.dp, 14.dp)
-            }
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = if (views.settingsPanel.watermarkSelectorList.childCount == 0) 0 else 8.dp
-            }
-            val title = TextView(this).apply {
-                text = item.title
-                textSize = 15f
-                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
-            }
-            card.addView(title)
-            val supporting = TextView(this).apply {
-                text = item.supportingText
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
-                setPadding(0, 6.dp, 0, 0)
-            }
-            card.addView(supporting)
-            item.useAction?.let { action ->
-                val useButton = Button(
-                    this,
-                    null,
-                    0,
-                    R.style.Widget_OpenCamera_CompactButton
-                ).apply {
-                    text = getString(R.string.button_use_this_template)
-                    isAllCaps = false
-                    isEnabled = model.editingEnabled
-                    setOnClickListener { applySettingsAction(action) }
-                }
-                val useParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = 10.dp
-                }
-                card.addView(useButton, useParams)
-            }
-            item.editButtonLabel?.let { label ->
-                val editButton = Button(
-                    this,
-                    null,
-                    0,
-                    R.style.Widget_OpenCamera_CompactButton
-                ).apply {
-                    text = label
-                    isAllCaps = false
-                    isEnabled = model.editingEnabled
-                    setOnClickListener { openWatermarkLabDetail(item.templateId) }
-                }
-                val editParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = 10.dp
-                }
-                card.addView(editButton, editParams)
-            }
-            views.settingsPanel.watermarkSelectorList.addView(card, params)
-        }
-        renderPanelVisibility()
-    }
-
-    private fun renderWatermarkLabDetailPage(model: WatermarkLabDetailRenderModel) {
-        views.settingsPanel.watermarkDetailHeadline.text = model.headline
-        views.settingsPanel.watermarkDetailSupportingText.text = model.supportingText
-        views.settingsPanel.watermarkDetailHeroSummary.text = model.heroSummary
-        views.settingsPanel.watermarkDetailHeroSummary.isVisible = model.heroSummary.isNotEmpty()
-        views.settingsPanel.watermarkDetailEditingHint.text = model.editingHint
-        views.settingsPanel.watermarkDetailFooter.text = model.footer
-        renderSettingsControl(
-            views.settingsPanel.watermarkPlacement,
-            model.placementControl,
-            model.editingEnabled
-        )
-        renderSettingsControl(
-            views.settingsPanel.watermarkTextScale,
-            model.textScaleControl,
-            model.editingEnabled
-        )
-        renderSettingsControl(
-            views.settingsPanel.watermarkTextOpacity,
-            model.textOpacityControl,
-            model.editingEnabled
-        )
-        model.frameBackgroundControl?.let { control ->
-            views.settingsPanel.watermarkFrameBackground.isVisible = true
-            renderSettingsControl(
-                views.settingsPanel.watermarkFrameBackground,
-                control,
-                model.editingEnabled
-            )
-        } ?: run {
-            views.settingsPanel.watermarkFrameBackground.isVisible = false
-        }
-        renderPanelVisibility()
-    }
-
-    private fun renderSettingsControl(
-        button: Button,
-        model: SettingsControlRenderModel,
-        editingEnabled: Boolean
-    ) {
-        button.text = model.buttonLabel
-        button.isEnabled = editingEnabled && model.isInteractive
-    }
-
-    private fun renderFilterLabPage(model: FilterLabPageRenderModel) {
-        views.filterLab.headline.text = model.headline
-        views.filterLab.supportingText.text = model.supportingText
-        views.filterLab.heroSummary.text = model.heroSummary
-        views.filterLab.heroSummary.isVisible = model.heroSummary.isNotEmpty()
-        views.filterLab.currentSummary.text = model.currentFilterSummary
-        views.filterLab.editingHint.text = model.editingHint
-        views.filterLab.footer.text = model.footer
-
-        // Show/hide family tabs based on panel role
-        val tabsVisible = model.showFamilyTabs
-        views.filterLab.photoTab.isVisible = tabsVisible
-        views.filterLab.humanisticTab.isVisible = tabsVisible
-        views.filterLab.portraitTab.isVisible = tabsVisible
-        views.filterLab.videoTab.isVisible = tabsVisible
-        if (tabsVisible) {
-            renderFilterLabTab(views.filterLab.photoTab, model.photoTab)
-            renderFilterLabTab(views.filterLab.humanisticTab, model.humanisticTab)
-            renderFilterLabTab(views.filterLab.portraitTab, model.portraitTab)
-            renderFilterLabTab(views.filterLab.videoTab, model.videoTab)
-        }
-
-        // Show/hide filter selection list based on panel role
-        if (model.showFilterItems) {
-            renderFilterSelectionList(model)
-            renderSaveCustomControl(model.saveCustomControl, model.editingEnabled)
-            views.filterLab.currentSummary.isVisible = true
-        } else {
-            views.filterLab.selectionList.removeAllViews()
-            views.filterLab.currentSummary.isVisible = false
-            views.filterLab.saveCustom.isVisible = false
-        }
-
-        // Show/hide adjustment panel based on panel role
-        if (model.showAdjustmentPanel) {
-            renderAdjustmentPanel(
-                model.adjustmentPanel,
-                model.editingEnabled,
-                model.showAdvancedControls,
-                model.showModeToggle
-            )
-        } else {
-            views.filterLab.adjustmentPanel.isVisible = false
-        }
-
-        renderPanelVisibility()
-    }
-
-    private fun renderFilterLabTab(
-        button: Button,
-        model: FilterLabTabRenderModel
-    ) {
-        button.text = model.label
-        button.isEnabled = !model.isSelected
-        button.alpha = if (model.isSelected) 1f else 0.84f
-    }
-
-    private fun renderSaveCustomControl(
-        model: FilterLabSaveCustomRenderModel,
-        editingEnabled: Boolean
-    ) {
-        views.filterLab.saveCustom.text = model.buttonLabel
-        views.filterLab.saveCustom.isEnabled = editingEnabled && model.isEnabled
-    }
-
-    private fun renderFilterSelectionList(model: FilterLabPageRenderModel) {
-        views.filterLab.selectionList.removeAllViews()
-        model.filterItems.forEach { item ->
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setBackgroundResource(R.drawable.bg_settings_card)
-                alpha = if (item.isSelected) 1f else 0.9f
-                setPadding(14.dp, 14.dp, 14.dp, 14.dp)
-            }
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = if (views.filterLab.selectionList.childCount == 0) 0 else 8.dp
-            }
-
-            val title = TextView(this).apply {
-                text = item.title
-                textSize = 15f
-                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
-            }
-            card.addView(title)
-
-            val supporting = TextView(this).apply {
-                text = item.supportingText
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
-                setPadding(0, 6.dp, 0, 0)
-            }
-            card.addView(supporting)
-
-            if (item.isSelected) {
-                val adjustButton = Button(
-                    this,
-                    null,
-                    0,
-                    R.style.Widget_OpenCamera_CompactButton
-                ).apply {
-                    text = item.adjustButtonLabel
-                    isAllCaps = false
-                    isEnabled = model.editingEnabled && item.adjustButtonLabel != null
-                    setOnClickListener {
-                        openSelectedFilterAdjustment(model.adjustControl)
-                    }
-                }
-                val adjustParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = 10.dp
-                }
-                card.addView(adjustButton, adjustParams)
-            } else {
-                val selectButton = Button(
-                    this,
-                    null,
-                    0,
-                    R.style.Widget_OpenCamera_CompactButton
-                ).apply {
-                    text = getString(R.string.button_use_this_look)
-                    isAllCaps = false
-                    isEnabled = model.editingEnabled && item.nextAction != null
-                    setOnClickListener {
-                        panelRouter.reduce(CockpitPanelCommand.SelectFilterFamily(model.adjustControl.family))
-                        item.nextAction?.let(::applySettingsAction)
-                    }
-                }
-                val selectParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = 10.dp
-                }
-                card.addView(selectButton, selectParams)
-            }
-            views.filterLab.selectionList.addView(card, params)
-        }
-    }
-
-    private fun renderAdjustmentPanel(
-        model: FilterAdjustmentPanelRenderModel,
-        editingEnabled: Boolean,
-        showAdvancedControls: Boolean = true,
-        showModeToggle: Boolean = true
-    ) {
-        views.filterLab.adjustmentPanel.isVisible = model.isVisible
-        views.filterLab.modeToggle.isVisible = showModeToggle
-        if (showAdvancedControls) {
-            views.filterLab.modeToggle.text = model.modeToggleLabel
-            views.filterLab.modeToggle.isEnabled = editingEnabled && model.selectedProfileId != null
-        } else {
-            views.filterLab.modeToggle.text = getString(R.string.button_color_lab_reset)
-            views.filterLab.modeToggle.isEnabled = true
-        }
-        views.filterLab.paletteSummary.text = "${model.selectedProfileLabel}\n${model.lightPalette.summary}"
-        views.filterLab.paletteHint.text = model.lightPalette.supportingText
-        views.filterLab.paletteSurface.isVisible = model.mode == FilterAdjustmentMode.LIGHT
-        views.filterLab.paletteHint.isVisible = model.mode == FilterAdjustmentMode.LIGHT
-        views.filterLab.advancedTitle.isVisible = showAdvancedControls
-        views.filterLab.advancedControls.isVisible = showAdvancedControls && model.mode == FilterAdjustmentMode.ADVANCED
-        views.filterLab.advancedExposure.text = model.advancedControls.buttonLabel(FilterAdvancedControl.EXPOSURE)
-        views.filterLab.advancedSoftGlow.text = model.advancedControls.buttonLabel(FilterAdvancedControl.SOFT_GLOW)
-        views.filterLab.advancedHalo.text = model.advancedControls.buttonLabel(FilterAdvancedControl.HALO)
-        views.filterLab.advancedGrain.text = model.advancedControls.buttonLabel(FilterAdvancedControl.GRAIN)
-        views.filterLab.advancedSharpness.text = model.advancedControls.buttonLabel(FilterAdvancedControl.SHARPNESS)
-        views.filterLab.advancedVignette.text = model.advancedControls.buttonLabel(FilterAdvancedControl.VIGNETTE)
-        views.filterLab.advancedHighlights.text = model.advancedControls.buttonLabel(FilterAdvancedControl.HIGHLIGHTS)
-        views.filterLab.advancedShadows.text = model.advancedControls.buttonLabel(FilterAdvancedControl.SHADOWS)
-        views.filterLab.advancedWarmBoost.text = model.advancedControls.buttonLabel(FilterAdvancedControl.WARM_BOOST)
-        views.filterLab.advancedCoolBoost.text = model.advancedControls.buttonLabel(FilterAdvancedControl.COOL_BOOST)
-        views.filterLab.advancedTemperatureShift.text =
-            model.advancedControls.buttonLabel(FilterAdvancedControl.TEMPERATURE_SHIFT)
-        views.filterLab.advancedTintShift.text =
-            model.advancedControls.buttonLabel(FilterAdvancedControl.TINT_SHIFT)
-        val advancedButtons = listOf(
-            views.filterLab.advancedExposure,
-            views.filterLab.advancedSoftGlow,
-            views.filterLab.advancedHalo,
-            views.filterLab.advancedGrain,
-            views.filterLab.advancedSharpness,
-            views.filterLab.advancedVignette,
-            views.filterLab.advancedHighlights,
-            views.filterLab.advancedShadows,
-            views.filterLab.advancedWarmBoost,
-            views.filterLab.advancedCoolBoost,
-            views.filterLab.advancedTemperatureShift,
-            views.filterLab.advancedTintShift
-        )
-        advancedButtons.forEach { button ->
-            button.isEnabled = editingEnabled && model.selectedProfileId != null
-        }
-    }
-
-    private fun renderPanelVisibility() {
-        val route = activePanelRoute
-        views.settingsPanel.panel.isVisible = route.isSettingsOpen
-        views.filterLab.panel.isVisible = route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.ColorLab
-        views.panelDismissScrim.isVisible = route.isAnyPanelOpen
-
-        val subpage = (route as? CockpitPanelRoute.Settings)?.subpage
-        views.settingsPanel.rootContent.isVisible = route.isSettingsOpen && (subpage == null || subpage == SettingsSubpage.ROOT)
-        views.settingsPanel.portraitLabContent.isVisible = subpage == SettingsSubpage.PORTRAIT_LAB
-        views.settingsPanel.watermarkSelectorContent.isVisible = subpage == SettingsSubpage.WATERMARK_SELECTOR
-        views.settingsPanel.watermarkDetailContent.isVisible = subpage == SettingsSubpage.WATERMARK_DETAIL
-        views.settingsPanel.back.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
-
-        views.topBar.colorLabEntry.alpha = if (route is CockpitPanelRoute.ColorLab) 1f else 0.92f
-        views.topBar.settingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
-        views.topBar.filterEntry.alpha = if (route is CockpitPanelRoute.StyleLab) 1f else 0.92f
-        views.quickPanel.panel.isVisible = route is CockpitPanelRoute.QuickBubble
-        views.quickPanel.launcher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
-    }
-
-    private fun renderDevConsoleVisibility() {
-        val isDevVisible = activePanelRoute is CockpitPanelRoute.DevConsole
-        views.devConsole.panel.isVisible = isDevVisible
-        views.devConsole.entry.alpha = if (isDevVisible) 1f else 0.78f
-        if (isDevVisible) {
-            renderDevConsole()
-        }
-    }
-
-
     override fun selectDevLogTab(tab: DevLogTab) {
         selectedDevLogTab = tab
         refreshDevLogModel()
@@ -728,25 +300,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             text = AppTextResolver(this)
         )
         latestDevLogRenderModel = model
-        renderDevConsole()
-    }
-
-    private fun renderDevConsole() {
-        val model = latestDevLogRenderModel ?: return
-        views.devConsole.title.text = model.title
-        views.devConsole.summary.text = model.summaryText
-        views.devConsole.summary.isVisible = model.summaryText.isNotBlank()
-        views.devConsole.content.text = model.content
-        views.devConsole.tabKey.isEnabled = model.selectedTab != DevLogTab.KEY
-        views.devConsole.tabCore.isEnabled = model.selectedTab != DevLogTab.CORE
-        views.devConsole.tabError.isEnabled = model.selectedTab != DevLogTab.ERROR
-        views.devConsole.tabAll.isEnabled = model.selectedTab != DevLogTab.ALL
-        val activeAlpha = 1f
-        val inactiveAlpha = 0.84f
-        views.devConsole.tabKey.alpha = if (model.selectedTab == DevLogTab.KEY) activeAlpha else inactiveAlpha
-        views.devConsole.tabCore.alpha = if (model.selectedTab == DevLogTab.CORE) activeAlpha else inactiveAlpha
-        views.devConsole.tabError.alpha = if (model.selectedTab == DevLogTab.ERROR) activeAlpha else inactiveAlpha
-        views.devConsole.tabAll.alpha = if (model.selectedTab == DevLogTab.ALL) activeAlpha else inactiveAlpha
+        devConsoleRenderer.render(model)
     }
 
     override fun requestMicrophonePermission() {
@@ -827,8 +381,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             lightPaletteBaseSpec = null
         }
         renderLatestSettingsSurfaces()
-        renderPanelVisibility()
-        renderDevConsoleVisibility()
+        mainRenderer.renderPanelVisibility(activePanelRoute)
+        devConsoleRenderer.renderVisibility(activePanelRoute)
+        latestDevLogRenderModel?.let { devConsoleRenderer.render(it) }
     }
 
     override fun onDestroy() {
@@ -943,7 +498,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         if (panelState.isFilterAdjustmentVisible && lightPaletteBaseSpec == null) {
             lightPaletteBaseSpec = model.adjustmentPanel.renderSpec
         }
-        renderFilterLabPage(model)
+        filterLabRenderer.renderPage(model)
     }
 
     override fun renderLatestSettingsSurfaces() {
@@ -962,10 +517,11 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         latestPortraitLabRenderModel = portraitLabModel
         latestWatermarkLabSelectorRenderModel = selectorModel
         latestWatermarkLabDetailRenderModel = detailModel
-        renderSettingsPage(settingsModel)
-        renderPortraitLabPage(portraitLabModel)
-        renderWatermarkLabSelectorPage(selectorModel)
-        renderWatermarkLabDetailPage(detailModel)
+        settingsRenderer.renderPage(settingsModel)
+        settingsRenderer.renderTabs(panelState.selectedSettingsTab)
+        settingsRenderer.renderPortraitLabPage(portraitLabModel)
+        settingsRenderer.renderWatermarkSelectorPage(selectorModel)
+        settingsRenderer.renderWatermarkDetailPage(detailModel)
     }
 
     override fun saveCurrentFilterAsCustom(control: FilterLabSaveCustomRenderModel?) {
