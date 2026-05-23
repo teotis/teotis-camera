@@ -27,6 +27,7 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.captureAidMetadataTags
+import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.mode.eventTag
 import com.opencamera.core.mode.label
 import com.opencamera.core.settings.CountdownDuration
@@ -349,14 +350,8 @@ private class NightModeController(
         )
     }
 
-    private fun currentDeviceGraph(): DeviceGraphSpec {
-        return DeviceGraphSpec.stillCapture(
-            preferredLensFacing = runtimeState().lensFacing,
-            enablePreviewSnapshots = runtimeState().deviceCapabilities.supportsPreviewSnapshots,
-            qualityPreference = runtimeState().stillCaptureQuality,
-            resolutionPreset = runtimeState().stillCaptureResolutionPreset
-        )
-    }
+    private fun currentDeviceGraph(): DeviceGraphSpec =
+        stillCaptureDeviceGraph(runtimeState())
 
     private fun multiFrameEnabled(): Boolean = runtimeState().deviceCapabilities.supportsNightMultiFrame
     private fun flashSupported(): Boolean = runtimeState().deviceCapabilities.supportsFlashControl

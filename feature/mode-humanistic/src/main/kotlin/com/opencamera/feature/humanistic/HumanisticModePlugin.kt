@@ -28,6 +28,7 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.captureAidMetadataTags
+import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.mode.eventTag
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.FilterProfile
@@ -435,14 +436,8 @@ private class HumanisticModeController(
         }
     }
 
-    private fun currentDeviceGraph(): DeviceGraphSpec {
-        return DeviceGraphSpec.stillCapture(
-            preferredLensFacing = runtimeState().lensFacing,
-            enablePreviewSnapshots = runtimeState().deviceCapabilities.supportsPreviewSnapshots,
-            qualityPreference = runtimeState().stillCaptureQuality,
-            resolutionPreset = runtimeState().stillCaptureResolutionPreset
-        )
-    }
+    private fun currentDeviceGraph(): DeviceGraphSpec =
+        stillCaptureDeviceGraph(runtimeState())
 
     private fun currentFrameRatio(): FrameRatio = frameRatios[frameRatioIndex]
     private fun resolvedWatermarkText(style: HumanisticStyle): String {

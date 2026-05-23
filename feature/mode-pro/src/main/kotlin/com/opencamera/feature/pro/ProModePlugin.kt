@@ -27,6 +27,7 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.captureAidMetadataTags
+import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.mode.eventTag
 import com.opencamera.core.mode.label
 import com.opencamera.core.settings.compactSummary
@@ -273,14 +274,8 @@ private class ProModeController(
         )
     }
 
-    private fun currentDeviceGraph(): DeviceGraphSpec {
-        return DeviceGraphSpec.stillCapture(
-            preferredLensFacing = runtimeState().lensFacing,
-            enablePreviewSnapshots = runtimeState().deviceCapabilities.supportsPreviewSnapshots,
-            qualityPreference = runtimeState().stillCaptureQuality,
-            resolutionPreset = runtimeState().stillCaptureResolutionPreset
-        )
-    }
+    private fun currentDeviceGraph(): DeviceGraphSpec =
+        stillCaptureDeviceGraph(runtimeState())
 
     private fun manualControlsEnabled(): Boolean =
         runtimeState().deviceCapabilities.supportsAppliedManualControls

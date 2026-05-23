@@ -19,6 +19,7 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.captureAidMetadataTags
+import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.mode.eventTag
 import com.opencamera.core.mode.label
 import com.opencamera.core.media.CaptureStrategy
@@ -366,14 +367,8 @@ private class PhotoModeController(
         return ModeSignal.ShowHint("画幅：${ratio.label}")
     }
 
-    private fun currentDeviceGraph(): DeviceGraphSpec {
-        return DeviceGraphSpec.stillCapture(
-            preferredLensFacing = runtimeState().lensFacing,
-            enablePreviewSnapshots = runtimeState().deviceCapabilities.supportsPreviewSnapshots,
-            qualityPreference = runtimeState().stillCaptureQuality,
-            resolutionPreset = runtimeState().stillCaptureResolutionPreset
-        )
-    }
+    private fun currentDeviceGraph(): DeviceGraphSpec =
+        stillCaptureDeviceGraph(runtimeState())
 
     private fun currentFlashModes(): List<FlashMode> {
         return if (currentFlashSupported()) {

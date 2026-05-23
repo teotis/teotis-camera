@@ -24,6 +24,7 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.captureAidMetadataTags
+import com.opencamera.core.mode.stillCaptureDeviceGraph
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -251,14 +252,8 @@ private class DocumentModeController(
         )
     }
 
-    private fun currentDeviceGraph(): DeviceGraphSpec {
-        return DeviceGraphSpec.stillCapture(
-            preferredLensFacing = runtimeState().lensFacing,
-            enablePreviewSnapshots = runtimeState().deviceCapabilities.supportsPreviewSnapshots,
-            qualityPreference = runtimeState().stillCaptureQuality,
-            resolutionPreset = runtimeState().stillCaptureResolutionPreset
-        )
-    }
+    private fun currentDeviceGraph(): DeviceGraphSpec =
+        stillCaptureDeviceGraph(runtimeState())
 
     private fun enhancementEnabled(): Boolean =
         runtimeState().deviceCapabilities.supportsDocumentScanEnhancement
