@@ -141,6 +141,8 @@ internal data class StillCaptureTargetResolution(
 
 private const val FOUR_THIRDS_RATIO = 4.0 / 3.0
 private const val ASPECT_RATIO_TOLERANCE = 0.05
+private const val PREVIEW_METERING_POINT_SIZE = 0.15f
+private const val MIN_PREVIEW_METERING_AUTO_CANCEL_MILLIS = 1L
 
 internal fun classifyPreviewBindingFailure(
     throwable: Throwable
@@ -1161,6 +1163,96 @@ class CameraXCaptureAdapter(
             status = status,
             reason = reason
         )
+    }
+
+    private suspend fun applyPreviewMetering(request: PreviewMeteringRequest) {
+        val result = withContext(Dispatchers.Main.immediate) {
+            val camera = boundCamera
+            val previewView = boundPreviewView
+            if (camera == null || previewView == null) {
+                return@withContext previewMeteringResult(
+                    request = request,
+                    status = PreviewMeteringResultStatus.FAILED,
+                    reason = "Preview is not bound"
+                )
+            }
+
+            val point = request.point.clamped()
+            val pixel = previewMeteringPixelPoint(
+                normalizedX = point.normalizedX,
+                normalizedY = point.normalizedY,
+                viewWidth = previewView.width,
+                viewHeight = previewView.height
+            )
+            val meteringPoint = previewView.meteringPointFactory.createPoint(
+                pixel.x,
+                pixel.y,
+                PREVIEW_METERING_POINT_SIZE
+            )
+            val autoCancelMillis = request.autoCancelMillis
+                .coerceAtLeast(MIN_PREVIEW_METERING_AUTO_CANCEL_MILLIS)
+
+            val focusAndAeAction = FocusMeteringAction.Builder(
+                meteringPoint,
+                FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+            )
+                .setAutoCancelDuration(autoCancelMillis, TimeUnit.MILLISECONDS)
+                .build()
+
+            val aeOnlyAction = FocusMeteringAction.Builder(
+                meteringPoint,
+                FocusMeteringAction.FLAG_AE
+            )
+                .setAutoCancelDuration(autoCancelMillis, TimeUnit.MILLISECONDS)
+                .build()
+
+            val selected = when (request.mode) {
+                PreviewMeteringMode.FOCUS_AND_AUTO_EXPOSURE -> when {
+                    camera.cameraInfo.isFocusMeteringSupported(focusAndAeAction) ->
+                        focusAndAeAction to PreviewMeteringResultStatus.SUCCEEDED
+
+                    camera.cameraInfo.isFocusMeteringSupported(aeOnlyAction) ->
+                        aeOnlyAction to PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY
+
+                    else -> null
+                }
+
+                PreviewMeteringMode.AUTO_EXPOSURE_ONLY -> when {
+                    camera.cameraInfo.isFocusMeteringSupported(aeOnlyAction) ->
+                        aeOnlyAction to PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY
+
+                    else -> null
+                }
+            }
+
+            if (selected == null) {
+                return@withContext PreviewMeteringResult(
+                    requestId = request.requestId,
+                    point = point,
+                    status = PreviewMeteringResultStatus.UNSUPPORTED,
+                    reason = "Focus and exposure metering are unsupported"
+                )
+            }
+
+            val cameraXResult = camera.cameraControl.startFocusAndMetering(selected.first).await()
+            val status = selected.second
+            val reason = if (
+                status == PreviewMeteringResultStatus.SUCCEEDED &&
+                !cameraXResult.isFocusSuccessful
+            ) {
+                "Focus did not lock"
+            } else {
+                null
+            }
+            PreviewMeteringResult(
+                requestId = request.requestId,
+                point = point,
+                status = status,
+                reason = reason
+            )
+        }
+
+        _events.emit(DeviceEvent.PreviewMeteringCompleted(result))
     }
 
     private fun applyOutputRotation(rotation: com.opencamera.core.device.CameraOutputRotation) {
