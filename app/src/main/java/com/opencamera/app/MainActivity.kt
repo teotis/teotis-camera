@@ -648,6 +648,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     override fun renderAfterPanelChange() {
         if (activePanelRoute !is CockpitPanelRoute.StyleLab && activePanelRoute !is CockpitPanelRoute.ColorLab) {
             lightPaletteBaseSpec = null
+        } else {
+            renderLatestFilterLab()
         }
         mainRenderer.renderPanelVisibility(activePanelRoute)
         devConsoleRenderer.renderVisibility(activePanelRoute)
