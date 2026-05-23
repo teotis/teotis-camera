@@ -3,5 +3,5 @@
     <gradient
         android:angle="270"
         android:endColor="#00000000"
-        android:startColor="@color/oc_surface_scrim_light" />
+        android:startColor="#00000000" />
 </shape>
