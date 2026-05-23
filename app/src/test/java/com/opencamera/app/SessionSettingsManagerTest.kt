@@ -100,11 +100,11 @@ class SessionSettingsManagerTest {
         )
 
         val result = manager.apply(
-            PersistedSettingsAction.UpdatePhotoFilter("photo-original")
+            PersistedSettingsAction.UpdatePhotoFilter("photo-rich")
         )
 
         assertEquals(SessionSettingsApplyResult.Applied, result)
-        assertEquals("photo-original", store.load().photo.defaultFilterProfileId)
+        assertEquals("photo-rich", store.load().photo.defaultFilterProfileId)
     }
 
     @Test
