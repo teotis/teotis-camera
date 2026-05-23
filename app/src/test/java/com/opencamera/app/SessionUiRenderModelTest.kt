@@ -950,7 +950,7 @@ class SessionUiRenderModelTest {
     @Test
     fun `mode directory render model hides humanistic entry and uses product order`() {
         val state = defaultSessionState(
-            activeMode = ModeId.NIGHT,
+            activeMode = ModeId.VIDEO,
             availableModes = listOf(
                 ModeId.PHOTO,
                 ModeId.DOCUMENT,
@@ -961,14 +961,14 @@ class SessionUiRenderModelTest {
                 ModeId.VIDEO
             ),
             modeSnapshot = ModeSnapshot(
-                id = ModeId.NIGHT,
+                id = ModeId.VIDEO,
                 uiSpec = ModeUiSpec(
-                    title = "Scenery",
-                    shutterLabel = "Capture Scenery"
+                    title = "Video",
+                    shutterLabel = "Capture Video"
                 ),
                 state = ModeState(
-                    headline = "Scenery mode active",
-                    detail = "Tripod multi-frame available"
+                    headline = "Video mode active",
+                    detail = "Ready"
                 )
             )
         )
@@ -976,22 +976,12 @@ class SessionUiRenderModelTest {
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Scenery", "Port", "Pro", "Video", "Doc"),
+            listOf("Photo", "Video", "Doc"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
         )
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
-        )
-        assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
-        assertEquals("Balanced", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
-        assertEquals(
-            "Scenery style, Pro variant, brightening fallback, frame ratio",
-            model.items.first { it.modeId == ModeId.NIGHT }.declaredSubfeatures
-        )
-        assertEquals(
-            "• Scenery | Default Balanced | Scenery style, Pro variant, brightening fallback, frame ratio",
-            modeDirectoryText(state, TestAppTextResolver()).lineSequence().elementAt(1)
         )
     }
 
@@ -1002,20 +992,15 @@ class SessionUiRenderModelTest {
                 supportsPortraitDepthEffect = false,
                 supportsNightMultiFrame = false
             ),
-            availableModes = listOf(ModeId.NIGHT, ModeId.PORTRAIT)
+            availableModes = listOf(ModeId.PHOTO, ModeId.VIDEO, ModeId.DOCUMENT)
         )
 
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
-        assertEquals("Balanced", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
+        assertEquals(3, model.items.size)
         assertEquals(
-            "Scenery style, Pro variant, brightening fallback, frame ratio",
-            model.items.first { it.modeId == ModeId.NIGHT }.declaredSubfeatures
-        )
-        assertEquals("Portrait Original", model.items.first { it.modeId == ModeId.PORTRAIT }.defaultStyleLabel)
-        assertEquals(
-            "Portrait style, Pro variant, focus fallback, frame ratio",
-            model.items.first { it.modeId == ModeId.PORTRAIT }.declaredSubfeatures
+            listOf(ModeId.PHOTO, ModeId.VIDEO, ModeId.DOCUMENT),
+            model.items.map { it.modeId }
         )
     }
 
@@ -1217,12 +1202,15 @@ class SessionUiRenderModelTest {
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(6, model.items.size)
+        assertEquals(3, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map { it.modeId }
         )
         assertTrue(model.items.none { it.modeId == ModeId.HUMANISTIC })
+        assertTrue(model.items.none { it.modeId == ModeId.NIGHT })
+        assertTrue(model.items.none { it.modeId == ModeId.PORTRAIT })
+        assertTrue(model.items.none { it.modeId == ModeId.PRO })
         assertFalse(model.items.any { it.isActive })
         assertFalse(model.items.first { it.modeId == ModeId.PHOTO }.isActive)
         assertTrue(model.items.all { it.isAvailable })
@@ -1267,12 +1255,12 @@ class SessionUiRenderModelTest {
     @Test
     fun `active mode track item has distinct visual state`() {
         val state = defaultSessionState(
-            activeMode = ModeId.NIGHT,
+            activeMode = ModeId.VIDEO,
             availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        val active = model.items.first { it.modeId == ModeId.NIGHT }
+        val active = model.items.first { it.modeId == ModeId.VIDEO }
         val inactive = model.items.first { it.modeId == ModeId.PHOTO }
 
         assertTrue(active.isActive)

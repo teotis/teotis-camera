@@ -155,12 +155,12 @@ internal class CockpitSurfaceRenderer(
     fun renderModeTrack(model: ModeTrackRenderModel) {
         val buttons = listOf(
             modeTrack.photo,
-            modeTrack.night,
-            modeTrack.portrait,
-            modeTrack.pro,
             modeTrack.video,
             modeTrack.document
         )
+        modeTrack.night.visibility = View.GONE
+        modeTrack.portrait.visibility = View.GONE
+        modeTrack.pro.visibility = View.GONE
         modeTrack.humanistic.visibility = View.GONE
         model.items.forEachIndexed { index, item ->
             if (index < buttons.size) {

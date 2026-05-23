@@ -142,16 +142,15 @@ class CameraCockpitRenderModelTest {
             ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
         )
         val state = defaultSessionState(
-            activeMode = ModeId.PORTRAIT,
+            activeMode = ModeId.VIDEO,
             availableModes = availableModes
         )
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         val modeIds = model.modeTrack.items.map { it.modeId }
-        assertTrue(modeIds.contains(ModeId.PORTRAIT))
         assertTrue(modeIds.contains(ModeId.PHOTO))
-        assertTrue(modeIds.contains(ModeId.NIGHT))
-        assertTrue(model.modeTrack.items.first { it.modeId == ModeId.PORTRAIT }.isActive)
+        assertTrue(modeIds.contains(ModeId.VIDEO))
+        assertTrue(model.modeTrack.items.first { it.modeId == ModeId.VIDEO }.isActive)
     }
 
     @Test
@@ -357,8 +356,6 @@ class CameraCockpitRenderModelTest {
     @Test
     fun `formatRecordingElapsed formats hours minutes seconds`() {
         assertEquals("1:02:09", formatRecordingElapsed(3_729_000L))
-    }
-        assertTrue(model.modeTrack.items.isNotEmpty())
     }
 
     private fun defaultSessionState(
