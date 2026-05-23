@@ -138,7 +138,8 @@ fun ThumbnailSource.renderUriOrNull(): String? {
     return when (this) {
         ThumbnailSource.None -> null
         ThumbnailSource.Pending -> null
-        is ThumbnailSource.PreviewSnapshot -> null
+        is ThumbnailSource.PreviewSnapshot ->
+            File(outputPath).takeIf { it.exists() && it.isAbsolute }?.toURI()?.toString()
         is ThumbnailSource.SavedMedia ->
             renderUri ?: outputPath.takeIf { File(it).isAbsolute }?.let { File(it).toURI().toString() }
     }

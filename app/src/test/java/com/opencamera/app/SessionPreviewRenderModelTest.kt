@@ -13,6 +13,7 @@ import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PermissionState
 import com.opencamera.core.session.PreviewMetrics
 import com.opencamera.core.session.PreviewStatus
+import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionLifecycle

@@ -18,14 +18,28 @@ internal fun galleryOpenTargetFor(
     source: ThumbnailSource?,
     savedMediaType: SavedMediaType?
 ): GalleryOpenTarget? {
-    val saved = source as? ThumbnailSource.SavedMedia ?: return null
-    val mimeType = when (savedMediaType) {
-        SavedMediaType.VIDEO -> "video/*"
-        SavedMediaType.PHOTO,
-        null -> "image/*"
+    val outputPath: String
+    val renderUri: String?
+    val mimeType: String
+
+    when (source) {
+        is ThumbnailSource.SavedMedia -> {
+            outputPath = source.outputPath
+            renderUri = source.renderUri?.takeIf { it.isNotBlank() }
+            mimeType = when (savedMediaType) {
+                SavedMediaType.VIDEO -> "video/*"
+                SavedMediaType.PHOTO,
+                null -> "image/*"
+            }
+        }
+        is ThumbnailSource.PreviewSnapshot -> {
+            outputPath = source.outputPath
+            renderUri = null
+            mimeType = "image/*"
+        }
+        else -> return null
     }
 
-    val renderUri = saved.renderUri?.takeIf { it.isNotBlank() }
     if (renderUri != null && renderUri.startsWith("content://")) {
         return GalleryOpenTarget(
             uri = renderUri,
@@ -38,7 +52,7 @@ internal fun galleryOpenTargetFor(
         ?.takeIf { it.startsWith("file://") }
         ?.removePrefix("file://")
     val absolutePath = fileUriPath
-        ?: saved.outputPath.takeIf { it.startsWith("/") }
+        ?: outputPath.takeIf { it.startsWith("/") }
 
     return absolutePath?.let { path ->
         GalleryOpenTarget(

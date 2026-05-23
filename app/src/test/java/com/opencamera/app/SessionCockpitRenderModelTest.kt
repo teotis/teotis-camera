@@ -9,7 +9,6 @@ import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.CaptureProfile
-import com.opencamera.core.media.SavedMediaType
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.LivePhotoBundle
@@ -28,6 +27,7 @@ import com.opencamera.core.session.PermissionState
 import com.opencamera.core.session.PreviewMetrics
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
+import com.opencamera.core.session.SavedMediaType
 import com.opencamera.core.session.SessionLifecycle
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
