@@ -105,10 +105,33 @@
 - `2026-05-23` 横竖模式切换需求已沉淀为可交给非多模态 agent 的方案文档 [`2026-05-23-orientation-adaptive-camera-ui.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-orientation-adaptive-camera-ui.md)：核心产品决策是固定 camera cockpit 拓扑，不新增横屏专用布局，改为由物理方向 owner 驱动文字/方向性图案旋转，并把 CameraX output target rotation 通过 `SessionIntent -> SessionEffect -> DeviceCommand` 接入设备层；方案同时吸收 Android CameraX、Apple AVFoundation/Camera Control、OPPO Quick Button 和 vivo X300 Ultra 摄影握持/专业操控资料。本轮只新增方案文档并更新状态文档，未改运行时代码。
 - `2026-05-23` 外部 agent 提出的 `ShotExecutor / ShotGraph` 统一审查已完成核验并沉淀为非多模态执行方案包：结论认可“运行时 `ShotPlan` 与 2.0 `ShotGraph` 并存存在事实源漂移风险”，但不认可一次性删除 `ShotPlan`，因为它仍是 session effect、device command、CameraX adapter、video active plan、device translator 和 `ShotResult` 合成的运行时载体。新增总索引 [`2026-05-23-shot-pipeline-unification-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-pipeline-unification-index.md)，以及 [`2026-05-23-shot-graph-planning-source-of-truth.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-graph-planning-source-of-truth.md)、[`2026-05-23-shot-graph-device-execution-migration.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-shot-graph-device-execution-migration.md) 两份顺序落地方案；本轮只新增方案文档，未改运行时代码。聚焦核验命令 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:media:test --tests com.opencamera.core.media.ShotExecutorTest --tests com.opencamera.core.media.AlgorithmProcessorTest --tests com.opencamera.core.media.AlgorithmJobSchedulerTest :core:mode:test --tests com.opencamera.core.mode.ModeCaptureStrategyGraphTest` 已通过。
 - `2026-05-23` 外部 agent 关于 mode controller 模板化重构的 `.tmp/mode-refactor/v2-*.md` 审查结论已完成仓内核验：重复问题仍成立，但执行口径修正为“先抽 `core/mode` 小 helper/delegate/reducer，不引入 `BaseModeController`”。新增总索引 [`2026-05-23-mode-controller-refactor-v2-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-mode-controller-refactor-v2-index.md) 以及 4 份可交给非多模态 agent 的执行文档，分别覆盖 still capture graph helper、frame ratio delegate、Pro variant state 和 still shot session event reducer；这些包会改同一批 mode plugin 文件，后续应串行实施或由单一 integrator 合并并跑 Stage 7 gate。
+- `2026-05-23` 外部 agent 关于 `SessionUiRenderModel` 按域拆分的 R1 审查结论已完成仓内核验：结论成立，当前 `SessionUiRenderModel.kt` 为 2730 行、`SessionUiRenderModelTest.kt` 为 1929 行，且 `MainActivity.render(state)` 仍集中构建 settings、portrait、watermark、filter/style/color、preview、cockpit、diagnostics 等模型；执行口径修正为“聚焦纯 render-model 构建层，不重复已存在的 `MainActivityViews/SettingsPanelRenderer/FilterLabPanelRenderer/CockpitSurfaceRenderer` 视图应用拆分”。新增总索引 [`2026-05-23-session-ui-render-model-split-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-ui-render-model-split-index.md)，以及 3 份可交给非多模态 agent 的串行执行文档，分别覆盖 shared contracts + cockpit/preview、settings/portrait/watermark、style/color/diagnostics + MainActivity composition；本轮只新增方案文档，未改运行时代码。聚焦核验命令 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest` 已通过。
 
 ---
 
 # 最近有效闭环
+
+## 2026-05-23：SessionUiRenderModel 按域拆分核验与方案文档
+
+- 目标：核验外部 agent 关于 `SessionUiRenderModel` 过大、render model 按域拆分的 R1 审查结论，并输出可交给非多模态 agent 的落地方案。
+- 核验结果：
+  外部结论成立：`SessionUiRenderModel.kt` 当前 2730 行，`SessionUiRenderModelTest.kt` 当前 1929 行，单文件覆盖 cockpit、preview、settings、portrait、watermark、filter/style/color、mode directory、diagnostics 等多个 UI 域；
+  `MainActivity.render(state)` 仍一次性构建并分发所有域模型；
+  当前文件直接依赖 `core:device / core:effect / core:media / core:mode / core:session / core:settings` 多个核心类型，导致每次 UI render 调整都容易扩大编译和测试心智负担。
+- 修正点：
+  仓内已经存在 `MainActivityViews`、`SettingsPanelRenderer`、`FilterLabPanelRenderer`、`CockpitSurfaceRenderer`、`DevConsoleRenderer` 等视图应用层拆分，因此本轮 R1 不应重复做 Activity 视图下沉；
+  不建议把所有 data class 迁移到单个新的 `SessionUiRenderContracts.kt`，否则只是换名产生第二个大文件；共享 contract 只能承接跨域复用类型，领域模型应跟随领域 builder。
+- 核心结果：
+  [`2026-05-23-session-ui-render-model-split-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-ui-render-model-split-index.md) 记录核验证据、架构决策、串行顺序和全局验收；
+  [`2026-05-23-session-ui-render-split-01-contracts-cockpit-preview.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-ui-render-split-01-contracts-cockpit-preview.md) 定义 shared contracts、cockpit 与 preview render model 的第一步机械拆分；
+  [`2026-05-23-session-ui-render-split-02-settings-labs.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-ui-render-split-02-settings-labs.md) 定义 settings、runtime Pro、portrait lab、watermark lab 拆分；
+  [`2026-05-23-session-ui-render-split-03-style-diagnostics-composer.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-ui-render-split-03-style-diagnostics-composer.md) 定义 style/color、diagnostics 和 `MainActivity.render(state)` 组合 facade 收口。
+- 验证：
+  本轮只新增方案文档并更新状态文档，未改运行时代码；
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest` 已通过；
+  已用 `rtk rg` 检查新增方案文档无 `TODO / TBD / fill in / implement later` 占位词和省略号伪代码。
+- 结论：
+  该 R1 是高收益、高成本、低产品行为风险的代码健康任务；建议按 contracts/cockpit/preview -> settings/labs -> style/diagnostics/composer 串行推进，避免多个 agent 同时改同一个 2730 行源文件和 1929 行测试文件。
 
 ## 2026-05-23：Mode Controller 模板化重构 V2 核验与方案文档
 
