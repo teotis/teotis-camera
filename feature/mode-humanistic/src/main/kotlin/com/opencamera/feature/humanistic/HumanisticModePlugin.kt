@@ -29,7 +29,6 @@ import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.FrameRatioDelegate
 import com.opencamera.core.mode.captureAidMetadataTags
-import com.opencamera.core.mode.eventTag
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
