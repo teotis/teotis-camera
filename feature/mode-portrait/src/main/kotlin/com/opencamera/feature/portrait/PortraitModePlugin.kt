@@ -13,7 +13,6 @@ import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LivePhotoCaptureSpec
 import com.opencamera.core.media.MediaMetadata
-import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.StillCaptureQualityPreference
@@ -25,10 +24,13 @@ import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeIntent
 import com.opencamera.core.mode.ModeSessionEvent
 import com.opencamera.core.mode.ModeSignal
+import com.opencamera.core.mode.StillShotSessionEventText
+import com.opencamera.core.mode.reduceStillShotSessionEvent
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.FrameRatioDelegate
+import com.opencamera.core.mode.ProVariantState
 import com.opencamera.core.mode.captureAidMetadataTags
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.FilterProfile
@@ -67,7 +69,9 @@ private class PortraitModeController(
         modeEventPrefix = "portrait",
         effectSpecProvider = { buildEffectSpec() }
     )
-    private var proVariantEnabled = false
+    private val proVariantState = ProVariantState(context)
+    private val proVariantEnabled: Boolean
+        get() = proVariantState.isEnabled
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
@@ -148,36 +152,21 @@ private class PortraitModeController(
     }
 
     override suspend fun onSessionEvent(event: ModeSessionEvent) {
-        when (event) {
-            is ModeSessionEvent.ShotStarted -> {
-                if (event.shot.mediaType != MediaType.PHOTO) {
-                    return
+        reduceStillShotSessionEvent(
+            event = event,
+            text = StillShotSessionEventText(
+                shotStartedHeadline = "Portrait capture in progress",
+                shotCompletedHeadline = "Portrait saved",
+                shotFailedHeadline = "Portrait capture failed"
+            ),
+            updateSnapshot = { headline, detail ->
+                mutableSnapshot.value = if (detail == null) {
+                    buildSnapshot(headline = headline)
+                } else {
+                    buildSnapshot(headline = headline, detail = detail)
                 }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Portrait capture in progress"
-                )
             }
-
-            is ModeSessionEvent.ShotCompleted -> {
-                if (event.result.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Portrait saved",
-                    detail = event.result.outputPath
-                )
-            }
-
-            is ModeSessionEvent.ShotFailed -> {
-                if (event.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Portrait capture failed",
-                    detail = event.reason
-                )
-            }
-        }
+        )
     }
 
     private suspend fun submitCurrentStyle(): ModeSignal {
@@ -216,11 +205,9 @@ private class PortraitModeController(
                                 putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
                                 put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
-                                put("modeVariant", if (proVariantEnabled) "pro" else "standard")
+                                put("modeVariant", proVariantState.modeVariantTag())
                                 if (proVariantEnabled) {
-                                    put("controlMode", resolvedControlMode())
-                                    put("manualDraftState", manualDraftState())
-                                    putAll(currentManualDraft().toMetadataTags())
+                                    putAll(proVariantState.metadataTags())
                                 }
                                 putAll(context.captureAidMetadataTags())
                                 style.bokehStrength?.let { put("bokehStrength", it.toString()) }
@@ -305,7 +292,7 @@ private class PortraitModeController(
         put("SceneCaptureType", "Portrait")
         put("PortraitStyle", style.label)
         if (proVariantEnabled) {
-            put("PortraitVariant", if (manualControlsEnabled()) "Pro" else "Pro Assist")
+            put("PortraitVariant", proVariantState.variantExifLabel())
             put("ManualDraft", currentManualDraft().compactSummary())
         }
         put("PortraitProfile", portraitSettings.portraitProfile.label)
@@ -346,8 +333,8 @@ private class PortraitModeController(
     }
 
     private suspend fun toggleProVariant(): ModeSignal {
-        proVariantEnabled = !proVariantEnabled
-        context.eventSink("portrait.pro-variant.${if (proVariantEnabled) "entered" else "exited"}")
+        val result = proVariantState.toggle("Portrait")
+        context.eventSink("portrait.pro-variant.${result.eventSuffix}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (proVariantEnabled) {
                 if (manualControlsEnabled()) {
@@ -361,17 +348,7 @@ private class PortraitModeController(
                 "Portrait focus active"
             }
         )
-        return ModeSignal.ShowHint(
-            if (proVariantEnabled) {
-                if (manualControlsEnabled()) {
-                    "Portrait Pro on"
-                } else {
-                    "Portrait Pro assist on"
-                }
-            } else {
-                "Portrait Pro off"
-            }
-        )
+        return result.signal
     }
 
     private fun buildSnapshot(
@@ -385,17 +362,7 @@ private class PortraitModeController(
                 shutterLabel = "Capture Portrait",
                 secondaryActionLabel = "Cycle Portrait Style",
                 tertiaryActionLabel = "Cycle Frame",
-                proActionLabel = if (proVariantEnabled) {
-                    if (manualControlsEnabled()) {
-                        "Exit Pro"
-                    } else {
-                        "Exit Pro Assist"
-                    }
-                } else if (manualControlsEnabled()) {
-                    "Enter Pro"
-                } else {
-                    "Enter Pro Assist"
-                }
+                proActionLabel = proVariantState.proActionLabel()
             ),
             state = ModeState(
                 headline = headline,
@@ -420,20 +387,17 @@ private class PortraitModeController(
         runtimeState().deviceCapabilities.supportsPortraitDepthEffect
     private fun runtimeState() = context.runtimeState()
     private fun manualControlsEnabled(): Boolean =
-        runtimeState().deviceCapabilities.supportsAppliedManualControls
-    private fun currentManualDraft() = context.settingsSnapshot.catalog.manualCaptureDraft
-    private fun currentManualDraftOrNull() = currentManualDraft().takeIf { proVariantEnabled }
-    private fun resolvedControlMode(): String = if (manualControlsEnabled()) "manual" else "assisted"
-    private fun manualDraftState(): String = if (manualControlsEnabled()) "metadata-draft" else "unsupported"
-    private fun resolvedAlgorithmProfile(base: String): String {
-        return if (!proVariantEnabled) {
-            base
-        } else if (manualControlsEnabled()) {
-            "${base}-pro"
-        } else {
-            "${base}-pro-assist"
-        }
-    }
+        proVariantState.manualControlsEnabled()
+    private fun currentManualDraft() =
+        proVariantState.currentManualDraft()
+    private fun currentManualDraftOrNull() =
+        proVariantState.currentManualDraftOrNull()
+    private fun resolvedControlMode(): String =
+        proVariantState.resolvedControlMode()
+    private fun manualDraftState(): String =
+        proVariantState.manualDraftState()
+    private fun resolvedAlgorithmProfile(base: String): String =
+        proVariantState.resolvedAlgorithmProfile(base)
 
     private fun currentStyles(): List<PortraitStyle> {
         return portraitFilters
@@ -502,11 +466,7 @@ private class PortraitModeController(
         if (!proVariantEnabled) {
             return standardSummary
         }
-        val proSummary = if (manualControlsEnabled()) {
-            "Pro draft ${currentManualDraft().compactSummary()} is attached to the portrait request."
-        } else {
-            "Pro assist keeps ${currentManualDraft().compactSummary()} as saved-only draft because manual controls are unavailable on this device."
-        }
+        val proSummary = proVariantState.summaryText("portrait")
         return "$standardSummary | $proSummary"
     }
 

@@ -8,7 +8,7 @@ import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.MediaMetadata
-import com.opencamera.core.media.MediaType
+
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.StillCaptureQualityPreference
@@ -19,6 +19,8 @@ import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeIntent
 import com.opencamera.core.mode.ModeSessionEvent
+import com.opencamera.core.mode.StillShotSessionEventText
+import com.opencamera.core.mode.reduceStillShotSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
@@ -129,36 +131,21 @@ private class DocumentModeController(
     }
 
     override suspend fun onSessionEvent(event: ModeSessionEvent) {
-        when (event) {
-            is ModeSessionEvent.ShotStarted -> {
-                if (event.shot.mediaType != MediaType.PHOTO) {
-                    return
+        reduceStillShotSessionEvent(
+            event = event,
+            text = StillShotSessionEventText(
+                shotStartedHeadline = "Document scan in progress",
+                shotCompletedHeadline = "Document saved",
+                shotFailedHeadline = "Document capture failed"
+            ),
+            updateSnapshot = { headline, detail ->
+                mutableSnapshot.value = if (detail == null) {
+                    buildSnapshot(headline = headline)
+                } else {
+                    buildSnapshot(headline = headline, detail = detail)
                 }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Document scan in progress"
-                )
             }
-
-            is ModeSessionEvent.ShotCompleted -> {
-                if (event.result.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Document saved",
-                    detail = event.result.outputPath
-                )
-            }
-
-            is ModeSessionEvent.ShotFailed -> {
-                if (event.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Document capture failed",
-                    detail = event.reason
-                )
-            }
-        }
+        )
     }
 
     private suspend fun submitCurrentProfile(): ModeSignal {

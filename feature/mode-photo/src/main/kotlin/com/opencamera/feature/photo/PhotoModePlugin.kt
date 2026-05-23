@@ -14,6 +14,8 @@ import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeIntent
 import com.opencamera.core.mode.ModeSessionEvent
+import com.opencamera.core.mode.StillShotSessionEventText
+import com.opencamera.core.mode.reduceStillShotSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
@@ -26,7 +28,7 @@ import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LivePhotoCaptureSpec
-import com.opencamera.core.media.MediaType
+
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.StillCaptureQualityPreference
@@ -219,39 +221,22 @@ private class PhotoModeController(
     }
 
     override suspend fun onSessionEvent(event: ModeSessionEvent) {
-        when (event) {
-            is ModeSessionEvent.ShotStarted -> {
-                if (event.shot.mediaType != MediaType.PHOTO) {
-                    return
+        reduceStillShotSessionEvent(
+            event = event,
+            text = StillShotSessionEventText(
+                shotStartedHeadline = "Photo capture in progress",
+                shotStartedDetail = "Unified shot pipeline accepted the photo save task.",
+                shotCompletedHeadline = "Photo saved",
+                shotFailedHeadline = "Photo capture failed"
+            ),
+            updateSnapshot = { headline, detail ->
+                mutableSnapshot.value = if (detail == null) {
+                    buildSnapshot(headline = headline)
+                } else {
+                    buildSnapshot(headline = headline, detail = detail)
                 }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Photo capture in progress",
-                    detail = "Unified shot pipeline accepted the photo save task."
-                )
             }
-
-            is ModeSessionEvent.ShotCompleted -> {
-                if (event.result.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Photo saved",
-                    detail = event.result.outputPath
-                )
-            }
-
-            is ModeSessionEvent.ShotFailed -> {
-                if (event.mediaType != MediaType.PHOTO) {
-                    return
-                }
-                mutableSnapshot.value = buildSnapshot(
-                    headline = "Photo capture failed",
-                    detail = event.reason
-                )
-            }
-
-            else -> Unit
-        }
+        )
     }
 
     private suspend fun cycleFlashMode(): ModeSignal {
