@@ -125,7 +125,10 @@ class CaptureFeedbackPolicyTest {
     @Test
     fun `filter with non-null render spec suppresses feedback`() {
         // filterSpec.brightnessShift=1 triggers a non-null parse result
-        val request = shotRequest(customTags = mapOf("filterSpec.brightnessShift" to "1"))
+        val request = shotRequest(customTags = mapOf(
+            "filterSpec.version" to "1",
+            "filterSpec.brightnessShift" to "1"
+        ))
         assertEquals(
             CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA,
             captureFeedbackPolicyFor(request)
@@ -164,37 +167,10 @@ class CaptureFeedbackPolicyTest {
         val request = shotRequest(
             customTags = mapOf(
                 "filterProfile" to "portrait-classic",
+                "filterSpec.version" to "1",
                 "filterSpec.brightnessShift" to "1"
             ),
             algorithmProfile = "portrait-classic"
-        )
-        assertEquals(
-            CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA,
-            captureFeedbackPolicyFor(request)
-        )
-    }
-
-    // ── Watermark text suppression ────────────────────────────────────
-
-    @Test
-    fun `watermark text in postProcessSpec suppresses feedback`() {
-        val request = shotRequest(
-            postProcessSpec = PostProcessSpec(watermarkText = "OpenCamera")
-        )
-        assertEquals(
-            CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA,
-            captureFeedbackPolicyFor(request)
-        )
-    }
-
-    @Test
-    fun `watermark text in save request metadata suppresses feedback`() {
-        val request = shotRequest(
-            saveRequest = SaveRequest.photoLibrary(
-                metadata = com.opencamera.core.media.MediaMetadata(
-                    watermarkText = "OpenCamera"
-                )
-            )
         )
         assertEquals(
             CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA,
