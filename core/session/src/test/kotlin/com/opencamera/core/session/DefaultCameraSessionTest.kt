@@ -6,7 +6,10 @@ import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.asCapabilityGraphQuery
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PhotoLowLightStrategySupport
+import com.opencamera.core.device.PhotoSceneSignal
 import com.opencamera.core.device.RecordingQualityPreset
+import com.opencamera.core.device.SceneLightState
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
@@ -3972,5 +3975,217 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         assertTrue(session.state.value.capabilityPipelineNotes.isEmpty())
+    }
+
+    // --- Low-light night assist ---
+
+    @Test
+    fun `low light signal in photo mode with active preview shows prompt`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewBindingStarted(reason = "test", isRecovery = false))
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(50))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PhotoSceneSignalUpdated(
+                PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.15f,
+                    source = "preview-bitmap-luma"
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val prompt = session.state.value.presentation.photoLowLightPrompt
+        assertNotNull(prompt)
+        assertEquals(PhotoLowLightPromptStatus.AVAILABLE_ENABLED, prompt.status)
+        assertNotNull(prompt.visibleUntilElapsedMillis)
+        assertEquals(0.15f, prompt.brightnessScore)
+        assertTrue(trace.snapshot().any { it.name == "photo.low-light.detected" })
+        assertTrue(trace.snapshot().any { it.name == "photo.low-light.prompt.visible" })
+    }
+
+    @Test
+    fun `low light signal outside photo mode does not show prompt`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.PreviewBindingStarted(reason = "test", isRecovery = false))
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(50))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PhotoSceneSignalUpdated(
+                PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.15f,
+                    source = "preview-bitmap-luma"
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.photoLowLightPrompt)
+        assertTrue(trace.snapshot().any { it.name == "photo.low-light.ignored" })
+    }
+
+    @Test
+    fun `disabled setting shows disabled prompt state on low light detection`() = runTest {
+        val trace = InMemorySessionTrace()
+        val settings = SessionSettingsSnapshot(
+            persisted = PersistedSettings(
+                photo = PhotoSettings(lowLightNightAssistEnabled = false)
+            )
+        )
+        val session = createSession(trace, this, settingsSnapshot = settings)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewBindingStarted(reason = "test", isRecovery = false))
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(50))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PhotoSceneSignalUpdated(
+                PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.12f,
+                    source = "preview-bitmap-luma"
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val prompt = session.state.value.presentation.photoLowLightPrompt
+        assertNotNull(prompt)
+        assertEquals(PhotoLowLightPromptStatus.AVAILABLE_DISABLED, prompt.status)
+    }
+
+    @Test
+    fun `multi frame support maps to available state`() = runTest {
+        val trace = InMemorySessionTrace()
+        val caps = DeviceCapabilities.DEFAULT.copy(
+            supportsStillCapture = true,
+            supportsNightMultiFrame = true
+        )
+        val session = createSession(trace, this, deviceCapabilities = caps)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewBindingStarted(reason = "test", isRecovery = false))
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(50))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PhotoSceneSignalUpdated(
+                PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.10f,
+                    source = "test"
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val prompt = session.state.value.presentation.photoLowLightPrompt
+        assertNotNull(prompt)
+        assertEquals(PhotoLowLightPromptStatus.AVAILABLE_ENABLED, prompt.status)
+    }
+
+    @Test
+    fun `no multi frame maps to degraded state`() = runTest {
+        val trace = InMemorySessionTrace()
+        val caps = DeviceCapabilities.DEFAULT.copy(
+            supportsStillCapture = true,
+            supportsNightMultiFrame = false
+        )
+        val session = createSession(trace, this, deviceCapabilities = caps)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewBindingStarted(reason = "test", isRecovery = false))
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(50))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PhotoSceneSignalUpdated(
+                PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.10f,
+                    source = "test"
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val prompt = session.state.value.presentation.photoLowLightPrompt
+        assertNotNull(prompt)
+        assertEquals(PhotoLowLightPromptStatus.DEGRADED_ENABLED, prompt.status)
+    }
+
+    @Test
+    fun `unsupported still capture does not present as available`() = runTest {
+        val trace = InMemorySessionTrace()
+        val caps = DeviceCapabilities.DEFAULT.copy(
+            supportsStillCapture = false,
+            supportsNightMultiFrame = false
+        )
+        val session = createSession(trace, this, deviceCapabilities = caps)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewBindingStarted(reason = "test", isRecovery = false))
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(50))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.PhotoSceneSignalUpdated(
+                PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.10f,
+                    source = "test"
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val prompt = session.state.value.presentation.photoLowLightPrompt
+        assertNotNull(prompt)
+        assertEquals(PhotoLowLightPromptStatus.UNSUPPORTED, prompt.status)
+    }
+
+    @Test
+    fun `photo scene signal is stored in presentation state`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        val signal = PhotoSceneSignal(
+            lightState = SceneLightState.NORMAL,
+            brightnessScore = 0.45f,
+            source = "test"
+        )
+        session.dispatch(SessionIntent.PhotoSceneSignalUpdated(signal))
+        advanceUntilIdle()
+
+        assertEquals(signal, session.state.value.presentation.photoSceneSignal)
     }
 }

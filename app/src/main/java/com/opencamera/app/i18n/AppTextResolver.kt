@@ -73,6 +73,8 @@ open class AppTextResolver(private val context: Context?) {
     open fun quickLauncher(): String = str(R.string.button_quick_launcher, "Quick")
     open fun quickGrid(): String = str(R.string.button_quick_grid, "Grid")
     open fun quickQuality(): String = str(R.string.button_quick_flash, "Quality")
+    open fun quickBrightness(): String = str(R.string.button_quick_brightness, "Brightness")
+    open fun quickBrightnessNa(): String = str(R.string.button_quick_brightness_na, "N/A")
     open fun quickLive(): String = str(R.string.button_quick_live, "Live")
     open fun quickTimer(): String = str(R.string.button_quick_timer, "Timer")
     open fun moreControls(): String = str(R.string.button_more_controls, "More")
@@ -477,6 +479,9 @@ open class AppTextResolver(private val context: Context?) {
     open fun disabledFrameRatioUnsupportedMode(): String = str(R.string.disabled_frame_ratio_unsupported_mode, "Frame ratio not supported in current mode")
     open fun disabledFrameRatioActiveShot(): String = str(R.string.disabled_frame_ratio_active_shot, "Wait for current capture to finish")
     open fun disabledFrameRatioCountdown(): String = str(R.string.disabled_frame_ratio_countdown, "Wait for countdown to finish")
+    open fun disabledBrightnessUnsupported(): String = str(R.string.disabled_brightness_unsupported, "Brightness unavailable")
+    open fun disabledBrightnessCountdown(): String = str(R.string.disabled_brightness_countdown, "Wait for countdown to finish")
+    open fun disabledBrightnessActiveShot(): String = str(R.string.disabled_brightness_active_shot, "Wait for current capture to finish")
 
     // Recording status
     open fun statusRecordingStarting(): String = str(R.string.status_recording_starting, "Starting…")

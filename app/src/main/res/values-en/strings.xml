@@ -65,6 +65,13 @@
     <string name="button_preview_ratio">Preview Ratio</string>
     <string name="button_quick_live">Live</string>
     <string name="button_quick_timer">Timer</string>
+    <string name="button_quick_brightness">Bright</string>
+    <string name="button_quick_brightness_minus">−</string>
+    <string name="button_quick_brightness_plus">+</string>
+    <string name="button_quick_brightness_na">N/A</string>
+    <string name="disabled_brightness_unsupported">Brightness unavailable</string>
+    <string name="disabled_brightness_countdown">Wait for countdown to finish</string>
+    <string name="disabled_brightness_active_shot">Wait for current capture to finish</string>
     <string name="button_more_controls">More</string>
     <string name="mode_track_label">Mode</string>
     <string name="button_dev_entry">DEV</string>

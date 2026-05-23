@@ -5,6 +5,9 @@ import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PreviewBrightnessRequest
+import com.opencamera.core.device.PreviewBrightnessResult
+import com.opencamera.core.device.PreviewBrightnessResultStatus
 import com.opencamera.core.device.PreviewMeteringPoint
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
@@ -323,6 +326,11 @@ class DefaultCameraSession(
             SessionIntent.PreviewRatioToggled -> handlePreviewRatioToggled()
             is SessionIntent.FrameRatioSelected -> handleModeIntent(ModeIntent.FrameRatioSelected(intent.ratio))
             is SessionIntent.OutputRotationChanged -> handleOutputRotationChanged(intent.rotation)
+            is SessionIntent.ApplyPreviewBrightness -> handleApplyPreviewBrightness(intent.exposureCompensationSteps)
+            SessionIntent.IncreasePreviewBrightness -> handleStepPreviewBrightness(1)
+            SessionIntent.DecreasePreviewBrightness -> handleStepPreviewBrightness(-1)
+            SessionIntent.ResetPreviewBrightness -> handleApplyPreviewBrightness(0)
+            is SessionIntent.PreviewBrightnessApplied -> handlePreviewBrightnessApplied(intent.result)
             else -> error("Unexpected mode control intent: $intent")
         }
     }
@@ -353,6 +361,7 @@ class DefaultCameraSession(
         }
 
         currentController.onEnter()
+        resetPreviewBrightness()
         val hasCameraPermission = _state.value.permissionState.cameraGranted
         updateState(
             lifecycle = SessionLifecycle.RUNNING,
@@ -443,6 +452,7 @@ class DefaultCameraSession(
             stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset
         )
         currentController.onEnter()
+        resetPreviewBrightness()
 
         updateState(
             activeMode = currentController.id,
@@ -553,6 +563,7 @@ class DefaultCameraSession(
 
         sessionLensFacing = nextLensFacing
         currentController.onLensFacingChanged(nextLensFacing)
+        resetPreviewBrightness()
         updateState(
             modeSnapshot = currentController.snapshot.value,
             activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
@@ -1089,6 +1100,115 @@ class DefaultCameraSession(
         _effects.emit(SessionEffect.UpdateOutputRotation(rotation))
     }
 
+    private suspend fun handleStepPreviewBrightness(delta: Int) {
+        val current = _state.value.presentation.previewBrightnessSteps
+        val range = _state.value.activeDeviceCapabilities.previewBrightnessRange
+        val newValue = range.clamp(current + delta)
+        handleApplyPreviewBrightness(newValue)
+    }
+
+    private suspend fun handleApplyPreviewBrightness(targetSteps: Int) {
+        if (_state.value.activeMode != ModeId.PHOTO) {
+            updateState(lastAction = "Brightness is only available in photo mode")
+            return
+        }
+        if (_state.value.previewStatus != PreviewStatus.ACTIVE) {
+            return
+        }
+        if (!_state.value.permissionState.cameraGranted || _state.value.previewHostAvailable.not()) {
+            return
+        }
+        if (captureRecordingProcessor.countdownInProgress()) {
+            updateState(lastAction = "Wait for countdown to finish before adjusting brightness")
+            return
+        }
+        if (_state.value.activeShot != null) {
+            updateState(lastAction = "Wait for current capture to finish before adjusting brightness")
+            return
+        }
+
+        val range = _state.value.activeDeviceCapabilities.previewBrightnessRange
+        val clamped = range.clamp(targetSteps)
+        val requestId = "brightness-${System.nanoTime()}"
+        updateState(
+            previewBrightnessFeedback = PreviewBrightnessFeedback(
+                requestId = requestId,
+                requestedSteps = clamped,
+                appliedSteps = null,
+                status = PreviewBrightnessFeedbackStatus.REQUESTED
+            ),
+            lastAction = "Brightness set to ${brightnessLabel(clamped)}",
+            lastError = null
+        )
+        trace.record("preview.brightness.requested", "requestId=$requestId,steps=$clamped")
+        _effects.emit(
+            SessionEffect.ApplyPreviewBrightness(
+                PreviewBrightnessRequest(
+                    requestId = requestId,
+                    exposureCompensationSteps = clamped
+                )
+            )
+        )
+    }
+
+    private fun handlePreviewBrightnessApplied(result: PreviewBrightnessResult) {
+        val currentFeedback = _state.value.presentation.previewBrightnessFeedback ?: return
+        if (currentFeedback.requestId != result.requestId) {
+            trace.record("preview.brightness.stale", "expected=${currentFeedback.requestId},got=${result.requestId}")
+            return
+        }
+        when (result.status) {
+            PreviewBrightnessResultStatus.APPLIED -> {
+                updateState(
+                    previewBrightnessSteps = result.exposureCompensationSteps,
+                    previewBrightnessFeedback = currentFeedback.copy(
+                        appliedSteps = result.exposureCompensationSteps,
+                        status = PreviewBrightnessFeedbackStatus.APPLIED
+                    )
+                )
+                trace.record("preview.brightness.applied", "steps=${result.exposureCompensationSteps}")
+            }
+            PreviewBrightnessResultStatus.DEGRADED_SAVED_ONLY -> {
+                updateState(
+                    previewBrightnessFeedback = currentFeedback.copy(
+                        status = PreviewBrightnessFeedbackStatus.DEGRADED_SAVED_ONLY,
+                        reason = result.reason
+                    )
+                )
+                trace.record("preview.brightness.degraded", result.reason ?: "saved-only")
+            }
+            PreviewBrightnessResultStatus.FAILED -> {
+                updateState(
+                    previewBrightnessFeedback = currentFeedback.copy(
+                        status = PreviewBrightnessFeedbackStatus.FAILED,
+                        reason = result.reason
+                    )
+                )
+                trace.record("preview.brightness.failed", result.reason ?: "unknown")
+            }
+            PreviewBrightnessResultStatus.UNSUPPORTED -> {
+                updateState(
+                    previewBrightnessFeedback = currentFeedback.copy(
+                        status = PreviewBrightnessFeedbackStatus.UNSUPPORTED,
+                        reason = result.reason
+                    )
+                )
+                trace.record("preview.brightness.unsupported", result.reason ?: "unsupported")
+            }
+        }
+    }
+
+    private fun resetPreviewBrightness() {
+        val current = _state.value.presentation.previewBrightnessSteps
+        if (current != 0) {
+            updateState(previewBrightnessSteps = 0, previewBrightnessFeedback = null)
+        }
+    }
+
+    private fun brightnessLabel(steps: Int): String {
+        return if (steps >= 0) "+$steps" else "$steps"
+    }
+
     private fun updateState(
         lifecycle: SessionLifecycle = _state.value.lifecycle,
         permissionState: PermissionState = _state.value.permissionState,
@@ -1120,7 +1240,11 @@ class DefaultCameraSession(
         latestPipelineNotes: List<String> = _state.value.presentation.latestPipelineNotes,
         pendingCaptureFeedback: CaptureFeedbackPreview? = _state.value.presentation.pendingCaptureFeedback,
         lastError: String? = _state.value.presentation.lastError,
-        previewMeteringFeedback: PreviewMeteringFeedback? = _state.value.presentation.previewMeteringFeedback
+        previewMeteringFeedback: PreviewMeteringFeedback? = _state.value.presentation.previewMeteringFeedback,
+        previewBrightnessSteps: Int = _state.value.presentation.previewBrightnessSteps,
+        previewBrightnessFeedback: PreviewBrightnessFeedback? = _state.value.presentation.previewBrightnessFeedback,
+        photoSceneSignal: com.opencamera.core.device.PhotoSceneSignal = _state.value.presentation.photoSceneSignal,
+        photoLowLightPrompt: PhotoLowLightPrompt? = _state.value.presentation.photoLowLightPrompt
     ) {
         _state.value = _state.value.copy(
             lifecycle = lifecycle,
@@ -1154,7 +1278,11 @@ class DefaultCameraSession(
                 latestSavedMediaType = latestSavedMediaType,
                 latestPipelineNotes = latestPipelineNotes,
                 lastError = lastError,
-                previewMeteringFeedback = previewMeteringFeedback
+                previewMeteringFeedback = previewMeteringFeedback,
+                previewBrightnessSteps = previewBrightnessSteps,
+                previewBrightnessFeedback = previewBrightnessFeedback,
+                photoSceneSignal = photoSceneSignal,
+                photoLowLightPrompt = photoLowLightPrompt
             )
         )
     }

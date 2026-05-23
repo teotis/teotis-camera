@@ -57,6 +57,10 @@ import com.opencamera.core.device.DeviceShotRequestTranslator
 import com.opencamera.core.device.DefaultDeviceShotRequestTranslator
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ManualControlCapabilityMatrix
+import com.opencamera.core.device.PreviewBrightnessRange
+import com.opencamera.core.device.PreviewBrightnessRequest
+import com.opencamera.core.device.PreviewBrightnessResult
+import com.opencamera.core.device.PreviewBrightnessResultStatus
 import com.opencamera.core.device.PreviewMeteringMode
 import com.opencamera.core.device.PreviewMeteringRequest
 import com.opencamera.core.device.PreviewMeteringResult
@@ -131,7 +135,8 @@ data class CameraLensProfile(
     val availableStillCaptureResolutionPresets: Set<StillCaptureResolutionPreset> =
         StillCaptureResolutionPreset.entries.toSet(),
     val videoSpecConstraints: VideoSpecConstraints = DeviceCapabilities.DEFAULT.videoSpecConstraints,
-    val manualControlCapabilities: ManualControlCapabilityMatrix? = null
+    val manualControlCapabilities: ManualControlCapabilityMatrix? = null,
+    val previewBrightnessRange: PreviewBrightnessRange = PreviewBrightnessRange.CONSERVATIVE
 )
 
 internal data class StillCaptureTargetResolution(
@@ -608,6 +613,7 @@ internal fun resolveDeviceCapabilities(
         cameraProfiles = prioritizedProfiles
     )
     val manualControlCapabilities = mergeManualControlCapabilities(prioritizedProfiles)
+    val previewBrightnessRange = mergePreviewBrightnessRange(prioritizedProfiles)
 
     return baseCapabilities.copy(
         supportsFlashControl = supportsFlashControl,
@@ -616,6 +622,7 @@ internal fun resolveDeviceCapabilities(
             .toSet()
             .ifEmpty { baseCapabilities.availableLensFacings },
         zoomRatioCapability = zoomRatioCapability,
+        previewBrightnessRange = previewBrightnessRange,
         availableStillCaptureOutputSizes = availableStillCaptureOutputSizes
             .ifEmpty { baseCapabilities.availableStillCaptureOutputSizes },
         availableStillCaptureResolutionPresets = availableStillCaptureResolutionPresets,
@@ -681,6 +688,23 @@ private inline fun List<ManualControlCapabilityMatrix>.maxSupportOf(
     selector: (ManualControlCapabilityMatrix) -> ManualControlSupport
 ): ManualControlSupport {
     return map(selector).maxBy(ManualControlSupport::ordinal)
+}
+
+internal fun mergePreviewBrightnessRange(
+    cameraProfiles: List<CameraLensProfile>
+): PreviewBrightnessRange {
+    val ranges = cameraProfiles.map { it.previewBrightnessRange }
+    if (ranges.all { it == PreviewBrightnessRange.UNSUPPORTED }) {
+        return PreviewBrightnessRange.UNSUPPORTED
+    }
+    val supported = ranges.filter { it != PreviewBrightnessRange.UNSUPPORTED }
+    if (supported.isEmpty()) {
+        return PreviewBrightnessRange.CONSERVATIVE
+    }
+    return PreviewBrightnessRange(
+        minSteps = supported.minOf { it.minSteps },
+        maxSteps = supported.maxOf { it.maxSteps }
+    )
 }
 
 internal fun mergeVideoSpecConstraints(
@@ -954,6 +978,17 @@ internal fun detectZoomRatioCapability(
     )
 }
 
+internal fun detectPreviewBrightnessRange(
+    characteristics: CameraCharacteristics
+): PreviewBrightnessRange {
+    val range = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+        ?: return PreviewBrightnessRange.CONSERVATIVE
+    if (range.lower == 0 && range.upper == 0) {
+        return PreviewBrightnessRange.UNSUPPORTED
+    }
+    return PreviewBrightnessRange(minSteps = range.lower, maxSteps = range.upper)
+}
+
 private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> {
     val cameraManager = context.getSystemService(CameraManager::class.java) ?: return emptyList()
     return runCatching {
@@ -971,6 +1006,7 @@ private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> 
                 lensFacing = lensFacing,
                 hasFlashUnit = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
                 zoomRatioCapability = detectZoomRatioCapability(characteristics),
+                previewBrightnessRange = detectPreviewBrightnessRange(characteristics),
                 availableStillCaptureOutputSizes = normalizeStillCaptureOutputSizes(
                     characteristics
                         .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
@@ -1149,6 +1185,21 @@ class CameraXCaptureAdapter(
                     )
                 )
             }
+
+            is DeviceCommand.ApplyPreviewBrightness -> runCatching {
+                applyPreviewBrightness(command.request)
+            }.onFailure { throwable ->
+                _events.emit(
+                    DeviceEvent.PreviewBrightnessApplied(
+                        PreviewBrightnessResult(
+                            requestId = command.request.requestId,
+                            exposureCompensationSteps = command.request.exposureCompensationSteps,
+                            status = PreviewBrightnessResultStatus.FAILED,
+                            reason = throwable.message ?: "Preview brightness failed"
+                        )
+                    )
+                )
+            }
         }
     }
 
@@ -1253,6 +1304,65 @@ class CameraXCaptureAdapter(
         }
 
         _events.emit(DeviceEvent.PreviewMeteringCompleted(result))
+    }
+
+    private suspend fun applyPreviewBrightness(request: PreviewBrightnessRequest) {
+        val result = withContext(Dispatchers.Main.immediate) {
+            val camera = boundCamera
+            if (camera == null) {
+                return@withContext PreviewBrightnessResult(
+                    requestId = request.requestId,
+                    exposureCompensationSteps = request.exposureCompensationSteps,
+                    status = PreviewBrightnessResultStatus.FAILED,
+                    reason = "No bound camera"
+                )
+            }
+
+            val exposureState = camera.cameraInfo.exposureState
+            val range = exposureState.exposureCompensationRange
+            if (request.exposureCompensationSteps !in range) {
+                return@withContext PreviewBrightnessResult(
+                    requestId = request.requestId,
+                    exposureCompensationSteps = request.exposureCompensationSteps,
+                    status = PreviewBrightnessResultStatus.UNSUPPORTED,
+                    reason = "Value ${request.exposureCompensationSteps} outside range $range"
+                )
+            }
+
+            runCatching {
+                camera.cameraControl
+                    .setExposureCompensationIndex(request.exposureCompensationSteps)
+                    .await()
+            }.fold(
+                onSuccess = {
+                    PreviewBrightnessResult(
+                        requestId = request.requestId,
+                        exposureCompensationSteps = request.exposureCompensationSteps,
+                        status = PreviewBrightnessResultStatus.APPLIED
+                    )
+                },
+                onFailure = { throwable ->
+                    val isSavedOnly = capabilities.manualControlCapabilities
+                        ?.exposureCompensation == ManualControlSupport.SAVED_ONLY
+                    if (isSavedOnly) {
+                        PreviewBrightnessResult(
+                            requestId = request.requestId,
+                            exposureCompensationSteps = request.exposureCompensationSteps,
+                            status = PreviewBrightnessResultStatus.DEGRADED_SAVED_ONLY,
+                            reason = throwable.message ?: "Saved-only exposure"
+                        )
+                    } else {
+                        PreviewBrightnessResult(
+                            requestId = request.requestId,
+                            exposureCompensationSteps = request.exposureCompensationSteps,
+                            status = PreviewBrightnessResultStatus.FAILED,
+                            reason = throwable.message ?: "setExposureCompensationIndex failed"
+                        )
+                    }
+                }
+            )
+        }
+        _events.emit(DeviceEvent.PreviewBrightnessApplied(result))
     }
 
     private fun applyOutputRotation(rotation: com.opencamera.core.device.CameraOutputRotation) {

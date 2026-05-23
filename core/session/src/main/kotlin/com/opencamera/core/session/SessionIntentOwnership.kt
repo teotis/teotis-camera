@@ -27,7 +27,12 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     SessionIntent.StillCaptureResolutionToggled,
     SessionIntent.PreviewRatioToggled,
     is SessionIntent.FrameRatioSelected,
-    is SessionIntent.OutputRotationChanged -> SessionIntentOwner.MODE_CONTROL
+    is SessionIntent.OutputRotationChanged,
+    is SessionIntent.ApplyPreviewBrightness,
+    SessionIntent.IncreasePreviewBrightness,
+    SessionIntent.DecreasePreviewBrightness,
+    SessionIntent.ResetPreviewBrightness,
+    is SessionIntent.PreviewBrightnessApplied -> SessionIntentOwner.MODE_CONTROL
 
     SessionIntent.PreviewHostAttached,
     is SessionIntent.PreviewHostDetached,
@@ -42,7 +47,9 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     is SessionIntent.PreviewRuntimeIssue,
     is SessionIntent.PreviewStopped,
     is SessionIntent.PreviewTapToFocus,
-    is SessionIntent.PreviewMeteringCompleted -> SessionIntentOwner.PREVIEW_RECOVERY
+    is SessionIntent.PreviewMeteringCompleted,
+    is SessionIntent.PhotoSceneSignalUpdated,
+    SessionIntent.PhotoLowLightPromptExpired -> SessionIntentOwner.PREVIEW_RECOVERY
 
     is SessionIntent.CountdownTick,
     SessionIntent.CountdownCompleted,

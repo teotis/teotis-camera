@@ -106,6 +106,15 @@ internal class MainActivityActionBinder(
         views.quickPanel.flash.setOnClickListener {
             callbacks.dispatch(SessionIntent.StillCaptureQualityToggled)
         }
+        views.quickPanel.brightnessMinus.setOnClickListener {
+            callbacks.dispatch(SessionIntent.DecreasePreviewBrightness)
+        }
+        views.quickPanel.brightnessValue.setOnClickListener {
+            callbacks.dispatch(SessionIntent.ResetPreviewBrightness)
+        }
+        views.quickPanel.brightnessPlus.setOnClickListener {
+            callbacks.dispatch(SessionIntent.IncreasePreviewBrightness)
+        }
         views.quickPanel.frame43.setOnClickListener {
             callbacks.dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_4_3))
         }

@@ -6,6 +6,7 @@ import com.opencamera.core.device.PreviewMeteringRequest
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.displayReason
+import com.opencamera.core.device.photoLowLightStrategySupport
 import com.opencamera.core.device.recoveryReason
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.outputPathOrNull
@@ -46,6 +47,8 @@ internal class PreviewRecoverySessionProcessor(
             is SessionIntent.PreviewStopped -> handlePreviewStopped(intent.reason)
             is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
             is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
+            is SessionIntent.PhotoSceneSignalUpdated -> handlePhotoSceneSignalUpdated(intent.signal)
+            SessionIntent.PhotoLowLightPromptExpired -> handlePhotoLowLightPromptExpired()
             else -> error("Unexpected preview intent: $intent")
         }
     }
@@ -327,6 +330,91 @@ internal class PreviewRecoverySessionProcessor(
             PreviewMeteringResultStatus.UNSUPPORTED -> "preview.metering.unsupported"
         }
         trace.record(traceLabel, "requestId=${result.requestId}")
+    }
+
+    // -- Low-light scene signal --
+
+    private fun handlePhotoSceneSignalUpdated(signal: com.opencamera.core.device.PhotoSceneSignal) {
+        val snapshot = state.value
+        state.value = snapshot.copy(
+            presentation = snapshot.presentation.copy(
+                photoSceneSignal = signal
+            )
+        )
+
+        if (snapshot.activeMode != com.opencamera.core.mode.ModeId.PHOTO) {
+            trace.record("photo.low-light.ignored", "mode=${snapshot.activeMode}")
+            return
+        }
+        if (snapshot.previewStatus != PreviewStatus.ACTIVE) {
+            trace.record("photo.low-light.ignored", "preview=${snapshot.previewStatus}")
+            return
+        }
+
+        val support = snapshot.activeDeviceCapabilities.photoLowLightStrategySupport()
+        val settingEnabled = snapshot.settings.persisted.photo.lowLightNightAssistEnabled
+
+        if (signal.lightState == com.opencamera.core.device.SceneLightState.LOW_LIGHT) {
+            trace.record(
+                "photo.low-light.detected",
+                "state=LOW_LIGHT,score=${signal.brightnessScore},support=$support,setting=${if (settingEnabled) "enabled" else "disabled"}"
+            )
+            val status = resolveLowLightPromptStatus(settingEnabled, support)
+            val message = when (status) {
+                PhotoLowLightPromptStatus.AVAILABLE_ENABLED -> "夜间辅助已开启"
+                PhotoLowLightPromptStatus.AVAILABLE_DISABLED -> "夜间辅助已关闭"
+                PhotoLowLightPromptStatus.DEGRADED_ENABLED -> "夜间辅助已开启（降级）"
+                PhotoLowLightPromptStatus.DEGRADED_DISABLED -> "夜间辅助已关闭（降级）"
+                PhotoLowLightPromptStatus.UNSUPPORTED -> "设备不支持夜间辅助"
+                PhotoLowLightPromptStatus.HIDDEN -> ""
+            }
+            val visibleUntil = System.currentTimeMillis() + 3000L
+            state.value = state.value.copy(
+                presentation = state.value.presentation.copy(
+                    photoLowLightPrompt = PhotoLowLightPrompt(
+                        status = status,
+                        visibleUntilElapsedMillis = visibleUntil,
+                        brightnessScore = signal.brightnessScore,
+                        message = message
+                    )
+                )
+            )
+            trace.record(
+                "photo.low-light.prompt.visible",
+                "untilElapsedMillis=$visibleUntil"
+            )
+        }
+    }
+
+    private fun handlePhotoLowLightPromptExpired() {
+        val prompt = state.value.presentation.photoLowLightPrompt ?: return
+        val now = System.currentTimeMillis()
+        val visibleUntil = prompt.visibleUntilElapsedMillis
+        if (visibleUntil != null && now >= visibleUntil) {
+            state.value = state.value.copy(
+                presentation = state.value.presentation.copy(
+                    photoLowLightPrompt = prompt.copy(
+                        status = PhotoLowLightPromptStatus.HIDDEN,
+                        visibleUntilElapsedMillis = null
+                    )
+                )
+            )
+            trace.record("photo.low-light.prompt.hidden", "expired")
+        }
+    }
+
+    private fun resolveLowLightPromptStatus(
+        settingEnabled: Boolean,
+        support: com.opencamera.core.device.PhotoLowLightStrategySupport
+    ): PhotoLowLightPromptStatus = when (support) {
+        com.opencamera.core.device.PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME ->
+            if (settingEnabled) PhotoLowLightPromptStatus.AVAILABLE_ENABLED
+            else PhotoLowLightPromptStatus.AVAILABLE_DISABLED
+        com.opencamera.core.device.PhotoLowLightStrategySupport.DEGRADED_SINGLE_FRAME ->
+            if (settingEnabled) PhotoLowLightPromptStatus.DEGRADED_ENABLED
+            else PhotoLowLightPromptStatus.DEGRADED_DISABLED
+        com.opencamera.core.device.PhotoLowLightStrategySupport.UNSUPPORTED ->
+            PhotoLowLightPromptStatus.UNSUPPORTED
     }
 
     // -- Helpers (also called from DefaultCameraSession lifecycle handlers) --

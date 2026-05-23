@@ -67,6 +67,13 @@
     <string name="button_preview_ratio">预览比例</string>
     <string name="button_quick_live">实况</string>
     <string name="button_quick_timer">定时</string>
+    <string name="button_quick_brightness">亮度</string>
+    <string name="button_quick_brightness_minus">−</string>
+    <string name="button_quick_brightness_plus">+</string>
+    <string name="button_quick_brightness_na">N/A</string>
+    <string name="disabled_brightness_unsupported">亮度调节不可用</string>
+    <string name="disabled_brightness_countdown">倒计时结束后才能调节亮度</string>
+    <string name="disabled_brightness_active_shot">等待当前拍摄完成后才能调节亮度</string>
     <string name="button_more_controls">更多</string>
     <string name="mode_track_label">模式</string>
     <string name="button_dev_entry">开发</string>

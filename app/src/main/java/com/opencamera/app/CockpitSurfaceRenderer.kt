@@ -125,6 +125,25 @@ internal class CockpitSurfaceRenderer(
         quickPanel.flash.text = "${sheet.qualityRow.title} ${sheet.qualityRow.value}"
         quickPanel.flash.isEnabled = sheet.qualityRow.isEnabled
 
+        val brightness = sheet.brightnessRow
+        if (brightness.isVisible) {
+            quickPanel.brightnessMinus.visibility = android.view.View.VISIBLE
+            quickPanel.brightnessValue.visibility = android.view.View.VISIBLE
+            quickPanel.brightnessPlus.visibility = android.view.View.VISIBLE
+            quickPanel.brightnessMinus.isEnabled = brightness.canDecrease
+            quickPanel.brightnessValue.text = brightness.value
+            quickPanel.brightnessValue.isEnabled = brightness.canReset
+            quickPanel.brightnessPlus.isEnabled = brightness.canIncrease
+            val alpha = if (brightness.disabledReason != null) 0.4f else 1f
+            quickPanel.brightnessMinus.alpha = if (brightness.canDecrease) alpha else 0.3f
+            quickPanel.brightnessValue.alpha = if (brightness.disabledReason != null) 0.4f else 1f
+            quickPanel.brightnessPlus.alpha = if (brightness.canIncrease) alpha else 0.3f
+        } else {
+            quickPanel.brightnessMinus.visibility = android.view.View.GONE
+            quickPanel.brightnessValue.visibility = android.view.View.GONE
+            quickPanel.brightnessPlus.visibility = android.view.View.GONE
+        }
+
         quickPanel.frame43.isEnabled = sheet.frameRatioEnabled
         quickPanel.frame169.isEnabled = sheet.frameRatioEnabled
         quickPanel.frame11.isEnabled = sheet.frameRatioEnabled

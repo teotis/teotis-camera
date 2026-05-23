@@ -200,6 +200,53 @@
                 android:layout_height="40dp"
                 android:layout_marginTop="4dp" />
 
+            <!-- Brightness row: minus / value / plus -->
+            <LinearLayout
+                android:id="@+id/brightnessRow"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="6dp"
+                android:background="@drawable/bg_panel_row">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/button_quick_brightness"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    android:gravity="start|center_vertical" />
+
+                <Button
+                    android:id="@+id/buttonBrightnessMinus"
+                    style="@style/Widget.OpenCamera.QuickBubbleButton"
+                    android:layout_width="36dp"
+                    android:layout_height="32dp"
+                    android:text="@string/button_quick_brightness_minus"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/buttonBrightnessValue"
+                    style="@style/Widget.OpenCamera.QuickBubbleButton"
+                    android:layout_width="44dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="4dp"
+                    android:text="0"
+                    android:textSize="12sp" />
+
+                <Button
+                    android:id="@+id/buttonBrightnessPlus"
+                    style="@style/Widget.OpenCamera.QuickBubbleButton"
+                    android:layout_width="36dp"
+                    android:layout_height="32dp"
+                    android:layout_marginStart="4dp"
+                    android:text="@string/button_quick_brightness_plus"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
             <!-- Frame ratio row: title + segmented chips -->
             <LinearLayout
                 android:id="@+id/frameRatioRow"

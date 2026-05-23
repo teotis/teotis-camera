@@ -88,6 +88,9 @@ class CameraSessionCoordinator(
             is SessionEffect.UpdateOutputRotation -> cameraAdapter.dispatch(
                 DeviceCommand.UpdateOutputRotation(effect.rotation)
             )
+            is SessionEffect.ApplyPreviewBrightness -> cameraAdapter.dispatch(
+                DeviceCommand.ApplyPreviewBrightness(effect.request)
+            )
         }
     }
 
@@ -135,6 +138,9 @@ class CameraSessionCoordinator(
             )
             is DeviceEvent.PreviewMeteringCompleted -> session.dispatch(
                 SessionIntent.PreviewMeteringCompleted(event.result)
+            )
+            is DeviceEvent.PreviewBrightnessApplied -> session.dispatch(
+                SessionIntent.PreviewBrightnessApplied(event.result)
             )
         }
     }

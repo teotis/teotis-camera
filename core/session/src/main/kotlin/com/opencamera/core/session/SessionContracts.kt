@@ -122,6 +122,38 @@ data class PreviewMeteringFeedback(
     val reason: String? = null
 )
 
+enum class PreviewBrightnessFeedbackStatus {
+    REQUESTED,
+    APPLIED,
+    DEGRADED_SAVED_ONLY,
+    FAILED,
+    UNSUPPORTED
+}
+
+data class PreviewBrightnessFeedback(
+    val requestId: String,
+    val requestedSteps: Int,
+    val appliedSteps: Int?,
+    val status: PreviewBrightnessFeedbackStatus,
+    val reason: String? = null
+)
+
+enum class PhotoLowLightPromptStatus {
+    HIDDEN,
+    AVAILABLE_ENABLED,
+    AVAILABLE_DISABLED,
+    DEGRADED_ENABLED,
+    DEGRADED_DISABLED,
+    UNSUPPORTED
+}
+
+data class PhotoLowLightPrompt(
+    val status: PhotoLowLightPromptStatus,
+    val visibleUntilElapsedMillis: Long?,
+    val brightnessScore: Float?,
+    val message: String
+)
+
 data class PermissionState(
     val cameraGranted: Boolean = false,
     val microphoneGranted: Boolean = false
@@ -150,6 +182,10 @@ data class SessionPresentationState(
     val latestPipelineNotes: List<String> = emptyList(),
     val lastError: String? = null,
     val previewMeteringFeedback: PreviewMeteringFeedback? = null,
+    val previewBrightnessSteps: Int = 0,
+    val previewBrightnessFeedback: PreviewBrightnessFeedback? = null,
+    val photoSceneSignal: com.opencamera.core.device.PhotoSceneSignal = com.opencamera.core.device.PhotoSceneSignal(),
+    val photoLowLightPrompt: PhotoLowLightPrompt? = null,
     val recordingStartedAtElapsedMillis: Long? = null,
     val recordingElapsedMillis: Long? = null
 )
@@ -277,6 +313,17 @@ sealed interface SessionIntent {
     data class PreviewTapToFocus(val normalizedX: Float, val normalizedY: Float) : SessionIntent
     data class PreviewMeteringCompleted(val result: com.opencamera.core.device.PreviewMeteringResult) : SessionIntent
     data class OutputRotationChanged(val rotation: CameraOutputRotation) : SessionIntent
+    data class ApplyPreviewBrightness(val exposureCompensationSteps: Int) : SessionIntent
+    data object IncreasePreviewBrightness : SessionIntent
+    data object DecreasePreviewBrightness : SessionIntent
+    data object ResetPreviewBrightness : SessionIntent
+    data class PreviewBrightnessApplied(
+        val result: com.opencamera.core.device.PreviewBrightnessResult
+    ) : SessionIntent
+    data class PhotoSceneSignalUpdated(
+        val signal: com.opencamera.core.device.PhotoSceneSignal
+    ) : SessionIntent
+    data object PhotoLowLightPromptExpired : SessionIntent
 }
 
 sealed interface SessionEffect {
@@ -295,6 +342,9 @@ sealed interface SessionEffect {
     ) : SessionEffect
     data class ApplyPreviewMetering(val request: com.opencamera.core.device.PreviewMeteringRequest) : SessionEffect
     data class UpdateOutputRotation(val rotation: CameraOutputRotation) : SessionEffect
+    data class ApplyPreviewBrightness(
+        val request: com.opencamera.core.device.PreviewBrightnessRequest
+    ) : SessionEffect
 }
 
 interface CameraSession {

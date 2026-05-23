@@ -54,9 +54,20 @@ internal data class QuickPanelRowRenderModel(
     val disabledReason: String? = null
 )
 
+internal data class QuickBrightnessRenderModel(
+    val title: String,
+    val value: String,
+    val canDecrease: Boolean,
+    val canIncrease: Boolean,
+    val canReset: Boolean,
+    val isVisible: Boolean,
+    val disabledReason: String?
+)
+
 internal data class QuickPanelSheetRenderModel(
     val gridRow: QuickPanelRowRenderModel,
     val qualityRow: QuickPanelRowRenderModel,
+    val brightnessRow: QuickBrightnessRenderModel,
     val frameRatioRow: QuickPanelRowRenderModel,
     val frameRatioOptions: List<FrameRatioOptionRenderModel>,
     val frameRatioEnabled: Boolean,
@@ -125,6 +136,44 @@ private val stillModesWithFrameRatio = setOf(
     ModeId.PRO
 )
 
+internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): QuickBrightnessRenderModel {
+    val isPhotoMode = state.activeMode == ModeId.PHOTO
+    val isPreviewActive = state.previewStatus == PreviewStatus.ACTIVE
+    val isBusy = state.activeShot != null || state.countdownRemainingSeconds != null
+    val isVisible = isPhotoMode
+    val range = state.activeDeviceCapabilities.previewBrightnessRange
+    val isUnsupported = range == com.opencamera.core.device.PreviewBrightnessRange.UNSUPPORTED
+    val steps = state.presentation.previewBrightnessSteps
+    val canInteract = isPhotoMode && isPreviewActive && !isBusy && !isUnsupported
+
+    val valueLabel = if (isUnsupported) {
+        text.quickBrightnessNa()
+    } else {
+        brightnessValueLabel(steps)
+    }
+
+    val disabledReason = when {
+        !isPhotoMode -> null
+        isUnsupported -> text.disabledBrightnessUnsupported()
+        isBusy -> text.disabledBrightnessActiveShot()
+        else -> null
+    }
+
+    return QuickBrightnessRenderModel(
+        title = text.quickBrightness(),
+        value = valueLabel,
+        canDecrease = canInteract && steps > range.minSteps,
+        canIncrease = canInteract && steps < range.maxSteps,
+        canReset = canInteract && steps != 0,
+        isVisible = isVisible,
+        disabledReason = disabledReason
+    )
+}
+
+private fun brightnessValueLabel(steps: Int): String {
+    return if (steps >= 0) "+$steps" else "$steps"
+}
+
 internal fun frameRatioControlRenderModel(state: SessionState, text: AppTextResolver): FrameRatioControlRenderModel {
     val current = state.activeEffectSpec.find<FrameEffect>()?.ratio ?: FrameRatio.RATIO_4_3
     val isSupportedMode = state.activeMode in stillModesWithFrameRatio
@@ -163,6 +212,7 @@ internal fun quickPanelSheetRenderModel(
     val live = settingsPage.photoSection.livePhoto
     val timer = settingsPage.photoSection.countdown
     val frameControl = frameRatioControlRenderModel(state, text)
+    val brightnessControl = brightnessRenderModel(state, text)
 
     return QuickPanelSheetRenderModel(
         gridRow = QuickPanelRowRenderModel(
@@ -175,6 +225,7 @@ internal fun quickPanelSheetRenderModel(
             value = strings.buttonStillFast,
             isEnabled = true
         ),
+        brightnessRow = brightnessControl,
         frameRatioRow = QuickPanelRowRenderModel(
             title = text.frameRatioTitle(),
             value = frameControl.currentLabel,
