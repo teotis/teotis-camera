@@ -190,6 +190,16 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         dispatch(SessionIntent.Boot)
         dispatch(SessionIntent.PreviewHostAttached)
         requestCameraPermissionIfNeeded()
+        loadLatestGalleryImage()
+    }
+
+    private fun loadLatestGalleryImage() {
+        lifecycleScope.launch {
+            val latestImage = queryLatestGalleryImage(this@MainActivity)
+            if (latestImage != null) {
+                dispatch(SessionIntent.LatestGalleryImageLoaded(latestImage))
+            }
+        }
     }
 
     override fun onStop() {

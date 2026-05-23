@@ -1,14 +1,22 @@
 package com.opencamera.app
 
+import android.Manifest
 import android.content.ContentUris
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.MediaStore
+import androidx.core.content.ContextCompat
 import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal suspend fun queryLatestGalleryImage(context: Context): ThumbnailSource.SavedMedia? {
     return withContext(Dispatchers.IO) {
+        if (!hasReadMediaImagesPermission(context)) {
+            return@withContext null
+        }
+
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DATA,
@@ -29,5 +37,19 @@ internal suspend fun queryLatestGalleryImage(context: Context): ThumbnailSource.
                 } else null
             }
         }.getOrNull()
+    }
+}
+
+private fun hasReadMediaImagesPermission(context: Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_MEDIA_IMAGES
+        ) == PackageManager.PERMISSION_GRANTED
+    } else {
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
     }
 }

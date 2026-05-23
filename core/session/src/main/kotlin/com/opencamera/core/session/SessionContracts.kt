@@ -242,6 +242,9 @@ sealed interface SessionIntent {
         val source: ThumbnailSource,
         val generation: Int = 0
     ) : SessionIntent
+    data class LatestGalleryImageLoaded(
+        val source: ThumbnailSource.SavedMedia
+    ) : SessionIntent
     data class CaptureFeedbackSnapshotUpdated(
         val shotId: String,
         val outputPath: String

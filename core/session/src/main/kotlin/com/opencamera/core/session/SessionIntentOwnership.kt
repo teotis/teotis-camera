@@ -34,6 +34,7 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     is SessionIntent.PreviewBindingStarted,
     is SessionIntent.PreviewFirstFrameAvailable,
     is SessionIntent.PreviewSnapshotUpdated,
+    is SessionIntent.LatestGalleryImageLoaded,
     is SessionIntent.CaptureFeedbackSnapshotUpdated,
     is SessionIntent.PreviewSurfaceLost,
     is SessionIntent.PreviewError,

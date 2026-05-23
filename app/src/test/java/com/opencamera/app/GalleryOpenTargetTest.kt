@@ -33,13 +33,15 @@ class GalleryOpenTargetTest {
     }
 
     @Test
-    fun `preview snapshot does not open gallery`() {
+    fun `preview snapshot with absolute path opens as file`() {
         val target = galleryOpenTargetFor(
             source = ThumbnailSource.PreviewSnapshot("/tmp/preview.jpg"),
             savedMediaType = SavedMediaType.PHOTO
         )
 
-        assertNull(target)
+        assertEquals(GalleryOpenUriKind.ABSOLUTE_FILE, target?.kind)
+        assertEquals("/tmp/preview.jpg", target?.uri)
+        assertEquals("image/*", target?.mimeType)
     }
 
     @Test
