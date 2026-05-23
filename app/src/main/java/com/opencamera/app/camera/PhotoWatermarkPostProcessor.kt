@@ -455,6 +455,19 @@ internal fun renderPhotoWatermarkBitmap(
             centered = false
         )
 
+        TEMPLATE_PURE_TEXT -> {
+            val canvas = Canvas(bitmap)
+            drawPureTextOverlay(
+                canvas = canvas,
+                bitmap = bitmap,
+                template = template,
+                titleTextSize = titleTextSize,
+                detailTextSize = detailTextSize,
+                padding = padding
+            )
+            PhotoWatermarkBitmapRenderResult(bitmap = bitmap, warning = template.warning)
+        }
+
         TEMPLATE_RETRO_FRAME -> drawExpandedFrame(
             source = bitmap,
             template = template,
@@ -541,6 +554,69 @@ private fun drawClassicOverlay(
     template.supportingLines.forEach { line ->
         baseline += detailHeight + lineGap
         canvas.drawText(line, left, baseline, detailPaint)
+    }
+}
+
+private fun drawPureTextOverlay(
+    canvas: Canvas,
+    bitmap: Bitmap,
+    template: ResolvedPhotoWatermarkTemplate,
+    titleTextSize: Float,
+    detailTextSize: Float,
+    padding: Float
+) {
+    val align = when (template.placement) {
+        WatermarkTextPlacement.TOP_LEFT,
+        WatermarkTextPlacement.BOTTOM_LEFT -> Paint.Align.LEFT
+        WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
+        WatermarkTextPlacement.TOP_RIGHT,
+        WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
+    }
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = titleTextSize
+        style = Paint.Style.FILL
+        textAlign = align
+        alpha = (255 * template.textOpacity).toInt()
+        setShadowLayer(titleTextSize * 0.22f, 0f, titleTextSize * 0.08f, Color.argb(190, 0, 0, 0))
+    }
+    val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(220, 235, 238, 242)
+        textSize = detailTextSize
+        style = Paint.Style.FILL
+        textAlign = align
+        alpha = (220 * template.textOpacity).toInt()
+        setShadowLayer(detailTextSize * 0.22f, 0f, detailTextSize * 0.08f, Color.argb(190, 0, 0, 0))
+    }
+    val lineGap = detailTextSize * 0.28f
+    val titleMetrics = titlePaint.fontMetrics
+    val detailMetrics = detailPaint.fontMetrics
+    val titleHeight = titleMetrics.descent - titleMetrics.ascent
+    val detailHeight = detailMetrics.descent - detailMetrics.ascent
+    val blockHeight = titleHeight +
+        template.supportingLines.size * detailHeight +
+        template.supportingLines.size * lineGap
+    val x = when (template.placement) {
+        WatermarkTextPlacement.TOP_LEFT,
+        WatermarkTextPlacement.BOTTOM_LEFT -> padding
+        WatermarkTextPlacement.BOTTOM_CENTER -> bitmap.width / 2f
+        WatermarkTextPlacement.TOP_RIGHT,
+        WatermarkTextPlacement.BOTTOM_RIGHT -> bitmap.width - padding
+    }
+    val top = when (template.placement) {
+        WatermarkTextPlacement.TOP_LEFT,
+        WatermarkTextPlacement.TOP_RIGHT -> padding
+        WatermarkTextPlacement.BOTTOM_LEFT,
+        WatermarkTextPlacement.BOTTOM_RIGHT,
+        WatermarkTextPlacement.BOTTOM_CENTER -> bitmap.height - padding - blockHeight - padding
+    }
+    val maxWidth = bitmap.width - padding * 2
+    var baseline = top - titleMetrics.ascent
+    canvas.drawText(template.title, x, baseline, titlePaint)
+    template.supportingLines.take(2).forEach { rawLine ->
+        baseline += detailHeight + lineGap
+        val line = fitText(rawLine, detailPaint, maxWidth)
+        canvas.drawText(line, x, baseline, detailPaint)
     }
 }
 
