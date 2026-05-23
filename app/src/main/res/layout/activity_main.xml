@@ -89,7 +89,7 @@
             android:ellipsize="end"
             android:includeFontPadding="false"
             android:maxLines="1"
-            android:text=""
+            android:text="@string/app_name"
             android:textColor="@color/oc_text_primary"
             android:textSize="@dimen/text_size_title"
             android:textStyle="bold" />

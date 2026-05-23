@@ -31,7 +31,7 @@ internal class CockpitSurfaceRenderer(
         get() = (this * context.resources.displayMetrics.density).toInt()
 
     fun renderTopTitle() {
-        topBar.titleText.text = ""
+        topBar.titleText.text = context.getString(R.string.app_name)
     }
 
     fun renderShutter(state: SessionState, controls: SessionControlsRenderModel) {
