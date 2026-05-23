@@ -363,6 +363,8 @@
     <string name="watermark_attr_background_prefix">Background </string>
     <string name="watermark_template_expanded_frame">Expanded frame</string>
     <string name="watermark_template_classic_overlay">Classic overlay</string>
+    <string name="watermark_template_pure_text">Clean text overlay</string>
+    <string name="watermark_template_blur_four_border">Blurred image frame</string>
 
     <!-- Portrait lab -->
     <string name="portrait_lab_supporting">Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.</string>

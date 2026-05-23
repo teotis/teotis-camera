@@ -1112,7 +1112,11 @@ internal fun watermarkLabSelectorRenderModel(
                 templateId = template.id,
                 title = template.label,
                 supportingText = buildString {
-                    append(if (template.supportsFrameBorder) text.watermarkTemplateExpandedFrame() else text.watermarkTemplateClassicOverlay())
+                    append(when (template.id) {
+                        "pure-text" -> text.watermarkTemplatePureText()
+                        "blur-four-border" -> text.watermarkTemplateBlurFourBorder()
+                        else -> if (template.supportsFrameBorder) text.watermarkTemplateExpandedFrame() else text.watermarkTemplateClassicOverlay()
+                    })
                     append(" | ")
                     append(text.tokensLabel())
                     append(" ")

@@ -436,7 +436,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun watermarkSelectorCurrentDefault(): String = str(R.string.watermark_selector_current_default, " | Current default")
     open fun watermarkEditAttrsFrame(): String = str(R.string.watermark_selector_edit_attrs_frame, "Placement, scale, opacity, background")
     open fun watermarkEditAttrsClassic(): String = str(R.string.watermark_selector_edit_attrs_classic, "Placement, scale, opacity")
-    open fun watermarkSelectorFooterSupported(): String = str(R.string.watermark_selector_footer_supported, "Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages.")
+    open fun watermarkSelectorFooterSupported(): String = str(R.string.watermark_selector_footer_supported, "Pure Text shows no frame; Classic Overlay keeps its border fixed; Travel Polaroid and Retro Frame expose frame variants; Blur Four Border uses blur-only backgrounds.")
     open fun watermarkSelectorFooterUnsupported(): String = str(R.string.watermark_selector_footer_unsupported, "Still capture is unavailable on this device, so Watermark Lab stays read-only.")
 
     // Watermark detail
@@ -453,6 +453,8 @@ open class AppTextResolver(private val context: Context?) {
     open fun watermarkAttrBackgroundPrefix(): String = str(R.string.watermark_attr_background_prefix, "Background ")
     open fun watermarkTemplateExpandedFrame(): String = str(R.string.watermark_template_expanded_frame, "Expanded frame")
     open fun watermarkTemplateClassicOverlay(): String = str(R.string.watermark_template_classic_overlay, "Classic overlay")
+    open fun watermarkTemplatePureText(): String = str(R.string.watermark_template_pure_text, "纯文字")
+    open fun watermarkTemplateBlurFourBorder(): String = str(R.string.watermark_template_blur_four_border, "模糊四边框")
 
     // Portrait lab
     open fun portraitLabSupporting(): String = str(R.string.portrait_lab_supporting, "Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.")

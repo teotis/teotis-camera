@@ -37,8 +37,18 @@ class PreviewEffectAdapter {
             templateId = effect.templateId,
             placement = effect.style.textPlacement,
             previewText = effect.tokens["watermarkModel"] ?: "Watermark",
-            opacity = effect.style.textOpacity.alphaFraction * 0.6f
+            opacity = effect.style.textOpacity.alphaFraction * 0.6f,
+            shape = resolveWatermarkShape(effect.templateId)
         )
+    }
+
+    private fun resolveWatermarkShape(templateId: String): WatermarkPreviewShape {
+        return when (templateId) {
+            "pure-text" -> WatermarkPreviewShape.TEXT_ONLY
+            "blur-four-border" -> WatermarkPreviewShape.FOUR_BORDER
+            "travel-polaroid", "retro-frame" -> WatermarkPreviewShape.EXPANDED_FRAME
+            else -> WatermarkPreviewShape.BACKED_TEXT
+        }
     }
 
     private fun buildFrameGuideline(effect: FrameEffect): FrameGuidelineSpec {

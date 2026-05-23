@@ -311,7 +311,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun watermarkSelectorCurrentDefault(): String = " | Current default"
     override fun watermarkEditAttrsFrame(): String = "Placement, scale, opacity, background"
     override fun watermarkEditAttrsClassic(): String = "Placement, scale, opacity"
-    override fun watermarkSelectorFooterSupported(): String = "Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages."
+    override fun watermarkSelectorFooterSupported(): String = "Pure Text shows no frame; Classic Overlay keeps its border fixed; Travel Polaroid and Retro Frame expose frame variants; Blur Four Border uses blur-only backgrounds."
     override fun watermarkSelectorFooterUnsupported(): String = "Still capture is unavailable on this device, so Watermark Lab stays read-only."
 
     // Watermark detail
@@ -328,6 +328,8 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun watermarkAttrBackgroundPrefix(): String = "Background "
     override fun watermarkTemplateExpandedFrame(): String = "Expanded frame"
     override fun watermarkTemplateClassicOverlay(): String = "Classic overlay"
+    override fun watermarkTemplatePureText(): String = "Pure text"
+    override fun watermarkTemplateBlurFourBorder(): String = "Blur four border"
 
     // Portrait lab
     override fun portraitLabSupporting(): String = "Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster."

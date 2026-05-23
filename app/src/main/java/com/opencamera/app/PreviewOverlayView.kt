@@ -12,6 +12,7 @@ import android.view.View
 import com.opencamera.core.effect.FilterOverlaySpec
 import com.opencamera.core.effect.FrameGuidelineSpec
 import com.opencamera.core.effect.WatermarkHintSpec
+import com.opencamera.core.effect.WatermarkPreviewShape
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.WatermarkTextPlacement
 import kotlin.math.min
@@ -72,6 +73,12 @@ class PreviewOverlayView @JvmOverloads constructor(
             resources.displayMetrics
         )
         typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+    }
+
+    private val watermarkBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = 2f * resources.displayMetrics.density
     }
 
     private val frameScrimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -259,6 +266,15 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawWatermarkHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        when (spec.shape) {
+            WatermarkPreviewShape.FOUR_BORDER -> drawWatermarkFourBorderHint(canvas, spec)
+            WatermarkPreviewShape.TEXT_ONLY,
+            WatermarkPreviewShape.BACKED_TEXT,
+            WatermarkPreviewShape.EXPANDED_FRAME -> drawWatermarkTextHint(canvas, spec)
+        }
+    }
+
+    private fun drawWatermarkTextHint(canvas: Canvas, spec: WatermarkHintSpec) {
         watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
         val padding = 16f * density
         val x: Float
@@ -290,6 +306,38 @@ class PreviewOverlayView @JvmOverloads constructor(
             }
         }
         canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
+    }
+
+    private fun drawWatermarkFourBorderHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        val inset = 10f * density
+        val rect = activeFrameRectOrFullView()
+        val borderRect = RectF(
+            rect.left + inset,
+            rect.top + inset,
+            rect.right - inset,
+            rect.bottom - inset
+        )
+        watermarkBorderPaint.alpha = (spec.opacity * 255 * 0.7f).toInt().coerceIn(0, 255)
+        canvas.drawRect(borderRect, watermarkBorderPaint)
+
+        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
+        val padding = 16f * density
+        val textY = borderRect.bottom - padding
+        watermarkHintPaint.textAlign = when (spec.placement) {
+            WatermarkTextPlacement.TOP_LEFT,
+            WatermarkTextPlacement.BOTTOM_LEFT -> Paint.Align.LEFT
+            WatermarkTextPlacement.TOP_RIGHT,
+            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
+            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
+        }
+        val textX = when (spec.placement) {
+            WatermarkTextPlacement.TOP_LEFT,
+            WatermarkTextPlacement.BOTTOM_LEFT -> borderRect.left + padding
+            WatermarkTextPlacement.TOP_RIGHT,
+            WatermarkTextPlacement.BOTTOM_RIGHT -> borderRect.right - padding
+            WatermarkTextPlacement.BOTTOM_CENTER -> borderRect.centerX()
+        }
+        canvas.drawText(spec.previewText, textX, textY, watermarkHintPaint)
     }
 
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {

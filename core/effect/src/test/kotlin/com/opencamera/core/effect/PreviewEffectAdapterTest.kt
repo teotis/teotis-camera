@@ -4,6 +4,7 @@ import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.WatermarkStyleSettings
 import com.opencamera.core.settings.WatermarkTextOpacity
+import com.opencamera.core.settings.WatermarkFrameBackground
 import com.opencamera.core.settings.WatermarkTextPlacement
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -152,5 +153,73 @@ class PreviewEffectAdapterTest {
         // Strong warm should have higher R and lower B than mild warm
         assertTrue(strongR > mildR, "strong warm R=$strongR should be > mild warm R=$mildR")
         assertTrue(strongB < mildB, "strong warm B=$strongB should be < mild warm B=$mildB")
+    }
+
+    @Test
+    fun `pure text watermark hint is text overlay`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "pure-text",
+                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    style = WatermarkStyleSettings(
+                        textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+                        textOpacity = WatermarkTextOpacity.SOFT
+                    )
+                )
+            ))
+        )
+
+        assertEquals("pure-text", model.watermarkHint?.templateId)
+        assertEquals(WatermarkPreviewShape.TEXT_ONLY, model.watermarkHint?.shape)
+    }
+
+    @Test
+    fun `blur four border watermark hint is frame hint`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "blur-four-border",
+                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    style = WatermarkStyleSettings(
+                        textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+                        textOpacity = WatermarkTextOpacity.SOLID,
+                        frameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR
+                    )
+                )
+            ))
+        )
+
+        assertEquals(WatermarkPreviewShape.FOUR_BORDER, model.watermarkHint?.shape)
+    }
+
+    @Test
+    fun `travel polaroid watermark hint is expanded frame`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "travel-polaroid",
+                    tokens = mapOf("watermarkModel" to "Camera"),
+                    style = WatermarkStyleSettings()
+                )
+            ))
+        )
+
+        assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+    }
+
+    @Test
+    fun `unknown watermark hint defaults to backed text`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "custom-template",
+                    tokens = mapOf("watermarkModel" to "Test"),
+                    style = WatermarkStyleSettings()
+                )
+            ))
+        )
+
+        assertEquals(WatermarkPreviewShape.BACKED_TEXT, model.watermarkHint?.shape)
     }
 }

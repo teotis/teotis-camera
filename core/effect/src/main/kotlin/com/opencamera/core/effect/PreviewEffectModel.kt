@@ -4,6 +4,13 @@ import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.WatermarkTextPlacement
 
+enum class WatermarkPreviewShape {
+    TEXT_ONLY,
+    BACKED_TEXT,
+    EXPANDED_FRAME,
+    FOUR_BORDER
+}
+
 data class PreviewEffectRenderModel(
     val filterOverlay: FilterOverlaySpec?,
     val watermarkHint: WatermarkHintSpec?,
@@ -26,7 +33,8 @@ data class WatermarkHintSpec(
     val templateId: String,
     val placement: WatermarkTextPlacement,
     val previewText: String,
-    val opacity: Float
+    val opacity: Float,
+    val shape: WatermarkPreviewShape = WatermarkPreviewShape.BACKED_TEXT
 )
 
 data class FrameGuidelineSpec(

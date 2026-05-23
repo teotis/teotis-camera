@@ -361,6 +361,8 @@
     <string name="watermark_attr_background_prefix">背景</string>
     <string name="watermark_template_expanded_frame">扩展边框</string>
     <string name="watermark_template_classic_overlay">经典叠加</string>
+    <string name="watermark_template_pure_text">纯文字</string>
+    <string name="watermark_template_blur_four_border">模糊四边框</string>
 
     <!-- Portrait lab -->
     <string name="portrait_lab_supporting">人像产品调节位于设置下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。</string>

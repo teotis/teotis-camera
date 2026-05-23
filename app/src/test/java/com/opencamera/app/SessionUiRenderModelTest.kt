@@ -257,7 +257,7 @@ class SessionUiRenderModelTest {
             )
         )
         assertTrue(summary.contains("Video defaults: 4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich"))
-        assertTrue(summary.contains("Catalog: 18 filters | 3 watermark templates | Live 1500 ms bundle"))
+        assertTrue(summary.contains("Catalog: 18 filters | 5 watermark templates | Live 1500 ms bundle"))
         assertTrue(summary.contains("Manual draft: RAW Off | ISO Auto | S Auto | WB Auto"))
         assertTrue(summary.contains("Action: Still resolution set to 4000x3000"))
     }
@@ -346,7 +346,7 @@ class SessionUiRenderModelTest {
             "4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich",
             model.videoSummary
         )
-        assertEquals("18 filters | 3 watermark templates | Live 1500 ms bundle", model.catalogSummary)
+        assertEquals("18 filters | 5 watermark templates | Live 1500 ms bundle", model.catalogSummary)
         assertEquals("RAW Off | ISO Auto | S Auto | WB Auto", model.manualDraftSummary)
     }
 
@@ -514,7 +514,7 @@ class SessionUiRenderModelTest {
             model.photoSection.portraitLab.buttonLabel
         )
         assertEquals(
-            "Watermark Lab\nTravel Polaroid\n部分支持 • Open selector + per-template tuning; 3 templates",
+            "Watermark Lab\nTravel Polaroid\n部分支持 • Open selector + per-template tuning; 5 templates",
             model.photoSection.watermarkTemplate.buttonLabel
         )
         assertEquals(
@@ -640,9 +640,11 @@ class SessionUiRenderModelTest {
 
         assertEquals("Watermark Lab", model.headline)
         assertEquals("", model.heroSummary)
-        assertEquals(3, model.items.size)
+        assertEquals(5, model.items.size)
         val selected = model.items.first { it.templateId == "travel-polaroid" }
         val classic = model.items.first { it.templateId == "classic-overlay" }
+        val pureText = model.items.first { it.templateId == "pure-text" }
+        val blurBorder = model.items.first { it.templateId == "blur-four-border" }
         assertTrue(selected.isSelected)
         assertEquals(null, selected.useAction)
         assertTrue(selected.supportingText.contains("Current default"))
@@ -652,7 +654,9 @@ class SessionUiRenderModelTest {
             classic.useAction
         )
         assertTrue(classic.supportingText.contains("Classic overlay"))
-        assertTrue(model.footer.contains("Classic Overlay keeps its border background fixed"))
+        assertTrue(pureText.supportingText.contains("Pure text", ignoreCase = true))
+        assertTrue(blurBorder.supportingText.contains("Blur four border", ignoreCase = true))
+        assertTrue(model.footer.contains("Pure Text shows no frame"))
     }
 
     @Test
