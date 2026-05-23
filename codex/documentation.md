@@ -68,6 +68,7 @@
 
 ## 当前遗留风险
 
+- 点击预览对焦/自动 EV 的 session/device/coordinator/UI feedback 链路已经存在，但 `CameraXCaptureAdapter` 的 `DeviceCommand.ApplyPreviewMetering` 分支仍是 `UNSUPPORTED` stub，尚未真正调用 CameraX `FocusMeteringAction`；已补充可转交 agent 的修复方案与反 stub 验证方案，落地前不应再把该能力判为真实完成。
 - `CameraXCaptureAdapter` 已能输出 `bind/provider heuristic + CameraState` runtime issue，并在 `provider/fatal` issue 上清理缓存 provider；但 `ProcessCameraProvider` 真正 provider death 仍没有平台级强信号，当前 `provider failure` 里依然包含基于异常文案的保守分类。
 - 第 `7` 阶段的 `recovery failure`、`切变焦`、`thermal`、`后台恢复` 与 `preview startup stall` 仓内 owner 已建立，但 `provider death` 真信号与更长时间维度的真机矩阵仍缺少可信来源，继续硬推容易只剩 contract。
 - 当前验证仍以 unit/assemble 为主；首帧超时 watchdog 已建立，但 provider death、provider restart 后真实重连成功率和更长稳的热/权限/生命周期组合仍未建立可收敛的自动化验证。
@@ -193,6 +194,18 @@
   [`2026-05-23-session-split-02-intent-ownership-scaffold.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-02-intent-ownership-scaffold.md) 建立 exhaustive intent ownership；
   [`2026-05-23-session-split-03-preview-recovery-processor.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-03-preview-recovery-processor.md)、[`2026-05-23-session-split-04-capture-recording-processor.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-04-capture-recording-processor.md)、[`2026-05-23-session-split-05-mode-device-control-processor.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-23-session-split-05-mode-device-control-processor.md) 分别覆盖 Stage 7 高价值 preview recovery、capture/recording 和 mode/device control 行为剥离。
 - 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读 `codex/plan.md`、`codex/prompt.md`、`codex/documentation.md`、`DefaultCameraSession.kt`、`SessionContracts.kt`、`DefaultCameraSessionTest.kt` 与 `CameraSessionCoordinator.kt`。
+
+## 2026-05-24：点击预览对焦 CameraX 执行缺口核验与修复方案
+
+- 目标：确认自动检测提出的 `CameraX FocusMeteringAction 未实现` 是否成立，并分析此前 agent plan 中点击对焦落地是否执行到位。
+- 结论：
+  C1 成立。当前 UI、session、device command、coordinator 和 reticle feedback 链路已经存在，但 [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 的 `DeviceCommand.ApplyPreviewMetering` 分支仍固定返回 `PreviewMeteringResultStatus.UNSUPPORTED`，没有调用 `FocusMeteringAction` / `CameraControl.startFocusAndMetering`。
+- 核心结果：
+  新增可直接交给非多模态 agent 的修复执行文档 [`2026-05-24-tap-focus-camerax-execution-repair.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-tap-focus-camerax-execution-repair.md)，限定只在 CameraX adapter 端补齐 AF+AE / AE-only degraded / unsupported / failed 结果；
+  新增验证和反 stub 门禁方案 [`2026-05-24-tap-focus-verification-and-anti-stub-gate.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-tap-focus-verification-and-anti-stub-gate.md)，同时记录当前 `SessionCockpitRenderModel.kt` 的 `SavedMediaType` 错误 import 会阻塞 app focused test。
+- 验证：
+  本轮只做核验和方案文档，不改运行时代码；
+  已尝试运行 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PreviewMeteringActionPlannerTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest`，但 `:app:compileDebugKotlin` 先因 `SessionCockpitRenderModel.kt` 错误导入 `com.opencamera.core.media.SavedMediaType` 失败，因此不能把 focused test 判为通过。
 
 ## 2026-05-23：缩略图相册跳转与预览点按对焦/自动 EV 验收收口
 

@@ -3,11 +3,8 @@ package com.opencamera.app
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
-import com.opencamera.core.device.StillCaptureOutputSize
-import com.opencamera.core.device.StillCaptureQualityPreference
-import com.opencamera.core.device.StillCaptureResolutionPreset
-import com.opencamera.core.media.LivePhotoBundle
-import com.opencamera.core.media.SavedMediaType
+import com.opencamera.core.media.StillCaptureQualityPreference
+import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
@@ -16,8 +13,6 @@ import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PermissionState
 import com.opencamera.core.session.PreviewMetrics
 import com.opencamera.core.session.PreviewStatus
-import com.opencamera.core.session.RecordingStatus
-import com.opencamera.core.session.SavedMediaType
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionLifecycle
