@@ -27,54 +27,12 @@ data class FilterRenderSpec(
     val warmBoost: Float = 0f,
     val coolBoost: Float = 0f
 ) {
-    fun toMetadataTags(prefix: String = METADATA_PREFIX): Map<String, String> {
-        return linkedMapOf(
-            "${prefix}.version" to "1",
-            "${prefix}.brightnessShift" to brightnessShift.toString(),
-            "${prefix}.contrast" to contrast.toString(),
-            "${prefix}.saturation" to saturation.toString(),
-            "${prefix}.warmthShift" to warmthShift.toString(),
-            "${prefix}.tintShift" to tintShift.toString(),
-            "${prefix}.monochromeMix" to monochromeMix.toString(),
-            "${prefix}.vignetteStrength" to vignetteStrength.toString(),
-            "${prefix}.softGlowStrength" to softGlowStrength.toString(),
-            "${prefix}.haloStrength" to haloStrength.toString(),
-            "${prefix}.grainStrength" to grainStrength.toString(),
-            "${prefix}.sharpnessBoost" to sharpnessBoost.toString(),
-            "${prefix}.highlightCompression" to highlightCompression.toString(),
-            "${prefix}.shadowLift" to shadowLift.toString(),
-            "${prefix}.warmBoost" to warmBoost.toString(),
-            "${prefix}.coolBoost" to coolBoost.toString()
-        )
-    }
-
     companion object {
-        private const val METADATA_PREFIX = "filterSpec"
-
         fun fromMetadataTags(
             tags: Map<String, String>,
-            prefix: String = METADATA_PREFIX
+            prefix: String = "filterSpec"
         ): FilterRenderSpec? {
-            if (tags["${prefix}.version"] == null) {
-                return null
-            }
-            return FilterRenderSpec(
-                brightnessShift = tags["${prefix}.brightnessShift"]?.toIntOrNull() ?: 0,
-                contrast = tags["${prefix}.contrast"]?.toFloatOrNull() ?: 1f,
-                saturation = tags["${prefix}.saturation"]?.toFloatOrNull() ?: 1f,
-                warmthShift = tags["${prefix}.warmthShift"]?.toIntOrNull() ?: 0,
-                tintShift = tags["${prefix}.tintShift"]?.toIntOrNull() ?: 0,
-                monochromeMix = tags["${prefix}.monochromeMix"]?.toFloatOrNull() ?: 0f,
-                vignetteStrength = tags["${prefix}.vignetteStrength"]?.toFloatOrNull() ?: 0f,
-                softGlowStrength = tags["${prefix}.softGlowStrength"]?.toFloatOrNull() ?: 0f,
-                haloStrength = tags["${prefix}.haloStrength"]?.toFloatOrNull() ?: 0f,
-                grainStrength = tags["${prefix}.grainStrength"]?.toFloatOrNull() ?: 0f,
-                sharpnessBoost = tags["${prefix}.sharpnessBoost"]?.toFloatOrNull() ?: 0f,
-                highlightCompression = tags["${prefix}.highlightCompression"]?.toFloatOrNull() ?: 0f,
-                shadowLift = tags["${prefix}.shadowLift"]?.toFloatOrNull() ?: 0f,
-                warmBoost = tags["${prefix}.warmBoost"]?.toFloatOrNull() ?: 0f,
-                coolBoost = tags["${prefix}.coolBoost"]?.toFloatOrNull() ?: 0f
-            )
+            return parseFilterRenderSpec(tags, prefix)
         }
     }
 }
@@ -246,48 +204,6 @@ data class FeatureCatalog(
             add(insertIndex, profile.copy(builtIn = false))
         }
         return copy(filterProfiles = mergedProfiles)
-    }
-
-    fun reduce(action: FeatureCatalogAction): FeatureCatalog {
-        return when (action) {
-            is FeatureCatalogAction.UpdateManualRawEnabled -> copy(
-                manualCaptureDraft = manualCaptureDraft.copy(rawEnabled = action.enabled)
-            )
-
-            is FeatureCatalogAction.UpdateManualIso -> copy(
-                manualCaptureDraft = manualCaptureDraft.copy(iso = action.iso)
-            )
-
-            is FeatureCatalogAction.UpdateManualShutterSpeedMillis -> copy(
-                manualCaptureDraft = manualCaptureDraft.copy(
-                    shutterSpeedMillis = action.shutterSpeedMillis
-                )
-            )
-
-            is FeatureCatalogAction.UpdateManualExposureCompensationSteps -> copy(
-                manualCaptureDraft = manualCaptureDraft.copy(
-                    exposureCompensationSteps = action.exposureCompensationSteps
-                )
-            )
-
-            is FeatureCatalogAction.UpdateManualFocusDistanceDiopters -> copy(
-                manualCaptureDraft = manualCaptureDraft.copy(
-                    focusDistanceDiopters = action.focusDistanceDiopters
-                )
-            )
-
-            is FeatureCatalogAction.UpdateManualApertureFNumber -> copy(
-                manualCaptureDraft = manualCaptureDraft.copy(
-                    apertureFNumber = action.apertureFNumber
-                )
-            )
-
-            is FeatureCatalogAction.UpdateManualWhiteBalanceKelvin -> copy(
-                manualCaptureDraft = manualCaptureDraft.copy(
-                    whiteBalanceKelvin = action.whiteBalanceKelvin
-                )
-            )
-        }
     }
 }
 

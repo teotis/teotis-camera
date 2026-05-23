@@ -546,26 +546,16 @@ class MainActivity : AppCompatActivity() {
             dispatch(SessionIntent.LensFacingToggled)
         }
         previewThumbnail.setOnClickListener {
-            val presentation = latestSessionState?.presentation ?: return@setOnClickListener
-            val filePath = presentation.latestCapturePath
-                ?: presentation.latestVideoPath
-                ?: return@setOnClickListener
-            val file = File(filePath)
-            if (!file.exists()) {
+            val state = latestSessionState ?: return@setOnClickListener
+            val target = galleryOpenTargetFor(
+                source = state.presentation.latestThumbnailSource,
+                savedMediaType = state.presentation.latestSavedMediaType
+            ) ?: run {
                 Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-            val mimeType = when (presentation.latestSavedMediaType) {
-                com.opencamera.core.session.SavedMediaType.VIDEO -> "video/*"
-                com.opencamera.core.session.SavedMediaType.PHOTO -> "image/*"
-                null -> "image/*"
-            }
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, mimeType)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            runCatching { startActivity(intent) }.onFailure {
+            val galleryLauncher = GalleryLauncher(this)
+            if (!galleryLauncher.open(target)) {
                 Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
             }
         }
@@ -716,7 +706,19 @@ class MainActivity : AppCompatActivity() {
             when (val action = gesturePolicy.map(event, activeMode, currentZoom)) {
                 is GestureAction.DispatchSession -> dispatch(action.intent)
                 is GestureAction.FocusAt -> {
-                    // TODO: focus/metering tap-to-focus integration
+                    val tap = normalizedPreviewTapOrNull(
+                        tapX = action.x,
+                        tapY = action.y,
+                        viewWidth = previewView.width,
+                        viewHeight = previewView.height,
+                        activeFrameRect = previewOverlayView.currentActiveFrameRectOrNull()
+                    ) ?: return@GestureRouter
+                    dispatch(
+                        SessionIntent.PreviewTapToFocus(
+                            normalizedX = tap.x,
+                            normalizedY = tap.y
+                        )
+                    )
                 }
                 is GestureAction.ShowExposureHint -> {
                     // TODO: exposure adjustment via vertical scroll

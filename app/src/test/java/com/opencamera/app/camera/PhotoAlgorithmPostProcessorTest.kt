@@ -7,6 +7,7 @@ import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.toMetadataTags
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

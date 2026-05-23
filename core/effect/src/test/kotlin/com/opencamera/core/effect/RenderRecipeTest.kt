@@ -9,6 +9,7 @@ import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.toMetadataTags
 import com.opencamera.core.settings.WatermarkStyleSettings
 import com.opencamera.core.settings.WatermarkTextOpacity
 import com.opencamera.core.settings.WatermarkTextPlacement

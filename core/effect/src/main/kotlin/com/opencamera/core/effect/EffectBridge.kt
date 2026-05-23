@@ -1,6 +1,7 @@
 package com.opencamera.core.effect
 
 import com.opencamera.core.media.PostProcessSpec
+import com.opencamera.core.settings.toMetadataTags
 
 object EffectBridge {
 
