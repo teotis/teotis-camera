@@ -1,6 +1,7 @@
 package com.opencamera.core.settings
 
 import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 data class ColorLabSpec(

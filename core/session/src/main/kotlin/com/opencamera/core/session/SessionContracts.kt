@@ -149,7 +149,9 @@ data class SessionPresentationState(
     val latestSavedMediaType: SavedMediaType? = null,
     val latestPipelineNotes: List<String> = emptyList(),
     val lastError: String? = null,
-    val previewMeteringFeedback: PreviewMeteringFeedback? = null
+    val previewMeteringFeedback: PreviewMeteringFeedback? = null,
+    val recordingStartedAtElapsedMillis: Long? = null,
+    val recordingElapsedMillis: Long? = null
 )
 
 data class SessionState(
@@ -244,6 +246,10 @@ sealed interface SessionIntent {
     ) : SessionIntent
     data class LatestGalleryImageLoaded(
         val source: ThumbnailSource.SavedMedia
+    ) : SessionIntent
+    data class LatestGalleryMediaLoaded(
+        val source: ThumbnailSource.SavedMedia,
+        val mediaType: SavedMediaType
     ) : SessionIntent
     data class CaptureFeedbackSnapshotUpdated(
         val shotId: String,
