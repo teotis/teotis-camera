@@ -482,6 +482,14 @@ internal fun renderPhotoWatermarkBitmap(
             centered = true
         )
 
+        TEMPLATE_BLUR_FOUR_BORDER -> drawBlurFourBorderFrame(
+            source = bitmap,
+            template = template,
+            titleTextSize = titleTextSize,
+            detailTextSize = detailTextSize,
+            padding = padding
+        )
+
         else -> PhotoWatermarkBitmapRenderResult(
             bitmap = bitmap,
             warning = mergeWarnings(template.warning, "template-fallback")
@@ -692,6 +700,109 @@ private fun drawExpandedFrame(
             detailPaint
         )
     }
+    return PhotoWatermarkBitmapRenderResult(
+        bitmap = framedBitmap,
+        warning = template.warning
+    )
+}
+
+private fun drawBlurFourBorderFrame(
+    source: Bitmap,
+    template: ResolvedPhotoWatermarkTemplate,
+    titleTextSize: Float,
+    detailTextSize: Float,
+    padding: Float
+): PhotoWatermarkBitmapRenderResult {
+    val minEdge = minOf(source.width, source.height).toFloat()
+    val sideBorder = maxOf(20f, minEdge * 0.045f)
+    val topBorder = maxOf(20f, minEdge * 0.045f)
+    val bottomBorder = maxOf(titleTextSize * 2.35f, minEdge * 0.09f)
+    val framedWidth = (source.width + sideBorder * 2f).toInt()
+    val framedHeight = (source.height + topBorder + bottomBorder).toInt()
+    val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(framedBitmap)
+    val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
+    drawFrameBackground(canvas, source, fullRect, template.frameBackground)
+    canvas.drawBitmap(source, sideBorder, topBorder, null)
+
+    val hairlineColor = when (template.frameBackground) {
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb((24 * 255 / 100), 0, 0, 0)
+        else -> Color.argb((28 * 255 / 100), 255, 255, 255)
+    }
+    val hairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = hairlineColor
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+    }
+    canvas.drawRect(
+        sideBorder - 0.5f,
+        topBorder - 0.5f,
+        sideBorder + source.width + 0.5f,
+        topBorder + source.height + 0.5f,
+        hairlinePaint
+    )
+
+    val titleColor = when (template.frameBackground) {
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(255, 245, 240, 230)
+        WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> Color.argb(255, 58, 55, 50)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(255, 255, 250, 235)
+        else -> Color.WHITE
+    }
+    val detailColor = when (template.frameBackground) {
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(230, 225, 218, 208)
+        WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> Color.argb(230, 95, 90, 82)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(230, 235, 228, 210)
+        else -> Color.argb(220, 235, 238, 242)
+    }
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = titleColor
+        textSize = titleTextSize
+        style = Paint.Style.FILL
+        alpha = (255 * template.textOpacity).toInt()
+        textAlign = when (template.placement) {
+            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
+            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
+            else -> Paint.Align.LEFT
+        }
+    }
+    val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = detailColor
+        textSize = detailTextSize
+        style = Paint.Style.FILL
+        alpha = (255 * template.textOpacity).toInt()
+        textAlign = when (template.placement) {
+            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
+            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
+            else -> Paint.Align.LEFT
+        }
+    }
+    val contentLeft = sideBorder + padding
+    val contentRight = framedWidth - sideBorder - padding
+    val blockTop = source.height + topBorder + padding
+    val titleMetrics = titlePaint.fontMetrics
+    val detailMetrics = detailPaint.fontMetrics
+    var baseline = blockTop - titleMetrics.ascent
+    val titleX = when (template.placement) {
+        WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
+        WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
+        else -> contentLeft
+    }
+    canvas.drawText(template.title, titleX, baseline, titlePaint)
+    template.supportingLines.take(2).forEach { line ->
+        baseline += (detailMetrics.descent - detailMetrics.ascent) + detailTextSize * 0.24f
+        val detailX = when (template.placement) {
+            WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
+            WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
+            else -> contentLeft
+        }
+        canvas.drawText(
+            fitText(line, detailPaint, contentRight - contentLeft),
+            detailX,
+            baseline,
+            detailPaint
+        )
+    }
+
     return PhotoWatermarkBitmapRenderResult(
         bitmap = framedBitmap,
         warning = template.warning
