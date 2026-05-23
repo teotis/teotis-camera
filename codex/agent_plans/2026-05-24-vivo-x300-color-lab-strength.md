@@ -59,6 +59,13 @@
    - warmth/tint 从 `-24..24` 可保持或放到 `-32..32`。建议放到 `-32..32` 以允许角落可见。
    - shadow/highlight/warm/cool boost 从 `0..0.38` 可放到 `0..0.48`。
 
+二次审查补充：
+
+- `pow(0.85)` 会让中等输入也变强，例如 `0.5` 会变成约 `0.55`。这符合增强方向，但如果真机中段过猛，可改用分段曲线：`abs(x) < 0.45` 时保持线性，超过后再加速。
+- 不建议一开始同时大幅放宽所有 clamp。更稳的落地方式是两步：先增强 mapping 并保留 clamp，测试发现边角被 clamp 截断后再放宽对应字段。
+- 方案里的阈值测试应保留少量余量，避免 roundToInt 和不同基础 spec 导致脆弱测试。比如 brightness/warmth 用 `>= 15` / `>= 18` 这种范围，不要断言精确值。
+- 需要额外验证 `PersistedSettingsSerializerTest`，因为 `ColorLabSpec` 序列化包含 `strength/colorAxis/toneAxis`。虽然本方案不改字段，但增强 mapping 后老设置会立刻变强，属于有意行为，需在 release note 或 documentation 中说明。
+
 ## 具体实现提示
 
 在 `ColorLabSpec.kt` 中新增私有 helper：
@@ -113,6 +120,7 @@ import kotlin.math.pow
 
 ```bash
 rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:settings:test --tests com.opencamera.core.settings.ColorLabSpecTest --tests com.opencamera.core.settings.StyleColorPipelineTest
+rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:settings:test --tests com.opencamera.core.settings.PersistedSettingsSerializerTest
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
@@ -140,4 +148,4 @@ rtk adb install -r -d /Users/dingren/.codex-build/OpenCamera/app/outputs/apk/deb
 - 不新增新的 Color Lab UI 控件。
 - 不把 `strength` 默认值改到超过 `1f`，避免破坏序列化和旧设置语义。
 - 不在 `PreviewOverlayView` 上单独增强 tint，预览和成片必须走同一 render spec 语义，避免“预览很强、成片不同”。
-
+- 不把调色板坐标做“吸边”或“角落放大命中”来伪造强度；用户问题是效果力度，不是触点无法到达边界。

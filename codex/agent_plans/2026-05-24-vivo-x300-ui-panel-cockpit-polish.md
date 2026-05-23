@@ -19,6 +19,7 @@
 - `app/src/main/res/layout/activity_main.xml`
 - `app/src/main/res/values/colors.xml`
 - `app/src/main/res/values/dimens.xml`
+- `app/src/main/res/values/themes.xml`
 - `app/src/main/res/values/styles.xml`
 - `app/src/main/res/drawable/bg_bottom_panel.xml`
 - `app/src/main/res/drawable/bg_panel_row.xml`
@@ -33,6 +34,7 @@
 - `quickBubblePanel` 当前约束到 `modeTrackScroll`，不是统一的二级面板下边界。
 - `panelDismissScrim` 已存在，`MainActivityActionBinder.bindPanelActions()` 已绑定 `DismissAll`，但 scrim 可能覆盖层级/点击范围和 quick panel 的 z-order 有冲突，需要验证 quick panel 打开时 scrim 在面板下、预览/底栏上。
 - `bg_bottom_panel.xml` 当前 solid 指向 `@color/oc_surface_scrim`，而 `colors.xml` 中该色为透明。如果真机仍黑，黑色可能来自父背景、系统导航栏、预览被底栏约束切掉后露出黑底，或 bottom cockpit 内某个子控件/窗口 inset 区域。
+- `Widget.OpenCamera.QuickBubbleButton` 在 `themes.xml` 中也使用 `@color/oc_surface_scrim` 作为 `backgroundTint`，这同样是透明的；不能依赖默认 style 给未选中画幅按钮提供背景。
 - `PreviewOverlayView.drawPreviewFrame()` 已有 `frame.dimOutsideFrame` 时的外部遮罩，属于成片区域提示的正确 owner。
 
 ## 方案
@@ -67,7 +69,7 @@
 1. 给 `frameRatioRow` 使用 `@drawable/bg_panel_row` 或新建轻量背景 `bg_quick_panel_row.xml`，颜色采用 `@color/oc_surface_panel_alt` 或更轻的半透明黑。
 2. 不要在未选中比例按钮上执行 `button.background = null`。改为始终设置稳定背景：
    - 选中：`R.drawable.bg_quick_chip_selected`
-   - 未选中：复用 `Widget.OpenCamera.QuickBubbleButton` 的默认背景，或新增 `bg_quick_chip.xml`
+   - 未选中：新增 `bg_quick_chip.xml` 或把 `Widget.OpenCamera.QuickBubbleButton` 的 `backgroundTint` 改为非透明半透明色。当前默认背景是透明，不能直接复用。
 3. 增大比例按钮命中：
    - `buttonFrameRatio43/169/11` 高度从 `32dp` 提到至少 `40dp`
    - 宽度从 `56dp` 提到 `64dp` 或让三项 `0dp + weight=1` 铺满行
@@ -90,6 +92,12 @@
 2. 检查 `activity_main.xml` 中 `cameraPreview` 和 `previewOverlay` 当前被约束到底部 `modeTrackScroll` 上方。这会让预览区域不覆盖底部 cockpit，可能露出窗口/父背景黑色。建议让 `cameraPreview` 和 `previewOverlay` 约束到 parent bottom，全屏铺底；底部控件浮在 preview 上方。
 3. 若改为全屏 preview，确保 `PreviewOverlayView.previewContentGeometry()` 仍使用全视图计算，和保存裁切一致。不要为了避开底栏缩小 active frame。
 4. `PreviewOverlayView.drawPreviewFrame()` 已有 outside-frame 半透明遮罩。若真机觉得遮罩不足，可只微调 `frameScrimPaint` alpha，但不要给底栏加黑底。
+
+二次审查补充：
+
+- `MainActivity` 当前对 `bottomSheet` 设置 navigation bar bottom padding。如果底栏透明后导航栏区域仍显黑，先检查 `Theme.OpenCamera` 的 `android:navigationBarColor` 当前为 black；这可能是“底部黑色”的一部分。若要修复，应谨慎改为透明并验证手势导航/三键导航两种情况。
+- 全屏 preview 后，`PreviewTapFocusGeometry.normalizedPreviewTapOrNull()` 会以 full `PreviewView` 尺寸归一化。底部控件若浮在 preview 上，点击控件区域不应穿透到 preview；确保 bottom controls 本身消费点击，且 overlay 不把 bottom controls 区域当成可对焦区域。
+- `PreviewView` 使用 `app:scaleType="fitCenter"`。如果全屏铺底后画面 letterbox 区域变大，需要确认 frame overlay 和实际 CameraX preview content 没有明显错位；必要时增加布局截图/真机点按验证，不要只依赖 unit test。
 
 验收：
 
@@ -131,6 +139,11 @@
 4. 点击 `panelDismissScrim` 必须触发 `CockpitPanelCommand.DismissAll` 并调用 `renderAfterPanelChange()`。已有代码可保留。
 5. 增加或更新 `CockpitPanelRouteTest`：QuickBubble 打开后 `DismissAll` 回到 `None`。
 
+二次审查补充：
+
+- 仅测试 router 不够，还要检查 `MainActivityRenderer.renderPanelVisibility()` 对 `QuickBubble` 是否让 scrim 可见、quick panel 可见。若现有测试没有 view 层，可至少添加一个小型 renderer test 或在手动验收清单中明确验证“scrim 显示时 quick panel 仍可点击”。
+- `panelDismissScrim` 当前背景是 `#26000000`，用户第 3 条要求底栏透明，但打开面板时出现全屏淡遮罩是合理的。验收时应区分“常态底栏黑底”和“面板打开时 scrim 变暗”。
+
 验收：
 
 - 打开快捷，点击预览空白处、底部透明区、右侧空白处都收起快捷。
@@ -159,4 +172,5 @@ rtk adb install -r -d /Users/dingren/.codex-build/OpenCamera/app/outputs/apk/deb
 3. 点击快捷外区域，确认收起。
 4. 打开设置/色彩实验室，确认面板下边界约在屏幕 60% 高度。
 5. 切换 16:9/1:1，确认预览外区域半透明提示成片区域。
-
+6. 点按预览中部和接近底部控件上方区域，确认 tap-to-focus 坐标没有因全屏 preview 改动而偏移。
+7. 分别在手势导航和三键导航模式下确认底部不出现系统导航栏黑块误判。

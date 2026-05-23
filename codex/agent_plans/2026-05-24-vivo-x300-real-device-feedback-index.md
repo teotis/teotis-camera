@@ -31,6 +31,15 @@
 
 ## 暂缓项：不直接出代码落地方案
 
+## 二次审查补充
+
+下游 agent 执行前应注意：
+
+- UI 方案里的 widget 样式实际主要在 `app/src/main/res/values/themes.xml`，不是 `styles.xml`。`styles.xml` 当前主要是 text appearances。
+- `Widget.OpenCamera.QuickBubbleButton` 当前 `backgroundTint` 是 `@color/oc_surface_scrim`，而该色为透明；因此“复用默认快捷按钮背景”不能解决画幅裸露问题。实现时需要改 style tint 或新增明确的 quick row/chip drawable。
+- 如果把 `cameraPreview` / `previewOverlay` 改成铺到 parent bottom，必须同步验证 tap-to-focus 的有效区域、frame ratio overlay、bottom inset。不要只看黑底消失。
+- `设置` 中 `拍照/视频` 无效不应完全搁置。建议先追加一个“轻量诊断任务”：为 settings tab 点击和 section visibility 增补 unit test / render trace，确认是 tab 切换失效还是 tab 内控制项无效。
+
 ### 6. 快捷中实况能力未实现
 
 当前文本证据显示 Live Photo 已有降级链路，但 CameraX 侧仍可能是 metadata-only / still-only fallback。相关线索：
@@ -63,6 +72,14 @@
 
 当前代码中 `SettingsPanelRenderer.renderTabs()` 会按 `SettingsTab.PHOTO/VIDEO` 切换 section 可见性，`MainActivityActionBinder` 也绑定了 tab 点击。因此需要先用真机或测试确认失败点，不建议在信息不足时直接改。
 
+补充建议：先由 UI Agent 增加或核对 `SettingsTab` 相关测试，至少覆盖：
+
+- `SelectSettingsTab(SettingsTab.PHOTO)` 后 `selectedSettingsTab == PHOTO`。
+- `SettingsPanelRenderer.renderTabs(PHOTO)` 后 `photoSection.isVisible == true` 且 `commonSection/videoSection` 隐藏。
+- `SettingsPanelRenderer.renderTabs(VIDEO)` 同理。
+
+若这些测试通过，问题大概率在 tab 内某些 setting 的实际能力或反馈，而不是 tab 切换本身。
+
 ## 共同验收命令
 
 每个落地 agent 至少运行相关单测和构建：
@@ -83,4 +100,3 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:settings:test --tests
 ```bash
 rtk ./scripts/verify_stage_7_observability.sh
 ```
-
