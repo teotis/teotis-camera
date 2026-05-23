@@ -58,6 +58,7 @@ internal class CaptureRecordingSessionProcessor(
     private var pendingCountdownJob: Job? = null
     private var pendingCountdownStrategy: CaptureStrategy? = null
     private var recordingWatchdogJob: Job? = null
+    private var recordingElapsedJob: Job? = null
 
     // ── Public queries ──────────────────────────────────────────────
 
@@ -88,11 +89,15 @@ internal class CaptureRecordingSessionProcessor(
             delay(timeoutMillis)
             if (state.value.recordingStatus == expectedStatus) {
                 trace.record("recording.watchdog.timeout", "status=$expectedStatus, timeout=${timeoutMillis}ms")
+                recordingElapsedJob?.cancel()
+                recordingElapsedJob = null
                 updateState.update { s ->
                     s.copy(
                         recordingStatus = RecordingStatus.IDLE,
                         activeShot = null,
                         presentation = s.presentation.copy(
+                            recordingStartedAtElapsedMillis = null,
+                            recordingElapsedMillis = null,
                             lastAction = "Recording timed out after ${timeoutMillis}ms",
                             lastError = "Recording state $expectedStatus timed out"
                         )
@@ -105,6 +110,19 @@ internal class CaptureRecordingSessionProcessor(
     fun cancelRecordingWatchdog() {
         recordingWatchdogJob?.cancel()
         recordingWatchdogJob = null
+    }
+
+    private fun cancelRecordingElapsedTimer() {
+        recordingElapsedJob?.cancel()
+        recordingElapsedJob = null
+        updateState.update { s ->
+            s.copy(
+                presentation = s.presentation.copy(
+                    recordingStartedAtElapsedMillis = null,
+                    recordingElapsedMillis = null
+                )
+            )
+        }
     }
 
     // ── Countdown management ────────────────────────────────────────
@@ -190,6 +208,13 @@ internal class CaptureRecordingSessionProcessor(
 
     private suspend fun handleShotStarted(shot: ShotRequest) {
         currentController().onSessionEvent(ModeSessionEvent.ShotStarted(shot))
+        recordingElapsedJob?.cancel()
+        recordingElapsedJob = null
+        val startedAt = if (shot.mediaType == MediaType.VIDEO) {
+            android.os.SystemClock.elapsedRealtime()
+        } else {
+            null
+        }
         updateState.update { s ->
             s.copy(
                 captureStatus = if (shot.mediaType == MediaType.PHOTO) {
@@ -209,6 +234,8 @@ internal class CaptureRecordingSessionProcessor(
                 presentation = s.presentation.copy(
                     countdownRemainingSeconds = null,
                     pendingCaptureFeedback = null,
+                    recordingStartedAtElapsedMillis = startedAt,
+                    recordingElapsedMillis = if (shot.mediaType == MediaType.VIDEO) 0L else null,
                     lastAction = if (shot.mediaType == MediaType.PHOTO) {
                         if (shot.livePhotoSpec != null) {
                             "Saving Live photo bundle"
@@ -222,6 +249,28 @@ internal class CaptureRecordingSessionProcessor(
                 )
             )
         }
+        if (shot.mediaType == MediaType.VIDEO) {
+            val shotId = shot.shotId
+            recordingElapsedJob = scope.launch {
+                while (state.value.activeShot?.shotId == shotId &&
+                    state.value.recordingStatus == RecordingStatus.RECORDING
+                ) {
+                    delay(1_000)
+                    val current = state.value
+                    if (current.activeShot?.shotId != shotId ||
+                        current.recordingStatus != RecordingStatus.RECORDING
+                    ) break
+                    val elapsed = android.os.SystemClock.elapsedRealtime() - startedAt
+                    updateState.update { s ->
+                        s.copy(
+                            presentation = s.presentation.copy(
+                                recordingElapsedMillis = elapsed
+                            )
+                        )
+                    }
+                }
+            }
+        }
         if (shot.mediaType == MediaType.PHOTO) {
             trace.record("capture.feedback.snapshot.requested", "shotId=${shot.shotId}")
         }
@@ -233,6 +282,8 @@ internal class CaptureRecordingSessionProcessor(
 
     private suspend fun handleShotCompleted(result: ShotResult) {
         currentController().onSessionEvent(ModeSessionEvent.ShotCompleted(result))
+        recordingElapsedJob?.cancel()
+        recordingElapsedJob = null
         updateState.update { s ->
             s.copy(
                 captureStatus = if (result.mediaType == MediaType.PHOTO) {
@@ -247,6 +298,8 @@ internal class CaptureRecordingSessionProcessor(
                 activeDeviceGraph = resolvedActiveDeviceGraph(),
                 presentation = s.presentation.copy(
                     countdownRemainingSeconds = null,
+                    recordingStartedAtElapsedMillis = null,
+                    recordingElapsedMillis = null,
                     previewThumbnailPath = result.thumbnailSource.outputPathOrNull()
                         ?: s.presentation.previewThumbnailPath,
                     latestThumbnailSource = when (result.thumbnailSource) {
@@ -351,6 +404,8 @@ internal class CaptureRecordingSessionProcessor(
                 reason = reason
             )
         )
+        recordingElapsedJob?.cancel()
+        recordingElapsedJob = null
         updateState.update { s ->
             s.copy(
                 captureStatus = if (mediaType == MediaType.PHOTO) {
@@ -365,6 +420,8 @@ internal class CaptureRecordingSessionProcessor(
                 activeDeviceGraph = resolvedActiveDeviceGraph(),
                 presentation = s.presentation.copy(
                     countdownRemainingSeconds = null,
+                    recordingStartedAtElapsedMillis = null,
+                    recordingElapsedMillis = null,
                     lastAction = if (mediaType == MediaType.PHOTO) {
                         "Photo capture failed"
                     } else {
@@ -386,6 +443,8 @@ internal class CaptureRecordingSessionProcessor(
         shot: ShotRequest,
         reason: String
     ) {
+        recordingElapsedJob?.cancel()
+        recordingElapsedJob = null
         currentController().onSessionEvent(
             ModeSessionEvent.ShotFailed(
                 shotId = shot.shotId,

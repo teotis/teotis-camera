@@ -17,8 +17,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:implementationMode="compatible"
-        android:layout_marginBottom="@dimen/space_16"
-        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -30,8 +29,7 @@
         android:layout_height="0dp"
         android:clickable="false"
         android:focusable="false"
-        android:layout_marginBottom="@dimen/space_16"
-        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -43,6 +41,7 @@
         android:layout_height="0dp"
         android:background="#26000000"
         android:clickable="true"
+        android:elevation="4dp"
         android:focusable="true"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -172,6 +171,7 @@
         android:layout_height="0dp"
         android:layout_marginEnd="74dp"
         android:clipToPadding="false"
+        android:elevation="8dp"
         android:fadeScrollbars="false"
         android:scrollbars="none"
         android:visibility="gone"
@@ -209,7 +209,7 @@
                 android:orientation="vertical"
                 android:gravity="center_horizontal"
                 android:padding="6dp"
-                android:background="@color/oc_surface_scrim">
+                android:background="@drawable/bg_panel_row">
 
                 <TextView
                     android:id="@+id/frameRatioQuickTitle"
@@ -222,7 +222,7 @@
 
                 <LinearLayout
                     android:id="@+id/frameRatioOptionRow"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:orientation="horizontal"
@@ -231,8 +231,9 @@
                     <Button
                         android:id="@+id/buttonFrameRatio43"
                         style="@style/Widget.OpenCamera.QuickBubbleButton"
-                        android:layout_width="56dp"
-                        android:layout_height="32dp"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
                         android:paddingHorizontal="6dp"
                         android:text="4:3"
                         android:textSize="11sp" />
@@ -240,8 +241,9 @@
                     <Button
                         android:id="@+id/buttonFrameRatio169"
                         style="@style/Widget.OpenCamera.QuickBubbleButton"
-                        android:layout_width="56dp"
-                        android:layout_height="32dp"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
                         android:layout_marginStart="4dp"
                         android:paddingHorizontal="6dp"
                         android:text="16:9"
@@ -250,8 +252,9 @@
                     <Button
                         android:id="@+id/buttonFrameRatio11"
                         style="@style/Widget.OpenCamera.QuickBubbleButton"
-                        android:layout_width="56dp"
-                        android:layout_height="32dp"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
                         android:layout_marginStart="4dp"
                         android:paddingHorizontal="6dp"
                         android:text="1:1"
@@ -367,6 +370,7 @@
         android:layout_marginBottom="64dp"
         android:background="@drawable/bg_settings_panel"
         android:contentDescription="@string/settings_panel_content_description"
+        android:elevation="8dp"
         android:fillViewport="true"
         android:padding="0dp"
         android:visibility="gone"
@@ -939,6 +943,7 @@
         android:layout_marginBottom="64dp"
         android:background="@drawable/bg_settings_panel"
         android:contentDescription="@string/filter_panel_content_description"
+        android:elevation="8dp"
         android:fillViewport="true"
         android:padding="0dp"
         android:visibility="gone"

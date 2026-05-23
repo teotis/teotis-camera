@@ -131,8 +131,8 @@ internal class CockpitSurfaceRenderer(
                 button.alpha = 1f
                 button.setBackgroundResource(R.drawable.bg_quick_chip_selected)
             } else {
-                button.alpha = 0.6f
-                button.background = null
+                button.alpha = if (sheet.frameRatioEnabled) 0.85f else 0.4f
+                button.setBackgroundResource(R.drawable.bg_quick_chip)
             }
         }
 

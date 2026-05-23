@@ -38,6 +38,7 @@ internal class PreviewRecoverySessionProcessor(
             is SessionIntent.PreviewFirstFrameAvailable -> handlePreviewFirstFrameAvailable(intent.firstFrameLatencyMillis)
             is SessionIntent.PreviewSnapshotUpdated -> handlePreviewSnapshotUpdated(intent.source, intent.generation)
             is SessionIntent.LatestGalleryImageLoaded -> handleLatestGalleryImageLoaded(intent.source)
+            is SessionIntent.LatestGalleryMediaLoaded -> handleLatestGalleryMediaLoaded(intent.source, intent.mediaType)
             is SessionIntent.CaptureFeedbackSnapshotUpdated -> handleCaptureFeedbackSnapshotUpdated(intent.shotId, intent.outputPath)
             is SessionIntent.PreviewSurfaceLost -> handlePreviewSurfaceLost(intent.reason)
             is SessionIntent.PreviewError -> handlePreviewError(intent.reason)
@@ -172,6 +173,21 @@ internal class PreviewRecoverySessionProcessor(
         }
         mutations.updatePreviewThumbnail(source, generation = 0)
         trace.record("latest.gallery.loaded", source.outputPathOrNull().orEmpty())
+    }
+
+    private fun handleLatestGalleryMediaLoaded(source: ThumbnailSource.SavedMedia, mediaType: SavedMediaType) {
+        val currentSource = state.value.presentation.latestThumbnailSource
+        if (currentSource is ThumbnailSource.SavedMedia) {
+            trace.record("latest.gallery.media.ignored", "already has saved media")
+            return
+        }
+        mutations.updatePreviewThumbnail(source, generation = 0)
+        state.value = state.value.copy(
+            presentation = state.value.presentation.copy(
+                latestSavedMediaType = mediaType
+            )
+        )
+        trace.record("latest.gallery.media.loaded", "path=${source.outputPathOrNull()},type=$mediaType")
     }
 
     private fun handleCaptureFeedbackSnapshotUpdated(shotId: String, outputPath: String) {

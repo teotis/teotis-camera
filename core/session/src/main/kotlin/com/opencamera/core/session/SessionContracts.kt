@@ -208,6 +208,12 @@ data class SessionState(
 
     val lastError: String?
         get() = presentation.lastError
+
+    val recordingStartedAtElapsedMillis: Long?
+        get() = presentation.recordingStartedAtElapsedMillis
+
+    val recordingElapsedMillis: Long?
+        get() = presentation.recordingElapsedMillis
 }
 
 sealed interface SessionIntent {

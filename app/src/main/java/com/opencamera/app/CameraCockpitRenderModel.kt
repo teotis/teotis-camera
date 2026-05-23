@@ -47,6 +47,12 @@ internal data class ZoomStripRenderModel(
     val isVisible: Boolean
 )
 
+internal data class RecordingIndicatorRenderModel(
+    val isVisible: Boolean,
+    val label: String,
+    val status: com.opencamera.core.session.RecordingStatus
+)
+
 internal data class BottomCockpitRenderModel(
     val captureOutputText: String,
     val shutterLabel: String,
@@ -54,6 +60,7 @@ internal data class BottomCockpitRenderModel(
     val isRecording: Boolean,
     val lensButtonLabel: String,
     val lensButtonEnabled: Boolean,
+    val recordingIndicator: RecordingIndicatorRenderModel,
     val disabledReason: String? = null
 )
 

@@ -24,6 +24,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.renderUriOrNull
 import com.opencamera.core.mode.ModeId
+import com.opencamera.core.session.SavedMediaType
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.RecordingStatus
@@ -40,6 +41,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private lateinit var views: MainActivityViews
     private val shutterClickSound = MediaActionSound()
     private var lastRequestedThumbnailUri: String? = null
+    private var lastSourceIdentity: String? = null
     private var lastPlayedShutterSoundShotId: String? = null
     private val panelRouter = CockpitPanelRouter()
     private val panelState: CockpitPanelUiState
