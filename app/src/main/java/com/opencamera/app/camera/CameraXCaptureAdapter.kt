@@ -21,6 +21,7 @@ import android.util.Size
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraState
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -56,6 +57,10 @@ import com.opencamera.core.device.DeviceShotRequestTranslator
 import com.opencamera.core.device.DefaultDeviceShotRequestTranslator
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ManualControlCapabilityMatrix
+import com.opencamera.core.device.PreviewMeteringMode
+import com.opencamera.core.device.PreviewMeteringRequest
+import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlan
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlanner
@@ -115,6 +120,7 @@ import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 
 data class CameraLensProfile(
@@ -1115,14 +1121,15 @@ class CameraXCaptureAdapter(
                 )
             }
 
-            is DeviceCommand.ApplyPreviewMetering -> {
+            is DeviceCommand.ApplyPreviewMetering -> runCatching {
+                applyPreviewMetering(command.request)
+            }.onFailure { throwable ->
                 _events.emit(
                     DeviceEvent.PreviewMeteringCompleted(
-                        com.opencamera.core.device.PreviewMeteringResult(
-                            requestId = command.request.requestId,
-                            point = command.request.point,
-                            status = com.opencamera.core.device.PreviewMeteringResultStatus.UNSUPPORTED,
-                            reason = "CameraX FocusMeteringAction not yet implemented"
+                        previewMeteringResult(
+                            request = command.request,
+                            status = PreviewMeteringResultStatus.FAILED,
+                            reason = throwable.message ?: "Preview metering failed"
                         )
                     )
                 )
@@ -1141,6 +1148,19 @@ class CameraXCaptureAdapter(
                 )
             }
         }
+    }
+
+    private fun previewMeteringResult(
+        request: PreviewMeteringRequest,
+        status: PreviewMeteringResultStatus,
+        reason: String? = null
+    ): PreviewMeteringResult {
+        return PreviewMeteringResult(
+            requestId = request.requestId,
+            point = request.point.clamped(),
+            status = status,
+            reason = reason
+        )
     }
 
     private fun applyOutputRotation(rotation: com.opencamera.core.device.CameraOutputRotation) {
