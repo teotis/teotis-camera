@@ -1,170 +1,98 @@
 package com.opencamera.core.settings
 
-enum class CompositionGridMode(
-    val storageKey: String,
+interface StorageKeyEnum {
+    val storageKey: String
     val label: String
-) {
-    OFF(
-        storageKey = "off",
-        label = "Off"
-    ),
-    RULE_OF_THIRDS(
-        storageKey = "rule-of-thirds",
-        label = "3x3"
-    ),
-    GOLDEN_RATIO(
-        storageKey = "golden-ratio",
-        label = "Golden"
-    );
+}
+
+inline fun <reified T> storageKeyFrom(value: String?): T?
+    where T : Enum<T>, T : StorageKeyEnum {
+    return enumValues<T>().firstOrNull { it.storageKey == value }
+}
+
+enum class CompositionGridMode(
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
+    OFF("off", "Off"),
+    RULE_OF_THIRDS("rule-of-thirds", "3x3"),
+    GOLDEN_RATIO("golden-ratio", "Golden");
 
     companion object {
-        fun fromStorageKey(value: String?): CompositionGridMode? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): CompositionGridMode? = storageKeyFrom(value)
     }
 }
 
 enum class CountdownDuration(
-    val storageKey: String,
+    override val storageKey: String,
     val seconds: Int,
-    val label: String
-) {
-    OFF(
-        storageKey = "off",
-        seconds = 0,
-        label = "Off"
-    ),
-    SECONDS_3(
-        storageKey = "3s",
-        seconds = 3,
-        label = "3s"
-    ),
-    SECONDS_5(
-        storageKey = "5s",
-        seconds = 5,
-        label = "5s"
-    ),
-    SECONDS_10(
-        storageKey = "10s",
-        seconds = 10,
-        label = "10s"
-    );
+    override val label: String
+) : StorageKeyEnum {
+    OFF("off", 0, "Off"),
+    SECONDS_3("3s", 3, "3s"),
+    SECONDS_5("5s", 5, "5s"),
+    SECONDS_10("10s", 10, "10s");
 
     companion object {
-        fun fromStorageKey(value: String?): CountdownDuration? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): CountdownDuration? = storageKeyFrom(value)
     }
 }
 
 enum class AudioProfile(
-    val storageKey: String,
-    val label: String
-) {
-    STANDARD(
-        storageKey = "standard",
-        label = "Standard"
-    ),
-    CONCERT(
-        storageKey = "concert",
-        label = "Concert"
-    );
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
+    STANDARD("standard", "Standard"),
+    CONCERT("concert", "Concert");
 
     companion object {
-        fun fromStorageKey(value: String?): AudioProfile? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): AudioProfile? = storageKeyFrom(value)
     }
 }
 
 enum class VideoResolution(
-    val storageKey: String,
-    val label: String
-) {
-    UHD_8K(
-        storageKey = "8k",
-        label = "8K"
-    ),
-    UHD_4K(
-        storageKey = "4k",
-        label = "4K"
-    ),
-    FHD_1080P(
-        storageKey = "1080p",
-        label = "1080p"
-    ),
-    HD_720P(
-        storageKey = "720p",
-        label = "720p"
-    ),
-    SD_480P(
-        storageKey = "480p",
-        label = "480p"
-    );
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
+    UHD_8K("8k", "8K"),
+    UHD_4K("4k", "4K"),
+    FHD_1080P("1080p", "1080p"),
+    HD_720P("720p", "720p"),
+    SD_480P("480p", "480p");
 
     companion object {
-        fun fromStorageKey(value: String?): VideoResolution? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): VideoResolution? = storageKeyFrom(value)
     }
 }
 
 enum class VideoFrameRate(
-    val storageKey: String,
+    override val storageKey: String,
     val fps: Int
-) {
-    FPS_24(
-        storageKey = "24",
-        fps = 24
-    ),
-    FPS_25(
-        storageKey = "25",
-        fps = 25
-    ),
-    FPS_30(
-        storageKey = "30",
-        fps = 30
-    ),
-    FPS_60(
-        storageKey = "60",
-        fps = 60
-    ),
-    FPS_100(
-        storageKey = "100",
-        fps = 100
-    ),
-    FPS_120(
-        storageKey = "120",
-        fps = 120
-    );
+) : StorageKeyEnum {
+    FPS_24("24", 24),
+    FPS_25("25", 25),
+    FPS_30("30", 30),
+    FPS_60("60", 60),
+    FPS_100("100", 100),
+    FPS_120("120", 120);
 
-    val label: String
+    override val label: String
         get() = "${fps}fps"
 
     companion object {
-        fun fromStorageKey(value: String?): VideoFrameRate? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): VideoFrameRate? = storageKeyFrom(value)
     }
 }
 
 enum class DynamicVideoFpsPolicy(
-    val storageKey: String,
-    val label: String
-) {
-    LOCKED(
-        storageKey = "locked",
-        label = "Locked fps"
-    ),
-    LOW_LIGHT_AUTO_24FPS(
-        storageKey = "low-light-auto-24fps",
-        label = "Low-light auto 24fps"
-    );
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
+    LOCKED("locked", "Locked fps"),
+    LOW_LIGHT_AUTO_24FPS("low-light-auto-24fps", "Low-light auto 24fps");
 
     companion object {
-        fun fromStorageKey(value: String?): DynamicVideoFpsPolicy? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): DynamicVideoFpsPolicy? = storageKeyFrom(value)
     }
 }
 
@@ -176,45 +104,25 @@ enum class FilterProfileCategory {
 }
 
 enum class LiveWatermarkMotionBehavior(
-    val storageKey: String,
-    val label: String,
+    override val storageKey: String,
+    override val label: String,
     val isDynamic: Boolean,
     val brightnessCouplingKey: String,
     val opacityCouplingKey: String
-) {
-    STATIC_OVERLAY(
-        storageKey = "static-overlay",
-        label = "Static Overlay",
-        isDynamic = false,
-        brightnessCouplingKey = "locked",
-        opacityCouplingKey = "locked"
-    ),
-    FOLLOW_FRAME_LUMA(
-        storageKey = "follow-frame-luma",
-        label = "Follow Frame Luma",
-        isDynamic = true,
-        brightnessCouplingKey = "follow-frame-luma",
-        opacityCouplingKey = "locked"
-    ),
-    FOLLOW_FRAME_LUMA_AND_MOTION(
-        storageKey = "follow-frame-luma-and-motion",
-        label = "Follow Frame Luma + Motion",
-        isDynamic = true,
-        brightnessCouplingKey = "follow-frame-luma",
-        opacityCouplingKey = "follow-frame-motion"
-    );
+) : StorageKeyEnum {
+    STATIC_OVERLAY("static-overlay", "Static Overlay", false, "locked", "locked"),
+    FOLLOW_FRAME_LUMA("follow-frame-luma", "Follow Frame Luma", true, "follow-frame-luma", "locked"),
+    FOLLOW_FRAME_LUMA_AND_MOTION("follow-frame-luma-and-motion", "Follow Frame Luma + Motion", true, "follow-frame-luma", "follow-frame-motion");
 
     companion object {
-        fun fromStorageKey(value: String?): LiveWatermarkMotionBehavior? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): LiveWatermarkMotionBehavior? = storageKeyFrom(value)
     }
 }
 
 enum class WatermarkTextPlacement(
-    val storageKey: String,
-    val label: String
-) {
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
     TOP_LEFT("top-left", "Top Left"),
     TOP_RIGHT("top-right", "Top Right"),
     BOTTOM_LEFT("bottom-left", "Bottom Left"),
@@ -222,48 +130,42 @@ enum class WatermarkTextPlacement(
     BOTTOM_CENTER("bottom-center", "Bottom Center");
 
     companion object {
-        fun fromStorageKey(value: String?): WatermarkTextPlacement? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): WatermarkTextPlacement? = storageKeyFrom(value)
     }
 }
 
 enum class WatermarkTextScale(
-    val storageKey: String,
-    val label: String,
+    override val storageKey: String,
+    override val label: String,
     val multiplier: Float
-) {
+) : StorageKeyEnum {
     COMPACT("compact", "Compact", 0.85f),
     NORMAL("normal", "Normal", 1f),
     LARGE("large", "Large", 1.2f);
 
     companion object {
-        fun fromStorageKey(value: String?): WatermarkTextScale? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): WatermarkTextScale? = storageKeyFrom(value)
     }
 }
 
 enum class WatermarkTextOpacity(
-    val storageKey: String,
-    val label: String,
+    override val storageKey: String,
+    override val label: String,
     val alphaFraction: Float
-) {
+) : StorageKeyEnum {
     SUBTLE("subtle", "Subtle", 0.55f),
     SOFT("soft", "Soft", 0.8f),
     SOLID("solid", "Solid", 1f);
 
     companion object {
-        fun fromStorageKey(value: String?): WatermarkTextOpacity? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): WatermarkTextOpacity? = storageKeyFrom(value)
     }
 }
 
 enum class WatermarkFrameBackground(
-    val storageKey: String,
-    val label: String
-) {
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
     DARK("dark", "Dark"),
     WHITE("white", "White"),
     SOURCE_BLUR("source-blur", "Source Blur"),
@@ -271,109 +173,59 @@ enum class WatermarkFrameBackground(
     SOURCE_VIVID_BLUR("source-vivid-blur", "Vivid Blur");
 
     companion object {
-        fun fromStorageKey(value: String?): WatermarkFrameBackground? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): WatermarkFrameBackground? = storageKeyFrom(value)
     }
 }
 
 enum class PortraitProfile(
-    val storageKey: String,
-    val label: String
-) {
-    NATIVE(
-        storageKey = "native",
-        label = "Native Portrait"
-    ),
-    LUMINOUS(
-        storageKey = "luminous",
-        label = "Luminous Portrait"
-    );
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
+    NATIVE("native", "Native Portrait"),
+    LUMINOUS("luminous", "Luminous Portrait");
 
     companion object {
-        fun fromStorageKey(value: String?): PortraitProfile? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): PortraitProfile? = storageKeyFrom(value)
     }
 }
 
 enum class PortraitBeautyPreset(
-    val storageKey: String,
-    val label: String
-) {
-    AUTHENTIC(
-        storageKey = "authentic",
-        label = "Authentic"
-    ),
-    CLEAR(
-        storageKey = "clear",
-        label = "Clear"
-    ),
-    RADIANT(
-        storageKey = "radiant",
-        label = "Radiant"
-    );
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
+    AUTHENTIC("authentic", "Authentic"),
+    CLEAR("clear", "Clear"),
+    RADIANT("radiant", "Radiant");
 
     companion object {
-        fun fromStorageKey(value: String?): PortraitBeautyPreset? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): PortraitBeautyPreset? = storageKeyFrom(value)
     }
 }
 
 enum class PortraitBeautyStrength(
-    val storageKey: String,
-    val label: String,
+    override val storageKey: String,
+    override val label: String,
     val intensity: Float
-) {
-    OFF(
-        storageKey = "off",
-        label = "Off",
-        intensity = 0f
-    ),
-    SOFT(
-        storageKey = "soft",
-        label = "Soft",
-        intensity = 0.35f
-    ),
-    BALANCED(
-        storageKey = "balanced",
-        label = "Balanced",
-        intensity = 0.6f
-    ),
-    ELEVATED(
-        storageKey = "elevated",
-        label = "Elevated",
-        intensity = 0.85f
-    );
+) : StorageKeyEnum {
+    OFF("off", "Off", 0f),
+    SOFT("soft", "Soft", 0.35f),
+    BALANCED("balanced", "Balanced", 0.6f),
+    ELEVATED("elevated", "Elevated", 0.85f);
 
     companion object {
-        fun fromStorageKey(value: String?): PortraitBeautyStrength? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): PortraitBeautyStrength? = storageKeyFrom(value)
     }
 }
 
 enum class PortraitBokehEffect(
-    val storageKey: String,
-    val label: String
-) {
-    NATURAL(
-        storageKey = "natural",
-        label = "Natural"
-    ),
-    CREAMY(
-        storageKey = "creamy",
-        label = "Creamy"
-    ),
-    DREAMY(
-        storageKey = "dreamy",
-        label = "Dreamy"
-    );
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
+    NATURAL("natural", "Natural"),
+    CREAMY("creamy", "Creamy"),
+    DREAMY("dreamy", "Dreamy");
 
     companion object {
-        fun fromStorageKey(value: String?): PortraitBokehEffect? {
-            return entries.firstOrNull { it.storageKey == value }
-        }
+        fun fromStorageKey(value: String?): PortraitBokehEffect? = storageKeyFrom(value)
     }
 }
