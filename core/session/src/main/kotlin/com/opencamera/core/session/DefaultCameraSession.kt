@@ -383,6 +383,7 @@ class DefaultCameraSession(
         }
 
         captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because session stopped")
+        captureRecordingProcessor.cancelRecordingWatchdog()
         currentController.onExit()
         updateState(
             lifecycle = SessionLifecycle.STOPPED,

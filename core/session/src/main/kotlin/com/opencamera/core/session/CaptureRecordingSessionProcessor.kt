@@ -102,6 +102,11 @@ internal class CaptureRecordingSessionProcessor(
         }
     }
 
+    fun cancelRecordingWatchdog() {
+        recordingWatchdogJob?.cancel()
+        recordingWatchdogJob = null
+    }
+
     // ── Countdown management ────────────────────────────────────────
 
     private suspend fun handleCountdownTick(remainingSeconds: Int) {
