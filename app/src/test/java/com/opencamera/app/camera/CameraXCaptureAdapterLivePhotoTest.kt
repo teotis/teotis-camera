@@ -1,6 +1,5 @@
 package com.opencamera.app.camera
 
-import android.net.Uri
 import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LiveMotionSource
 import com.opencamera.core.media.LivePhotoBundle
@@ -433,7 +432,7 @@ class CameraXCaptureAdapterLivePhotoTest {
                 displayPath = "Pictures/OpenCamera/capture.jpg",
                 contentUri = "content://media/external/images/media/42"
             ),
-            savedUri = null
+            savedUriString = null
         )
 
         assertEquals("content://media/external/images/media/42", handle.contentUri)
@@ -445,7 +444,7 @@ class CameraXCaptureAdapterLivePhotoTest {
             outputHandle = MediaOutputHandle(
                 displayPath = "Pictures/OpenCamera/capture.jpg"
             ),
-            savedUri = Uri.parse("content://media/external/images/media/43")
+            savedUriString = "content://media/external/images/media/43"
         )
 
         assertEquals("content://media/external/images/media/43", handle.contentUri)

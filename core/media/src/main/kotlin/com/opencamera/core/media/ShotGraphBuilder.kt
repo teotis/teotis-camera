@@ -10,11 +10,14 @@ internal object ShotGraphBuilder {
         val imageFormat = CaptureFrameFormat(mimeType = request.saveRequest.mimeType)
         val videoFormat = CaptureFrameFormat(mimeType = "video/mp4")
 
+        val primaryCaptureNodeId: String
+
         when (request.shotKind) {
             ShotKind.STILL_CAPTURE -> {
+                primaryCaptureNodeId = "${request.shotId}:primary"
                 captureNodes.add(
                     CaptureNode(
-                        id = "${request.shotId}:primary",
+                        id = primaryCaptureNodeId,
                         role = CaptureNodeRole.PRIMARY_STILL,
                         frameCount = 1,
                         requiredFormat = imageFormat
@@ -30,6 +33,7 @@ internal object ShotGraphBuilder {
             }
 
             ShotKind.MULTI_FRAME_CAPTURE -> {
+                primaryCaptureNodeId = "${request.shotId}:primary"
                 captureNodes.add(
                     CaptureNode(
                         id = "${request.shotId}:temp-frames",
@@ -41,7 +45,7 @@ internal object ShotGraphBuilder {
                 )
                 captureNodes.add(
                     CaptureNode(
-                        id = "${request.shotId}:primary",
+                        id = primaryCaptureNodeId,
                         role = CaptureNodeRole.PRIMARY_STILL,
                         frameCount = 1,
                         requiredFormat = imageFormat
@@ -52,7 +56,7 @@ internal object ShotGraphBuilder {
                         id = "${request.shotId}:alg:merge",
                         type = AlgorithmType.MULTI_FRAME_MERGE,
                         inputs = listOf("${request.shotId}:temp-frames"),
-                        output = "${request.shotId}:primary",
+                        output = primaryCaptureNodeId,
                         requirement = AlgorithmRequirement.REQUIRED,
                         fallback = AlgorithmFallback.FAIL_SHOT
                     )
@@ -67,9 +71,10 @@ internal object ShotGraphBuilder {
             }
 
             ShotKind.LIVE_PHOTO -> {
+                primaryCaptureNodeId = "${request.shotId}:still"
                 captureNodes.add(
                     CaptureNode(
-                        id = "${request.shotId}:still",
+                        id = primaryCaptureNodeId,
                         role = CaptureNodeRole.PRIMARY_STILL,
                         frameCount = 1,
                         requiredFormat = imageFormat
@@ -87,7 +92,7 @@ internal object ShotGraphBuilder {
                     AlgorithmNode(
                         id = "${request.shotId}:alg:live-assemble",
                         type = AlgorithmType.LIVE_ASSEMBLE,
-                        inputs = listOf("${request.shotId}:still", "${request.shotId}:motion"),
+                        inputs = listOf(primaryCaptureNodeId, "${request.shotId}:motion"),
                         output = "${request.shotId}:live-bundle",
                         requirement = AlgorithmRequirement.REQUIRED,
                         fallback = AlgorithmFallback.USE_ORIGINAL
@@ -118,9 +123,10 @@ internal object ShotGraphBuilder {
             }
 
             ShotKind.VIDEO_RECORDING -> {
+                primaryCaptureNodeId = "${request.shotId}:video"
                 captureNodes.add(
                     CaptureNode(
-                        id = "${request.shotId}:video",
+                        id = primaryCaptureNodeId,
                         role = CaptureNodeRole.PRIMARY_VIDEO,
                         frameCount = 1,
                         requiredFormat = videoFormat
@@ -142,7 +148,7 @@ internal object ShotGraphBuilder {
                 AlgorithmNode(
                     id = "${request.shotId}:alg:filter",
                     type = AlgorithmType.FILTER_RENDER,
-                    inputs = listOf("${request.shotId}:primary"),
+                    inputs = listOf(primaryCaptureNodeId),
                     output = "${request.shotId}:filtered",
                     requirement = AlgorithmRequirement.OPTIONAL,
                     fallback = AlgorithmFallback.USE_ORIGINAL
@@ -154,7 +160,7 @@ internal object ShotGraphBuilder {
                 AlgorithmNode(
                     id = "${request.shotId}:alg:watermark",
                     type = AlgorithmType.WATERMARK_RENDER,
-                    inputs = listOf("${request.shotId}:primary"),
+                    inputs = listOf(primaryCaptureNodeId),
                     output = "${request.shotId}:watermarked",
                     requirement = AlgorithmRequirement.OPTIONAL,
                     fallback = AlgorithmFallback.USE_ORIGINAL
@@ -166,7 +172,7 @@ internal object ShotGraphBuilder {
                 AlgorithmNode(
                     id = "${request.shotId}:alg:thumbnail",
                     type = AlgorithmType.THUMBNAIL_SELECT,
-                    inputs = listOf("${request.shotId}:primary"),
+                    inputs = listOf(primaryCaptureNodeId),
                     output = "${request.shotId}:thumbnail",
                     requirement = AlgorithmRequirement.OPTIONAL,
                     fallback = AlgorithmFallback.SKIP

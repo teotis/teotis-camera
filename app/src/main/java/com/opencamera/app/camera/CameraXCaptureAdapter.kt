@@ -2357,7 +2357,10 @@ class CameraXCaptureAdapter(
         val cleanupFile: File? = null
     ) {
         fun resolveOutputHandle(savedUri: Uri?): MediaOutputHandle {
-            return resolvePhotoOutputHandle(outputHandle, savedUri)
+            val uriString = savedUri
+                ?.takeUnless { it == Uri.EMPTY }
+                ?.toString()
+            return resolvePhotoOutputHandle(outputHandle, uriString)
         }
 
         fun cleanupPaths(): List<String> {
@@ -2417,11 +2420,9 @@ class CameraXCaptureAdapter(
 
 internal fun resolvePhotoOutputHandle(
     outputHandle: MediaOutputHandle,
-    savedUri: Uri?
+    savedUriString: String?
 ): MediaOutputHandle {
-    val resolvedContentUri = savedUri
-        ?.takeUnless { it == Uri.EMPTY }
-        ?.toString()
+    val resolvedContentUri = savedUriString?.takeIf { it.isNotBlank() }
     return if (resolvedContentUri == null) {
         outputHandle
     } else {

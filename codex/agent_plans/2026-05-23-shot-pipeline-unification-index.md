@@ -88,3 +88,45 @@ Result: pass.
 ```bash
 rtk ./scripts/verify_stage_7_observability.sh
 ```
+
+## Re-Verification 2026-05-23 (第二轮)
+
+核验人：Claude，基于外部 agent 提交 (c90f87d, b10a63a) 后的仓库状态。
+
+### 已通过
+
+| 检查项 | 结果 |
+|--------|------|
+| `verify_stage_7_observability.sh` 汇编 | PASS |
+| ShotExecutor / AlgorithmProcessor / AlgorithmJobScheduler 测试 | PASS |
+| ModeCaptureStrategyGraph 测试 | PASS |
+| DefaultDeviceShotRequestTranslator 测试 | PASS |
+| CameraXCaptureAdapter 全量单元测试 (29 个) | PASS |
+
+### 已修复的问题
+
+1. **[P1] CameraX LivePhoto 测试失败** — `resolvePhotoOutputHandle` 的参数从 `String?` 改为 `Uri?` 后，JVM 单元测试中 `Uri.parse()` 返回 null（因 `isReturnDefaultValues = true`）。修复：将 Uri→String 转换移至调用点 `PhotoOutputRequest.resolveOutputHandle()`，函数参数恢复为 `String?`，JVM 测试可直接传字符串。
+
+2. **[P2] ShotGraph 可选算法节点引用错误节点 ID** — `ShotGraphBuilder` 的 filter/watermark/thumbnail 节点硬编码引用 `${shotId}:primary`，但 LIVE_PHOTO 的 primary capture node 是 `${shotId}:still`，VIDEO_RECORDING 是 `${shotId}:video`。修复：在各 when 分支设置 `primaryCaptureNodeId` 变量，算法节点统一使用该变量。
+
+### 保留风险（非 ShotGraph 回归）
+
+**[P1] MediaStore editable handle** — Android Q+ 的 `createPhotoOutputRequest` 创建 `outputHandle` 时仅设 `displayPath`（相对路径）。如果 CameraX 省略 `savedUri`，下游 Color Lab/水印/画幅后处理可能拿不到 `contentUri`。这是 ShotGraph 工作之前就存在的设计限制，建议后续单独处理（如 Q+ 预插入 MediaStore 获取 content URI）。
+
+### 图语义迁移状态
+
+`executeShot()` 已成功迁移到图谓词调度：
+```kotlin
+when {
+    graph.primaryVideoNode() != null -> startVideoRecording(...)
+    graph.temporaryFrameNode() != null -> captureStillImage(...)
+    graph.primaryStillNode() != null -> captureStillImage(...)
+    else -> error(...)
+}
+```
+
+`DeviceShotRequestTranslator.translate(plan)` 已改为读取 `plan.graph` 做设备翻译决策。
+
+### 结论
+
+ShotGraph 方向核心代码已落地，所有门禁和数据面测试通过。两个已修复的问题均为测试兼容性和图节点一致性 bug，不影响架构正确性。
