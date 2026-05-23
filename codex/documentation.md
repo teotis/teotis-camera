@@ -76,6 +76,7 @@
 
 ## 下一步建议
 
+- `2026-05-24` 多种水印（纯文字、模糊四边框及既有模板扩展）已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-multi-watermark-design-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-multi-watermark-design-index.md) 将工作拆成设置契约、渲染管线、UI 预览与验证三份文档。核心口径是模板选择和样式仍由 `core:settings`/`EffectSpec` 承接，最终 JPEG 像素只在 `PhotoWatermarkPostProcessor` 中渲染；纯文字不画底卡，模糊四边框必须在保存图四边显示源图模糊边框，并通过设置能力过滤避免无效控件。本轮只新增方案文档，不改运行时代码；最终美观验收需由多模态 owner 对保存 JPEG、缩略图和窄屏设置页做视觉复验。
 - `2026-05-24` 拍照/录像模式 `快捷` 中画质/分辨率切换能力已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-quick-quality-resolution-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-quick-quality-resolution-index.md) 将工作拆为拍照快捷画质/像素、录像快捷组合规格和验证门禁三份文档；拍照侧要求复用既有 `StillCaptureQualityToggled / StillCaptureResolutionToggled` session owner，录像侧要求把 quick quality 改为能力过滤后的 `VideoSpec(resolution, fps)` 组合项，例如 `4K30 / 1080p60`，不再把 fps 做成独立快捷项。本轮只做方案交接，不改运行时代码；精确 Apple/vivo 视觉对齐登记为后续多模态 QA。
 - `2026-05-24` 拍照模式 Live / Google Motion Photo 能力已归纳为 1 个总索引和 3 个可交给非多模态 agent 的实施方案：[`2026-05-24-live-motion-photo-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-index.md)、[`2026-05-24-live-motion-photo-preview-ring-buffer.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-preview-ring-buffer.md)、[`2026-05-24-live-motion-photo-google-container.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-google-container.md)、[`2026-05-24-live-motion-photo-session-integration.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-session-integration.md)。本轮只设计交接，不改运行时代码；方案明确先用预览低分辨率 ring buffer 作为 motion segment 来源，再写 Google Motion Photo JPEG container，最后接回 session/media/product 语义。该工作属于 feature / capability-kernel 增强，不是第 `7` 阶段 exit 必要项，落地前需要用户明确授权回 feature 侧。
 - `2026-05-24` 视频模式真机反馈已归纳为 1 个总索引和 2 个可交给非多模态 agent 的实施方案：[`2026-05-24-video-mode-real-device-feedback-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-mode-real-device-feedback-index.md)、[`2026-05-24-video-thumbnail-and-gallery-preload.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-thumbnail-and-gallery-preload.md)、[`2026-05-24-video-recording-elapsed-time.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-recording-elapsed-time.md)。本轮只设计交接，不改运行时代码；视频缩略图方案限定在 saved media 查询、视频首帧 materialize 和 gallery MIME 语义，录像时间方案限定在 session-owned elapsed presentation。视频滤镜/水印烧录、转码、内置播放器和长录稳定性阈值登记为非本轮范围。
@@ -115,6 +116,19 @@
 ---
 
 # 最近有效闭环
+
+## 2026-05-24：多种水印与模糊四边框方案文档
+
+- 目标：按用户新增水印需求，输出可直接转交一个或多个非多模态 agent 的 Markdown 实施方案；本轮不改运行时代码。
+- 核心判断：
+  当前仓内已有 `classic-overlay / travel-polaroid / retro-frame`、每模板样式持久化、预览轻提示、JPEG 后处理和 OCWM 可逆归档；本轮不应重做水印基础链路，而应扩展模板能力模型、补齐 `pure-text` 与 `blur-four-border` 两种产品模板，并让设置页按模板能力联动。
+  纯文字水印应定义为无底卡、无边框扩展、只烧录文字的成片模板；模糊四边框应定义为扩展画布并在四边显示源图模糊背景的成片模板，不能只做 metadata 或预览提示。
+- 核心结果：
+  新增总索引 [`2026-05-24-multi-watermark-design-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-multi-watermark-design-index.md)；
+  新增设置契约方案 [`2026-05-24-multi-watermark-settings-and-contracts.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-multi-watermark-settings-and-contracts.md)，覆盖 `WatermarkTemplateKind`、模板能力、两类新增模板、持久化样式和 settings render model 控件过滤；
+  新增渲染管线方案 [`2026-05-24-multi-watermark-renderer-and-pipeline.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-multi-watermark-renderer-and-pipeline.md)，限定最终像素渲染仍在 `PhotoWatermarkPostProcessor`，并保持 EXIF restore 与 OCWM embedding 顺序；
+  新增 UI 预览与验证方案 [`2026-05-24-multi-watermark-ui-preview-verification.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-multi-watermark-ui-preview-verification.md)，覆盖预览 hint 语义、设置文案、验证脚本和多模态视觉 QA。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读 `codex/plan.md`、`codex/prompt.md`、`codex/documentation.md`、现有水印后处理、settings serializer/reducer、effect bridge、preview overlay、Photo mode 接线和 Stage 6B3 验证脚本，并用 `rtk rg` 检查新增方案文档无 `TODO / TBD / fill in / implement later` 和省略号式占位词，所有文档命令均使用 `rtk` 前缀。
 
 ## 2026-05-24：Photo Live / Google Motion Photo 实现方案
 
