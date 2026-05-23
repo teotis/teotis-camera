@@ -95,6 +95,26 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `editor warning is included in pipeline notes`() = runTest {
+        val editor = FakePhotoWatermarkEditor(
+            result = PhotoWatermarkApplied(warning = "archive-embed-failed")
+        )
+        val processor = PhotoWatermarkPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                watermarkText = "Night Street",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/night.jpg",
+                    filePath = "/tmp/night.jpg"
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("watermark:rendered:travel-polaroid"))
+        assertTrue(result.pipelineNotes.contains("watermark:warning:archive-embed-failed"))
+    }
+
+    @Test
     fun `non photo result is ignored`() = runTest {
         val editor = FakePhotoWatermarkEditor(
             result = PhotoWatermarkApplied()
