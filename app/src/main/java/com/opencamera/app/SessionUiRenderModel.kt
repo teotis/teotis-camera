@@ -14,8 +14,6 @@ import com.opencamera.core.device.resolveVideoSpec
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.modeDirectoryDeclaration
 import com.opencamera.core.session.CaptureStatus
-import com.opencamera.core.session.PreviewMeteringFeedback
-import com.opencamera.core.session.PreviewMeteringFeedbackStatus
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SavedMediaType
@@ -23,8 +21,6 @@ import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
 import com.opencamera.core.session.buildSessionDebugDump
-import com.opencamera.core.effect.PreviewEffectAdapter
-import com.opencamera.core.effect.PreviewEffectRenderModel
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.ColorLabSpec
@@ -56,26 +52,6 @@ import com.opencamera.core.settings.VideoResolution
 import java.util.Locale
 import com.opencamera.app.i18n.AppTextResolver
 
-internal data class SessionUiStrings(
-    val buttonSwitchToFront: String,
-    val buttonSwitchToBack: String,
-    val buttonSingleLens: String,
-    val buttonZoomPrefix: String,
-    val buttonZoomUnavailable: String,
-    val buttonStillFast: String,
-    val buttonStillMax: String,
-    val buttonStillQualityUnavailable: String,
-    val buttonStill12Mp: String,
-    val buttonStill8Mp: String,
-    val buttonStill2Mp: String,
-    val buttonStillResolutionUnavailable: String,
-    val outputErrorPrefix: String,
-    val outputVideoPrefix: String,
-    val outputLivePrefix: String,
-    val outputSavedPrefix: String,
-    val outputPreviewPrefix: String,
-    val outputWaiting: String
-)
 
 internal data class ZoomCapsuleRenderModel(
     val label: String,
@@ -90,24 +66,6 @@ internal data class SessionControlsRenderModel(
     val isZoomCapsuleRowVisible: Boolean
 )
 
-internal data class PreviewOverlayRenderModel(
-    val gridMode: CompositionGridMode,
-    val isGridVisible: Boolean,
-    val countdownLabel: String?,
-    val isCountdownVisible: Boolean,
-    val effectModel: PreviewEffectRenderModel? = null,
-    val frame: PreviewFrameRenderModel? = null
-) {
-    val isVisible: Boolean
-        get() = isGridVisible || isCountdownVisible || effectModel != null || frame != null
-}
-
-internal data class PreviewFrameRenderModel(
-    val ratio: FrameRatio,
-    val label: String,
-    val dimOutsideFrame: Boolean,
-    val bottomInsetPx: Float = 0f
-)
 
 internal data class FrameRatioOptionRenderModel(
     val label: String,
@@ -151,38 +109,6 @@ internal data class SessionSettingsRenderModel(
     val manualDraftSummary: String
 )
 
-internal enum class SettingsControlAvailability {
-    SUPPORTED,
-    DEGRADED,
-    UNSUPPORTED
-}
-
-internal data class SettingsControlRenderModel(
-    val label: String,
-    val value: String,
-    val availability: SettingsControlAvailability = SettingsControlAvailability.SUPPORTED,
-    val availabilityLabel: String = "",
-    val supportLabel: String? = null,
-    val nextAction: PersistedSettingsAction? = null,
-    val enabled: Boolean = true,
-    val disabledReason: String? = null
-) {
-    val isInteractive: Boolean
-        get() = enabled && availability != SettingsControlAvailability.UNSUPPORTED && nextAction != null
-
-    val buttonLabel: String
-        get() = buildString {
-            append(label)
-            append('\n')
-            append(value)
-            append('\n')
-            append(availabilityLabel.ifEmpty { availability.name.lowercase().replaceFirstChar(Char::titlecase) })
-            supportLabel?.let {
-                append(" • ")
-                append(it)
-            }
-        }
-}
 
 internal data class CommonSettingsSectionRenderModel(
     val summary: String,
@@ -221,30 +147,6 @@ internal data class SessionSettingsPageRenderModel(
     val catalogFooter: String
 )
 
-internal data class FeatureCatalogControlRenderModel(
-    val label: String,
-    val value: String,
-    val availability: SettingsControlAvailability = SettingsControlAvailability.SUPPORTED,
-    val availabilityLabel: String = "",
-    val supportLabel: String? = null,
-    val nextAction: FeatureCatalogAction? = null
-) {
-    val isInteractive: Boolean
-        get() = nextAction != null
-
-    val buttonLabel: String
-        get() = buildString {
-            append(label)
-            append('\n')
-            append(value)
-            append('\n')
-            append(availabilityLabel.ifEmpty { availability.name.lowercase().replaceFirstChar(Char::titlecase) })
-            supportLabel?.let {
-                append(" • ")
-                append(it)
-            }
-        }
-}
 
 internal data class RuntimeProControlsRenderModel(
     val isVisible: Boolean,
@@ -498,55 +400,6 @@ internal fun sessionControlsRenderModel(
     )
 }
 
-internal fun focusReticleRenderModel(
-    feedback: PreviewMeteringFeedback
-): FocusReticleRenderModel = FocusReticleRenderModel(
-    normalizedX = feedback.normalizedX,
-    normalizedY = feedback.normalizedY,
-    status = when (feedback.status) {
-        PreviewMeteringFeedbackStatus.REQUESTED -> FocusReticleStatus.REQUESTED
-        PreviewMeteringFeedbackStatus.SUCCEEDED -> FocusReticleStatus.SUCCEEDED
-        PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> FocusReticleStatus.DEGRADED
-        PreviewMeteringFeedbackStatus.FAILED -> FocusReticleStatus.FAILED
-        PreviewMeteringFeedbackStatus.UNSUPPORTED -> FocusReticleStatus.UNSUPPORTED
-    }
-)
-
-internal fun previewOverlayRenderModel(
-    state: SessionState,
-    effectAdapter: PreviewEffectAdapter? = null
-): PreviewOverlayRenderModel {
-    val gridMode = state.settings.persisted.common.gridMode
-    val previewSupportsOverlay = state.permissionState.cameraGranted &&
-        state.previewHostAvailable &&
-        state.previewStatus in setOf(
-            PreviewStatus.STARTING,
-            PreviewStatus.ACTIVE,
-            PreviewStatus.RECOVERING
-        )
-    val countdownLabel = state.countdownRemainingSeconds?.let { "${it}s" }
-    val effectModel = effectAdapter?.adapt(state.activeEffectSpec)
-    val frameRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio
-    val frame = if (previewSupportsOverlay && frameRatio != null) {
-        PreviewFrameRenderModel(
-            ratio = frameRatio,
-            label = frameRatio.label,
-            dimOutsideFrame = true
-        )
-    } else {
-        null
-    }
-    return PreviewOverlayRenderModel(
-        gridMode = gridMode,
-        isGridVisible = previewSupportsOverlay && gridMode != CompositionGridMode.OFF,
-        countdownLabel = countdownLabel,
-        isCountdownVisible = state.captureStatus == CaptureStatus.REQUESTED &&
-            countdownLabel != null &&
-            state.permissionState.cameraGranted,
-        effectModel = effectModel,
-        frame = frame
-    )
-}
 
 private val stillModesWithFrameRatio = setOf(
     ModeId.PHOTO,
