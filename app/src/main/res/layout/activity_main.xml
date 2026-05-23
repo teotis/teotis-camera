@@ -104,7 +104,7 @@
 
         <Button
             android:id="@+id/buttonSettingsEntry"
-            style="@style/Widget.OpenCamera.TopActionChipLight"
+            style="@style/Widget.OpenCamera.TopActionChip"
             android:layout_width="wrap_content"
             android:layout_height="32dp"
             android:layout_marginStart="@dimen/space_2"
