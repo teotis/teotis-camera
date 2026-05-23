@@ -268,5 +268,29 @@ val DEFAULT_WATERMARK_TEMPLATES: List<WatermarkTemplate> = listOf(
         label = "Retro Frame",
         tokenKeys = setOf("model", "datetime", "camera-params"),
         supportsFrameBorder = true
+    ),
+    WatermarkTemplate(
+        id = "pure-text",
+        label = "Pure Text",
+        tokenKeys = setOf("model", "datetime", "camera-params"),
+        supportsFrameBorder = false,
+        kind = WatermarkTemplateKind.TEXT_OVERLAY
+    ),
+    WatermarkTemplate(
+        id = "blur-four-border",
+        label = "Blur Four Border",
+        tokenKeys = setOf("model", "datetime", "location", "camera-params"),
+        supportsFrameBorder = true,
+        kind = WatermarkTemplateKind.EXPANDED_FRAME,
+        allowedPlacements = setOf(
+            WatermarkTextPlacement.BOTTOM_LEFT,
+            WatermarkTextPlacement.BOTTOM_CENTER,
+            WatermarkTextPlacement.BOTTOM_RIGHT
+        ),
+        allowedFrameBackgrounds = setOf(
+            WatermarkFrameBackground.SOURCE_BLUR,
+            WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
+            WatermarkFrameBackground.SOURCE_VIVID_BLUR
+        )
     )
 )

@@ -154,6 +154,8 @@ fun PhotoSettings.watermarkStyleFor(
     return when (templateId) {
         "travel-polaroid" -> travelPolaroidWatermarkStyle
         "retro-frame" -> retroFrameWatermarkStyle
+        "pure-text" -> pureTextWatermarkStyle
+        "blur-four-border" -> blurFourBorderWatermarkStyle
         else -> classicOverlayWatermarkStyle
     }
 }
@@ -178,6 +180,12 @@ private fun PhotoSettings.updateWatermarkStyle(
         )
         "retro-frame" -> copy(
             retroFrameWatermarkStyle = transform(retroFrameWatermarkStyle)
+        )
+        "pure-text" -> copy(
+            pureTextWatermarkStyle = transform(pureTextWatermarkStyle)
+        )
+        "blur-four-border" -> copy(
+            blurFourBorderWatermarkStyle = transform(blurFourBorderWatermarkStyle)
         )
         else -> copy(
             classicOverlayWatermarkStyle = transform(classicOverlayWatermarkStyle)

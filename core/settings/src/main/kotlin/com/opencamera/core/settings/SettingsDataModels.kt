@@ -67,7 +67,10 @@ data class WatermarkTemplate(
     val id: String,
     val label: String,
     val tokenKeys: Set<String> = emptySet(),
-    val supportsFrameBorder: Boolean = false
+    val supportsFrameBorder: Boolean = false,
+    val kind: WatermarkTemplateKind = WatermarkTemplateKind.INFO_OVERLAY,
+    val allowedPlacements: Set<WatermarkTextPlacement> = WatermarkTextPlacement.entries.toSet(),
+    val allowedFrameBackgrounds: Set<WatermarkFrameBackground> = WatermarkFrameBackground.entries.toSet()
 )
 
 data class WatermarkStyleSettings(
@@ -165,6 +168,18 @@ data class PhotoSettings(
         textScale = WatermarkTextScale.NORMAL,
         textOpacity = WatermarkTextOpacity.SOFT,
         frameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR
+    ),
+    val pureTextWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
+        textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        textScale = WatermarkTextScale.NORMAL,
+        textOpacity = WatermarkTextOpacity.SOFT,
+        frameBackground = WatermarkFrameBackground.DARK
+    ),
+    val blurFourBorderWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
+        textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+        textScale = WatermarkTextScale.NORMAL,
+        textOpacity = WatermarkTextOpacity.SOLID,
+        frameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR
     ),
     val livePhotoEnabledByDefault: Boolean = false,
     val countdownDuration: CountdownDuration = CountdownDuration.OFF,

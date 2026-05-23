@@ -764,6 +764,40 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `pure text watermark detail hides frame background`() {
+        val model = watermarkLabDetailRenderModel(
+            state = defaultSessionState(),
+            templateId = "pure-text",
+            text = TestAppTextResolver()
+        )
+
+        assertEquals(null, model.frameBackgroundControl)
+        assertNotNull(model.placementControl.nextAction)
+    }
+
+    @Test
+    fun `blur four border cycles only blur backgrounds`() {
+        val model = watermarkLabDetailRenderModel(
+            state = defaultSessionState(),
+            templateId = "blur-four-border",
+            text = TestAppTextResolver()
+        )
+
+        val action = model.frameBackgroundControl?.nextAction
+        assertNotNull(action)
+        assertTrue(action is PersistedSettingsAction.UpdateWatermarkFrameBackground)
+        val bgAction = action as PersistedSettingsAction.UpdateWatermarkFrameBackground
+        assertTrue(
+            bgAction.background in setOf(
+                WatermarkFrameBackground.SOURCE_BLUR,
+                WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
+                WatermarkFrameBackground.SOURCE_VIVID_BLUR
+            ),
+            "Expected blur-family background but got ${bgAction.background}"
+        )
+    }
+
+    @Test
     fun `filter lab render model follows active portrait mode and cycles portrait defaults`() {
         val model = filterLabPageRenderModel(
             defaultSessionState(

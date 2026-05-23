@@ -1170,6 +1170,12 @@ internal fun watermarkLabDetailRenderModel(
         ?: catalog.watermarkTemplates.firstOrNull()
         ?: WatermarkTemplate(id = templateId, label = templateId)
     val style = settings.photo.watermarkStyleFor(template.id)
+    val allowedPlacements = template.allowedPlacements
+        .takeIf { it.isNotEmpty() }
+        ?: WatermarkTextPlacement.entries.toSet()
+    val allowedBackgrounds = template.allowedFrameBackgrounds
+        .takeIf { it.isNotEmpty() }
+        ?: WatermarkFrameBackground.entries.toSet()
     val controlAvailability = if (supportsStillCapture) {
         SettingsControlAvailability.SUPPORTED
     } else {
@@ -1196,14 +1202,14 @@ internal fun watermarkLabDetailRenderModel(
             availability = controlAvailability,
             availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
-                text.placementsCount(WatermarkTextPlacement.entries.size)
+                text.placementsCount(allowedPlacements.size)
             } else {
                 text.stillCaptureUnavailable()
             },
             nextAction = if (supportsStillCapture) {
                 PersistedSettingsAction.UpdateWatermarkTextPlacement(
                     templateId = template.id,
-                    placement = nextListValue(style.textPlacement, WatermarkTextPlacement.entries.toList())
+                    placement = nextListValue(style.textPlacement, allowedPlacements.toList())
                 )
             } else {
                 null
@@ -1253,7 +1259,7 @@ internal fun watermarkLabDetailRenderModel(
                 value = style.frameBackground.label,
                 availability = controlAvailability,
                 supportLabel = if (supportsStillCapture) {
-                    text.moodsCount(WatermarkFrameBackground.entries.size)
+                    text.moodsCount(allowedBackgrounds.size)
                 } else {
                     text.stillCaptureUnavailable()
                 },
@@ -1262,7 +1268,7 @@ internal fun watermarkLabDetailRenderModel(
                         templateId = template.id,
                         background = nextListValue(
                             style.frameBackground,
-                            WatermarkFrameBackground.entries.toList()
+                            allowedBackgrounds.toList()
                         )
                     )
                 } else {

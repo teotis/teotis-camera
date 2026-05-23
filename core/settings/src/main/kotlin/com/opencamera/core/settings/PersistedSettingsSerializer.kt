@@ -24,6 +24,14 @@ object PersistedSettingsSerializer {
     private const val KEY_PHOTO_WATERMARK_RETRO_SCALE = "photo.watermark.retroFrame.scale"
     private const val KEY_PHOTO_WATERMARK_RETRO_OPACITY = "photo.watermark.retroFrame.opacity"
     private const val KEY_PHOTO_WATERMARK_RETRO_BACKGROUND = "photo.watermark.retroFrame.background"
+    private const val KEY_PHOTO_WATERMARK_PURE_TEXT_POSITION = "photo.watermark.pureText.position"
+    private const val KEY_PHOTO_WATERMARK_PURE_TEXT_SCALE = "photo.watermark.pureText.scale"
+    private const val KEY_PHOTO_WATERMARK_PURE_TEXT_OPACITY = "photo.watermark.pureText.opacity"
+    private const val KEY_PHOTO_WATERMARK_PURE_TEXT_BACKGROUND = "photo.watermark.pureText.background"
+    private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_POSITION = "photo.watermark.blurFourBorder.position"
+    private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_SCALE = "photo.watermark.blurFourBorder.scale"
+    private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_OPACITY = "photo.watermark.blurFourBorder.opacity"
+    private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_BACKGROUND = "photo.watermark.blurFourBorder.background"
     private const val KEY_PHOTO_LIVE_DEFAULT = "photo.livePhotoEnabledByDefault"
     private const val KEY_PHOTO_COUNTDOWN = "photo.countdownDuration"
     private const val KEY_VIDEO_FILTER = "video.defaultFilterProfileId"
@@ -64,6 +72,14 @@ object PersistedSettingsSerializer {
             KEY_PHOTO_WATERMARK_RETRO_SCALE to settings.photo.retroFrameWatermarkStyle.textScale.storageKey,
             KEY_PHOTO_WATERMARK_RETRO_OPACITY to settings.photo.retroFrameWatermarkStyle.textOpacity.storageKey,
             KEY_PHOTO_WATERMARK_RETRO_BACKGROUND to settings.photo.retroFrameWatermarkStyle.frameBackground.storageKey,
+            KEY_PHOTO_WATERMARK_PURE_TEXT_POSITION to settings.photo.pureTextWatermarkStyle.textPlacement.storageKey,
+            KEY_PHOTO_WATERMARK_PURE_TEXT_SCALE to settings.photo.pureTextWatermarkStyle.textScale.storageKey,
+            KEY_PHOTO_WATERMARK_PURE_TEXT_OPACITY to settings.photo.pureTextWatermarkStyle.textOpacity.storageKey,
+            KEY_PHOTO_WATERMARK_PURE_TEXT_BACKGROUND to settings.photo.pureTextWatermarkStyle.frameBackground.storageKey,
+            KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_POSITION to settings.photo.blurFourBorderWatermarkStyle.textPlacement.storageKey,
+            KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_SCALE to settings.photo.blurFourBorderWatermarkStyle.textScale.storageKey,
+            KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_OPACITY to settings.photo.blurFourBorderWatermarkStyle.textOpacity.storageKey,
+            KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_BACKGROUND to settings.photo.blurFourBorderWatermarkStyle.frameBackground.storageKey,
             KEY_PHOTO_LIVE_DEFAULT to settings.photo.livePhotoEnabledByDefault.toString(),
             KEY_PHOTO_COUNTDOWN to settings.photo.countdownDuration.storageKey,
             KEY_VIDEO_FILTER to settings.video.defaultFilterProfileId,
@@ -163,6 +179,34 @@ object PersistedSettingsSerializer {
                     frameBackground = WatermarkFrameBackground.fromStorageKey(
                         values[KEY_PHOTO_WATERMARK_RETRO_BACKGROUND]
                     ) ?: defaults.photo.retroFrameWatermarkStyle.frameBackground
+                ),
+                pureTextWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_PURE_TEXT_POSITION]
+                    ) ?: defaults.photo.pureTextWatermarkStyle.textPlacement,
+                    textScale = WatermarkTextScale.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_PURE_TEXT_SCALE]
+                    ) ?: defaults.photo.pureTextWatermarkStyle.textScale,
+                    textOpacity = WatermarkTextOpacity.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_PURE_TEXT_OPACITY]
+                    ) ?: defaults.photo.pureTextWatermarkStyle.textOpacity,
+                    frameBackground = WatermarkFrameBackground.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_PURE_TEXT_BACKGROUND]
+                    ) ?: defaults.photo.pureTextWatermarkStyle.frameBackground
+                ),
+                blurFourBorderWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_POSITION]
+                    ) ?: defaults.photo.blurFourBorderWatermarkStyle.textPlacement,
+                    textScale = WatermarkTextScale.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_SCALE]
+                    ) ?: defaults.photo.blurFourBorderWatermarkStyle.textScale,
+                    textOpacity = WatermarkTextOpacity.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_OPACITY]
+                    ) ?: defaults.photo.blurFourBorderWatermarkStyle.textOpacity,
+                    frameBackground = WatermarkFrameBackground.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_BACKGROUND]
+                    ) ?: defaults.photo.blurFourBorderWatermarkStyle.frameBackground
                 ),
                 livePhotoEnabledByDefault = parseBoolean(
                     values[KEY_PHOTO_LIVE_DEFAULT],

@@ -217,6 +217,12 @@ enum class PortraitBeautyStrength(
     }
 }
 
+enum class WatermarkTemplateKind {
+    TEXT_OVERLAY,
+    INFO_OVERLAY,
+    EXPANDED_FRAME
+}
+
 enum class PortraitBokehEffect(
     override val storageKey: String,
     override val label: String

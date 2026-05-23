@@ -41,6 +41,18 @@ class PersistedSettingsSerializerTest {
                     textOpacity = WatermarkTextOpacity.SOFT,
                     frameBackground = WatermarkFrameBackground.WHITE
                 ),
+                pureTextWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.TOP_RIGHT,
+                    textScale = WatermarkTextScale.LARGE,
+                    textOpacity = WatermarkTextOpacity.SUBTLE,
+                    frameBackground = WatermarkFrameBackground.DARK
+                ),
+                blurFourBorderWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+                    textScale = WatermarkTextScale.COMPACT,
+                    textOpacity = WatermarkTextOpacity.SOLID,
+                    frameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR
+                ),
                 livePhotoEnabledByDefault = true,
                 countdownDuration = CountdownDuration.SECONDS_3
             ),
@@ -71,6 +83,9 @@ class PersistedSettingsSerializerTest {
         assertEquals("top-right", serialized["photo.watermark.classicOverlay.position"])
         assertEquals("compact", serialized["photo.watermark.travelPolaroid.scale"])
         assertEquals("white", serialized["photo.watermark.retroFrame.background"])
+        assertEquals("top-right", serialized["photo.watermark.pureText.position"])
+        assertEquals("subtle", serialized["photo.watermark.pureText.opacity"])
+        assertEquals("source-vivid-blur", serialized["photo.watermark.blurFourBorder.background"])
     }
 
     @Test
@@ -314,5 +329,25 @@ class PersistedSettingsSerializerTest {
     fun `serializer falls back to enabled when low light key is missing`() {
         val decoded = PersistedSettingsSerializer.fromMap(emptyMap())
         assertTrue(decoded.photo.lowLightNightAssistEnabled)
+    }
+
+    @Test
+    fun `default watermark catalog includes pure text and blur four border`() {
+        val catalog = FeatureCatalog()
+        val pureText = catalog.watermarkTemplates.first { it.id == "pure-text" }
+        val blurBorder = catalog.watermarkTemplates.first { it.id == "blur-four-border" }
+
+        assertEquals(WatermarkTemplateKind.TEXT_OVERLAY, pureText.kind)
+        assertFalse(pureText.supportsFrameBorder)
+        assertEquals(WatermarkTemplateKind.EXPANDED_FRAME, blurBorder.kind)
+        assertTrue(blurBorder.supportsFrameBorder)
+        assertEquals(
+            setOf(
+                WatermarkFrameBackground.SOURCE_BLUR,
+                WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
+                WatermarkFrameBackground.SOURCE_VIVID_BLUR
+            ),
+            blurBorder.allowedFrameBackgrounds
+        )
     }
 }
