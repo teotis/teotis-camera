@@ -30,4 +30,5 @@ internal interface MainActivityActionCallbacks {
     fun refreshDevLogModel()
     fun selectDevLogTab(tab: DevLogTab)
     fun neutralColorLabAction(): PersistedSettingsAction
+    fun toggleLowLightNightAssist()
 }

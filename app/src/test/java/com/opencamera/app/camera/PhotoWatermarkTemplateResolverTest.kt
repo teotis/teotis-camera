@@ -117,6 +117,48 @@ class PhotoWatermarkTemplateResolverTest {
     }
 
     @Test
+    fun `pure text resolver keeps overlay template and no frame expansion`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "pure-text",
+            watermarkText = "OpenCamera",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkPosition" to "top-right",
+                    "watermarkTextScale" to "1.2",
+                    "watermarkTextOpacity" to "0.8"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("pure-text", resolved.templateId)
+        assertFalse(resolved.usesExpandedFrame)
+        assertEquals(WatermarkTextPlacement.TOP_RIGHT, resolved.placement)
+        assertEquals(1.2f, resolved.textScale)
+        assertEquals(0.8f, resolved.textOpacity)
+    }
+
+    @Test
+    fun `blur four border resolver clamps unsupported solid background to light blur`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "blur-four-border",
+            watermarkText = "OpenCamera",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkFrameBackground" to "white",
+                    "watermarkPosition" to "bottom-center"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("blur-four-border", resolved.templateId)
+        assertTrue(resolved.usesExpandedFrame)
+        assertEquals(WatermarkFrameBackground.SOURCE_LIGHT_BLUR, resolved.frameBackground)
+        assertEquals(WatermarkTextPlacement.BOTTOM_CENTER, resolved.placement)
+    }
+
+    @Test
     fun `unknown template falls back to classic overlay and formats gps camera params`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "unsupported-template",

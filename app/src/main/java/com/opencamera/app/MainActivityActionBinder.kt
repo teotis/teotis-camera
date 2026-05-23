@@ -57,6 +57,10 @@ internal class MainActivityActionBinder(
             callbacks.reducePanel(CockpitPanelCommand.ToggleQuickBubble)
             callbacks.renderAfterPanelChange()
         }
+        views.floatingUtility.lowLightNightPrompt.setOnClickListener {
+            callbacks.toggleLowLightNightAssist()
+            callbacks.renderAfterPanelChange()
+        }
     }
 
     private fun bindCaptureActions() {

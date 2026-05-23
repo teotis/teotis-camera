@@ -3,6 +3,10 @@ package com.opencamera.core.mode
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PhotoLowLightStrategySupport
+import com.opencamera.core.device.PhotoSceneSignal
+import com.opencamera.core.device.SceneLightState
+import com.opencamera.core.device.photoLowLightStrategySupport
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
@@ -80,9 +84,19 @@ data class ModeContext(
     },
     val eventSink: suspend (String) -> Unit = {},
     val onEffectSpecChanged: suspend (EffectSpec) -> Unit = {},
-    private val settingsSnapshotProvider: () -> SessionSettingsSnapshot = { SessionSettingsSnapshot() }
+    private val settingsSnapshotProvider: () -> SessionSettingsSnapshot = { SessionSettingsSnapshot() },
+    val photoLowLightRuntimeStateProvider: () -> PhotoLowLightRuntimeState = {
+        val snapshot = settingsSnapshotProvider()
+        PhotoLowLightRuntimeState(
+            settingEnabled = snapshot.persisted.photo.lowLightNightAssistEnabled,
+            sceneSignal = PhotoSceneSignal(),
+            support = deviceCapabilities.photoLowLightStrategySupport()
+        )
+    }
 ) {
     val settingsSnapshot: SessionSettingsSnapshot get() = settingsSnapshotProvider()
+    val photoLowLightRuntimeState: PhotoLowLightRuntimeState
+        get() = photoLowLightRuntimeStateProvider()
 }
 
 fun ModeContext.captureAidMetadataTags(): Map<String, String> {
@@ -106,6 +120,17 @@ data class ModeRuntimeState(
     val stillCaptureQuality: StillCaptureQualityPreference,
     val stillCaptureResolutionPreset: StillCaptureResolutionPreset
 )
+
+data class PhotoLowLightRuntimeState(
+    val settingEnabled: Boolean,
+    val sceneSignal: PhotoSceneSignal,
+    val support: PhotoLowLightStrategySupport
+) {
+    val shouldUseNightAssist: Boolean
+        get() = settingEnabled &&
+            sceneSignal.lightState == SceneLightState.LOW_LIGHT &&
+            support != PhotoLowLightStrategySupport.UNSUPPORTED
+}
 
 data class ModeUiSpec(
     val title: String,

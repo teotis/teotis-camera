@@ -16,6 +16,7 @@ import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
+import com.opencamera.core.session.PhotoLowLightPromptStatus
 import com.opencamera.app.i18n.AppTextResolver
 
 internal data class ZoomCapsuleRenderModel(
@@ -62,6 +63,13 @@ internal data class QuickBrightnessRenderModel(
     val canReset: Boolean,
     val isVisible: Boolean,
     val disabledReason: String?
+)
+
+internal data class LowLightNightPromptRenderModel(
+    val label: String,
+    val contentDescription: String,
+    val isVisible: Boolean,
+    val isEnabled: Boolean
 )
 
 internal data class QuickPanelSheetRenderModel(
@@ -172,6 +180,32 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
 
 private fun brightnessValueLabel(steps: Int): String {
     return if (steps >= 0) "+$steps" else "$steps"
+}
+
+internal fun lowLightNightPromptRenderModel(
+    state: SessionState,
+    text: AppTextResolver
+): LowLightNightPromptRenderModel {
+    val prompt = state.presentation.photoLowLightPrompt
+    val isVisible = prompt != null &&
+        prompt.status != PhotoLowLightPromptStatus.HIDDEN &&
+        prompt.status != PhotoLowLightPromptStatus.UNSUPPORTED
+    val isEnabled = prompt?.status == PhotoLowLightPromptStatus.AVAILABLE_ENABLED ||
+        prompt?.status == PhotoLowLightPromptStatus.DEGRADED_ENABLED
+    val isDegraded = prompt?.status == PhotoLowLightPromptStatus.DEGRADED_ENABLED ||
+        prompt?.status == PhotoLowLightPromptStatus.DEGRADED_DISABLED
+    val label = when {
+        prompt == null -> ""
+        isDegraded -> text.buttonLowLightNightPromptDegraded()
+        isEnabled -> text.buttonLowLightNightPromptEnabled()
+        else -> text.buttonLowLightNightPromptDisabled()
+    }
+    return LowLightNightPromptRenderModel(
+        label = label,
+        contentDescription = text.lowLightNightAssistContentDescription(),
+        isVisible = isVisible,
+        isEnabled = isEnabled
+    )
 }
 
 internal fun frameRatioControlRenderModel(state: SessionState, text: AppTextResolver): FrameRatioControlRenderModel {

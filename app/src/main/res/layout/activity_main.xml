@@ -153,6 +153,16 @@
             android:layout_marginTop="@dimen/right_rail_gap"
             android:text="@string/button_quick_launcher" />
 
+        <Button
+            android:id="@+id/buttonLowLightNightPrompt"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:layout_marginTop="@dimen/right_rail_gap"
+            android:contentDescription="@string/low_light_night_assist_content_description"
+            android:text="@string/button_low_light_night_prompt"
+            android:visibility="gone" />
+
         <!-- buttonLensLabEntry removed: legacy right-rail settings entry superseded by buttonColorLabEntry in top bar -->
 
         <Button

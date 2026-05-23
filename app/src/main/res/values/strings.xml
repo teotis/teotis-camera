@@ -74,6 +74,11 @@
     <string name="disabled_brightness_unsupported">亮度调节不可用</string>
     <string name="disabled_brightness_countdown">倒计时结束后才能调节亮度</string>
     <string name="disabled_brightness_active_shot">等待当前拍摄完成后才能调节亮度</string>
+    <string name="button_low_light_night_prompt">夜</string>
+    <string name="button_low_light_night_prompt_enabled">夜景辅助已开启</string>
+    <string name="button_low_light_night_prompt_disabled">夜景辅助已关闭</string>
+    <string name="button_low_light_night_prompt_degraded">夜景辅助（单帧降级）</string>
+    <string name="low_light_night_assist_content_description">低光夜景辅助提示</string>
     <string name="button_more_controls">更多</string>
     <string name="mode_track_label">模式</string>
     <string name="button_dev_entry">开发</string>

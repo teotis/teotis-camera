@@ -19,6 +19,7 @@ internal class CockpitSurfaceRenderer(
     private val context: Context,
     private val topBar: TopBarViews,
     private val quickPanel: QuickPanelViews,
+    private val floatingUtility: FloatingUtilityViews,
     private val bottomCockpit: BottomCockpitViews,
     private val modeTrack: ModeTrackViews,
     private val preview: PreviewViews,
@@ -219,6 +220,19 @@ internal class CockpitSurfaceRenderer(
                     modeTrack.scroll.smoothScrollTo(scrollX, 0)
                 }
             }
+        }
+    }
+
+    fun renderLowLightNightPrompt(model: LowLightNightPromptRenderModel) {
+        val button = floatingUtility.lowLightNightPrompt
+        if (model.isVisible) {
+            button.visibility = View.VISIBLE
+            button.text = model.label
+            button.contentDescription = model.contentDescription
+            button.isEnabled = model.isEnabled
+            button.alpha = if (model.isEnabled) 1f else 0.5f
+        } else {
+            button.visibility = View.GONE
         }
     }
 }

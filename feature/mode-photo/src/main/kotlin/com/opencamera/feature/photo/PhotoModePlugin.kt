@@ -3,6 +3,8 @@ package com.opencamera.feature.photo
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PhotoLowLightStrategySupport
+import com.opencamera.core.device.SceneLightState
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
@@ -148,8 +150,16 @@ private class PhotoModeController(
                 val postProcessSpec = basePostProcessSpec.copy(
                     watermarkText = "PHOTO $flashLabel"
                 )
+                val lowLightState = context.photoLowLightRuntimeState
                 ModeSignal.SubmitCapture(
-                    if (livePhotoEnabledByDefault()) {
+                    if (lowLightState.shouldUseNightAssist) {
+                        buildLowLightCaptureStrategy(
+                            flashMode = flashMode,
+                            postProcessSpec = postProcessSpec,
+                            bridgeTags = bridgeTags,
+                            lowLightState = lowLightState
+                        )
+                    } else if (livePhotoEnabledByDefault()) {
                         CaptureStrategy.LivePhoto(
                             saveRequest = SaveRequest.photoLibrary(
                                 metadata = com.opencamera.core.media.MediaMetadata(
@@ -300,6 +310,86 @@ private class PhotoModeController(
             append(currentFrameRatio().label)
             append(" • Flash ")
             append(flashMode.label)
+        }
+    }
+
+    private suspend fun buildLowLightCaptureStrategy(
+        flashMode: FlashMode,
+        postProcessSpec: PostProcessSpec,
+        bridgeTags: Map<String, String>,
+        lowLightState: com.opencamera.core.mode.PhotoLowLightRuntimeState
+    ): CaptureStrategy {
+        val signal = lowLightState.sceneSignal
+        val baseMetadata = buildMap {
+            put("mode", "photo")
+            put("flash", flashMode.name.lowercase())
+            put("photoLowLightNightAssist", "on")
+            put("photoLowLightBrightnessScore", signal.brightnessScore?.toString() ?: "unknown")
+            put("photoLowLightSignalSource", signal.source)
+            put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
+            put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
+            putAll(context.captureAidMetadataTags())
+            putAll(bridgeTags)
+        }
+        return when (lowLightState.support) {
+            PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME -> {
+                context.eventSink("photo.low-light.capture.multi-frame")
+                CaptureStrategy.MultiFrame(
+                    saveRequest = SaveRequest.photoLibrary(
+                        metadata = com.opencamera.core.media.MediaMetadata(
+                            customTags = baseMetadata + mapOf(
+                                "photoLowLightStrategy" to "multi-frame"
+                            )
+                        )
+                    ),
+                    postProcessSpec = postProcessSpec,
+                    captureProfile = CaptureProfile(
+                        frameCount = 6,
+                        longExposureMillis = 450L,
+                        requiresTripod = false,
+                        flashMode = flashMode,
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
+                        stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
+                    )
+                )
+            }
+            PhotoLowLightStrategySupport.DEGRADED_SINGLE_FRAME -> {
+                context.eventSink("photo.low-light.capture.single-frame-degraded")
+                CaptureStrategy.SingleFrame(
+                    saveRequest = SaveRequest.photoLibrary(
+                        metadata = com.opencamera.core.media.MediaMetadata(
+                            customTags = baseMetadata + mapOf(
+                                "photoLowLightStrategy" to "single-frame-degraded"
+                            )
+                        )
+                    ),
+                    postProcessSpec = postProcessSpec.copy(
+                        algorithmProfile = "photo-low-light-single-frame"
+                    ),
+                    captureProfile = CaptureProfile(
+                        flashMode = flashMode,
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
+                        stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
+                    )
+                )
+            }
+            PhotoLowLightStrategySupport.UNSUPPORTED -> {
+                CaptureStrategy.SingleFrame(
+                    saveRequest = SaveRequest.photoLibrary(
+                        metadata = com.opencamera.core.media.MediaMetadata(
+                            customTags = baseMetadata + mapOf(
+                                "photoLowLightStrategy" to "unsupported-fallback"
+                            )
+                        )
+                    ),
+                    postProcessSpec = postProcessSpec,
+                    captureProfile = CaptureProfile(
+                        flashMode = flashMode,
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
+                        stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
+                    )
+                )
+            }
         }
     }
 

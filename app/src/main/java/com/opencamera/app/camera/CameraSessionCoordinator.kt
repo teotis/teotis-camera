@@ -17,7 +17,8 @@ class CameraSessionCoordinator(
     private val session: CameraSession,
     private val cameraAdapter: CameraDeviceAdapter,
     private val scope: CoroutineScope,
-    private val runtimeIssueMonitor: RuntimeIssueMonitor = NoOpRuntimeIssueMonitor
+    private val runtimeIssueMonitor: RuntimeIssueMonitor = NoOpRuntimeIssueMonitor,
+    private val sceneBrightnessSource: SceneBrightnessSignalSource? = null
 ) {
     private var lifecycleOwner: LifecycleOwner? = null
     private var previewView: PreviewView? = null
@@ -35,6 +36,13 @@ class CameraSessionCoordinator(
             runtimeIssueMonitor.runtimeIssues.collect { issue ->
                 runtimeIssueMonitor.onPreviewStopped(issue.reason)
                 session.dispatch(SessionIntent.PreviewRuntimeIssue(issue))
+            }
+        }
+        sceneBrightnessSource?.let { source ->
+            scope.launch {
+                source.signals.collect { signal ->
+                    session.dispatch(SessionIntent.PhotoSceneSignalUpdated(signal))
+                }
             }
         }
     }
@@ -175,6 +183,7 @@ class CameraSessionCoordinator(
             cameraAdapter.bindUseCases(owner, preview, deviceGraph)
         }.onSuccess {
             attachedMode = modeId
+            sceneBrightnessSource?.onPreviewStarted()
         }.onFailure { throwable ->
             attachedMode = null
             runtimeIssueMonitor.onPreviewStopped(throwable.message ?: "bind failure")
@@ -192,6 +201,7 @@ class CameraSessionCoordinator(
     ) {
         cameraAdapter.release()
         attachedMode = null
+        sceneBrightnessSource?.onPreviewStopped()
         runtimeIssueMonitor.onPreviewStopped(reason)
         if (clearHost) {
             pendingPreviewBind = null
@@ -209,6 +219,7 @@ class CameraSessionCoordinator(
     }
 
     private fun clearPreviewAttachment() {
+        sceneBrightnessSource?.onPreviewHostDetached()
         runtimeIssueMonitor.onPreviewHostDetached()
         attachedMode = null
         lifecycleOwner = null

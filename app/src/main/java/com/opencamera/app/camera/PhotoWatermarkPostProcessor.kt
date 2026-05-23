@@ -716,6 +716,8 @@ private const val PHOTO_WATERMARK_PROFILE_NAME_KEY = "watermarkProfileName"
 private const val TEMPLATE_CLASSIC_OVERLAY = "classic-overlay"
 private const val TEMPLATE_TRAVEL_POLAROID = "travel-polaroid"
 private const val TEMPLATE_RETRO_FRAME = "retro-frame"
+private const val TEMPLATE_PURE_TEXT = "pure-text"
+private const val TEMPLATE_BLUR_FOUR_BORDER = "blur-four-border"
 
 private fun resolveWatermarkTemplateId(templateId: String?): String {
     return templateId
@@ -734,7 +736,9 @@ internal fun resolvePhotoWatermarkTemplate(
     val normalizedTemplateId = when (requestedTemplateId) {
         TEMPLATE_CLASSIC_OVERLAY,
         TEMPLATE_TRAVEL_POLAROID,
-        TEMPLATE_RETRO_FRAME -> requestedTemplateId
+        TEMPLATE_RETRO_FRAME,
+        TEMPLATE_PURE_TEXT,
+        TEMPLATE_BLUR_FOUR_BORDER -> requestedTemplateId
         else -> TEMPLATE_CLASSIC_OVERLAY
     }
     val warning = if (normalizedTemplateId == requestedTemplateId) {
@@ -754,9 +758,11 @@ internal fun resolvePhotoWatermarkTemplate(
         ?: formatCameraParams(preservedExif)
     val profileName = metadata.customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY]
     val supportedTokens = when (normalizedTemplateId) {
-        TEMPLATE_CLASSIC_OVERLAY -> listOfNotNull(datetime, location, cameraParams)
+        TEMPLATE_CLASSIC_OVERLAY,
+        TEMPLATE_PURE_TEXT -> listOfNotNull(datetime, location, cameraParams)
         TEMPLATE_TRAVEL_POLAROID -> listOfNotNull(datetime, location, profileName)
-        TEMPLATE_RETRO_FRAME -> listOfNotNull(datetime, cameraParams, profileName)
+        TEMPLATE_RETRO_FRAME,
+        TEMPLATE_BLUR_FOUR_BORDER -> listOfNotNull(datetime, cameraParams, profileName)
         else -> emptyList()
     }
     return ResolvedPhotoWatermarkTemplate(
@@ -767,7 +773,9 @@ internal fun resolvePhotoWatermarkTemplate(
             templateId = normalizedTemplateId,
             customTags = metadata.customTags
         ),
-        usesExpandedFrame = normalizedTemplateId != TEMPLATE_CLASSIC_OVERLAY,
+        usesExpandedFrame = normalizedTemplateId == TEMPLATE_TRAVEL_POLAROID ||
+            normalizedTemplateId == TEMPLATE_RETRO_FRAME ||
+            normalizedTemplateId == TEMPLATE_BLUR_FOUR_BORDER,
         placement = resolveWatermarkPlacement(normalizedTemplateId, metadata.customTags),
         textScale = metadata.customTags[PHOTO_WATERMARK_TEXT_SCALE_KEY]
             ?.toFloatOrNull()
@@ -802,16 +810,25 @@ private fun resolveWatermarkFrameBackground(
     templateId: String,
     customTags: Map<String, String>
 ): WatermarkFrameBackground {
-    WatermarkFrameBackground.fromStorageKey(customTags[PHOTO_WATERMARK_BACKGROUND_KEY])?.let {
-        return it
+    val resolved = WatermarkFrameBackground.fromStorageKey(customTags[PHOTO_WATERMARK_BACKGROUND_KEY])
+        ?: defaultWatermarkFrameBackground(templateId)
+    if (templateId == TEMPLATE_BLUR_FOUR_BORDER && resolved !in SUPPORTED_BLUR_BACKGROUNDS) {
+        return WatermarkFrameBackground.SOURCE_LIGHT_BLUR
     }
-    return defaultWatermarkFrameBackground(templateId)
+    return resolved
 }
+
+private val SUPPORTED_BLUR_BACKGROUNDS = setOf(
+    WatermarkFrameBackground.SOURCE_BLUR,
+    WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
+    WatermarkFrameBackground.SOURCE_VIVID_BLUR
+)
 
 private fun defaultWatermarkFrameBackground(templateId: String): WatermarkFrameBackground {
     return when (templateId) {
         TEMPLATE_TRAVEL_POLAROID -> WatermarkFrameBackground.WHITE
         TEMPLATE_RETRO_FRAME -> WatermarkFrameBackground.SOURCE_VIVID_BLUR
+        TEMPLATE_BLUR_FOUR_BORDER -> WatermarkFrameBackground.SOURCE_LIGHT_BLUR
         else -> WatermarkFrameBackground.DARK
     }
 }

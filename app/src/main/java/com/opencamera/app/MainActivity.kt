@@ -130,6 +130,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             context = this,
             topBar = views.topBar,
             quickPanel = views.quickPanel,
+            floatingUtility = views.floatingUtility,
             bottomCockpit = views.bottomCockpit,
             modeTrack = views.modeTrack,
             preview = views.preview,
@@ -295,6 +296,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         cockpitRenderer.renderZoomCapsules(controls)
         val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
         cockpitRenderer.renderQuickBubble(settingsPage, sheet)
+        cockpitRenderer.renderLowLightNightPrompt(lowLightNightPromptRenderModel(state, text))
         mainRenderer.renderDevEntryVisibility(com.opencamera.app.BuildConfig.DEBUG)
         val devLogModel = devLogRenderModel(
             state = state,
@@ -651,6 +653,15 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     override fun neutralColorLabAction(): PersistedSettingsAction {
         return neutralColorLabTopLevel()
+    }
+
+    override fun toggleLowLightNightAssist() {
+        val current = latestSessionState?.settings?.persisted?.photo?.lowLightNightAssistEnabled ?: true
+        lifecycleScope.launch {
+            container.sessionSettingsManager.apply(
+                PersistedSettingsAction.UpdatePhotoLowLightNightAssistEnabled(!current)
+            )
+        }
     }
 
     override fun handleFilterPaletteTouch(colorAxis: Float, toneAxis: Float) {

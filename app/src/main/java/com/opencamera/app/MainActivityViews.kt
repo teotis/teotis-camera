@@ -165,6 +165,11 @@ internal data class ModeTrackViews(
     val humanistic: Button
 )
 
+internal data class FloatingUtilityViews(
+    val quickLauncher: Button,
+    val lowLightNightPrompt: Button
+)
+
 internal data class BottomCockpitViews(
     val shutter: Button,
     val lensFacing: Button,
@@ -177,6 +182,7 @@ internal data class MainActivityViews(
     val preview: PreviewViews,
     val topBar: TopBarViews,
     val quickPanel: QuickPanelViews,
+    val floatingUtility: FloatingUtilityViews,
     val settingsPanel: SettingsPanelViews,
     val filterLab: FilterLabViews,
     val devConsole: DevConsoleViews,
@@ -212,6 +218,10 @@ internal data class MainActivityViews(
                 livePhoto = activity.findViewById(R.id.buttonQuickLivePhoto),
                 timer = activity.findViewById(R.id.buttonQuickTimer),
                 launcher = activity.findViewById(R.id.buttonQuickLauncher)
+            )
+            val floatingUtility = FloatingUtilityViews(
+                quickLauncher = activity.findViewById(R.id.buttonQuickLauncher),
+                lowLightNightPrompt = activity.findViewById(R.id.buttonLowLightNightPrompt)
             )
             val settingsPanel = SettingsPanelViews(
                 panel = activity.findViewById(R.id.settingsPanel),
@@ -345,6 +355,7 @@ internal data class MainActivityViews(
                 preview = preview,
                 topBar = topBar,
                 quickPanel = quickPanel,
+                floatingUtility = floatingUtility,
                 settingsPanel = settingsPanel,
                 filterLab = filterLab,
                 devConsole = devConsole,

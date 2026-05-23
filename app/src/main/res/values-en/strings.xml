@@ -72,6 +72,11 @@
     <string name="disabled_brightness_unsupported">Brightness unavailable</string>
     <string name="disabled_brightness_countdown">Wait for countdown to finish</string>
     <string name="disabled_brightness_active_shot">Wait for current capture to finish</string>
+    <string name="button_low_light_night_prompt">Night</string>
+    <string name="button_low_light_night_prompt_enabled">Night assist on</string>
+    <string name="button_low_light_night_prompt_disabled">Night assist off</string>
+    <string name="button_low_light_night_prompt_degraded">Night assist (single-frame)</string>
+    <string name="low_light_night_assist_content_description">Low-light night assist prompt</string>
     <string name="button_more_controls">More</string>
     <string name="mode_track_label">Mode</string>
     <string name="button_dev_entry">DEV</string>

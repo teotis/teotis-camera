@@ -483,6 +483,13 @@ open class AppTextResolver(private val context: Context?) {
     open fun disabledBrightnessCountdown(): String = str(R.string.disabled_brightness_countdown, "Wait for countdown to finish")
     open fun disabledBrightnessActiveShot(): String = str(R.string.disabled_brightness_active_shot, "Wait for current capture to finish")
 
+    // Low-light night assist prompt
+    open fun buttonLowLightNightPrompt(): String = str(R.string.button_low_light_night_prompt, "Night")
+    open fun buttonLowLightNightPromptEnabled(): String = str(R.string.button_low_light_night_prompt_enabled, "Night assist on")
+    open fun buttonLowLightNightPromptDisabled(): String = str(R.string.button_low_light_night_prompt_disabled, "Night assist off")
+    open fun buttonLowLightNightPromptDegraded(): String = str(R.string.button_low_light_night_prompt_degraded, "Night assist (single-frame)")
+    open fun lowLightNightAssistContentDescription(): String = str(R.string.low_light_night_assist_content_description, "Low-light night assist prompt")
+
     // Recording status
     open fun statusRecordingStarting(): String = str(R.string.status_recording_starting, "Starting…")
     open fun statusRecordingActive(): String = str(R.string.status_recording_active, "Recording")
