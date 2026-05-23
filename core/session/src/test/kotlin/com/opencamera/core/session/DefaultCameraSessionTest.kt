@@ -2964,6 +2964,8 @@ class DefaultCameraSessionTest {
 
         assertEquals(PreviewStatus.BLOCKED, session.state.value.previewStatus)
         assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+        assertNull(session.state.value.recordingStartedAtElapsedMillis)
+        assertNull(session.state.value.recordingElapsedMillis)
         assertEquals("Camera permission missing", session.state.value.lastError)
         assertEquals("Recording failed", session.state.value.modeSnapshot.state.headline)
         assertEquals("Camera permission missing", session.state.value.modeSnapshot.state.detail)

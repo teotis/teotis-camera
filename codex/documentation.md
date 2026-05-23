@@ -77,6 +77,7 @@
 ## 下一步建议
 
 - `2026-05-24` 视频模式真机反馈已归纳为 1 个总索引和 2 个可交给非多模态 agent 的实施方案：[`2026-05-24-video-mode-real-device-feedback-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-mode-real-device-feedback-index.md)、[`2026-05-24-video-thumbnail-and-gallery-preload.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-thumbnail-and-gallery-preload.md)、[`2026-05-24-video-recording-elapsed-time.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-recording-elapsed-time.md)。本轮只设计交接，不改运行时代码；视频缩略图方案限定在 saved media 查询、视频首帧 materialize 和 gallery MIME 语义，录像时间方案限定在 session-owned elapsed presentation。视频滤镜/水印烧录、转码、内置播放器和长录稳定性阈值登记为非本轮范围。
+- `2026-05-24` 拍照模式新增产品需求已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-photo-low-light-brightness-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-photo-low-light-brightness-index.md) 将工作拆为低光/夜景 assist、快捷亮度调节和联合验证三份文档。核心口径是低光策略保持 `PHOTO` 模式内的 session-owned adaptive capture，不自动切到 `NIGHT/Scenery`；快捷亮度走 session/device preview EV，不把 Color Lab 的后处理亮度当作实时曝光；图标精修、阈值调参和真机画质判断登记为后续多模态/真机 QA。
 - 第 `7` 阶段若继续推进，最高优先级已切到 `provider death / provider restart 真信号` 这类更依赖平台和真机信号的项；当前仓内结构已允许继续挂接，但缺少可信验证来源。
 - 第二优先级是把当前默认 perf budget 接到真实设备/机型阈值矩阵；在没有额外口径和真机的前提下，继续细化只会把默认阈值写死。
 - 现有第 `6` 阶段功能闭环无需继续扩写；后续若回到 feature 侧，应单独获得新的阶段授权。
@@ -112,6 +113,19 @@
 ---
 
 # 最近有效闭环
+
+## 2026-05-24：拍照低光/夜景策略与快捷亮度方案文档
+
+- 目标：按用户新增拍照模式需求，输出可直接转交非多模态 agent 的 Markdown 实施方案；本轮不改运行时代码。
+- 核心判断：
+  低光/夜景策略不应自动切换到 `ModeId.NIGHT`，否则会制造隐式模式状态迁移；推荐在 `PHOTO` 模式内通过 session-owned `PhotoSceneSignal` 和 `PhotoLowLightRuntimeState` 选择多帧或单帧降级 capture strategy。
+  “快捷”亮度应定义为 preview exposure compensation，经 `SessionIntent -> SessionEffect -> DeviceCommand -> DeviceEvent` 回传结果；不能复用 Color Lab `FilterRenderSpec.brightnessShift`，后者只影响滤镜/后处理。
+- 核心结果：
+  新增总索引 [`2026-05-24-photo-low-light-brightness-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-photo-low-light-brightness-index.md)；
+  新增低光/夜景 assist 方案 [`2026-05-24-photo-low-light-night-assist.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-photo-low-light-night-assist.md)，覆盖默认开启设置、低频亮度信号、3 秒浮动提示、支持/降级/不支持语义和 `PhotoModePlugin` 捕获策略；
+  新增快捷亮度方案 [`2026-05-24-photo-quick-brightness-adjustment.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-photo-quick-brightness-adjustment.md)，覆盖 quick panel row、session preview brightness state、CameraX `setExposureCompensationIndex` 适配和降级结果；
+  新增联合验证方案 [`2026-05-24-photo-low-light-brightness-verification.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-photo-low-light-brightness-verification.md)。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已交叉阅读 `codex/plan.md`、`codex/prompt.md`、`codex/documentation.md`、`PhotoModePlugin.kt`、`NightModePlugin.kt`、`SessionContracts.kt`、`DeviceContracts.kt`、`SessionCockpitRenderModel.kt`、`MainActivityActionBinder.kt`、`CockpitSurfaceRenderer.kt`、`activity_main.xml` 与 settings serializer/reducer 相关文件。
 
 ## 2026-05-24：可逆水印自包含 JPEG 归档方案
 

@@ -443,8 +443,7 @@ internal class CaptureRecordingSessionProcessor(
         shot: ShotRequest,
         reason: String
     ) {
-        recordingElapsedJob?.cancel()
-        recordingElapsedJob = null
+        cancelRecordingElapsedTimer()
         currentController().onSessionEvent(
             ModeSessionEvent.ShotFailed(
                 shotId = shot.shotId,
