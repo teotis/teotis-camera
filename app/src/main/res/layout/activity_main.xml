@@ -50,6 +50,14 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Secondary panel bottom boundary: ~2/5 from screen bottom -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/secondaryPanelBottomGuide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.6" />
+
     <!-- Layer 2: Top lightweight status area -->
     <View
         android:id="@+id/topScrim"
@@ -362,7 +370,7 @@
         android:fillViewport="true"
         android:padding="0dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
@@ -934,7 +942,7 @@
         android:fillViewport="true"
         android:padding="0dp"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
@@ -1268,7 +1276,7 @@
         app:cardBackgroundColor="@color/oc_surface_panel"
         app:cardCornerRadius="@dimen/radius_panel_shell"
         app:cardElevation="10dp"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">

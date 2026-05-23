@@ -28,5 +28,5 @@
     <color name="oc_divider">#2FFFFFFF</color>
 
     <!-- Root background (visible when preview has not started) -->
-    <color name="oc_root_background">#FF000000</color>
+    <color name="oc_root_background">#00000000</color>
 </resources>
