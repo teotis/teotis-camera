@@ -60,9 +60,11 @@ private class HumanisticModeController(
 ) : ModeController {
     private val styles = resolveHumanisticStyles()
     private var styleIndex = resolvedDefaultStyleIndex()
-    private val frameRatioDelegate = FrameRatioDelegate(context, "humanistic") {
-        buildEffectSpec()
-    }
+    private val frameRatioDelegate = FrameRatioDelegate(
+        context = context,
+        modeEventPrefix = "humanistic",
+        effectSpecProvider = { buildEffectSpec() }
+    )
     private var proVariantEnabled = false
 
     private val mutableSnapshot = MutableStateFlow(

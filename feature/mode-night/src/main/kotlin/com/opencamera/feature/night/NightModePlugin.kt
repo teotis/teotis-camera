@@ -52,9 +52,11 @@ private class NightModeController(
     private val context: ModeContext
 ) : ModeController {
     private var profileIndex = 0
-    private val frameRatioDelegate = FrameRatioDelegate(context, "night") {
-        buildEffectSpec()
-    }
+    private val frameRatioDelegate = FrameRatioDelegate(
+        context = context,
+        modeEventPrefix = "night",
+        effectSpecProvider = { buildEffectSpec() }
+    )
     private var proVariantEnabled = false
 
     private val mutableSnapshot = MutableStateFlow(

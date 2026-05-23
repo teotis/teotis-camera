@@ -51,9 +51,11 @@ private class ProModeController(
     private val context: ModeContext
 ) : ModeController {
     private var presetIndex = 0
-    private val frameRatioDelegate = FrameRatioDelegate(context, "pro") {
-        buildEffectSpec()
-    }
+    private val frameRatioDelegate = FrameRatioDelegate(
+        context = context,
+        modeEventPrefix = "pro",
+        effectSpecProvider = { buildEffectSpec() }
+    )
 
     private val uiSpec = ModeUiSpec(
         title = "Pro",

@@ -62,9 +62,11 @@ private class PortraitModeController(
 ) : ModeController {
     private val portraitFilters = resolvePortraitFilters()
     private var styleIndex = resolvedDefaultStyleIndex()
-    private val frameRatioDelegate = FrameRatioDelegate(context, "portrait") {
-        buildEffectSpec()
-    }
+    private val frameRatioDelegate = FrameRatioDelegate(
+        context = context,
+        modeEventPrefix = "portrait",
+        effectSpecProvider = { buildEffectSpec() }
+    )
     private var proVariantEnabled = false
 
     private val mutableSnapshot = MutableStateFlow(

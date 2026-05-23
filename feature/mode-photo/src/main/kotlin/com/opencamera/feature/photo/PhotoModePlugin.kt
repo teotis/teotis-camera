@@ -61,9 +61,11 @@ private class PhotoModeController(
     private val context: ModeContext
 ) : ModeController {
     private var flashModeIndex = 0
-    private val frameRatioDelegate = FrameRatioDelegate(context, "photo") {
-        buildEffectSpec(currentFlashMode())
-    }
+    private val frameRatioDelegate = FrameRatioDelegate(
+        context = context,
+        modeEventPrefix = "photo",
+        effectSpecProvider = { buildEffectSpec(currentFlashMode()) }
+    )
     private var selectedFilter = resolvedDefaultFilter()
 
     private val mutableSnapshot = MutableStateFlow(
