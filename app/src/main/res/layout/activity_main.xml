@@ -41,7 +41,7 @@
         android:id="@+id/panelDismissScrim"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:background="#00000000"
+        android:background="#26000000"
         android:clickable="true"
         android:focusable="true"
         android:visibility="gone"
