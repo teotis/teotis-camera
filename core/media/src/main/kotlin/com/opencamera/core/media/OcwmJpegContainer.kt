@@ -4,7 +4,7 @@ object OcwmJpegContainer {
 
     private val OCWM_MAGIC = byteArrayOf('O'.code.toByte(), 'C'.code.toByte(), 'W'.code.toByte(), 'M'.code.toByte(), 0x00)
     private const val MAX_OCWM_SEGMENT_PAYLOAD_BYTES = 60000
-    private const val FIXED_HEADER_SIZE = 26 // 5 magic + 1 version + 1 flags + 4 chunkIndex + 4 chunkCount + 8 totalPayloadLength + 4 manifestLength
+    private const val FIXED_HEADER_SIZE = 27 // 5 magic + 1 version + 1 flags + 4 chunkIndex + 4 chunkCount + 8 totalPayloadLength + 4 manifestLength
 
     data class EmbeddedArchive(
         val manifest: ReversibleWatermarkArchiveManifest,
@@ -131,8 +131,8 @@ object OcwmJpegContainer {
 
         if (ocwmChunks.isEmpty()) return null
 
-        // Group by manifest payloadSha256 (all chunks share same group for v1)
-        val groups = ocwmChunks.groupBy { it.payloadSha256 }
+        // Group by totalPayloadLength + chunkCount (consistent across all chunks)
+        val groups = ocwmChunks.groupBy { "${it.totalPayloadLength}-${it.chunkCount}" }
         require(groups.size == 1) { "ocwm-chunk-missing" }
         val chunks = groups.values.first()
 
@@ -143,6 +143,9 @@ object OcwmJpegContainer {
         for (idx in sorted.indices) {
             require(sorted[idx].chunkIndex == idx) { "ocwm-chunk-missing" }
         }
+
+        // Verify binary format version from chunk header
+        require(sorted.first().formatVersion == 1) { "ocwm-version-unsupported" }
 
         // Reassemble payload
         val totalPayloadLength = sorted.first().totalPayloadLength.toInt()
@@ -158,9 +161,6 @@ object OcwmJpegContainer {
         val manifestJson = sorted.first().manifestUtf8
             ?: throw IllegalArgumentException("ocwm-chunk-missing")
         val manifest = ReversibleWatermarkArchiveManifest.fromJson(manifestJson)
-
-        // Verify version
-        require(manifest.version == 1) { "ocwm-version-unsupported" }
 
         // Verify payload integrity
         val actualHash = sha256Hex(payload)
@@ -261,8 +261,10 @@ object OcwmJpegContainer {
             if (jpeg[i] != 0xFF.toByte()) { i++; continue }
             val marker = jpeg[i + 1]
             if (marker == 0xDA.toByte()) return i // SOS
+            if (marker == 0xD9.toByte()) break // EOI
             if (i + 3 >= jpeg.size) break
             val segLen = ((jpeg[i + 2].toInt() and 0xFF) shl 8) or (jpeg[i + 3].toInt() and 0xFF)
+            if (segLen < 2) break
             i += 2 + segLen
         }
         return -1

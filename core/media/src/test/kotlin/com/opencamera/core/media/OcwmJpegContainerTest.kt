@@ -133,8 +133,9 @@ class OcwmJpegContainerTest {
         val output = OcwmJpegContainer.embedArchive(visible, archive)
 
         val sosIndex = findMarkerIndex(output, 0xDA)
-        // SOS segment: marker(2) + length(2) + data(0) = 4 bytes, then scan data starts
-        val scanStart = sosIndex + 4
+        // SOS segment: marker(2) + length(2, value=4, includes itself) + paramData(2) = 6 bytes
+        val sosSegLen = ((output[sosIndex + 2].toInt() and 0xFF) shl 8) or (output[sosIndex + 3].toInt() and 0xFF)
+        val scanStart = sosIndex + 2 + sosSegLen
         assertEquals(0x11.toByte(), output[scanStart])
         assertEquals(0x22.toByte(), output[scanStart + 1])
         assertEquals(0x33.toByte(), output[scanStart + 2])
@@ -287,17 +288,15 @@ class OcwmJpegContainerTest {
         // Find last APP15 before SOS and corrupt its payload
         var scanIdx = 2
         var lastApp15End = -1
-        while (scanIdx < sosIdx) {
-            require(corrupted[scanIdx] == 0xFF.toByte())
+        while (scanIdx < sosIdx && scanIdx + 3 < corrupted.size) {
+            if (corrupted[scanIdx] != 0xFF.toByte()) break
             val marker = corrupted[scanIdx + 1]
-            if (marker == 0xE.toByte() && scanIdx + 2 < corrupted.size) {
-                val segLen = ((corrupted[scanIdx + 2].toInt() and 0xFF) shl 8) or (corrupted[scanIdx + 3].toInt() and 0xFF)
+            val segLen = ((corrupted[scanIdx + 2].toInt() and 0xFF) shl 8) or (corrupted[scanIdx + 3].toInt() and 0xFF)
+            if (segLen < 2) break
+            if (marker == 0xEF.toByte()) {
                 lastApp15End = scanIdx + 2 + segLen - 1
             }
-            if (scanIdx + 2 < corrupted.size) {
-                val segLen = ((corrupted[scanIdx + 2].toInt() and 0xFF) shl 8) or (corrupted[scanIdx + 3].toInt() and 0xFF)
-                scanIdx += 2 + segLen
-            } else break
+            scanIdx += 2 + segLen
         }
         if (lastApp15End > 0 && lastApp15End < corrupted.size) {
             corrupted[lastApp15End] = (corrupted[lastApp15End].toInt() xor 0xFF).toByte()
@@ -324,18 +323,17 @@ class OcwmJpegContainerTest {
         // Corrupt version byte in first APP15 chunk (after magic 5 bytes, version is at offset 5)
         val sosIdx = findMarkerIndex(embedded, 0xDA)
         var scanIdx = 2
-        while (scanIdx < sosIdx) {
-            require(embedded[scanIdx] == 0xFF.toByte())
+        while (scanIdx < sosIdx && scanIdx + 3 < embedded.size) {
+            if (embedded[scanIdx] != 0xFF.toByte()) break
             val marker = embedded[scanIdx + 1]
-            if (marker == 0xE.toByte()) {
+            val segLen = ((embedded[scanIdx + 2].toInt() and 0xFF) shl 8) or (embedded[scanIdx + 3].toInt() and 0xFF)
+            if (segLen < 2) break
+            if (marker == 0xEF.toByte()) {
                 // APP15 found - version is at payload+5 (after magic)
                 embedded[scanIdx + 4 + 5] = 99.toByte()
                 break
             }
-            if (scanIdx + 2 < embedded.size) {
-                val segLen = ((embedded[scanIdx + 2].toInt() and 0xFF) shl 8) or (embedded[scanIdx + 3].toInt() and 0xFF)
-                scanIdx += 2 + segLen
-            } else break
+            scanIdx += 2 + segLen
         }
         assertFailsWith<IllegalArgumentException>("ocwm-version-unsupported") {
             OcwmJpegContainer.extractArchive(embedded)
@@ -352,8 +350,9 @@ class OcwmJpegContainerTest {
                 i = 2
                 continue
             }
-            if (data[i] == 0xFF.toByte() && i + 2 < data.size) {
+            if (data[i] == 0xFF.toByte() && i + 3 < data.size) {
                 val segLen = ((data[i + 2].toInt() and 0xFF) shl 8) or (data[i + 3].toInt() and 0xFF)
+                if (segLen < 2) break
                 i += 2 + segLen
             } else {
                 i++
@@ -375,8 +374,9 @@ class OcwmJpegContainerTest {
                     data[payloadStart + 3] == 'M'.code.toByte()
                 ) return i
             }
-            if (data[i] == 0xFF.toByte() && i + 2 < data.size) {
+            if (data[i] == 0xFF.toByte() && i + 3 < data.size) {
                 val segLen = ((data[i + 2].toInt() and 0xFF) shl 8) or (data[i + 3].toInt() and 0xFF)
+                if (segLen < 2) break
                 i += 2 + segLen
             } else {
                 i++
@@ -399,8 +399,9 @@ class OcwmJpegContainerTest {
                 }
                 count++
             }
-            if (copy[i] == 0xFF.toByte() && i + 2 < copy.size) {
+            if (copy[i] == 0xFF.toByte() && i + 3 < copy.size) {
                 val segLen = ((copy[i + 2].toInt() and 0xFF) shl 8) or (copy[i + 3].toInt() and 0xFF)
+                if (segLen < 2) break
                 i += 2 + segLen
             } else {
                 i++
