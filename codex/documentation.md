@@ -1015,3 +1015,9 @@
   对应 session 回归测试已建立。
 - 留存影响：
   该阶段主要作为后续复杂模式迁入和第 6 阶段 feature 扩展的稳定性背景，不再单独作为当前执行目标。
+
+## 2026-05-24：点击预览对焦 CameraX 执行修复
+
+- 目标：修复此前 tap focus/AE 链路只落到 session/device/coordinator，但 `CameraXCaptureAdapter` 仍返回 `UNSUPPORTED` stub 的问题。
+- 核心结果：`DeviceCommand.ApplyPreviewMetering` 现在通过 CameraX `FocusMeteringAction` 执行 AF+AE metering，并在 AE-only、unsupported、failed 情况下回传结构化 `PreviewMeteringResultStatus`。
+- 验证：`./scripts/verify_tap_focus_camerax_execution.sh` 与 `./scripts/verify_stage_7_observability.sh` 通过；真机仍需 smoke 复验具体机型的 AF/AE 区域支持。

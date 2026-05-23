@@ -57,6 +57,10 @@ cd "$ROOT_DIR"
   --tests com.opencamera.app.DevLogRenderModelTest \
   --tests com.opencamera.app.camera.CameraSessionCoordinatorTest
 
+# ── tap-focus CameraX execution anti-stub gate ────────────────────────────
+
+./scripts/verify_tap_focus_camerax_execution.sh
+
 # ── assemble debug APK ────────────────────────────────────────────────────
 
 ./gradlew --no-daemon :app:assembleDebug
