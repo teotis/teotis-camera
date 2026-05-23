@@ -11,6 +11,30 @@ import com.opencamera.core.settings.ManualCaptureParams
 import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
 
+enum class PhotoLowLightStrategySupport {
+    UNSUPPORTED,
+    DEGRADED_SINGLE_FRAME,
+    SUPPORTED_MULTI_FRAME
+}
+
+enum class SceneLightState {
+    UNKNOWN,
+    NORMAL,
+    LOW_LIGHT
+}
+
+data class PhotoSceneSignal(
+    val lightState: SceneLightState = SceneLightState.UNKNOWN,
+    val brightnessScore: Float? = null,
+    val source: String = "unknown"
+)
+
+fun DeviceCapabilities.photoLowLightStrategySupport(): PhotoLowLightStrategySupport = when {
+    !supportsStillCapture -> PhotoLowLightStrategySupport.UNSUPPORTED
+    supportsNightMultiFrame -> PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME
+    else -> PhotoLowLightStrategySupport.DEGRADED_SINGLE_FRAME
+}
+
 enum class CameraOutputRotation {
     ROTATION_0,
     ROTATION_90,
@@ -113,6 +137,7 @@ data class DeviceCapabilities(
     val supportsPreviewSnapshots: Boolean = true,
     val supportsAudioRecording: Boolean = true,
     val zoomRatioCapability: ZoomRatioCapability = ZoomRatioCapability(),
+    val previewBrightnessRange: PreviewBrightnessRange = PreviewBrightnessRange.CONSERVATIVE,
     val supportsManualControls: Boolean = true,
     val manualControlCapabilities: ManualControlCapabilityMatrix? = null,
     val supportsDocumentScanEnhancement: Boolean = true,
@@ -241,6 +266,37 @@ private fun ManualCaptureParams.isAutoRequest(): Boolean {
         apertureFNumber == null &&
         whiteBalanceKelvin == null
 }
+
+data class PreviewBrightnessRange(
+    val minSteps: Int,
+    val maxSteps: Int
+) {
+    fun clamp(value: Int): Int = value.coerceIn(minSteps, maxSteps)
+
+    companion object {
+        val CONSERVATIVE = PreviewBrightnessRange(-2, 2)
+        val UNSUPPORTED = PreviewBrightnessRange(0, 0)
+    }
+}
+
+enum class PreviewBrightnessResultStatus {
+    APPLIED,
+    DEGRADED_SAVED_ONLY,
+    FAILED,
+    UNSUPPORTED
+}
+
+data class PreviewBrightnessRequest(
+    val requestId: String,
+    val exposureCompensationSteps: Int
+)
+
+data class PreviewBrightnessResult(
+    val requestId: String,
+    val exposureCompensationSteps: Int,
+    val status: PreviewBrightnessResultStatus,
+    val reason: String? = null
+)
 
 data class PreviewMeteringPoint(
     val normalizedX: Float,
@@ -472,6 +528,7 @@ sealed interface DeviceCommand {
     data class UpdateZoomRatio(val zoomRatio: Float) : DeviceCommand
     data class ApplyPreviewMetering(val request: PreviewMeteringRequest) : DeviceCommand
     data class UpdateOutputRotation(val rotation: CameraOutputRotation) : DeviceCommand
+    data class ApplyPreviewBrightness(val request: PreviewBrightnessRequest) : DeviceCommand
 }
 
 enum class DeviceRuntimeIssueKind {
@@ -540,4 +597,5 @@ sealed interface DeviceEvent {
         val outputPath: String
     ) : DeviceEvent
     data class PreviewMeteringCompleted(val result: PreviewMeteringResult) : DeviceEvent
+    data class PreviewBrightnessApplied(val result: PreviewBrightnessResult) : DeviceEvent
 }
