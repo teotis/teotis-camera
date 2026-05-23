@@ -378,7 +378,7 @@ private class PhotoModeController(
 
     private fun currentFlashSupported(): Boolean = runtimeState().deviceCapabilities.supportsFlashControl
     private fun currentFlashMode(): FlashMode = currentFlashModes()[flashModeIndex]
-    private fun currentFrameRatio(): FrameRatio = frameRatios[frameRatioIndex]
+    private fun currentFrameRatio(): FrameRatio = frameRatioDelegate.currentFrameRatio()
     private fun selectedWatermarkTemplate(): WatermarkTemplate {
         val persistedTemplateId = context.settingsSnapshot.persisted.photo.defaultWatermarkTemplateId
         return context.settingsSnapshot.catalog.watermarkTemplates.firstOrNull { template ->
