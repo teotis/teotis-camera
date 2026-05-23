@@ -115,6 +115,48 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `pure text template passes through to pipeline notes`() = runTest {
+        val editor = FakePhotoWatermarkEditor(
+            result = PhotoWatermarkApplied()
+        )
+        val processor = PhotoWatermarkPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                watermarkText = "OpenCamera",
+                watermarkTemplate = "pure-text",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/pure.jpg",
+                    filePath = "/tmp/pure.jpg"
+                )
+            )
+        )
+
+        assertEquals("pure-text", editor.invocations.single().templateId)
+        assertTrue(result.pipelineNotes.contains("watermark:rendered:pure-text"))
+    }
+
+    @Test
+    fun `blur four border template passes through to pipeline notes`() = runTest {
+        val editor = FakePhotoWatermarkEditor(
+            result = PhotoWatermarkApplied()
+        )
+        val processor = PhotoWatermarkPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                watermarkText = "OpenCamera",
+                watermarkTemplate = "blur-four-border",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/blur.jpg",
+                    filePath = "/tmp/blur.jpg"
+                )
+            )
+        )
+
+        assertEquals("blur-four-border", editor.invocations.single().templateId)
+        assertTrue(result.pipelineNotes.contains("watermark:rendered:blur-four-border"))
+    }
+
+    @Test
     fun `non photo result is ignored`() = runTest {
         val editor = FakePhotoWatermarkEditor(
             result = PhotoWatermarkApplied()
