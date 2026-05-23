@@ -960,9 +960,8 @@ class DefaultCameraSessionTest {
         advanceTimeBy(3_000)
         advanceUntilIdle()
 
-        val elapsed = session.state.value.recordingElapsedMillis
-        assertNotNull(elapsed)
-        assertTrue("Expected elapsed >= 3000 but was $elapsed", elapsed >= 3_000L)
+        val elapsed = session.state.value.recordingElapsedMillis!!
+        assertTrue(elapsed >= 3_000L, "Expected elapsed >= 3000 but was $elapsed")
     }
 
     @Test
