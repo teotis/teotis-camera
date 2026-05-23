@@ -868,4 +868,50 @@ class PreviewRecoverySessionProcessorTest {
         }
         assertTrue(threw)
     }
+
+    @Test
+    fun `LatestGalleryMediaLoaded sets thumbnail source and media type`() = runTest {
+        val harness = Harness()
+        val source = ThumbnailSource.SavedMedia(
+            outputPath = "Movies/video.mp4",
+            renderUri = "content://media/external/video/media/99"
+        )
+        harness.dispatch(SessionIntent.LatestGalleryMediaLoaded(source, SavedMediaType.VIDEO))
+
+        assertTrue(harness.mutations.calls.any { it.startsWith("thumbnail:") })
+        assertEquals(SavedMediaType.VIDEO, harness.state.value.presentation.latestSavedMediaType)
+    }
+
+    @Test
+    fun `LatestGalleryMediaLoaded ignored when saved media already exists`() = runTest {
+        val harness = Harness(runningState().copy(
+            presentation = SessionPresentationState(
+                latestThumbnailSource = ThumbnailSource.SavedMedia("/saved.jpg")
+            )
+        ))
+        harness.dispatch(SessionIntent.LatestGalleryMediaLoaded(
+            ThumbnailSource.SavedMedia("Movies/video.mp4", "content://media/external/video/media/99"),
+            SavedMediaType.VIDEO
+        ))
+
+        assertFalse(harness.mutations.calls.any { it.startsWith("thumbnail:") })
+        assertNull(harness.state.value.presentation.latestSavedMediaType)
+    }
+
+    @Test
+    fun `LatestGalleryImageLoaded does not overwrite existing saved media`() = runTest {
+        val harness = Harness(runningState().copy(
+            presentation = SessionPresentationState(
+                latestThumbnailSource = ThumbnailSource.SavedMedia(
+                    outputPath = "Pictures/existing.jpg",
+                    renderUri = "content://media/external/images/media/10"
+                )
+            )
+        ))
+        harness.dispatch(SessionIntent.LatestGalleryImageLoaded(
+            ThumbnailSource.SavedMedia("Pictures/new.jpg", "content://media/external/images/media/20")
+        ))
+
+        assertFalse(harness.mutations.calls.any { it.startsWith("thumbnail:") })
+    }
 }

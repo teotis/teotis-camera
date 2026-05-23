@@ -192,14 +192,19 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         dispatch(SessionIntent.Boot)
         dispatch(SessionIntent.PreviewHostAttached)
         requestCameraPermissionIfNeeded()
-        loadLatestGalleryImage()
+        loadLatestGalleryMedia()
     }
 
-    private fun loadLatestGalleryImage() {
+    private fun loadLatestGalleryMedia() {
         lifecycleScope.launch {
-            val latestImage = queryLatestGalleryImage(this@MainActivity)
-            if (latestImage != null) {
-                dispatch(SessionIntent.LatestGalleryImageLoaded(latestImage))
+            val latestMedia = queryLatestGalleryMedia(this@MainActivity)
+            if (latestMedia != null) {
+                dispatch(SessionIntent.LatestGalleryMediaLoaded(latestMedia.source, latestMedia.mediaType))
+            } else {
+                val latestImage = queryLatestGalleryImage(this@MainActivity)
+                if (latestImage != null) {
+                    dispatch(SessionIntent.LatestGalleryImageLoaded(latestImage))
+                }
             }
         }
     }
@@ -283,6 +288,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         maybePlayShutterSound(state)
 
         cockpitRenderer.renderShutter(state, controls)
+        cockpitRenderer.renderRecordingIndicator(
+            recordingIndicatorRenderModel(state, text)
+        )
         cockpitRenderer.renderCaptureOutput(sessionCaptureOutputText(state, sessionUiStrings()))
         cockpitRenderer.renderZoomCapsules(controls)
         val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
@@ -299,17 +307,37 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         devConsoleRenderer.renderVisibility(activePanelRoute)
         devConsoleRenderer.render(devLogModel)
 
-        val nextThumbnailRenderUri = state.presentation.pendingCaptureFeedback?.let { feedback ->
+        val pendingThumbnailUri = state.presentation.pendingCaptureFeedback?.let { feedback ->
             feedback.outputPath.takeIf { File(it).isAbsolute }?.let { File(it).toURI().toString() }
-        } ?: state.presentation.latestThumbnailSource?.renderUriOrNull()
-        when (val command = nextThumbnailRenderCommand(lastRequestedThumbnailUri, nextThumbnailRenderUri)) {
+        }
+        val savedMediaType = state.presentation.latestSavedMediaType
+        val rawSourceUri = state.presentation.latestThumbnailSource?.renderUriOrNull()
+        val nextSourceUri = pendingThumbnailUri ?: rawSourceUri
+        val nextRenderUri = if (pendingThumbnailUri != null) {
+            pendingThumbnailUri
+        } else if (savedMediaType == SavedMediaType.VIDEO && rawSourceUri != null) {
+            VideoFrameExtractor.extract(this, rawSourceUri)
+        } else {
+            rawSourceUri
+        }
+        val nextIdentity = if (pendingThumbnailUri != null) {
+            pendingThumbnailUri
+        } else {
+            sourceIdentityFor(nextSourceUri, savedMediaType)
+        }
+        when (val command = nextThumbnailRenderCommand(
+            lastRequestedThumbnailUri, nextRenderUri,
+            lastSourceIdentity, nextIdentity
+        )) {
             ThumbnailRenderCommand.NoOp -> Unit
             ThumbnailRenderCommand.Clear -> {
                 lastRequestedThumbnailUri = null
+                lastSourceIdentity = null
                 views.preview.thumbnail.setImageDrawable(null)
             }
             is ThumbnailRenderCommand.Load -> {
                 lastRequestedThumbnailUri = command.uri
+                lastSourceIdentity = command.sourceIdentity
                 views.preview.thumbnail.setImageURI(null)
                 views.preview.thumbnail.setImageURI(Uri.parse(command.uri))
             }

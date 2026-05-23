@@ -139,6 +139,7 @@ internal fun cameraCockpitRenderModel(
             isRecording = state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE,
             lensButtonLabel = controls.lensFacingButtonLabel,
             lensButtonEnabled = controls.lensFacingEnabled,
+            recordingIndicator = recordingIndicatorRenderModel(state, text),
             disabledReason = captureDisabledReason(state, text)
         ),
         previewRatioChip = PreviewRatioChipRenderModel(
@@ -161,5 +162,37 @@ internal fun orientationRenderModel(displayRotation: Int): CockpitOrientationRen
         else -> CockpitOrientationRenderModel(
             CockpitDisplayOrientation.PORTRAIT, 0f
         )
+    }
+}
+
+internal fun recordingIndicatorRenderModel(
+    state: SessionState,
+    text: AppTextResolver
+): RecordingIndicatorRenderModel {
+    val status = state.recordingStatus
+    val isVisible = status != com.opencamera.core.session.RecordingStatus.IDLE
+    val label = when (status) {
+        com.opencamera.core.session.RecordingStatus.REQUESTING -> text.statusRecordingStarting()
+        com.opencamera.core.session.RecordingStatus.RECORDING ->
+            formatRecordingElapsed(state.recordingElapsedMillis ?: 0L)
+        com.opencamera.core.session.RecordingStatus.STOPPING -> text.statusRecordingSaving()
+        com.opencamera.core.session.RecordingStatus.IDLE -> ""
+    }
+    return RecordingIndicatorRenderModel(
+        isVisible = isVisible,
+        label = label,
+        status = status
+    )
+}
+
+internal fun formatRecordingElapsed(millis: Long): String {
+    val totalSeconds = millis / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
     }
 }

@@ -921,6 +921,122 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `video shot started sets recording status and elapsed to zero`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+        assertEquals(0L, session.state.value.recordingStartedAtElapsedMillis)
+        assertEquals(0L, session.state.value.recordingElapsedMillis)
+    }
+
+    @Test
+    fun `video recording elapsed advances over time`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+
+        assertEquals(0L, session.state.value.recordingElapsedMillis)
+
+        advanceTimeBy(3_000)
+        advanceUntilIdle()
+
+        val elapsed = session.state.value.recordingElapsedMillis
+        assertNotNull(elapsed)
+        assertTrue("Expected elapsed >= 3000 but was $elapsed", elapsed >= 3_000L)
+    }
+
+    @Test
+    fun `video shot completed clears recording elapsed fields`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+
+        assertNotNull(session.state.value.recordingStartedAtElapsedMillis)
+        assertNotNull(session.state.value.recordingElapsedMillis)
+
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.VIDEO,
+                    outputPath = "Movies/OpenCamera/test.mp4",
+                    saveRequest = SaveRequest.videoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Movies/OpenCamera/test.mp4"),
+                    metadata = SaveRequest.videoLibrary().metadata,
+                    pipelineNotes = emptyList()
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+        assertNull(session.state.value.recordingStartedAtElapsedMillis)
+        assertNull(session.state.value.recordingElapsedMillis)
+        assertEquals(SavedMediaType.VIDEO, session.state.value.latestSavedMediaType)
+    }
+
+    @Test
+    fun `video shot failed clears recording elapsed fields`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+
+        assertNotNull(session.state.value.recordingStartedAtElapsedMillis)
+        assertNotNull(session.state.value.recordingElapsedMillis)
+
+        session.dispatch(
+            SessionIntent.ShotFailed(
+                shotId = shot.shotId,
+                mediaType = MediaType.VIDEO,
+                reason = "Camera disconnected"
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+        assertNull(session.state.value.recordingStartedAtElapsedMillis)
+        assertNull(session.state.value.recordingElapsedMillis)
+    }
+
+    @Test
     fun `video mode cycles quality through tertiary action before recording`() = runTest {
         val session = createSession(InMemorySessionTrace(), this)
 

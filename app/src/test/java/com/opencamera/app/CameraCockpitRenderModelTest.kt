@@ -292,6 +292,72 @@ class CameraCockpitRenderModelTest {
 
         assertTrue(model.zoomStrip.isVisible)
         assertTrue(model.zoomStrip.chips.isNotEmpty())
+    }
+
+    @Test
+    fun `recording indicator is hidden when idle`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(model.bottomCockpit.recordingIndicator.isVisible)
+        assertEquals("", model.bottomCockpit.recordingIndicator.label)
+    }
+
+    @Test
+    fun `recording indicator shows starting status when requesting`() {
+        val state = defaultSessionState().copy(
+            recordingStatus = RecordingStatus.REQUESTING
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.bottomCockpit.recordingIndicator.isVisible)
+        assertEquals("Starting…", model.bottomCockpit.recordingIndicator.label)
+    }
+
+    @Test
+    fun `recording indicator shows saving status when stopping`() {
+        val state = defaultSessionState().copy(
+            recordingStatus = RecordingStatus.STOPPING
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.bottomCockpit.recordingIndicator.isVisible)
+        assertEquals("Saving…", model.bottomCockpit.recordingIndicator.label)
+    }
+
+    @Test
+    fun `recording indicator shows elapsed time when recording`() {
+        val state = defaultSessionState().copy(
+            recordingStatus = RecordingStatus.RECORDING,
+            presentation = SessionPresentationState(
+                recordingElapsedMillis = 84_000L
+            )
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.bottomCockpit.recordingIndicator.isVisible)
+        assertEquals("01:24", model.bottomCockpit.recordingIndicator.label)
+    }
+
+    @Test
+    fun `formatRecordingElapsed formats zero as 00_00`() {
+        assertEquals("00:00", formatRecordingElapsed(0L))
+    }
+
+    @Test
+    fun `formatRecordingElapsed formats seconds correctly`() {
+        assertEquals("00:03", formatRecordingElapsed(3_000L))
+    }
+
+    @Test
+    fun `formatRecordingElapsed formats minutes and seconds`() {
+        assertEquals("01:24", formatRecordingElapsed(84_000L))
+    }
+
+    @Test
+    fun `formatRecordingElapsed formats hours minutes seconds`() {
+        assertEquals("1:02:09", formatRecordingElapsed(3_729_000L))
+    }
         assertTrue(model.modeTrack.items.isNotEmpty())
     }
 

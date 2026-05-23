@@ -166,7 +166,8 @@ internal data class BottomCockpitViews(
     val shutter: Button,
     val lensFacing: Button,
     val zoomScroll: android.widget.HorizontalScrollView,
-    val zoomRow: LinearLayout
+    val zoomRow: LinearLayout,
+    val recordingIndicator: TextView
 )
 
 internal data class MainActivityViews(
@@ -331,7 +332,8 @@ internal data class MainActivityViews(
                 shutter = activity.findViewById(R.id.buttonShutter),
                 lensFacing = activity.findViewById(R.id.buttonLensFacing),
                 zoomScroll = activity.findViewById(R.id.zoomCapsuleScroll),
-                zoomRow = activity.findViewById(R.id.zoomCapsuleRow)
+                zoomRow = activity.findViewById(R.id.zoomCapsuleRow),
+                recordingIndicator = activity.findViewById(R.id.recordingIndicator)
             )
             return MainActivityViews(
                 preview = preview,

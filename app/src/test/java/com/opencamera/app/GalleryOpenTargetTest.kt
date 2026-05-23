@@ -106,4 +106,19 @@ class GalleryOpenTargetTest {
 
         assertNull(target)
     }
+
+    @Test
+    fun `cached video frame thumbnail is not used as gallery target`() {
+        val target = galleryOpenTargetFor(
+            source = ThumbnailSource.SavedMedia(
+                outputPath = "Movies/OpenCamera/video.mp4",
+                renderUri = "content://media/external/video/media/99"
+            ),
+            savedMediaType = SavedMediaType.VIDEO
+        )
+
+        assertEquals("content://media/external/video/media/99", target?.uri)
+        assertEquals("video/*", target?.mimeType)
+        assertEquals(GalleryOpenUriKind.CONTENT_URI, target?.kind)
+    }
 }

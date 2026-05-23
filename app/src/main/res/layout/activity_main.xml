@@ -1447,6 +1447,18 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
+        <!-- Recording elapsed indicator -->
+        <TextView
+            android:id="@+id/recordingIndicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:textColor="@color/oc_accent"
+            android:textSize="@dimen/text_size_status"
+            android:visibility="gone" />
+
         <!-- Main control row: Thumbnail | Shutter | Lens/Zoom -->
         <LinearLayout
             android:layout_width="match_parent"

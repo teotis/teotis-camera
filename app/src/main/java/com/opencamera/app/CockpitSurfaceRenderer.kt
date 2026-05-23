@@ -57,6 +57,13 @@ internal class CockpitSurfaceRenderer(
         preview.captureOutput.text = text
     }
 
+    fun renderRecordingIndicator(indicator: RecordingIndicatorRenderModel) {
+        bottomCockpit.recordingIndicator.isVisible = indicator.isVisible
+        if (indicator.isVisible) {
+            bottomCockpit.recordingIndicator.text = indicator.label
+        }
+    }
+
     fun renderPreviewMirror(state: SessionState) {
         preview.previewView.scaleX = if (
             state.activeDeviceGraph.preferredLensFacing == com.opencamera.core.device.LensFacing.FRONT &&
