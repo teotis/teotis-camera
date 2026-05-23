@@ -66,8 +66,8 @@ open class AppTextResolver(private val context: Context?) {
     open fun devRestart(): String = str(R.string.button_dev_restart_session, "Restart Session")
     open fun devClose(): String = str(R.string.dev_close, "Close")
     open fun devExportLog(): String = str(R.string.dev_export_log, "Export Log")
-    open fun devTabKey(): String = str(R.string.dev_tab_key, "Key")
-    open fun devTabCore(): String = str(R.string.dev_tab_core, "Core")
+    open fun devTabKey(): String = str(R.string.dev_tab_key, "Summary")
+    open fun devTabCore(): String = str(R.string.dev_tab_core, "Pipeline")
     open fun devTabError(): String = str(R.string.dev_tab_error, "Error")
     open fun devTabAll(): String = str(R.string.dev_tab_all, "All")
     open fun quickLauncher(): String = str(R.string.button_quick_launcher, "Quick")
@@ -198,9 +198,9 @@ open class AppTextResolver(private val context: Context?) {
 
     // Dev log title labels
     open fun devLogTitleKey(count: Int): String =
-        String.format(str(R.string.dev_log_title_key, "Key Log (%d)"), count)
+        String.format(str(R.string.dev_log_title_key, "Summary Log (%d)"), count)
     open fun devLogTitleCore(count: Int): String =
-        String.format(str(R.string.dev_log_title_core, "Core Log (%d)"), count)
+        String.format(str(R.string.dev_log_title_core, "Pipeline Log (%d)"), count)
     open fun devLogTitleError(count: Int): String =
         String.format(str(R.string.dev_log_title_error, "Error Log (%d)"), count)
     open fun devLogTitleAll(count: Int): String =

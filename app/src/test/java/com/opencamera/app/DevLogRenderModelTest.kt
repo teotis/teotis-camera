@@ -169,7 +169,7 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.KEY,
             text = TestAppTextResolver()
         )
-        assertTrue(keyModel.title.startsWith("Key Log"))
+        assertTrue(keyModel.title.startsWith("Summary Log"))
         val allModel = devLogRenderModel(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,

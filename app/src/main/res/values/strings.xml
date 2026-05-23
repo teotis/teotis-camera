@@ -71,8 +71,8 @@
     <string name="mode_track_label">模式</string>
     <string name="button_dev_entry">开发</string>
     <string name="button_dev_restart_session">重启会话</string>
-    <string name="dev_tab_key">关键</string>
-    <string name="dev_tab_core">核心</string>
+    <string name="dev_tab_key">摘要</string>
+    <string name="dev_tab_core">链路</string>
     <string name="dev_tab_error">错误</string>
     <string name="dev_tab_all">全部</string>
     <string name="dev_export_log">导出日志</string>
@@ -294,8 +294,8 @@
     <string name="filter_signed_magenta_plus">洋红+</string>
     <string name="filter_signed_green">绿</string>
     <string name="filter_signed_green_plus">绿+</string>
-    <string name="dev_log_title_key">关键日志 (%d)</string>
-    <string name="dev_log_title_core">核心日志 (%d)</string>
+    <string name="dev_log_title_key">摘要日志 (%d)</string>
+    <string name="dev_log_title_core">链路日志 (%d)</string>
     <string name="dev_log_title_error">错误日志 (%d)</string>
     <string name="dev_log_title_all">全部事件 (%d)</string>
 

@@ -69,8 +69,8 @@
     <string name="mode_track_label">Mode</string>
     <string name="button_dev_entry">DEV</string>
     <string name="button_dev_restart_session">Restart Session</string>
-    <string name="dev_tab_key">Key</string>
-    <string name="dev_tab_core">Core</string>
+    <string name="dev_tab_key">Summary</string>
+    <string name="dev_tab_core">Pipeline</string>
     <string name="dev_tab_error">Error</string>
     <string name="dev_tab_all">All</string>
     <string name="dev_export_log">Export Log</string>
@@ -292,8 +292,8 @@
     <string name="filter_signed_magenta_plus">Magenta+</string>
     <string name="filter_signed_green">Green</string>
     <string name="filter_signed_green_plus">Green+</string>
-    <string name="dev_log_title_key">Key Log (%d)</string>
-    <string name="dev_log_title_core">Core Log (%d)</string>
+    <string name="dev_log_title_key">Summary Log (%d)</string>
+    <string name="dev_log_title_core">Pipeline Log (%d)</string>
     <string name="dev_log_title_error">Error Log (%d)</string>
     <string name="dev_log_title_all">All Events (%d)</string>
 
