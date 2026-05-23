@@ -9,6 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PreviewEffectAdapterTest {
 
@@ -116,5 +117,40 @@ class PreviewEffectAdapterTest {
         assertEquals("Pro", model.watermarkHint!!.previewText)
         assertEquals(WatermarkTextPlacement.TOP_LEFT, model.watermarkHint!!.placement)
         assertEquals(FrameRatio.RATIO_1_1, model.frameGuideline!!.ratio)
+    }
+
+    @Test
+    fun `tint color is proportional to warmth shift not clamped to extremes`() {
+        val spec = FilterRenderSpec(warmthShift = 6, tintShift = -1, warmBoost = 0.09f)
+        val effect = FilterEffect(profileId = "warm", renderSpec = spec)
+        val model = adapter.adapt(EffectSpec(listOf(effect)))
+
+        val tintColor = model.filterOverlay!!.tintColor
+        val r = (tintColor ushr 16) and 0xFF
+        val g = (tintColor ushr 8) and 0xFF
+        val b = tintColor and 0xFF
+
+        // With warmthShift=6, channels should be warm but not clamped to extremes
+        assertTrue(r in 130..200, "R=$r should be warm but not saturated (was clamped to 255 with old ×60)")
+        assertTrue(b in 70..128, "B=$b should be cool but not zero (was clamped to 0 with old ×60)")
+        assertTrue(g in 120..140, "G=$g should be near neutral")
+    }
+
+    @Test
+    fun `tint color distinguishes different warmth levels`() {
+        val mild = FilterEffect("mild", FilterRenderSpec(warmthShift = 3))
+        val strong = FilterEffect("strong", FilterRenderSpec(warmthShift = 10))
+
+        val mildColor = adapter.adapt(EffectSpec(listOf(mild))).filterOverlay!!.tintColor
+        val strongColor = adapter.adapt(EffectSpec(listOf(strong))).filterOverlay!!.tintColor
+
+        val mildR = (mildColor ushr 16) and 0xFF
+        val strongR = (strongColor ushr 16) and 0xFF
+        val mildB = mildColor and 0xFF
+        val strongB = strongColor and 0xFF
+
+        // Strong warm should have higher R and lower B than mild warm
+        assertTrue(strongR > mildR, "strong warm R=$strongR should be > mild warm R=$mildR")
+        assertTrue(strongB < mildB, "strong warm B=$strongB should be < mild warm B=$mildB")
     }
 }

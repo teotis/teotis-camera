@@ -54,10 +54,10 @@ class PreviewEffectAdapter {
         val tint = (spec?.tintShift ?: 0).toFloat()
         val warmBoost = (spec?.warmBoost ?: 0f)
         val coolBoost = (spec?.coolBoost ?: 0f)
-        val effectiveWarmth = warmth + warmBoost - coolBoost
-        val r = (128 + effectiveWarmth * 60).toInt().coerceIn(0, 255)
-        val g = 128
-        val b = (128 - effectiveWarmth * 60 + tint * 60).toInt().coerceIn(0, 255)
+        val effectiveWarmth = warmth + warmBoost * 6f - coolBoost * 6f
+        val r = (128 + effectiveWarmth * 4.0f + tint * 2.8f).toInt().coerceIn(0, 255)
+        val g = (128 - tint * 2.8f).toInt().coerceIn(0, 255)
+        val b = (128 - effectiveWarmth * 4.0f + tint * 2.8f).toInt().coerceIn(0, 255)
         return (0xFF shl 24) or (r shl 16) or (g shl 8) or b
     }
 
