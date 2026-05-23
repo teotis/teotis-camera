@@ -79,16 +79,6 @@ class PreviewOverlayView @JvmOverloads constructor(
         style = Paint.Style.FILL
     }
 
-    private val frameLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textSize = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_SP,
-            12f,
-            resources.displayMetrics
-        )
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-    }
-
     private val reticleRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 2f * density
@@ -318,7 +308,6 @@ class PreviewOverlayView @JvmOverloads constructor(
             canvas.drawPath(outsidePath, frameScrimPaint)
         }
         canvas.drawRect(rect, frameGuidelinePaint)
-        canvas.drawText(frame.label, rect.left + 10f * density, rect.top + 20f * density, frameLabelPaint)
     }
 
     private fun drawFocusReticle(canvas: Canvas) {
