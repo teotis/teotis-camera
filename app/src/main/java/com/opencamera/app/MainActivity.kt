@@ -161,6 +161,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         listOf(
             // Right rail utility buttons
             views.topBar.filterEntry,
+            views.topBar.colorLabEntry,
+            views.topBar.settingsEntry,
             views.quickPanel.launcher,
             views.devConsole.entry,
             // Bottom cockpit controls
@@ -172,6 +174,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             views.quickPanel.frame11,
             views.settingsPanel.gridMode
         ).forEach { it.rotation = degrees }
+        cockpitRenderer.controlRotationDegrees = degrees
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {

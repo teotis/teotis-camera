@@ -25,6 +25,8 @@ internal class CockpitSurfaceRenderer(
     private val callbacks: CockpitCallbacks,
     private val isModeTrackScrolling: () -> Boolean = { false }
 ) {
+    var controlRotationDegrees: Float = 0f
+
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
 
@@ -94,6 +96,7 @@ internal class CockpitSurfaceRenderer(
                 setOnClickListener {
                     callbacks.onZoomRatioSelected(capsule.ratio)
                 }
+                rotation = controlRotationDegrees
             }
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
