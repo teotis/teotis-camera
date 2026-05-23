@@ -21,7 +21,7 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:scaleType="fillCenter" />
+        app:scaleType="fitCenter" />
 
     <com.opencamera.app.PreviewOverlayView
         android:id="@+id/previewOverlay"
