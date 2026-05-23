@@ -112,6 +112,22 @@
 
 # 最近有效闭环
 
+## 2026-05-24：可逆水印自包含 JPEG 归档方案
+
+- 目标：把“去水印”从 AI/任意图片修复收敛为 OpenCamera 自己生成水印的可逆归档能力；用户确认优先支持“单个 JPG 自包含、长期归档、未来可直接解析出无水印原图”的方向。
+- 核心判断：
+  只保存水印区域 patch 更省空间，但长期依赖坐标、模板和可见图未被二次编辑；不适合作为主归档格式。
+  主方案改为在可见水印 JPEG 内嵌一份完整的“水印前成片 JPEG”，其中“原图”定义为媒体管线中完成上游滤镜/裁切/人像/文档处理之后、进入 `PhotoWatermarkPostProcessor` 之前的 JPEG 字节。
+  XMP 只适合放轻量摘要；大 payload 采用自定义 `APP15` chunk，magic 为 `OCWM\0`，并提供脚本级可解析格式。
+- 核心结果：
+  [`2026-05-24-reversible-watermark-archive-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-reversible-watermark-archive-index.md) 记录总目标、当前代码事实、拆包顺序和全局验收；
+  [`2026-05-24-reversible-watermark-ocwm-container.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-reversible-watermark-ocwm-container.md) 定义纯 Kotlin `core:media` 层 OCWM JPEG 容器、manifest、chunk 编码/解码和单元测试；
+  [`2026-05-24-reversible-watermark-pipeline-embedding.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-reversible-watermark-pipeline-embedding.md) 定义 `PhotoWatermarkPostProcessor` / `AndroidPhotoWatermarkEditor` 的嵌入顺序：先渲染水印并恢复 EXIF，再嵌入 OCWM，避免 `ExifInterface.saveAttributes()` 后续移除自定义段；
+  [`2026-05-24-reversible-watermark-extraction-verification.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-reversible-watermark-extraction-verification.md) 定义无 Android 依赖的 Python 提取脚本和验证门禁。
+- 验证：本轮只新增方案文档并更新状态文档，未改运行时代码；已用 `rtk rg` 对新增方案文档做占位词和命令口径检查。
+- 结论：
+  该方案是独立的 feature/media-pipeline 增强，不属于第 `7` 阶段稳定性 exit 的必要项；如果启动实现，应按 container -> pipeline embedding -> extraction verification 串行推进，避免在尚未固定二进制格式前改 app 水印渲染路径。
+
 ## 2026-05-23：SessionUiRenderModel 按域拆分核验与方案文档
 
 - 目标：核验外部 agent 关于 `SessionUiRenderModel` 过大、render model 按域拆分的 R1 审查结论，并输出可交给非多模态 agent 的落地方案。
