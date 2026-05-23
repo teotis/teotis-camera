@@ -1,10 +1,7 @@
 package com.opencamera.app.camera
 
-import com.opencamera.core.media.LiveBundleStatus
-import com.opencamera.core.media.LiveMotionSource
-import com.opencamera.core.media.LivePhotoBundle
-import com.opencamera.core.media.LiveTemporalWindow
-import com.opencamera.core.media.MediaOutputHandle
+import com.opencamera.app.camera.live.FakeLivePreviewFrameSource
+import com.opencamera.core.media.*
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -449,4 +446,74 @@ class CameraXCaptureAdapterLivePhotoTest {
 
         assertEquals("content://media/external/images/media/43", handle.contentUri)
     }
+
+    @Test
+    fun `resolveLiveMotionSource returns PREVIEW_RING_BUFFER when frame source has frames`() {
+        val frameSource = FakeLivePreviewFrameSource()
+        frameSource.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+
+        // Add frames around shutter time
+        val shutterNanos = 2_000_000_000L
+        frameSource.addFrame(makeDescriptor("f1", timestampNanos = shutterNanos - 500_000_000L))
+        frameSource.addFrame(makeDescriptor("f2", timestampNanos = shutterNanos))
+
+        val result = resolveLiveMotionSource(
+            frameSource = frameSource,
+            shutterTimestampNanos = shutterNanos,
+            spec = LivePhotoCaptureSpec()
+        )
+
+        assertEquals(LiveMotionSource.PREVIEW_RING_BUFFER, result.source)
+        assertTrue(result.selectedFrameSet.frames.isNotEmpty())
+        assertTrue(result.ringBufferDepthMillis > 0)
+    }
+
+    @Test
+    fun `resolveLiveMotionSource returns METADATA_ONLY when frame source is not active`() {
+        val frameSource = FakeLivePreviewFrameSource()
+
+        val result = resolveLiveMotionSource(
+            frameSource = frameSource,
+            shutterTimestampNanos = 1_000_000_000L,
+            spec = LivePhotoCaptureSpec()
+        )
+
+        assertEquals(LiveMotionSource.METADATA_ONLY, result.source)
+        assertTrue(result.selectedFrameSet.frames.isEmpty())
+    }
+
+    @Test
+    fun `resolveLiveMotionSource returns METADATA_ONLY when no frames near shutter`() {
+        val frameSource = FakeLivePreviewFrameSource()
+        frameSource.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+
+        // Add frames far from shutter time
+        frameSource.addFrame(makeDescriptor("f1", timestampNanos = 100_000_000L))
+
+        val result = resolveLiveMotionSource(
+            frameSource = frameSource,
+            shutterTimestampNanos = 5_000_000_000L,
+            spec = LivePhotoCaptureSpec()
+        )
+
+        assertEquals(LiveMotionSource.METADATA_ONLY, result.source)
+        assertTrue(result.selectedFrameSet.frames.isEmpty())
+    }
+
+    private fun makeDescriptor(
+        frameId: String,
+        timestampNanos: Long,
+        width: Int = 640,
+        height: Int = 480
+    ) = FrameDescriptor(
+        frameId = frameId,
+        source = FrameSourceKind.PREVIEW_ANALYSIS,
+        timestampNanos = timestampNanos,
+        width = width,
+        height = height,
+        rotationDegrees = 0,
+        payloadAccess = FramePayloadAccess.METADATA_ONLY,
+        lensFacingTag = "BACK",
+        zoomRatio = 1.0f
+    )
 }

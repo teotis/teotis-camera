@@ -445,6 +445,64 @@ internal fun materializeLivePhotoSidecar(
     sidecarFile.writeText(payload)
 }
 
+data class LiveMotionSourceResult(
+    val source: LiveMotionSource,
+    val selectedFrameSet: com.opencamera.core.media.SelectedFrameSet,
+    val ringBufferDepthMillis: Long,
+    val postShutterBudgetMillis: Long,
+    val diagnostics: List<String>
+)
+
+internal fun resolveLiveMotionSource(
+    frameSource: com.opencamera.app.camera.live.LivePreviewFrameSource,
+    shutterTimestampNanos: Long,
+    spec: com.opencamera.core.media.LivePhotoCaptureSpec
+): LiveMotionSourceResult {
+    if (!frameSource.isActive) {
+        return LiveMotionSourceResult(
+            source = LiveMotionSource.METADATA_ONLY,
+            selectedFrameSet = com.opencamera.core.media.SelectedFrameSet(
+                frames = emptyList(),
+                preShutterCount = 0,
+                postShutterCount = 0,
+                coveredPreShutterMillis = 0,
+                coveredPostShutterMillis = 0,
+                diagnostics = listOf("frame-source:not-active")
+            ),
+            ringBufferDepthMillis = 0,
+            postShutterBudgetMillis = 0,
+            diagnostics = listOf("live:source=metadata-only")
+        )
+    }
+
+    val selectedFrameSet = frameSource.selectForLive(shutterTimestampNanos, spec)
+
+    return if (selectedFrameSet.frames.isNotEmpty()) {
+        LiveMotionSourceResult(
+            source = LiveMotionSource.PREVIEW_RING_BUFFER,
+            selectedFrameSet = selectedFrameSet,
+            ringBufferDepthMillis = spec.motionDurationMillis,
+            postShutterBudgetMillis = spec.motionDurationMillis / 5,
+            diagnostics = buildList {
+                add("live:source=preview-ring-buffer")
+                add("frame-buffer:selected=${selectedFrameSet.frames.size}")
+                add("frame-buffer:window=-${selectedFrameSet.coveredPreShutterMillis}ms,+${selectedFrameSet.coveredPostShutterMillis}ms")
+            }
+        )
+    } else {
+        LiveMotionSourceResult(
+            source = LiveMotionSource.METADATA_ONLY,
+            selectedFrameSet = selectedFrameSet,
+            ringBufferDepthMillis = 0,
+            postShutterBudgetMillis = 0,
+            diagnostics = buildList {
+                add("live:source=metadata-only")
+                add("live:degraded=no-frames-near-shutter")
+            }
+        )
+    }
+}
+
 internal fun buildLivePhotoSidecarPayload(
     bundle: LivePhotoBundle
 ): String {
@@ -1055,7 +1113,8 @@ class CameraXCaptureAdapter(
             MultiFrameMergePlaceholderPostProcessor(),
             PipelineMetadataPostProcessor()
         )
-    )
+    ),
+    private val livePreviewFrameSource: com.opencamera.app.camera.live.LivePreviewFrameSource? = null
 ) : CameraDeviceAdapter {
     private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var cameraProvider: ProcessCameraProvider? = null
@@ -1379,6 +1438,7 @@ class CameraXCaptureAdapter(
             removePreviewStreamObserver()
             removeCameraStateObserver()
             applyVideoTorch(false)
+            livePreviewFrameSource?.stop("release")
             if (activeRecording != null) {
                 activeVideoPlan?.request?.shotId?.let { lifecycleInterruptedShotIds.add(it) }
                 val interruptedPlan = activeVideoPlan
@@ -1528,12 +1588,38 @@ class CameraXCaptureAdapter(
             is PhotoCaptureOutcome.Success -> {
                 val resolvedSpec = plan.saveTask.livePhotoSpec
                     ?: com.opencamera.core.media.LivePhotoCaptureSpec()
+
+                // Use frame source if available
+                val frameSource = livePreviewFrameSource
+                val motionSourceResult = if (frameSource != null) {
+                    resolveLiveMotionSource(
+                        frameSource = frameSource,
+                        shutterTimestampNanos = System.nanoTime(),
+                        spec = resolvedSpec
+                    )
+                } else {
+                    LiveMotionSourceResult(
+                        source = LiveMotionSource.METADATA_ONLY,
+                        selectedFrameSet = com.opencamera.core.media.SelectedFrameSet(
+                            frames = emptyList(),
+                            preShutterCount = 0,
+                            postShutterCount = 0,
+                            coveredPreShutterMillis = 0,
+                            coveredPostShutterMillis = 0,
+                            diagnostics = listOf("frame-source:not-configured")
+                        ),
+                        ringBufferDepthMillis = 0,
+                        postShutterBudgetMillis = 0,
+                        diagnostics = listOf("live:source=metadata-only")
+                    )
+                }
+
                 val temporalPlan = planLiveTemporalAssembly(
                     LiveTemporalPlannerInput(
                         captureSpec = resolvedSpec,
-                        availableSource = LiveMotionSource.METADATA_ONLY,
-                        ringBufferDepthMillis = 0,
-                        postShutterBudgetMillis = 0
+                        availableSource = motionSourceResult.source,
+                        ringBufferDepthMillis = motionSourceResult.ringBufferDepthMillis,
+                        postShutterBudgetMillis = motionSourceResult.postShutterBudgetMillis
                     )
                 )
                 val livePhotoBundle = createLivePhotoBundle(
@@ -1553,6 +1639,7 @@ class CameraXCaptureAdapter(
 
                 val diagnosisBuilder = buildList {
                     add("device:live-photo=bundle")
+                    addAll(motionSourceResult.diagnostics)
                     if (sidecarResult.isSuccess) {
                         add(
                             if (File(livePhotoBundle.sidecarPath).isAbsolute) {
@@ -2340,6 +2427,7 @@ class CameraXCaptureAdapter(
             useCase.setSurfaceProvider(previewView.surfaceProvider)
         }
 
+        livePreviewFrameSource?.stop("unbind")
         provider.unbindAll()
         if (closeActiveRecording) {
             activeRecording?.close()
@@ -2421,6 +2509,14 @@ class CameraXCaptureAdapter(
         if (resetPreviewObserver || previewStreamObserver == null) {
             observePreviewStream(previewView, lifecycleOwner)
         }
+
+        // Start live preview frame source for STILL_CAPTURE template
+        if (deviceGraph.template == CaptureTemplate.STILL_CAPTURE) {
+            livePreviewFrameSource?.start(
+                com.opencamera.core.media.FrameBufferPolicy.LIVE_PREVIEW_DEFAULT
+            )
+        }
+
         suppressPreviewStateEvents = false
     }
 
