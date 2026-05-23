@@ -1,33 +1,7 @@
 package com.opencamera.app
 
 import android.view.MotionEvent
-import android.view.View
 import android.widget.HorizontalScrollView
-
-internal data class ModeTrackTouchDecision(
-    val shouldDispatchClick: Boolean,
-    val shouldTreatAsScroll: Boolean
-)
-
-/**
- * Pure function: given pointer-down/up coordinates and a movement threshold,
- * decides whether the gesture is a tap (dispatch click) or a scroll (suppress).
- */
-internal fun modeTrackTouchDecision(
-    downX: Float,
-    downY: Float,
-    upX: Float,
-    upY: Float,
-    touchSlop: Float
-): ModeTrackTouchDecision {
-    val dx = kotlin.math.abs(upX - downX)
-    val dy = kotlin.math.abs(upY - downY)
-    val isScroll = dx > touchSlop || dy > touchSlop
-    return ModeTrackTouchDecision(
-        shouldDispatchClick = !isScroll,
-        shouldTreatAsScroll = isScroll
-    )
-}
 
 /**
  * Attaches to a [HorizontalScrollView] to track whether the user is actively

@@ -250,13 +250,6 @@ class ShotExecutorTest {
         assertEquals(1, plan.graph.captureNodes[0].frameCount)
     }
 
-    @Test
-    fun `toShotGraph returns the same graph as plan graph field`() {
-        val executor = ShotExecutor(idGenerator = { "shot-graph-compat" })
-        val plan = executor.plan(CaptureStrategy.SingleFrame())
-
-        assertEquals(plan.graph, plan.toShotGraph())
-    }
 
     @Test
     fun `video plan produces primary video capture and output nodes`() {

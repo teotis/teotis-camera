@@ -9,7 +9,7 @@ import com.opencamera.core.media.MediaArtifactRole
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotExecutor
-import com.opencamera.core.media.toShotGraph
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -18,7 +18,7 @@ class ModeCaptureStrategyGraphTest {
 
     private val executor = ShotExecutor(idGenerator = { "test-shot" })
 
-    private fun graphFor(strategy: CaptureStrategy) = executor.plan(strategy).toShotGraph()
+    private fun graphFor(strategy: CaptureStrategy) = executor.plan(strategy).graph
 
     @Test
     fun `photo single frame produces still capture graph`() {
