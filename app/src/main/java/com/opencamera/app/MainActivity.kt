@@ -247,6 +247,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         latestWatermarkLabSelectorRenderModel = watermarkSelectorPage
         latestWatermarkLabDetailRenderModel = watermarkDetailPage
         latestFilterLabRenderModel = filterLabPage
+        if (panelState.isFilterAdjustmentVisible && activePanelRoute !is CockpitPanelRoute.ColorLab) {
+            lightPaletteBaseSpec = filterLabPage.adjustmentPanel.renderSpec
+        }
         // Top panel: lightweight primary status
         cockpitRenderer.renderTopTitle()
         cockpitRenderer.renderModeTrack(modeTrack)
