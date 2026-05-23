@@ -3,6 +3,7 @@ package com.opencamera.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.media.MediaActionSound
 import android.net.Uri
 import android.os.Bundle
@@ -11,7 +12,17 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import com.opencamera.app.gesture.GestureAction
+import com.opencamera.app.gesture.GestureEvent
+import com.opencamera.app.gesture.GestureGuard
+import com.opencamera.app.gesture.GestureGuardState
+import com.opencamera.app.gesture.GesturePolicy
+import com.opencamera.app.gesture.GestureRouter
+import com.opencamera.app.gesture.GestureZone
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
@@ -21,188 +32,174 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
+import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.opencamera.core.device.CaptureTemplate
+import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.StillCaptureOutputSize
+import com.opencamera.core.media.FrameRatio
+import com.opencamera.core.media.StillCaptureQualityPreference
+import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.renderUriOrNull
-import com.opencamera.core.session.PreviewMeteringFeedback
-import com.opencamera.core.session.PreviewMeteringFeedbackStatus
+import com.opencamera.core.mode.ModeId
+import com.opencamera.core.mode.catalogProfile
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.RecordingStatus
+import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PersistedSettingsAction
 import kotlinx.coroutines.launch
 import java.io.File
 
-enum class SettingsTab { COMMON, PHOTO, VIDEO }
-
-@Suppress("EXPOSED_PARAMETER_TYPE")
-class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
+class MainActivity : AppCompatActivity() {
     private val container: AppContainer
         get() = (application as OpenCameraApplication).container
 
-    private var orientationMonitor: CameraOrientationMonitor? = null
-    private val contentRotator = OrientationContentRotator()
-    private var latestOrientationRenderModel: CameraOrientationRenderModel =
-        CameraOrientationRenderModel(
-            CameraPhysicalOrientation.PORTRAIT,
-            0f,
-            com.opencamera.core.device.CameraOutputRotation.ROTATION_0
-        )
-
-    private var selectedSettingsTab = SettingsTab.COMMON
-    private lateinit var views: MainActivityViews
-    private lateinit var actionBinder: MainActivityActionBinder
-    private lateinit var galleryLauncher: GalleryLauncher
-    private lateinit var permissionUiController: PermissionUiController
-    private lateinit var mainRenderer: MainActivityRenderer
-    private lateinit var cockpitRenderer: CockpitSurfaceRenderer
-    private lateinit var settingsRenderer: SettingsPanelRenderer
-    private lateinit var filterLabRenderer: FilterLabPanelRenderer
-    private lateinit var devConsoleRenderer: DevConsoleRenderer
-
-    // Compatibility accessors for view groups
-    private val previewView: PreviewView get() = views.preview.previewView
-    private val previewOverlayView: PreviewOverlayView get() = views.preview.overlayView
-    private val previewThumbnail: ImageView get() = views.preview.thumbnail
-    private val captureOutput: TextView get() = views.preview.captureOutput
-    private val titleText: TextView get() = views.topBar.titleText
-    private val permissionStatus: TextView get() = views.topBar.permissionStatus
-    private val buttonColorLabEntry: Button get() = views.topBar.colorLabEntry
-    private val buttonSettingsEntry: Button get() = views.topBar.settingsEntry
-    private val buttonFilterEntry: Button get() = views.topBar.filterEntry
-    private val panelDismissScrim: View get() = views.panelDismissScrim
-    private val quickBubblePanel get() = views.quickPanel.panel
-    private val buttonQuickGrid: Button get() = views.quickPanel.grid
-    private val buttonQuickFlash: Button get() = views.quickPanel.flash
-    private val buttonFrameRatio43: Button get() = views.quickPanel.frame43
-    private val buttonFrameRatio169: Button get() = views.quickPanel.frame169
-    private val buttonFrameRatio11: Button get() = views.quickPanel.frame11
-    private val buttonQuickLivePhoto: Button get() = views.quickPanel.livePhoto
-    private val buttonQuickTimer: Button get() = views.quickPanel.timer
-    private val buttonQuickLauncher: Button get() = views.quickPanel.launcher
-    private val settingsPanel get() = views.settingsPanel.panel
-    private val buttonCloseSettings: Button get() = views.settingsPanel.close
-    private val buttonSettingsBack: Button get() = views.settingsPanel.back
-    private val settingsRootContent: LinearLayout get() = views.settingsPanel.rootContent
-    private val settingsPortraitLabContent: LinearLayout get() = views.settingsPanel.portraitLabContent
-    private val settingsWatermarkSelectorContent: LinearLayout get() = views.settingsPanel.watermarkSelectorContent
-    private val settingsWatermarkDetailContent: LinearLayout get() = views.settingsPanel.watermarkDetailContent
-    private val settingsHeadline: TextView get() = views.settingsPanel.headline
-    private val settingsSupportingText: TextView get() = views.settingsPanel.supportingText
-    private val settingsHeroSummary: TextView get() = views.settingsPanel.heroSummary
-    private val settingsCommonSummary: TextView get() = views.settingsPanel.commonSummary
-    private val settingsPhotoSummary: TextView get() = views.settingsPanel.photoSummary
-    private val settingsVideoSummary: TextView get() = views.settingsPanel.videoSummary
-    private val settingsCatalogFooter: TextView get() = views.settingsPanel.catalogFooter
-    private val settingsEditingHint: TextView get() = views.settingsPanel.editingHint
-    private val buttonSettingsTabCommon: Button get() = views.settingsPanel.tabCommon
-    private val buttonSettingsTabPhoto: Button get() = views.settingsPanel.tabPhoto
-    private val buttonSettingsTabVideo: Button get() = views.settingsPanel.tabVideo
-    private val settingsCommonSection: LinearLayout get() = views.settingsPanel.commonSection
-    private val settingsPhotoSection: LinearLayout get() = views.settingsPanel.photoSection
-    private val settingsVideoSection: LinearLayout get() = views.settingsPanel.videoSection
-    private val buttonGridMode: Button get() = views.settingsPanel.gridMode
-    private val buttonShutterSound: Button get() = views.settingsPanel.shutterSound
-    private val buttonSelfieMirror: Button get() = views.settingsPanel.selfieMirror
-    private val buttonPhotoFilter: Button get() = views.settingsPanel.photoFilter
-    private val buttonPhotoPortraitLab: Button get() = views.settingsPanel.photoPortraitLab
-    private val buttonPhotoWatermark: Button get() = views.settingsPanel.photoWatermark
-    private val buttonPhotoLive: Button get() = views.settingsPanel.photoLive
-    private val buttonPhotoTimer: Button get() = views.settingsPanel.photoTimer
-    private val buttonVideoResolution: Button get() = views.settingsPanel.videoResolution
-    private val buttonVideoFrameRate: Button get() = views.settingsPanel.videoFrameRate
-    private val buttonVideoDynamicFps: Button get() = views.settingsPanel.videoDynamicFps
-    private val buttonVideoAudio: Button get() = views.settingsPanel.videoAudio
-    private val buttonVideoFilter: Button get() = views.settingsPanel.videoFilter
-    private val portraitLabHeadline: TextView get() = views.settingsPanel.portraitHeadline
-    private val portraitLabSupportingText: TextView get() = views.settingsPanel.portraitSupportingText
-    private val portraitLabHeroSummary: TextView get() = views.settingsPanel.portraitHeroSummary
-    private val portraitLabEditingHint: TextView get() = views.settingsPanel.portraitEditingHint
-    private val buttonPortraitProfile: Button get() = views.settingsPanel.portraitProfile
-    private val buttonPortraitBeautyPreset: Button get() = views.settingsPanel.portraitBeautyPreset
-    private val buttonPortraitBeautyStrength: Button get() = views.settingsPanel.portraitBeautyStrength
-    private val buttonPortraitBokehEffect: Button get() = views.settingsPanel.portraitBokehEffect
-    private val portraitLabFooter: TextView get() = views.settingsPanel.portraitFooter
-    private val watermarkSelectorHeadline: TextView get() = views.settingsPanel.watermarkSelectorHeadline
-    private val watermarkSelectorSupportingText: TextView get() = views.settingsPanel.watermarkSelectorSupportingText
-    private val watermarkSelectorHeroSummary: TextView get() = views.settingsPanel.watermarkSelectorHeroSummary
-    private val watermarkSelectorList: LinearLayout get() = views.settingsPanel.watermarkSelectorList
-    private val watermarkSelectorEditingHint: TextView get() = views.settingsPanel.watermarkSelectorEditingHint
-    private val watermarkSelectorFooter: TextView get() = views.settingsPanel.watermarkSelectorFooter
-    private val watermarkDetailHeadline: TextView get() = views.settingsPanel.watermarkDetailHeadline
-    private val watermarkDetailSupportingText: TextView get() = views.settingsPanel.watermarkDetailSupportingText
-    private val watermarkDetailHeroSummary: TextView get() = views.settingsPanel.watermarkDetailHeroSummary
-    private val watermarkDetailEditingHint: TextView get() = views.settingsPanel.watermarkDetailEditingHint
-    private val buttonWatermarkPlacement: Button get() = views.settingsPanel.watermarkPlacement
-    private val buttonWatermarkTextScale: Button get() = views.settingsPanel.watermarkTextScale
-    private val buttonWatermarkTextOpacity: Button get() = views.settingsPanel.watermarkTextOpacity
-    private val buttonWatermarkFrameBackground: Button get() = views.settingsPanel.watermarkFrameBackground
-    private val watermarkDetailFooter: TextView get() = views.settingsPanel.watermarkDetailFooter
-    private val filterPanel get() = views.filterLab.panel
-    private val buttonCloseFilter: Button get() = views.filterLab.close
-    private val filterHeadline: TextView get() = views.filterLab.headline
-    private val filterSupportingText: TextView get() = views.filterLab.supportingText
-    private val filterHeroSummary: TextView get() = views.filterLab.heroSummary
-    private val filterCurrentSummary: TextView get() = views.filterLab.currentSummary
-    private val filterSectionFiltersTitle: TextView get() = views.filterLab.sectionFiltersTitle
-    private val filterSelectionCard: LinearLayout get() = views.filterLab.selectionCard
-    private val filterSelectionList: LinearLayout get() = views.filterLab.selectionList
-    private val filterEditingHint: TextView get() = views.filterLab.editingHint
-    private val filterFooter: TextView get() = views.filterLab.footer
-    private val buttonFilterPhotoTab: Button get() = views.filterLab.photoTab
-    private val buttonFilterHumanisticTab: Button get() = views.filterLab.humanisticTab
-    private val buttonFilterPortraitTab: Button get() = views.filterLab.portraitTab
-    private val buttonFilterVideoTab: Button get() = views.filterLab.videoTab
-    private val buttonFilterSaveCustom: Button get() = views.filterLab.saveCustom
-    private val filterSectionPaletteTitle: TextView get() = views.filterLab.sectionPaletteTitle
-    private val filterAdjustmentPanel: LinearLayout get() = views.filterLab.adjustmentPanel
-    private val buttonFilterModeToggle: Button get() = views.filterLab.modeToggle
-    private val filterPaletteSummary: TextView get() = views.filterLab.paletteSummary
-    private val filterPaletteHint: TextView get() = views.filterLab.paletteHint
-    private val filterPaletteSurface: FilterPaletteView get() = views.filterLab.paletteSurface
-    private val filterAdvancedTitle: TextView get() = views.filterLab.advancedTitle
-    private val filterAdvancedControls: LinearLayout get() = views.filterLab.advancedControls
-    private val buttonAdvancedExposure: Button get() = views.filterLab.advancedExposure
-    private val buttonAdvancedSoftGlow: Button get() = views.filterLab.advancedSoftGlow
-    private val buttonAdvancedHalo: Button get() = views.filterLab.advancedHalo
-    private val buttonAdvancedGrain: Button get() = views.filterLab.advancedGrain
-    private val buttonAdvancedSharpness: Button get() = views.filterLab.advancedSharpness
-    private val buttonAdvancedVignette: Button get() = views.filterLab.advancedVignette
-    private val buttonAdvancedHighlights: Button get() = views.filterLab.advancedHighlights
-    private val buttonAdvancedShadows: Button get() = views.filterLab.advancedShadows
-    private val buttonAdvancedWarmBoost: Button get() = views.filterLab.advancedWarmBoost
-    private val buttonAdvancedCoolBoost: Button get() = views.filterLab.advancedCoolBoost
-    private val buttonAdvancedTemperatureShift: Button get() = views.filterLab.advancedTemperatureShift
-    private val buttonAdvancedTintShift: Button get() = views.filterLab.advancedTintShift
-    private val buttonDevEntry: Button get() = views.devConsole.entry
-    private val devConsolePanel get() = views.devConsole.panel
-    private val buttonDevTabKey: Button get() = views.devConsole.tabKey
-    private val buttonDevTabCore: Button get() = views.devConsole.tabCore
-    private val buttonDevTabError: Button get() = views.devConsole.tabError
-    private val buttonDevTabAll: Button get() = views.devConsole.tabAll
-    private val devConsoleTitle: TextView get() = views.devConsole.title
-    private val devConsoleSummary: TextView get() = views.devConsole.summary
-    private val devConsoleContent: TextView get() = views.devConsole.content
-    private val buttonDevExport: Button get() = views.devConsole.export
-    private val buttonDevClose: Button get() = views.devConsole.close
-    private val modeTrackScroll get() = views.modeTrack.scroll
-    private val photoModeButton: Button get() = views.modeTrack.photo
-    private val nightModeButton: Button get() = views.modeTrack.night
-    private val portraitModeButton: Button get() = views.modeTrack.portrait
-    private val proModeButton: Button get() = views.modeTrack.pro
-    private val videoModeButton: Button get() = views.modeTrack.video
-    private val documentModeButton: Button get() = views.modeTrack.document
-    private val humanisticModeButton: Button get() = views.modeTrack.humanistic
-    private val shutterButton: Button get() = views.bottomCockpit.shutter
-    private val lensFacingButton: Button get() = views.bottomCockpit.lensFacing
-    private val zoomCapsuleScroll get() = views.bottomCockpit.zoomScroll
-    private val zoomCapsuleRow: LinearLayout get() = views.bottomCockpit.zoomRow
+    private lateinit var previewView: PreviewView
+    private lateinit var previewOverlayView: PreviewOverlayView
+    private lateinit var panelDismissScrim: View
+    private lateinit var titleText: TextView
+    private lateinit var permissionStatus: TextView
+    private lateinit var buttonColorLabEntry: Button
+    private lateinit var buttonSettingsEntry: Button
+    private lateinit var buttonFilterEntry: Button
+    private lateinit var buttonQuickGrid: Button
+    private lateinit var buttonQuickFlash: Button
+    private lateinit var buttonFrameRatio43: Button
+    private lateinit var buttonFrameRatio169: Button
+    private lateinit var buttonFrameRatio11: Button
+    private lateinit var buttonQuickLivePhoto: Button
+    private lateinit var buttonQuickTimer: Button
+    private lateinit var buttonQuickLauncher: Button
+    private lateinit var quickBubblePanel: androidx.core.widget.NestedScrollView
+    private lateinit var settingsPanel: androidx.core.widget.NestedScrollView
+    private lateinit var filterPanel: androidx.core.widget.NestedScrollView
+    private lateinit var buttonSettingsBack: Button
+    private lateinit var settingsRootContent: LinearLayout
+    private lateinit var settingsPortraitLabContent: LinearLayout
+    private lateinit var settingsWatermarkSelectorContent: LinearLayout
+    private lateinit var settingsWatermarkDetailContent: LinearLayout
+    private lateinit var settingsHeadline: TextView
+    private lateinit var settingsSupportingText: TextView
+    private lateinit var settingsHeroSummary: TextView
+    private lateinit var settingsCommonSummary: TextView
+    private lateinit var settingsPhotoSummary: TextView
+    private lateinit var settingsVideoSummary: TextView
+    private lateinit var settingsCatalogFooter: TextView
+    private lateinit var settingsEditingHint: TextView
+    private lateinit var portraitLabHeadline: TextView
+    private lateinit var portraitLabSupportingText: TextView
+    private lateinit var portraitLabHeroSummary: TextView
+    private lateinit var portraitLabEditingHint: TextView
+    private lateinit var buttonPortraitProfile: Button
+    private lateinit var buttonPortraitBeautyPreset: Button
+    private lateinit var buttonPortraitBeautyStrength: Button
+    private lateinit var buttonPortraitBokehEffect: Button
+    private lateinit var portraitLabFooter: TextView
+    private lateinit var watermarkSelectorHeadline: TextView
+    private lateinit var watermarkSelectorSupportingText: TextView
+    private lateinit var watermarkSelectorHeroSummary: TextView
+    private lateinit var watermarkSelectorList: LinearLayout
+    private lateinit var watermarkSelectorEditingHint: TextView
+    private lateinit var watermarkSelectorFooter: TextView
+    private lateinit var watermarkDetailHeadline: TextView
+    private lateinit var watermarkDetailSupportingText: TextView
+    private lateinit var watermarkDetailHeroSummary: TextView
+    private lateinit var watermarkDetailEditingHint: TextView
+    private lateinit var buttonWatermarkPlacement: Button
+    private lateinit var buttonWatermarkTextScale: Button
+    private lateinit var buttonWatermarkTextOpacity: Button
+    private lateinit var buttonWatermarkFrameBackground: Button
+    private lateinit var watermarkDetailFooter: TextView
+    private lateinit var buttonGridMode: Button
+    private lateinit var buttonShutterSound: Button
+    private lateinit var buttonSelfieMirror: Button
+    private lateinit var buttonPhotoFilter: Button
+    private lateinit var buttonPhotoPortraitLab: Button
+    private lateinit var buttonPhotoWatermark: Button
+    private lateinit var buttonPhotoLive: Button
+    private lateinit var buttonPhotoTimer: Button
+    private lateinit var buttonVideoResolution: Button
+    private lateinit var buttonVideoFrameRate: Button
+    private lateinit var buttonVideoDynamicFps: Button
+    private lateinit var buttonVideoAudio: Button
+    private lateinit var buttonVideoFilter: Button
+    private lateinit var buttonCloseSettings: Button
+    private lateinit var buttonSettingsTabCommon: Button
+    private lateinit var buttonSettingsTabPhoto: Button
+    private lateinit var buttonSettingsTabVideo: Button
+    private lateinit var settingsCommonSection: LinearLayout
+    private lateinit var settingsPhotoSection: LinearLayout
+    private lateinit var settingsVideoSection: LinearLayout
+    private lateinit var filterHeadline: TextView
+    private lateinit var filterSupportingText: TextView
+    private lateinit var filterHeroSummary: TextView
+    private lateinit var filterCurrentSummary: TextView
+    private lateinit var filterSelectionList: LinearLayout
+    private lateinit var filterEditingHint: TextView
+    private lateinit var filterFooter: TextView
+    private lateinit var buttonFilterPhotoTab: Button
+    private lateinit var buttonFilterHumanisticTab: Button
+    private lateinit var buttonFilterPortraitTab: Button
+    private lateinit var buttonFilterVideoTab: Button
+    private lateinit var buttonFilterSaveCustom: Button
+    private lateinit var filterAdjustmentPanel: LinearLayout
+    private lateinit var buttonFilterModeToggle: Button
+    private lateinit var filterPaletteSummary: TextView
+    private lateinit var filterPaletteHint: TextView
+    private lateinit var filterPaletteSurface: FilterPaletteView
+    private lateinit var filterAdvancedTitle: TextView
+    private lateinit var filterAdvancedControls: LinearLayout
+    private lateinit var buttonAdvancedExposure: Button
+    private lateinit var buttonAdvancedSoftGlow: Button
+    private lateinit var buttonAdvancedHalo: Button
+    private lateinit var buttonAdvancedGrain: Button
+    private lateinit var buttonAdvancedSharpness: Button
+    private lateinit var buttonAdvancedVignette: Button
+    private lateinit var buttonAdvancedHighlights: Button
+    private lateinit var buttonAdvancedShadows: Button
+    private lateinit var buttonAdvancedWarmBoost: Button
+    private lateinit var buttonAdvancedCoolBoost: Button
+    private lateinit var buttonAdvancedTemperatureShift: Button
+    private lateinit var buttonAdvancedTintShift: Button
+    private lateinit var buttonCloseFilter: Button
+    private lateinit var captureOutput: TextView
+    private lateinit var previewThumbnail: ImageView
+    private lateinit var zoomCapsuleScroll: android.widget.HorizontalScrollView
+    private lateinit var modeTrackScroll: android.widget.HorizontalScrollView
+    private lateinit var zoomCapsuleRow: LinearLayout
+    private lateinit var buttonDevEntry: Button
+    private lateinit var devConsolePanel: com.google.android.material.card.MaterialCardView
+    private lateinit var buttonDevTabKey: Button
+    private lateinit var buttonDevTabCore: Button
+    private lateinit var buttonDevTabError: Button
+    private lateinit var buttonDevTabAll: Button
+    private lateinit var devConsoleTitle: TextView
+    private lateinit var devConsoleSummary: TextView
+    private lateinit var devConsoleContent: TextView
+    private lateinit var buttonDevExport: Button
+    private lateinit var buttonDevClose: Button
+    private lateinit var shutterButton: Button
+    private lateinit var lensFacingButton: Button
+    private lateinit var photoModeButton: Button
+    private lateinit var documentModeButton: Button
+    private lateinit var nightModeButton: Button
+    private lateinit var humanisticModeButton: Button
+    private lateinit var portraitModeButton: Button
+    private lateinit var proModeButton: Button
+    private lateinit var videoModeButton: Button
     private val shutterClickSound = MediaActionSound()
     private var lastRequestedThumbnailUri: String? = null
     private var lastPlayedShutterSoundShotId: String? = null
-    private var activePanelRoute: CockpitPanelRoute = CockpitPanelRoute.None
+    private val panelRouter = CockpitPanelRouter()
+    private val panelState: CockpitPanelUiState
+        get() = panelRouter.state
+    private val activePanelRoute: CockpitPanelRoute
+        get() = panelState.route
     private var selectedDevLogTab = DevLogTab.KEY
     private var latestDevLogRenderModel: DevLogRenderModel? = null
     private lateinit var devLogExporter: DevLogExporter
@@ -212,11 +209,10 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var latestWatermarkLabDetailRenderModel: WatermarkLabDetailRenderModel? = null
     private var latestFilterLabRenderModel: FilterLabPageRenderModel? = null
     private var latestSessionState: SessionState? = null
-    private var selectedWatermarkDetailTemplateId: String? = null
-    private var selectedFilterLabFamilyOverride: FilterLabFamily? = null
-    private var isFilterAdjustmentVisible = true
-    private var filterAdjustmentMode = FilterAdjustmentMode.LIGHT
     private var lightPaletteBaseSpec: FilterRenderSpec? = null
+    private lateinit var gestureRouter: GestureRouter
+    private val gesturePolicy = GesturePolicy()
+    private val gestureGuard = GestureGuard()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -240,33 +236,140 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        views = MainActivityViews.bind(this)
+        previewView = findViewById(R.id.cameraPreview)
+        previewOverlayView = findViewById(R.id.previewOverlay)
+        panelDismissScrim = findViewById(R.id.panelDismissScrim)
+        titleText = findViewById(R.id.titleText)
+        permissionStatus = findViewById(R.id.permissionStatus)
+        buttonColorLabEntry = findViewById(R.id.buttonColorLabEntry)
+        buttonSettingsEntry = findViewById(R.id.buttonSettingsEntry)
+        buttonFilterEntry = findViewById(R.id.buttonFilterEntry)
+        buttonQuickGrid = findViewById(R.id.buttonQuickGrid)
+        buttonQuickFlash = findViewById(R.id.buttonQuickFlash)
+        buttonFrameRatio43 = findViewById(R.id.buttonFrameRatio43)
+        buttonFrameRatio169 = findViewById(R.id.buttonFrameRatio169)
+        buttonFrameRatio11 = findViewById(R.id.buttonFrameRatio11)
+        buttonQuickLivePhoto = findViewById(R.id.buttonQuickLivePhoto)
+        buttonQuickTimer = findViewById(R.id.buttonQuickTimer)
+        buttonQuickLauncher = findViewById(R.id.buttonQuickLauncher)
+        quickBubblePanel = findViewById(R.id.quickBubblePanel)
+        settingsPanel = findViewById(R.id.settingsPanel)
+        filterPanel = findViewById(R.id.filterPanel)
+        buttonSettingsBack = findViewById(R.id.buttonSettingsBack)
+        settingsRootContent = findViewById(R.id.settingsRootContent)
+        settingsPortraitLabContent = findViewById(R.id.settingsPortraitLabContent)
+        settingsWatermarkSelectorContent = findViewById(R.id.settingsWatermarkSelectorContent)
+        settingsWatermarkDetailContent = findViewById(R.id.settingsWatermarkDetailContent)
+        settingsHeadline = findViewById(R.id.settingsHeadline)
+        settingsSupportingText = findViewById(R.id.settingsSupportingText)
+        settingsHeroSummary = findViewById(R.id.settingsHeroSummary)
+        settingsCommonSummary = findViewById(R.id.settingsCommonSummary)
+        settingsPhotoSummary = findViewById(R.id.settingsPhotoSummary)
+        settingsVideoSummary = findViewById(R.id.settingsVideoSummary)
+        settingsCatalogFooter = findViewById(R.id.settingsCatalogFooter)
+        settingsEditingHint = findViewById(R.id.settingsEditingHint)
+        portraitLabHeadline = findViewById(R.id.portraitLabHeadline)
+        portraitLabSupportingText = findViewById(R.id.portraitLabSupportingText)
+        portraitLabHeroSummary = findViewById(R.id.portraitLabHeroSummary)
+        portraitLabEditingHint = findViewById(R.id.portraitLabEditingHint)
+        buttonPortraitProfile = findViewById(R.id.buttonPortraitProfile)
+        buttonPortraitBeautyPreset = findViewById(R.id.buttonPortraitBeautyPreset)
+        buttonPortraitBeautyStrength = findViewById(R.id.buttonPortraitBeautyStrength)
+        buttonPortraitBokehEffect = findViewById(R.id.buttonPortraitBokehEffect)
+        portraitLabFooter = findViewById(R.id.portraitLabFooter)
+        watermarkSelectorHeadline = findViewById(R.id.watermarkSelectorHeadline)
+        watermarkSelectorSupportingText = findViewById(R.id.watermarkSelectorSupportingText)
+        watermarkSelectorHeroSummary = findViewById(R.id.watermarkSelectorHeroSummary)
+        watermarkSelectorList = findViewById(R.id.watermarkSelectorList)
+        watermarkSelectorEditingHint = findViewById(R.id.watermarkSelectorEditingHint)
+        watermarkSelectorFooter = findViewById(R.id.watermarkSelectorFooter)
+        watermarkDetailHeadline = findViewById(R.id.watermarkDetailHeadline)
+        watermarkDetailSupportingText = findViewById(R.id.watermarkDetailSupportingText)
+        watermarkDetailHeroSummary = findViewById(R.id.watermarkDetailHeroSummary)
+        watermarkDetailEditingHint = findViewById(R.id.watermarkDetailEditingHint)
+        buttonWatermarkPlacement = findViewById(R.id.buttonWatermarkPlacement)
+        buttonWatermarkTextScale = findViewById(R.id.buttonWatermarkTextScale)
+        buttonWatermarkTextOpacity = findViewById(R.id.buttonWatermarkTextOpacity)
+        buttonWatermarkFrameBackground = findViewById(R.id.buttonWatermarkFrameBackground)
+        watermarkDetailFooter = findViewById(R.id.watermarkDetailFooter)
+        buttonGridMode = findViewById(R.id.buttonGridMode)
+        buttonShutterSound = findViewById(R.id.buttonShutterSound)
+        buttonSelfieMirror = findViewById(R.id.buttonSelfieMirror)
+        buttonPhotoFilter = findViewById(R.id.buttonPhotoFilter)
+        buttonPhotoPortraitLab = findViewById(R.id.buttonPhotoPortraitLab)
+        buttonPhotoWatermark = findViewById(R.id.buttonPhotoWatermark)
+        buttonPhotoLive = findViewById(R.id.buttonPhotoLive)
+        buttonPhotoTimer = findViewById(R.id.buttonPhotoTimer)
+        buttonVideoResolution = findViewById(R.id.buttonVideoResolution)
+        buttonVideoFrameRate = findViewById(R.id.buttonVideoFrameRate)
+        buttonVideoDynamicFps = findViewById(R.id.buttonVideoDynamicFps)
+        buttonVideoAudio = findViewById(R.id.buttonVideoAudio)
+        buttonVideoFilter = findViewById(R.id.buttonVideoFilter)
+        buttonCloseSettings = findViewById(R.id.buttonCloseSettings)
+        buttonSettingsTabCommon = findViewById(R.id.buttonSettingsTabCommon)
+        buttonSettingsTabPhoto = findViewById(R.id.buttonSettingsTabPhoto)
+        buttonSettingsTabVideo = findViewById(R.id.buttonSettingsTabVideo)
+        settingsCommonSection = findViewById(R.id.settingsCommonSection)
+        settingsPhotoSection = findViewById(R.id.settingsPhotoSection)
+        settingsVideoSection = findViewById(R.id.settingsVideoSection)
+        filterHeadline = findViewById(R.id.filterHeadline)
+        filterSupportingText = findViewById(R.id.filterSupportingText)
+        filterHeroSummary = findViewById(R.id.filterHeroSummary)
+        filterCurrentSummary = findViewById(R.id.filterCurrentSummary)
+        filterSelectionList = findViewById(R.id.filterSelectionList)
+        filterEditingHint = findViewById(R.id.filterEditingHint)
+        filterFooter = findViewById(R.id.filterFooter)
+        buttonFilterPhotoTab = findViewById(R.id.buttonFilterPhotoTab)
+        buttonFilterHumanisticTab = findViewById(R.id.buttonFilterHumanisticTab)
+        buttonFilterPortraitTab = findViewById(R.id.buttonFilterPortraitTab)
+        buttonFilterVideoTab = findViewById(R.id.buttonFilterVideoTab)
+        buttonFilterSaveCustom = findViewById(R.id.buttonFilterSaveCustom)
+        filterAdjustmentPanel = findViewById(R.id.filterAdjustmentPanel)
+        buttonFilterModeToggle = findViewById(R.id.buttonFilterModeToggle)
+        filterPaletteSummary = findViewById(R.id.filterPaletteSummary)
+        filterPaletteHint = findViewById(R.id.filterPaletteHint)
+        filterPaletteSurface = findViewById(R.id.filterPaletteSurface)
+        filterAdvancedTitle = findViewById(R.id.filterAdvancedTitle)
+        filterAdvancedControls = findViewById(R.id.filterAdvancedControls)
+        buttonAdvancedExposure = findViewById(R.id.buttonAdvancedExposure)
+        buttonAdvancedSoftGlow = findViewById(R.id.buttonAdvancedSoftGlow)
+        buttonAdvancedHalo = findViewById(R.id.buttonAdvancedHalo)
+        buttonAdvancedGrain = findViewById(R.id.buttonAdvancedGrain)
+        buttonAdvancedSharpness = findViewById(R.id.buttonAdvancedSharpness)
+        buttonAdvancedVignette = findViewById(R.id.buttonAdvancedVignette)
+        buttonAdvancedHighlights = findViewById(R.id.buttonAdvancedHighlights)
+        buttonAdvancedShadows = findViewById(R.id.buttonAdvancedShadows)
+        buttonAdvancedWarmBoost = findViewById(R.id.buttonAdvancedWarmBoost)
+        buttonAdvancedCoolBoost = findViewById(R.id.buttonAdvancedCoolBoost)
+        buttonAdvancedTemperatureShift = findViewById(R.id.buttonAdvancedTemperatureShift)
+        buttonAdvancedTintShift = findViewById(R.id.buttonAdvancedTintShift)
+        buttonCloseFilter = findViewById(R.id.buttonCloseFilter)
+        captureOutput = findViewById(R.id.captureOutput)
+        previewThumbnail = findViewById(R.id.previewThumbnail)
+        shutterButton = findViewById(R.id.buttonShutter)
+        lensFacingButton = findViewById(R.id.buttonLensFacing)
+        photoModeButton = findViewById(R.id.buttonPhotoMode)
+        documentModeButton = findViewById(R.id.buttonDocumentMode)
+        nightModeButton = findViewById(R.id.buttonNightMode)
+        humanisticModeButton = findViewById(R.id.buttonHumanisticMode)
+        portraitModeButton = findViewById(R.id.buttonPortraitMode)
+        proModeButton = findViewById(R.id.buttonProMode)
+        videoModeButton = findViewById(R.id.buttonVideoMode)
+        zoomCapsuleScroll = findViewById(R.id.zoomCapsuleScroll)
+        modeTrackScroll = findViewById(R.id.modeTrackScroll)
+        zoomCapsuleRow = findViewById(R.id.zoomCapsuleRow)
+        buttonDevEntry = findViewById(R.id.buttonDevEntry)
+        devConsolePanel = findViewById(R.id.devConsolePanel)
+        buttonDevTabKey = findViewById(R.id.buttonDevTabKey)
+        buttonDevTabCore = findViewById(R.id.buttonDevTabCore)
+        buttonDevTabError = findViewById(R.id.buttonDevTabError)
+        buttonDevTabAll = findViewById(R.id.buttonDevTabAll)
+        devConsoleTitle = findViewById(R.id.devConsoleTitle)
+        devConsoleSummary = findViewById(R.id.devConsoleSummary)
+        devConsoleContent = findViewById(R.id.devConsoleContent)
+        buttonDevExport = findViewById(R.id.buttonDevExport)
+        buttonDevClose = findViewById(R.id.buttonDevClose)
         devLogExporter = DevLogExporter(this)
-
-        cockpitRenderer = CockpitSurfaceRenderer(
-            context = this,
-            topBar = views.topBar,
-            quickPanel = views.quickPanel,
-            bottomCockpit = views.bottomCockpit,
-            modeTrack = views.modeTrack,
-            preview = views.preview,
-            callbacks = CockpitCallbacks(
-                onZoomRatioSelected = { ratio -> dispatch(SessionIntent.ApplyZoomRatio(ratio)) }
-            )
-        )
-        settingsRenderer = SettingsPanelRenderer(this, views.settingsPanel)
-        filterLabRenderer = FilterLabPanelRenderer(this, views.filterLab)
-        devConsoleRenderer = DevConsoleRenderer(this, views.devConsole)
-        mainRenderer = MainActivityRenderer(
-            views = views,
-            cockpit = cockpitRenderer,
-            settings = settingsRenderer,
-            filterLab = filterLabRenderer,
-            devConsole = devConsoleRenderer
-        )
-        galleryLauncher = GalleryLauncher(this)
-        permissionUiController = PermissionUiController(this, views.topBar.permissionStatus) { AppTextResolver(this) }
-        actionBinder = MainActivityActionBinder(views, ::currentUiSnapshot, this, ::hasPermission, ::captureConfigDisabledReason)
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.topPanel)) { v, insets ->
             val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
@@ -280,38 +383,40 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             insets
         }
 
-        actionBinder.bind()
+        bindActions()
+        bindGestureRouter()
         bindState()
         syncPermissionState()
-        initOrientationMonitor()
+        applyControlRotationForDisplay()
     }
 
-    private fun initOrientationMonitor() {
-        contentRotator.register(
+    private fun applyControlRotationForDisplay() {
+        val rotation = display?.rotation ?: android.view.Surface.ROTATION_0
+        val orientationModel = orientationRenderModel(rotation)
+        val degrees = orientationModel.controlRotationDegrees
+        listOf(
+            // Right rail utility buttons
             buttonFilterEntry,
             buttonQuickLauncher,
             buttonDevEntry,
+            // Bottom cockpit controls
             shutterButton,
             lensFacingButton,
+            // Quick panel text-bearing buttons
             buttonFrameRatio43,
             buttonFrameRatio169,
             buttonFrameRatio11,
             buttonGridMode
-        )
-        orientationMonitor = CameraOrientationMonitor(this) { model ->
-            latestOrientationRenderModel = model
-            renderOrientation(model)
-            dispatch(SessionIntent.OutputRotationChanged(model.outputRotation))
-        }
+        ).forEach { it.rotation = degrees }
     }
 
-    private fun renderOrientation(model: CameraOrientationRenderModel) {
-        contentRotator.applyRotation(model.contentRotationDegrees)
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyControlRotationForDisplay()
     }
 
     override fun onStart() {
         super.onStart()
-        orientationMonitor?.enable()
         container.cameraCoordinator.attachPreviewHost(this, previewView)
         syncPermissionState()
         dispatch(SessionIntent.Boot)
@@ -321,275 +426,311 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     override fun onStop() {
         super.onStop()
-        orientationMonitor?.disable()
         dispatch(SessionIntent.PreviewHostDetached("Activity moved to background"))
     }
 
-    private fun currentUiSnapshot(): MainActivityUiSnapshot = MainActivityUiSnapshot(
-        sessionState = latestSessionState,
-        activePanelRoute = activePanelRoute,
-        isFilterAdjustmentVisible = isFilterAdjustmentVisible,
-        settingsPage = latestSettingsPageRenderModel,
-        portraitLabPage = latestPortraitLabRenderModel,
-        watermarkDetailPage = latestWatermarkLabDetailRenderModel,
-        filterLabPage = latestFilterLabRenderModel,
-        devLog = latestDevLogRenderModel
-    )
-
-    // region MainActivityActionCallbacks
-
-    override fun dispatch(intent: SessionIntent) {
-        lifecycleScope.launch {
-            container.cameraSession.dispatch(intent)
-        }
-    }
-
-    override fun applySettingsAction(action: PersistedSettingsAction) {
-        lifecycleScope.launch {
-            val result = container.sessionSettingsManager.apply(action)
-            if (result is SessionSettingsApplyResult.BlockedByActiveShot) {
-                Toast.makeText(this@MainActivity, AppTextResolver(this@MainActivity).settingsBlockedByCapture(), Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    @Suppress("EXPOSED_PARAMETER_TYPE")
-    override fun applySettingsControl(control: SettingsControlRenderModel?) {
-        val text = AppTextResolver(this)
-        if (control == null) {
-            Toast.makeText(this, text.settingsNotLoaded(), Toast.LENGTH_SHORT).show()
-            return
-        }
-        val action = control.nextAction
-        if (action == null) {
-            Toast.makeText(this, text.settingsActionUnsupported(), Toast.LENGTH_SHORT).show()
-            return
-        }
-        applySettingsAction(action)
-    }
-
-    override fun setPanelRoute(route: CockpitPanelRoute) {
-        activePanelRoute = route
-        if (route is CockpitPanelRoute.None) {
-            selectedWatermarkDetailTemplateId = null
-            selectedFilterLabFamilyOverride = null
-            isFilterAdjustmentVisible = false
+    private fun bindActions() {
+        panelDismissScrim.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.DismissAll)
             lightPaletteBaseSpec = null
-            selectedSettingsTab = SettingsTab.COMMON
+            renderPanelVisibility()
+            renderDevConsoleVisibility()
         }
-        if (route is CockpitPanelRoute.ColorLab || route is CockpitPanelRoute.StyleLab) {
-            isFilterAdjustmentVisible = true
-            maybeAutoPrepareFilter()
-            renderLatestFilterLab()
+        buttonColorLabEntry.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.ToggleColorLab)
+            if (activePanelRoute is CockpitPanelRoute.ColorLab) {
+                maybeAutoPrepareFilter()
+                renderLatestFilterLab()
+            } else {
+                lightPaletteBaseSpec = null
+            }
+            renderPanelVisibility()
         }
-        if (route is CockpitPanelRoute.Settings) {
-            selectedWatermarkDetailTemplateId = null
+        buttonSettingsEntry.setOnClickListener {
+            toggleSettingsPanel()
+        }
+        buttonFilterEntry.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.ToggleStyleLab)
+            if (activePanelRoute is CockpitPanelRoute.StyleLab) {
+                maybeAutoPrepareFilter()
+                renderLatestFilterLab()
+            } else {
+                lightPaletteBaseSpec = null
+            }
+            renderPanelVisibility()
+        }
+        buttonCloseSettings.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.CloseSettings)
+            renderPanelVisibility()
+        }
+        buttonSettingsTabCommon.setOnClickListener { panelRouter.reduce(CockpitPanelCommand.SelectSettingsTab(SettingsTab.COMMON)); renderSettingsTabs() }
+        buttonSettingsTabPhoto.setOnClickListener { panelRouter.reduce(CockpitPanelCommand.SelectSettingsTab(SettingsTab.PHOTO)); renderSettingsTabs() }
+        buttonSettingsTabVideo.setOnClickListener { panelRouter.reduce(CockpitPanelCommand.SelectSettingsTab(SettingsTab.VIDEO)); renderSettingsTabs() }
+        buttonSettingsBack.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.SettingsBack)
             renderLatestSettingsSurfaces()
+            renderPanelVisibility()
         }
-    }
-
-    override fun renderAfterPanelChange() {
-        mainRenderer.renderPanelVisibility(activePanelRoute)
-        devConsoleRenderer.renderVisibility(activePanelRoute)
-        devConsoleRenderer.render(latestDevLogRenderModel)
-        if (activePanelRoute is CockpitPanelRoute.QuickBubble) {
+        buttonCloseFilter.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.CloseFilterLab)
+            lightPaletteBaseSpec = null
+            renderPanelVisibility()
+        }
+        buttonDevEntry.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.ToggleDevConsole)
+            renderDevConsoleVisibility()
+            renderPanelVisibility()
+        }
+        buttonQuickLauncher.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.ToggleQuickBubble)
             latestSessionState?.let(::render)
         }
-    }
-
-    override fun renderLatestSettingsSurfaces() {
-        val state = latestSessionState ?: return
-        val text = AppTextResolver(this)
-        val settingsModel = sessionSettingsPageRenderModel(state, text)
-        val portraitLabModel = portraitLabPageRenderModel(state, text)
-        val selectorModel = watermarkLabSelectorRenderModel(state, text)
-        val detailModel = watermarkLabDetailRenderModel(
-            state = state,
-            templateId = selectedWatermarkDetailTemplateId
-                ?: state.settings.persisted.photo.defaultWatermarkTemplateId,
-            text = text
-        )
-        latestSettingsPageRenderModel = settingsModel
-        latestPortraitLabRenderModel = portraitLabModel
-        latestWatermarkLabSelectorRenderModel = selectorModel
-        latestWatermarkLabDetailRenderModel = detailModel
-        settingsRenderer.renderPage(settingsModel)
-        settingsRenderer.renderTabs(selectedSettingsTab)
-        settingsRenderer.renderPortraitLabPage(portraitLabModel)
-        settingsRenderer.renderWatermarkSelectorPage(selectorModel)
-        settingsRenderer.renderWatermarkDetailPage(detailModel)
-        mainRenderer.renderPanelVisibility(activePanelRoute)
-    }
-
-    override fun renderLatestFilterLab() {
-        val state = latestSessionState ?: return
-        val text = AppTextResolver(this)
-        val model = filterLabPageRenderModel(
-            state = state,
-            text = text,
-            selectedFamily = selectedFilterLabFamily(state),
-            panelRole = if (activePanelRoute is CockpitPanelRoute.ColorLab) StyleAndColorLabRole.COLOR_LAB else StyleAndColorLabRole.STYLE,
-            showAdjustmentPanel = isFilterAdjustmentVisible,
-            adjustmentMode = filterAdjustmentMode
-        )
-        latestFilterLabRenderModel = model
-        if (isFilterAdjustmentVisible && lightPaletteBaseSpec == null) {
-            lightPaletteBaseSpec = model.adjustmentPanel.renderSpec
+        buttonQuickGrid.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.gridMode)
         }
-        filterLabRenderer.renderPage(model)
-        mainRenderer.renderPanelVisibility(activePanelRoute)
-    }
-
-    override fun maybeAutoPrepareFilter() {
-        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
-        if (!panel.needsAutoPrepare) return
-        val profileId = panel.selectedProfileId ?: return
-        val family = latestFilterLabRenderModel?.adjustControl?.family ?: return
-        lifecycleScope.launch {
-            container.sessionSettingsManager.prepareFilterForAdjustment(family = family, sourceProfileId = profileId)
-            renderLatestFilterLab()
+        buttonQuickFlash.setOnClickListener {
+            dispatch(SessionIntent.StillCaptureQualityToggled)
         }
-    }
-
-    @Suppress("EXPOSED_PARAMETER_TYPE")
-    override fun saveCurrentFilterAsCustom(control: FilterLabSaveCustomRenderModel?) {
-        val sourceProfileId = control?.sourceProfileId ?: return
-        if (!control.isEnabled) return
-        lifecycleScope.launch {
-            container.sessionSettingsManager.saveCurrentFilterAsCustom(family = control.family, sourceProfileId = sourceProfileId)
+        buttonFrameRatio43.setOnClickListener {
+            dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_4_3))
         }
-    }
-
-    @Suppress("EXPOSED_PARAMETER_TYPE")
-    override fun openSelectedFilterAdjustment(control: FilterLabAdjustRenderModel?) {
-        val sourceProfileId = control?.sourceProfileId ?: return
-        if (!control.isEnabled) return
-        lifecycleScope.launch {
-            val editableProfileId = container.sessionSettingsManager.prepareFilterForAdjustment(family = control.family, sourceProfileId = sourceProfileId)
-            if (editableProfileId != null) {
-                isFilterAdjustmentVisible = true
-                filterAdjustmentMode = FilterAdjustmentMode.LIGHT
-                lightPaletteBaseSpec = latestFilterLabRenderModel?.adjustmentPanel?.renderSpec
-                renderLatestFilterLab()
+        buttonFrameRatio169.setOnClickListener {
+            dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_16_9))
+        }
+        buttonFrameRatio11.setOnClickListener {
+            dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_1_1))
+        }
+        buttonQuickLivePhoto.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.livePhoto)
+        }
+        buttonQuickTimer.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.countdown)
+        }
+        buttonDevTabKey.setOnClickListener {
+            selectedDevLogTab = DevLogTab.KEY
+            refreshDevLogModel()
+        }
+        buttonDevTabCore.setOnClickListener {
+            selectedDevLogTab = DevLogTab.CORE
+            refreshDevLogModel()
+        }
+        buttonDevTabError.setOnClickListener {
+            selectedDevLogTab = DevLogTab.ERROR
+            refreshDevLogModel()
+        }
+        buttonDevTabAll.setOnClickListener {
+            selectedDevLogTab = DevLogTab.ALL
+            refreshDevLogModel()
+        }
+        buttonDevExport.setOnClickListener {
+            refreshDevLogModel()
+            val model = latestDevLogRenderModel ?: return@setOnClickListener
+            if (model.exportContent.isBlank()) return@setOnClickListener
+            val file = devLogExporter.export(model.exportContent)
+            captureOutput.text = "Debug log exported: ${file.absolutePath}"
+        }
+        buttonDevClose.setOnClickListener {
+            panelRouter.reduce(CockpitPanelCommand.CloseDevConsole)
+            renderDevConsoleVisibility()
+            renderPanelVisibility()
+        }
+        bindModeTrackTouch()
+        shutterButton.setOnClickListener {
+            if (!hasPermission(Manifest.permission.CAMERA)) {
+                requestCameraPermissionIfNeeded()
+                return@setOnClickListener
+            }
+            dispatch(SessionIntent.ShutterPressed)
+        }
+        lensFacingButton.setOnClickListener {
+            dispatch(SessionIntent.LensFacingToggled)
+        }
+        previewThumbnail.setOnClickListener {
+            val presentation = latestSessionState?.presentation ?: return@setOnClickListener
+            val filePath = presentation.latestCapturePath
+                ?: presentation.latestVideoPath
+                ?: return@setOnClickListener
+            val file = File(filePath)
+            if (!file.exists()) {
+                Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+            val mimeType = when (presentation.latestSavedMediaType) {
+                com.opencamera.core.session.SavedMediaType.VIDEO -> "video/*"
+                com.opencamera.core.session.SavedMediaType.PHOTO -> "image/*"
+                null -> "image/*"
+            }
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            runCatching { startActivity(intent) }.onFailure {
+                Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    @Suppress("EXPOSED_PARAMETER_TYPE")
-    override fun applyAdvancedFilterControl(control: FilterAdvancedControl) {
-        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
-        val profileId = panel.selectedProfileId ?: return
-        lifecycleScope.launch {
-            container.sessionSettingsManager.updateCustomFilterRenderSpec(filterProfileId = profileId, renderSpec = panel.renderSpec.nextAdvancedControl(control))
+        buttonGridMode.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.gridMode)
         }
-    }
-
-    override fun toggleFilterAdjustmentMode() {
-        filterAdjustmentMode = if (filterAdjustmentMode == FilterAdjustmentMode.LIGHT) FilterAdjustmentMode.ADVANCED else FilterAdjustmentMode.LIGHT
-        if (filterAdjustmentMode == FilterAdjustmentMode.LIGHT) {
-            lightPaletteBaseSpec = latestFilterLabRenderModel?.adjustmentPanel?.renderSpec
+        buttonShutterSound.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.shutterSound)
         }
-        renderLatestFilterLab()
-    }
-
-    override fun handleFilterPaletteTouch(colorAxis: Float, toneAxis: Float) {
-        if (activePanelRoute is CockpitPanelRoute.ColorLab) {
-            val persisted = latestSessionState?.settings?.persisted ?: return
-            filterPaletteSurface.updateReticle(colorAxis, toneAxis)
-            lifecycleScope.launch {
-                container.sessionSettingsManager.apply(colorLabPaletteUpdateAction(persisted = persisted, colorAxis = colorAxis, toneAxis = toneAxis))
+        buttonSelfieMirror.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.commonSection?.selfieMirror)
+        }
+        buttonPhotoFilter.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.defaultFilter)
+        }
+        buttonPhotoPortraitLab.setOnClickListener {
+            openPortraitLab()
+        }
+        buttonPhotoWatermark.setOnClickListener {
+            openWatermarkLabSelector()
+        }
+        buttonPortraitProfile.setOnClickListener {
+            applySettingsControlAction(latestPortraitLabRenderModel?.profileControl)
+        }
+        buttonPortraitBeautyPreset.setOnClickListener {
+            applySettingsControlAction(latestPortraitLabRenderModel?.beautyPresetControl)
+        }
+        buttonPortraitBeautyStrength.setOnClickListener {
+            applySettingsControlAction(latestPortraitLabRenderModel?.beautyStrengthControl)
+        }
+        buttonPortraitBokehEffect.setOnClickListener {
+            applySettingsControlAction(latestPortraitLabRenderModel?.bokehEffectControl)
+        }
+        buttonPhotoLive.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.livePhoto)
+        }
+        buttonPhotoTimer.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.photoSection?.countdown)
+        }
+        buttonVideoResolution.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.videoSection?.resolution)
+        }
+        buttonVideoFrameRate.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.videoSection?.frameRate)
+        }
+        buttonVideoDynamicFps.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.videoSection?.dynamicFps)
+        }
+        buttonVideoAudio.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.videoSection?.audioProfile)
+        }
+        buttonVideoFilter.setOnClickListener {
+            applySettingsControlAction(latestSettingsPageRenderModel?.videoSection?.defaultFilter)
+        }
+        buttonWatermarkPlacement.setOnClickListener {
+            applySettingsControlAction(latestWatermarkLabDetailRenderModel?.placementControl)
+        }
+        buttonWatermarkTextScale.setOnClickListener {
+            applySettingsControlAction(latestWatermarkLabDetailRenderModel?.textScaleControl)
+        }
+        buttonWatermarkTextOpacity.setOnClickListener {
+            applySettingsControlAction(latestWatermarkLabDetailRenderModel?.textOpacityControl)
+        }
+        buttonWatermarkFrameBackground.setOnClickListener {
+            applySettingsControlAction(latestWatermarkLabDetailRenderModel?.frameBackgroundControl)
+        }
+        buttonFilterPhotoTab.setOnClickListener {
+            selectFilterLabFamily(FilterLabFamily.PHOTO)
+        }
+        buttonFilterHumanisticTab.setOnClickListener {
+            selectFilterLabFamily(FilterLabFamily.HUMANISTIC)
+        }
+        buttonFilterPortraitTab.setOnClickListener {
+            selectFilterLabFamily(FilterLabFamily.PORTRAIT)
+        }
+        buttonFilterVideoTab.setOnClickListener {
+            selectFilterLabFamily(FilterLabFamily.VIDEO)
+        }
+        buttonFilterSaveCustom.setOnClickListener {
+            saveCurrentFilterAsCustom(latestFilterLabRenderModel?.saveCustomControl)
+        }
+        buttonFilterModeToggle.setOnClickListener {
+            if (activePanelRoute is CockpitPanelRoute.ColorLab) {
+                lifecycleScope.launch {
+                    container.sessionSettingsManager.apply(
+                        neutralColorLabAction()
+                    )
+                }
+            } else {
+                toggleFilterAdjustmentMode()
             }
-            return
         }
-        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
-        val profileId = panel.selectedProfileId ?: return
-        if (!panel.isVisible || panel.mode != FilterAdjustmentMode.LIGHT) return
-        if (panel.needsAutoPrepare) return
-        val baseSpec = lightPaletteBaseSpec ?: panel.renderSpec
-        lifecycleScope.launch {
-            container.sessionSettingsManager.updateCustomFilterRenderSpec(filterProfileId = profileId, renderSpec = baseSpec.applyLightPalette(colorAxis, toneAxis))
+        buttonAdvancedExposure.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.EXPOSURE)
+        }
+        buttonAdvancedSoftGlow.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.SOFT_GLOW)
+        }
+        buttonAdvancedHalo.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.HALO)
+        }
+        buttonAdvancedGrain.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.GRAIN)
+        }
+        buttonAdvancedSharpness.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.SHARPNESS)
+        }
+        buttonAdvancedVignette.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.VIGNETTE)
+        }
+        buttonAdvancedHighlights.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.HIGHLIGHTS)
+        }
+        buttonAdvancedShadows.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.SHADOWS)
+        }
+        buttonAdvancedWarmBoost.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.WARM_BOOST)
+        }
+        buttonAdvancedCoolBoost.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.COOL_BOOST)
+        }
+        buttonAdvancedTemperatureShift.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.TEMPERATURE_SHIFT)
+        }
+        buttonAdvancedTintShift.setOnClickListener {
+            applyAdvancedFilterControl(FilterAdvancedControl.TINT_SHIFT)
+        }
+        filterPaletteSurface.setOnPaletteTouchListener { colorAxis, toneAxis ->
+            handleFilterPaletteTouch(colorAxis, toneAxis)
         }
     }
 
-    @Suppress("EXPOSED_PARAMETER_TYPE")
-    override fun selectFilterLabFamily(family: FilterLabFamily) {
-        selectedFilterLabFamilyOverride = family
-        isFilterAdjustmentVisible = true
-        lightPaletteBaseSpec = null
-        maybeAutoPrepareFilter()
-        renderLatestFilterLab()
-    }
-
-    override fun openPortraitLab() {
-        val settingsModel = latestSettingsPageRenderModel ?: return
-        if (!settingsModel.editingEnabled || settingsModel.photoSection.portraitLab.availability == SettingsControlAvailability.UNSUPPORTED) return
-        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.PORTRAIT_LAB)
-        renderLatestSettingsSurfaces()
-    }
-
-    override fun openWatermarkLabSelector() {
-        val settingsModel = latestSettingsPageRenderModel ?: return
-        if (!settingsModel.editingEnabled || settingsModel.photoSection.watermarkTemplate.availability == SettingsControlAvailability.UNSUPPORTED) return
-        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR)
-        selectedWatermarkDetailTemplateId = null
-        renderLatestSettingsSurfaces()
-    }
-
-    override fun openWatermarkLabDetail(templateId: String) {
-        val detailModel = latestWatermarkLabDetailRenderModel
-        if (detailModel != null && !detailModel.editingEnabled) return
-        selectedWatermarkDetailTemplateId = templateId
-        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_DETAIL)
-        renderLatestSettingsSurfaces()
-    }
-
-    override fun requestCameraPermissionIfNeeded() {
-        when {
-            hasPermission(Manifest.permission.CAMERA) -> {
-                permissionUiController.renderGrantedState(cameraGranted = true, microphoneGranted = hasPermission(Manifest.permission.RECORD_AUDIO))
+    private fun bindGestureRouter() {
+        gestureRouter = GestureRouter(this) { event ->
+            val guardState = GestureGuardState(
+                activePanel = activePanelRoute,
+                isFilterAdjustmentActive = panelState.isFilterAdjustmentVisible
+            )
+            if (!gestureGuard.isGestureAllowed(GestureZone.PREVIEW, guardState)) {
+                return@GestureRouter
             }
-            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
-                permissionUiController.renderRationalePrompt()
-                permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
+            if (event is GestureEvent.HorizontalScroll && !gestureGuard.isHorizontalScrollAllowed(guardState)) {
+                return@GestureRouter
             }
-            else -> {
-                permissionUiController.renderPermanentlyDenied()
+            val activeMode = latestSessionState?.activeMode ?: return@GestureRouter
+            val currentZoom = latestSessionState?.activeDeviceGraph?.preview?.zoomRatio ?: 1.0f
+            when (val action = gesturePolicy.map(event, activeMode, currentZoom)) {
+                is GestureAction.DispatchSession -> dispatch(action.intent)
+                is GestureAction.FocusAt -> {
+                    // TODO: focus/metering tap-to-focus integration
+                }
+                is GestureAction.ShowExposureHint -> {
+                    // TODO: exposure adjustment via vertical scroll
+                }
+                is GestureAction.AssistModeSwitch -> {
+                    // TODO: mode track assist switch via horizontal scroll
+                }
+                is GestureAction.Ignore -> Unit
             }
         }
-    }
-
-    override fun requestMicrophonePermission() {
-        permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-    }
-
-    override fun showDisabledReason(reason: String) {
-        Toast.makeText(this, reason, Toast.LENGTH_SHORT).show()
-    }
-
-    override fun openLatestGalleryMedia() {
-        val presentation = latestSessionState?.presentation ?: return
-        val target = galleryOpenTargetFor(source = presentation.latestThumbnailSource, savedMediaType = presentation.latestSavedMediaType)
-        if (target == null || !galleryLauncher.open(target)) {
-            Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
+        previewView.setOnTouchListener { v, event ->
+            gestureRouter.onTouchEvent(v, event)
         }
     }
-
-    override fun exportDevLog() {
-        refreshDevLogModel()
-        val model = latestDevLogRenderModel ?: return
-        if (model.exportContent.isBlank()) return
-        val file = devLogExporter.export(model.exportContent)
-        captureOutput.text = "Debug log exported: ${file.absolutePath}"
-    }
-
-    override fun refreshDevLogModel() {
-        val state = latestSessionState ?: return
-        val model = devLogRenderModel(state = state, traceEvents = container.trace.snapshot(), isDebugBuild = com.opencamera.app.BuildConfig.DEBUG, selectedTab = selectedDevLogTab, text = AppTextResolver(this))
-        latestDevLogRenderModel = model
-        devConsoleRenderer.render(model)
-    }
-
-    // endregion
 
     private fun applyLocale(settings: com.opencamera.core.settings.PersistedSettings) {
         val language = settings.common.appLanguage
@@ -617,7 +758,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         val watermarkSelectorPage = watermarkLabSelectorRenderModel(state, text)
         val watermarkDetailPage = watermarkLabDetailRenderModel(
             state = state,
-            templateId = selectedWatermarkDetailTemplateId
+            templateId = panelState.selectedWatermarkDetailTemplateId
                 ?: state.settings.persisted.photo.defaultWatermarkTemplateId,
             text = text
         )
@@ -630,8 +771,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             } else {
                 StyleAndColorLabRole.STYLE
             },
-            showAdjustmentPanel = isFilterAdjustmentVisible,
-            adjustmentMode = filterAdjustmentMode
+            showAdjustmentPanel = panelState.isFilterAdjustmentVisible,
+            adjustmentMode = panelState.filterAdjustmentMode
         )
         if (activePanelRoute is CockpitPanelRoute.ColorLab) {
             val colorLabModel = colorLabPanelRenderModel(state, text)
@@ -644,28 +785,44 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         latestWatermarkLabDetailRenderModel = watermarkDetailPage
         latestFilterLabRenderModel = filterLabPage
         // Top panel: lightweight primary status
-        cockpitRenderer.renderTopTitle()
-        cockpitRenderer.renderModeTrack(modeTrack)
-        settingsRenderer.renderPage(settingsPage)
-        settingsRenderer.renderTabs(selectedSettingsTab)
-        settingsRenderer.renderPortraitLabPage(portraitLabPage)
-        settingsRenderer.renderWatermarkSelectorPage(watermarkSelectorPage)
-        settingsRenderer.renderWatermarkDetailPage(watermarkDetailPage)
-        filterLabRenderer.renderPage(filterLabPage)
-        mainRenderer.renderPanelVisibility(activePanelRoute)
+        titleText.text = getString(R.string.app_name)
+        renderModeTrack(modeTrack)
+        renderSettingsPage(settingsPage)
+        renderPortraitLabPage(portraitLabPage)
+        renderWatermarkLabSelectorPage(watermarkSelectorPage)
+        renderWatermarkLabDetailPage(watermarkDetailPage)
+        renderFilterLabPage(filterLabPage)
         previewOverlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter))
-        previewOverlayView.updateFocusReticle(
-            state.presentation.previewMeteringFeedback?.toFocusReticleRenderModel()
-        )
-        cockpitRenderer.renderPreviewMirror(state)
+        previewView.scaleX = if (
+            state.activeDeviceGraph.preferredLensFacing == LensFacing.FRONT &&
+            state.settings.persisted.common.selfieMirrorEnabled
+        ) {
+            -1f
+        } else {
+            1f
+        }
         maybePlayShutterSound(state)
 
-        cockpitRenderer.renderShutter(state, controls)
-        cockpitRenderer.renderCaptureOutput(sessionCaptureOutputText(state, sessionUiStrings()))
-        cockpitRenderer.renderZoomCapsules(controls)
-        val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
-        cockpitRenderer.renderQuickBubble(settingsPage, sheet)
-        mainRenderer.renderDevEntryVisibility(com.opencamera.app.BuildConfig.DEBUG)
+        val shutterLabel = when (state.recordingStatus) {
+            RecordingStatus.IDLE -> getString(R.string.button_photo_capture)
+            RecordingStatus.REQUESTING -> getString(R.string.button_recording_starting)
+            RecordingStatus.RECORDING -> getString(R.string.button_recording_stop)
+            RecordingStatus.STOPPING -> getString(R.string.button_recording_saving)
+        }
+        shutterButton.contentDescription = shutterLabel
+        shutterButton.text = ""
+        if (state.recordingStatus != RecordingStatus.IDLE) {
+            shutterButton.setBackgroundResource(R.drawable.bg_shutter_recording_selector)
+        } else {
+            shutterButton.setBackgroundResource(R.drawable.bg_shutter_selector)
+        }
+        lensFacingButton.text = controls.lensFacingButtonLabel
+        shutterButton.isEnabled = state.modeSnapshot.state.isShutterEnabled
+        lensFacingButton.isEnabled = controls.lensFacingEnabled
+        captureOutput.text = sessionCaptureOutputText(state, sessionUiStrings())
+        renderZoomCapsules(controls)
+        renderQuickBubble(settingsPage)
+        buttonDevEntry.isVisible = com.opencamera.app.BuildConfig.DEBUG
         val devLogModel = devLogRenderModel(
             state = state,
             traceEvents = container.trace.snapshot(),
@@ -674,7 +831,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             text = text
         )
         latestDevLogRenderModel = devLogModel
-        devConsoleRenderer.render(devLogModel)
+        renderDevConsole()
 
         val nextThumbnailRenderUri = state.presentation.pendingCaptureFeedback?.let { feedback ->
             feedback.outputPath.takeIf { File(it).isAbsolute }?.let { File(it).toURI().toString() }
@@ -694,9 +851,662 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     }
 
+    private fun renderSettingsPage(model: SessionSettingsPageRenderModel) {
+        settingsHeadline.text = model.headline
+        settingsSupportingText.text = model.supportingText
+        settingsHeroSummary.text = model.heroSummary
+        settingsHeroSummary.isVisible = model.heroSummary.isNotEmpty()
+        settingsCommonSummary.text = model.commonSection.summary
+        settingsCommonSummary.isVisible = model.commonSection.summary.isNotEmpty()
+        settingsPhotoSummary.text = model.photoSection.summary
+        settingsPhotoSummary.isVisible = model.photoSection.summary.isNotEmpty()
+        settingsVideoSummary.text = model.videoSection.summary
+        settingsVideoSummary.isVisible = model.videoSection.summary.isNotEmpty()
+        settingsCatalogFooter.text = model.catalogFooter
+        settingsCatalogFooter.isVisible = model.catalogFooter.isNotEmpty()
+        settingsEditingHint.text = model.editingHint
+        renderSettingsControl(buttonGridMode, model.commonSection.gridMode, model.editingEnabled)
+        renderSettingsControl(buttonShutterSound, model.commonSection.shutterSound, model.editingEnabled)
+        renderSettingsControl(buttonSelfieMirror, model.commonSection.selfieMirror, model.editingEnabled)
+        renderSettingsControl(buttonPhotoFilter, model.photoSection.defaultFilter, model.editingEnabled)
+        buttonPhotoPortraitLab.text = model.photoSection.portraitLab.buttonLabel
+        buttonPhotoPortraitLab.isEnabled = model.editingEnabled &&
+            model.photoSection.portraitLab.availability != SettingsControlAvailability.UNSUPPORTED
+        buttonPhotoWatermark.text = model.photoSection.watermarkTemplate.buttonLabel
+        buttonPhotoWatermark.isEnabled = model.editingEnabled &&
+            model.photoSection.watermarkTemplate.availability != SettingsControlAvailability.UNSUPPORTED
+        renderSettingsControl(buttonPhotoLive, model.photoSection.livePhoto, model.editingEnabled)
+        renderSettingsControl(buttonPhotoTimer, model.photoSection.countdown, model.editingEnabled)
+        renderSettingsControl(buttonVideoResolution, model.videoSection.resolution, model.editingEnabled)
+        renderSettingsControl(buttonVideoFrameRate, model.videoSection.frameRate, model.editingEnabled)
+        renderSettingsControl(buttonVideoDynamicFps, model.videoSection.dynamicFps, model.editingEnabled)
+        renderSettingsControl(buttonVideoAudio, model.videoSection.audioProfile, model.editingEnabled)
+        renderSettingsControl(buttonVideoFilter, model.videoSection.defaultFilter, model.editingEnabled)
+        renderSettingsTabs()
+        renderPanelVisibility()
+    }
 
-    private fun selectedFilterLabFamily(state: SessionState): FilterLabFamily {
-        return selectedFilterLabFamilyOverride ?: defaultFilterLabFamily(state.activeMode)
+    private fun renderSettingsTabs() {
+        val selectedTab = panelState.selectedSettingsTab
+        buttonSettingsTabCommon.isEnabled = selectedTab != SettingsTab.COMMON
+        buttonSettingsTabPhoto.isEnabled = selectedTab != SettingsTab.PHOTO
+        buttonSettingsTabVideo.isEnabled = selectedTab != SettingsTab.VIDEO
+        buttonSettingsTabCommon.alpha = if (selectedTab == SettingsTab.COMMON) 1f else 0.84f
+        buttonSettingsTabPhoto.alpha = if (selectedTab == SettingsTab.PHOTO) 1f else 0.84f
+        buttonSettingsTabVideo.alpha = if (selectedTab == SettingsTab.VIDEO) 1f else 0.84f
+        settingsCommonSection.isVisible = selectedTab == SettingsTab.COMMON
+        settingsPhotoSection.isVisible = selectedTab == SettingsTab.PHOTO
+        settingsVideoSection.isVisible = selectedTab == SettingsTab.VIDEO
+    }
+
+    private fun renderPortraitLabPage(model: PortraitLabPageRenderModel) {
+        portraitLabHeadline.text = model.headline
+        portraitLabSupportingText.text = model.supportingText
+        portraitLabHeroSummary.text = model.heroSummary
+        portraitLabHeroSummary.isVisible = model.heroSummary.isNotEmpty()
+        portraitLabEditingHint.text = model.editingHint
+        portraitLabFooter.text = model.footer
+        renderSettingsControl(buttonPortraitProfile, model.profileControl, model.editingEnabled)
+        renderSettingsControl(
+            buttonPortraitBeautyPreset,
+            model.beautyPresetControl,
+            model.editingEnabled
+        )
+        renderSettingsControl(
+            buttonPortraitBeautyStrength,
+            model.beautyStrengthControl,
+            model.editingEnabled
+        )
+        renderSettingsControl(
+            buttonPortraitBokehEffect,
+            model.bokehEffectControl,
+            model.editingEnabled
+        )
+        renderPanelVisibility()
+    }
+
+    private fun renderWatermarkLabSelectorPage(model: WatermarkLabSelectorRenderModel) {
+        watermarkSelectorHeadline.text = model.headline
+        watermarkSelectorSupportingText.text = model.supportingText
+        watermarkSelectorHeroSummary.text = model.heroSummary
+        watermarkSelectorHeroSummary.isVisible = model.heroSummary.isNotEmpty()
+        watermarkSelectorEditingHint.text = model.editingHint
+        watermarkSelectorFooter.text = model.footer
+        watermarkSelectorList.removeAllViews()
+        model.items.forEach { item ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundResource(R.drawable.bg_settings_card)
+                alpha = if (item.isSelected) 1f else 0.92f
+                setPadding(14.dp, 14.dp, 14.dp, 14.dp)
+            }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = if (watermarkSelectorList.childCount == 0) 0 else 8.dp
+            }
+            val title = TextView(this).apply {
+                text = item.title
+                textSize = 15f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+            }
+            card.addView(title)
+            val supporting = TextView(this).apply {
+                text = item.supportingText
+                textSize = 12f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                setPadding(0, 6.dp, 0, 0)
+            }
+            card.addView(supporting)
+            item.useAction?.let { action ->
+                val useButton = Button(
+                    this,
+                    null,
+                    0,
+                    R.style.Widget_OpenCamera_CompactButton
+                ).apply {
+                    text = getString(R.string.button_use_this_template)
+                    isAllCaps = false
+                    isEnabled = model.editingEnabled
+                    setOnClickListener { applySettingsAction(action) }
+                }
+                val useParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 10.dp
+                }
+                card.addView(useButton, useParams)
+            }
+            item.editButtonLabel?.let { label ->
+                val editButton = Button(
+                    this,
+                    null,
+                    0,
+                    R.style.Widget_OpenCamera_CompactButton
+                ).apply {
+                    text = label
+                    isAllCaps = false
+                    isEnabled = model.editingEnabled
+                    setOnClickListener { openWatermarkLabDetail(item.templateId) }
+                }
+                val editParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 10.dp
+                }
+                card.addView(editButton, editParams)
+            }
+            watermarkSelectorList.addView(card, params)
+        }
+        renderPanelVisibility()
+    }
+
+    private fun renderWatermarkLabDetailPage(model: WatermarkLabDetailRenderModel) {
+        watermarkDetailHeadline.text = model.headline
+        watermarkDetailSupportingText.text = model.supportingText
+        watermarkDetailHeroSummary.text = model.heroSummary
+        watermarkDetailHeroSummary.isVisible = model.heroSummary.isNotEmpty()
+        watermarkDetailEditingHint.text = model.editingHint
+        watermarkDetailFooter.text = model.footer
+        renderSettingsControl(
+            buttonWatermarkPlacement,
+            model.placementControl,
+            model.editingEnabled
+        )
+        renderSettingsControl(
+            buttonWatermarkTextScale,
+            model.textScaleControl,
+            model.editingEnabled
+        )
+        renderSettingsControl(
+            buttonWatermarkTextOpacity,
+            model.textOpacityControl,
+            model.editingEnabled
+        )
+        model.frameBackgroundControl?.let { control ->
+            buttonWatermarkFrameBackground.isVisible = true
+            renderSettingsControl(
+                buttonWatermarkFrameBackground,
+                control,
+                model.editingEnabled
+            )
+        } ?: run {
+            buttonWatermarkFrameBackground.isVisible = false
+        }
+        renderPanelVisibility()
+    }
+
+    private fun renderSettingsControl(
+        button: Button,
+        model: SettingsControlRenderModel,
+        editingEnabled: Boolean
+    ) {
+        button.text = model.buttonLabel
+        button.isEnabled = editingEnabled && model.isInteractive
+    }
+
+    private fun renderFilterLabPage(model: FilterLabPageRenderModel) {
+        filterHeadline.text = model.headline
+        filterSupportingText.text = model.supportingText
+        filterHeroSummary.text = model.heroSummary
+        filterHeroSummary.isVisible = model.heroSummary.isNotEmpty()
+        filterCurrentSummary.text = model.currentFilterSummary
+        filterEditingHint.text = model.editingHint
+        filterFooter.text = model.footer
+
+        // Show/hide family tabs based on panel role
+        val tabsVisible = model.showFamilyTabs
+        buttonFilterPhotoTab.isVisible = tabsVisible
+        buttonFilterHumanisticTab.isVisible = tabsVisible
+        buttonFilterPortraitTab.isVisible = tabsVisible
+        buttonFilterVideoTab.isVisible = tabsVisible
+        if (tabsVisible) {
+            renderFilterLabTab(buttonFilterPhotoTab, model.photoTab)
+            renderFilterLabTab(buttonFilterHumanisticTab, model.humanisticTab)
+            renderFilterLabTab(buttonFilterPortraitTab, model.portraitTab)
+            renderFilterLabTab(buttonFilterVideoTab, model.videoTab)
+        }
+
+        // Show/hide filter selection list based on panel role
+        if (model.showFilterItems) {
+            renderFilterSelectionList(model)
+            renderSaveCustomControl(model.saveCustomControl, model.editingEnabled)
+            filterCurrentSummary.isVisible = true
+        } else {
+            filterSelectionList.removeAllViews()
+            filterCurrentSummary.isVisible = false
+            buttonFilterSaveCustom.isVisible = false
+        }
+
+        // Show/hide adjustment panel based on panel role
+        if (model.showAdjustmentPanel) {
+            renderAdjustmentPanel(
+                model.adjustmentPanel,
+                model.editingEnabled,
+                model.showAdvancedControls,
+                model.showModeToggle
+            )
+        } else {
+            filterAdjustmentPanel.isVisible = false
+        }
+
+        renderPanelVisibility()
+    }
+
+    private fun renderFilterLabTab(
+        button: Button,
+        model: FilterLabTabRenderModel
+    ) {
+        button.text = model.label
+        button.isEnabled = !model.isSelected
+        button.alpha = if (model.isSelected) 1f else 0.84f
+    }
+
+    private fun renderSaveCustomControl(
+        model: FilterLabSaveCustomRenderModel,
+        editingEnabled: Boolean
+    ) {
+        buttonFilterSaveCustom.text = model.buttonLabel
+        buttonFilterSaveCustom.isEnabled = editingEnabled && model.isEnabled
+    }
+
+    private fun renderFilterSelectionList(model: FilterLabPageRenderModel) {
+        filterSelectionList.removeAllViews()
+        model.filterItems.forEach { item ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundResource(R.drawable.bg_settings_card)
+                alpha = if (item.isSelected) 1f else 0.9f
+                setPadding(14.dp, 14.dp, 14.dp, 14.dp)
+            }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = if (filterSelectionList.childCount == 0) 0 else 8.dp
+            }
+
+            val title = TextView(this).apply {
+                text = item.title
+                textSize = 15f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+            }
+            card.addView(title)
+
+            val supporting = TextView(this).apply {
+                text = item.supportingText
+                textSize = 12f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                setPadding(0, 6.dp, 0, 0)
+            }
+            card.addView(supporting)
+
+            if (item.isSelected) {
+                val adjustButton = Button(
+                    this,
+                    null,
+                    0,
+                    R.style.Widget_OpenCamera_CompactButton
+                ).apply {
+                    text = item.adjustButtonLabel
+                    isAllCaps = false
+                    isEnabled = model.editingEnabled && item.adjustButtonLabel != null
+                    setOnClickListener {
+                        openSelectedFilterAdjustment(model.adjustControl)
+                    }
+                }
+                val adjustParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 10.dp
+                }
+                card.addView(adjustButton, adjustParams)
+            } else {
+                val selectButton = Button(
+                    this,
+                    null,
+                    0,
+                    R.style.Widget_OpenCamera_CompactButton
+                ).apply {
+                    text = getString(R.string.button_use_this_look)
+                    isAllCaps = false
+                    isEnabled = model.editingEnabled && item.nextAction != null
+                    setOnClickListener {
+                        panelRouter.reduce(CockpitPanelCommand.SelectFilterFamily(model.adjustControl.family))
+                        item.nextAction?.let(::applySettingsAction)
+                    }
+                }
+                val selectParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 10.dp
+                }
+                card.addView(selectButton, selectParams)
+            }
+            filterSelectionList.addView(card, params)
+        }
+    }
+
+    private fun renderAdjustmentPanel(
+        model: FilterAdjustmentPanelRenderModel,
+        editingEnabled: Boolean,
+        showAdvancedControls: Boolean = true,
+        showModeToggle: Boolean = true
+    ) {
+        filterAdjustmentPanel.isVisible = model.isVisible
+        buttonFilterModeToggle.isVisible = showModeToggle
+        if (showAdvancedControls) {
+            buttonFilterModeToggle.text = model.modeToggleLabel
+            buttonFilterModeToggle.isEnabled = editingEnabled && model.selectedProfileId != null
+        } else {
+            buttonFilterModeToggle.text = getString(R.string.button_color_lab_reset)
+            buttonFilterModeToggle.isEnabled = true
+        }
+        filterPaletteSummary.text = "${model.selectedProfileLabel}\n${model.lightPalette.summary}"
+        filterPaletteHint.text = model.lightPalette.supportingText
+        filterPaletteSurface.isVisible = model.mode == FilterAdjustmentMode.LIGHT
+        filterPaletteHint.isVisible = model.mode == FilterAdjustmentMode.LIGHT
+        filterAdvancedTitle.isVisible = showAdvancedControls
+        filterAdvancedControls.isVisible = showAdvancedControls && model.mode == FilterAdjustmentMode.ADVANCED
+        buttonAdvancedExposure.text = model.advancedControls.buttonLabel(FilterAdvancedControl.EXPOSURE)
+        buttonAdvancedSoftGlow.text = model.advancedControls.buttonLabel(FilterAdvancedControl.SOFT_GLOW)
+        buttonAdvancedHalo.text = model.advancedControls.buttonLabel(FilterAdvancedControl.HALO)
+        buttonAdvancedGrain.text = model.advancedControls.buttonLabel(FilterAdvancedControl.GRAIN)
+        buttonAdvancedSharpness.text = model.advancedControls.buttonLabel(FilterAdvancedControl.SHARPNESS)
+        buttonAdvancedVignette.text = model.advancedControls.buttonLabel(FilterAdvancedControl.VIGNETTE)
+        buttonAdvancedHighlights.text = model.advancedControls.buttonLabel(FilterAdvancedControl.HIGHLIGHTS)
+        buttonAdvancedShadows.text = model.advancedControls.buttonLabel(FilterAdvancedControl.SHADOWS)
+        buttonAdvancedWarmBoost.text = model.advancedControls.buttonLabel(FilterAdvancedControl.WARM_BOOST)
+        buttonAdvancedCoolBoost.text = model.advancedControls.buttonLabel(FilterAdvancedControl.COOL_BOOST)
+        buttonAdvancedTemperatureShift.text =
+            model.advancedControls.buttonLabel(FilterAdvancedControl.TEMPERATURE_SHIFT)
+        buttonAdvancedTintShift.text =
+            model.advancedControls.buttonLabel(FilterAdvancedControl.TINT_SHIFT)
+        val advancedButtons = listOf(
+            buttonAdvancedExposure,
+            buttonAdvancedSoftGlow,
+            buttonAdvancedHalo,
+            buttonAdvancedGrain,
+            buttonAdvancedSharpness,
+            buttonAdvancedVignette,
+            buttonAdvancedHighlights,
+            buttonAdvancedShadows,
+            buttonAdvancedWarmBoost,
+            buttonAdvancedCoolBoost,
+            buttonAdvancedTemperatureShift,
+            buttonAdvancedTintShift
+        )
+        advancedButtons.forEach { button ->
+            button.isEnabled = editingEnabled && model.selectedProfileId != null
+        }
+    }
+
+    private fun toggleSettingsPanel() {
+        panelRouter.reduce(CockpitPanelCommand.ToggleSettingsRoot)
+        if (activePanelRoute.isSettingsOpen) {
+            renderLatestSettingsSurfaces()
+        }
+        renderPanelVisibility()
+    }
+
+    private fun renderQuickBubble(settingsPage: SessionSettingsPageRenderModel, text: AppTextResolver = AppTextResolver(this)) {
+        val state = latestSessionState ?: return
+        val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
+
+        buttonQuickGrid.text = "${sheet.gridRow.title} ${sheet.gridRow.value}"
+        buttonQuickGrid.isEnabled = sheet.gridRow.isEnabled
+
+        buttonQuickFlash.text = "${sheet.qualityRow.title} ${sheet.qualityRow.value}"
+        buttonQuickFlash.isEnabled = sheet.qualityRow.isEnabled
+
+        buttonFrameRatio43.isEnabled = sheet.frameRatioEnabled
+        buttonFrameRatio169.isEnabled = sheet.frameRatioEnabled
+        buttonFrameRatio11.isEnabled = sheet.frameRatioEnabled
+        sheet.frameRatioOptions.forEach { option ->
+            val button = when (option.ratio) {
+                FrameRatio.RATIO_4_3 -> buttonFrameRatio43
+                FrameRatio.RATIO_16_9 -> buttonFrameRatio169
+                FrameRatio.RATIO_1_1 -> buttonFrameRatio11
+            }
+            if (option.isSelected) {
+                button.alpha = 1f
+                button.setBackgroundResource(R.drawable.bg_quick_chip_selected)
+            } else {
+                button.alpha = 0.6f
+                button.background = null
+            }
+        }
+
+        buttonQuickLivePhoto.text = "${sheet.liveRow.title} ${sheet.liveRow.value}"
+        buttonQuickLivePhoto.isEnabled = sheet.liveRow.isEnabled
+
+        buttonQuickTimer.text = "${sheet.timerRow.title} ${sheet.timerRow.value}"
+        buttonQuickTimer.isEnabled = sheet.timerRow.isEnabled
+    }
+
+    private fun renderPanelVisibility() {
+        val route = activePanelRoute
+        settingsPanel.isVisible = route.isSettingsOpen
+        filterPanel.isVisible = route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.ColorLab
+        panelDismissScrim.isVisible = route.isAnyPanelOpen
+
+        val subpage = (route as? CockpitPanelRoute.Settings)?.subpage
+        settingsRootContent.isVisible = route.isSettingsOpen && (subpage == null || subpage == SettingsSubpage.ROOT)
+        settingsPortraitLabContent.isVisible = subpage == SettingsSubpage.PORTRAIT_LAB
+        settingsWatermarkSelectorContent.isVisible = subpage == SettingsSubpage.WATERMARK_SELECTOR
+        settingsWatermarkDetailContent.isVisible = subpage == SettingsSubpage.WATERMARK_DETAIL
+        buttonSettingsBack.isVisible = route.isSettingsOpen && subpage != null && subpage != SettingsSubpage.ROOT
+
+        buttonColorLabEntry.alpha = if (route is CockpitPanelRoute.ColorLab) 1f else 0.92f
+        buttonSettingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
+        buttonFilterEntry.alpha = if (route is CockpitPanelRoute.StyleLab) 1f else 0.92f
+        quickBubblePanel.isVisible = route is CockpitPanelRoute.QuickBubble
+        buttonQuickLauncher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
+    }
+
+    private fun renderZoomCapsules(controls: SessionControlsRenderModel) {
+        zoomCapsuleScroll.isVisible = controls.isZoomCapsuleRowVisible
+        if (!controls.isZoomCapsuleRowVisible) return
+        zoomCapsuleRow.removeAllViews()
+        controls.zoomCapsules.forEach { capsule ->
+            val chip = TextView(this).apply {
+                text = capsule.label
+                textSize = resources.getDimension(R.dimen.text_size_zoom_chip) / resources.displayMetrics.density
+                minWidth = resources.getDimension(R.dimen.zoom_chip_min_width).toInt()
+                minHeight = resources.getDimension(R.dimen.zoom_chip_min_height).toInt()
+                gravity = Gravity.CENTER
+                typeface = Typeface.DEFAULT
+                setPadding(
+                    resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
+                    resources.getDimension(R.dimen.zoom_chip_padding_v).toInt(),
+                    resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
+                    resources.getDimension(R.dimen.zoom_chip_padding_v).toInt()
+                )
+                if (capsule.isActive) {
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.oc_text_primary))
+                    setBackgroundResource(R.drawable.bg_zoom_chip_active)
+                } else {
+                    setTextColor(ContextCompat.getColor(this@MainActivity, R.color.oc_text_secondary))
+                    setBackgroundResource(R.drawable.bg_zoom_chip)
+                }
+                setOnClickListener {
+                    dispatch(SessionIntent.ApplyZoomRatio(capsule.ratio))
+                }
+            }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = if (zoomCapsuleRow.childCount == 0) 0 else 4.dp
+            }
+            zoomCapsuleRow.addView(chip, params)
+        }
+    }
+
+    private fun renderDevConsoleVisibility() {
+        val isDevVisible = activePanelRoute is CockpitPanelRoute.DevConsole
+        devConsolePanel.isVisible = isDevVisible
+        buttonDevEntry.alpha = if (isDevVisible) 1f else 0.78f
+        if (isDevVisible) {
+            renderDevConsole()
+        }
+    }
+
+    private fun refreshDevLogModel() {
+        val state = latestSessionState ?: return
+        val model = devLogRenderModel(
+            state = state,
+            traceEvents = container.trace.snapshot(),
+            isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
+            selectedTab = selectedDevLogTab,
+            text = AppTextResolver(this)
+        )
+        latestDevLogRenderModel = model
+        renderDevConsole()
+    }
+
+    private fun renderDevConsole() {
+        val model = latestDevLogRenderModel ?: return
+        devConsoleTitle.text = model.title
+        devConsoleSummary.text = model.summaryText
+        devConsoleSummary.isVisible = model.summaryText.isNotBlank()
+        devConsoleContent.text = model.content
+        buttonDevTabKey.isEnabled = model.selectedTab != DevLogTab.KEY
+        buttonDevTabCore.isEnabled = model.selectedTab != DevLogTab.CORE
+        buttonDevTabError.isEnabled = model.selectedTab != DevLogTab.ERROR
+        buttonDevTabAll.isEnabled = model.selectedTab != DevLogTab.ALL
+        val activeAlpha = 1f
+        val inactiveAlpha = 0.84f
+        buttonDevTabKey.alpha = if (model.selectedTab == DevLogTab.KEY) activeAlpha else inactiveAlpha
+        buttonDevTabCore.alpha = if (model.selectedTab == DevLogTab.CORE) activeAlpha else inactiveAlpha
+        buttonDevTabError.alpha = if (model.selectedTab == DevLogTab.ERROR) activeAlpha else inactiveAlpha
+        buttonDevTabAll.alpha = if (model.selectedTab == DevLogTab.ALL) activeAlpha else inactiveAlpha
+    }
+
+    private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
+
+    private fun bindModeTrackTouch() {
+        val buttons = listOf(
+            photoModeButton to ModeId.PHOTO,
+            nightModeButton to ModeId.NIGHT,
+            portraitModeButton to ModeId.PORTRAIT,
+            proModeButton to ModeId.PRO,
+            videoModeButton to ModeId.VIDEO,
+            documentModeButton to ModeId.DOCUMENT
+        )
+        humanisticModeButton.visibility = View.GONE
+        humanisticModeButton.setOnClickListener(null)
+        modeTrackScrollGuard.attach(modeTrackScroll)
+        buttons.forEach { (button, modeId) ->
+            button.setOnClickListener {
+                if (modeTrackScrollGuard.isScrolling) return@setOnClickListener
+                val state = latestSessionState
+                if (state != null) {
+                    val reason = captureConfigDisabledReason(state)
+                    if (reason != null) {
+                        showDisabledReason(reason)
+                        return@setOnClickListener
+                    }
+                }
+                if (modeId == ModeId.VIDEO && !hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                    permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
+                }
+                dispatch(SessionIntent.SwitchMode(modeId))
+            }
+        }
+    }
+
+    private var lastAutoScrolledActiveMode: ModeId? = null
+
+    private fun renderModeTrack(model: ModeTrackRenderModel) {
+        val buttons = listOf(
+            photoModeButton,
+            nightModeButton,
+            portraitModeButton,
+            proModeButton,
+            videoModeButton,
+            documentModeButton
+        )
+        humanisticModeButton.visibility = View.GONE
+        model.items.forEachIndexed { index, item ->
+            if (index < buttons.size) {
+                val button = buttons[index]
+                button.visibility = View.VISIBLE
+                button.text = item.trackLabel
+                button.isEnabled = item.isAvailable
+                if (item.isActive) {
+                    button.setTextColor(ContextCompat.getColor(this, R.color.oc_accent))
+                    button.setTypeface(null, android.graphics.Typeface.BOLD)
+                    button.setBackgroundResource(R.drawable.bg_mode_track_active_chip)
+                    button.alpha = 1f
+                } else {
+                    button.setTextColor(ContextCompat.getColor(this, R.color.oc_text_primary))
+                    button.setTypeface(null, android.graphics.Typeface.NORMAL)
+                    button.background = null
+                    button.alpha = if (item.isAvailable) 0.78f else 0.42f
+                }
+            }
+        }
+        buttons.drop(model.items.size).forEach { button ->
+            button.visibility = View.GONE
+        }
+        // Auto-scroll only when active mode changes and user is not dragging
+        val activeItem = model.items.firstOrNull { it.isActive }
+        val activeModeId = activeItem?.modeId
+        if (activeModeId != null && activeModeId != lastAutoScrolledActiveMode && !modeTrackScrollGuard.isScrolling) {
+            lastAutoScrolledActiveMode = activeModeId
+            modeTrackScroll.post {
+                val activeButton = buttons.firstOrNull { b ->
+                    val idx = buttons.indexOf(b)
+                    idx < model.items.size && model.items[idx].isActive
+                }
+                activeButton?.let {
+                    val viewWidth = modeTrackScroll.width
+                    val chipCenter = it.left + it.width / 2
+                    val scrollX = (chipCenter - viewWidth / 2).coerceAtLeast(0)
+                    modeTrackScroll.smoothScrollTo(scrollX, 0)
+                }
+            }
+        }
+    }
+
+    private fun requestCameraPermissionIfNeeded() {
+        when {
+            hasPermission(Manifest.permission.CAMERA) -> {
+                permissionStatus.text = if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                    getString(R.string.permission_granted)
+                } else {
+                    getString(R.string.permission_camera_only)
+                }
+            }
+
+            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
+                permissionStatus.text = getString(R.string.permission_pending)
+                permissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.CAMERA,
+                        Manifest.permission.RECORD_AUDIO
+                    )
+                )
+            }
+
+            else -> {
+                val text = AppTextResolver(this)
+                permissionStatus.text = text.permissionPermanentlyDenied()
+                permissionStatus.visibility = View.VISIBLE
+                permissionStatus.setOnClickListener {
+                    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    }
+                    startActivity(intent)
+                }
+            }
+        }
     }
 
     private fun maybePlayShutterSound(state: SessionState) {
@@ -709,6 +1519,30 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
         shutterClickSound.play(MediaActionSound.SHUTTER_CLICK)
         lastPlayedShutterSoundShotId = activeShot?.shotId
+    }
+
+    private fun hasPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    override fun onBackPressed() {
+        val previousRoute = activePanelRoute
+        panelRouter.reduce(CockpitPanelCommand.AndroidBack)
+        if (activePanelRoute == previousRoute && activePanelRoute is CockpitPanelRoute.None) {
+            super.onBackPressed()
+            return
+        }
+        if (previousRoute is CockpitPanelRoute.StyleLab || previousRoute is CockpitPanelRoute.ColorLab) {
+            lightPaletteBaseSpec = null
+        }
+        renderLatestSettingsSurfaces()
+        renderPanelVisibility()
+        renderDevConsoleVisibility()
+    }
+
+    override fun onDestroy() {
+        shutterClickSound.release()
+        super.onDestroy()
     }
 
     private fun sessionUiStrings(): SessionUiStrings {
@@ -734,7 +1568,220 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         )
     }
 
-    internal fun captureConfigDisabledReason(state: SessionState): String? {
+    private fun applySettingsAction(action: PersistedSettingsAction) {
+        lifecycleScope.launch {
+            val result = container.sessionSettingsManager.apply(action)
+            if (result is SessionSettingsApplyResult.BlockedByActiveShot) {
+                Toast.makeText(this@MainActivity, AppTextResolver(this@MainActivity).settingsBlockedByCapture(), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun applySettingsControlAction(control: SettingsControlRenderModel?) {
+        val text = AppTextResolver(this)
+        if (control == null) {
+            Toast.makeText(this, text.settingsNotLoaded(), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val action = control.nextAction
+        if (action == null) {
+            Toast.makeText(this, text.settingsActionUnsupported(), Toast.LENGTH_SHORT).show()
+            return
+        }
+        applySettingsAction(action)
+    }
+
+    private fun openPortraitLab() {
+        val settingsModel = latestSettingsPageRenderModel ?: return
+        if (!settingsModel.editingEnabled ||
+            settingsModel.photoSection.portraitLab.availability == SettingsControlAvailability.UNSUPPORTED
+        ) {
+            return
+        }
+        panelRouter.reduce(CockpitPanelCommand.OpenPortraitLab)
+        renderLatestSettingsSurfaces()
+    }
+
+    private fun openWatermarkLabSelector() {
+        val settingsModel = latestSettingsPageRenderModel ?: return
+        if (!settingsModel.editingEnabled ||
+            settingsModel.photoSection.watermarkTemplate.availability == SettingsControlAvailability.UNSUPPORTED
+        ) {
+            return
+        }
+        panelRouter.reduce(CockpitPanelCommand.OpenWatermarkSelector)
+        renderLatestSettingsSurfaces()
+    }
+
+    private fun openWatermarkLabDetail(templateId: String) {
+        val detailModel = latestWatermarkLabDetailRenderModel
+        if (detailModel != null && !detailModel.editingEnabled) {
+            return
+        }
+        panelRouter.reduce(CockpitPanelCommand.OpenWatermarkDetail(templateId))
+        renderLatestSettingsSurfaces()
+    }
+
+    private fun selectFilterLabFamily(family: FilterLabFamily) {
+        panelRouter.reduce(CockpitPanelCommand.SelectFilterFamily(family))
+        lightPaletteBaseSpec = null
+        maybeAutoPrepareFilter()
+        renderLatestFilterLab()
+    }
+
+    private fun selectedFilterLabFamily(state: SessionState): FilterLabFamily {
+        return panelState.selectedFilterLabFamilyOverride ?: defaultFilterLabFamily(state.activeMode)
+    }
+
+    private fun renderLatestFilterLab() {
+        val state = latestSessionState ?: return
+        val text = AppTextResolver(this)
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = text,
+            selectedFamily = selectedFilterLabFamily(state),
+            panelRole = if (activePanelRoute is CockpitPanelRoute.ColorLab) {
+                StyleAndColorLabRole.COLOR_LAB
+            } else {
+                StyleAndColorLabRole.STYLE
+            },
+            showAdjustmentPanel = panelState.isFilterAdjustmentVisible,
+            adjustmentMode = panelState.filterAdjustmentMode
+        )
+        latestFilterLabRenderModel = model
+        if (panelState.isFilterAdjustmentVisible && lightPaletteBaseSpec == null) {
+            lightPaletteBaseSpec = model.adjustmentPanel.renderSpec
+        }
+        renderFilterLabPage(model)
+    }
+
+    private fun renderLatestSettingsSurfaces() {
+        val state = latestSessionState ?: return
+        val text = AppTextResolver(this)
+        val settingsModel = sessionSettingsPageRenderModel(state, text)
+        val portraitLabModel = portraitLabPageRenderModel(state, text)
+        val selectorModel = watermarkLabSelectorRenderModel(state, text)
+        val detailModel = watermarkLabDetailRenderModel(
+            state = state,
+            templateId = panelState.selectedWatermarkDetailTemplateId
+                ?: state.settings.persisted.photo.defaultWatermarkTemplateId,
+            text = text
+        )
+        latestSettingsPageRenderModel = settingsModel
+        latestPortraitLabRenderModel = portraitLabModel
+        latestWatermarkLabSelectorRenderModel = selectorModel
+        latestWatermarkLabDetailRenderModel = detailModel
+        renderSettingsPage(settingsModel)
+        renderPortraitLabPage(portraitLabModel)
+        renderWatermarkLabSelectorPage(selectorModel)
+        renderWatermarkLabDetailPage(detailModel)
+    }
+
+    private fun saveCurrentFilterAsCustom(control: FilterLabSaveCustomRenderModel?) {
+        val sourceProfileId = control?.sourceProfileId ?: return
+        if (!control.isEnabled) {
+            return
+        }
+        lifecycleScope.launch {
+            container.sessionSettingsManager.saveCurrentFilterAsCustom(
+                family = control.family,
+                sourceProfileId = sourceProfileId
+            )
+        }
+    }
+
+    private fun maybeAutoPrepareFilter() {
+        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
+        if (!panel.needsAutoPrepare) return
+        val profileId = panel.selectedProfileId ?: return
+        val family = latestFilterLabRenderModel?.adjustControl?.family ?: return
+        lifecycleScope.launch {
+            container.sessionSettingsManager.prepareFilterForAdjustment(
+                family = family,
+                sourceProfileId = profileId
+            )
+            renderLatestFilterLab()
+        }
+    }
+
+    private fun openSelectedFilterAdjustment(control: FilterLabAdjustRenderModel?) {
+        val sourceProfileId = control?.sourceProfileId ?: return
+        if (!control.isEnabled) {
+            return
+        }
+        lifecycleScope.launch {
+            val editableProfileId = container.sessionSettingsManager.prepareFilterForAdjustment(
+                family = control.family,
+                sourceProfileId = sourceProfileId
+            )
+            if (editableProfileId != null) {
+                panelRouter.reduce(CockpitPanelCommand.SelectFilterFamily(control.family))
+                lightPaletteBaseSpec = latestFilterLabRenderModel?.adjustmentPanel?.renderSpec
+                renderLatestFilterLab()
+            }
+        }
+    }
+
+    private fun toggleFilterAdjustmentMode() {
+        panelRouter.reduce(CockpitPanelCommand.ToggleFilterAdjustmentMode)
+        if (panelState.filterAdjustmentMode == FilterAdjustmentMode.LIGHT) {
+            lightPaletteBaseSpec = latestFilterLabRenderModel?.adjustmentPanel?.renderSpec
+        }
+        renderLatestFilterLab()
+    }
+
+    private fun applyAdvancedFilterControl(control: FilterAdvancedControl) {
+        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
+        val profileId = panel.selectedProfileId ?: return
+        lifecycleScope.launch {
+            container.sessionSettingsManager.updateCustomFilterRenderSpec(
+                filterProfileId = profileId,
+                renderSpec = panel.renderSpec.nextAdvancedControl(control)
+            )
+        }
+    }
+
+    private fun handleFilterPaletteTouch(colorAxis: Float, toneAxis: Float) {
+        if (activePanelRoute is CockpitPanelRoute.ColorLab) {
+            val persisted = latestSessionState?.settings?.persisted ?: return
+            filterPaletteSurface.updateReticle(colorAxis, toneAxis)
+            lifecycleScope.launch {
+                container.sessionSettingsManager.apply(
+                    colorLabPaletteUpdateAction(
+                        persisted = persisted,
+                        colorAxis = colorAxis,
+                        toneAxis = toneAxis
+                    )
+                )
+            }
+            return
+        }
+        val panel = latestFilterLabRenderModel?.adjustmentPanel ?: return
+        val profileId = panel.selectedProfileId ?: return
+        if (!panel.isVisible || panel.mode != FilterAdjustmentMode.LIGHT) {
+            return
+        }
+        if (panel.needsAutoPrepare) return
+        val baseSpec = lightPaletteBaseSpec ?: panel.renderSpec
+        lifecycleScope.launch {
+            container.sessionSettingsManager.updateCustomFilterRenderSpec(
+                filterProfileId = profileId,
+                renderSpec = baseSpec.applyLightPalette(colorAxis, toneAxis)
+            )
+        }
+    }
+
+    private fun dispatch(intent: SessionIntent) {
+        lifecycleScope.launch {
+            container.cameraSession.dispatch(intent)
+        }
+    }
+
+    private fun showDisabledReason(reason: String) {
+        Toast.makeText(this, reason, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun captureConfigDisabledReason(state: SessionState): String? {
         if (!state.permissionState.cameraGranted) return getString(R.string.disabled_permission)
         if (state.previewStatus == com.opencamera.core.session.PreviewStatus.RECOVERING)
             return getString(R.string.disabled_preview_recovering)
@@ -762,10 +1809,6 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
-    private fun hasPermission(permission: String): Boolean {
-        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
-    }
-
     private val Int.dp: Int
         get() = (this * resources.displayMetrics.density).toInt()
 
@@ -773,19 +1816,5 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         control: FilterAdvancedControl
     ): String {
         return first { item -> item.control == control }.buttonLabel
-    }
-
-    private fun PreviewMeteringFeedback.toFocusReticleRenderModel(): FocusReticleRenderModel {
-        return FocusReticleRenderModel(
-            normalizedX = normalizedX,
-            normalizedY = normalizedY,
-            status = when (status) {
-                PreviewMeteringFeedbackStatus.REQUESTED -> FocusReticleStatus.REQUESTED
-                PreviewMeteringFeedbackStatus.SUCCEEDED -> FocusReticleStatus.SUCCEEDED
-                PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> FocusReticleStatus.DEGRADED
-                PreviewMeteringFeedbackStatus.FAILED -> FocusReticleStatus.FAILED
-                PreviewMeteringFeedbackStatus.UNSUPPORTED -> FocusReticleStatus.UNSUPPORTED
-            }
-        )
     }
 }
