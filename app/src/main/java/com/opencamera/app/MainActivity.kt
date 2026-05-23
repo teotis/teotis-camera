@@ -59,6 +59,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     // Shared scroll guard for mode track scroll-vs-tap disambiguation
     private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
+    private lateinit var orientationMonitor: CameraOrientationMonitor
 
     // Renderers (initialized in onCreate after views)
     private lateinit var cockpitRenderer: CockpitSurfaceRenderer
@@ -114,6 +115,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             modeTrackScrollGuard = modeTrackScrollGuard
         )
         actionBinder.bind()
+        orientationMonitor = CameraOrientationMonitor(this) { model ->
+            dispatch(SessionIntent.OutputRotationChanged(model.outputRotation))
+        }
         bindState()
         syncPermissionState()
         applyControlRotationForDisplay()
@@ -177,6 +181,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     override fun onStart() {
         super.onStart()
+        orientationMonitor.enable()
         container.cameraCoordinator.attachPreviewHost(this, views.preview.previewView)
         syncPermissionState()
         dispatch(SessionIntent.Boot)
@@ -186,6 +191,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     override fun onStop() {
         super.onStop()
+        orientationMonitor.disable()
         dispatch(SessionIntent.PreviewHostDetached("Activity moved to background"))
     }
 
@@ -252,6 +258,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         filterLabRenderer.renderPage(filterLabPage)
         mainRenderer.renderPanelVisibility(activePanelRoute)
         views.preview.overlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter))
+        views.preview.overlayView.updateFocusReticle(
+            state.presentation.previewMeteringFeedback?.let { focusReticleRenderModel(it) }
+        )
         cockpitRenderer.renderPreviewMirror(state)
         maybePlayShutterSound(state)
 

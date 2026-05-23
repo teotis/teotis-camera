@@ -14,6 +14,8 @@ import com.opencamera.core.device.resolveVideoSpec
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.modeDirectoryDeclaration
 import com.opencamera.core.session.CaptureStatus
+import com.opencamera.core.session.PreviewMeteringFeedback
+import com.opencamera.core.session.PreviewMeteringFeedbackStatus
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SavedMediaType
@@ -495,6 +497,20 @@ internal fun sessionControlsRenderModel(
         isZoomCapsuleRowVisible = state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported
     )
 }
+
+internal fun focusReticleRenderModel(
+    feedback: PreviewMeteringFeedback
+): FocusReticleRenderModel = FocusReticleRenderModel(
+    normalizedX = feedback.normalizedX,
+    normalizedY = feedback.normalizedY,
+    status = when (feedback.status) {
+        PreviewMeteringFeedbackStatus.REQUESTED -> FocusReticleStatus.REQUESTED
+        PreviewMeteringFeedbackStatus.SUCCEEDED -> FocusReticleStatus.SUCCEEDED
+        PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> FocusReticleStatus.DEGRADED
+        PreviewMeteringFeedbackStatus.FAILED -> FocusReticleStatus.FAILED
+        PreviewMeteringFeedbackStatus.UNSUPPORTED -> FocusReticleStatus.UNSUPPORTED
+    }
+)
 
 internal fun previewOverlayRenderModel(
     state: SessionState,
