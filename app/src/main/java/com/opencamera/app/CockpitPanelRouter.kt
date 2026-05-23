@@ -138,7 +138,12 @@ internal fun nextState(
         }
 
         is CockpitPanelCommand.CloseFilterLab -> {
-            defaultState
+            current.copy(
+                route = CockpitPanelRoute.None,
+                selectedFilterLabFamilyOverride = null,
+                isFilterAdjustmentVisible = false,
+                filterAdjustmentMode = FilterAdjustmentMode.LIGHT
+            )
         }
 
         is CockpitPanelCommand.CloseDevConsole -> {

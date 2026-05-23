@@ -8,7 +8,7 @@ internal interface MainActivityActionCallbacks {
     fun dispatch(intent: SessionIntent)
     fun applySettingsAction(action: PersistedSettingsAction)
     fun applySettingsControl(control: SettingsControlRenderModel?)
-    fun setPanelRoute(route: CockpitPanelRoute)
+    fun reducePanel(command: CockpitPanelCommand)
     fun renderAfterPanelChange()
     fun renderLatestSettingsSurfaces()
     fun renderLatestFilterLab()
@@ -28,4 +28,6 @@ internal interface MainActivityActionCallbacks {
     fun openLatestGalleryMedia()
     fun exportDevLog()
     fun refreshDevLogModel()
+    fun selectDevLogTab(tab: DevLogTab)
+    fun neutralColorLabAction(): PersistedSettingsAction
 }

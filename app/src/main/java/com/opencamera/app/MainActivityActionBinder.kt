@@ -38,47 +38,23 @@ internal class MainActivityActionBinder(
 
     private fun bindPanelActions() {
         views.panelDismissScrim.setOnClickListener {
-            callbacks.setPanelRoute(CockpitPanelRoute.None)
+            callbacks.reducePanel(CockpitPanelCommand.DismissAll)
             callbacks.renderAfterPanelChange()
         }
         views.topBar.colorLabEntry.setOnClickListener {
-            val current = snapshot().activePanelRoute
-            val next = if (current is CockpitPanelRoute.ColorLab) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.ColorLab
-            }
-            callbacks.setPanelRoute(next)
+            callbacks.reducePanel(CockpitPanelCommand.ToggleColorLab)
             callbacks.renderAfterPanelChange()
         }
         views.topBar.settingsEntry.setOnClickListener {
-            val current = snapshot().activePanelRoute
-            val next = if (current.isSettingsOpen) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.Settings()
-            }
-            callbacks.setPanelRoute(next)
+            callbacks.reducePanel(CockpitPanelCommand.ToggleSettingsRoot)
             callbacks.renderAfterPanelChange()
         }
         views.topBar.filterEntry.setOnClickListener {
-            val current = snapshot().activePanelRoute
-            val next = if (current is CockpitPanelRoute.StyleLab) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.StyleLab
-            }
-            callbacks.setPanelRoute(next)
+            callbacks.reducePanel(CockpitPanelCommand.ToggleStyleLab)
             callbacks.renderAfterPanelChange()
         }
         views.quickPanel.launcher.setOnClickListener {
-            val current = snapshot().activePanelRoute
-            val next = if (current is CockpitPanelRoute.QuickBubble) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.QuickBubble
-            }
-            callbacks.setPanelRoute(next)
+            callbacks.reducePanel(CockpitPanelCommand.ToggleQuickBubble)
             callbacks.renderAfterPanelChange()
         }
     }
@@ -102,27 +78,23 @@ internal class MainActivityActionBinder(
 
     private fun bindSettingsActions() {
         views.settingsPanel.close.setOnClickListener {
-            callbacks.setPanelRoute(CockpitPanelRoute.None)
+            callbacks.reducePanel(CockpitPanelCommand.CloseSettings)
             callbacks.renderAfterPanelChange()
         }
         views.settingsPanel.tabCommon.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.SelectSettingsTab(SettingsTab.COMMON))
             callbacks.renderAfterPanelChange()
         }
         views.settingsPanel.tabPhoto.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.SelectSettingsTab(SettingsTab.PHOTO))
             callbacks.renderAfterPanelChange()
         }
         views.settingsPanel.tabVideo.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.SelectSettingsTab(SettingsTab.VIDEO))
             callbacks.renderAfterPanelChange()
         }
         views.settingsPanel.back.setOnClickListener {
-            val current = snapshot().activePanelRoute as? CockpitPanelRoute.Settings
-                ?: return@setOnClickListener
-            callbacks.setPanelRoute(when (current.subpage) {
-                SettingsSubpage.WATERMARK_DETAIL -> CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR)
-                SettingsSubpage.PORTRAIT_LAB,
-                SettingsSubpage.WATERMARK_SELECTOR -> CockpitPanelRoute.Settings()
-                else -> CockpitPanelRoute.Settings()
-            })
+            callbacks.reducePanel(CockpitPanelCommand.SettingsBack)
             callbacks.renderLatestSettingsSurfaces()
             callbacks.renderAfterPanelChange()
         }
@@ -222,7 +194,7 @@ internal class MainActivityActionBinder(
 
     private fun bindFilterActions() {
         views.filterLab.close.setOnClickListener {
-            callbacks.setPanelRoute(CockpitPanelRoute.None)
+            callbacks.reducePanel(CockpitPanelCommand.CloseFilterLab)
             callbacks.renderAfterPanelChange()
         }
         views.filterLab.photoTab.setOnClickListener {
@@ -243,7 +215,7 @@ internal class MainActivityActionBinder(
         views.filterLab.modeToggle.setOnClickListener {
             val current = snapshot().activePanelRoute
             if (current is CockpitPanelRoute.ColorLab) {
-                callbacks.applySettingsAction(neutralColorLabAction())
+                callbacks.applySettingsAction(callbacks.neutralColorLabAction())
             } else {
                 callbacks.toggleFilterAdjustmentMode()
             }
@@ -291,32 +263,18 @@ internal class MainActivityActionBinder(
 
     private fun bindDevConsoleActions() {
         views.devConsole.entry.setOnClickListener {
-            val current = snapshot().activePanelRoute
-            val next = if (current is CockpitPanelRoute.DevConsole) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.DevConsole
-            }
-            callbacks.setPanelRoute(next)
+            callbacks.reducePanel(CockpitPanelCommand.ToggleDevConsole)
             callbacks.renderAfterPanelChange()
         }
-        views.devConsole.tabKey.setOnClickListener {
-            callbacks.refreshDevLogModel()
-        }
-        views.devConsole.tabCore.setOnClickListener {
-            callbacks.refreshDevLogModel()
-        }
-        views.devConsole.tabError.setOnClickListener {
-            callbacks.refreshDevLogModel()
-        }
-        views.devConsole.tabAll.setOnClickListener {
-            callbacks.refreshDevLogModel()
-        }
+        views.devConsole.tabKey.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.KEY) }
+        views.devConsole.tabCore.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.CORE) }
+        views.devConsole.tabError.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.ERROR) }
+        views.devConsole.tabAll.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.ALL) }
         views.devConsole.export.setOnClickListener {
             callbacks.exportDevLog()
         }
         views.devConsole.close.setOnClickListener {
-            callbacks.setPanelRoute(CockpitPanelRoute.None)
+            callbacks.reducePanel(CockpitPanelCommand.CloseDevConsole)
             callbacks.renderAfterPanelChange()
         }
     }
