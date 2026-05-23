@@ -55,13 +55,10 @@ import com.opencamera.core.settings.PersistedSettingsAction
 import kotlinx.coroutines.launch
 import java.io.File
 
-private enum class SettingsTab { COMMON, PHOTO, VIDEO }
-
 class MainActivity : AppCompatActivity() {
     private val container: AppContainer
         get() = (application as OpenCameraApplication).container
 
-    private var selectedSettingsTab = SettingsTab.COMMON
     private lateinit var previewView: PreviewView
     private lateinit var previewOverlayView: PreviewOverlayView
     private lateinit var panelDismissScrim: View
@@ -198,7 +195,11 @@ class MainActivity : AppCompatActivity() {
     private val shutterClickSound = MediaActionSound()
     private var lastRequestedThumbnailUri: String? = null
     private var lastPlayedShutterSoundShotId: String? = null
-    private var activePanelRoute: CockpitPanelRoute = CockpitPanelRoute.None
+    private val panelRouter = CockpitPanelRouter()
+    private val panelState: CockpitPanelUiState
+        get() = panelRouter.state
+    private val activePanelRoute: CockpitPanelRoute
+        get() = panelState.route
     private var selectedDevLogTab = DevLogTab.KEY
     private var latestDevLogRenderModel: DevLogRenderModel? = null
     private lateinit var devLogExporter: DevLogExporter
@@ -208,10 +209,6 @@ class MainActivity : AppCompatActivity() {
     private var latestWatermarkLabDetailRenderModel: WatermarkLabDetailRenderModel? = null
     private var latestFilterLabRenderModel: FilterLabPageRenderModel? = null
     private var latestSessionState: SessionState? = null
-    private var selectedWatermarkDetailTemplateId: String? = null
-    private var selectedFilterLabFamilyOverride: FilterLabFamily? = null
-    private var isFilterAdjustmentVisible = true
-    private var filterAdjustmentMode = FilterAdjustmentMode.LIGHT
     private var lightPaletteBaseSpec: FilterRenderSpec? = null
     private lateinit var gestureRouter: GestureRouter
     private val gesturePolicy = GesturePolicy()
@@ -434,28 +431,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun bindActions() {
         panelDismissScrim.setOnClickListener {
-            activePanelRoute = CockpitPanelRoute.None
-            selectedWatermarkDetailTemplateId = null
-            selectedFilterLabFamilyOverride = null
-            isFilterAdjustmentVisible = false
+            panelRouter.reduce(CockpitPanelCommand.DismissAll)
             lightPaletteBaseSpec = null
-            selectedSettingsTab = SettingsTab.COMMON
             renderPanelVisibility()
             renderDevConsoleVisibility()
         }
         buttonColorLabEntry.setOnClickListener {
-            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.ColorLab) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.ColorLab
-            }
+            panelRouter.reduce(CockpitPanelCommand.ToggleColorLab)
             if (activePanelRoute is CockpitPanelRoute.ColorLab) {
-                isFilterAdjustmentVisible = true
                 maybeAutoPrepareFilter()
                 renderLatestFilterLab()
             } else {
-                selectedFilterLabFamilyOverride = null
-                isFilterAdjustmentVisible = false
                 lightPaletteBaseSpec = null
             }
             renderPanelVisibility()
@@ -464,67 +450,39 @@ class MainActivity : AppCompatActivity() {
             toggleSettingsPanel()
         }
         buttonFilterEntry.setOnClickListener {
-            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.StyleLab) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.StyleLab
-            }
+            panelRouter.reduce(CockpitPanelCommand.ToggleStyleLab)
             if (activePanelRoute is CockpitPanelRoute.StyleLab) {
-                isFilterAdjustmentVisible = true
                 maybeAutoPrepareFilter()
                 renderLatestFilterLab()
             } else {
-                selectedFilterLabFamilyOverride = null
-                isFilterAdjustmentVisible = false
                 lightPaletteBaseSpec = null
             }
             renderPanelVisibility()
         }
         buttonCloseSettings.setOnClickListener {
-            activePanelRoute = CockpitPanelRoute.None
-            selectedWatermarkDetailTemplateId = null
-            selectedSettingsTab = SettingsTab.COMMON
+            panelRouter.reduce(CockpitPanelCommand.CloseSettings)
             renderPanelVisibility()
         }
-        buttonSettingsTabCommon.setOnClickListener { selectedSettingsTab = SettingsTab.COMMON; renderSettingsTabs() }
-        buttonSettingsTabPhoto.setOnClickListener { selectedSettingsTab = SettingsTab.PHOTO; renderSettingsTabs() }
-        buttonSettingsTabVideo.setOnClickListener { selectedSettingsTab = SettingsTab.VIDEO; renderSettingsTabs() }
+        buttonSettingsTabCommon.setOnClickListener { panelRouter.reduce(CockpitPanelCommand.SelectSettingsTab(SettingsTab.COMMON)); renderSettingsTabs() }
+        buttonSettingsTabPhoto.setOnClickListener { panelRouter.reduce(CockpitPanelCommand.SelectSettingsTab(SettingsTab.PHOTO)); renderSettingsTabs() }
+        buttonSettingsTabVideo.setOnClickListener { panelRouter.reduce(CockpitPanelCommand.SelectSettingsTab(SettingsTab.VIDEO)); renderSettingsTabs() }
         buttonSettingsBack.setOnClickListener {
-            val currentSettings = activePanelRoute as? CockpitPanelRoute.Settings ?: return@setOnClickListener
-            activePanelRoute = when (currentSettings.subpage) {
-                SettingsSubpage.WATERMARK_DETAIL -> {
-                    selectedWatermarkDetailTemplateId = null
-                    CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR)
-                }
-                SettingsSubpage.PORTRAIT_LAB,
-                SettingsSubpage.WATERMARK_SELECTOR -> CockpitPanelRoute.Settings()
-                else -> CockpitPanelRoute.Settings()
-            }
+            panelRouter.reduce(CockpitPanelCommand.SettingsBack)
             renderLatestSettingsSurfaces()
             renderPanelVisibility()
         }
         buttonCloseFilter.setOnClickListener {
-            activePanelRoute = CockpitPanelRoute.None
-            selectedFilterLabFamilyOverride = null
-            isFilterAdjustmentVisible = false
+            panelRouter.reduce(CockpitPanelCommand.CloseFilterLab)
             lightPaletteBaseSpec = null
             renderPanelVisibility()
         }
         buttonDevEntry.setOnClickListener {
-            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.DevConsole) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.DevConsole
-            }
+            panelRouter.reduce(CockpitPanelCommand.ToggleDevConsole)
             renderDevConsoleVisibility()
             renderPanelVisibility()
         }
         buttonQuickLauncher.setOnClickListener {
-            activePanelRoute = if (activePanelRoute is CockpitPanelRoute.QuickBubble) {
-                CockpitPanelRoute.None
-            } else {
-                CockpitPanelRoute.QuickBubble
-            }
+            panelRouter.reduce(CockpitPanelCommand.ToggleQuickBubble)
             latestSessionState?.let(::render)
         }
         buttonQuickGrid.setOnClickListener {
@@ -572,7 +530,7 @@ class MainActivity : AppCompatActivity() {
             captureOutput.text = "Debug log exported: ${file.absolutePath}"
         }
         buttonDevClose.setOnClickListener {
-            activePanelRoute = CockpitPanelRoute.None
+            panelRouter.reduce(CockpitPanelCommand.CloseDevConsole)
             renderDevConsoleVisibility()
             renderPanelVisibility()
         }
@@ -745,7 +703,7 @@ class MainActivity : AppCompatActivity() {
         gestureRouter = GestureRouter(this) { event ->
             val guardState = GestureGuardState(
                 activePanel = activePanelRoute,
-                isFilterAdjustmentActive = isFilterAdjustmentVisible
+                isFilterAdjustmentActive = panelState.isFilterAdjustmentVisible
             )
             if (!gestureGuard.isGestureAllowed(GestureZone.PREVIEW, guardState)) {
                 return@GestureRouter
@@ -800,7 +758,7 @@ class MainActivity : AppCompatActivity() {
         val watermarkSelectorPage = watermarkLabSelectorRenderModel(state, text)
         val watermarkDetailPage = watermarkLabDetailRenderModel(
             state = state,
-            templateId = selectedWatermarkDetailTemplateId
+            templateId = panelState.selectedWatermarkDetailTemplateId
                 ?: state.settings.persisted.photo.defaultWatermarkTemplateId,
             text = text
         )
@@ -813,8 +771,8 @@ class MainActivity : AppCompatActivity() {
             } else {
                 StyleAndColorLabRole.STYLE
             },
-            showAdjustmentPanel = isFilterAdjustmentVisible,
-            adjustmentMode = filterAdjustmentMode
+            showAdjustmentPanel = panelState.isFilterAdjustmentVisible,
+            adjustmentMode = panelState.filterAdjustmentMode
         )
         if (activePanelRoute is CockpitPanelRoute.ColorLab) {
             val colorLabModel = colorLabPanelRenderModel(state, text)
@@ -929,15 +887,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderSettingsTabs() {
-        buttonSettingsTabCommon.isEnabled = selectedSettingsTab != SettingsTab.COMMON
-        buttonSettingsTabPhoto.isEnabled = selectedSettingsTab != SettingsTab.PHOTO
-        buttonSettingsTabVideo.isEnabled = selectedSettingsTab != SettingsTab.VIDEO
-        buttonSettingsTabCommon.alpha = if (selectedSettingsTab == SettingsTab.COMMON) 1f else 0.84f
-        buttonSettingsTabPhoto.alpha = if (selectedSettingsTab == SettingsTab.PHOTO) 1f else 0.84f
-        buttonSettingsTabVideo.alpha = if (selectedSettingsTab == SettingsTab.VIDEO) 1f else 0.84f
-        settingsCommonSection.isVisible = selectedSettingsTab == SettingsTab.COMMON
-        settingsPhotoSection.isVisible = selectedSettingsTab == SettingsTab.PHOTO
-        settingsVideoSection.isVisible = selectedSettingsTab == SettingsTab.VIDEO
+        val selectedTab = panelState.selectedSettingsTab
+        buttonSettingsTabCommon.isEnabled = selectedTab != SettingsTab.COMMON
+        buttonSettingsTabPhoto.isEnabled = selectedTab != SettingsTab.PHOTO
+        buttonSettingsTabVideo.isEnabled = selectedTab != SettingsTab.VIDEO
+        buttonSettingsTabCommon.alpha = if (selectedTab == SettingsTab.COMMON) 1f else 0.84f
+        buttonSettingsTabPhoto.alpha = if (selectedTab == SettingsTab.PHOTO) 1f else 0.84f
+        buttonSettingsTabVideo.alpha = if (selectedTab == SettingsTab.VIDEO) 1f else 0.84f
+        settingsCommonSection.isVisible = selectedTab == SettingsTab.COMMON
+        settingsPhotoSection.isVisible = selectedTab == SettingsTab.PHOTO
+        settingsVideoSection.isVisible = selectedTab == SettingsTab.VIDEO
     }
 
     private fun renderPortraitLabPage(model: PortraitLabPageRenderModel) {
@@ -1217,7 +1176,7 @@ class MainActivity : AppCompatActivity() {
                     isAllCaps = false
                     isEnabled = model.editingEnabled && item.nextAction != null
                     setOnClickListener {
-                        isFilterAdjustmentVisible = true
+                        panelRouter.reduce(CockpitPanelCommand.SelectFilterFamily(model.adjustControl.family))
                         item.nextAction?.let(::applySettingsAction)
                     }
                 }
@@ -1288,12 +1247,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toggleSettingsPanel() {
-        activePanelRoute = if (activePanelRoute.isSettingsOpen) {
-            CockpitPanelRoute.None
-        } else {
-            CockpitPanelRoute.Settings()
-        }
-        selectedWatermarkDetailTemplateId = null
+        panelRouter.reduce(CockpitPanelCommand.ToggleSettingsRoot)
         if (activePanelRoute.isSettingsOpen) {
             renderLatestSettingsSurfaces()
         }
@@ -1572,43 +1526,18 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onBackPressed() {
-        when (activePanelRoute) {
-            CockpitPanelRoute.None -> {
-                super.onBackPressed()
-            }
-            is CockpitPanelRoute.Settings -> {
-                val settings = activePanelRoute as CockpitPanelRoute.Settings
-                when (settings.subpage) {
-                    SettingsSubpage.WATERMARK_DETAIL -> {
-                        selectedWatermarkDetailTemplateId = null
-                        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR)
-                    }
-                    SettingsSubpage.PORTRAIT_LAB,
-                    SettingsSubpage.WATERMARK_SELECTOR -> {
-                        activePanelRoute = CockpitPanelRoute.Settings()
-                    }
-                    SettingsSubpage.ROOT -> {
-                        activePanelRoute = CockpitPanelRoute.None
-                        selectedSettingsTab = SettingsTab.COMMON
-                    }
-                }
-                renderLatestSettingsSurfaces()
-                renderPanelVisibility()
-            }
-            CockpitPanelRoute.StyleLab,
-            CockpitPanelRoute.ColorLab,
-            CockpitPanelRoute.DevConsole,
-            CockpitPanelRoute.QuickBubble -> {
-                if (activePanelRoute is CockpitPanelRoute.StyleLab || activePanelRoute is CockpitPanelRoute.ColorLab) {
-                    selectedFilterLabFamilyOverride = null
-                    isFilterAdjustmentVisible = false
-                    lightPaletteBaseSpec = null
-                }
-                activePanelRoute = CockpitPanelRoute.None
-                renderPanelVisibility()
-                renderDevConsoleVisibility()
-            }
+        val previousRoute = activePanelRoute
+        panelRouter.reduce(CockpitPanelCommand.AndroidBack)
+        if (activePanelRoute == previousRoute && activePanelRoute is CockpitPanelRoute.None) {
+            super.onBackPressed()
+            return
         }
+        if (previousRoute is CockpitPanelRoute.StyleLab || previousRoute is CockpitPanelRoute.ColorLab) {
+            lightPaletteBaseSpec = null
+        }
+        renderLatestSettingsSurfaces()
+        renderPanelVisibility()
+        renderDevConsoleVisibility()
     }
 
     override fun onDestroy() {
@@ -1669,7 +1598,7 @@ class MainActivity : AppCompatActivity() {
         ) {
             return
         }
-        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.PORTRAIT_LAB)
+        panelRouter.reduce(CockpitPanelCommand.OpenPortraitLab)
         renderLatestSettingsSurfaces()
     }
 
@@ -1680,8 +1609,7 @@ class MainActivity : AppCompatActivity() {
         ) {
             return
         }
-        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR)
-        selectedWatermarkDetailTemplateId = null
+        panelRouter.reduce(CockpitPanelCommand.OpenWatermarkSelector)
         renderLatestSettingsSurfaces()
     }
 
@@ -1690,21 +1618,19 @@ class MainActivity : AppCompatActivity() {
         if (detailModel != null && !detailModel.editingEnabled) {
             return
         }
-        selectedWatermarkDetailTemplateId = templateId
-        activePanelRoute = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_DETAIL)
+        panelRouter.reduce(CockpitPanelCommand.OpenWatermarkDetail(templateId))
         renderLatestSettingsSurfaces()
     }
 
     private fun selectFilterLabFamily(family: FilterLabFamily) {
-        selectedFilterLabFamilyOverride = family
-        isFilterAdjustmentVisible = true
+        panelRouter.reduce(CockpitPanelCommand.SelectFilterFamily(family))
         lightPaletteBaseSpec = null
         maybeAutoPrepareFilter()
         renderLatestFilterLab()
     }
 
     private fun selectedFilterLabFamily(state: SessionState): FilterLabFamily {
-        return selectedFilterLabFamilyOverride ?: defaultFilterLabFamily(state.activeMode)
+        return panelState.selectedFilterLabFamilyOverride ?: defaultFilterLabFamily(state.activeMode)
     }
 
     private fun renderLatestFilterLab() {
@@ -1719,11 +1645,11 @@ class MainActivity : AppCompatActivity() {
             } else {
                 StyleAndColorLabRole.STYLE
             },
-            showAdjustmentPanel = isFilterAdjustmentVisible,
-            adjustmentMode = filterAdjustmentMode
+            showAdjustmentPanel = panelState.isFilterAdjustmentVisible,
+            adjustmentMode = panelState.filterAdjustmentMode
         )
         latestFilterLabRenderModel = model
-        if (isFilterAdjustmentVisible && lightPaletteBaseSpec == null) {
+        if (panelState.isFilterAdjustmentVisible && lightPaletteBaseSpec == null) {
             lightPaletteBaseSpec = model.adjustmentPanel.renderSpec
         }
         renderFilterLabPage(model)
@@ -1737,7 +1663,7 @@ class MainActivity : AppCompatActivity() {
         val selectorModel = watermarkLabSelectorRenderModel(state, text)
         val detailModel = watermarkLabDetailRenderModel(
             state = state,
-            templateId = selectedWatermarkDetailTemplateId
+            templateId = panelState.selectedWatermarkDetailTemplateId
                 ?: state.settings.persisted.photo.defaultWatermarkTemplateId,
             text = text
         )
@@ -1789,8 +1715,7 @@ class MainActivity : AppCompatActivity() {
                 sourceProfileId = sourceProfileId
             )
             if (editableProfileId != null) {
-                isFilterAdjustmentVisible = true
-                filterAdjustmentMode = FilterAdjustmentMode.LIGHT
+                panelRouter.reduce(CockpitPanelCommand.SelectFilterFamily(control.family))
                 lightPaletteBaseSpec = latestFilterLabRenderModel?.adjustmentPanel?.renderSpec
                 renderLatestFilterLab()
             }
@@ -1798,12 +1723,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toggleFilterAdjustmentMode() {
-        filterAdjustmentMode = if (filterAdjustmentMode == FilterAdjustmentMode.LIGHT) {
-            FilterAdjustmentMode.ADVANCED
-        } else {
-            FilterAdjustmentMode.LIGHT
-        }
-        if (filterAdjustmentMode == FilterAdjustmentMode.LIGHT) {
+        panelRouter.reduce(CockpitPanelCommand.ToggleFilterAdjustmentMode)
+        if (panelState.filterAdjustmentMode == FilterAdjustmentMode.LIGHT) {
             lightPaletteBaseSpec = latestFilterLabRenderModel?.adjustmentPanel?.renderSpec
         }
         renderLatestFilterLab()
