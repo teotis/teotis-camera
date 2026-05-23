@@ -50,13 +50,13 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Secondary panel bottom boundary: ~2/5 from screen bottom -->
+    <!-- Secondary panel bottom boundary: ~2/5 from screen top -->
     <androidx.constraintlayout.widget.Guideline
         android:id="@+id/secondaryPanelBottomGuide"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintGuide_percent="0.6" />
+        app:layout_constraintGuide_percent="0.4" />
 
     <!-- Layer 2: Top lightweight status area -->
     <View
