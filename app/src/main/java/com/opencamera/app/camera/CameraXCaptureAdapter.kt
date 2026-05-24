@@ -547,6 +547,7 @@ internal fun materializeMotionPhotoBundleIfPossible(
         LiveMotionPhotoMaterializationResult(
             bundle = bundle.copy(
                 stillPath = outputPath,
+                motionPath = motionPath,
                 thumbnailPath = outputPath,
                 thumbnailHandle = MediaOutputHandle(displayPath = outputPath)
             ),

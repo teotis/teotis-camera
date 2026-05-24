@@ -82,21 +82,25 @@ internal class CameraXLivePreviewFrameSource(
             return
         }
 
-        frameCounter++
-        val descriptor = FrameDescriptor(
-            frameId = "preview-$frameCounter",
-            source = FrameSourceKind.PREVIEW_ANALYSIS,
-            timestampNanos = System.nanoTime(),
-            width = image.width,
-            height = image.height,
-            rotationDegrees = rotationDegrees,
-            payloadAccess = FramePayloadAccess.CPU_YUV,
-            lensFacingTag = "BACK",
-            zoomRatio = 1.0f
-        )
-
-        appendCapturedFrame(image.toCapturedPreviewYuvFrame(descriptor))
-        image.close()
+        try {
+            frameCounter++
+            val descriptor = FrameDescriptor(
+                frameId = "preview-$frameCounter",
+                source = FrameSourceKind.PREVIEW_ANALYSIS,
+                timestampNanos = System.nanoTime(),
+                width = image.width,
+                height = image.height,
+                rotationDegrees = rotationDegrees,
+                payloadAccess = FramePayloadAccess.CPU_YUV,
+                lensFacingTag = "BACK",
+                zoomRatio = 1.0f
+            )
+            appendCapturedFrame(image.toCapturedPreviewYuvFrame(descriptor))
+        } catch (throwable: Throwable) {
+            Log.w(TAG, "Failed to capture live preview frame", throwable)
+        } finally {
+            image.close()
+        }
     }
 
     internal fun appendCapturedFrame(frame: CapturedPreviewYuvFrame) {

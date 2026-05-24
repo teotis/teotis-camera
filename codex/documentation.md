@@ -138,6 +138,7 @@
   [`PreviewMotionSegmentEncoder.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/live/PreviewMotionSegmentEncoder.kt) 新增 Android `MediaCodec + MediaMuxer` H.264/MP4 encoder，把有界预览 YUV 帧编码为 `.live.mp4`；
   [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `materializeMotionPhotoBundleIfPossible(...)`，只有 materializer 真成功时才把 bundle 指向单文件 Motion Photo 并追加 `motion-photo:container=google-jpeg`；
   `captureLivePhoto()` 现会先调用 `MotionSegmentFrameSource.materializeMotionSegment(...)` 生成 motionPath，再交给 `MotionPhotoFileMaterializer` 写 Google Motion Photo 容器；
+  本轮继续收口了运行时硬化：Motion Photo 成功时同步更新 bundle `motionPath` 为真实 encoded MP4，`ImageAnalysis` 帧复制异常会记录 warning 并确保 `ImageProxy.close()`，encoder 若无法送入 EOS 会直接失败而不是长时间等待；
   materializer 失败时 bundle 改为 `STILL_ONLY_FALLBACK`，诊断追加 `motion-photo:container=failed:<reason>`，避免上层和后续 agent 误判；
   [`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 新增 motion segment 准备、materializer 成功/失败路径测试，锁住“不宣称 google container 成功”的行为；
   [`LivePreviewFrameSourceTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/live/LivePreviewFrameSourceTest.kt) 新增 fake encoder 测试，锁定选中 YUV payload 能交给 motion segment encoder；

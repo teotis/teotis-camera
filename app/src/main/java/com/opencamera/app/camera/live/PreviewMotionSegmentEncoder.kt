@@ -133,15 +133,14 @@ internal class AndroidPreviewMotionSegmentEncoder : PreviewMotionSegmentEncoder 
 
     private fun signalEndOfStream(codec: MediaCodec, presentationTimeUs: Long) {
         val inputIndex = codec.dequeueInputBuffer(INPUT_TIMEOUT_US)
-        if (inputIndex >= 0) {
-            codec.queueInputBuffer(
-                inputIndex,
-                0,
-                0,
-                presentationTimeUs,
-                MediaCodec.BUFFER_FLAG_END_OF_STREAM
-            )
-        }
+        require(inputIndex >= 0) { "timed out waiting for encoder end-of-stream buffer" }
+        codec.queueInputBuffer(
+            inputIndex,
+            0,
+            0,
+            presentationTimeUs,
+            MediaCodec.BUFFER_FLAG_END_OF_STREAM
+        )
     }
 
     private fun drain(

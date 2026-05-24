@@ -584,6 +584,7 @@ class CameraXCaptureAdapterLivePhotoTest {
 
         assertEquals("/tmp/generated-preview.mp4", materializedMotionPath)
         assertEquals("/tmp/capture_MP.jpg", result.bundle.stillPath)
+        assertEquals("/tmp/generated-preview.mp4", result.bundle.motionPath)
         assertTrue(result.diagnostics.contains("motion-photo:motion-segment=materialized"))
         assertTrue(result.diagnostics.contains("motion-photo:container=google-jpeg"))
     }
