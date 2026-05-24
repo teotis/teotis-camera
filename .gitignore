@@ -4,6 +4,8 @@ build/
 local.properties
 ._*
 .DS_Store
+__pycache__/
+*.pyc
 
 # Git worktrees
 .worktrees/

@@ -107,6 +107,68 @@ class OcwmExtractorCompatibilityTest {
         tmpDir.delete()
     }
 
+    @Test
+    fun pythonExtractorRecoversOriginalPayload() {
+        val scriptPath = findPythonExtractor() ?: return // skip if script not found
+        val pythonBin = findPython3() ?: return // skip if python3 not available
+
+        val visible = syntheticVisibleJpeg()
+        val original = syntheticOriginalJpeg()
+
+        val manifest = ReversibleWatermarkArchiveManifest(
+            watermarkTemplateId = "python-compat",
+            visibleImageSha256 = sha256Hex(visible),
+            payloadSha256 = sha256Hex(original),
+            payloadLength = original.size.toLong()
+        )
+        val archive = OcwmJpegContainer.EmbeddedArchive(manifest, original)
+        val archived = OcwmJpegContainer.embedArchive(visible, archive)
+
+        val tmpDir = File(System.getProperty("java.io.tmpdir"), "ocwm-python-compat")
+        tmpDir.mkdirs()
+        val fixtureFile = File(tmpDir, "test-archived.jpg")
+        fixtureFile.writeBytes(archived)
+        val outputFile = File(tmpDir, "extracted-output.jpg")
+
+        try {
+            val process = ProcessBuilder(pythonBin, scriptPath, fixtureFile.absolutePath, outputFile.absolutePath)
+                .redirectErrorStream(true)
+                .start()
+            val stdout = process.inputStream.bufferedReader().readText()
+            val exitCode = process.waitFor()
+            assertEquals(0, exitCode, "Python extractor must exit 0, stdout: $stdout")
+            assert(outputFile.exists()) { "Python extractor must produce output file" }
+            assertContentEquals(original, outputFile.readBytes(), "Python-extracted payload must match original")
+        } finally {
+            fixtureFile.delete()
+            outputFile.delete()
+            tmpDir.delete()
+        }
+    }
+
+    private fun findPythonExtractor(): String? {
+        val candidates = listOf(
+            "scripts/extract_ocwm_original.py",
+            "../scripts/extract_ocwm_original.py",
+            "../../scripts/extract_ocwm_original.py"
+        )
+        for (c in candidates) {
+            val f = File(c).canonicalFile
+            if (f.exists()) return f.absolutePath
+        }
+        return null
+    }
+
+    private fun findPython3(): String? {
+        return try {
+            val p = ProcessBuilder("python3", "--version").start()
+            p.waitFor()
+            if (p.exitValue() == 0) "python3" else null
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     // ── Helpers ──
 
     private fun syntheticVisibleJpeg(): ByteArray {

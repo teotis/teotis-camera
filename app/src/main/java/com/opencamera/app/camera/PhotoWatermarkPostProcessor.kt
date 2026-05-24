@@ -218,7 +218,9 @@ internal class AndroidPhotoWatermarkEditor(
                 originalHeight = originalHeight
             )
             if (archiveBytes != null) {
-                writeEncodedBytes(target, archiveBytes)
+                if (!writeEncodedBytes(target, archiveBytes)) {
+                    return@withContext ProcessorEditorResult.Failed("archive-write-failed")
+                }
             }
 
             PhotoWatermarkApplied(
