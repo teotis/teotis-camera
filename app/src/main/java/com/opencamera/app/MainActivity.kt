@@ -288,7 +288,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         cockpitRenderer.renderPreviewMirror(state)
         maybePlayShutterSound(state)
 
-        cockpitRenderer.renderShutter(state, controls)
+        cockpitRenderer.renderShutter(state, controls, captureDisabledReason(state, text) == null)
         cockpitRenderer.renderRecordingIndicator(
             recordingIndicatorRenderModel(state, text)
         )

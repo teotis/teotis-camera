@@ -20,8 +20,8 @@
     <!-- Shutter button states -->
     <color name="oc_shutter_ring">#CCF8FAFC</color>
     <color name="oc_shutter_fill_pressed">#B3F8FAFC</color>
-    <color name="oc_shutter_fill_disabled">#4DF8FAFC</color>
-    <color name="oc_shutter_ring_disabled">#33F8FAFC</color>
+    <color name="oc_shutter_fill_disabled">#9955D6BE</color>
+    <color name="oc_shutter_ring_disabled">#CC55D6BE</color>
     <color name="oc_shutter_recording_pressed">#CCFF3B30</color>
 
     <!-- Divider -->
