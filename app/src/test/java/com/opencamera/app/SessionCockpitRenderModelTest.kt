@@ -371,22 +371,61 @@ class SessionCockpitRenderModelTest {
 
     @Test
     fun `quick button labels fit within 96dp button width without ellipsis`() {
-        val quickLabels = listOf("网格", "画质", "画幅", "实况", "定时")
+        val quickLabels = listOf("网格", "画质", "像素", "画幅", "实况", "定时")
         quickLabels.forEach { label ->
             assertTrue(label.length <= 2, "Quick button label '$label' exceeds 2 chars")
         }
     }
 
     @Test
-    fun `quick panel sheet exposes all five rows`() {
+    fun `quick panel sheet exposes all six rows`() {
         val state = defaultSessionState()
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Grid", sheet.gridRow.title)
         assertEquals("Quality", sheet.qualityRow.title)
+        assertEquals("Size", sheet.resolutionRow.title)
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
+    }
+
+    @Test
+    fun `quick panel sheet exposes photo quality and resolution rows`() {
+        val state = defaultSessionState(
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                qualityPreference = StillCaptureQualityPreference.QUALITY,
+                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
+            )
+        )
+
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("Quality", sheet.qualityRow.title)
+        assertEquals("Still Max", sheet.qualityRow.value)
+        assertEquals("Size", sheet.resolutionRow.title)
+        assertEquals("8MP", sheet.resolutionRow.value)
+        assertTrue(sheet.qualityRow.isEnabled)
+        assertTrue(sheet.resolutionRow.isEnabled)
+    }
+
+    @Test
+    fun `quick resolution uses active native output size when available`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableStillCaptureOutputSizes = listOf(
+                    StillCaptureOutputSize(width = 6000, height = 4000),
+                    StillCaptureOutputSize(width = 4000, height = 3000)
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                outputSize = StillCaptureOutputSize(width = 6000, height = 4000)
+            )
+        )
+
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("24MP", sheet.resolutionRow.value)
     }
 
     @Test

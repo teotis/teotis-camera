@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomRatioCapability
@@ -7,6 +8,7 @@ import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LivePhotoBundle
+import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.SavedMediaType
@@ -18,6 +20,7 @@ import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.PhotoLowLightPromptStatus
 import com.opencamera.app.i18n.AppTextResolver
+import kotlin.math.roundToInt
 
 internal data class ZoomCapsuleRenderModel(
     val label: String,
@@ -75,6 +78,7 @@ internal data class LowLightNightPromptRenderModel(
 internal data class QuickPanelSheetRenderModel(
     val gridRow: QuickPanelRowRenderModel,
     val qualityRow: QuickPanelRowRenderModel,
+    val resolutionRow: QuickPanelRowRenderModel,
     val brightnessRow: QuickBrightnessRenderModel,
     val frameRatioRow: QuickPanelRowRenderModel,
     val frameRatioOptions: List<FrameRatioOptionRenderModel>,
@@ -248,6 +252,11 @@ internal fun quickPanelSheetRenderModel(
     val frameControl = frameRatioControlRenderModel(state, text)
     val brightnessControl = brightnessRenderModel(state, text)
 
+    val stillTemplate = state.activeDeviceGraph.template == CaptureTemplate.STILL_CAPTURE
+    val stillBusy = state.activeShot != null || state.countdownRemainingSeconds != null
+    val qualityEnabled = stillTemplate && !stillBusy && state.activeDeviceCapabilities.supportsStillCapture
+    val resolutionEnabled = qualityEnabled && isStillResolutionToggleEnabled(state)
+
     return QuickPanelSheetRenderModel(
         gridRow = QuickPanelRowRenderModel(
             title = text.quickGrid(),
@@ -256,8 +265,13 @@ internal fun quickPanelSheetRenderModel(
         ),
         qualityRow = QuickPanelRowRenderModel(
             title = text.quickQuality(),
-            value = strings.buttonStillFast,
-            isEnabled = true
+            value = stillQualityQuickLabel(state, strings),
+            isEnabled = qualityEnabled
+        ),
+        resolutionRow = QuickPanelRowRenderModel(
+            title = text.quickResolution(),
+            value = stillResolutionQuickLabel(state, strings),
+            isEnabled = resolutionEnabled
         ),
         brightnessRow = brightnessControl,
         frameRatioRow = QuickPanelRowRenderModel(
@@ -595,4 +609,22 @@ private fun Set<StillCaptureResolutionPreset>.stillResolutionPresetSummary(): St
 
 private fun List<StillCaptureOutputSize>.stillCaptureOutputSizeSummary(): String {
     return this.take(4).joinToString(separator = "/") { it.label }
+}
+
+private fun stillQualityQuickLabel(state: SessionState, strings: SessionUiStrings): String {
+    return when (state.activeDeviceGraph.stillCapture.qualityPreference) {
+        StillCaptureQualityPreference.LATENCY -> strings.buttonStillFast
+        StillCaptureQualityPreference.QUALITY -> strings.buttonStillMax
+    }
+}
+
+private fun stillResolutionQuickLabel(state: SessionState, strings: SessionUiStrings): String {
+    val native = selectedNativeStillCaptureOutputSizeOrNull(state)
+    return native?.quickMegapixelLabel()
+        ?: state.activeDeviceGraph.stillCapture.resolutionPreset.label
+}
+
+private fun StillCaptureOutputSize.quickMegapixelLabel(): String {
+    val megapixels = (pixelCount / 1_000_000.0).roundToInt()
+    return "${megapixels}MP"
 }

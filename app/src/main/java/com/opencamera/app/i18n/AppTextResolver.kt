@@ -73,6 +73,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun quickLauncher(): String = str(R.string.button_quick_launcher, "Quick")
     open fun quickGrid(): String = str(R.string.button_quick_grid, "Grid")
     open fun quickQuality(): String = str(R.string.button_quick_flash, "Quality")
+    open fun quickResolution(): String = str(R.string.button_quick_resolution, "Size")
     open fun quickBrightness(): String = str(R.string.button_quick_brightness, "Brightness")
     open fun quickBrightnessNa(): String = str(R.string.button_quick_brightness_na, "N/A")
     open fun quickLive(): String = str(R.string.button_quick_live, "Live")

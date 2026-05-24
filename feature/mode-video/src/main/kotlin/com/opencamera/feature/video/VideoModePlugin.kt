@@ -3,6 +3,8 @@ package com.opencamera.feature.video
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.nextQuickVideoSpec
+import com.opencamera.core.device.quickLabel
 import com.opencamera.core.device.resolveVideoSpec
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
@@ -30,7 +32,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.FilterProfile
-import com.opencamera.core.settings.VideoResolution
 import com.opencamera.core.settings.renderStyleColorSpec
 
 class VideoModePlugin : CameraModePlugin {
@@ -269,30 +270,27 @@ private class VideoModeController(
         if (isRecording) {
             return ModeSignal.ShowHint("Video quality can only be changed before recording starts")
         }
-        val supportedResolutions = runtimeState()
-            .deviceCapabilities
-            .videoSpecConstraints
-            .resolutions
-            .sortedBy(VideoResolution::ordinal)
-            .ifEmpty { listOf(VideoResolution.UHD_4K) }
-        val currentIndex = supportedResolutions.indexOf(requestedVideoSpec.resolution)
-        val nextResolution = if (currentIndex == -1) {
-            supportedResolutions.first()
-        } else {
-            supportedResolutions[(currentIndex + 1) % supportedResolutions.size]
+        val constraints = runtimeState().deviceCapabilities.videoSpecConstraints
+        val nextSpec = constraints.nextQuickVideoSpec(
+            current = requestedVideoSpec,
+            preserve = requestedVideoSpec
+        )
+        if (nextSpec == null) {
+            return ModeSignal.ShowHint("Video quality is unavailable")
         }
-        requestedVideoSpec = requestedVideoSpec.copy(resolution = nextResolution)
-        context.eventSink("video.quality.selected.${nextResolution.storageKey}")
+        requestedVideoSpec = nextSpec
+        context.eventSink("video.quality.selected.${nextSpec.resolution.storageKey}.${nextSpec.frameRate.storageKey}")
         mutableSnapshot.value = buildSnapshot(
             headline = "Video quality updated"
         )
         val activeVideoSpec = resolvedVideoSpec()
-        val suffix = if (activeVideoSpec.resolution != nextResolution) {
-            " (active ${activeVideoSpec.resolution.label})"
+        val requestedLabel = nextSpec.quickLabel()
+        val suffix = if (activeVideoSpec.resolution != nextSpec.resolution || activeVideoSpec.frameRate != nextSpec.frameRate) {
+            " (active ${activeVideoSpec.quickLabel()})"
         } else {
             ""
         }
-        return ModeSignal.ShowHint("Video quality: ${nextResolution.label}$suffix")
+        return ModeSignal.ShowHint("Video quality: $requestedLabel$suffix")
     }
 
     private fun buildSnapshot(
@@ -328,10 +326,10 @@ private class VideoModeController(
             "Torch unavailable on this device"
         }
         val videoSpecText = if (requestedVideoSpec == resolvedVideoSpec) {
-            "Active ${resolvedVideoSpec.summaryLabel}"
+            "Active ${resolvedVideoSpec.quickLabel()}"
         } else {
             buildString {
-                append("Active ${resolvedVideoSpec.summaryLabel} fallback")
+                append("Active ${resolvedVideoSpec.quickLabel()} fallback")
                 buildList {
                     if (requestedVideoSpec.resolution != resolvedVideoSpec.resolution) {
                         add("resolution")
@@ -353,9 +351,9 @@ private class VideoModeController(
             }
         }
         return buildString {
-            append("Quality ${resolvedVideoSpec.resolution.label}")
+            append("Quality ${resolvedVideoSpec.quickLabel()}")
             append(" | ")
-            append("Default ${requestedVideoSpec.summaryLabel} | ")
+            append("Default ${requestedVideoSpec.quickLabel()} | ")
             append(videoSpecText)
             append(" | Mic ${requestedVideoSpec.audioProfile.label}")
             append(" | Filter ${selectedFilter().label}")
@@ -413,4 +411,6 @@ private class VideoModeController(
         .deviceCapabilities
         .resolveVideoSpec(requestedVideoSpec)
         .applied
+
+    private fun VideoSpec.quickLabel(): String = "${resolution.quickLabel}${frameRate.fps}"
 }

@@ -55,6 +55,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun quickLauncher(): String = "Quick"
     override fun quickGrid(): String = "Grid"
     override fun quickQuality(): String = "Quality"
+    override fun quickResolution(): String = "Size"
     override fun quickLive(): String = "Live"
     override fun quickTimer(): String = "Timer"
     override fun moreControls(): String = "More"

@@ -5,6 +5,81 @@ import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.VideoFrameRate
 import com.opencamera.core.settings.VideoResolution
 import com.opencamera.core.settings.VideoSpec
+import com.opencamera.core.settings.VideoSpecConstraints
+
+data class VideoQuickSpecOption(
+    val resolution: VideoResolution,
+    val frameRate: VideoFrameRate
+) {
+    val spec: VideoSpec
+        get() = VideoSpec(resolution = resolution, frameRate = frameRate)
+
+    val label: String
+        get() = "${resolution.quickLabel}${frameRate.fps}"
+}
+
+val VideoResolution.quickLabel: String
+    get() = when (this) {
+        VideoResolution.UHD_8K -> "8K"
+        VideoResolution.UHD_4K -> "4K"
+        VideoResolution.FHD_1080P -> "1080p"
+        VideoResolution.HD_720P -> "720p"
+        VideoResolution.SD_480P -> "480p"
+    }
+
+fun VideoSpecConstraints.quickVideoSpecOptions(): List<VideoQuickSpecOption> {
+    val preferred = listOf(
+        VideoQuickSpecOption(VideoResolution.UHD_4K, VideoFrameRate.FPS_30),
+        VideoQuickSpecOption(VideoResolution.UHD_4K, VideoFrameRate.FPS_60),
+        VideoQuickSpecOption(VideoResolution.UHD_4K, VideoFrameRate.FPS_25),
+        VideoQuickSpecOption(VideoResolution.FHD_1080P, VideoFrameRate.FPS_60),
+        VideoQuickSpecOption(VideoResolution.FHD_1080P, VideoFrameRate.FPS_30),
+        VideoQuickSpecOption(VideoResolution.FHD_1080P, VideoFrameRate.FPS_25),
+        VideoQuickSpecOption(VideoResolution.HD_720P, VideoFrameRate.FPS_60),
+        VideoQuickSpecOption(VideoResolution.HD_720P, VideoFrameRate.FPS_30),
+        VideoQuickSpecOption(VideoResolution.HD_720P, VideoFrameRate.FPS_25),
+        VideoQuickSpecOption(VideoResolution.UHD_8K, VideoFrameRate.FPS_30),
+        VideoQuickSpecOption(VideoResolution.UHD_8K, VideoFrameRate.FPS_25),
+        VideoQuickSpecOption(VideoResolution.UHD_8K, VideoFrameRate.FPS_60),
+        VideoQuickSpecOption(VideoResolution.UHD_4K, VideoFrameRate.FPS_120),
+        VideoQuickSpecOption(VideoResolution.UHD_4K, VideoFrameRate.FPS_100),
+        VideoQuickSpecOption(VideoResolution.FHD_1080P, VideoFrameRate.FPS_120),
+        VideoQuickSpecOption(VideoResolution.FHD_1080P, VideoFrameRate.FPS_100),
+        VideoQuickSpecOption(VideoResolution.HD_720P, VideoFrameRate.FPS_120),
+        VideoQuickSpecOption(VideoResolution.HD_720P, VideoFrameRate.FPS_100),
+        VideoQuickSpecOption(VideoResolution.SD_480P, VideoFrameRate.FPS_30),
+        VideoQuickSpecOption(VideoResolution.SD_480P, VideoFrameRate.FPS_25)
+    )
+    val supported = preferred.filter { option ->
+        option.frameRate in frameRatesFor(option.resolution)
+    }
+    val extra = supportedFrameRatesByResolution
+        .flatMap { (resolution, rates) ->
+            rates.map { rate -> VideoQuickSpecOption(resolution, rate) }
+        }
+        .filterNot { option -> preferred.any { it == option } }
+        .sortedWith(
+            compareBy<VideoQuickSpecOption> { it.resolution.ordinal }
+                .thenBy { it.frameRate.ordinal }
+        )
+    return (supported + extra).distinct()
+}
+
+fun VideoSpecConstraints.nextQuickVideoSpec(
+    current: VideoSpec,
+    preserve: VideoSpec = current
+): VideoSpec? {
+    val options = quickVideoSpecOptions()
+    if (options.isEmpty()) return null
+    val currentIndex = options.indexOfFirst {
+        it.resolution == current.resolution && it.frameRate == current.frameRate
+    }
+    val next = options[(currentIndex + 1).mod(options.size)]
+    return preserve.copy(
+        resolution = next.resolution,
+        frameRate = next.frameRate
+    )
+}
 
 data class VideoSceneSignal(
     val isLowLight: Boolean = false,

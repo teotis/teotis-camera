@@ -126,6 +126,9 @@ internal class CockpitSurfaceRenderer(
         quickPanel.flash.text = "${sheet.qualityRow.title} ${sheet.qualityRow.value}"
         quickPanel.flash.isEnabled = sheet.qualityRow.isEnabled
 
+        quickPanel.resolution.text = "${sheet.resolutionRow.title} ${sheet.resolutionRow.value}"
+        quickPanel.resolution.isEnabled = sheet.resolutionRow.isEnabled
+
         val brightness = sheet.brightnessRow
         if (brightness.isVisible) {
             quickPanel.brightnessMinus.visibility = android.view.View.VISIBLE

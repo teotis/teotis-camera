@@ -64,6 +64,7 @@
     <string name="button_quick_ratio">Frame</string>
     <string name="button_preview_ratio">Preview Ratio</string>
     <string name="button_quick_live">Live</string>
+    <string name="button_quick_resolution">Size</string>
     <string name="button_quick_timer">Timer</string>
     <string name="button_quick_brightness">Bright</string>
     <string name="button_quick_brightness_minus">−</string>

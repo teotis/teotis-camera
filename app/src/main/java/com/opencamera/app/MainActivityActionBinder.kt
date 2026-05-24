@@ -110,6 +110,9 @@ internal class MainActivityActionBinder(
         views.quickPanel.flash.setOnClickListener {
             callbacks.dispatch(SessionIntent.StillCaptureQualityToggled)
         }
+        views.quickPanel.resolution.setOnClickListener {
+            callbacks.dispatch(SessionIntent.StillCaptureResolutionToggled)
+        }
         views.quickPanel.brightnessMinus.setOnClickListener {
             callbacks.dispatch(SessionIntent.DecreasePreviewBrightness)
         }
