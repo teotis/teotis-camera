@@ -10,6 +10,7 @@ import com.opencamera.app.camera.AndroidPhotoAlgorithmEditor
 import com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitor
 import com.opencamera.app.camera.CameraSessionCoordinator
 import com.opencamera.app.camera.CameraXCaptureAdapter
+import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
 import com.opencamera.app.camera.CompositeRuntimeIssueMonitor
 import com.opencamera.app.camera.DocumentAutoCropPostProcessor
 import com.opencamera.app.camera.PhotoFrameRatioPostProcessor
@@ -95,10 +96,13 @@ class AppContainer(
         )
     )
 
+    private val livePreviewFrameSource = CameraXLivePreviewFrameSource()
+
     private val cameraAdapter: CameraDeviceAdapter = CameraXCaptureAdapter(
         context = appContext,
         shotExecutor = shotExecutor,
-        mediaPostProcessor = mediaPostProcessor
+        mediaPostProcessor = mediaPostProcessor,
+        livePreviewFrameSource = livePreviewFrameSource
     )
 
     val effectCapabilityResolver = EffectCapabilityResolver(

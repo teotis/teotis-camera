@@ -22,6 +22,7 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraState
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
@@ -2443,11 +2444,27 @@ class CameraXCaptureAdapter(
                     stillCaptureResolutionPreset = stillCaptureResolutionPreset,
                     manualCaptureConfig = manualCaptureConfigOverride
                 )
+
+                // Build use cases list, including ImageAnalysis if live preview frame source is available
+                val useCases = mutableListOf<androidx.camera.core.UseCase>(preview, capture)
+                if (livePreviewFrameSource != null) {
+                    val analysis = ImageAnalysis.Builder()
+                        .setTargetResolution(android.util.Size(720, 480))
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                    analysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
+                        (livePreviewFrameSource as? CameraXLivePreviewFrameSource)?.onAnalyzeFrame(
+                            imageProxy,
+                            imageProxy.imageInfo.rotationDegrees
+                        ) ?: imageProxy.close()
+                    }
+                    useCases.add(analysis)
+                }
+
                 val camera = provider.bindToLifecycle(
                     lifecycleOwner,
                     selector,
-                    preview,
-                    capture
+                    *useCases.toTypedArray()
                 )
                 imageCapture = capture
                 videoCapture = null
