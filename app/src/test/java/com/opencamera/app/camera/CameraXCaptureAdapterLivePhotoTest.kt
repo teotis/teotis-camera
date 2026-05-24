@@ -530,12 +530,101 @@ class CameraXCaptureAdapterLivePhotoTest {
         val result = materializeMotionPhotoBundleIfPossible(
             bundle = bundle,
             motionSourceResult = motionSource,
+            prepareMotionSegment = { _, motionPath -> Result.success(motionPath) },
             materialize = { Result.failure(IllegalArgumentException("Motion file does not exist")) }
         )
 
         assertEquals(LiveBundleStatus.STILL_ONLY_FALLBACK, result.bundle.bundleStatus)
         assertFalse(result.diagnostics.contains("motion-photo:container=google-jpeg"))
         assertTrue(result.diagnostics.any { it.startsWith("motion-photo:container=failed:") })
+    }
+
+    @Test
+    fun `motion photo materialization uses prepared preview motion segment`() {
+        val shutterNanos = 2_000_000_000L
+        val selectedFrame = makeDescriptor("f1", timestampNanos = shutterNanos)
+        val motionSource = LiveMotionSourceResult(
+            source = LiveMotionSource.PREVIEW_RING_BUFFER,
+            selectedFrameSet = SelectedFrameSet(
+                frames = listOf(selectedFrame),
+                preShutterCount = 1,
+                postShutterCount = 0,
+                coveredPreShutterMillis = 0,
+                coveredPostShutterMillis = 0,
+                diagnostics = emptyList()
+            ),
+            ringBufferDepthMillis = 1_500,
+            postShutterBudgetMillis = 300,
+            diagnostics = emptyList()
+        )
+        val bundle = LivePhotoBundle(
+            stillPath = "/tmp/capture.jpg",
+            motionPath = "/tmp/capture.live.mp4",
+            sidecarPath = "/tmp/capture.live.json",
+            motionDurationMillis = 1_500,
+            motionMimeType = "video/mp4",
+            sidecarMimeType = "application/vnd.opencamera.live+json",
+            bundleStatus = LiveBundleStatus.COMPLETE
+        )
+        var materializedMotionPath: String? = null
+
+        val result = materializeMotionPhotoBundleIfPossible(
+            bundle = bundle,
+            motionSourceResult = motionSource,
+            prepareMotionSegment = { frames, motionPath ->
+                assertEquals(listOf(selectedFrame), frames)
+                assertEquals(bundle.motionPath, motionPath)
+                Result.success("/tmp/generated-preview.mp4")
+            },
+            materialize = { motionPath ->
+                materializedMotionPath = motionPath
+                Result.success("/tmp/capture_MP.jpg")
+            }
+        )
+
+        assertEquals("/tmp/generated-preview.mp4", materializedMotionPath)
+        assertEquals("/tmp/capture_MP.jpg", result.bundle.stillPath)
+        assertTrue(result.diagnostics.contains("motion-photo:motion-segment=materialized"))
+        assertTrue(result.diagnostics.contains("motion-photo:container=google-jpeg"))
+    }
+
+    @Test
+    fun `motion segment preparation failure does not invoke google container materializer`() {
+        val shutterNanos = 2_000_000_000L
+        val motionSource = LiveMotionSourceResult(
+            source = LiveMotionSource.PREVIEW_RING_BUFFER,
+            selectedFrameSet = SelectedFrameSet(
+                frames = listOf(makeDescriptor("f1", timestampNanos = shutterNanos)),
+                preShutterCount = 1,
+                postShutterCount = 0,
+                coveredPreShutterMillis = 0,
+                coveredPostShutterMillis = 0,
+                diagnostics = emptyList()
+            ),
+            ringBufferDepthMillis = 1_500,
+            postShutterBudgetMillis = 300,
+            diagnostics = emptyList()
+        )
+        val bundle = LivePhotoBundle(
+            stillPath = "/tmp/capture.jpg",
+            motionPath = "/tmp/capture.live.mp4",
+            sidecarPath = "/tmp/capture.live.json",
+            motionDurationMillis = 1_500,
+            motionMimeType = "video/mp4",
+            sidecarMimeType = "application/vnd.opencamera.live+json",
+            bundleStatus = LiveBundleStatus.COMPLETE
+        )
+
+        val result = materializeMotionPhotoBundleIfPossible(
+            bundle = bundle,
+            motionSourceResult = motionSource,
+            prepareMotionSegment = { _, _ -> Result.failure(IllegalStateException("no yuv payload")) },
+            materialize = { error("container materializer must not run without a motion segment") }
+        )
+
+        assertEquals(LiveBundleStatus.STILL_ONLY_FALLBACK, result.bundle.bundleStatus)
+        assertTrue(result.diagnostics.any { it.startsWith("motion-photo:motion-segment=failed:") })
+        assertFalse(result.diagnostics.contains("motion-photo:container=google-jpeg"))
     }
 
     private fun makeDescriptor(

@@ -513,7 +513,9 @@ data class LiveMotionPhotoMaterializationResult(
 internal fun materializeMotionPhotoBundleIfPossible(
     bundle: LivePhotoBundle,
     motionSourceResult: LiveMotionSourceResult,
-    materialize: () -> Result<String>
+    prepareMotionSegment: (List<com.opencamera.core.media.FrameDescriptor>, String) -> Result<String> =
+        { _, motionPath -> Result.success(motionPath) },
+    materialize: (String) -> Result<String>
 ): LiveMotionPhotoMaterializationResult {
     val hasSelectedFrames = motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
         motionSourceResult.selectedFrameSet.frames.isNotEmpty()
@@ -524,7 +526,22 @@ internal fun materializeMotionPhotoBundleIfPossible(
         )
     }
 
-    val motionPhotoResult = materialize()
+    val motionSegmentResult = prepareMotionSegment(
+        motionSourceResult.selectedFrameSet.frames,
+        bundle.motionPath
+    )
+    if (motionSegmentResult.isFailure) {
+        val reason = motionSegmentResult.exceptionOrNull()?.message ?: "unknown"
+        return LiveMotionPhotoMaterializationResult(
+            bundle = bundle.copy(
+                bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK
+            ),
+            diagnostics = listOf("motion-photo:motion-segment=failed:$reason")
+        )
+    }
+
+    val motionPath = motionSegmentResult.getOrDefault(bundle.motionPath)
+    val motionPhotoResult = materialize(motionPath)
     return if (motionPhotoResult.isSuccess) {
         val outputPath = motionPhotoResult.getOrDefault(bundle.stillPath)
         LiveMotionPhotoMaterializationResult(
@@ -533,7 +550,10 @@ internal fun materializeMotionPhotoBundleIfPossible(
                 thumbnailPath = outputPath,
                 thumbnailHandle = MediaOutputHandle(displayPath = outputPath)
             ),
-            diagnostics = listOf("motion-photo:container=google-jpeg")
+            diagnostics = listOf(
+                "motion-photo:motion-segment=materialized",
+                "motion-photo:container=google-jpeg"
+            )
         )
     } else {
         val reason = motionPhotoResult.exceptionOrNull()?.message ?: "unknown"
@@ -1676,11 +1696,18 @@ class CameraXCaptureAdapter(
 
                 val motionPhotoMaterialization = materializeMotionPhotoBundleIfPossible(
                     bundle = livePhotoBundle,
-                    motionSourceResult = motionSourceResult
-                ) {
+                    motionSourceResult = motionSourceResult,
+                    prepareMotionSegment = { frames, motionPath ->
+                        (frameSource as? com.opencamera.app.camera.live.MotionSegmentFrameSource)
+                            ?.materializeMotionSegment(frames, motionPath)
+                            ?: Result.failure(
+                                IllegalStateException("Motion segment source is not available")
+                            )
+                    }
+                ) { motionPath ->
                     com.opencamera.app.camera.live.MotionPhotoFileMaterializer().materialize(
                         stillPath = result.outputPath,
-                        motionPath = livePhotoBundle.motionPath,
+                        motionPath = motionPath,
                         outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
                         spec = com.opencamera.core.media.MotionPhotoContainerSpec(
                             motionLengthBytes = 0

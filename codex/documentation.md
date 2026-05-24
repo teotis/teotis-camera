@@ -46,7 +46,7 @@
 
 ## 当前验证基线
 
-- `cd OpenCamera && ./scripts/verify_stage_7_observability.sh`
+- `cd OpenCamera && rtk ./scripts/verify_stage_7_observability.sh`
 - 该脚本当前覆盖：
   `DefaultCameraSessionTest`
   `SessionDiagnosticsTest`
@@ -58,6 +58,14 @@
   `CameraSessionCoordinatorTest`
   `:app:assembleDebug`
 - 本轮通过：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:media:test --tests com.opencamera.core.media.FrameRingBufferTest --tests com.opencamera.core.media.MotionPhotoJpegContainerTest --tests com.opencamera.core.media.LiveTemporalAssemblyPlannerTest :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest --tests com.opencamera.app.camera.live.MotionPhotoFileMaterializerTest`
+  `rtk ./gradlew --no-daemon :core:media:test --tests com.opencamera.core.media.ShotExecutorTest`
+  `rtk ./gradlew --no-daemon :core:device:test --tests com.opencamera.core.device.DefaultDeviceShotRequestTranslatorTest`
+  `rtk ./gradlew --no-daemon :core:session:test --tests "com.opencamera.core.session.DefaultCameraSessionTest.live photo completion stores bundle and uses live saved action" --tests "com.opencamera.core.session.DefaultCameraSessionTest.live photo completion with still-only fallback does not store bundle" --tests "com.opencamera.core.session.DefaultCameraSessionTest.live photo completion with degraded motion still stores bundle" --tests "com.opencamera.core.session.DefaultCameraSessionTest.portrait mode uses live photo shot kind when live default is enabled" --tests "com.opencamera.core.session.DefaultCameraSessionTest.humanistic mode uses live photo shot kind when live default is enabled"`
+  `rtk ./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
+  `rtk ./gradlew --no-daemon :app:assembleDebug`
   `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
   `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest`
   `./gradlew --no-daemon :app:assembleDebug`
@@ -68,6 +76,7 @@
 
 ## 当前遗留风险
 
+- Live / Google Motion Photo 本地代码闭环已从 metadata-only 推进到 `ImageAnalysis` YUV payload 缓冲、预览帧 MP4 motion segment 编码、Google Motion Photo JPEG container 物化和诚实降级诊断；但 Android `MediaCodec/MediaMuxer` 编码质量、设备兼容性、文件是否能被 Google Photos/系统相册识别为 Motion Photo，仍需要真机 smoke 采证后才能判为产品级 pass。
 - 点击预览对焦/自动 EV 的 session/device/coordinator/UI feedback 链路已经存在，但 `CameraXCaptureAdapter` 的 `DeviceCommand.ApplyPreviewMetering` 分支仍是 `UNSUPPORTED` stub，尚未真正调用 CameraX `FocusMeteringAction`；已补充可转交 agent 的修复方案与反 stub 验证方案，落地前不应再把该能力判为真实完成。
 - `CameraXCaptureAdapter` 已能输出 `bind/provider heuristic + CameraState` runtime issue，并在 `provider/fatal` issue 上清理缓存 provider；但 `ProcessCameraProvider` 真正 provider death 仍没有平台级强信号，当前 `provider failure` 里依然包含基于异常文案的保守分类。
 - 第 `7` 阶段的 `recovery failure`、`切变焦`、`thermal`、`后台恢复` 与 `preview startup stall` 仓内 owner 已建立，但 `provider death` 真信号与更长时间维度的真机矩阵仍缺少可信来源，继续硬推容易只剩 contract。
@@ -78,7 +87,7 @@
 
 - `2026-05-24` 多种水印（纯文字、模糊四边框及既有模板扩展）已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-multi-watermark-design-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-multi-watermark-design-index.md) 将工作拆成设置契约、渲染管线、UI 预览与验证三份文档。核心口径是模板选择和样式仍由 `core:settings`/`EffectSpec` 承接，最终 JPEG 像素只在 `PhotoWatermarkPostProcessor` 中渲染；纯文字不画底卡，模糊四边框必须在保存图四边显示源图模糊边框，并通过设置能力过滤避免无效控件。本轮只新增方案文档，不改运行时代码；最终美观验收需由多模态 owner 对保存 JPEG、缩略图和窄屏设置页做视觉复验。
 - `2026-05-24` 拍照/录像模式 `快捷` 中画质/分辨率切换能力已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-quick-quality-resolution-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-quick-quality-resolution-index.md) 将工作拆为拍照快捷画质/像素、录像快捷组合规格和验证门禁三份文档；拍照侧要求复用既有 `StillCaptureQualityToggled / StillCaptureResolutionToggled` session owner，录像侧要求把 quick quality 改为能力过滤后的 `VideoSpec(resolution, fps)` 组合项，例如 `4K30 / 1080p60`，不再把 fps 做成独立快捷项。本轮只做方案交接，不改运行时代码；精确 Apple/vivo 视觉对齐登记为后续多模态 QA。
-- `2026-05-24` 拍照模式 Live / Google Motion Photo 能力已归纳为 1 个总索引和 3 个可交给非多模态 agent 的实施方案：[`2026-05-24-live-motion-photo-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-index.md)、[`2026-05-24-live-motion-photo-preview-ring-buffer.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-preview-ring-buffer.md)、[`2026-05-24-live-motion-photo-google-container.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-google-container.md)、[`2026-05-24-live-motion-photo-session-integration.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-session-integration.md)。本轮只设计交接，不改运行时代码；方案明确先用预览低分辨率 ring buffer 作为 motion segment 来源，再写 Google Motion Photo JPEG container，最后接回 session/media/product 语义。该工作属于 feature / capability-kernel 增强，不是第 `7` 阶段 exit 必要项，落地前需要用户明确授权回 feature 侧。
+- `2026-05-24` 拍照模式 Live / Google Motion Photo 已完成本地实现核查与补强：当前仓内有预览低分辨率 YUV ring buffer、MP4 motion segment encoder、Google Motion Photo JPEG container writer、sidecar 和 session bundle 语义；后续最高价值不是继续写 contract，而是真机 smoke：拍一张 Live Photo，确认输出 JPEG 含 appended MP4/XMP，系统相册或 Google Photos 能识别动态效果，并记录失败设备型号与 diagnostics notes。
 - `2026-05-24` 视频模式真机反馈已归纳为 1 个总索引和 2 个可交给非多模态 agent 的实施方案：[`2026-05-24-video-mode-real-device-feedback-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-mode-real-device-feedback-index.md)、[`2026-05-24-video-thumbnail-and-gallery-preload.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-thumbnail-and-gallery-preload.md)、[`2026-05-24-video-recording-elapsed-time.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-recording-elapsed-time.md)。本轮只设计交接，不改运行时代码；视频缩略图方案限定在 saved media 查询、视频首帧 materialize 和 gallery MIME 语义，录像时间方案限定在 session-owned elapsed presentation。视频滤镜/水印烧录、转码、内置播放器和长录稳定性阈值登记为非本轮范围。
 - `2026-05-24` 拍照模式新增产品需求已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-photo-low-light-brightness-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-photo-low-light-brightness-index.md) 将工作拆为低光/夜景 assist、快捷亮度调节和联合验证三份文档。核心口径是低光策略保持 `PHOTO` 模式内的 session-owned adaptive capture，不自动切到 `NIGHT/Scenery`；快捷亮度走 session/device preview EV，不把 Color Lab 的后处理亮度当作实时曝光；图标精修、阈值调参和真机画质判断登记为后续多模态/真机 QA。
 - 第 `7` 阶段若继续推进，最高优先级已切到 `provider death / provider restart 真信号` 这类更依赖平台和真机信号的项；当前仓内结构已允许继续挂接，但缺少可信验证来源。
@@ -116,6 +125,30 @@
 ---
 
 # 最近有效闭环
+
+## 2026-05-24：Live / Google Motion Photo 外部落地核验与本地闭环补强
+
+- 目标：核查外部 agent 对拍照模式实况能力的落地是否满足“预览流作为短视频部分 + Google Motion Photo 格式”需求；若发现问题则就地修复。
+- 核心判断：
+  外部实现已补上 `CameraXLivePreviewFrameSource` 注入、`ImageAnalysis` 预览帧接入、ring buffer 选择、sidecar 物化和 Google Motion Photo JPEG container writer 测试，比原先硬编码 `METADATA_ONLY` 有实质推进；
+  但初版预览帧源仍是 metadata descriptor，缺少 preview frames -> MP4 motion segment 编码器，`captureLivePhoto()` 传给 `MotionPhotoFileMaterializer` 的 `.live.mp4` 实际不会被创建；
+  原实现会在选到预览帧但 materializer 失败时仍追加 `motion-photo:container=google-jpeg` 诊断，造成“Google Motion Photo 已成功”的假阳性。
+- 核心结果：
+  [`CameraXLivePreviewFrameSource.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/live/CameraXLivePreviewFrameSource.kt) 现会从 `ImageProxy` 复制 YUV payload，以 `FramePayloadAccess.CPU_YUV` descriptor 进入 ring buffer，并可按选中帧集合物化 motion segment；
+  [`PreviewMotionSegmentEncoder.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/live/PreviewMotionSegmentEncoder.kt) 新增 Android `MediaCodec + MediaMuxer` H.264/MP4 encoder，把有界预览 YUV 帧编码为 `.live.mp4`；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `materializeMotionPhotoBundleIfPossible(...)`，只有 materializer 真成功时才把 bundle 指向单文件 Motion Photo 并追加 `motion-photo:container=google-jpeg`；
+  `captureLivePhoto()` 现会先调用 `MotionSegmentFrameSource.materializeMotionSegment(...)` 生成 motionPath，再交给 `MotionPhotoFileMaterializer` 写 Google Motion Photo 容器；
+  materializer 失败时 bundle 改为 `STILL_ONLY_FALLBACK`，诊断追加 `motion-photo:container=failed:<reason>`，避免上层和后续 agent 误判；
+  [`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 新增 motion segment 准备、materializer 成功/失败路径测试，锁住“不宣称 google container 成功”的行为；
+  [`LivePreviewFrameSourceTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/live/LivePreviewFrameSourceTest.kt) 新增 fake encoder 测试，锁定选中 YUV payload 能交给 motion segment encoder；
+  [`verify_stage_6b7_live_photo.sh`](/Volumes/Extreme_SSD/project/codex_camera/scripts/verify_stage_6b7_live_photo.sh) 内部 Gradle 调用已改为 `rtk ./gradlew`，符合当前仓库命令规则。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest` 已通过；
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:media:test --tests com.opencamera.core.media.FrameRingBufferTest --tests com.opencamera.core.media.MotionPhotoJpegContainerTest --tests com.opencamera.core.media.LiveTemporalAssemblyPlannerTest :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest --tests com.opencamera.app.camera.live.MotionPhotoFileMaterializerTest` 已通过；
+  `rtk ./gradlew --no-daemon :core:media:test --tests com.opencamera.core.media.ShotExecutorTest`、`rtk ./gradlew --no-daemon :core:device:test --tests com.opencamera.core.device.DefaultDeviceShotRequestTranslatorTest`、Live Photo 相关 `DefaultCameraSessionTest` 子集、`rtk ./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`、`rtk ./gradlew --no-daemon :app:assembleDebug` 均已通过；
+  `rtk ./scripts/verify_stage_6b7_live_photo.sh` 在 sandbox 中启动时因 Gradle wrapper 访问 `~/.gradle/.../gradle-8.7-bin.zip.lck` 被拒绝，未作为失败判断；同等子命令已逐条验证。
+- 结论：
+  当前需求在本地代码/单元/编译层面已可判为 pass：预览流会作为短视频来源，生成 `.live.mp4` 后写入 Google Motion Photo JPEG container；产品级 pass 仍需要真机 smoke 证明 `MediaCodec/MediaMuxer` 输出和 Google Motion Photo XMP/appended MP4 能被目标相册识别。
 
 ## 2026-05-24：多种水印与模糊四边框方案文档
 
