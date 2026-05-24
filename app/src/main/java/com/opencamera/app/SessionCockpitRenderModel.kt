@@ -2,6 +2,7 @@ package com.opencamera.app
 
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.quickLabel
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.device.normalizedZoomRatioValue
@@ -240,6 +241,17 @@ internal fun frameRatioControlRenderModel(state: SessionState, text: AppTextReso
     )
 }
 
+private fun videoQualityQuickLabel(state: SessionState): String {
+    val requested = state.activeDeviceGraph.recording.requestedVideoSpec
+    val applied = state.activeDeviceGraph.recording.videoSpec
+    val appliedLabel = "${applied.resolution.quickLabel}${applied.frameRate.fps}"
+    return if (requested.resolution == applied.resolution && requested.frameRate == applied.frameRate) {
+        appliedLabel
+    } else {
+        "$appliedLabel*"
+    }
+}
+
 internal fun quickPanelSheetRenderModel(
     state: SessionState,
     text: AppTextResolver,
@@ -253,9 +265,17 @@ internal fun quickPanelSheetRenderModel(
     val brightnessControl = brightnessRenderModel(state, text)
 
     val stillTemplate = state.activeDeviceGraph.template == CaptureTemplate.STILL_CAPTURE
+    val videoTemplate = state.activeDeviceGraph.template == CaptureTemplate.VIDEO_RECORDING
     val stillBusy = state.activeShot != null || state.countdownRemainingSeconds != null
-    val qualityEnabled = stillTemplate && !stillBusy && state.activeDeviceCapabilities.supportsStillCapture
-    val resolutionEnabled = qualityEnabled && isStillResolutionToggleEnabled(state)
+    val stillQualityEnabled = stillTemplate && !stillBusy && state.activeDeviceCapabilities.supportsStillCapture
+    val videoQualityEnabled = videoTemplate && state.recordingStatus == RecordingStatus.IDLE
+    val qualityEnabled = stillQualityEnabled || videoQualityEnabled
+    val qualityValue = if (videoTemplate) {
+        videoQualityQuickLabel(state)
+    } else {
+        stillQualityQuickLabel(state, strings)
+    }
+    val resolutionEnabled = stillQualityEnabled && isStillResolutionToggleEnabled(state)
 
     return QuickPanelSheetRenderModel(
         gridRow = QuickPanelRowRenderModel(
@@ -265,7 +285,7 @@ internal fun quickPanelSheetRenderModel(
         ),
         qualityRow = QuickPanelRowRenderModel(
             title = text.quickQuality(),
-            value = stillQualityQuickLabel(state, strings),
+            value = qualityValue,
             isEnabled = qualityEnabled
         ),
         resolutionRow = QuickPanelRowRenderModel(

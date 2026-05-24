@@ -9,6 +9,7 @@ import com.opencamera.core.settings.VideoSpecConstraints
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class VideoSpecSelectionTest {
@@ -125,5 +126,66 @@ class VideoSpecSelectionTest {
 
         assertEquals(VideoFrameRate.FPS_24, runtimeSpec.frameRate)
         assertEquals(DynamicVideoFpsPolicy.LOW_LIGHT_AUTO_24FPS, runtimeSpec.dynamicFpsPolicy)
+    }
+
+    @Test
+    fun `quick video specs expose only supported combined options`() {
+        val constraints = VideoSpecConstraints(
+            supportedFrameRatesByResolution = linkedMapOf(
+                VideoResolution.UHD_4K to setOf(VideoFrameRate.FPS_30),
+                VideoResolution.FHD_1080P to setOf(VideoFrameRate.FPS_30, VideoFrameRate.FPS_60)
+            )
+        )
+
+        assertEquals(
+            listOf("4K30", "1080p60", "1080p30"),
+            constraints.quickVideoSpecOptions().map { it.label }
+        )
+    }
+
+    @Test
+    fun `next quick video spec changes resolution and fps together`() {
+        val constraints = VideoSpecConstraints(
+            supportedFrameRatesByResolution = linkedMapOf(
+                VideoResolution.UHD_4K to setOf(VideoFrameRate.FPS_30),
+                VideoResolution.FHD_1080P to setOf(VideoFrameRate.FPS_60)
+            )
+        )
+
+        val next = constraints.nextQuickVideoSpec(
+            current = VideoSpec(
+                resolution = VideoResolution.UHD_4K,
+                frameRate = VideoFrameRate.FPS_30,
+                dynamicFpsPolicy = DynamicVideoFpsPolicy.LOW_LIGHT_AUTO_24FPS,
+                audioProfile = AudioProfile.CONCERT
+            )
+        )
+
+        assertNotNull(next)
+        assertEquals(VideoResolution.FHD_1080P, next.resolution)
+        assertEquals(VideoFrameRate.FPS_60, next.frameRate)
+        assertEquals(DynamicVideoFpsPolicy.LOW_LIGHT_AUTO_24FPS, next.dynamicFpsPolicy)
+        assertEquals(AudioProfile.CONCERT, next.audioProfile)
+    }
+
+    @Test
+    fun `next quick video spec wraps around to first option`() {
+        val constraints = VideoSpecConstraints(
+            supportedFrameRatesByResolution = linkedMapOf(
+                VideoResolution.UHD_4K to setOf(VideoFrameRate.FPS_30),
+                VideoResolution.FHD_1080P to setOf(VideoFrameRate.FPS_60)
+            )
+        )
+
+        val next = constraints.nextQuickVideoSpec(
+            current = VideoSpec(
+                resolution = VideoResolution.FHD_1080P,
+                frameRate = VideoFrameRate.FPS_60
+            )
+        )
+
+        assertNotNull(next)
+        assertEquals(VideoResolution.UHD_4K, next.resolution)
+        assertEquals(VideoFrameRate.FPS_30, next.frameRate)
     }
 }

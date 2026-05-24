@@ -6,6 +6,7 @@ import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.nextQuickVideoSpec
 import com.opencamera.core.device.quickLabel
 import com.opencamera.core.device.resolveVideoSpec
+import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect

@@ -108,7 +108,12 @@ internal class MainActivityActionBinder(
             callbacks.applySettingsControl(snapshot().settingsPage?.commonSection?.gridMode)
         }
         views.quickPanel.flash.setOnClickListener {
-            callbacks.dispatch(SessionIntent.StillCaptureQualityToggled)
+            val mode = snapshot().sessionState?.activeMode
+            if (mode == ModeId.VIDEO) {
+                callbacks.dispatch(SessionIntent.TertiaryActionPressed)
+            } else {
+                callbacks.dispatch(SessionIntent.StillCaptureQualityToggled)
+            }
         }
         views.quickPanel.resolution.setOnClickListener {
             callbacks.dispatch(SessionIntent.StillCaptureResolutionToggled)

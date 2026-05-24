@@ -562,6 +562,66 @@ class SessionCockpitRenderModelTest {
         assertEquals("Camera permission required", reason)
     }
 
+    @Test
+    fun `quick quality row shows combined video spec in video mode`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            activeDeviceGraph = DeviceGraphSpec.videoRecording(
+                requestedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.FHD_1080P,
+                    frameRate = VideoFrameRate.FPS_60
+                ),
+                resolvedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.FHD_1080P,
+                    frameRate = VideoFrameRate.FPS_60
+                )
+            )
+        )
+
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("1080p60", sheet.qualityRow.value)
+        assertTrue(sheet.qualityRow.isEnabled)
+    }
+
+    @Test
+    fun `quick quality row shows degraded video spec with asterisk`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            activeDeviceGraph = DeviceGraphSpec.videoRecording(
+                requestedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.UHD_4K,
+                    frameRate = VideoFrameRate.FPS_60
+                ),
+                resolvedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.UHD_4K,
+                    frameRate = VideoFrameRate.FPS_30
+                )
+            )
+        )
+
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("4K30*", sheet.qualityRow.value)
+    }
+
+    @Test
+    fun `quick quality row disabled during video recording`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            activeDeviceGraph = DeviceGraphSpec.videoRecording(
+                requestedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.FHD_1080P,
+                    frameRate = VideoFrameRate.FPS_30
+                )
+            )
+        ).copy(recordingStatus = RecordingStatus.RECORDING)
+
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.qualityRow.isEnabled)
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",
