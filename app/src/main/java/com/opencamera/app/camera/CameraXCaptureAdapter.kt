@@ -107,6 +107,7 @@ import com.opencamera.core.media.ShotTiming
 import com.opencamera.core.media.primaryStillNode
 import com.opencamera.core.media.primaryVideoNode
 import com.opencamera.core.media.temporaryFrameNode
+import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
@@ -1631,9 +1632,37 @@ class CameraXCaptureAdapter(
                     bundleStatus = temporalPlan.expectedBundleStatus,
                     temporalWindow = temporalPlan.temporalWindow
                 )
+
+                // If we have real frames, try to create Google Motion Photo
+                val finalBundle = if (motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
+                    motionSourceResult.selectedFrameSet.frames.isNotEmpty()
+                ) {
+                    val materializer = com.opencamera.app.camera.live.MotionPhotoFileMaterializer()
+                    val motionPhotoResult = materializer.materialize(
+                        stillPath = result.outputPath,
+                        motionPath = livePhotoBundle.motionPath,
+                        outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
+                        spec = com.opencamera.core.media.MotionPhotoContainerSpec(
+                            motionLengthBytes = 0 // Will be calculated by materializer
+                        ),
+                        cleanupTempMotion = false
+                    )
+                    if (motionPhotoResult.isSuccess) {
+                        livePhotoBundle.copy(
+                            stillPath = motionPhotoResult.getOrDefault(livePhotoBundle.stillPath)
+                        )
+                    } else {
+                        livePhotoBundle.copy(
+                            bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK
+                        )
+                    }
+                } else {
+                    livePhotoBundle
+                }
+
                 val sidecarResult = runCatching {
                     materializeLivePhotoSidecar(
-                        bundle = livePhotoBundle,
+                        bundle = finalBundle,
                         writeContentUriPayload = ::writeTextToContentUri
                     )
                 }
@@ -1641,9 +1670,14 @@ class CameraXCaptureAdapter(
                 val diagnosisBuilder = buildList {
                     add("device:live-photo=bundle")
                     addAll(motionSourceResult.diagnostics)
+                    if (motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
+                        motionSourceResult.selectedFrameSet.frames.isNotEmpty()
+                    ) {
+                        add("motion-photo:container=google-jpeg")
+                    }
                     if (sidecarResult.isSuccess) {
                         add(
-                            if (File(livePhotoBundle.sidecarPath).isAbsolute) {
+                            if (File(finalBundle.sidecarPath).isAbsolute) {
                                 "device:live-sidecar=materialized"
                             } else {
                                 "device:live-sidecar=planned"
@@ -1653,7 +1687,7 @@ class CameraXCaptureAdapter(
                         val sidecarError = sidecarResult.exceptionOrNull()?.message ?: "unknown"
                         add("device:live-sidecar=failed:$sidecarError")
                         add("device:live-photo=still-only-fallback")
-                        livePhotoBundle.sidecarHandle.contentUri?.let { deleteContentUriQuietly(it) }
+                        finalBundle.sidecarHandle.contentUri?.let { deleteContentUriQuietly(it) }
                     }
                 }
 
@@ -1661,7 +1695,7 @@ class CameraXCaptureAdapter(
                 // Return Success with livePhotoBundle = null so consumers
                 // treat it as a regular still photo, not a live photo.
                 result.copy(
-                    livePhotoBundle = if (sidecarResult.isSuccess) livePhotoBundle else null,
+                    livePhotoBundle = if (sidecarResult.isSuccess) finalBundle else null,
                     diagnostics = result.diagnostics + diagnosisBuilder
                 )
             }
