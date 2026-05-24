@@ -505,6 +505,47 @@ internal fun resolveLiveMotionSource(
     }
 }
 
+data class LiveMotionPhotoMaterializationResult(
+    val bundle: LivePhotoBundle,
+    val diagnostics: List<String>
+)
+
+internal fun materializeMotionPhotoBundleIfPossible(
+    bundle: LivePhotoBundle,
+    motionSourceResult: LiveMotionSourceResult,
+    materialize: () -> Result<String>
+): LiveMotionPhotoMaterializationResult {
+    val hasSelectedFrames = motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
+        motionSourceResult.selectedFrameSet.frames.isNotEmpty()
+    if (!hasSelectedFrames) {
+        return LiveMotionPhotoMaterializationResult(
+            bundle = bundle,
+            diagnostics = emptyList()
+        )
+    }
+
+    val motionPhotoResult = materialize()
+    return if (motionPhotoResult.isSuccess) {
+        val outputPath = motionPhotoResult.getOrDefault(bundle.stillPath)
+        LiveMotionPhotoMaterializationResult(
+            bundle = bundle.copy(
+                stillPath = outputPath,
+                thumbnailPath = outputPath,
+                thumbnailHandle = MediaOutputHandle(displayPath = outputPath)
+            ),
+            diagnostics = listOf("motion-photo:container=google-jpeg")
+        )
+    } else {
+        val reason = motionPhotoResult.exceptionOrNull()?.message ?: "unknown"
+        LiveMotionPhotoMaterializationResult(
+            bundle = bundle.copy(
+                bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK
+            ),
+            diagnostics = listOf("motion-photo:container=failed:$reason")
+        )
+    }
+}
+
 internal fun buildLivePhotoSidecarPayload(
     bundle: LivePhotoBundle
 ): String {
@@ -1633,32 +1674,21 @@ class CameraXCaptureAdapter(
                     temporalWindow = temporalPlan.temporalWindow
                 )
 
-                // If we have real frames, try to create Google Motion Photo
-                val finalBundle = if (motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
-                    motionSourceResult.selectedFrameSet.frames.isNotEmpty()
+                val motionPhotoMaterialization = materializeMotionPhotoBundleIfPossible(
+                    bundle = livePhotoBundle,
+                    motionSourceResult = motionSourceResult
                 ) {
-                    val materializer = com.opencamera.app.camera.live.MotionPhotoFileMaterializer()
-                    val motionPhotoResult = materializer.materialize(
+                    com.opencamera.app.camera.live.MotionPhotoFileMaterializer().materialize(
                         stillPath = result.outputPath,
                         motionPath = livePhotoBundle.motionPath,
                         outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
                         spec = com.opencamera.core.media.MotionPhotoContainerSpec(
-                            motionLengthBytes = 0 // Will be calculated by materializer
+                            motionLengthBytes = 0
                         ),
                         cleanupTempMotion = false
                     )
-                    if (motionPhotoResult.isSuccess) {
-                        livePhotoBundle.copy(
-                            stillPath = motionPhotoResult.getOrDefault(livePhotoBundle.stillPath)
-                        )
-                    } else {
-                        livePhotoBundle.copy(
-                            bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK
-                        )
-                    }
-                } else {
-                    livePhotoBundle
                 }
+                val finalBundle = motionPhotoMaterialization.bundle
 
                 val sidecarResult = runCatching {
                     materializeLivePhotoSidecar(
@@ -1670,11 +1700,7 @@ class CameraXCaptureAdapter(
                 val diagnosisBuilder = buildList {
                     add("device:live-photo=bundle")
                     addAll(motionSourceResult.diagnostics)
-                    if (motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
-                        motionSourceResult.selectedFrameSet.frames.isNotEmpty()
-                    ) {
-                        add("motion-photo:container=google-jpeg")
-                    }
+                    addAll(motionPhotoMaterialization.diagnostics)
                     if (sidecarResult.isSuccess) {
                         add(
                             if (File(finalBundle.sidecarPath).isAbsolute) {

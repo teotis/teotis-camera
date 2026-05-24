@@ -217,14 +217,14 @@ internal class AndroidPhotoWatermarkEditor(
                 originalWidth = originalWidth,
                 originalHeight = originalHeight
             )
-            if (archiveBytes != null) {
-                if (!writeEncodedBytes(target, archiveBytes)) {
-                    return@withContext ProcessorEditorResult.Failed("archive-write-failed")
-                }
+            val archiveWriteWarning = if (archiveBytes != null && !writeEncodedBytes(target, archiveBytes)) {
+                "archive-write-failed"
+            } else {
+                null
             }
 
             PhotoWatermarkApplied(
-                warning = mergeWarnings(renderResult.warning, exifWarning, archiveWarning)
+                warning = mergeWarnings(renderResult.warning, exifWarning, archiveWarning, archiveWriteWarning)
             )
         } catch (_: Throwable) {
             ProcessorEditorResult.Failed("render-exception")
@@ -324,9 +324,10 @@ internal class AndroidPhotoWatermarkEditor(
     private fun mergeWarnings(
         templateWarning: String?,
         exifWarning: String?,
-        archiveWarning: String? = null
+        archiveWarning: String? = null,
+        archiveWriteWarning: String? = null
     ): String? {
-        return listOfNotNull(templateWarning, exifWarning, archiveWarning)
+        return listOfNotNull(templateWarning, exifWarning, archiveWarning, archiveWriteWarning)
             .takeIf { warnings -> warnings.isNotEmpty() }
             ?.joinToString(separator = ",")
     }
@@ -1139,4 +1140,3 @@ private fun formatCameraParams(exif: Map<String, String>): String? {
     }
     return params.takeIf { it.isNotEmpty() }?.joinToString(separator = " • ")
 }
-

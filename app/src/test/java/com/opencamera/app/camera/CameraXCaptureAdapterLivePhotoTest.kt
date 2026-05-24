@@ -500,6 +500,44 @@ class CameraXCaptureAdapterLivePhotoTest {
         assertTrue(result.selectedFrameSet.frames.isEmpty())
     }
 
+    @Test
+    fun `motion photo materialization failure does not claim google container success`() {
+        val shutterNanos = 2_000_000_000L
+        val motionSource = LiveMotionSourceResult(
+            source = LiveMotionSource.PREVIEW_RING_BUFFER,
+            selectedFrameSet = SelectedFrameSet(
+                frames = listOf(makeDescriptor("f1", timestampNanos = shutterNanos)),
+                preShutterCount = 1,
+                postShutterCount = 0,
+                coveredPreShutterMillis = 0,
+                coveredPostShutterMillis = 0,
+                diagnostics = listOf("frame-buffer:selected=1")
+            ),
+            ringBufferDepthMillis = 1_500,
+            postShutterBudgetMillis = 300,
+            diagnostics = listOf("live:source=preview-ring-buffer")
+        )
+        val bundle = LivePhotoBundle(
+            stillPath = "/tmp/capture.jpg",
+            motionPath = "/tmp/missing.live.mp4",
+            sidecarPath = "/tmp/capture.live.json",
+            motionDurationMillis = 1_500,
+            motionMimeType = "video/mp4",
+            sidecarMimeType = "application/vnd.opencamera.live+json",
+            bundleStatus = LiveBundleStatus.COMPLETE
+        )
+
+        val result = materializeMotionPhotoBundleIfPossible(
+            bundle = bundle,
+            motionSourceResult = motionSource,
+            materialize = { Result.failure(IllegalArgumentException("Motion file does not exist")) }
+        )
+
+        assertEquals(LiveBundleStatus.STILL_ONLY_FALLBACK, result.bundle.bundleStatus)
+        assertFalse(result.diagnostics.contains("motion-photo:container=google-jpeg"))
+        assertTrue(result.diagnostics.any { it.startsWith("motion-photo:container=failed:") })
+    }
+
     private fun makeDescriptor(
         frameId: String,
         timestampNanos: Long,
