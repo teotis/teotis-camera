@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var selectedDevLogTab = DevLogTab.KEY
     private var latestDevLogRenderModel: DevLogRenderModel? = null
     private lateinit var devLogExporter: DevLogExporter
+    private var latestQuickPanelSheetRenderModel: QuickPanelSheetRenderModel? = null
     private var latestSettingsPageRenderModel: SessionSettingsPageRenderModel? = null
     private var latestPortraitLabRenderModel: PortraitLabPageRenderModel? = null
     private var latestWatermarkLabSelectorRenderModel: WatermarkLabSelectorRenderModel? = null
@@ -172,9 +173,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             views.bottomCockpit.shutter,
             views.bottomCockpit.lensFacing,
             // Quick panel text-bearing buttons
-            views.quickPanel.frame43,
-            views.quickPanel.frame169,
-            views.quickPanel.frame11,
+            views.quickPanel.frameRatio,
             views.settingsPanel.gridMode
         ).forEach { it.rotation = degrees }
         cockpitRenderer.controlRotationDegrees = degrees
@@ -281,20 +280,21 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         settingsRenderer.renderWatermarkDetailPage(watermarkDetailPage)
         filterLabRenderer.renderPage(filterLabPage)
         mainRenderer.renderPanelVisibility(activePanelRoute)
-        views.preview.overlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter))
+        views.preview.overlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter, container.previewMaskSnapshot))
         views.preview.overlayView.updateFocusReticle(
             state.presentation.previewMeteringFeedback?.let { focusReticleRenderModel(it) }
         )
         cockpitRenderer.renderPreviewMirror(state)
         maybePlayShutterSound(state)
 
-        cockpitRenderer.renderShutter(state, controls, captureDisabledReason(state, text) == null)
+        cockpitRenderer.renderShutter(state, controls, shutterDisabledReason(state, text) == null)
         cockpitRenderer.renderRecordingIndicator(
             recordingIndicatorRenderModel(state, text)
         )
         cockpitRenderer.renderCaptureOutput(sessionCaptureOutputText(state, sessionUiStrings()))
         cockpitRenderer.renderZoomCapsules(controls)
         val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
+        latestQuickPanelSheetRenderModel = sheet
         cockpitRenderer.renderQuickBubble(settingsPage, sheet)
         cockpitRenderer.renderLowLightNightPrompt(lowLightNightPromptRenderModel(state, text))
         mainRenderer.renderDevEntryVisibility(com.opencamera.app.BuildConfig.DEBUG)
@@ -421,6 +421,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             activePanelRoute = activePanelRoute,
             isFilterAdjustmentVisible = panelState.isFilterAdjustmentVisible,
             settingsPage = latestSettingsPageRenderModel,
+            quickPanelSheet = latestQuickPanelSheetRenderModel,
             portraitLabPage = latestPortraitLabRenderModel,
             watermarkDetailPage = latestWatermarkLabDetailRenderModel,
             filterLabPage = latestFilterLabRenderModel,

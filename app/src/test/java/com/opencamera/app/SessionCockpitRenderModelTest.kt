@@ -2,6 +2,8 @@ package com.opencamera.app
 
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ManualControlCapabilityMatrix
 import com.opencamera.core.device.ManualControlSupport
@@ -9,7 +11,8 @@ import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.CaptureProfile
-import com.opencamera.core.media.StillCaptureQualityPreference
+import com.opencamera.core.media.FrameRatio
+
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
@@ -69,7 +72,7 @@ class SessionCockpitRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
+
                 resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
@@ -87,7 +90,7 @@ class SessionCockpitRenderModelTest {
             activeDeviceGraph = DeviceGraphSpec.videoRecording(
                 preferredLensFacing = LensFacing.FRONT,
                 enablePreviewSnapshots = true,
-                stillResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
+                stillCaptureResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
             ),
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 availableLensFacings = setOf(LensFacing.FRONT)
@@ -210,48 +213,49 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `mode directory render model hides humanistic entry and uses product order`() {
+    fun `mode directory render model includes humanistic entry and uses product order`() {
         val state = defaultSessionState(
-            activeMode = ModeId.NIGHT,
+            activeMode = ModeId.HUMANISTIC,
             availableModes = listOf(
-                ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
-                ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+                ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
+                ModeId.VIDEO
             ),
             modeSnapshot = ModeSnapshot(
-                id = ModeId.NIGHT,
-                uiSpec = ModeUiSpec(title = "Scenery", shutterLabel = "Capture Scenery"),
-                state = ModeState(headline = "Scenery mode active", detail = "Tripod multi-frame available")
+                id = ModeId.HUMANISTIC,
+                uiSpec = ModeUiSpec(title = "Humanistic", shutterLabel = "Capture Humanistic"),
+                state = ModeState(headline = "Humanistic mode active", detail = "Street-life quick capture ready")
             )
         )
 
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Scenery", "Port", "Pro", "Video", "Doc"),
+            listOf("Photo", "Humanistic", "Video", "Doc"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
         )
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
-        assertEquals("Balanced", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
+        assertEquals("街头 Street", model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel)
     }
 
     @Test
-    fun `mode directory render model degrades scenery and portrait features with capability fallback`() {
+    fun `mode directory render model shows humanistic with street-life subfeatures`() {
         val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                supportsPortraitDepthEffect = false,
-                supportsNightMultiFrame = false
-            ),
-            availableModes = listOf(ModeId.NIGHT, ModeId.PORTRAIT)
+            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO)
         )
 
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
-        assertEquals("Balanced", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
-        assertEquals("Portrait Original", model.items.first { it.modeId == ModeId.PORTRAIT }.defaultStyleLabel)
+        assertEquals(3, model.items.size)
+        assertEquals(
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO),
+            model.items.map(ModeDirectoryItemRenderModel::modeId)
+        )
+        assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
+        assertEquals("街头 Street", model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel)
     }
 
     @Test
@@ -320,30 +324,28 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `mode track render model hides humanistic entry and uses product order`() {
+    fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
-            ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC, ModeId.VIDEO
         )
         val state = defaultSessionState(activeMode = ModeId.HUMANISTIC, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(6, model.items.size)
+        assertEquals(4, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map { it.modeId }
         )
-        assertTrue(model.items.none { it.modeId == ModeId.HUMANISTIC })
-        assertFalse(model.items.any { it.isActive })
+        assertTrue(model.items.any { it.modeId == ModeId.HUMANISTIC })
+        assertTrue(model.items.any { it.isActive })
     }
 
     @Test
     fun `mode track labels are short and stable`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
-            ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+            ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT
         )
-        val state = defaultSessionState(availableModes = availableModes)
+        val state = defaultSessionState(activeMode = ModeId.PHOTO, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
         model.items.forEach { item ->
@@ -357,12 +359,12 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `active mode track item has distinct visual state`() {
         val state = defaultSessionState(
-            activeMode = ModeId.NIGHT,
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
+            activeMode = ModeId.HUMANISTIC,
+            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO)
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        val active = model.items.first { it.modeId == ModeId.NIGHT }
+        val active = model.items.first { it.modeId == ModeId.HUMANISTIC }
         val inactive = model.items.first { it.modeId == ModeId.PHOTO }
 
         assertTrue(active.isActive)
@@ -388,13 +390,19 @@ class SessionCockpitRenderModelTest {
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
+
+        // Brightness row has slider fields
+        assertEquals("Brightness", sheet.brightnessRow.title)
+        assertTrue(sheet.brightnessRow.isVisible)
+        assertEquals(0, sheet.brightnessRow.steps)
+        assertTrue(sheet.brightnessRow.maxSteps >= sheet.brightnessRow.minSteps)
     }
 
     @Test
     fun `quick panel sheet exposes photo quality and resolution rows`() {
         val state = defaultSessionState(
             activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
+
                 resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
             )
         )
@@ -447,6 +455,7 @@ class SessionCockpitRenderModelTest {
         assertFalse(sheet.frameRatioEnabled)
         assertNotNull(sheet.frameRatioDisabledReason)
         assertTrue(sheet.frameRatioOptions.all { !it.isEnabled })
+        assertNull(sheet.frameRatioNext)
     }
 
     @Test
@@ -466,6 +475,29 @@ class SessionCockpitRenderModelTest {
 
         assertFalse(sheet.frameRatioEnabled)
         assertNotNull(sheet.frameRatioDisabledReason)
+        assertNull(sheet.frameRatioNext)
+    }
+
+    @Test
+    fun `frameRatioNext cycles 4_3 to 16_9 to 1_1 back to 4_3`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(FrameRatio.RATIO_16_9, sheet.frameRatioNext)
+
+        // Simulate 16:9 selected
+        val state169 = defaultSessionState().copy(
+            activeEffectSpec = EffectSpec(listOf(FrameEffect(FrameRatio.RATIO_16_9)))
+        )
+        val sheet169 = quickPanelSheetRenderModel(state169, TestAppTextResolver(), strings)
+        assertEquals(FrameRatio.RATIO_1_1, sheet169.frameRatioNext)
+
+        // Simulate 1:1 selected
+        val state11 = defaultSessionState().copy(
+            activeEffectSpec = EffectSpec(listOf(FrameEffect(FrameRatio.RATIO_1_1)))
+        )
+        val sheet11 = quickPanelSheetRenderModel(state11, TestAppTextResolver(), strings)
+        assertEquals(FrameRatio.RATIO_4_3, sheet11.frameRatioNext)
     }
 
     @Test
@@ -650,7 +682,7 @@ class SessionCockpitRenderModelTest {
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
             enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.LATENCY,
+
             resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
         ),
         previewStatus: PreviewStatus = PreviewStatus.ACTIVE,

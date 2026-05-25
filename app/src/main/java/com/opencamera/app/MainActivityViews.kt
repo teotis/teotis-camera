@@ -3,6 +3,7 @@ package com.opencamera.app
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -30,12 +31,9 @@ internal data class QuickPanelViews(
     val grid: Button,
     val flash: Button,
     val resolution: Button,
-    val brightnessMinus: Button,
-    val brightnessValue: Button,
-    val brightnessPlus: Button,
-    val frame43: Button,
-    val frame169: Button,
-    val frame11: Button,
+    val brightnessSlider: SeekBar,
+    val brightnessValueText: TextView,
+    val frameRatio: Button,
     val livePhoto: Button,
     val timer: Button,
     val launcher: Button
@@ -211,12 +209,9 @@ internal data class MainActivityViews(
                 grid = activity.findViewById(R.id.buttonQuickGrid),
                 flash = activity.findViewById(R.id.buttonQuickFlash),
                 resolution = activity.findViewById(R.id.buttonQuickResolution),
-                brightnessMinus = activity.findViewById(R.id.buttonBrightnessMinus),
-                brightnessValue = activity.findViewById(R.id.buttonBrightnessValue),
-                brightnessPlus = activity.findViewById(R.id.buttonBrightnessPlus),
-                frame43 = activity.findViewById(R.id.buttonFrameRatio43),
-                frame169 = activity.findViewById(R.id.buttonFrameRatio169),
-                frame11 = activity.findViewById(R.id.buttonFrameRatio11),
+                brightnessSlider = activity.findViewById(R.id.brightnessSlider),
+                brightnessValueText = activity.findViewById(R.id.brightnessValueText),
+                frameRatio = activity.findViewById(R.id.buttonQuickFrameRatio),
                 livePhoto = activity.findViewById(R.id.buttonQuickLivePhoto),
                 timer = activity.findViewById(R.id.buttonQuickTimer),
                 launcher = activity.findViewById(R.id.buttonQuickLauncher)

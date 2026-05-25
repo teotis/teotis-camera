@@ -17,7 +17,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:implementationMode="compatible"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -29,7 +29,7 @@
         android:layout_height="0dp"
         android:clickable="false"
         android:focusable="false"
-        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -218,7 +218,7 @@
                 android:layout_height="40dp"
                 android:layout_marginTop="4dp" />
 
-            <!-- Brightness row: minus / value / plus -->
+            <!-- Brightness row: label + SeekBar + value -->
             <LinearLayout
                 android:id="@+id/brightnessRow"
                 android:layout_width="match_parent"
@@ -230,101 +230,44 @@
                 android:background="@drawable/bg_panel_row">
 
                 <TextView
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:text="@string/button_quick_brightness"
                     android:textColor="#FFFFFF"
                     android:textSize="11sp"
                     android:gravity="start|center_vertical" />
 
-                <Button
-                    android:id="@+id/buttonBrightnessMinus"
-                    style="@style/Widget.OpenCamera.QuickBubbleButton"
-                    android:layout_width="36dp"
+                <SeekBar
+                    android:id="@+id/brightnessSlider"
+                    android:layout_width="0dp"
                     android:layout_height="32dp"
-                    android:text="@string/button_quick_brightness_minus"
-                    android:textSize="14sp" />
+                    android:layout_weight="1"
+                    android:paddingHorizontal="6dp" />
 
-                <Button
-                    android:id="@+id/buttonBrightnessValue"
-                    style="@style/Widget.OpenCamera.QuickBubbleButton"
+                <TextView
+                    android:id="@+id/brightnessValueText"
                     android:layout_width="44dp"
                     android:layout_height="32dp"
-                    android:layout_marginStart="4dp"
-                    android:text="0"
-                    android:textSize="12sp" />
-
-                <Button
-                    android:id="@+id/buttonBrightnessPlus"
-                    style="@style/Widget.OpenCamera.QuickBubbleButton"
-                    android:layout_width="36dp"
-                    android:layout_height="32dp"
-                    android:layout_marginStart="4dp"
-                    android:text="@string/button_quick_brightness_plus"
-                    android:textSize="14sp" />
+                    android:textSize="12sp"
+                    android:textColor="#FFFFFF"
+                    android:gravity="center" />
             </LinearLayout>
 
-            <!-- Frame ratio row: title + segmented chips -->
+            <!-- Frame ratio row: single cycle button -->
             <LinearLayout
                 android:id="@+id/frameRatioRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:orientation="vertical"
-                android:gravity="center_horizontal"
-                android:padding="6dp"
+                android:orientation="horizontal"
+                android:gravity="center"
                 android:background="@drawable/bg_panel_row">
 
-                <TextView
-                    android:id="@+id/frameRatioQuickTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/button_quick_ratio"
-                    android:textColor="#FFFFFF"
-                    android:textSize="11sp"
-                    android:gravity="center" />
-
-                <LinearLayout
-                    android:id="@+id/frameRatioOptionRow"
+                <Button
+                    android:id="@+id/buttonQuickFrameRatio"
+                    style="@style/Widget.OpenCamera.QuickBubbleButton"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:orientation="horizontal"
-                    android:gravity="center">
-
-                    <Button
-                        android:id="@+id/buttonFrameRatio43"
-                        style="@style/Widget.OpenCamera.QuickBubbleButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:paddingHorizontal="6dp"
-                        android:text="4:3"
-                        android:textSize="11sp" />
-
-                    <Button
-                        android:id="@+id/buttonFrameRatio169"
-                        style="@style/Widget.OpenCamera.QuickBubbleButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="4dp"
-                        android:paddingHorizontal="6dp"
-                        android:text="16:9"
-                        android:textSize="11sp" />
-
-                    <Button
-                        android:id="@+id/buttonFrameRatio11"
-                        style="@style/Widget.OpenCamera.QuickBubbleButton"
-                        android:layout_width="0dp"
-                        android:layout_height="40dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="4dp"
-                        android:paddingHorizontal="6dp"
-                        android:text="1:1"
-                        android:textSize="11sp" />
-                </LinearLayout>
+                    android:layout_height="40dp" />
             </LinearLayout>
 
             <!-- Live row -->
@@ -1552,6 +1495,7 @@
                     android:layout_width="@dimen/touch_target_shutter"
                     android:layout_height="@dimen/touch_target_shutter"
                     android:background="@drawable/bg_shutter_selector"
+                    app:backgroundTint="@null"
                     android:includeFontPadding="false"
                     android:insetLeft="0dp"
                     android:insetTop="0dp"

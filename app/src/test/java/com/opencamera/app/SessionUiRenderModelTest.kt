@@ -19,7 +19,7 @@ import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ThumbnailPolicy
-import com.opencamera.core.media.StillCaptureQualityPreference
+
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
@@ -85,7 +85,7 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
+
                 resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
@@ -103,7 +103,7 @@ class SessionUiRenderModelTest {
             activeDeviceGraph = DeviceGraphSpec.videoRecording(
                 preferredLensFacing = LensFacing.FRONT,
                 enablePreviewSnapshots = true,
-                stillResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
+                stillCaptureResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
             ),
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 availableLensFacings = setOf(LensFacing.FRONT)
@@ -232,7 +232,7 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.FRONT,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
+
                 resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
@@ -846,14 +846,14 @@ class SessionUiRenderModelTest {
 
         assertTrue(model.humanisticTab.isSelected)
         assertEquals(
-            "Next Humanistic look\nHumanistic Street\n可用 • 5 looks | import/export deferred",
+            "Next Humanistic look\n街头 Street\n可用 • 3 looks | import/export deferred",
             model.cycleControl.buttonLabel
         )
         assertEquals(
             PersistedSettingsAction.UpdateHumanisticFilter("humanistic-portrait"),
             model.cycleControl.nextAction
         )
-        assertTrue(model.rosterText.contains("• Humanistic Street"))
+        assertTrue(model.rosterText.contains("• 街头 Street"))
         assertTrue(model.saveCustomControl.isEnabled)
         assertTrue(model.supportingText.contains("Import and export stay deferred"))
     }
@@ -1047,7 +1047,7 @@ class SessionUiRenderModelTest {
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
             enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.LATENCY,
+
             resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
         ),
         previewStatus: PreviewStatus = PreviewStatus.ACTIVE,
@@ -1151,7 +1151,7 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 1f,
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
+
                 resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
@@ -1263,8 +1263,8 @@ class SessionUiRenderModelTest {
         )
 
         assertTrue(model.photoTab.isSelected)
-        assertTrue(model.rosterText.contains("Humanistic Street"))
-        assertTrue(model.rosterText.contains("Humanistic Life"))
+        assertTrue(model.rosterText.contains("街头 Street"))
+        assertTrue(model.rosterText.contains("生活 Life"))
     }
 
     @Test
@@ -1627,10 +1627,20 @@ class SessionUiRenderModelTest {
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Grid", sheet.gridRow.title)
+        assertEquals("3x3", sheet.gridRow.value)
         assertEquals("Quality", sheet.qualityRow.title)
+        assertEquals("Still Max", sheet.qualityRow.value)
+        assertTrue(sheet.qualityRow.value != sheet.gridRow.value,
+            "Quality row value should show still quality, not grid value")
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
+
+        // Brightness row has slider fields
+        assertEquals("Brightness", sheet.brightnessRow.title)
+        assertTrue(sheet.brightnessRow.isVisible)
+        assertEquals(0, sheet.brightnessRow.steps)
+        assertTrue(sheet.brightnessRow.maxSteps >= sheet.brightnessRow.minSteps)
     }
 
     @Test
