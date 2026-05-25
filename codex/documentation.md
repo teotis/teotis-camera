@@ -1156,3 +1156,22 @@
 - 目标：修复此前 tap focus/AE 链路只落到 session/device/coordinator，但 `CameraXCaptureAdapter` 仍返回 `UNSUPPORTED` stub 的问题。
 - 核心结果：`DeviceCommand.ApplyPreviewMetering` 现在通过 CameraX `FocusMeteringAction` 执行 AF+AE metering，并在 AE-only、unsupported、failed 情况下回传结构化 `PreviewMeteringResultStatus`。
 - 验证：`./scripts/verify_tap_focus_camerax_execution.sh` 与 `./scripts/verify_stage_7_observability.sh` 通过；真机仍需 smoke 复验具体机型的 AF/AE 区域支持。
+- `2026-05-25` Live Photo 兼容性诊断落地完成：`CameraXCaptureAdapter.captureLivePhoto()` 现已输出标准化诊断字段（`live-format:intended`, `live-format:actual`, `live-motion:status`, `motion-photo:xmp`, `motion-photo:appended-mp4-bytes`, `gallery-recognition`）；`MotionPhotoJpegContainerTest` 新增字节级断言（无末尾额外字节、`Item:Length` 与实际 MP4 字节数一致）；`SessionCockpitRenderModelTest` 新增 QA 诊断可见性测试。
+
+## Live Photo 真机兼容性冒烟检查清单
+
+以下检查项只能在真机上完成，无法由 JVM 单元测试覆盖：
+
+1. **构建并安装 APK**：`./gradlew :app:assembleDebug` 或通过 Android Studio 安装
+2. **启用 Live Photo**：在 Quick Panel 中切换 Live Photo 开关为开启
+3. **拍摄测试**：分别拍摄明亮场景和室内场景的 Live Photo 各一张
+4. **诊断字段验证**：在 Session Cockpit 输出中确认以下诊断均存在：
+   - `live-format:intended=google-motion-photo-jpeg`
+   - `live-format:actual=<格式>`（成功时为 `google-motion-photo-jpeg`，失败时为 `still-jpeg`）
+   - `live-motion:status=<状态>`（`encoded` / `failed` / `missing`）
+   - `motion-photo:appended-mp4-bytes=<n>`（成功时）
+   - `gallery-recognition=untested`
+5. **图库识别测试**：在目标图库应用（Google Photos 或 OEM 图库）中打开保存的照片，记录是否以动态媒体形式播放
+6. **文件验证**：通过 `adb pull` 拉取保存的 JPEG 文件，确认末尾附加了 MP4 字节
+
+注意：图库识别结果因 OEM 图库、Google Photos 版本、文件名、MediaStore MIME 处理及 XMP 严格程度而异，应作为产品证据记录，不作为确定性测试断言。

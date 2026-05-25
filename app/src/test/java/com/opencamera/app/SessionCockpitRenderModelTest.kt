@@ -14,6 +14,7 @@ import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.FrameRatio
 
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.PostProcessSpec
@@ -180,6 +181,70 @@ class SessionCockpitRenderModelTest {
             "Last Live photo:\nStill: Pictures/OpenCamera/live.jpg (content://media/external/images/media/42)\nMotion: Pictures/OpenCamera/live.live.mp4\nSidecar: Pictures/OpenCamera/live.live.json (content://media/external/file/88)\nThumbnail: Pictures/OpenCamera/live.jpg (content://media/external/images/media/42)\nPipeline: live-photo:bundle",
             sessionCaptureOutputText(state, strings)
         )
+    }
+
+    @Test
+    fun `capture output exposes live photo format diagnostics without metadata bloat`() {
+        val state = defaultSessionState(
+            latestSavedMediaType = SavedMediaType.PHOTO,
+            latestCapturePath = "Pictures/OpenCamera/live.jpg",
+            latestLivePhotoBundle = LivePhotoBundle(
+                stillPath = "Pictures/OpenCamera/live.jpg",
+                motionPath = "Pictures/OpenCamera/live.live.mp4",
+                sidecarPath = "Pictures/OpenCamera/live.live.json",
+                motionDurationMillis = 1500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json"
+            ),
+            latestPipelineNotes = listOf(
+                "live-format:intended=google-motion-photo-jpeg",
+                "live-format:actual=google-motion-photo-jpeg",
+                "live-motion:status=encoded",
+                "motion-photo:xmp=present",
+                "motion-photo:appended-mp4-bytes=12345",
+                "gallery-recognition=untested"
+            )
+        )
+
+        val output = sessionCaptureOutputText(state, strings)
+        assertTrue(output.contains("live-format:intended=google-motion-photo-jpeg"))
+        assertTrue(output.contains("live-format:actual=google-motion-photo-jpeg"))
+        assertTrue(output.contains("live-motion:status=encoded"))
+        assertTrue(output.contains("gallery-recognition=untested"))
+        // Output must not dump raw metadata blobs
+        assertFalse(output.contains("x:xmpmeta"))
+        assertFalse(output.contains("rdf:RDF"))
+        assertEquals(6, output.lines().size, "Output must stay compact for QA")
+    }
+
+    @Test
+    fun `capture output shows still only fallback diagnostics for degraded live photo`() {
+        val state = defaultSessionState(
+            latestSavedMediaType = SavedMediaType.PHOTO,
+            latestCapturePath = "Pictures/OpenCamera/fallback.jpg",
+            latestLivePhotoBundle = LivePhotoBundle(
+                stillPath = "Pictures/OpenCamera/fallback.jpg",
+                motionPath = "Pictures/OpenCamera/fallback.live.mp4",
+                sidecarPath = "Pictures/OpenCamera/fallback.live.json",
+                motionDurationMillis = 1500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json",
+                bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK
+            ),
+            latestPipelineNotes = listOf(
+                "live-format:intended=google-motion-photo-jpeg",
+                "live-format:actual=still-jpeg",
+                "live-motion:status=failed",
+                "motion-photo:container=failed:motion-encode-error",
+                "gallery-recognition=untested"
+            )
+        )
+
+        val output = sessionCaptureOutputText(state, strings)
+        assertTrue(output.contains("live-format:actual=still-jpeg"))
+        assertTrue(output.contains("live-motion:status=failed"))
+        assertTrue(output.contains("gallery-recognition=untested"))
+        assertFalse(output.contains("google-jpeg"))
     }
 
     @Test

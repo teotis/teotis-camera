@@ -536,6 +536,7 @@ class CameraXCaptureAdapterLivePhotoTest {
 
         assertEquals(LiveBundleStatus.STILL_ONLY_FALLBACK, result.bundle.bundleStatus)
         assertFalse(result.diagnostics.contains("motion-photo:container=google-jpeg"))
+        assertFalse(result.diagnostics.contains("motion-photo:xmp=present"))
         assertTrue(result.diagnostics.any { it.startsWith("motion-photo:container=failed:") })
     }
 
@@ -587,6 +588,7 @@ class CameraXCaptureAdapterLivePhotoTest {
         assertEquals("/tmp/generated-preview.mp4", result.bundle.motionPath)
         assertTrue(result.diagnostics.contains("motion-photo:motion-segment=materialized"))
         assertTrue(result.diagnostics.contains("motion-photo:container=google-jpeg"))
+        assertTrue(result.diagnostics.contains("motion-photo:xmp=present"))
     }
 
     @Test
@@ -626,6 +628,7 @@ class CameraXCaptureAdapterLivePhotoTest {
         assertEquals(LiveBundleStatus.STILL_ONLY_FALLBACK, result.bundle.bundleStatus)
         assertTrue(result.diagnostics.any { it.startsWith("motion-photo:motion-segment=failed:") })
         assertFalse(result.diagnostics.contains("motion-photo:container=google-jpeg"))
+        assertFalse(result.diagnostics.contains("motion-photo:xmp=present"))
     }
 
     private fun makeDescriptor(

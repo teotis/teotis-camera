@@ -556,7 +556,8 @@ internal fun materializeMotionPhotoBundleIfPossible(
             ),
             diagnostics = listOf(
                 "motion-photo:motion-segment=materialized",
-                "motion-photo:container=google-jpeg"
+                "motion-photo:container=google-jpeg",
+                "motion-photo:xmp=present"
             )
         )
     } else {
@@ -1742,10 +1743,35 @@ class CameraXCaptureAdapter(
                     )
                 }
 
+                val containerSucceeded = motionPhotoMaterialization.diagnostics
+                    .any { it == "motion-photo:container=google-jpeg" }
+                val containerFailed = motionPhotoMaterialization.diagnostics
+                    .any { it.startsWith("motion-photo:container=failed:") }
+                val motionMissing = motionPhotoMaterialization.diagnostics
+                    .any { it.startsWith("motion-photo:motion-segment=failed:") }
+
                 val diagnosisBuilder = buildList {
+                    add("live-format:intended=google-motion-photo-jpeg")
+                    add("live-format:actual=${
+                        if (containerSucceeded) "google-motion-photo-jpeg" else "still-jpeg"
+                    }")
+                    add("live-motion:status=${
+                        when {
+                            containerSucceeded -> "encoded"
+                            containerFailed || motionMissing -> "failed"
+                            else -> "missing"
+                        }
+                    }")
                     add("device:live-photo=bundle")
                     addAll(motionSourceResult.diagnostics)
                     addAll(motionPhotoMaterialization.diagnostics)
+                    if (containerSucceeded) {
+                        val motionFile = File(finalBundle.motionPath)
+                        if (motionFile.exists()) {
+                            add("motion-photo:appended-mp4-bytes=${motionFile.length()}")
+                        }
+                    }
+                    add("gallery-recognition=untested")
                     if (sidecarResult.isSuccess) {
                         add(
                             if (File(finalBundle.sidecarPath).isAbsolute) {
