@@ -102,6 +102,8 @@ class PreviewOverlayView @JvmOverloads constructor(
     private var lastVignetteKey: Float = -1f
 
     private var focusReticle: FocusReticleRenderModel? = null
+    private var previewView: androidx.camera.view.PreviewView? = null
+    private var lastAppliedColorFilter: ColorMatrixColorFilter? = null
 
     private var renderModel = PreviewOverlayRenderModel(
         gridMode = CompositionGridMode.OFF,
@@ -124,7 +126,31 @@ class PreviewOverlayView @JvmOverloads constructor(
         renderModel = model
         visibility = if (model.isVisible) VISIBLE else GONE
         prepareVignetteCache(model)
+        applyColorTransformToPreview(model)
         invalidate()
+    }
+
+    private fun applyColorTransformToPreview(model: PreviewOverlayRenderModel) {
+        if (previewView == null) {
+            previewView = (parent as? android.view.ViewGroup)?.let { vg ->
+                (0 until vg.childCount)
+                    .map { vg.getChildAt(it) }
+                    .filterIsInstance<androidx.camera.view.PreviewView>()
+                    .firstOrNull()
+            }
+        }
+        val pv = previewView ?: return
+        val transform = model.effectModel?.colorTransform
+        val filter = if (transform != null && !transform.isIdentity) {
+            ColorMatrixColorFilter(transform.colorMatrix)
+        } else {
+            null
+        }
+        if (lastAppliedColorFilter != filter) {
+            pv.paint.colorFilter = filter
+            lastAppliedColorFilter = filter
+            pv.invalidate()
+        }
     }
 
     internal fun updateFocusReticle(model: FocusReticleRenderModel?) {
@@ -240,16 +266,9 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawFilterOverlay(canvas: Canvas, spec: FilterOverlaySpec) {
-        // Apply color matrix filter to the overlay paint when available.
-        // Note: For SurfaceView (implementationMode=compatible), this transforms
-        // the overlay's drawn content but not the underlying camera surface.
-        // The overlay tint values are tuned to approximate the color matrix effect.
-        val colorTransform = renderModel.effectModel?.colorTransform
-        if (colorTransform != null && !colorTransform.isIdentity) {
-            filterOverlayPaint.colorFilter = ColorMatrixColorFilter(colorTransform.colorMatrix)
-        } else {
-            filterOverlayPaint.colorFilter = null
-        }
+        // Color matrix is applied to previewView.paint (TextureView mode),
+        // so the overlay only handles tint and vignette.
+        filterOverlayPaint.colorFilter = null
 
         if (spec.tintAlpha > 0f) {
             filterOverlayPaint.color = spec.tintColor

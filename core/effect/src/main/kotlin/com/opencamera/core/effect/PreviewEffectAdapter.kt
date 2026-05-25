@@ -86,9 +86,9 @@ class PreviewEffectAdapter {
     private fun resolveOverlayOpacity(spec: FilterRenderSpec?): Float {
         val saturation = spec?.saturation ?: 1f
         val contrast = spec?.contrast ?: 1f
-        // Reduced opacity: the color matrix now handles saturation/contrast precisely.
-        // Overlay only provides a subtle warm/cool tint supplement.
-        return ((2f - saturation) * 0.06f + (contrast - 1f) * 0.04f)
-            .coerceIn(0f, 0.15f)
+        // Overlay provides warm/cool tint supplement on top of the color matrix
+        // applied to the preview surface (TextureView mode).
+        return ((2f - saturation) * 0.10f + (contrast - 1f) * 0.08f)
+            .coerceIn(0f, 0.30f)
     }
 }
