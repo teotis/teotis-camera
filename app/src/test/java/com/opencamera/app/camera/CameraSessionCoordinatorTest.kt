@@ -12,14 +12,16 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PhotoSceneSignal
 import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.device.SceneLightState
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.RecordingQualityPreset
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
-import com.opencamera.core.media.StillCaptureQualityPreference
+
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.media.ThumbnailSource
@@ -538,13 +540,11 @@ class CameraSessionCoordinatorTest {
     fun `still quality bind effect rebinds while staying in same mode`() = runTest {
         val initialGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.LATENCY
+            enablePreviewSnapshots = true
         )
         val updatedGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.QUALITY
+            enablePreviewSnapshots = true
         )
         val session = FakeCameraSession(
             initialState = defaultSessionState(
@@ -1076,6 +1076,70 @@ class CameraSessionCoordinatorTest {
         data object Success : BindResult
 
         data class Failure(val reason: String) : BindResult
+    }
+
+    @Test
+    fun `scene brightness source signals are forwarded as PhotoSceneSignalUpdated`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val sceneSource = FakeSceneBrightnessSignalSource()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope,
+            sceneBrightnessSource = sceneSource
+        )
+        advanceUntilIdle()
+
+        val signal = PhotoSceneSignal(
+            lightState = SceneLightState.LOW_LIGHT,
+            brightnessScore = 0.15f,
+            source = "test"
+        )
+        sceneSource.emit(signal)
+        advanceUntilIdle()
+
+        assertTrue(
+            session.recordedIntents.contains(
+                SessionIntent.PhotoSceneSignalUpdated(signal)
+            )
+        )
+    }
+
+    @Test
+    fun `updateBitmapProvider sets bitmap provider for scene brightness source`() = runTest {
+        val sceneSource = FakeSceneBrightnessSignalSource()
+
+        var capturedBitmap: android.graphics.Bitmap? = null
+        sceneSource.updateBitmapProvider { capturedBitmap }
+        val providerBitmap = sceneSource.currentBitmapProvider?.invoke()
+
+        assertEquals(capturedBitmap, providerBitmap)
+    }
+
+    private class FakeSceneBrightnessSignalSource : SceneBrightnessSignalSource {
+        private val mutableSignals = MutableSharedFlow<PhotoSceneSignal>(
+            replay = 4,
+            extraBufferCapacity = 4
+        )
+
+        var currentBitmapProvider: (() -> android.graphics.Bitmap?)? = null
+            private set
+
+        override val signals: Flow<PhotoSceneSignal> = mutableSignals.asSharedFlow()
+
+        override fun onPreviewStarted() {}
+        override fun onPreviewStopped() {}
+        override fun onPreviewHostDetached() {}
+
+        override fun updateBitmapProvider(provider: (() -> android.graphics.Bitmap?)?) {
+            currentBitmapProvider = provider
+        }
+
+        suspend fun emit(signal: PhotoSceneSignal) {
+            mutableSignals.emit(signal)
+        }
     }
 
     private class TestLifecycleOwner : LifecycleOwner {

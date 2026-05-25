@@ -133,6 +133,9 @@ object SceneMaskPipelineNotes {
 
     fun reason(reason: String): String = "scene-mask:reason=$reason"
 
+    fun staleMask(ageMs: Long, thresholdMs: Long): String =
+        "scene-mask:stale:age=${ageMs}ms:threshold=${thresholdMs}ms"
+
     fun capabilityNotes(capability: SceneMaskCapability): List<String> = buildList {
         add(backend(capability.backendId))
         add(preview(capability.previewMask))

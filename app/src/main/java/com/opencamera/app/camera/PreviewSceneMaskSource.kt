@@ -4,6 +4,7 @@ import androidx.camera.core.ImageProxy
 import com.opencamera.core.media.SceneMaskDescriptor
 import com.opencamera.core.media.SceneMaskQuality
 import com.opencamera.core.media.SceneMaskRole
+import com.opencamera.core.media.SceneMaskPipelineNotes
 import com.opencamera.core.media.SceneMaskSupport
 import com.opencamera.core.media.SceneMaskTransform
 
@@ -68,6 +69,32 @@ data class PreviewSceneMaskPayload(
         result = 31 * result + timestampMillis.hashCode()
         return result
     }
+}
+
+fun PreviewSceneMaskPayload?.toSnapshot(
+    staleThresholdMs: Long = 500
+): com.opencamera.core.effect.PreviewSceneMaskSnapshot {
+    if (this == null) return com.opencamera.core.effect.PreviewSceneMaskSnapshot.UNAVAILABLE
+    val now = System.currentTimeMillis()
+    val age = now - timestampMillis
+    val isStale = age > staleThresholdMs
+    val descriptor = toDescriptor()
+    val staleNote = if (isStale) {
+        listOf(SceneMaskPipelineNotes.staleMask(age, staleThresholdMs))
+    } else {
+        emptyList()
+    }
+    val qualityDescriptor = descriptor.copy(
+        diagnostics = descriptor.diagnostics + staleNote
+    )
+    return com.opencamera.core.effect.PreviewSceneMaskSnapshot(
+        descriptor = qualityDescriptor,
+        timestampMillis = timestampMillis,
+        isStale = isStale,
+        backendId = descriptor.backendId,
+        quality = if (isStale) SceneMaskQuality.DEGRADED else descriptor.quality,
+        isAvailable = !isStale
+    )
 }
 
 interface PreviewSceneMaskSource {

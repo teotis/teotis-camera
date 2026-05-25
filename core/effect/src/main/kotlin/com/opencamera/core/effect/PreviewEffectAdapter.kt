@@ -1,6 +1,9 @@
 package com.opencamera.core.effect
 
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PreviewColorFidelity
+
+import com.opencamera.core.media.SceneMaskQuality
 
 /**
  * Pure-JVM ARGB color constants (matching android.graphics.Color values).
@@ -9,7 +12,10 @@ private const val COLOR_WHITE: Int = -1 // 0xFFFFFFFF
 
 class PreviewEffectAdapter {
 
-    fun adapt(spec: EffectSpec): PreviewEffectRenderModel {
+    fun adapt(
+        spec: EffectSpec,
+        maskSnapshot: PreviewSceneMaskSnapshot = PreviewSceneMaskSnapshot.UNAVAILABLE
+    ): PreviewEffectRenderModel {
         val filter = spec.find<FilterEffect>()
         val watermark = spec.find<WatermarkEffect>()
         val frame = spec.find<FrameEffect>()
@@ -18,8 +24,30 @@ class PreviewEffectAdapter {
             filterOverlay = filter?.let { buildFilterOverlay(it) },
             watermarkHint = watermark?.let { buildWatermarkHint(it) },
             frameGuideline = frame?.let { buildFrameGuideline(it) },
-            compositionGrid = null
+            compositionGrid = null,
+            subjectMaskPreview = buildSubjectMaskPreview(maskSnapshot),
+            colorTransform = resolveColorTransform(maskSnapshot)
         )
+    }
+
+    private fun buildSubjectMaskPreview(
+        snapshot: PreviewSceneMaskSnapshot
+    ): SubjectMaskPreviewDescriptor {
+        return SubjectMaskPreviewDescriptor(
+            isAvailable = snapshot.isAvailable,
+            backendId = snapshot.backendId,
+            isApproximate = snapshot.quality != SceneMaskQuality.SAVED_PHOTO
+        )
+    }
+
+    private fun resolveColorTransform(
+        snapshot: PreviewSceneMaskSnapshot
+    ): PreviewColorTransform {
+        return when {
+            snapshot.isAvailable -> PreviewColorTransform.MASK_AWARE
+            snapshot.backendId != "none" && snapshot.isStale -> PreviewColorTransform.FALLBACK
+            else -> PreviewColorTransform.NONE
+        }
     }
 
     private fun buildFilterOverlay(effect: FilterEffect): FilterOverlaySpec {

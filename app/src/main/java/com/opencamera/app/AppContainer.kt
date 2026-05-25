@@ -15,9 +15,12 @@ import com.opencamera.app.camera.MlKitSavedPhotoSceneMaskProvider
 import com.opencamera.app.camera.NoOpSavedPhotoSceneMaskProvider
 import com.opencamera.app.camera.PreviewSceneMaskSource
 import com.opencamera.app.camera.SavedPhotoSceneMaskProvider
+import com.opencamera.app.camera.toSnapshot
 import com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitor
 import com.opencamera.app.camera.CameraSessionCoordinator
 import com.opencamera.app.camera.CameraXCaptureAdapter
+import com.opencamera.app.camera.PreviewSceneBrightnessMonitor
+import com.opencamera.app.camera.toSignalSource
 import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
 import com.opencamera.app.camera.CompositeRuntimeIssueMonitor
 import com.opencamera.app.camera.DocumentAutoCropPostProcessor
@@ -32,6 +35,7 @@ import com.opencamera.core.capability.CapabilityGraphResolver
 import com.opencamera.core.device.asCapabilityGraphQuery
 import com.opencamera.core.effect.EffectCapabilityResolver
 import com.opencamera.core.effect.PreviewEffectAdapter
+import com.opencamera.core.effect.PreviewSceneMaskSnapshot
 import com.opencamera.core.media.MediaProcessorAvailability
 import com.opencamera.core.media.CompositeMediaPostProcessor
 import com.opencamera.core.media.MultiFrameMergePlaceholderPostProcessor
@@ -146,6 +150,9 @@ class AppContainer(
     )
     val previewEffectAdapter = PreviewEffectAdapter()
 
+    val previewMaskSnapshot: PreviewSceneMaskSnapshot
+        get() = sceneMaskSource.latestMask().toSnapshot()
+
     val cameraSession: CameraSession = DefaultCameraSession(
         registry = modeRegistry,
         trace = trace,
@@ -170,6 +177,7 @@ class AppContainer(
         runtimeIssueMonitor = CompositeRuntimeIssueMonitor(
             AndroidThermalRuntimeIssueMonitor(appContext),
             PreviewStartupRuntimeIssueMonitor(applicationScope)
-        )
+        ),
+        sceneBrightnessSource = PreviewSceneBrightnessMonitor(applicationScope).toSignalSource()
     )
 }
