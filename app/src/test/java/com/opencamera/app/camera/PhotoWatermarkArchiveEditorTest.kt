@@ -113,4 +113,84 @@ class PhotoWatermarkArchiveEditorTest {
         assertNull(bytes)
         assertEquals("archive-input-empty", warning)
     }
+
+    @Test
+    fun `embedArchiveAfterVisibleWrite covers pure-text template`() {
+        val original = minimalJpeg()
+        val visible = minimalJpeg()
+        val (bytes, warning) = embedArchiveAfterVisibleWrite(
+            originalBytes = original,
+            visibleBytesAfterExifRestore = visible,
+            templateId = "pure-text",
+            originalWidth = 3000,
+            originalHeight = 2000
+        )
+        assertNotNull(bytes)
+        assertEquals(null, warning)
+
+        val extracted = OcwmJpegContainer.extractArchive(bytes!!)
+        assertNotNull(extracted)
+        assertTrue(original.contentEquals(extracted.payload))
+        assertEquals("pure-text", extracted.manifest.watermarkTemplateId)
+    }
+
+    @Test
+    fun `embedArchiveAfterVisibleWrite covers blur-four-border template`() {
+        val original = minimalJpeg()
+        val visible = minimalJpeg()
+        val (bytes, warning) = embedArchiveAfterVisibleWrite(
+            originalBytes = original,
+            visibleBytesAfterExifRestore = visible,
+            templateId = "blur-four-border",
+            originalWidth = 3000,
+            originalHeight = 2000
+        )
+        assertNotNull(bytes)
+        assertEquals(null, warning)
+
+        val extracted = OcwmJpegContainer.extractArchive(bytes!!)
+        assertNotNull(extracted)
+        assertTrue(original.contentEquals(extracted.payload))
+        assertEquals("blur-four-border", extracted.manifest.watermarkTemplateId)
+    }
+
+    @Test
+    fun `embedArchiveAfterVisibleWrite covers professional-bottom-bar template`() {
+        val original = minimalJpeg()
+        val visible = minimalJpeg()
+        val (bytes, warning) = embedArchiveAfterVisibleWrite(
+            originalBytes = original,
+            visibleBytesAfterExifRestore = visible,
+            templateId = "professional-bottom-bar",
+            originalWidth = 3000,
+            originalHeight = 2000
+        )
+        assertNotNull(bytes)
+        assertEquals(null, warning)
+
+        val extracted = OcwmJpegContainer.extractArchive(bytes!!)
+        assertNotNull(extracted)
+        assertTrue(original.contentEquals(extracted.payload))
+        assertEquals("professional-bottom-bar", extracted.manifest.watermarkTemplateId)
+    }
+
+    @Test
+    fun `embedArchiveAfterVisibleWrite covers retro-frame template`() {
+        val original = minimalJpeg()
+        val visible = minimalJpeg()
+        val (bytes, warning) = embedArchiveAfterVisibleWrite(
+            originalBytes = original,
+            visibleBytesAfterExifRestore = visible,
+            templateId = "retro-frame",
+            originalWidth = 3000,
+            originalHeight = 2000
+        )
+        assertNotNull(bytes)
+        assertEquals(null, warning)
+
+        val extracted = OcwmJpegContainer.extractArchive(bytes!!)
+        assertNotNull(extracted)
+        assertTrue(original.contentEquals(extracted.payload))
+        assertEquals("retro-frame", extracted.manifest.watermarkTemplateId)
+    }
 }

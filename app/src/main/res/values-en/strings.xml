@@ -347,7 +347,7 @@
     <string name="watermark_selector_current_default"> | Current default</string>
     <string name="watermark_selector_edit_attrs_frame">Placement, scale, opacity, background</string>
     <string name="watermark_selector_edit_attrs_classic">Placement, scale, opacity</string>
-    <string name="watermark_selector_footer_supported">Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages.</string>
+    <string name="watermark_selector_footer_supported">Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages. All still-photo watermarks embed a reversible original JPEG archive, extractable via the provided tooling.</string>
     <string name="watermark_selector_footer_unsupported">Still capture is unavailable on this device, so Watermark Lab stays read-only.</string>
 
     <!-- Watermark detail -->

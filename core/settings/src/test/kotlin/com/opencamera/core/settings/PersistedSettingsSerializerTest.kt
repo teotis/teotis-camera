@@ -375,6 +375,65 @@ class PersistedSettingsSerializerTest {
     }
 
     @Test
+    fun `default watermark catalog includes professional bottom bar`() {
+        val catalog = FeatureCatalog()
+        val proBar = catalog.watermarkTemplates.first { it.id == "professional-bottom-bar" }
+
+        assertEquals(WatermarkTemplateKind.EXPANDED_FRAME, proBar.kind)
+        assertTrue(proBar.supportsFrameBorder)
+        assertEquals(
+            setOf("model", "datetime", "camera-params"),
+            proBar.tokenKeys
+        )
+        assertEquals(
+            setOf(
+                WatermarkTextPlacement.BOTTOM_LEFT,
+                WatermarkTextPlacement.BOTTOM_CENTER,
+                WatermarkTextPlacement.BOTTOM_RIGHT
+            ),
+            proBar.allowedPlacements
+        )
+        assertTrue(proBar.allowedFrameBackgrounds.contains(WatermarkFrameBackground.DARK))
+        assertTrue(proBar.allowedFrameBackgrounds.contains(WatermarkFrameBackground.WHITE))
+    }
+
+    @Test
+    fun `serializer round trips professional bottom bar watermark style`() {
+        val settings = PersistedSettings(
+            photo = PhotoSettings(
+                defaultWatermarkTemplateId = "professional-bottom-bar",
+                professionalBottomBarWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+                    textScale = WatermarkTextScale.LARGE,
+                    textOpacity = WatermarkTextOpacity.SUBTLE,
+                    frameBackground = WatermarkFrameBackground.WHITE
+                )
+            )
+        )
+
+        val serialized = PersistedSettingsSerializer.toMap(settings)
+        assertEquals(
+            "professional-bottom-bar",
+            serialized["photo.defaultWatermarkTemplateId"]
+        )
+        assertEquals(
+            "bottom-left",
+            serialized["photo.watermark.professionalBottomBar.position"]
+        )
+        assertEquals(
+            "large",
+            serialized["photo.watermark.professionalBottomBar.scale"]
+        )
+        assertEquals(
+            "white",
+            serialized["photo.watermark.professionalBottomBar.background"]
+        )
+
+        val decoded = PersistedSettingsSerializer.fromMap(serialized)
+        assertEquals(settings, decoded)
+    }
+
+    @Test
     fun `default portrait depth strength is 50`() {
         val settings = PhotoSettings()
         assertEquals(50, settings.portraitDepthStrength)

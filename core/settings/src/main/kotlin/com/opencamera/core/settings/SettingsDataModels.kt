@@ -182,6 +182,12 @@ data class PhotoSettings(
         textOpacity = WatermarkTextOpacity.SOLID,
         frameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR
     ),
+    val professionalBottomBarWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
+        textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+        textScale = WatermarkTextScale.NORMAL,
+        textOpacity = WatermarkTextOpacity.SOLID,
+        frameBackground = WatermarkFrameBackground.DARK
+    ),
     val livePhotoEnabledByDefault: Boolean = false,
     val countdownDuration: CountdownDuration = CountdownDuration.OFF,
     val colorLabSpec: ColorLabSpec = ColorLabSpec(),

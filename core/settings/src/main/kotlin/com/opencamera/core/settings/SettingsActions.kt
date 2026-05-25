@@ -163,6 +163,7 @@ fun PhotoSettings.watermarkStyleFor(
         "retro-frame" -> retroFrameWatermarkStyle
         "pure-text" -> pureTextWatermarkStyle
         "blur-four-border" -> blurFourBorderWatermarkStyle
+        "professional-bottom-bar" -> professionalBottomBarWatermarkStyle
         else -> classicOverlayWatermarkStyle
     }
 }
@@ -193,6 +194,9 @@ private fun PhotoSettings.updateWatermarkStyle(
         )
         "blur-four-border" -> copy(
             blurFourBorderWatermarkStyle = transform(blurFourBorderWatermarkStyle)
+        )
+        "professional-bottom-bar" -> copy(
+            professionalBottomBarWatermarkStyle = transform(professionalBottomBarWatermarkStyle)
         )
         else -> copy(
             classicOverlayWatermarkStyle = transform(classicOverlayWatermarkStyle)

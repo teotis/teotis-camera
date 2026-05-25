@@ -493,6 +493,14 @@ internal fun renderPhotoWatermarkBitmap(
             padding = padding
         )
 
+        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> drawProfessionalBottomBar(
+            source = bitmap,
+            template = template,
+            titleTextSize = titleTextSize,
+            detailTextSize = detailTextSize,
+            padding = padding
+        )
+
         else -> PhotoWatermarkBitmapRenderResult(
             bitmap = bitmap,
             warning = mergeWarnings(template.warning, "template-fallback")
@@ -812,6 +820,106 @@ private fun drawBlurFourBorderFrame(
     )
 }
 
+private fun drawProfessionalBottomBar(
+    source: Bitmap,
+    template: ResolvedPhotoWatermarkTemplate,
+    titleTextSize: Float,
+    detailTextSize: Float,
+    padding: Float
+): PhotoWatermarkBitmapRenderResult {
+    val bottomBandHeight = maxOf(titleTextSize * 3.2f, source.height * 0.13f)
+    val framedWidth = source.width
+    val framedHeight = (source.height + bottomBandHeight).toInt()
+    val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(framedBitmap)
+    val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
+    drawFrameBackground(canvas, source, fullRect, template.frameBackground)
+    canvas.drawBitmap(source, 0f, 0f, null)
+
+    val hairlineColor = when (template.frameBackground) {
+        WatermarkFrameBackground.WHITE -> Color.argb(40, 0, 0, 0)
+        WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> Color.argb(50, 0, 0, 0)
+        else -> Color.argb(40, 255, 255, 255)
+    }
+    val hairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = hairlineColor
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+    }
+    canvas.drawLine(
+        0f,
+        source.height.toFloat(),
+        framedWidth.toFloat(),
+        source.height.toFloat(),
+        hairlinePaint
+    )
+
+    val titleColor = when (template.frameBackground) {
+        WatermarkFrameBackground.DARK,
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(255, 248, 248, 252)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(255, 255, 250, 235)
+        else -> Color.argb(255, 44, 48, 58)
+    }
+    val detailColor = when (template.frameBackground) {
+        WatermarkFrameBackground.DARK,
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(220, 172, 177, 188)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(230, 235, 228, 210)
+        else -> Color.argb(220, 120, 118, 112)
+    }
+    val contentLeft = padding
+    val contentRight = framedWidth - padding
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = titleColor
+        textSize = titleTextSize
+        style = Paint.Style.FILL
+        alpha = (255 * template.textOpacity).toInt()
+        textAlign = when (template.placement) {
+            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
+            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
+            else -> Paint.Align.LEFT
+        }
+    }
+    val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = detailColor
+        textSize = detailTextSize
+        style = Paint.Style.FILL
+        alpha = (255 * template.textOpacity).toInt()
+        textAlign = when (template.placement) {
+            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
+            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
+            else -> Paint.Align.LEFT
+        }
+    }
+    val titleMetrics = titlePaint.fontMetrics
+    val detailMetrics = detailPaint.fontMetrics
+    val blockTop = source.height + padding
+    var baseline = blockTop - titleMetrics.ascent
+    val titleX = when (template.placement) {
+        WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
+        WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
+        else -> contentLeft
+    }
+    canvas.drawText(template.title, titleX, baseline, titlePaint)
+    val detailX = when (template.placement) {
+        WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
+        WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
+        else -> contentLeft
+    }
+    template.supportingLines.take(2).forEach { line ->
+        baseline += (detailMetrics.descent - detailMetrics.ascent) + detailTextSize * 0.24f
+        canvas.drawText(
+            fitText(line, detailPaint, contentRight - contentLeft),
+            detailX,
+            baseline,
+            detailPaint
+        )
+    }
+    return PhotoWatermarkBitmapRenderResult(
+        bitmap = framedBitmap,
+        warning = template.warning
+    )
+}
+
 private fun drawFrameBackground(
     canvas: Canvas,
     source: Bitmap,
@@ -908,6 +1016,7 @@ private const val TEMPLATE_TRAVEL_POLAROID = "travel-polaroid"
 private const val TEMPLATE_RETRO_FRAME = "retro-frame"
 private const val TEMPLATE_PURE_TEXT = "pure-text"
 private const val TEMPLATE_BLUR_FOUR_BORDER = "blur-four-border"
+private const val TEMPLATE_PROFESSIONAL_BOTTOM_BAR = "professional-bottom-bar"
 
 private fun resolveWatermarkTemplateId(templateId: String?): String {
     return templateId
@@ -928,7 +1037,8 @@ internal fun resolvePhotoWatermarkTemplate(
         TEMPLATE_TRAVEL_POLAROID,
         TEMPLATE_RETRO_FRAME,
         TEMPLATE_PURE_TEXT,
-        TEMPLATE_BLUR_FOUR_BORDER -> requestedTemplateId
+        TEMPLATE_BLUR_FOUR_BORDER,
+        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> requestedTemplateId
         else -> TEMPLATE_CLASSIC_OVERLAY
     }
     val warning = if (normalizedTemplateId == requestedTemplateId) {
@@ -953,6 +1063,7 @@ internal fun resolvePhotoWatermarkTemplate(
         TEMPLATE_TRAVEL_POLAROID -> listOfNotNull(datetime, location, profileName)
         TEMPLATE_RETRO_FRAME,
         TEMPLATE_BLUR_FOUR_BORDER -> listOfNotNull(datetime, cameraParams, profileName)
+        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> listOfNotNull(datetime, cameraParams)
         else -> emptyList()
     }
     return ResolvedPhotoWatermarkTemplate(
@@ -965,7 +1076,8 @@ internal fun resolvePhotoWatermarkTemplate(
         ),
         usesExpandedFrame = normalizedTemplateId == TEMPLATE_TRAVEL_POLAROID ||
             normalizedTemplateId == TEMPLATE_RETRO_FRAME ||
-            normalizedTemplateId == TEMPLATE_BLUR_FOUR_BORDER,
+            normalizedTemplateId == TEMPLATE_BLUR_FOUR_BORDER ||
+            normalizedTemplateId == TEMPLATE_PROFESSIONAL_BOTTOM_BAR,
         placement = resolveWatermarkPlacement(normalizedTemplateId, metadata.customTags),
         textScale = metadata.customTags[PHOTO_WATERMARK_TEXT_SCALE_KEY]
             ?.toFloatOrNull()
@@ -992,6 +1104,7 @@ private fun resolveWatermarkPlacement(
 private fun defaultWatermarkPlacement(templateId: String): WatermarkTextPlacement {
     return when (templateId) {
         TEMPLATE_RETRO_FRAME -> WatermarkTextPlacement.BOTTOM_CENTER
+        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> WatermarkTextPlacement.BOTTOM_CENTER
         else -> WatermarkTextPlacement.BOTTOM_LEFT
     }
 }
@@ -1019,6 +1132,7 @@ private fun defaultWatermarkFrameBackground(templateId: String): WatermarkFrameB
         TEMPLATE_TRAVEL_POLAROID -> WatermarkFrameBackground.WHITE
         TEMPLATE_RETRO_FRAME -> WatermarkFrameBackground.SOURCE_VIVID_BLUR
         TEMPLATE_BLUR_FOUR_BORDER -> WatermarkFrameBackground.SOURCE_LIGHT_BLUR
+        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> WatermarkFrameBackground.DARK
         else -> WatermarkFrameBackground.DARK
     }
 }

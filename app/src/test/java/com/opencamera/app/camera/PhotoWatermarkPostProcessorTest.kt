@@ -157,6 +157,27 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `professional bottom bar template passes through to pipeline notes`() = runTest {
+        val editor = FakePhotoWatermarkEditor(
+            result = PhotoWatermarkApplied()
+        )
+        val processor = PhotoWatermarkPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                watermarkText = "Scenery Handheld",
+                watermarkTemplate = "professional-bottom-bar",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/pro.jpg",
+                    filePath = "/tmp/pro.jpg"
+                )
+            )
+        )
+
+        assertEquals("professional-bottom-bar", editor.invocations.single().templateId)
+        assertTrue(result.pipelineNotes.contains("watermark:rendered:professional-bottom-bar"))
+    }
+
+    @Test
     fun `non photo result is ignored`() = runTest {
         val editor = FakePhotoWatermarkEditor(
             result = PhotoWatermarkApplied()
