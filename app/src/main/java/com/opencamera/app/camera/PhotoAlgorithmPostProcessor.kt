@@ -137,21 +137,22 @@ internal class PhotoAlgorithmPostProcessor(
 
             is ProcessorWork.Execute -> {
                 val payload = work.payload
-                val maskResolve = resolveMask(result)
+                var maskResolve: MaskResolveResult? = null
                 try {
-                    when (maskResolve) {
+                    val resolvedMask = resolveMask(result).also { maskResolve = it }
+                    when (resolvedMask) {
                         is MaskResolveResult.Available -> {
                             if (editor is MaskAwarePhotoAlgorithmEditor) {
                                 val (editorResult, maskNotes) = editor.applyWithMask(
-                                    maskResolve.bitmap, payload.spec, maskResolve.mask
+                                    resolvedMask.bitmap, payload.spec, resolvedMask.mask
                                 )
                                 val baseResult = applyEditorResult(result, payload, editorResult)
-                                val descriptor = maskResolve.mask.toDescriptor(
+                                val descriptor = resolvedMask.mask.toDescriptor(
                                     maskId = result.shotId,
-                                    sourceWidth = maskResolve.bitmap.width,
-                                    sourceHeight = maskResolve.bitmap.height
+                                    sourceWidth = resolvedMask.bitmap.width,
+                                    sourceHeight = resolvedMask.bitmap.height
                                 )
-                                val withNotes = (maskNotes + maskResolve.extraNotes + listOf(
+                                val withNotes = (maskNotes + resolvedMask.extraNotes + listOf(
                                     SceneMaskPipelineNotes.preview(SceneMaskSupport.UNSUPPORTED)
                                 )).fold(baseResult) { acc, note ->
                                     acc.addPipelineNotes(note)
@@ -167,13 +168,13 @@ internal class PhotoAlgorithmPostProcessor(
                                     SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED) + ":editor-not-mask-aware",
                                     SceneMaskPipelineNotes.preview(SceneMaskSupport.UNSUPPORTED)
                                 )
-                                (maskResolve.extraNotes + fallbackNotes).fold(
+                                (resolvedMask.extraNotes + fallbackNotes).fold(
                                     applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
                                 ) { acc, note -> acc.addPipelineNotes(note) }
                             }
                         }
                         is MaskResolveResult.Fallback -> {
-                            maskResolve.extraNotes.fold(
+                            resolvedMask.extraNotes.fold(
                                 applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
                             ) { acc, note -> acc.addPipelineNotes(note) }
                         }
@@ -181,8 +182,9 @@ internal class PhotoAlgorithmPostProcessor(
                 } catch (_: Throwable) {
                     result.addPipelineNotes("algorithm-render:failed:render-exception")
                 } finally {
-                    if (maskResolve is MaskResolveResult.Available) {
-                        maskResolve.bitmap.recycle()
+                    val resolvedMask = maskResolve
+                    if (resolvedMask is MaskResolveResult.Available) {
+                        resolvedMask.bitmap.recycle()
                     }
                 }
             }

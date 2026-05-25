@@ -19,7 +19,12 @@ data class PreviewColorTransform(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is PreviewColorTransform) return false
-        return matrix?.contentEquals(other.matrix) == true &&
+        val matricesEqual = when {
+            matrix == null && other.matrix == null -> true
+            matrix != null && other.matrix != null -> matrix.contentEquals(other.matrix)
+            else -> false
+        }
+        return matricesEqual &&
             tintColor == other.tintColor &&
             tintAlpha == other.tintAlpha &&
             fidelity == other.fidelity

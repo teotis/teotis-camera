@@ -342,6 +342,28 @@ class PhotoAlgorithmPostProcessorTest {
     }
 
     @Test
+    fun `mask source exception preserves original result with failure note`() = runTest {
+        val editor = FakeMaskAwarePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val maskProvider = FakeSavedPhotoMaskProvider(
+            result = SceneMaskResult.Unavailable("not-used")
+        )
+        val input = photoResult(algorithmProfile = "portrait-depth-natural")
+        val processor = PhotoAlgorithmPostProcessor(
+            editor,
+            maskProvider = maskProvider,
+            maskBitmapSource = { throw IllegalStateException("decode source failed") }
+        )
+
+        val result = processor.process(input)
+
+        assertEquals(input.outputPath, result.outputPath)
+        assertEquals(input.outputHandle, result.outputHandle)
+        assertEquals(0, editor.applyInvocations.size)
+        assertEquals(0, editor.applyWithMaskInvocations.size)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:failed:render-exception"))
+    }
+
+    @Test
     fun `no mask provider falls back to legacy render without scene mask notes`() = runTest {
         val editor = FakeMaskAwarePhotoAlgorithmEditor(PhotoAlgorithmApplied())
         val processor = PhotoAlgorithmPostProcessor(editor, maskProvider = null)

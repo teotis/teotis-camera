@@ -82,6 +82,8 @@ internal data class SettingsPanelViews(
     val portraitBeautyPreset: Button,
     val portraitBeautyStrength: Button,
     val portraitBokehEffect: Button,
+    val portraitDepthStrengthSeekBar: SeekBar,
+    val portraitDepthStrengthValue: TextView,
     val portraitFooter: TextView,
     val watermarkSelectorHeadline: TextView,
     val watermarkSelectorSupportingText: TextView,
@@ -169,6 +171,12 @@ internal data class FloatingUtilityViews(
     val lowLightNightPrompt: Button
 )
 
+internal data class DocumentBatchRailViews(
+    val rail: LinearLayout,
+    val header: Button,
+    val list: LinearLayout
+)
+
 internal data class BottomCockpitViews(
     val shutter: Button,
     val lensFacing: Button,
@@ -182,6 +190,7 @@ internal data class MainActivityViews(
     val topBar: TopBarViews,
     val quickPanel: QuickPanelViews,
     val floatingUtility: FloatingUtilityViews,
+    val documentBatchRail: DocumentBatchRailViews,
     val settingsPanel: SettingsPanelViews,
     val filterLab: FilterLabViews,
     val devConsole: DevConsoleViews,
@@ -263,6 +272,8 @@ internal data class MainActivityViews(
                 portraitBeautyPreset = activity.findViewById(R.id.buttonPortraitBeautyPreset),
                 portraitBeautyStrength = activity.findViewById(R.id.buttonPortraitBeautyStrength),
                 portraitBokehEffect = activity.findViewById(R.id.buttonPortraitBokehEffect),
+                portraitDepthStrengthSeekBar = activity.findViewById(R.id.portraitDepthStrengthSeekBar),
+                portraitDepthStrengthValue = activity.findViewById(R.id.portraitDepthStrengthValue),
                 portraitFooter = activity.findViewById(R.id.portraitLabFooter),
                 watermarkSelectorHeadline = activity.findViewById(R.id.watermarkSelectorHeadline),
                 watermarkSelectorSupportingText = activity.findViewById(R.id.watermarkSelectorSupportingText),
@@ -341,6 +352,11 @@ internal data class MainActivityViews(
                 document = activity.findViewById(R.id.buttonDocumentMode),
                 humanistic = activity.findViewById(R.id.buttonHumanisticMode)
             )
+            val documentBatchRail = DocumentBatchRailViews(
+                rail = activity.findViewById(R.id.documentBatchRail),
+                header = activity.findViewById(R.id.documentBatchRailHeader),
+                list = activity.findViewById(R.id.documentBatchRailList)
+            )
             val bottomCockpit = BottomCockpitViews(
                 shutter = activity.findViewById(R.id.buttonShutter),
                 lensFacing = activity.findViewById(R.id.buttonLensFacing),
@@ -353,6 +369,7 @@ internal data class MainActivityViews(
                 topBar = topBar,
                 quickPanel = quickPanel,
                 floatingUtility = floatingUtility,
+                documentBatchRail = documentBatchRail,
                 settingsPanel = settingsPanel,
                 filterLab = filterLab,
                 devConsole = devConsole,

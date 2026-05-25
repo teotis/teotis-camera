@@ -39,7 +39,6 @@ import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.WatermarkTemplate
-import com.opencamera.core.settings.renderStyleColorSpec
 import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.liveWatermarkMetadataTags
 import com.opencamera.core.settings.watermarkStyleFor
@@ -393,7 +392,7 @@ private class PhotoModeController(
         val watermarkStyle = context.settingsSnapshot.persisted.photo
             .watermarkStyleFor(selectedWatermarkTemplate.id)
         return EffectSpec(listOf(
-            FilterEffect(filter.id, adjustedRenderSpec, recipe),
+            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe),
             WatermarkEffect(
                 templateId = selectedWatermarkTemplate.id,
                 tokens = mapOf(

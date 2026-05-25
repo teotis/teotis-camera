@@ -364,9 +364,7 @@ class CameraCockpitRenderModelTest {
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.LATENCY,
-            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+            enablePreviewSnapshots = true
         ),
         previewRatio: PreviewRatio = PreviewRatio.FULL
     ): SessionState {

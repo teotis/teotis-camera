@@ -33,7 +33,6 @@ import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.mode.label
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.compactSummary
-import com.opencamera.core.settings.toMetadataTags
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -86,11 +85,6 @@ private class NightModeController(
     }
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
-
-                "Scenery assist quality updated"
-            }
-        )
-    }
 
     override suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
@@ -201,7 +195,6 @@ private class NightModeController(
                     put("stabilization", if (profile.requiresTripod) "tripod" else "handheld")
                     put("mergeFrameCount", profile.frameCount.toString())
                     put("flash", flashMode.name.lowercase())
-                    put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                     put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                     put("modeVariant", proVariantState.modeVariantTag())
                     put("watermarkModeName", "Scenery")
@@ -224,7 +217,6 @@ private class NightModeController(
                     requiresTripod = profile.requiresTripod,
                     flashMode = flashMode,
                     manualCaptureParams = currentManualDraftOrNull(),
-                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
             )
@@ -235,7 +227,6 @@ private class NightModeController(
                 captureProfile = CaptureProfile(
                     flashMode = flashMode,
                     manualCaptureParams = currentManualDraftOrNull(),
-                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
             )
@@ -331,9 +322,9 @@ private class NightModeController(
             else -> "Flash ${resolvedFlashMode(profile).label}."
         }
         val standardSummary = if (multiFrameEnabled()) {
-            "Default style ${profile.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | ${profile.frameCount} frames | Exposure ${profile.longExposureMillis} ms | Tripod ${profile.requiresTripod} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Subfeatures scenery style, timer, frame ratio, and night fusion ride the current mode profile. $flashSummary"
+            "Default style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | ${profile.frameCount} frames | Exposure ${profile.longExposureMillis} ms | Tripod ${profile.requiresTripod} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Subfeatures scenery style, timer, frame ratio, and night fusion ride the current mode profile. $flashSummary"
         } else {
-            "Default style ${profile.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Single-frame brightening fallback because night multi-frame is unavailable on this device. | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Subfeatures scenery style, timer, and frame ratio stay available while fusion degrades. $flashSummary"
+            "Default style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Single-frame brightening fallback because night multi-frame is unavailable on this device. | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Subfeatures scenery style, timer, and frame ratio stay available while fusion degrades. $flashSummary"
         }
         if (!proVariantEnabled) {
             return standardSummary

@@ -417,7 +417,9 @@ fun nextZoomRatio(
 
 data class StillCaptureConfig(
     val resolutionOption: StillCaptureResolutionOption? = null,
-    val outputSize: StillCaptureOutputSize? = null
+    val outputSize: StillCaptureOutputSize? = null,
+    val qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference = com.opencamera.core.media.StillCaptureQualityPreference.LATENCY,
+    val resolutionPreset: com.opencamera.core.media.StillCaptureResolutionPreset = com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP
 )
 
 enum class RecordingQualityPreset(

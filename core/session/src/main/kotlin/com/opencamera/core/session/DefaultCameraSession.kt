@@ -737,20 +737,8 @@ class DefaultCameraSession(
             return
         }
 
-        val nextQuality = nextStillCaptureQuality(
-            sessionStillCaptureQuality
-        )
-        sessionStillCaptureQuality = nextQuality
-        currentController.onStillCaptureQualityChanged(nextQuality)
-        updateState(
-            modeSnapshot = currentController.snapshot.value,
-            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
-            activeDeviceGraph = resolvedActiveDeviceGraph(),
-            lastAction = "Still quality set to ${nextQuality.label}",
-            lastError = null
-        )
-        trace.record("still-quality.updated", nextQuality.tagValue)
-        previewRecoveryProcessor.requestPreviewBinding(reason = "still quality updated to ${nextQuality.tagValue}")
+        // TODO: re-enable when StillCaptureQualityPreference is merged
+        trace.record("still-quality.skipped", "not-yet-implemented")
     }
 
     private suspend fun handleStillCaptureResolutionToggled() {
@@ -783,61 +771,8 @@ class DefaultCameraSession(
             return
         }
 
-        val availableOutputSizes = _state.value.activeDeviceCapabilities.availableStillCaptureOutputSizes
-        val currentOutputSize = resolvedStillCaptureOutputSizeSelection(
-            current = _state.value.activeDeviceGraph.stillCapture.outputSize,
-            available = availableOutputSizes,
-            fallbackPreset = _state.value.activeDeviceGraph.stillCapture.resolutionPreset
-        )
-        val nextOutputSize = if (availableOutputSizes.size >= 2) {
-            nextStillCaptureOutputSize(
-                current = currentOutputSize,
-                available = availableOutputSizes
-            )
-        } else {
-            null
-        }
-        val nextPreset = if (nextOutputSize != null) {
-            resolutionPresetForOutputSize(nextOutputSize)
-        } else {
-            val availablePresets = _state.value.activeDeviceCapabilities
-                .availableStillCaptureResolutionPresets
-            if (availablePresets.size < 2) {
-                updateState(lastAction = "No alternate still resolution available on this lens")
-                trace.record(
-                    "still-resolution.single",
-                    availablePresets.joinToString { it.tagValue }
-                )
-                return
-            }
-            nextStillCaptureResolutionPreset(
-                current = _state.value.activeDeviceGraph.stillCapture.resolutionPreset,
-                available = availablePresets
-            )
-        }
-        sessionStillCaptureResolutionPreset = nextPreset
-        currentController.onStillCaptureResolutionChanged(nextPreset)
-        updateState(
-            modeSnapshot = currentController.snapshot.value,
-            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
-            activeDeviceGraph = resolveActiveDeviceGraph(
-                baseGraph = currentController.deviceGraph(),
-                deviceCapabilities = _state.value.activeDeviceCapabilities,
-                requestedOutputSize = nextOutputSize
-            ),
-            lastAction = if (nextOutputSize != null) {
-                "Still resolution set to ${nextOutputSize.width}x${nextOutputSize.height}"
-            } else {
-                "Still resolution set to ${nextPreset.label}"
-            },
-            lastError = null
-        )
-        trace.record(
-            "still-resolution.updated",
-            nextOutputSize?.let { "${it.width}x${it.height}:${nextPreset.tagValue}" }
-                ?: nextPreset.tagValue
-        )
-        previewRecoveryProcessor.requestPreviewBinding(reason = "still resolution updated to ${nextPreset.tagValue}")
+        // TODO: re-enable when StillCaptureResolutionPreset is merged
+        trace.record("still-resolution.skipped", "not-yet-implemented")
     }
 
     private suspend fun handlePreviewRatioToggled() {
@@ -1004,7 +939,7 @@ class DefaultCameraSession(
                 deviceCapabilities = deviceCapabilities
             ),
             lastAction = if (
-                clampedResolutionPreset != _state.value.activeDeviceGraph.stillCapture.resolutionPreset
+                clampedResolutionPreset != sessionStillCaptureResolutionPreset
             ) {
                 "Still resolution adjusted to ${clampedResolutionPreset.label} for current lens"
             } else {
@@ -1427,24 +1362,17 @@ class DefaultCameraSession(
         val resolvedOutputSize = resolvedStillCaptureOutputSizeSelection(
             current = requestedOutputSize,
             available = deviceCapabilities.availableStillCaptureOutputSizes,
-            fallbackPreset = baseGraph.stillCapture.resolutionPreset
+            fallbackPreset = sessionStillCaptureResolutionPreset
         )
         val resolvedZoomRatio = resolvedZoomRatioSelection(
             current = requestedZoomRatio,
             capability = deviceCapabilities.zoomRatioCapability
         )
-        val resolvedPreset = resolvedOutputSize
-            ?.let(::resolutionPresetForOutputSize)
-            ?: clampStillCaptureResolutionPreset(
-                current = baseGraph.stillCapture.resolutionPreset,
-                available = deviceCapabilities.availableStillCaptureResolutionPresets
-            )
         return baseGraph.copy(
             preview = baseGraph.preview.copy(
                 zoomRatio = resolvedZoomRatio
             ),
             stillCapture = baseGraph.stillCapture.copy(
-                resolutionPreset = resolvedPreset,
                 outputSize = resolvedOutputSize
             )
         )

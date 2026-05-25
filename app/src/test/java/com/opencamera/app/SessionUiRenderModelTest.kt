@@ -85,8 +85,6 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-
-                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -102,8 +100,7 @@ class SessionUiRenderModelTest {
         val state = defaultSessionState(
             activeDeviceGraph = DeviceGraphSpec.videoRecording(
                 preferredLensFacing = LensFacing.FRONT,
-                enablePreviewSnapshots = true,
-                stillCaptureResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
+                enablePreviewSnapshots = true
             ),
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 availableLensFacings = setOf(LensFacing.FRONT)
@@ -232,8 +229,6 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.FRONT,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-
-                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -700,6 +695,49 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `portrait lab render model exposes depth strength slider`() {
+        val baseline = defaultSessionState()
+        val model = portraitLabPageRenderModel(
+            baseline.copy(
+                settings = baseline.settings.copy(
+                    persisted = baseline.settings.persisted.copy(
+                        photo = baseline.settings.persisted.photo.copy(
+                            portraitDepthStrength = 75
+                        )
+                    )
+                )
+            ),
+            TestAppTextResolver()
+        )
+
+        assertEquals(75, model.depthStrength)
+        assertEquals("75%", model.depthStrengthLabel)
+        assertNotNull(model.updateDepthStrengthAction)
+    }
+
+    @Test
+    fun `portrait lab depth strength action is null when editing disabled`() {
+        val model = portraitLabPageRenderModel(
+            defaultSessionState(
+                activeShot = ShotRequest(
+                    shotId = "shot-depth",
+                    shotKind = ShotKind.STILL_CAPTURE,
+                    mediaType = MediaType.PHOTO,
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+                    postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+                    captureProfile = CaptureProfile()
+                ),
+                persistedPhotoSettings = PhotoSettings(portraitDepthStrength = 75)
+            ),
+            TestAppTextResolver()
+        )
+
+        assertEquals(75, model.depthStrength)
+        assertNull(model.updateDepthStrengthAction)
+    }
+
+    @Test
     fun `watermark lab detail render model exposes frame controls for frame templates`() {
         val baselineState = defaultSessionState()
         val model = watermarkLabDetailRenderModel(
@@ -1046,9 +1084,7 @@ class SessionUiRenderModelTest {
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true,
-
-            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+            enablePreviewSnapshots = true
         ),
         previewStatus: PreviewStatus = PreviewStatus.ACTIVE,
         previewMetrics: PreviewMetrics = PreviewMetrics(),
@@ -1151,8 +1187,6 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 1f,
-
-                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )

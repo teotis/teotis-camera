@@ -174,6 +174,40 @@
             android:text="@string/button_dev_entry" />
     </LinearLayout>
 
+    <!-- Document batch side rail (visible only in document mode with active batch) -->
+    <LinearLayout
+        android:id="@+id/documentBatchRail"
+        android:layout_width="56dp"
+        android:layout_height="0dp"
+        android:layout_marginEnd="@dimen/space_8"
+        android:background="#40000000"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingVertical="@dimen/space_4"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintEnd_toStartOf="@id/floatingUtilityGroup"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <Button
+            android:id="@+id/documentBatchRailHeader"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="32dp"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:id="@+id/documentBatchRailList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="@dimen/space_4"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:orientation="vertical"
+            android:gravity="center_horizontal" />
+    </LinearLayout>
+
     <!-- Overlay: Quick Panel Sheet -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/quickBubblePanel"
@@ -772,6 +806,38 @@
                     android:paddingHorizontal="16dp"
                     android:paddingVertical="12dp"
                     android:textAlignment="viewStart" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Depth"
+                        android:textColor="@color/oc_text_secondary"
+                        android:textSize="@dimen/text_size_status" />
+
+                    <SeekBar
+                        android:id="@+id/portraitDepthStrengthSeekBar"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:paddingHorizontal="6dp" />
+
+                    <TextView
+                        android:id="@+id/portraitDepthStrengthValue"
+                        android:layout_width="44dp"
+                        android:layout_height="32dp"
+                        android:textSize="@dimen/text_size_status"
+                        android:textColor="@color/oc_text_secondary"
+                        android:gravity="center" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/portraitLabFooter"

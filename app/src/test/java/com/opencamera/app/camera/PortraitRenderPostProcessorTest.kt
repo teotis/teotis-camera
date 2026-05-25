@@ -662,6 +662,7 @@ class PortraitRenderPostProcessorTest {
         }
 
         override suspend fun applyWithMask(
+            target: ProcessorTarget,
             bitmap: android.graphics.Bitmap,
             spec: PortraitRenderSpec,
             mask: SavedPhotoMaskPixels

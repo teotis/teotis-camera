@@ -87,7 +87,18 @@ class AppContainer(
                 AndroidPhotoFrameRatioEditor(appContext)
             ),
             PortraitRenderPostProcessor(
-                AndroidPortraitRenderEditor(appContext)
+                AndroidPortraitRenderEditor(appContext),
+                savedMaskProvider,
+                maskBitmapSource = { target ->
+                    when (target) {
+                        is com.opencamera.core.media.ProcessorTarget.FilePath ->
+                            BitmapFactory.decodeFile(target.path)
+                        is com.opencamera.core.media.ProcessorTarget.ContentUri ->
+                            appContext.contentResolver.openInputStream(Uri.parse(target.value))?.use {
+                                BitmapFactory.decodeStream(it)
+                            }
+                    }
+                }
             ),
             PhotoAlgorithmPostProcessor(
                 AndroidPhotoAlgorithmEditor(appContext),

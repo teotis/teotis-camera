@@ -71,6 +71,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private lateinit var devConsoleRenderer: DevConsoleRenderer
     private lateinit var mainRenderer: MainActivityRenderer
     private lateinit var actionBinder: MainActivityActionBinder
+    private lateinit var documentBatchRailRenderer: DocumentBatchRailRenderer
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -153,6 +154,10 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             isFilterAdjustmentVisible = { panelState.isFilterAdjustmentVisible }
         )
         devConsoleRenderer = DevConsoleRenderer(this, views.devConsole)
+        documentBatchRailRenderer = DocumentBatchRailRenderer(
+            views = views.documentBatchRail,
+            onRemoveItemClick = { itemId -> dispatch(SessionIntent.DocumentBatchRemoveItem(itemId)) }
+        )
         mainRenderer = MainActivityRenderer(
             views, cockpitRenderer, settingsRenderer, filterLabRenderer, devConsoleRenderer
         )
@@ -297,6 +302,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         latestQuickPanelSheetRenderModel = sheet
         cockpitRenderer.renderQuickBubble(settingsPage, sheet)
         cockpitRenderer.renderLowLightNightPrompt(lowLightNightPromptRenderModel(state, text))
+        documentBatchRailRenderer.render(documentBatchRailRenderModel(state, text))
         mainRenderer.renderDevEntryVisibility(com.opencamera.app.BuildConfig.DEBUG)
         val devLogModel = devLogRenderModel(
             state = state,

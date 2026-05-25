@@ -4788,4 +4788,46 @@ class DefaultCameraSessionTest {
         assertEquals(itemsBefore[1].itemId, itemsAfter[1].itemId)
         assertEquals("Item already at target position", session.state.value.lastAction)
     }
+
+    @Test
+    fun `degraded shot completed from postprocess failure updates thumbnail and clears active shot`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/degraded-photo.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia(
+                        outputPath = "Pictures/OpenCamera/degraded-photo.jpg",
+                        renderUri = "file:///tmp/degraded-photo.jpg"
+                    ),
+                    metadata = SaveRequest.photoLibrary().metadata,
+                    pipelineNotes = listOf(
+                        "algorithm-render:applied:photo-vivid",
+                        "postprocess:failed:PhotoWatermark"
+                    )
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertNull(session.state.value.activeShot)
+        val thumbnail = session.state.value.latestThumbnailSource
+        assertTrue(thumbnail is ThumbnailSource.SavedMedia)
+        assertEquals("Pictures/OpenCamera/degraded-photo.jpg", thumbnail.outputPath)
+        assertEquals("Photo saved (degraded)", session.state.value.lastAction)
+    }
 }

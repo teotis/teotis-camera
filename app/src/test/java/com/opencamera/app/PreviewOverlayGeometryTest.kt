@@ -189,4 +189,51 @@ class PreviewOverlayGeometryTest {
     private fun assertInRange(min: Float, max: Float, value: Float) {
         assert(value in min..max) { "Expected $value to be in [$min, $max]" }
     }
+
+    // --- clampReticleCenter tests ---
+
+    @Test
+    fun `center tap in full-view bounds stays at center`() {
+        val result = clampReticleCenter(540f, 960f, 24f, 8f, 0f, 0f, 1080f, 1920f)
+        assertEquals(540f, result.x)
+        assertEquals(960f, result.y)
+    }
+
+    @Test
+    fun `tap near left edge is clamped`() {
+        val result = clampReticleCenter(5f, 960f, 24f, 8f, 0f, 0f, 1080f, 1920f)
+        assertEquals(32f, result.x) // 0 + 24 + 8
+    }
+
+    @Test
+    fun `tap near right edge is clamped`() {
+        val result = clampReticleCenter(1075f, 960f, 24f, 8f, 0f, 0f, 1080f, 1920f)
+        assertEquals(1048f, result.x) // 1080 - 24 - 8
+    }
+
+    @Test
+    fun `tap near top edge is clamped`() {
+        val result = clampReticleCenter(540f, 5f, 24f, 8f, 0f, 0f, 1080f, 1920f)
+        assertEquals(32f, result.y) // 0 + 24 + 8
+    }
+
+    @Test
+    fun `tap near bottom edge is clamped`() {
+        val result = clampReticleCenter(540f, 1915f, 24f, 8f, 0f, 0f, 1080f, 1920f)
+        assertEquals(1888f, result.y) // 1920 - 24 - 8
+    }
+
+    @Test
+    fun `reticle stays within inset 4_3 frame`() {
+        // 16:9 view with 4:3 frame: frame has horizontal insets
+        val result = clampReticleCenter(100f, 960f, 24f, 8f, 180f, 0f, 900f, 1920f)
+        assertEquals(212f, result.x) // 180 + 24 + 8
+    }
+
+    @Test
+    fun `reticle at exact boundary remains unchanged`() {
+        val result = clampReticleCenter(32f, 32f, 24f, 8f, 0f, 0f, 1080f, 1920f)
+        assertEquals(32f, result.x)
+        assertEquals(32f, result.y)
+    }
 }

@@ -97,6 +97,7 @@ import com.opencamera.core.media.planLiveTemporalAssembly
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaOutputHandle
+import com.opencamera.core.media.addPipelineNotes
 import com.opencamera.core.media.MultiFrameMergePlaceholderPostProcessor
 import com.opencamera.core.media.PipelineMetadataPostProcessor
 import com.opencamera.core.media.SaveRequest
@@ -1945,7 +1946,11 @@ class CameraXCaptureAdapter(
                 deviceCaptureCompletedAtElapsedMillis = deviceCaptureCompletedAtElapsedMillis
             )
         )
-        val processedResult = mediaPostProcessor.process(rawResult)
+        val processedResult = try {
+            mediaPostProcessor.process(rawResult)
+        } catch (_: Throwable) {
+            rawResult.addPipelineNotes("postprocess:failed:composite")
+        }
         val postProcessCompletedAt = SystemClock.elapsedRealtime()
         val timedResult = processedResult.copy(
             timing = processedResult.timing.copy(

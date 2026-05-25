@@ -423,9 +423,7 @@ class SessionSettingsManagerTest {
                 activeDeviceCapabilities = DeviceCapabilities.DEFAULT,
                 activeDeviceGraph = DeviceGraphSpec.stillCapture(
                     preferredLensFacing = LensFacing.BACK,
-                    enablePreviewSnapshots = true,
-                    qualityPreference = StillCaptureQualityPreference.LATENCY,
-                    resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+                    enablePreviewSnapshots = true
                 ),
                 previewMetrics = PreviewMetrics(),
                 presentation = SessionPresentationState(

@@ -375,4 +375,15 @@
     <string name="pro_controls_supporting_editable">上层手动草稿当前可编辑；每个控件会标明其状态：已应用、仅保存、或暂时不支持。</string>
     <string name="pro_controls_supporting_readonly">允许草稿更改，但此设备当前所有控件均处于仅保存或暂时不支持状态。</string>
     <string name="pro_controls_finish_capture_hint">完成当前拍摄后方可编辑。</string>
+
+    <!-- Document batch organizer -->
+    <string name="document_batch_organizer_title">整理本轮</string>
+    <string name="document_batch_page_count">%d 页</string>
+    <string name="document_batch_remove">移出本轮</string>
+    <string name="document_batch_move_up">上移</string>
+    <string name="document_batch_move_down">下移</string>
+    <string name="document_batch_crop_applied">已裁边</string>
+    <string name="document_batch_crop_skipped">未裁边</string>
+    <string name="document_batch_crop_failed">裁边失败</string>
+    <string name="document_batch_rail_page_description">第 %d 页</string>
 </resources>

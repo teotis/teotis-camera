@@ -54,7 +54,6 @@ class SessionStateRenderTest {
             activeDeviceGraph = DeviceGraphSpec.stillCapture(
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
-                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP,
                 outputSize = null
             )
         )
@@ -77,7 +76,6 @@ class SessionStateRenderTest {
             activeDeviceGraph = DeviceGraphSpec.stillCapture(
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
-                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -103,8 +101,7 @@ class SessionStateRenderTest {
             ),
             activeDeviceGraph = DeviceGraphSpec.videoRecording(
                 preferredLensFacing = LensFacing.BACK,
-                enablePreviewSnapshots = true,
-                stillResolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+                enablePreviewSnapshots = true
             )
         )
 
@@ -115,9 +112,7 @@ class SessionStateRenderTest {
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.LATENCY,
-            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+            enablePreviewSnapshots = true
         )
     ): SessionState {
         return SessionState(

@@ -352,6 +352,13 @@ internal class CaptureRecordingSessionProcessor(
                         result.mediaType == MediaType.PHOTO
                     ) {
                         val currentBatch = s.presentation.documentBatch
+                        val cropStatus = documentCropStatusFrom(result.pipelineNotes)
+                        val cropSuffix = when (cropStatus) {
+                            DocumentBatchCropStatus.APPLIED -> " • auto-cropped"
+                            DocumentBatchCropStatus.SKIPPED -> " • original kept"
+                            DocumentBatchCropStatus.FAILED -> " • processing degraded"
+                            DocumentBatchCropStatus.NOT_REQUESTED -> ""
+                        }
                         val newItem = DocumentBatchItem(
                             itemId = result.shotId,
                             shotId = result.shotId,
@@ -359,15 +366,15 @@ internal class CaptureRecordingSessionProcessor(
                             outputPath = result.outputPath,
                             renderUri = result.thumbnailSource.renderUriOrNull(),
                             thumbnailSource = result.thumbnailSource,
-                            profileId = null,
-                            scanMode = null,
-                            cropStatus = DocumentBatchCropStatus.NOT_REQUESTED,
+                            profileId = result.metadata.customTags["profile"],
+                            scanMode = result.metadata.customTags["scanMode"],
+                            cropStatus = cropStatus,
                             pipelineNotes = result.pipelineNotes
                         )
                         currentBatch.copy(
                             items = currentBatch.items + newItem,
                             latestItemId = newItem.itemId,
-                            lastMessage = "Added page ${newItem.orderIndex + 1}"
+                            lastMessage = "Page added$cropSuffix"
                         )
                     } else {
                         s.presentation.documentBatch
@@ -573,4 +580,13 @@ internal class CaptureRecordingSessionProcessor(
             saveTask = updatedSaveTask
         )
     }
+}
+
+internal fun documentCropStatusFrom(notes: List<String>): DocumentBatchCropStatus {
+    for (note in notes) {
+        if (note == "document:auto-crop:applied") return DocumentBatchCropStatus.APPLIED
+        if (note.startsWith("document:auto-crop:skipped:")) return DocumentBatchCropStatus.SKIPPED
+        if (note.startsWith("document:auto-crop:failed:")) return DocumentBatchCropStatus.FAILED
+    }
+    return DocumentBatchCropStatus.NOT_REQUESTED
 }

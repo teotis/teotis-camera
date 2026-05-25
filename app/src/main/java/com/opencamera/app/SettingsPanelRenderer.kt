@@ -70,6 +70,9 @@ internal class SettingsPanelRenderer(
         renderControl(views.portraitBeautyPreset, model.beautyPresetControl, model.editingEnabled)
         renderControl(views.portraitBeautyStrength, model.beautyStrengthControl, model.editingEnabled)
         renderControl(views.portraitBokehEffect, model.bokehEffectControl, model.editingEnabled)
+        views.portraitDepthStrengthSeekBar.progress = model.depthStrength
+        views.portraitDepthStrengthSeekBar.isEnabled = model.editingEnabled && model.updateDepthStrengthAction != null
+        views.portraitDepthStrengthValue.text = model.depthStrengthLabel
     }
 
     fun renderWatermarkSelectorPage(model: WatermarkLabSelectorRenderModel) {

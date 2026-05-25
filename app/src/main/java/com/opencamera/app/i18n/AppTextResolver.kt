@@ -525,6 +525,16 @@ open class AppTextResolver(private val context: Context?) {
         AppLanguage.EN -> "English"
     }
 
+    // Document batch organizer
+    open fun documentBatchOrganizerTitle(): String = str(R.string.document_batch_organizer_title, "整理本轮")
+    open fun documentBatchPageCount(count: Int): String = String.format(str(R.string.document_batch_page_count, "%d 页"), count)
+    open fun documentBatchRemoveLabel(): String = str(R.string.document_batch_remove, "移出本轮")
+    open fun documentBatchMoveUpLabel(): String = str(R.string.document_batch_move_up, "上移")
+    open fun documentBatchMoveDownLabel(): String = str(R.string.document_batch_move_down, "下移")
+    open fun documentBatchCropApplied(): String = str(R.string.document_batch_crop_applied, "已裁边")
+    open fun documentBatchCropSkipped(): String = str(R.string.document_batch_crop_skipped, "未裁边")
+    open fun documentBatchCropFailed(): String = str(R.string.document_batch_crop_failed, "裁边失败")
+
     internal open fun sessionUiStrings(): com.opencamera.app.SessionUiStrings {
         return com.opencamera.app.SessionUiStrings(
             buttonSwitchToFront = str(R.string.button_switch_to_front, "Switch to Front"),

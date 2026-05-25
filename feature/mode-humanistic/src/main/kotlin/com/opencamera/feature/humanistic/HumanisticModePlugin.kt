@@ -33,16 +33,13 @@ import com.opencamera.core.mode.ProVariantState
 import com.opencamera.core.mode.captureAidMetadataTags
 import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.settings.CountdownDuration
-import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.WatermarkTemplate
-import com.opencamera.core.settings.renderStyleColorSpec
 import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.liveWatermarkMetadataTags
-import com.opencamera.core.settings.toMetadataTags
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -187,7 +184,6 @@ private class HumanisticModeController(
                                 put("watermarkTemplate", selectedWatermarkTemplate().id)
                                 put("livePhotoDefault", "on")
                                 putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
-                                put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                                 put("modeVariant", proVariantState.modeVariantTag())
                                 if (proVariantEnabled) {
@@ -201,7 +197,6 @@ private class HumanisticModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     ),
                     livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft.toCaptureSpec()
@@ -219,7 +214,6 @@ private class HumanisticModeController(
                                 put("algorithmProfile", style.algorithmProfile)
                                 put("watermarkTemplate", selectedWatermarkTemplate().id)
                                 put("livePhotoDefault", "off")
-                                put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                                 put("modeVariant", proVariantState.modeVariantTag())
                                 if (proVariantEnabled) {
@@ -233,7 +227,6 @@ private class HumanisticModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )
@@ -255,7 +248,7 @@ private class HumanisticModeController(
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
-            FilterEffect(style.id, adjustedRenderSpec, recipe),
+            FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
             FrameEffect(currentFrameRatio())
         ))
     }
@@ -331,7 +324,6 @@ private class HumanisticModeController(
         val style = currentStyle()
         val standardSummary = buildString {
             append("Default style ${style.label}")
-            append(" | Still ${runtimeState().stillCaptureQuality.label}")
             append(" | Size ${runtimeState().stillCaptureResolutionPreset.label}")
             append(" | Watermark ${selectedWatermarkTemplate().label}")
             append(" | Live ${onOffLabel(livePhotoEnabledByDefault())}")

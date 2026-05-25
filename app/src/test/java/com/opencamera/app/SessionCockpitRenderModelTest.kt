@@ -72,8 +72,6 @@ class SessionCockpitRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-
-                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -89,8 +87,7 @@ class SessionCockpitRenderModelTest {
         val state = defaultSessionState(
             activeDeviceGraph = DeviceGraphSpec.videoRecording(
                 preferredLensFacing = LensFacing.FRONT,
-                enablePreviewSnapshots = true,
-                stillCaptureResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
+                enablePreviewSnapshots = true
             ),
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 availableLensFacings = setOf(LensFacing.FRONT)
@@ -401,10 +398,7 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `quick panel sheet exposes photo quality and resolution rows`() {
         val state = defaultSessionState(
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-
-                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
-            )
+            activeDeviceGraph = DeviceGraphSpec.stillCapture()
         )
 
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
@@ -681,9 +675,7 @@ class SessionCockpitRenderModelTest {
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true,
-
-            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+            enablePreviewSnapshots = true
         ),
         previewStatus: PreviewStatus = PreviewStatus.ACTIVE,
         previewMetrics: PreviewMetrics = PreviewMetrics(),

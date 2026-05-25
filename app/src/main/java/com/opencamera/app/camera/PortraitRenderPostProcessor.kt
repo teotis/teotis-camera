@@ -305,7 +305,7 @@ internal class PortraitRenderPostProcessor(
                 val renderResult = if (maskResult != null && editor is MaskAwarePortraitRenderEditor) {
                     try {
                         val (editorResult, maskNotes) = editor.applyWithMask(
-                            maskResult.first, payload.spec, maskResult.second
+                            payload.target, maskResult.first, payload.spec, maskResult.second
                         )
                         val baseResult = applyEditorResult(result, payload, editorResult)
                         maskNotes.fold(baseResult) { acc, note -> acc.addPipelineNotes(note) }
@@ -468,6 +468,7 @@ internal class AndroidPortraitRenderEditor(
     }
 
     override suspend fun applyWithMask(
+        target: ProcessorTarget,
         bitmap: Bitmap,
         spec: PortraitRenderSpec,
         mask: SavedPhotoMaskPixels
@@ -481,11 +482,27 @@ internal class AndroidPortraitRenderEditor(
                     spec = spec,
                     mask = mask
                 )
+                val lightSpotNotes = applyLightSpotEffect(bitmap, blurredBitmap, spec)
+                val encodedBytes = ByteArrayOutputStream().use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
+                        "Mask-aware portrait render JPEG compression failed"
+                    }
+                    output.toByteArray()
+                }
+                if (!writeEncodedBytes(target, encodedBytes)) {
+                    return@withContext Pair(
+                        ProcessorEditorResult.Failed("output-unavailable"),
+                        listOf("portrait-render:fallback-focus")
+                    )
+                }
+                val preservedExif = readPreservedExif(encodedBytes)
+                val exifWarning = restorePreservedExif(target, preservedExif)
                 val notes = mutableListOf(
                     "portrait-mask:saved=applied",
                     "portrait-render:subject-mask"
                 )
-                Pair(PortraitRenderApplied(), notes)
+                notes.addAll(lightSpotNotes)
+                Pair(PortraitRenderApplied(exifWarning, lightSpotNotes), notes)
             } finally {
                 blurredBitmap.recycle()
             }

@@ -26,6 +26,7 @@ internal sealed class CockpitPanelCommand {
     data class OpenWatermarkDetail(val templateId: String) : CockpitPanelCommand()
     data class SelectFilterFamily(val family: FilterLabFamily) : CockpitPanelCommand()
     data object ToggleFilterAdjustmentMode : CockpitPanelCommand()
+    data object ToggleDocumentBatchOrganizer : CockpitPanelCommand()
     data object AndroidBack : CockpitPanelCommand()
 }
 
@@ -184,6 +185,14 @@ internal fun nextState(
             )
         }
 
+        is CockpitPanelCommand.ToggleDocumentBatchOrganizer -> {
+            if (current.route is CockpitPanelRoute.DocumentBatchOrganizer) {
+                current.copy(route = CockpitPanelRoute.None)
+            } else {
+                current.copy(route = CockpitPanelRoute.DocumentBatchOrganizer)
+            }
+        }
+
         is CockpitPanelCommand.AndroidBack -> {
             when (current.route) {
                 is CockpitPanelRoute.None -> current
@@ -217,7 +226,8 @@ internal fun nextState(
                     )
                 }
                 is CockpitPanelRoute.DevConsole,
-                is CockpitPanelRoute.QuickBubble -> {
+                is CockpitPanelRoute.QuickBubble,
+                is CockpitPanelRoute.DocumentBatchOrganizer -> {
                     current.copy(route = CockpitPanelRoute.None)
                 }
             }

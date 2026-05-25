@@ -1795,8 +1795,12 @@ private fun filterLabFamilyState(
         FilterLabFamily.HUMANISTIC -> FilterLabFamilyState(
             family = selectedFamily,
             label = text.filterFamilyHumanistic(),
-            currentFilterId = settings.photo.defaultHumanisticFilterProfileId,
-            filters = catalog.filterProfilesFor(FilterProfileCategory.HUMANISTIC, includeCustom = true),
+            currentFilterId = catalog.humanisticStyleSubitems().let { filters ->
+                settings.photo.defaultHumanisticFilterProfileId.takeIf { current ->
+                    filters.any { profile -> profile.id == current }
+                } ?: filters.firstOrNull()?.id ?: settings.photo.defaultHumanisticFilterProfileId
+            },
+            filters = catalog.humanisticStyleSubitems(),
             supported = state.activeDeviceCapabilities.supportsStillCapture,
             unsupportedReason = text.stillCaptureUnavailable(),
             updateAction = PersistedSettingsAction::UpdateHumanisticFilter
@@ -1821,6 +1825,14 @@ private fun filterLabFamilyState(
             unsupportedReason = text.videoRecordingUnavailable(),
             updateAction = PersistedSettingsAction::UpdateVideoFilter
         )
+    }
+}
+
+private fun com.opencamera.core.settings.FeatureCatalog.humanisticStyleSubitems(): List<FilterProfile> {
+    val primaryIds = setOf("humanistic-street", "humanistic-portrait", "humanistic-life")
+    return filterProfiles.filter { profile ->
+        profile.category == FilterProfileCategory.HUMANISTIC &&
+            (profile.id in primaryIds || !profile.builtIn)
     }
 }
 

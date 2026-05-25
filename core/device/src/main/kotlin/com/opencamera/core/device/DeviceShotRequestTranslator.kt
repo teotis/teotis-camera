@@ -44,6 +44,10 @@ class DefaultDeviceShotRequestTranslator(
                 val resolvedFlashMode = resolveFlashMode(request.captureProfile.flashMode)
                 val stillCaptureResolutionPreset = request.captureProfile.stillCaptureResolutionPreset
                     ?: StillCaptureResolutionPreset.LARGE_12MP
+                val resolvedLatencyPriority = resolveLatencyPriority(
+                    request.captureProfile.stillCaptureQuality,
+                    defaultForSingleFrame = true
+                )
                 DeviceShotRequest(
                     shotId = request.shotId,
                     template = CaptureTemplate.STILL_CAPTURE,
@@ -53,11 +57,13 @@ class DefaultDeviceShotRequestTranslator(
                         request.captureProfile.manualCaptureParams
                     ),
                     manualControlCapabilities = deviceCapabilities.resolvedManualControlCapabilities,
+                    latencyPriority = resolvedLatencyPriority,
                     diagnostics = buildList {
                         add("device:template=still-capture")
                         add("device:graph=capture-topology")
                         add("device:graph-node=${stillNode.id}")
                         add("device:still-resolution=${stillCaptureResolutionPreset.tagValue}")
+                        addCaptureModeDiagnostic(request.captureProfile.stillCaptureQuality, defaultForSingleFrame = true)
                         addManualDiagnostics(request.captureProfile.manualCaptureParams)
                         addFlashDiagnostics(
                             requestedFlashMode = request.captureProfile.flashMode,
@@ -77,6 +83,10 @@ class DefaultDeviceShotRequestTranslator(
                 val resolvedFlashMode = resolveFlashMode(request.captureProfile.flashMode)
                 val stillCaptureResolutionPreset = request.captureProfile.stillCaptureResolutionPreset
                     ?: StillCaptureResolutionPreset.LARGE_12MP
+                val resolvedLatencyPriority = resolveLatencyPriority(
+                    request.captureProfile.stillCaptureQuality,
+                    defaultForSingleFrame = true
+                )
                 DeviceShotRequest(
                     shotId = request.shotId,
                     template = CaptureTemplate.STILL_CAPTURE,
@@ -86,11 +96,13 @@ class DefaultDeviceShotRequestTranslator(
                         request.captureProfile.manualCaptureParams
                     ),
                     manualControlCapabilities = deviceCapabilities.resolvedManualControlCapabilities,
+                    latencyPriority = resolvedLatencyPriority,
                     diagnostics = buildList {
                         add("device:template=still-capture")
                         add("device:graph=capture-topology")
                         add("device:graph-node=${stillNode.id}")
                         add("device:still-resolution=${stillCaptureResolutionPreset.tagValue}")
+                        addCaptureModeDiagnostic(request.captureProfile.stillCaptureQuality, defaultForSingleFrame = true)
                         add("device:live-photo=bundle")
                         addManualDiagnostics(request.captureProfile.manualCaptureParams)
                         request.livePhotoSpec?.let { livePhotoSpec ->
@@ -158,6 +170,10 @@ class DefaultDeviceShotRequestTranslator(
         val resolvedFlashMode = resolveFlashMode(captureProfile.flashMode)
         val stillCaptureResolutionPreset = captureProfile.stillCaptureResolutionPreset
             ?: StillCaptureResolutionPreset.LARGE_12MP
+        val resolvedLatencyPriority = resolveLatencyPriority(
+            captureProfile.stillCaptureQuality,
+            defaultForSingleFrame = false
+        )
 
         return DeviceShotRequest(
             shotId = plan.request.shotId,
@@ -166,6 +182,7 @@ class DefaultDeviceShotRequestTranslator(
             flashMode = resolvedFlashMode,
             manualCaptureParams = resolveManualCaptureParams(captureProfile.manualCaptureParams),
             manualControlCapabilities = deviceCapabilities.resolvedManualControlCapabilities,
+            latencyPriority = resolvedLatencyPriority,
             frameCount = normalizedFrameCount,
             interFrameDelayMillis = interFrameDelayMillis,
             diagnostics = buildList {
@@ -173,6 +190,7 @@ class DefaultDeviceShotRequestTranslator(
                 add("device:graph=capture-topology")
                 add("device:graph-node=${stillNode.id}")
                 add("device:still-resolution=${stillCaptureResolutionPreset.tagValue}")
+                addCaptureModeDiagnostic(captureProfile.stillCaptureQuality, defaultForSingleFrame = false)
                 addManualDiagnostics(captureProfile.manualCaptureParams)
                 addFlashDiagnostics(
                     requestedFlashMode = captureProfile.flashMode,
@@ -208,6 +226,36 @@ class DefaultDeviceShotRequestTranslator(
             return null
         }
         return requestedManualCaptureParams
+    }
+
+    private fun resolveLatencyPriority(
+        qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference?,
+        defaultForSingleFrame: Boolean
+    ): com.opencamera.core.media.CaptureLatencyPriority {
+        return when (qualityPreference) {
+            com.opencamera.core.media.StillCaptureQualityPreference.LATENCY ->
+                com.opencamera.core.media.CaptureLatencyPriority.QUICK_SNAP
+            com.opencamera.core.media.StillCaptureQualityPreference.QUALITY ->
+                com.opencamera.core.media.CaptureLatencyPriority.DEFAULT
+            null -> if (defaultForSingleFrame) {
+                com.opencamera.core.media.CaptureLatencyPriority.QUICK_SNAP
+            } else {
+                com.opencamera.core.media.CaptureLatencyPriority.DEFAULT
+            }
+        }
+    }
+
+    private fun MutableList<String>.addCaptureModeDiagnostic(
+        qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference?,
+        defaultForSingleFrame: Boolean
+    ) {
+        val latencyPriority = resolveLatencyPriority(qualityPreference, defaultForSingleFrame)
+        val mode = when (latencyPriority) {
+            com.opencamera.core.media.CaptureLatencyPriority.QUICK_SNAP -> "minimize-latency"
+            com.opencamera.core.media.CaptureLatencyPriority.DEFAULT -> "max-quality"
+            com.opencamera.core.media.CaptureLatencyPriority.ZSL_WHEN_SUPPORTED -> "zsl"
+        }
+        add("device:capture-mode=$mode")
     }
 
     private fun resolveTorchEnabled(requestedTorchEnabled: Boolean): Boolean {

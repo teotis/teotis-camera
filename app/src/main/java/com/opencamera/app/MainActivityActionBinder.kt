@@ -15,6 +15,7 @@ import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
+import com.opencamera.core.settings.PersistedSettingsAction
 
 internal class MainActivityActionBinder(
     private val views: MainActivityViews,
@@ -61,6 +62,10 @@ internal class MainActivityActionBinder(
         }
         views.floatingUtility.lowLightNightPrompt.setOnClickListener {
             callbacks.toggleLowLightNightAssist()
+            callbacks.renderAfterPanelChange()
+        }
+        views.documentBatchRail.header.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.ToggleDocumentBatchOrganizer)
             callbacks.renderAfterPanelChange()
         }
     }
@@ -196,6 +201,19 @@ internal class MainActivityActionBinder(
         views.settingsPanel.portraitBokehEffect.setOnClickListener {
             callbacks.applySettingsControl(snapshot().portraitLabPage?.bokehEffectControl)
         }
+        views.settingsPanel.portraitDepthStrengthSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                views.settingsPanel.portraitDepthStrengthValue.text = "$progress%"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val progress = seekBar?.progress ?: return
+                callbacks.applySettingsAction(
+                    PersistedSettingsAction.UpdatePortraitDepthStrength(progress)
+                )
+            }
+        })
 
         // Watermark detail
         views.settingsPanel.watermarkPlacement.setOnClickListener {
