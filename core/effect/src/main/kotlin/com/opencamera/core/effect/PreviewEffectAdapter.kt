@@ -3,6 +3,7 @@ package com.opencamera.core.effect
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PerceptualColorRecipe
 import com.opencamera.core.settings.PreviewColorFidelity
+import kotlin.math.abs
 
 import com.opencamera.core.media.SceneMaskQuality
 
@@ -55,21 +56,36 @@ class PreviewEffectAdapter {
     }
 
     private fun buildRecipeColorTransform(recipe: PerceptualColorRecipe): PreviewColorTransform {
-        val warmth = recipe.warmthBias * 20f
-        val tint = recipe.tintBias * 8f
-        val chromaStrength = (recipe.chromaBoost * 0.3f).coerceIn(0f, 0.5f)
-        val toneStrength = (recipe.toneLift + recipe.toneDepth).coerceIn(0f, 1f) * 0.15f
-        val alpha = (chromaStrength + toneStrength).coerceIn(0.05f, 0.45f)
+        val warmthStrength = (recipe.warmthBias * 25f).coerceIn(-1f, 1f)
+        val tintStrength = (recipe.tintBias * 10f).coerceIn(-1f, 1f)
+        val chromaStrength = (recipe.chromaBoost * 0.35f).coerceIn(0f, 0.55f)
+        val toneLiftFactor = (recipe.toneLift * 0.55f).coerceIn(0f, 0.55f)
+        val toneDepthFactor = (recipe.toneDepth * 0.50f).coerceIn(0f, 0.50f)
+        val highlightTintFactor = (recipe.highlightTint * 0.18f).coerceIn(0f, 0.18f)
+        val shadowTintFactor = (recipe.shadowTint * 0.20f).coerceIn(0f, 0.20f)
+        val alpha = (chromaStrength + toneLiftFactor * 0.3f + toneDepthFactor * 0.35f +
+            highlightTintFactor * 0.25f + shadowTintFactor * 0.25f)
+            .coerceIn(0.05f, 0.52f)
 
-        val r = (128 + warmth * 5f + tint * 2f).toInt().coerceIn(0, 255)
-        val g = (128 - tint * 2.5f).toInt().coerceIn(0, 255)
-        val b = (128 - warmth * 5f + tint * 2f).toInt().coerceIn(0, 255)
+        val r = (128 + warmthStrength * 90f + tintStrength * 25f).toInt().coerceIn(0, 255)
+        val g = (128 - tintStrength * 30f - toneDepthFactor * 30f + toneLiftFactor * 20f)
+            .toInt().coerceIn(0, 255)
+        val b = (128 - warmthStrength * 90f + tintStrength * 20f - toneLiftFactor * 15f)
+            .toInt().coerceIn(0, 255)
         val color = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+
+        val effectiveStrength = chromaStrength + (toneLiftFactor + toneDepthFactor) * 0.4f +
+            abs(recipe.warmthBias) * 0.3f
+        val fidelity = if (effectiveStrength > 0.08f) {
+            PreviewColorFidelity.APPROXIMATE
+        } else {
+            PreviewColorFidelity.DEGRADED
+        }
 
         return PreviewColorTransform(
             tintColor = color,
             tintAlpha = alpha,
-            fidelity = PreviewColorFidelity.APPROXIMATE
+            fidelity = fidelity
         )
     }
 

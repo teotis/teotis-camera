@@ -48,49 +48,49 @@ fun ColorLabSpec.toRecipe(
 
     return when (colorScience) {
         StyleColorScience.NATURAL -> PerceptualColorRecipe(
-            toneLift = airyTone * 0.32f,
-            toneDepth = deepTone * 0.38f,
-            chromaBoost = colorMagnitude * 0.28f,
-            warmthBias = color * 0.30f,
-            tintBias = (-color * 0.10f),
-            shadowTint = airyTone * 0.15f,
-            highlightTint = deepTone * 0.10f,
-            neutralProtection = 0.75f,
+            toneLift = airyTone * 0.40f,
+            toneDepth = deepTone * 0.45f,
+            chromaBoost = colorMagnitude * 0.35f,
+            warmthBias = color * 0.35f,
+            tintBias = (-color * 0.12f),
+            shadowTint = airyTone * 0.18f,
+            highlightTint = deepTone * 0.12f,
+            neutralProtection = 0.72f,
             skinProtection = 0.70f
         )
 
         StyleColorScience.TEXTURE -> PerceptualColorRecipe(
-            toneLift = airyTone * 0.18f,
-            toneDepth = deepTone * 0.22f,
-            chromaBoost = colorMagnitude * 0.12f,
-            warmthBias = color * 0.15f,
-            tintBias = (-color * 0.06f),
-            shadowTint = airyTone * 0.20f,
-            highlightTint = deepTone * 0.08f,
-            neutralProtection = 0.82f,
+            toneLift = airyTone * 0.24f,
+            toneDepth = deepTone * 0.28f,
+            chromaBoost = colorMagnitude * 0.16f,
+            warmthBias = color * 0.18f,
+            tintBias = (-color * 0.08f),
+            shadowTint = airyTone * 0.22f,
+            highlightTint = deepTone * 0.10f,
+            neutralProtection = 0.80f,
             skinProtection = 0.78f
         )
 
         StyleColorScience.VIVID -> PerceptualColorRecipe(
-            toneLift = airyTone * 0.26f,
-            toneDepth = deepTone * 0.30f,
-            chromaBoost = colorMagnitude * 0.32f,
-            warmthBias = color * 0.22f,
-            tintBias = (-color * 0.08f),
-            shadowTint = airyTone * 0.10f,
-            highlightTint = deepTone * 0.12f,
-            neutralProtection = 0.70f,
-            skinProtection = 0.68f
+            toneLift = airyTone * 0.34f,
+            toneDepth = deepTone * 0.38f,
+            chromaBoost = colorMagnitude * 0.40f,
+            warmthBias = color * 0.26f,
+            tintBias = (-color * 0.10f),
+            shadowTint = airyTone * 0.12f,
+            highlightTint = deepTone * 0.14f,
+            neutralProtection = 0.65f,
+            skinProtection = 0.65f
         )
 
         StyleColorScience.MONOCHROME -> PerceptualColorRecipe(
-            toneLift = airyTone * 0.30f,
-            toneDepth = deepTone * 0.30f,
+            toneLift = airyTone * 0.36f,
+            toneDepth = deepTone * 0.36f,
             chromaBoost = 0f,
             warmthBias = 0f,
             tintBias = 0f,
-            shadowTint = airyTone * 0.12f,
-            highlightTint = deepTone * 0.10f,
+            shadowTint = airyTone * 0.14f,
+            highlightTint = deepTone * 0.12f,
             neutralProtection = 0f,
             skinProtection = 0f
         )
@@ -100,6 +100,12 @@ fun ColorLabSpec.toRecipe(
 private fun signedPaletteCurveForRecipe(value: Float): Float {
     val normalized = value.coerceIn(-1f, 1f)
     val magnitude = abs(normalized)
-    val curved = magnitude.pow(0.72f)
-    return if (normalized < 0f) -curved else curved
+    if (magnitude < DEAD_ZONE_THRESHOLD) return 0f
+    val activeRange = 1f - DEAD_ZONE_THRESHOLD
+    val remapped = (magnitude - DEAD_ZONE_THRESHOLD) / activeRange
+    val curved = remapped.pow(0.62f)
+    val result = curved * (1f + 0.15f * (curved - 1f).coerceAtLeast(0f))
+    return if (normalized < 0f) -result.coerceIn(0f, 1f) else result.coerceIn(0f, 1f)
 }
+
+private const val DEAD_ZONE_THRESHOLD = 0.10f

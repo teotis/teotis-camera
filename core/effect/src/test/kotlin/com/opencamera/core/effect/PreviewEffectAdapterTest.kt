@@ -336,4 +336,44 @@ class PreviewEffectAdapterTest {
 
         assertTrue(warmR > coolR, "Warm R=$warmR should be > cool R=$coolR")
     }
+
+    @Test
+    fun `edge corner recipe produces stronger transform than mild recipe`() {
+        val edge = PerceptualColorRecipe(
+            warmthBias = 0.4f,
+            chromaBoost = 0.35f,
+            toneDepth = 0.3f
+        )
+        val mild = PerceptualColorRecipe(
+            warmthBias = 0.1f,
+            chromaBoost = 0.05f,
+            toneDepth = 0.05f
+        )
+
+        val edgeModel = adapter.adapt(EffectSpec(listOf(
+            FilterEffect("cl", null, recipe = edge)
+        )))
+        val mildModel = adapter.adapt(EffectSpec(listOf(
+            FilterEffect("cl", null, recipe = mild)
+        )))
+
+        assertTrue(
+            edgeModel.colorTransform.tintAlpha > mildModel.colorTransform.tintAlpha,
+            "Edge alpha=${edgeModel.colorTransform.tintAlpha} should be > mild alpha=${mildModel.colorTransform.tintAlpha}"
+        )
+        assertEquals(PreviewColorFidelity.APPROXIMATE, edgeModel.colorTransform.fidelity)
+    }
+
+    @Test
+    fun `very weak transform reports degraded fidelity`() {
+        val weak = PerceptualColorRecipe(
+            warmthBias = 0.02f,
+            chromaBoost = 0.01f
+        )
+        val model = adapter.adapt(EffectSpec(listOf(
+            FilterEffect("cl", null, recipe = weak)
+        )))
+        assertTrue(model.colorTransform != PreviewColorTransform.NONE)
+        assertEquals(PreviewColorFidelity.DEGRADED, model.colorTransform.fidelity)
+    }
 }
