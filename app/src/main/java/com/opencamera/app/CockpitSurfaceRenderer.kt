@@ -2,17 +2,16 @@ package com.opencamera.app
 
 import android.content.Context
 import android.graphics.Typeface
-import android.view.Gravity
 import android.view.View
 import android.widget.Button
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.opencamera.core.session.SessionState
 
 internal data class CockpitCallbacks(
-    val onZoomRatioSelected: (Float) -> Unit
+    val onZoomRatioSelected: (Float) -> Unit,
+    val onZoomRatioChanged: ((Float) -> Unit)? = null
 )
 
 internal class CockpitSurfaceRenderer(
@@ -76,44 +75,25 @@ internal class CockpitSurfaceRenderer(
         }
     }
 
-    fun renderZoomCapsules(controls: SessionControlsRenderModel) {
-        bottomCockpit.zoomScroll.isVisible = controls.isZoomCapsuleRowVisible
-        if (!controls.isZoomCapsuleRowVisible) return
-        bottomCockpit.zoomRow.removeAllViews()
-        controls.zoomCapsules.forEach { capsule ->
-            val chip = TextView(context).apply {
-                text = capsule.label
-                textSize = context.resources.getDimension(R.dimen.text_size_zoom_chip) / context.resources.displayMetrics.density
-                minWidth = context.resources.getDimension(R.dimen.zoom_chip_min_width).toInt()
-                minHeight = context.resources.getDimension(R.dimen.zoom_chip_min_height).toInt()
-                gravity = Gravity.CENTER
-                typeface = Typeface.DEFAULT
-                setPadding(
-                    context.resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
-                    context.resources.getDimension(R.dimen.zoom_chip_padding_v).toInt(),
-                    context.resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
-                    context.resources.getDimension(R.dimen.zoom_chip_padding_v).toInt()
-                )
-                if (capsule.isActive) {
-                    setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
-                    setBackgroundResource(R.drawable.bg_zoom_chip_active)
-                } else {
-                    setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
-                    setBackgroundResource(R.drawable.bg_zoom_chip)
-                }
-                setOnClickListener {
-                    callbacks.onZoomRatioSelected(capsule.ratio)
-                }
-                rotation = controlRotationDegrees
+    private var sliderInitialized = false
+
+    fun renderFocalLengthSlider(model: FocalLengthSliderRenderModel) {
+        val slider = bottomCockpit.focalLengthSlider
+        slider.setSliderVisible(model.isVisible)
+        if (!model.isVisible) return
+
+        if (!sliderInitialized) {
+            sliderInitialized = true
+            slider.onRatioChanged = { ratio ->
+                callbacks.onZoomRatioChanged?.invoke(ratio)
             }
-            val params = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                marginStart = if (bottomCockpit.zoomRow.childCount == 0) 0 else 4.dp
+            slider.onRatioSnapped = { ratio ->
+                callbacks.onZoomRatioSelected(ratio)
             }
-            bottomCockpit.zoomRow.addView(chip, params)
         }
+
+        slider.setPresetRatios(model.presetRatios)
+        slider.setCurrentRatio(model.currentRatio)
     }
 
     fun renderQuickBubble(

@@ -135,7 +135,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             modeTrack = views.modeTrack,
             preview = views.preview,
             callbacks = CockpitCallbacks(
-                onZoomRatioSelected = { ratio -> dispatch(SessionIntent.ApplyZoomRatio(ratio)) }
+                onZoomRatioSelected = { ratio -> dispatch(SessionIntent.ApplyZoomRatio(ratio)) },
+                onZoomRatioChanged = { ratio -> dispatch(SessionIntent.ApplyZoomRatio(ratio)) }
             ),
             isModeTrackScrolling = modeTrackScrollGuard::isScrolling
         )
@@ -293,7 +294,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             recordingIndicatorRenderModel(state, text)
         )
         cockpitRenderer.renderCaptureOutput(sessionCaptureOutputText(state, sessionUiStrings()))
-        cockpitRenderer.renderZoomCapsules(controls)
+        cockpitRenderer.renderFocalLengthSlider(controls.focalLengthSlider)
         val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
         cockpitRenderer.renderQuickBubble(settingsPage, sheet)
         cockpitRenderer.renderLowLightNightPrompt(lowLightNightPromptRenderModel(state, text))
