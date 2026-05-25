@@ -108,9 +108,10 @@ import com.opencamera.core.media.primaryStillNode
 import com.opencamera.core.media.primaryVideoNode
 import com.opencamera.core.media.temporaryFrameNode
 import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
-import com.opencamera.core.media.StillCaptureQualityPreference
+import com.opencamera.core.media.StillCaptureResolutionOption
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
+// smartFilterResolutionOptions is now in ResolutionFilterUtils.kt (local)
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -693,6 +694,27 @@ internal fun resolveStillCaptureOutputSize(
     }
 }
 
+internal fun resolveStillCaptureOutputSize(
+    option: StillCaptureResolutionOption,
+    availableOutputSizes: List<StillCaptureOutputSize>
+): StillCaptureOutputSize {
+    if (availableOutputSizes.isEmpty()) {
+        return StillCaptureOutputSize(
+            width = option.targetWidth,
+            height = option.targetHeight
+        )
+    }
+
+    // 找到最接近目标像素数的分辨率
+    val desiredPixels = option.pixelCount
+    return availableOutputSizes
+        .minByOrNull { kotlin.math.abs(it.pixelCount - desiredPixels) }
+        ?: StillCaptureOutputSize(
+            width = option.targetWidth,
+            height = option.targetHeight
+        )
+}
+
 internal fun targetSizeForStillCaptureResolutionPreset(
     preset: StillCaptureResolutionPreset
 ): Size {
@@ -730,6 +752,9 @@ internal fun resolveDeviceCapabilities(
         .flatMap { it.availableStillCaptureResolutionPresets }
         .toSet()
         .ifEmpty { baseCapabilities.availableStillCaptureResolutionPresets }
+    val availableStillCaptureResolutionOptions = smartFilterResolutionOptions(
+        availableStillCaptureOutputSizes
+    )
     val zoomRatioCapability = mergeZoomRatioCapability(
         baseCapability = baseCapabilities.zoomRatioCapability,
         cameraProfiles = prioritizedProfiles
@@ -747,6 +772,7 @@ internal fun resolveDeviceCapabilities(
         previewBrightnessRange = previewBrightnessRange,
         availableStillCaptureOutputSizes = availableStillCaptureOutputSizes
             .ifEmpty { baseCapabilities.availableStillCaptureOutputSizes },
+        availableStillCaptureResolutionOptions = availableStillCaptureResolutionOptions,
         availableStillCaptureResolutionPresets = availableStillCaptureResolutionPresets,
         manualControlCapabilities = manualControlCapabilities
             ?: baseCapabilities.manualControlCapabilities,

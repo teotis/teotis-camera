@@ -1,6 +1,8 @@
 package com.opencamera.app
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
 import com.opencamera.app.camera.AndroidDocumentAutoCropEditor
 import com.opencamera.app.camera.AndroidPhotoFrameRatioEditor
 import com.opencamera.app.camera.AndroidPhotoSelfieMirrorEditor
@@ -9,8 +11,10 @@ import com.opencamera.app.camera.AndroidPhotoWatermarkEditor
 import com.opencamera.app.camera.AndroidPhotoAlgorithmEditor
 import com.opencamera.app.camera.MlKitSelfiePreviewSceneMaskSource
 import com.opencamera.app.camera.NoOpPreviewSceneMaskSource
+import com.opencamera.app.camera.MlKitSavedPhotoSceneMaskProvider
 import com.opencamera.app.camera.NoOpSavedPhotoSceneMaskProvider
 import com.opencamera.app.camera.PreviewSceneMaskSource
+import com.opencamera.app.camera.SavedPhotoSceneMaskProvider
 import com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitor
 import com.opencamera.app.camera.CameraSessionCoordinator
 import com.opencamera.app.camera.CameraXCaptureAdapter
@@ -63,6 +67,12 @@ class AppContainer(
 
     val trace = InMemorySessionTrace()
     private val shotExecutor = ShotExecutor()
+    private val savedMaskProvider: SavedPhotoSceneMaskProvider = try {
+        MlKitSavedPhotoSceneMaskProvider()
+    } catch (_: Throwable) {
+        NoOpSavedPhotoSceneMaskProvider()
+    }
+
     private val mediaPostProcessor = CompositeMediaPostProcessor(
         listOf(
             MultiFrameMergePlaceholderPostProcessor(),
@@ -77,7 +87,17 @@ class AppContainer(
             ),
             PhotoAlgorithmPostProcessor(
                 AndroidPhotoAlgorithmEditor(appContext),
-                NoOpSavedPhotoSceneMaskProvider()
+                savedMaskProvider,
+                maskBitmapSource = { target ->
+                    when (target) {
+                        is com.opencamera.core.media.ProcessorTarget.FilePath ->
+                            BitmapFactory.decodeFile(target.path)
+                        is com.opencamera.core.media.ProcessorTarget.ContentUri ->
+                            appContext.contentResolver.openInputStream(Uri.parse(target.value))?.use {
+                                BitmapFactory.decodeStream(it)
+                            }
+                    }
+                }
             ),
             PhotoWatermarkPostProcessor(
                 AndroidPhotoWatermarkEditor(appContext)

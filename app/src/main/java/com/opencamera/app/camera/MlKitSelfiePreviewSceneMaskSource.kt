@@ -14,7 +14,7 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
         private const val TAG = "MlKitSelfieMask"
     }
 
-    override val capability: SceneMaskCapability = SceneMaskCapability.READY
+    override val capability: PreviewSceneMaskCapability = PreviewSceneMaskCapability.READY
 
     private var segmenter: com.google.mlkit.vision.segmentation.Segmenter? = null
     private val isRunning = AtomicBoolean(false)

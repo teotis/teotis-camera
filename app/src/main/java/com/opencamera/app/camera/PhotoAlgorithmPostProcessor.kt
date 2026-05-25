@@ -12,6 +12,8 @@ import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.SceneMaskPipelineNotes
+import com.opencamera.core.media.SceneMaskSupport
 import com.opencamera.core.media.addPipelineNotes
 import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.FilterRenderSpec
@@ -131,7 +133,28 @@ internal class PhotoAlgorithmPostProcessor(
                             maskResult.first, payload.spec, maskResult.second
                         )
                         val baseResult = applyEditorResult(result, payload, editorResult)
-                        maskNotes.fold(baseResult) { acc, note -> acc.addPipelineNotes(note) }
+                        val descriptor = maskResult.second.toDescriptor(
+                            maskId = result.shotId,
+                            sourceWidth = maskResult.first.width,
+                            sourceHeight = maskResult.first.height
+                        )
+                        val sceneMaskNotes = SceneMaskPipelineNotes.capabilityNotes(
+                            com.opencamera.core.media.SceneMaskCapability(
+                                subjectMask = SceneMaskSupport.SUPPORTED,
+                                savedPhotoMask = SceneMaskSupport.SUPPORTED,
+                                previewMask = SceneMaskSupport.SUPPORTED,
+                                backendId = "mlkit-selfie"
+                            )
+                        )
+                        val withNotes = (maskNotes + sceneMaskNotes).fold(baseResult) { acc, note ->
+                            acc.addPipelineNotes(note)
+                        }
+                        val sceneMaskTags = descriptor.toMetadataTags()
+                        withNotes.copy(
+                            metadata = withNotes.metadata.copy(
+                                customTags = withNotes.metadata.customTags + sceneMaskTags
+                            )
+                        )
                     } finally {
                         maskResult.first.recycle()
                     }
@@ -144,7 +167,7 @@ internal class PhotoAlgorithmPostProcessor(
         }
     }
 
-    private suspend fun resolveMask(result: ShotResult): Pair<android.graphics.Bitmap, SceneMaskPayload>? {
+    private suspend fun resolveMask(result: ShotResult): Pair<android.graphics.Bitmap, SavedPhotoMaskPixels>? {
         val provider = maskProvider ?: return null
         val target = result.outputHandle.toProcessorTargetOrNull() ?: return null
         val decoded = if (maskBitmapSource != null) {
@@ -389,7 +412,7 @@ internal class AndroidPhotoAlgorithmEditor(
     private fun applyStyleWithMask(
         bitmap: Bitmap,
         spec: PhotoAlgorithmSpec,
-        mask: SceneMaskPayload
+        mask: SavedPhotoMaskPixels
     ): List<String> {
         val width = bitmap.width
         val height = bitmap.height
@@ -397,7 +420,7 @@ internal class AndroidPhotoAlgorithmEditor(
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
         val originalPixels = pixels.copyOf()
 
-        val transform = SceneMaskTransform(
+        val transform = SceneMaskCoordinateMapper(
             maskWidth = mask.maskWidth,
             maskHeight = mask.maskHeight,
             targetWidth = width,

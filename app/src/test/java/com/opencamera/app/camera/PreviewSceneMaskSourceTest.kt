@@ -10,7 +10,7 @@ class PreviewSceneMaskSourceTest {
     @Test
     fun `NoOp reports UNSUPPORTED capability`() {
         val source = NoOpPreviewSceneMaskSource()
-        assertEquals(SceneMaskCapability.UNSUPPORTED, source.capability)
+        assertEquals(PreviewSceneMaskCapability.UNSUPPORTED, source.capability)
     }
 
     @Test
@@ -98,7 +98,6 @@ class PreviewSceneMaskSourceTest {
         val source = MlKitSelfiePreviewSceneMaskSource()
         source.start(PreviewSceneMaskConfig())
 
-        // Frame with null image should be dropped without crash
         val proxy = createTestImageProxy()
         source.onAnalyzeFrame(proxy, 0)
 
@@ -132,6 +131,22 @@ class PreviewSceneMaskSourceTest {
         assertFalse(desc.isAvailable)
         assertEquals("none", desc.backendId)
         assertTrue(desc.isApproximate)
+    }
+
+    @Test
+    fun `PreviewSceneMaskCapability toCoreSupport maps correctly`() {
+        assertEquals(
+            com.opencamera.core.media.SceneMaskSupport.SUPPORTED,
+            PreviewSceneMaskCapability.READY.toCoreSupport()
+        )
+        assertEquals(
+            com.opencamera.core.media.SceneMaskSupport.DEGRADED,
+            PreviewSceneMaskCapability.DEGRADED.toCoreSupport()
+        )
+        assertEquals(
+            com.opencamera.core.media.SceneMaskSupport.UNSUPPORTED,
+            PreviewSceneMaskCapability.UNSUPPORTED.toCoreSupport()
+        )
     }
 
     private fun createTestImageProxy(): ImageProxy {

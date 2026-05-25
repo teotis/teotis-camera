@@ -53,7 +53,7 @@ internal class MlKitSavedPhotoSceneMaskProvider : SavedPhotoSceneMaskProvider {
 
             val averageConfidence = confidenceValues.average().toFloat()
             SceneMaskResult.Available(
-                SceneMaskPayload(
+                SavedPhotoMaskPixels(
                     maskPixels = pixels,
                     maskWidth = maskWidth,
                     maskHeight = maskHeight,

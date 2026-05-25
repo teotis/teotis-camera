@@ -1,11 +1,22 @@
 package com.opencamera.app.camera
 
 import androidx.camera.core.ImageProxy
+import com.opencamera.core.media.SceneMaskDescriptor
+import com.opencamera.core.media.SceneMaskQuality
+import com.opencamera.core.media.SceneMaskRole
+import com.opencamera.core.media.SceneMaskSupport
+import com.opencamera.core.media.SceneMaskTransform
 
-enum class SceneMaskCapability {
+enum class PreviewSceneMaskCapability {
     READY,
     DEGRADED,
     UNSUPPORTED
+}
+
+fun PreviewSceneMaskCapability.toCoreSupport(): SceneMaskSupport = when (this) {
+    PreviewSceneMaskCapability.READY -> SceneMaskSupport.SUPPORTED
+    PreviewSceneMaskCapability.DEGRADED -> SceneMaskSupport.DEGRADED
+    PreviewSceneMaskCapability.UNSUPPORTED -> SceneMaskSupport.UNSUPPORTED
 }
 
 data class PreviewSceneMaskConfig(
@@ -23,6 +34,22 @@ data class PreviewSceneMaskPayload(
     val timestampMillis: Long,
     val diagnostics: List<String> = emptyList()
 ) {
+    fun toDescriptor(): SceneMaskDescriptor = SceneMaskDescriptor(
+        maskId = "preview-$timestampMillis",
+        role = SceneMaskRole.PERSON_SUBJECT,
+        quality = SceneMaskQuality.PREVIEW_APPROXIMATE,
+        backendId = "mlkit-selfie",
+        confidence = 0.5f,
+        transform = SceneMaskTransform(
+            sourceWidth = width,
+            sourceHeight = height,
+            maskWidth = width,
+            maskHeight = height,
+            rotationDegrees = rotationDegrees
+        ),
+        diagnostics = diagnostics
+    )
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is PreviewSceneMaskPayload) return false
@@ -44,7 +71,7 @@ data class PreviewSceneMaskPayload(
 }
 
 interface PreviewSceneMaskSource {
-    val capability: SceneMaskCapability
+    val capability: PreviewSceneMaskCapability
     fun start(config: PreviewSceneMaskConfig)
     fun stop(reason: String)
     fun latestMask(): PreviewSceneMaskPayload?

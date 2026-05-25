@@ -9,7 +9,7 @@ class NoOpPreviewSceneMaskSource : PreviewSceneMaskSource {
         private const val TAG = "NoOpSceneMask"
     }
 
-    override val capability: SceneMaskCapability = SceneMaskCapability.UNSUPPORTED
+    override val capability: PreviewSceneMaskCapability = PreviewSceneMaskCapability.UNSUPPORTED
 
     override fun start(config: PreviewSceneMaskConfig) {
         Log.d(TAG, "start: no-op, backend=${config.backendId}")
