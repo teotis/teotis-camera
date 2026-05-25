@@ -79,3 +79,33 @@ fun parseFilterRenderSpec(
         coolBoost = tags["${prefix}.coolBoost"]?.toFloatOrNull() ?: 0f
     )
 }
+
+fun PerceptualColorRecipe.toMetadataTags(): Map<String, String> {
+    if (isNeutral) return emptyMap()
+    return linkedMapOf(
+        "recipeToneLift" to toneLift.toString(),
+        "recipeToneDepth" to toneDepth.toString(),
+        "recipeChromaBoost" to chromaBoost.toString(),
+        "recipeWarmthBias" to warmthBias.toString(),
+        "recipeTintBias" to tintBias.toString(),
+        "recipeShadowTint" to shadowTint.toString(),
+        "recipeHighlightTint" to highlightTint.toString(),
+        "recipeNeutralProtection" to neutralProtection.toString(),
+        "recipeSkinProtection" to skinProtection.toString()
+    )
+}
+
+fun parsePerceptualColorRecipe(tags: Map<String, String>): PerceptualColorRecipe {
+    val toneLift = tags["recipeToneLift"]?.toFloatOrNull() ?: return PerceptualColorRecipe.NEUTRAL
+    return PerceptualColorRecipe(
+        toneLift = toneLift,
+        toneDepth = tags["recipeToneDepth"]?.toFloatOrNull() ?: 0f,
+        chromaBoost = tags["recipeChromaBoost"]?.toFloatOrNull() ?: 0f,
+        warmthBias = tags["recipeWarmthBias"]?.toFloatOrNull() ?: 0f,
+        tintBias = tags["recipeTintBias"]?.toFloatOrNull() ?: 0f,
+        shadowTint = tags["recipeShadowTint"]?.toFloatOrNull() ?: 0f,
+        highlightTint = tags["recipeHighlightTint"]?.toFloatOrNull() ?: 0f,
+        neutralProtection = tags["recipeNeutralProtection"]?.toFloatOrNull() ?: 0f,
+        skinProtection = tags["recipeSkinProtection"]?.toFloatOrNull() ?: 0f
+    )
+}

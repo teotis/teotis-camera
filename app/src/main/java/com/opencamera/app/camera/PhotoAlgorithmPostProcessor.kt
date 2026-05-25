@@ -822,18 +822,7 @@ internal class AndroidPhotoAlgorithmEditor(
 }
 
 private fun parseRecipeFromTags(tags: Map<String, String>): PerceptualColorRecipe {
-    val toneLift = tags["recipeToneLift"]?.toFloatOrNull() ?: return PerceptualColorRecipe.NEUTRAL
-    return PerceptualColorRecipe(
-        toneLift = toneLift,
-        toneDepth = tags["recipeToneDepth"]?.toFloatOrNull() ?: 0f,
-        chromaBoost = tags["recipeChromaBoost"]?.toFloatOrNull() ?: 0f,
-        warmthBias = tags["recipeWarmthBias"]?.toFloatOrNull() ?: 0f,
-        tintBias = tags["recipeTintBias"]?.toFloatOrNull() ?: 0f,
-        shadowTint = tags["recipeShadowTint"]?.toFloatOrNull() ?: 0f,
-        highlightTint = tags["recipeHighlightTint"]?.toFloatOrNull() ?: 0f,
-        neutralProtection = tags["recipeNeutralProtection"]?.toFloatOrNull() ?: 0f,
-        skinProtection = tags["recipeSkinProtection"]?.toFloatOrNull() ?: 0f
-    )
+    return com.opencamera.core.settings.parsePerceptualColorRecipe(tags)
 }
 
 internal fun resolvePhotoAlgorithmSpec(

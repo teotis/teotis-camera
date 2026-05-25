@@ -11,6 +11,7 @@ object EffectBridge {
         spec.find<FilterEffect>()?.let { effect ->
             tags["filterProfile"] = effect.profileId
             effect.renderSpec?.let { tags.putAll(it.toMetadataTags()) }
+            tags.putAll(effect.recipe.toMetadataTags())
         }
 
         spec.find<WatermarkEffect>()?.let { effect ->
@@ -33,6 +34,7 @@ object EffectBridge {
             tags["portraitBeautyPreset"] = effect.beautyPreset
             tags["portraitBeautyStrength"] = effect.beautyStrength
             tags["portraitBokehEffect"] = effect.bokehEffect
+            tags["portraitDepthStrength"] = effect.depthStrength.toString()
         }
 
         spec.find<DocumentEffect>()?.let { effect ->

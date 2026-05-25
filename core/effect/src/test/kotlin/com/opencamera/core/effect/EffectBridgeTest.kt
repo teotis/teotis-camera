@@ -2,6 +2,7 @@ package com.opencamera.core.effect
 
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PerceptualColorRecipe
 import com.opencamera.core.settings.WatermarkFrameBackground
 import com.opencamera.core.settings.WatermarkStyleSettings
 import com.opencamera.core.settings.WatermarkTextOpacity
@@ -78,7 +79,8 @@ class EffectBridgeTest {
             renderPath = "gpu-accelerated",
             beautyPreset = "clear",
             beautyStrength = "balanced",
-            bokehEffect = "smooth"
+            bokehEffect = "smooth",
+            depthStrength = 75
         )
         val spec = EffectSpec(listOf(effect))
 
@@ -90,6 +92,7 @@ class EffectBridgeTest {
         assertEquals("clear", tags["portraitBeautyPreset"])
         assertEquals("balanced", tags["portraitBeautyStrength"])
         assertEquals("smooth", tags["portraitBokehEffect"])
+        assertEquals("75", tags["portraitDepthStrength"])
     }
 
     @Test
@@ -148,5 +151,43 @@ class EffectBridgeTest {
 
         assertNull(result.algorithmProfile)
         assertNull(result.watermarkText)
+    }
+
+    @Test
+    fun `toMetadataTags with non-neutral recipe emits recipe tags`() {
+        val recipe = PerceptualColorRecipe(
+            toneLift = 0.5f,
+            toneDepth = 0.3f,
+            chromaBoost = 0.2f,
+            warmthBias = 0.4f,
+            tintBias = -0.1f,
+            neutralProtection = 0.75f,
+            skinProtection = 0.70f
+        )
+        val effect = FilterEffect(profileId = "color-lab", renderSpec = null, recipe = recipe)
+        val spec = EffectSpec(listOf(effect))
+
+        val tags = EffectBridge.toMetadataTags(spec)
+
+        assertEquals("color-lab", tags["filterProfile"])
+        assertEquals("0.5", tags["recipeToneLift"])
+        assertEquals("0.3", tags["recipeToneDepth"])
+        assertEquals("0.2", tags["recipeChromaBoost"])
+        assertEquals("0.4", tags["recipeWarmthBias"])
+        assertEquals("-0.1", tags["recipeTintBias"])
+        assertEquals("0.75", tags["recipeNeutralProtection"])
+        assertEquals("0.7", tags["recipeSkinProtection"])
+    }
+
+    @Test
+    fun `toMetadataTags with neutral recipe does not emit recipe tags`() {
+        val effect = FilterEffect(profileId = "vivid", renderSpec = null, recipe = PerceptualColorRecipe.NEUTRAL)
+        val spec = EffectSpec(listOf(effect))
+
+        val tags = EffectBridge.toMetadataTags(spec)
+
+        assertEquals("vivid", tags["filterProfile"])
+        assertNull(tags["recipeToneLift"])
+        assertNull(tags["recipeChromaBoost"])
     }
 }
