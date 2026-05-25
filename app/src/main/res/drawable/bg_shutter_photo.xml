@@ -3,12 +3,12 @@
     <item>
         <shape android:shape="oval">
             <solid android:color="@android:color/transparent" />
-            <stroke android:width="3dp" android:color="@color/oc_text_primary" />
+            <stroke android:width="3dp" android:color="@color/oc_shutter_default" />
         </shape>
     </item>
     <item android:left="8dp" android:right="8dp" android:top="8dp" android:bottom="8dp">
         <shape android:shape="oval">
-            <solid android:color="@color/oc_text_primary" />
+            <solid android:color="@color/oc_shutter_default" />
         </shape>
     </item>
 </layer-list>
