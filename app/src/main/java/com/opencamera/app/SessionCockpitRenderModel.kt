@@ -30,11 +30,18 @@ internal data class ZoomCapsuleRenderModel(
     val isActive: Boolean
 )
 
+internal data class FocalLengthSliderRenderModel(
+    val presetRatios: List<Float>,
+    val currentRatio: Float,
+    val isVisible: Boolean
+)
+
 internal data class SessionControlsRenderModel(
     val lensFacingButtonLabel: String,
     val lensFacingEnabled: Boolean,
     val zoomCapsules: List<ZoomCapsuleRenderModel>,
-    val isZoomCapsuleRowVisible: Boolean
+    val isZoomCapsuleRowVisible: Boolean,
+    val focalLengthSlider: FocalLengthSliderRenderModel
 )
 
 internal data class FrameRatioOptionRenderModel(
@@ -162,11 +169,22 @@ internal fun sessionControlsRenderModel(
     state: SessionState,
     strings: SessionUiStrings
 ): SessionControlsRenderModel {
+    val capability = state.activeDeviceCapabilities.zoomRatioCapability
+    val isZoomSupported = capability.isSwitchingSupported
+    val currentRatio = if (isZoomSupported) {
+        normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
+    } else 1f
+
     return SessionControlsRenderModel(
         lensFacingButtonLabel = lensFacingButtonLabel(state, strings),
         lensFacingEnabled = state.activeDeviceCapabilities.availableLensFacings.size > 1,
         zoomCapsules = zoomCapsuleModels(state),
-        isZoomCapsuleRowVisible = state.activeDeviceCapabilities.zoomRatioCapability.isSwitchingSupported
+        isZoomCapsuleRowVisible = isZoomSupported,
+        focalLengthSlider = FocalLengthSliderRenderModel(
+            presetRatios = if (isZoomSupported) capability.normalizedSupportedRatios else emptyList(),
+            currentRatio = currentRatio,
+            isVisible = isZoomSupported
+        )
     )
 }
 

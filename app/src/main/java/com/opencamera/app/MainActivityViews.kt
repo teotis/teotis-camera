@@ -189,8 +189,7 @@ internal data class DocumentBatchOrganizerViews(
 internal data class BottomCockpitViews(
     val shutter: Button,
     val lensFacing: Button,
-    val zoomScroll: android.widget.HorizontalScrollView,
-    val zoomRow: LinearLayout,
+    val focalLengthSlider: FocalLengthSliderView,
     val recordingIndicator: TextView
 )
 
@@ -378,8 +377,7 @@ internal data class MainActivityViews(
             val bottomCockpit = BottomCockpitViews(
                 shutter = activity.findViewById(R.id.buttonShutter),
                 lensFacing = activity.findViewById(R.id.buttonLensFacing),
-                zoomScroll = activity.findViewById(R.id.zoomCapsuleScroll),
-                zoomRow = activity.findViewById(R.id.zoomCapsuleRow),
+                focalLengthSlider = activity.findViewById(R.id.focalLengthSlider),
                 recordingIndicator = activity.findViewById(R.id.recordingIndicator)
             )
             return MainActivityViews(

@@ -1567,23 +1567,14 @@
             android:textSize="@dimen/text_size_status"
             android:visibility="gone" />
 
-        <!-- Zoom strip: integrated into cockpit -->
-        <HorizontalScrollView
-            android:id="@+id/zoomCapsuleScroll"
+        <!-- Focal length slider -->
+        <com.opencamera.app.FocalLengthSliderView
+            android:id="@+id/focalLengthSlider"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/zoom_strip_container_height"
+            android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_4"
-            android:clipToPadding="false"
-            android:scrollbars="none">
-
-            <LinearLayout
-                android:id="@+id/zoomCapsuleRow"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:paddingHorizontal="@dimen/space_8"
-                android:orientation="horizontal" />
-        </HorizontalScrollView>
+            android:layout_marginHorizontal="@dimen/space_16"
+            android:visibility="gone" />
 
         <!-- Recording elapsed indicator -->
         <TextView
