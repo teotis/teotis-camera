@@ -84,9 +84,9 @@ class SceneMaskPayloadTest {
     fun `mask with edge softness has smooth transition`() {
         val mask = SceneMaskTestUtils.createCenterSubjectMask(
             100, 100,
-            subjectFractionX = 0.4f,
+            subjectFractionX = 0.25f,
             subjectFractionY = 0.5f,
-            edgeSoftness = 0.5f
+            edgeSoftness = 0.8f
         )
         val centerAlpha = mask.sampleAlpha(50, 40)
         val edgeAlpha = mask.sampleAlpha(92, 40)

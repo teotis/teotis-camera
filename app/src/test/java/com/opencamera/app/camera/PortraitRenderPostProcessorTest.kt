@@ -13,6 +13,8 @@ import com.opencamera.core.settings.PortraitBeautyStrength
 import com.opencamera.core.settings.PortraitBokehEffect
 import com.opencamera.core.settings.PortraitProfile
 import kotlinx.coroutines.test.runTest
+import android.graphics.Bitmap
+import org.mockito.Mockito.mock
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -463,7 +465,7 @@ class PortraitRenderPostProcessorTest {
         val processor = PortraitRenderPostProcessor(
             maskEditor,
             maskProvider,
-            maskBitmapSource = { null }
+            maskBitmapSource = { mock(Bitmap::class.java) }
         )
         val result = processor.process(
             photoResult(
@@ -539,7 +541,7 @@ class PortraitRenderPostProcessorTest {
         val processor = PortraitRenderPostProcessor(
             maskEditor,
             maskProvider,
-            maskBitmapSource = { null }
+            maskBitmapSource = { mock(Bitmap::class.java) }
         )
         val result = processor.process(
             photoResult(

@@ -26,7 +26,7 @@ internal object SceneMaskTestUtils {
     fun createCenterSubjectMask(
         maskWidth: Int,
         maskHeight: Int,
-        subjectFractionX: Float = 0.4f,
+        subjectFractionX: Float = 0.2f,
         subjectFractionY: Float = 0.5f,
         edgeSoftness: Float = 0.08f
     ): SavedPhotoMaskPixels {
