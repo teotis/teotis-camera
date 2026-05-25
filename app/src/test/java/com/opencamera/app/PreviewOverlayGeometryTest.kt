@@ -141,6 +141,65 @@ class PreviewOverlayGeometryTest {
         assertEquals(1200f, rect.centerY, 1f)
     }
 
+    // --- scaleFrameRect tests ---
+
+    @Test
+    fun `scaleFrameRect with scale 1_0 returns same rect`() {
+        val rect = FrameRect(0f, 240f, 1080f, 1680f)
+        val result = scaleFrameRect(rect, 1f)
+        assertApprox(0f, result.left)
+        assertApprox(240f, result.top)
+        assertApprox(1080f, result.right)
+        assertApprox(1680f, result.bottom)
+    }
+
+    @Test
+    fun `scaleFrameRect with scale 0_5 halves rect around center`() {
+        val rect = FrameRect(0f, 0f, 1080f, 1440f)
+        val result = scaleFrameRect(rect, 0.5f)
+        // center = (540, 720), half-size = (270, 360)
+        assertApprox(270f, result.left)
+        assertApprox(360f, result.top)
+        assertApprox(810f, result.right)
+        assertApprox(1080f, result.bottom)
+    }
+
+    @Test
+    fun `scaleFrameRect preserves center point`() {
+        val rect = FrameRect(100f, 200f, 500f, 800f)
+        val result = scaleFrameRect(rect, 0.3f)
+        assertApprox(300f, result.centerX)
+        assertApprox(500f, result.centerY)
+    }
+
+    // --- zoom-scaled frame rect tests ---
+
+    @Test
+    fun `zoom 2x halves the frame rect dimensions`() {
+        val base = computeFrameRect(1080, 1920, 4, 3)
+        val scaled = scaleFrameRect(base, 1f / 2f)
+        assertApprox(base.width / 2f, scaled.width)
+        assertApprox(base.height / 2f, scaled.height)
+    }
+
+    @Test
+    fun `zoom 1x leaves frame rect unchanged`() {
+        val base = computeFrameRect(1080, 1920, 4, 3)
+        val scaled = scaleFrameRect(base, 1f / 1f)
+        assertApprox(base.width, scaled.width)
+        assertApprox(base.height, scaled.height)
+    }
+
+    @Test
+    fun `zoom 3x produces third-sized frame centered`() {
+        val base = computeFrameRect(1080, 1920, 4, 3)
+        val scaled = scaleFrameRect(base, 1f / 3f)
+        assertApprox(base.centerX, scaled.centerX)
+        assertApprox(base.centerY, scaled.centerY)
+        assertApprox(base.width / 3f, scaled.width)
+        assertApprox(base.height / 3f, scaled.height)
+    }
+
     // --- gridLinePositions tests ---
 
     @Test
