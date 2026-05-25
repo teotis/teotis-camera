@@ -54,7 +54,8 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     is SessionIntent.PreviewTapToFocus,
     is SessionIntent.PreviewMeteringCompleted,
     is SessionIntent.PhotoSceneSignalUpdated,
-    SessionIntent.PhotoLowLightPromptExpired -> SessionIntentOwner.PREVIEW_RECOVERY
+    SessionIntent.PhotoLowLightPromptExpired,
+    is SessionIntent.PreviewMeteringFeedbackExpired -> SessionIntentOwner.PREVIEW_RECOVERY
 
     is SessionIntent.CountdownTick,
     SessionIntent.CountdownCompleted,

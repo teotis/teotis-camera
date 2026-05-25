@@ -220,6 +220,12 @@ class DefaultCameraSession(
             )
         }
 
+        override fun clearPreviewMeteringFeedback(requestId: String) {
+            val currentFeedback = _state.value.presentation.previewMeteringFeedback ?: return
+            if (currentFeedback.requestId != requestId) return
+            updateState(previewMeteringFeedback = null)
+        }
+
         override fun updatePreviewHostAttached(lastAction: String) {
             updateState(
                 previewHostAvailable = true,

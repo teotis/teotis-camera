@@ -325,6 +325,7 @@ sealed interface SessionIntent {
         val signal: com.opencamera.core.device.PhotoSceneSignal
     ) : SessionIntent
     data object PhotoLowLightPromptExpired : SessionIntent
+    data class PreviewMeteringFeedbackExpired(val requestId: String) : SessionIntent
     data object DocumentBatchClear : SessionIntent
     data class DocumentBatchRemoveItem(val itemId: String) : SessionIntent
     data class DocumentBatchMoveItem(val itemId: String, val direction: DocumentBatchMoveDirection) : SessionIntent

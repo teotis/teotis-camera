@@ -13,8 +13,10 @@ import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.hasPostProcessFailures
 import com.opencamera.core.media.isTemporalMedia
 import com.opencamera.core.media.outputPathOrNull
+import com.opencamera.core.media.renderUriOrNull
 import com.opencamera.core.media.postProcessFailureSummary
 import com.opencamera.core.mode.ModeController
+import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSessionEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -344,7 +346,32 @@ internal class CaptureRecordingSessionProcessor(
                     },
                     latestPipelineNotes = result.pipelineNotes,
                     pendingCaptureFeedback = null,
-                    lastError = result.postProcessFailureSummary()
+                    lastError = result.postProcessFailureSummary(),
+                    documentBatch = if (s.activeMode == ModeId.DOCUMENT &&
+                        s.presentation.documentBatch.status == DocumentBatchStatus.ACTIVE &&
+                        result.mediaType == MediaType.PHOTO
+                    ) {
+                        val currentBatch = s.presentation.documentBatch
+                        val newItem = DocumentBatchItem(
+                            itemId = result.shotId,
+                            shotId = result.shotId,
+                            orderIndex = currentBatch.items.size,
+                            outputPath = result.outputPath,
+                            renderUri = result.thumbnailSource.renderUriOrNull(),
+                            thumbnailSource = result.thumbnailSource,
+                            profileId = null,
+                            scanMode = null,
+                            cropStatus = DocumentBatchCropStatus.NOT_REQUESTED,
+                            pipelineNotes = result.pipelineNotes
+                        )
+                        currentBatch.copy(
+                            items = currentBatch.items + newItem,
+                            latestItemId = newItem.itemId,
+                            lastMessage = "Added page ${newItem.orderIndex + 1}"
+                        )
+                    } else {
+                        s.presentation.documentBatch
+                    }
                 )
             )
         }
