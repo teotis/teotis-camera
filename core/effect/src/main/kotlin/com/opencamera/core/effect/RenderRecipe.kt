@@ -3,10 +3,13 @@ package com.opencamera.core.effect
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PerceptualColorRecipe
+import com.opencamera.core.settings.parsePerceptualColorRecipe
 
 data class RenderRecipe(
     val filterProfileId: String?,
     val filterRenderSpec: FilterRenderSpec?,
+    val perceptualColorRecipe: PerceptualColorRecipe = PerceptualColorRecipe.NEUTRAL,
     val frameRatio: FrameRatio?,
     val watermarkTemplateId: String?,
     val watermarkText: String?,
@@ -15,6 +18,7 @@ data class RenderRecipe(
     val requiresFinalOutputPostprocess: Boolean
         get() = !filterProfileId.isNullOrBlank() ||
             filterRenderSpec != null ||
+            !perceptualColorRecipe.isNeutral ||
             frameRatio != null && frameRatio != FrameRatio.RATIO_4_3 ||
             !watermarkText.isNullOrBlank() ||
             !watermarkTemplateId.isNullOrBlank() ||
@@ -24,6 +28,7 @@ data class RenderRecipe(
         val EMPTY = RenderRecipe(
             filterProfileId = null,
             filterRenderSpec = null,
+            perceptualColorRecipe = PerceptualColorRecipe.NEUTRAL,
             frameRatio = null,
             watermarkTemplateId = null,
             watermarkText = null,
@@ -39,6 +44,7 @@ data class RenderRecipe(
             return RenderRecipe(
                 filterProfileId = filter?.profileId,
                 filterRenderSpec = filter?.renderSpec,
+                perceptualColorRecipe = filter?.recipe ?: PerceptualColorRecipe.NEUTRAL,
                 frameRatio = frame?.ratio,
                 watermarkTemplateId = watermark?.templateId,
                 watermarkText = watermark?.tokens?.get("watermarkModel"),
@@ -61,9 +67,12 @@ data class RenderRecipe(
                 ?.takeIf(String::isNotEmpty)
             val selfieMirror = tags["selfieMirrorApply"].toBoolean()
 
+            val perceptualColorRecipe = parsePerceptualColorRecipe(tags)
+
             return RenderRecipe(
                 filterProfileId = filterProfileId,
                 filterRenderSpec = filterRenderSpec,
+                perceptualColorRecipe = perceptualColorRecipe,
                 frameRatio = frameRatio,
                 watermarkTemplateId = watermarkTemplateId,
                 watermarkText = watermarkText,

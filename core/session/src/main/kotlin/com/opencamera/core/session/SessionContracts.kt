@@ -84,6 +84,7 @@ internal fun captureFeedbackPolicyFor(shot: ShotRequest): CaptureFeedbackPolicy 
     val suppressRawFeedback = metadataFilterSpec.requiresTrustedSavedMedia(
         profileId = recipe.filterProfileId
     ) ||
+        !recipe.perceptualColorRecipe.isNeutral ||
         recipe.frameRatio != null && recipe.frameRatio != FrameRatio.RATIO_4_3 ||
         recipe.selfieMirror ||
         recipe.watermarkTemplateId?.let { it != "classic-overlay" } == true

@@ -8,6 +8,8 @@ import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ThumbnailPolicy
+import com.opencamera.core.settings.PerceptualColorRecipe
+import com.opencamera.core.settings.toMetadataTags
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -205,6 +207,33 @@ class CaptureFeedbackPolicyTest {
                 "watermarkTemplate" to "classic-overlay"
             )
         )
+        assertEquals(
+            CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP,
+            captureFeedbackPolicyFor(request)
+        )
+    }
+
+    // ── Perceptual recipe suppression ──────────────────────────────────
+
+    @Test
+    fun `non-neutral perceptual recipe suppresses feedback`() {
+        val recipe = PerceptualColorRecipe(
+            toneLift = 0.4f,
+            chromaBoost = 0.2f,
+            warmthBias = 0.3f,
+            neutralProtection = 0.75f,
+            skinProtection = 0.70f
+        )
+        val request = shotRequest(customTags = recipe.toMetadataTags())
+        assertEquals(
+            CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA,
+            captureFeedbackPolicyFor(request)
+        )
+    }
+
+    @Test
+    fun `neutral perceptual recipe allows feedback`() {
+        val request = shotRequest(customTags = PerceptualColorRecipe.NEUTRAL.toMetadataTags())
         assertEquals(
             CaptureFeedbackPolicy.ALLOW_PREVIEW_BITMAP,
             captureFeedbackPolicyFor(request)

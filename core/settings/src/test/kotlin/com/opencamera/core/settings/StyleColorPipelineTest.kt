@@ -19,6 +19,7 @@ class StyleColorPipelineTest {
         )
 
         assertEquals(base, result.finalRenderSpec)
+        assertEquals(PerceptualColorRecipe.NEUTRAL, result.perceptualColorRecipe)
         assertEquals(
             listOf(StyleColorStage.STYLE_BASE, StyleColorStage.COLOR_LAB_SECONDARY),
             result.stages
@@ -121,6 +122,46 @@ class StyleColorPipelineTest {
         assertEquals(0f, result.finalRenderSpec.coolBoost)
         assertEquals(1f, result.finalRenderSpec.monochromeMix)
         assertTrue(result.finalRenderSpec.contrast > 1f)
+    }
+
+    @Test
+    fun `non-neutral color lab produces non-neutral recipe`() {
+        val result = StyleColorPipeline.render(
+            StyleColorPipelineRequest(
+                styleProfileId = "photo-texture",
+                baseRenderSpec = textureBaseSpec(),
+                colorLabSpec = ColorLabSpec(toneAxis = 1f, colorAxis = 0.5f),
+                colorScience = StyleColorScience.TEXTURE
+            )
+        )
+
+        assertTrue(result.perceptualColorRecipe.toneLift > 0f)
+        assertTrue(result.perceptualColorRecipe.warmthBias != 0f)
+        assertTrue(result.perceptualColorRecipe.neutralProtection > 0f)
+    }
+
+    @Test
+    fun `recipe varies by color science`() {
+        val labSpec = ColorLabSpec(toneAxis = 1f, colorAxis = 0.5f)
+
+        val natural = StyleColorPipeline.render(
+            StyleColorPipelineRequest(
+                styleProfileId = "photo-default",
+                baseRenderSpec = FilterRenderSpec(),
+                colorLabSpec = labSpec,
+                colorScience = StyleColorScience.NATURAL
+            )
+        )
+        val texture = StyleColorPipeline.render(
+            StyleColorPipelineRequest(
+                styleProfileId = "photo-texture",
+                baseRenderSpec = FilterRenderSpec(),
+                colorLabSpec = labSpec,
+                colorScience = StyleColorScience.TEXTURE
+            )
+        )
+
+        assertTrue(natural.perceptualColorRecipe.toneLift != texture.perceptualColorRecipe.toneLift)
     }
 
     @Test
