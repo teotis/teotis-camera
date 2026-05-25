@@ -88,6 +88,15 @@ Use targeted Gradle tests for the touched modules, then the relevant stage scrip
 
 Current Stage 7 verification entry:
 
+### Build Isolation（强制）
+
+所有 Gradle 命令必须明确选择构建隔离策略：
+
+- **主 workspace（本仓库根目录）**：直接使用 `rtk ./gradlew ...` 即可，构建输出在 `~/.codex-build/OpenCamera/`。
+- **worktree 或外部 agent 执行**：必须使用 `rtk ./scripts/run_isolated_gradle.sh <gradle-args>` 以隔离构建根目录。wrapper 会根据 `git rev-parse --show-toplevel` 的 hash 自动派生独立输出路径 `~/.codex-build/OpenCamera-<hash>/`。
+- 不得依赖"从主 root 执行"作为唯一的隔离手段。并行 worktree 同时编译时，共享构建输出会导致 class 文件/ jar 元数据污染。
+- 遇到 `CODEX_BUILD_ROOT` 下出现缺失 Kotlin 类、部分 jar、metadata checksum/read 失败、或来自另一 workspace 的 source path 时，先用隔离构建根重新运行最小失败命令，再判定为产品回归。
+
 ```bash
 rtk ./scripts/verify_stage_7_observability.sh
 ```
@@ -107,9 +116,15 @@ That script currently covers:
 Useful focused commands:
 
 ```bash
+# 聚焦模块测试（主 workspace）
 rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest
 rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest
 rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest
+
+# 聚焦模块测试（worktree / 隔离构建）
+rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest
+
+# 组装验证
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
@@ -140,3 +155,15 @@ If Gradle shows transient Kotlin/build-directory errors in `~/.codex-build/OpenC
 - Add or update tests for behavior changes, especially session/device/app coordinator behavior.
 - This directory may not be a Git repository. Do not rely on Git status as the sole source of truth for user changes.
 
+- 默认构建输出在 `~/.codex-build/OpenCamera/`（由 `build.gradle.kts` 控制）。可通过 Gradle property `opencamera.buildRoot` 或环境变量 `OPENCAMERA_BUILD_ROOT` / `CODEX_BUILD_ROOT` 覆盖。
+- `.codex-build/` 中的构建产物不纳入项目交付
+
+## Security
+
+- 本仓库是无 API key 的 Android 客户端项目，不涉及外部 API 调用。
+- 构建和测试在本地环境运行，不触网。
+
+## Agent-specific adapters
+
+- Claude Code should read `CLAUDE.md`, which points back to this file.
+- Codex app should use this `AGENTS.md` as the shared project instruction file.
