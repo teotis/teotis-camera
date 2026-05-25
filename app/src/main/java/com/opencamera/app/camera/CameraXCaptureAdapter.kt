@@ -2514,7 +2514,12 @@ class CameraXCaptureAdapter(
         }
         removeCameraStateObserver()
 
-        val preview = Preview.Builder().build().also { useCase ->
+        val previewBuilder = Preview.Builder()
+        Camera2Interop.Extender(previewBuilder).setCaptureRequestOption(
+            CaptureRequest.CONTROL_AWB_MODE,
+            CaptureRequest.CONTROL_AWB_MODE_AUTO
+        )
+        val preview = previewBuilder.build().also { useCase ->
             useCase.setSurfaceProvider(previewView.surfaceProvider)
         }
 
