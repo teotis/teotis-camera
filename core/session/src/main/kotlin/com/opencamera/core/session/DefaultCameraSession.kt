@@ -62,7 +62,7 @@ class DefaultCameraSession(
         ?: supportedModes.firstOrNull()
         ?: error("No supported camera modes for $baseDeviceCapabilities")
     private val initialLensFacing = defaultLensFacing(baseDeviceCapabilities.availableLensFacings)
-    private val initialStillCaptureQuality = StillCaptureQualityPreference.LATENCY
+    private val initialStillCaptureQuality = StillCaptureQualityPreference.QUALITY
     private val initialStillCaptureResolutionPreset = clampStillCaptureResolutionPreset(
         StillCaptureResolutionPreset.LARGE_12MP,
         baseDeviceCapabilities.availableStillCaptureResolutionPresets

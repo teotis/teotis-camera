@@ -605,9 +605,11 @@ private fun List<StillCaptureOutputSize>.stillCaptureOutputSizeSummary(): String
 }
 
 private fun stillResolutionQuickLabel(state: SessionState, strings: SessionUiStrings): String {
+    val preset = state.activeDeviceGraph.stillCapture.resolutionPreset
     val native = selectedNativeStillCaptureOutputSizeOrNull(state)
-    return native?.quickMegapixelLabel()
-        ?: state.activeDeviceGraph.stillCapture.resolutionPreset.label
+    if (native == null) return preset.label
+    if (preset == StillCaptureResolutionPreset.LARGE_12MP) return preset.label
+    return native.quickMegapixelLabel()
 }
 
 private fun StillCaptureOutputSize.quickMegapixelLabel(): String {
