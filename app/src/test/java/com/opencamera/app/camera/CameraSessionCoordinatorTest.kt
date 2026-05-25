@@ -18,11 +18,10 @@ import com.opencamera.core.device.SceneLightState
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.RecordingQualityPreset
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.StillCaptureResolutionOption
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
-
-import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.mode.ModeId
@@ -540,11 +539,19 @@ class CameraSessionCoordinatorTest {
     fun `still quality bind effect rebinds while staying in same mode`() = runTest {
         val initialGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true
+            enablePreviewSnapshots = true,
+            resolutionOption = StillCaptureResolutionOption(
+                tagValue = "12mp", label = "12MP",
+                targetWidth = 4000, targetHeight = 3000
+            )
         )
         val updatedGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true
+            enablePreviewSnapshots = true,
+            resolutionOption = StillCaptureResolutionOption(
+                tagValue = "48mp", label = "48MP",
+                targetWidth = 8000, targetHeight = 6000
+            )
         )
         val session = FakeCameraSession(
             initialState = defaultSessionState(
@@ -594,12 +601,16 @@ class CameraSessionCoordinatorTest {
         val initialGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
             enablePreviewSnapshots = true,
-            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+            outputSize = com.opencamera.core.device.StillCaptureOutputSize(
+                width = 4000, height = 3000
+            )
         )
         val updatedGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
             enablePreviewSnapshots = true,
-            resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
+            outputSize = com.opencamera.core.device.StillCaptureOutputSize(
+                width = 8000, height = 6000
+            )
         )
         val session = FakeCameraSession(
             initialState = defaultSessionState(
@@ -1107,35 +1118,17 @@ class CameraSessionCoordinatorTest {
         )
     }
 
-    @Test
-    fun `updateBitmapProvider sets bitmap provider for scene brightness source`() = runTest {
-        val sceneSource = FakeSceneBrightnessSignalSource()
-
-        var capturedBitmap: android.graphics.Bitmap? = null
-        sceneSource.updateBitmapProvider { capturedBitmap }
-        val providerBitmap = sceneSource.currentBitmapProvider?.invoke()
-
-        assertEquals(capturedBitmap, providerBitmap)
-    }
-
     private class FakeSceneBrightnessSignalSource : SceneBrightnessSignalSource {
         private val mutableSignals = MutableSharedFlow<PhotoSceneSignal>(
             replay = 4,
             extraBufferCapacity = 4
         )
 
-        var currentBitmapProvider: (() -> android.graphics.Bitmap?)? = null
-            private set
-
         override val signals: Flow<PhotoSceneSignal> = mutableSignals.asSharedFlow()
 
         override fun onPreviewStarted() {}
         override fun onPreviewStopped() {}
         override fun onPreviewHostDetached() {}
-
-        override fun updateBitmapProvider(provider: (() -> android.graphics.Bitmap?)?) {
-            currentBitmapProvider = provider
-        }
 
         suspend fun emit(signal: PhotoSceneSignal) {
             mutableSignals.emit(signal)

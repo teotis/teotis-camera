@@ -28,6 +28,16 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
+internal sealed class MaskResolveResult {
+    data class Available(
+        val bitmap: Bitmap,
+        val mask: SavedPhotoMaskPixels,
+        val extraNotes: List<String>
+    ) : MaskResolveResult()
+
+    data class Fallback(val extraNotes: List<String>) : MaskResolveResult()
+}
+
 internal data class PhotoAlgorithmPayload(
     val target: ProcessorTarget,
     val spec: PhotoAlgorithmSpec
@@ -127,63 +137,71 @@ internal class PhotoAlgorithmPostProcessor(
 
             is ProcessorWork.Execute -> {
                 val payload = work.payload
-                val maskResult = resolveMask(result)
-                val renderResult = if (maskResult != null && editor is MaskAwarePhotoAlgorithmEditor) {
-                    try {
-                        val (editorResult, maskNotes) = editor.applyWithMask(
-                            maskResult.first, payload.spec, maskResult.second
-                        )
-                        val baseResult = applyEditorResult(result, payload, editorResult)
-                        val descriptor = maskResult.second.toDescriptor(
-                            maskId = result.shotId,
-                            sourceWidth = maskResult.first.width,
-                            sourceHeight = maskResult.first.height
-                        )
-                        val sceneMaskNotes = SceneMaskPipelineNotes.capabilityNotes(
-                            com.opencamera.core.media.SceneMaskCapability(
-                                subjectMask = SceneMaskSupport.SUPPORTED,
-                                savedPhotoMask = SceneMaskSupport.SUPPORTED,
-                                previewMask = SceneMaskSupport.SUPPORTED,
-                                backendId = "mlkit-selfie"
-                            )
-                        )
-                        val withNotes = (maskNotes + sceneMaskNotes).fold(baseResult) { acc, note ->
-                            acc.addPipelineNotes(note)
+                val maskResolve = resolveMask(result)
+                try {
+                    when (maskResolve) {
+                        is MaskResolveResult.Available -> {
+                            if (editor is MaskAwarePhotoAlgorithmEditor) {
+                                val (editorResult, maskNotes) = editor.applyWithMask(
+                                    maskResolve.bitmap, payload.spec, maskResolve.mask
+                                )
+                                val baseResult = applyEditorResult(result, payload, editorResult)
+                                val descriptor = maskResolve.mask.toDescriptor(
+                                    maskId = result.shotId,
+                                    sourceWidth = maskResolve.bitmap.width,
+                                    sourceHeight = maskResolve.bitmap.height
+                                )
+                                val withNotes = (maskNotes + maskResolve.extraNotes + listOf(
+                                    SceneMaskPipelineNotes.preview(SceneMaskSupport.UNSUPPORTED)
+                                )).fold(baseResult) { acc, note ->
+                                    acc.addPipelineNotes(note)
+                                }
+                                val sceneMaskTags = descriptor.toMetadataTags()
+                                withNotes.copy(
+                                    metadata = withNotes.metadata.copy(
+                                        customTags = withNotes.metadata.customTags + sceneMaskTags
+                                    )
+                                )
+                            } else {
+                                val fallbackNotes = listOf(
+                                    SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED) + ":editor-not-mask-aware",
+                                    SceneMaskPipelineNotes.preview(SceneMaskSupport.UNSUPPORTED)
+                                )
+                                (maskResolve.extraNotes + fallbackNotes).fold(
+                                    applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
+                                ) { acc, note -> acc.addPipelineNotes(note) }
+                            }
                         }
-                        val sceneMaskTags = descriptor.toMetadataTags()
-                        withNotes.copy(
-                            metadata = withNotes.metadata.copy(
-                                customTags = withNotes.metadata.customTags + sceneMaskTags
-                            )
-                        )
-                    } catch (_: Throwable) {
-                        result.addPipelineNotes("algorithm-render:failed:render-exception")
-                    } finally {
-                        maskResult.first.recycle()
+                        is MaskResolveResult.Fallback -> {
+                            maskResolve.extraNotes.fold(
+                                applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
+                            ) { acc, note -> acc.addPipelineNotes(note) }
+                        }
                     }
-                } else {
-                    maskResult?.first?.recycle()
-                    try {
-                        applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
-                    } catch (_: Throwable) {
-                        result.addPipelineNotes("algorithm-render:failed:render-exception")
+                } catch (_: Throwable) {
+                    result.addPipelineNotes("algorithm-render:failed:render-exception")
+                } finally {
+                    if (maskResolve is MaskResolveResult.Available) {
+                        maskResolve.bitmap.recycle()
                     }
                 }
-                renderResult
             }
         }
     }
 
-    private suspend fun resolveMask(result: ShotResult): Pair<android.graphics.Bitmap, SavedPhotoMaskPixels>? {
-        val provider = maskProvider ?: return null
-        val target = result.outputHandle.toProcessorTargetOrNull() ?: return null
+    private suspend fun resolveMask(result: ShotResult): MaskResolveResult {
+        val provider = maskProvider ?: return MaskResolveResult.Fallback(emptyList())
+        val target = result.outputHandle.toProcessorTargetOrNull()
+            ?: return MaskResolveResult.Fallback(emptyList())
         val decoded = if (maskBitmapSource != null) {
-            maskBitmapSource.invoke(target) ?: return null
+            maskBitmapSource.invoke(target)
+                ?: return MaskResolveResult.Fallback(emptyList())
         } else {
-            val sourceBytes = readSourceBytesForMask(target) ?: return null
-            if (sourceBytes.isEmpty()) return null
+            val sourceBytes = readSourceBytesForMask(target)
+                ?: return MaskResolveResult.Fallback(emptyList())
+            if (sourceBytes.isEmpty()) return MaskResolveResult.Fallback(emptyList())
             android.graphics.BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-                ?: return null
+                ?: return MaskResolveResult.Fallback(emptyList())
         }
         return try {
             val maskRequest = SavedPhotoSceneMaskRequest(
@@ -191,19 +209,34 @@ internal class PhotoAlgorithmPostProcessor(
                 outputHandleTag = result.outputHandle.displayPath
             )
             when (val maskResult = provider.createSubjectMask(decoded, maskRequest)) {
-                is SceneMaskResult.Available -> Pair(decoded, maskResult.mask)
+                is SceneMaskResult.Available -> MaskResolveResult.Available(
+                    bitmap = decoded,
+                    mask = maskResult.mask,
+                    extraNotes = listOf(
+                        SceneMaskPipelineNotes.saved(SceneMaskSupport.SUPPORTED)
+                    )
+                )
                 is SceneMaskResult.Unavailable -> {
                     decoded.recycle()
-                    null
+                    MaskResolveResult.Fallback(listOf(
+                        SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),
+                        SceneMaskPipelineNotes.reason(maskResult.reason)
+                    ))
                 }
                 is SceneMaskResult.Failed -> {
                     decoded.recycle()
-                    null
+                    MaskResolveResult.Fallback(listOf(
+                        SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                        SceneMaskPipelineNotes.reason(maskResult.reason)
+                    ))
                 }
             }
         } catch (_: Throwable) {
             decoded.recycle()
-            null
+            MaskResolveResult.Fallback(listOf(
+                SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),
+                SceneMaskPipelineNotes.reason("mask-resolve-exception")
+            ))
         }
     }
 
