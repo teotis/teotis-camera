@@ -220,6 +220,20 @@ object PersistedSettingsSerializer {
                         values[KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_BACKGROUND]
                     ) ?: defaults.photo.blurFourBorderWatermarkStyle.frameBackground
                 ),
+                professionalBottomBarWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_POSITION]
+                    ) ?: defaults.photo.professionalBottomBarWatermarkStyle.textPlacement,
+                    textScale = WatermarkTextScale.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_SCALE]
+                    ) ?: defaults.photo.professionalBottomBarWatermarkStyle.textScale,
+                    textOpacity = WatermarkTextOpacity.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_OPACITY]
+                    ) ?: defaults.photo.professionalBottomBarWatermarkStyle.textOpacity,
+                    frameBackground = WatermarkFrameBackground.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_BACKGROUND]
+                    ) ?: defaults.photo.professionalBottomBarWatermarkStyle.frameBackground
+                ),
                 livePhotoEnabledByDefault = parseBoolean(
                     values[KEY_PHOTO_LIVE_DEFAULT],
                     defaults.photo.livePhotoEnabledByDefault

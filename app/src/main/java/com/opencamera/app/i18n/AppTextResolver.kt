@@ -437,7 +437,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun watermarkSelectorCurrentDefault(): String = str(R.string.watermark_selector_current_default, " | Current default")
     open fun watermarkEditAttrsFrame(): String = str(R.string.watermark_selector_edit_attrs_frame, "Placement, scale, opacity, background")
     open fun watermarkEditAttrsClassic(): String = str(R.string.watermark_selector_edit_attrs_classic, "Placement, scale, opacity")
-    open fun watermarkSelectorFooterSupported(): String = str(R.string.watermark_selector_footer_supported, "Pure Text shows no frame; Classic Overlay keeps its border fixed; Travel Polaroid and Retro Frame expose frame variants; Blur Four Border uses blur-only backgrounds.")
+    open fun watermarkSelectorFooterSupported(): String = str(R.string.watermark_selector_footer_supported, "Pure Text shows no frame; Classic Overlay keeps its border fixed; Travel Polaroid and Retro Frame expose frame variants; Blur Four Border uses blur-only backgrounds. All still-photo watermarks embed a reversible original JPEG archive, extractable via the provided tooling.")
     open fun watermarkSelectorFooterUnsupported(): String = str(R.string.watermark_selector_footer_unsupported, "Still capture is unavailable on this device, so Watermark Lab stays read-only.")
 
     // Watermark detail

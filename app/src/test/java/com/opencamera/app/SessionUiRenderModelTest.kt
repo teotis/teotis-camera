@@ -252,7 +252,7 @@ class SessionUiRenderModelTest {
             )
         )
         assertTrue(summary.contains("Video defaults: 4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich"))
-        assertTrue(summary.contains("Catalog: 18 filters | 5 watermark templates | Live 1500 ms bundle"))
+        assertTrue(summary.contains("Catalog: 18 filters | 6 watermark templates | Live 1500 ms bundle"))
         assertTrue(summary.contains("Manual draft: RAW Off | ISO Auto | S Auto | WB Auto"))
         assertTrue(summary.contains("Action: Still resolution set to 4000x3000"))
     }
@@ -341,7 +341,7 @@ class SessionUiRenderModelTest {
             "4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich",
             model.videoSummary
         )
-        assertEquals("18 filters | 5 watermark templates | Live 1500 ms bundle", model.catalogSummary)
+        assertEquals("18 filters | 6 watermark templates | Live 1500 ms bundle", model.catalogSummary)
         assertEquals("RAW Off | ISO Auto | S Auto | WB Auto", model.manualDraftSummary)
     }
 
@@ -509,7 +509,7 @@ class SessionUiRenderModelTest {
             model.photoSection.portraitLab.buttonLabel
         )
         assertEquals(
-            "Watermark Lab\nTravel Polaroid\n部分支持 • Open selector + per-template tuning; 5 templates",
+            "Watermark Lab\nTravel Polaroid\n部分支持 • Open selector + per-template tuning; 6 templates",
             model.photoSection.watermarkTemplate.buttonLabel
         )
         assertEquals(
@@ -635,7 +635,7 @@ class SessionUiRenderModelTest {
 
         assertEquals("Watermark Lab", model.headline)
         assertEquals("", model.heroSummary)
-        assertEquals(5, model.items.size)
+        assertEquals(6, model.items.size)
         val selected = model.items.first { it.templateId == "travel-polaroid" }
         val classic = model.items.first { it.templateId == "classic-overlay" }
         val pureText = model.items.first { it.templateId == "pure-text" }
@@ -837,6 +837,25 @@ class SessionUiRenderModelTest {
             ),
             "Expected blur-family background but got ${bgAction.background}"
         )
+    }
+
+    @Test
+    fun `professional bottom bar detail shows frame background and bottom only placements`() {
+        val model = watermarkLabDetailRenderModel(
+            state = defaultSessionState(),
+            templateId = "professional-bottom-bar",
+            text = TestAppTextResolver()
+        )
+
+        assertNotNull(model.frameBackgroundControl)
+        val placementAction = model.placementControl.nextAction
+        assertNotNull(placementAction)
+        assertTrue(placementAction is PersistedSettingsAction.UpdateWatermarkTextPlacement)
+        val pa = placementAction as PersistedSettingsAction.UpdateWatermarkTextPlacement
+        assertEquals("professional-bottom-bar", pa.templateId)
+        val backgroundAction = model.frameBackgroundControl?.nextAction
+        assertNotNull(backgroundAction)
+        assertTrue(backgroundAction is PersistedSettingsAction.UpdateWatermarkFrameBackground)
     }
 
     @Test

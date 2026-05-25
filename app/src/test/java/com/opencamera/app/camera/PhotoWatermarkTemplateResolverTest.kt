@@ -159,6 +159,56 @@ class PhotoWatermarkTemplateResolverTest {
     }
 
     @Test
+    fun `professional bottom bar resolves model with mode and profile in title`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "professional-bottom-bar",
+            watermarkText = "PHOTO Auto",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModel" to "X300 Ultra",
+                    "watermarkModeName" to "Scenery",
+                    "watermarkProfileName" to "Handheld",
+                    "watermarkDatetime" to "2026-04-11 20:16",
+                    "watermarkCameraParams" to "1/50s • f/1.8 • ISO 320"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("professional-bottom-bar", resolved.templateId)
+        assertEquals("X300 Ultra · Scenery Handheld", resolved.title)
+        assertTrue(resolved.usesExpandedFrame)
+        assertEquals(WatermarkFrameBackground.DARK, resolved.frameBackground)
+        assertEquals(WatermarkTextPlacement.BOTTOM_CENTER, resolved.placement)
+        assertTrue(resolved.supportingLines.any { it.contains("2026-04-11 20:16") })
+        assertTrue(resolved.supportingLines.any { it.contains("ISO 320") })
+    }
+
+    @Test
+    fun `professional bottom bar degrades gracefully with missing mode tags`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "professional-bottom-bar",
+            watermarkText = "OpenCamera",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkDatetime" to "2026-05-25 10:00"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "OpenCamera DevKit",
+                ExifInterface.TAG_EXPOSURE_TIME to "1/250",
+                ExifInterface.TAG_F_NUMBER to "2.8",
+                ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY to "100"
+            )
+        )
+
+        assertEquals("professional-bottom-bar", resolved.templateId)
+        assertEquals("OpenCamera", resolved.title)
+        assertTrue(resolved.supportingLines.any { it.contains("2026-05-25 10:00") })
+        assertTrue(resolved.supportingLines.any { it.contains("ISO 100") })
+    }
+
+    @Test
     fun `unknown template falls back to classic overlay and formats gps camera params`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "unsupported-template",
