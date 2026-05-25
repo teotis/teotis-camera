@@ -353,6 +353,7 @@
     <string name="watermark_detail_supporting_not_selected">此模板尚不是当前默认。请先在此调整，准备就绪后从选择器页面切换。</string>
     <string name="watermark_detail_footer_frame">边框渲染对静态照片导出已激活。</string>
     <string name="watermark_detail_footer_overlay">经典叠加保持在源图像内，不扩展边框。</string>
+    <string name="watermark_detail_footer_pure_text">纯文字直接叠加在源图像上，无任何边框或背景容器。</string>
     <string name="watermark_detail_tokens_prefix">标记：</string>
 
     <!-- Watermark attribute prefixes for hero summary -->

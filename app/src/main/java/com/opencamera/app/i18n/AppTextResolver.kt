@@ -445,6 +445,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun watermarkDetailSupportingNotSelected(): String = str(R.string.watermark_detail_supporting_not_selected, "This template is not yet the current default. Adjust here first, then switch from the selector page when ready.")
     open fun watermarkDetailFooterFrame(): String = str(R.string.watermark_detail_footer_frame, "Frame border rendering is live for static-photo export.")
     open fun watermarkDetailFooterOverlay(): String = str(R.string.watermark_detail_footer_overlay, "Classic overlay stays inside the source image without an expanded border.")
+    open fun watermarkDetailFooterPureText(): String = str(R.string.watermark_detail_footer_pure_text, "Clean text sits directly on the source image with no border or background container.")
     open fun watermarkDetailTokensPrefix(): String = str(R.string.watermark_detail_tokens_prefix, "Tokens: ")
 
     // Watermark attribute prefixes for hero summary

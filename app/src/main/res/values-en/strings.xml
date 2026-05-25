@@ -355,6 +355,7 @@
     <string name="watermark_detail_supporting_not_selected">This template is not yet the current default. Adjust here first, then switch from the selector page when ready.</string>
     <string name="watermark_detail_footer_frame">Frame border rendering is live for static-photo export.</string>
     <string name="watermark_detail_footer_overlay">Classic overlay stays inside the source image without an expanded border.</string>
+    <string name="watermark_detail_footer_pure_text">Clean text sits directly on the source image with no border or background container.</string>
     <string name="watermark_detail_tokens_prefix">Tokens: </string>
 
     <!-- Watermark attribute prefixes for hero summary -->
