@@ -14,12 +14,24 @@ class PreviewEffectAdapter {
         val watermark = spec.find<WatermarkEffect>()
         val frame = spec.find<FrameEffect>()
 
+        val colorTransform = filter?.let { buildColorTransform(it) }
+        val fidelity = when {
+            colorTransform == null || colorTransform.isIdentity -> PreviewColorFidelity.NONE
+            else -> PreviewColorFidelity.GOOD
+        }
+
         return PreviewEffectRenderModel(
             filterOverlay = filter?.let { buildFilterOverlay(it) },
             watermarkHint = watermark?.let { buildWatermarkHint(it) },
             frameGuideline = frame?.let { buildFrameGuideline(it) },
-            compositionGrid = null
+            compositionGrid = null,
+            colorTransform = colorTransform,
+            colorFidelity = fidelity
         )
+    }
+
+    private fun buildColorTransform(effect: FilterEffect): PreviewColorTransform {
+        return PreviewColorTransform.fromSpec(effect.renderSpec)
     }
 
     private fun buildFilterOverlay(effect: FilterEffect): FilterOverlaySpec {
@@ -74,7 +86,9 @@ class PreviewEffectAdapter {
     private fun resolveOverlayOpacity(spec: FilterRenderSpec?): Float {
         val saturation = spec?.saturation ?: 1f
         val contrast = spec?.contrast ?: 1f
-        return ((2f - saturation) * 0.15f + (contrast - 1f) * 0.1f)
-            .coerceIn(0f, 0.4f)
+        // Reduced opacity: the color matrix now handles saturation/contrast precisely.
+        // Overlay only provides a subtle warm/cool tint supplement.
+        return ((2f - saturation) * 0.06f + (contrast - 1f) * 0.04f)
+            .coerceIn(0f, 0.15f)
     }
 }

@@ -11,11 +11,22 @@ enum class WatermarkPreviewShape {
     FOUR_BORDER
 }
 
+enum class PreviewColorFidelity {
+    /** No color transform — identity pass-through */
+    NONE,
+    /** Color matrix computed but not yet applied to preview surface */
+    APPROXIMATE,
+    /** Color matrix applied via ColorMatrixColorFilter */
+    GOOD
+}
+
 data class PreviewEffectRenderModel(
     val filterOverlay: FilterOverlaySpec?,
     val watermarkHint: WatermarkHintSpec?,
     val frameGuideline: FrameGuidelineSpec?,
-    val compositionGrid: CompositionGridSpec?
+    val compositionGrid: CompositionGridSpec?,
+    val colorTransform: PreviewColorTransform? = null,
+    val colorFidelity: PreviewColorFidelity = PreviewColorFidelity.NONE
 ) {
     companion object {
         val EMPTY = PreviewEffectRenderModel(null, null, null, null)

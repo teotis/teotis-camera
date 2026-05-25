@@ -3,6 +3,7 @@ package com.opencamera.app
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -239,10 +240,22 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawFilterOverlay(canvas: Canvas, spec: FilterOverlaySpec) {
-        if (spec.tintAlpha <= 0f) return
-        filterOverlayPaint.color = spec.tintColor
-        filterOverlayPaint.alpha = (spec.tintAlpha * 255).toInt().coerceIn(0, 255)
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), filterOverlayPaint)
+        // Apply color matrix filter to the overlay paint when available.
+        // Note: For SurfaceView (implementationMode=compatible), this transforms
+        // the overlay's drawn content but not the underlying camera surface.
+        // The overlay tint values are tuned to approximate the color matrix effect.
+        val colorTransform = renderModel.effectModel?.colorTransform
+        if (colorTransform != null && !colorTransform.isIdentity) {
+            filterOverlayPaint.colorFilter = ColorMatrixColorFilter(colorTransform.colorMatrix)
+        } else {
+            filterOverlayPaint.colorFilter = null
+        }
+
+        if (spec.tintAlpha > 0f) {
+            filterOverlayPaint.color = spec.tintColor
+            filterOverlayPaint.alpha = (spec.tintAlpha * 255).toInt().coerceIn(0, 255)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), filterOverlayPaint)
+        }
 
         val gradient = vignetteGradient
         val rect = vignetteOverlayRect
