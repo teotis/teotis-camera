@@ -262,12 +262,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     private fun drawFrameGuideline(canvas: Canvas, spec: FrameGuidelineSpec) {
         frameGuidelinePaint.color = spec.borderColor
         frameGuidelinePaint.alpha = (spec.borderAlpha * 255).toInt().coerceIn(0, 255)
-        val rect = previewContentGeometry(
-            viewWidth = width,
-            viewHeight = height,
-            ratioWidth = spec.ratio.width,
-            ratioHeight = spec.ratio.height
-        ).activeFrameRect
+        val rect = activeContentGeometry().activeFrameRect
         canvas.drawRect(rect, frameGuidelinePaint)
     }
 
@@ -347,12 +342,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
-        val rect = previewContentGeometry(
-            viewWidth = width,
-            viewHeight = height,
-            ratioWidth = frame.ratio.width,
-            ratioHeight = frame.ratio.height
-        ).activeFrameRect
+        val rect = activeContentGeometry().activeFrameRect
         if (frame.dimOutsideFrame) {
             val outsidePath = android.graphics.Path().apply {
                 fillType = android.graphics.Path.FillType.EVEN_ODD
