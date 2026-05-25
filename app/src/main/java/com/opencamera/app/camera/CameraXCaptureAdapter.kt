@@ -1590,6 +1590,19 @@ class CameraXCaptureAdapter(
             is PhotoCaptureOutcome.Success -> {
                 val resolvedSpec = plan.saveTask.livePhotoSpec
                     ?: com.opencamera.core.media.LivePhotoCaptureSpec()
+                val saveFormat = resolvedSpec.saveFormat
+
+                // STILL_JPEG_ONLY: skip live entirely, return still with diagnostic
+                if (saveFormat == com.opencamera.core.settings.LiveSaveFormat.STILL_JPEG_ONLY) {
+                    return result.copy(
+                        livePhotoBundle = null,
+                        diagnostics = result.diagnostics + listOf(
+                            "live-export:format=still-jpeg-only",
+                            "live-export:share-target=still",
+                            "live-export:fallback=disabled-by-format"
+                        )
+                    )
+                }
 
                 // Use frame source if available
                 val frameSource = livePreviewFrameSource
@@ -1633,31 +1646,51 @@ class CameraXCaptureAdapter(
                     temporalWindow = temporalPlan.temporalWindow
                 )
 
-                // If we have real frames, try to create Google Motion Photo
-                val finalBundle = if (motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
+                // Branch by save format for container materialization
+                val hasRealFrames = motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
                     motionSourceResult.selectedFrameSet.frames.isNotEmpty()
-                ) {
-                    val materializer = com.opencamera.app.camera.live.MotionPhotoFileMaterializer()
-                    val motionPhotoResult = materializer.materialize(
-                        stillPath = result.outputPath,
-                        motionPath = livePhotoBundle.motionPath,
-                        outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
-                        spec = com.opencamera.core.media.MotionPhotoContainerSpec(
-                            motionLengthBytes = 0 // Will be calculated by materializer
-                        ),
-                        cleanupTempMotion = false
-                    )
-                    if (motionPhotoResult.isSuccess) {
-                        livePhotoBundle.copy(
-                            stillPath = motionPhotoResult.getOrDefault(livePhotoBundle.stillPath)
-                        )
-                    } else {
-                        livePhotoBundle.copy(
-                            bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK
+
+                val finalBundle = when (saveFormat) {
+                    com.opencamera.core.settings.LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG -> {
+                        if (hasRealFrames) {
+                            val materializer = com.opencamera.app.camera.live.MotionPhotoFileMaterializer()
+                            val motionPhotoResult = materializer.materialize(
+                                stillPath = result.outputPath,
+                                motionPath = livePhotoBundle.motionPath,
+                                outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
+                                spec = com.opencamera.core.media.MotionPhotoContainerSpec(
+                                    motionLengthBytes = 0
+                                ),
+                                cleanupTempMotion = false
+                            )
+                            if (motionPhotoResult.isSuccess) {
+                                livePhotoBundle.copy(
+                                    stillPath = motionPhotoResult.getOrDefault(livePhotoBundle.stillPath)
+                                )
+                            } else {
+                                livePhotoBundle.copy(
+                                    bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK
+                                )
+                            }
+                        } else {
+                            livePhotoBundle
+                        }
+                    }
+                    com.opencamera.core.settings.LiveSaveFormat.MOTION_MP4_SIDECAR -> {
+                        // Keep still + MP4 + sidecar; never claim Google container
+                        livePhotoBundle
+                    }
+                    com.opencamera.core.settings.LiveSaveFormat.STILL_JPEG_ONLY -> {
+                        // Unreachable due to early return above, but exhaustive
+                        return result.copy(
+                            livePhotoBundle = null,
+                            diagnostics = result.diagnostics + listOf(
+                                "live-export:format=still-jpeg-only",
+                                "live-export:share-target=still",
+                                "live-export:fallback=disabled-by-format"
+                            )
                         )
                     }
-                } else {
-                    livePhotoBundle
                 }
 
                 val sidecarResult = runCatching {
@@ -1668,12 +1701,22 @@ class CameraXCaptureAdapter(
                 }
 
                 val diagnosisBuilder = buildList {
+                    add("live-export:format=${saveFormat.storageKey}")
                     add("device:live-photo=bundle")
                     addAll(motionSourceResult.diagnostics)
-                    if (motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
-                        motionSourceResult.selectedFrameSet.frames.isNotEmpty()
-                    ) {
-                        add("motion-photo:container=google-jpeg")
+                    when (saveFormat) {
+                        com.opencamera.core.settings.LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG -> {
+                            add("live-export:share-target=motion-photo")
+                            if (hasRealFrames) {
+                                add("motion-photo:container=google-jpeg")
+                            }
+                        }
+                        com.opencamera.core.settings.LiveSaveFormat.MOTION_MP4_SIDECAR -> {
+                            add("live-export:share-target=mp4")
+                        }
+                        com.opencamera.core.settings.LiveSaveFormat.STILL_JPEG_ONLY -> {
+                            add("live-export:share-target=still")
+                        }
                     }
                     if (sidecarResult.isSuccess) {
                         add(
@@ -1691,9 +1734,6 @@ class CameraXCaptureAdapter(
                     }
                 }
 
-                // Sidecar failure is non-fatal: still photo was already saved.
-                // Return Success with livePhotoBundle = null so consumers
-                // treat it as a regular still photo, not a live photo.
                 result.copy(
                     livePhotoBundle = if (sidecarResult.isSuccess) finalBundle else null,
                     diagnostics = result.diagnostics + diagnosisBuilder

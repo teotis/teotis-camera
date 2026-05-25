@@ -1,9 +1,12 @@
 package com.opencamera.core.media
 
+import com.opencamera.core.settings.LiveSaveFormat
+
 data class LivePhotoCaptureSpec(
     val motionDurationMillis: Long = 1_500,
     val motionMimeType: String = "video/mp4",
-    val sidecarMimeType: String = "application/vnd.opencamera.live+json"
+    val sidecarMimeType: String = "application/vnd.opencamera.live+json",
+    val saveFormat: LiveSaveFormat = LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG
 )
 
 data class LivePhotoBundle(

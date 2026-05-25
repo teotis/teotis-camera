@@ -332,6 +332,67 @@ class PersistedSettingsSerializerTest {
     }
 
     @Test
+    fun `serializer round trips live save format`() {
+        val settings = PersistedSettings(
+            photo = PhotoSettings(liveSaveFormat = LiveSaveFormat.MOTION_MP4_SIDECAR)
+        )
+
+        val serialized = PersistedSettingsSerializer.toMap(settings)
+        assertEquals("motion-mp4-sidecar", serialized["photo.live.saveFormat"])
+
+        val decoded = PersistedSettingsSerializer.fromMap(serialized)
+        assertEquals(LiveSaveFormat.MOTION_MP4_SIDECAR, decoded.photo.liveSaveFormat)
+    }
+
+    @Test
+    fun `serializer falls back to google motion photo when live save format key is missing`() {
+        val decoded = PersistedSettingsSerializer.fromMap(emptyMap())
+        assertEquals(LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG, decoded.photo.liveSaveFormat)
+    }
+
+    @Test
+    fun `serializer falls back to google motion photo for unknown live save format key`() {
+        val decoded = PersistedSettingsSerializer.fromMap(
+            mapOf("photo.live.saveFormat" to "unknown-format")
+        )
+        assertEquals(LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG, decoded.photo.liveSaveFormat)
+    }
+
+    @Test
+    fun `reducer updates live save format without affecting other fields`() {
+        val initial = PersistedSettings()
+        assertEquals(LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG, initial.photo.liveSaveFormat)
+
+        val updated = initial.reduce(
+            PersistedSettingsAction.UpdateLiveSaveFormat(LiveSaveFormat.STILL_JPEG_ONLY)
+        )
+        assertEquals(LiveSaveFormat.STILL_JPEG_ONLY, updated.photo.liveSaveFormat)
+        assertEquals(initial.photo.defaultFilterProfileId, updated.photo.defaultFilterProfileId)
+        assertEquals(initial.photo.livePhotoEnabledByDefault, updated.photo.livePhotoEnabledByDefault)
+        assertEquals(initial.common, updated.common)
+        assertEquals(initial.video, updated.video)
+    }
+
+    @Test
+    fun `map backed settings store preserves live save format in snapshot`() {
+        val store = MapPersistedSettingsStore()
+        val settings = PersistedSettings(
+            photo = PhotoSettings(liveSaveFormat = LiveSaveFormat.MOTION_MP4_SIDECAR)
+        )
+
+        store.save(settings)
+
+        assertEquals("motion-mp4-sidecar", store.snapshot()["photo.live.saveFormat"])
+        assertEquals(LiveSaveFormat.MOTION_MP4_SIDECAR, store.load().photo.liveSaveFormat)
+    }
+
+    @Test
+    fun `default live save format is google motion photo jpeg`() {
+        val settings = PhotoSettings()
+        assertEquals(LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG, settings.liveSaveFormat)
+    }
+
+    @Test
     fun `default watermark catalog includes pure text and blur four border`() {
         val catalog = FeatureCatalog()
         val pureText = catalog.watermarkTemplates.first { it.id == "pure-text" }

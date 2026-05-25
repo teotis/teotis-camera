@@ -118,6 +118,8 @@
     <string name="label_portrait_lab">人像</string>
     <string name="label_watermark_lab">水印</string>
     <string name="label_live_photo_default">实况照片默认</string>
+    <string name="label_live_save_format">实况保存格式</string>
+    <string name="format_live_save_format_support">%d 种格式: Motion Photo、MP4 副件、仅 JPEG</string>
     <string name="label_countdown">倒计时</string>
     <string name="label_resolution">分辨率</string>
     <string name="label_frame_rate">帧率</string>

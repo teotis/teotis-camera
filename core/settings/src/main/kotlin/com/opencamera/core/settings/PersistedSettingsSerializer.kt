@@ -33,6 +33,7 @@ object PersistedSettingsSerializer {
     private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_OPACITY = "photo.watermark.blurFourBorder.opacity"
     private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_BACKGROUND = "photo.watermark.blurFourBorder.background"
     private const val KEY_PHOTO_LIVE_DEFAULT = "photo.livePhotoEnabledByDefault"
+    private const val KEY_PHOTO_LIVE_SAVE_FORMAT = "photo.live.saveFormat"
     private const val KEY_PHOTO_COUNTDOWN = "photo.countdownDuration"
     private const val KEY_VIDEO_FILTER = "video.defaultFilterProfileId"
     private const val KEY_VIDEO_RESOLUTION = "video.defaultVideoResolution"
@@ -81,6 +82,7 @@ object PersistedSettingsSerializer {
             KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_OPACITY to settings.photo.blurFourBorderWatermarkStyle.textOpacity.storageKey,
             KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_BACKGROUND to settings.photo.blurFourBorderWatermarkStyle.frameBackground.storageKey,
             KEY_PHOTO_LIVE_DEFAULT to settings.photo.livePhotoEnabledByDefault.toString(),
+            KEY_PHOTO_LIVE_SAVE_FORMAT to settings.photo.liveSaveFormat.storageKey,
             KEY_PHOTO_COUNTDOWN to settings.photo.countdownDuration.storageKey,
             KEY_VIDEO_FILTER to settings.video.defaultFilterProfileId,
             KEY_VIDEO_RESOLUTION to settings.video.defaultVideoSpec.resolution.storageKey,
@@ -212,6 +214,8 @@ object PersistedSettingsSerializer {
                     values[KEY_PHOTO_LIVE_DEFAULT],
                     defaults.photo.livePhotoEnabledByDefault
                 ),
+                liveSaveFormat = LiveSaveFormat.fromStorageKey(values[KEY_PHOTO_LIVE_SAVE_FORMAT])
+                    ?: defaults.photo.liveSaveFormat,
                 countdownDuration = CountdownDuration.fromStorageKey(values[KEY_PHOTO_COUNTDOWN])
                     ?: defaults.photo.countdownDuration,
                 colorLabSpec = ColorLabSpec(

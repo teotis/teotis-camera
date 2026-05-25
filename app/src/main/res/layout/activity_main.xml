@@ -647,6 +647,16 @@
                         android:textAlignment="viewStart" />
 
                     <Button
+                        android:id="@+id/buttonPhotoLiveSaveFormat"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
                         android:id="@+id/buttonPhotoTimer"
                         style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"

@@ -190,7 +190,7 @@ private class PhotoModeController(
                                 stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                             ),
                             livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft
-                                .toCaptureSpec()
+                                .toCaptureSpec(context.settingsSnapshot.persisted.photo.liveSaveFormat)
                         )
                     } else {
                         CaptureStrategy.SingleFrame(
@@ -462,11 +462,14 @@ private class PhotoModeController(
     private fun livePhotoEnabledByDefault(): Boolean =
         context.settingsSnapshot.persisted.photo.livePhotoEnabledByDefault
 
-    private fun com.opencamera.core.settings.LiveMediaBundle.toCaptureSpec(): LivePhotoCaptureSpec {
+    private fun com.opencamera.core.settings.LiveMediaBundle.toCaptureSpec(
+        saveFormat: com.opencamera.core.settings.LiveSaveFormat
+    ): LivePhotoCaptureSpec {
         return LivePhotoCaptureSpec(
             motionDurationMillis = motionDurationMillis,
             motionMimeType = motionContainer,
-            sidecarMimeType = sidecarMimeType
+            sidecarMimeType = sidecarMimeType,
+            saveFormat = saveFormat
         )
     }
     private fun countdownDuration(): CountdownDuration = context.settingsSnapshot.persisted.photo.countdownDuration

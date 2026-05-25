@@ -235,3 +235,16 @@ enum class PortraitBokehEffect(
         fun fromStorageKey(value: String?): PortraitBokehEffect? = storageKeyFrom(value)
     }
 }
+
+enum class LiveSaveFormat(
+    override val storageKey: String,
+    override val label: String
+) : StorageKeyEnum {
+    GOOGLE_MOTION_PHOTO_JPEG("google-motion-photo-jpeg", "Motion Photo"),
+    MOTION_MP4_SIDECAR("motion-mp4-sidecar", "MP4 Sidecar"),
+    STILL_JPEG_ONLY("still-jpeg-only", "JPEG Only");
+
+    companion object {
+        fun fromStorageKey(value: String?): LiveSaveFormat? = storageKeyFrom(value)
+    }
+}

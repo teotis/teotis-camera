@@ -19,6 +19,7 @@ import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.FeatureCatalogAction
 import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
+import com.opencamera.core.settings.LiveSaveFormat
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.PhotoSettings
@@ -64,6 +65,7 @@ internal data class PhotoSettingsSectionRenderModel(
     val portraitLab: SettingsControlRenderModel,
     val watermarkTemplate: SettingsControlRenderModel,
     val livePhoto: SettingsControlRenderModel,
+    val liveSaveFormat: SettingsControlRenderModel,
     val countdown: SettingsControlRenderModel
 )
 
@@ -373,6 +375,9 @@ internal fun sessionSettingsRenderModel(
             append(watermarkTemplateLabel)
             append(text.settingsJoinerLive())
             append(text.onOff(settings.photo.livePhotoEnabledByDefault))
+            append(" (")
+            append(settings.photo.liveSaveFormat.label)
+            append(")")
             append(text.settingsJoinerTimer())
             append(settings.photo.countdownDuration.label)
         },
@@ -569,6 +574,32 @@ internal fun sessionSettingsPageRenderModel(
                 nextAction = if (supportsStillCapture) {
                     PersistedSettingsAction.UpdateLivePhotoDefault(
                         !settings.photo.livePhotoEnabledByDefault
+                    )
+                } else {
+                    null
+                }
+            ),
+            liveSaveFormat = SettingsControlRenderModel(
+                label = text.liveSaveFormatLabel(),
+                value = settings.photo.liveSaveFormat.label,
+                availability = if (supportsStillCapture) {
+                    SettingsControlAvailability.SUPPORTED
+                } else {
+                    SettingsControlAvailability.UNSUPPORTED
+                },
+                availabilityLabel = text.availabilityLabel(if (supportsStillCapture) {
+                    SettingsControlAvailability.SUPPORTED
+                } else {
+                    SettingsControlAvailability.UNSUPPORTED
+                }),
+                supportLabel = if (supportsStillCapture) {
+                    text.liveSaveFormatSupportLabel(LiveSaveFormat.entries.size)
+                } else {
+                    text.stillCaptureUnavailable()
+                },
+                nextAction = if (supportsStillCapture) {
+                    PersistedSettingsAction.UpdateLiveSaveFormat(
+                        nextListValue(settings.photo.liveSaveFormat, LiveSaveFormat.entries.toList())
                     )
                 } else {
                     null

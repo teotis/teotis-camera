@@ -164,6 +164,8 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun portraitLabSettingLabel(): String = "Portrait Lab"
     override fun watermarkLabSettingLabel(): String = "Watermark Lab"
     override fun livePhotoDefaultLabel(): String = "Live photo default"
+    override fun liveSaveFormatLabel(): String = "Live save format"
+    override fun liveSaveFormatSupportLabel(count: Int): String = "$count formats: Motion Photo, MP4 Sidecar, JPEG Only"
     override fun countdownLabel(): String = "Countdown"
     override fun resolutionLabel(): String = "Resolution"
     override fun frameRateLabel(): String = "Frame rate"
