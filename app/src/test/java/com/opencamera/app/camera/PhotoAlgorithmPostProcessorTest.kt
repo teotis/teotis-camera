@@ -113,6 +113,65 @@ class PhotoAlgorithmPostProcessorTest {
     }
 
     @Test
+    fun `editor exception during decode is caught and degrades gracefully`() = runTest {
+        val editor = ThrowingPhotoAlgorithmEditor(OutOfMemoryError("bitmap too large"))
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/color-lab-photo.jpg",
+                    filePath = "/tmp/color-lab-photo.jpg"
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("algorithm-render:failed:render-exception"))
+    }
+
+    @Test
+    fun `postprocess exception preserves original result with failure note`() = runTest {
+        val editor = ThrowingPhotoAlgorithmEditor(RuntimeException("unexpected"))
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val input = photoResult(
+            algorithmProfile = "photo-vivid",
+            outputHandle = MediaOutputHandle(
+                displayPath = "/tmp/lab-photo.jpg",
+                filePath = "/tmp/lab-photo.jpg"
+            )
+        )
+        val result = processor.process(input)
+
+        assertEquals(input.outputPath, result.outputPath)
+        assertEquals(input.outputHandle, result.outputHandle)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:failed:render-exception"))
+    }
+
+    @Test
+    fun `editor exception with custom filter spec degrades gracefully`() = runTest {
+        val editor = ThrowingPhotoAlgorithmEditor(RuntimeException("decode-crash"))
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "custom-vivid-1",
+                saveRequest = SaveRequest.photoLibrary(
+                    metadata = MediaMetadata(
+                        algorithmProfile = "custom-vivid-1",
+                        customTags = FilterRenderSpec(
+                            brightnessShift = -2,
+                            contrast = 1.11f,
+                            saturation = 1.19f,
+                            warmthShift = 2
+                        ).toMetadataTags() + mapOf("filterProfile" to "custom-vivid-1")
+                    )
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("algorithm-render:failed:render-exception"))
+    }
+
+    @Test
     fun `shared custom filter spec is rendered without built in algorithm mapping`() = runTest {
         val editor = FakePhotoAlgorithmEditor(
             result = PhotoAlgorithmApplied()
@@ -364,6 +423,17 @@ class PhotoAlgorithmPostProcessorTest {
         ): ProcessorEditorResult {
             invocations += Invocation(target, spec)
             return result
+        }
+    }
+
+    private class ThrowingPhotoAlgorithmEditor(
+        private val error: Throwable
+    ) : PhotoAlgorithmEditor {
+        override suspend fun apply(
+            target: ProcessorTarget,
+            spec: PhotoAlgorithmSpec
+        ): ProcessorEditorResult {
+            throw error
         }
     }
 

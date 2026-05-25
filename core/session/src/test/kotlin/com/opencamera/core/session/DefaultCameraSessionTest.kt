@@ -3502,6 +3502,115 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `color lab filtered photo shot completed updates thumbnail to saved media`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        val filteredShot = shot.copy(
+            saveRequest = shot.saveRequest.copy(
+                metadata = shot.saveRequest.metadata.copy(
+                    customTags = shot.saveRequest.metadata.customTags + mapOf(
+                        "filterProfile" to "photo-original",
+                        "filterSpec.version" to "1",
+                        "filterSpec.warmthShift" to "12",
+                        "filterSpec.contrast" to "1.17"
+                    )
+                )
+            )
+        )
+        session.dispatch(SessionIntent.ShotStarted(filteredShot))
+        advanceUntilIdle()
+
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+        assertNotNull(session.state.value.activeShot)
+
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = filteredShot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/color-lab-photo.jpg",
+                    saveRequest = filteredShot.saveRequest,
+                    thumbnailSource = ThumbnailSource.SavedMedia(
+                        outputPath = "Pictures/OpenCamera/color-lab-photo.jpg"
+                    ),
+                    metadata = filteredShot.saveRequest.metadata,
+                    pipelineNotes = listOf(
+                        "algorithm-render:applied:photo-original",
+                        "filterSpec.warmthShift=12",
+                        "filterSpec.contrast=1.17"
+                    )
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(CaptureStatus.COMPLETED, session.state.value.captureStatus)
+        assertNull(session.state.value.activeShot)
+        assertEquals("Pictures/OpenCamera/color-lab-photo.jpg", session.state.value.latestCapturePath)
+        assertEquals(SavedMediaType.PHOTO, session.state.value.latestSavedMediaType)
+        assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.SavedMedia)
+        assertEquals("Pictures/OpenCamera/color-lab-photo.jpg", session.state.value.previewThumbnailPath)
+        assertTrue(session.state.value.latestPipelineNotes.contains("algorithm-render:applied:photo-original"))
+        assertTrue(trace.snapshot().any { it.name == "capture.saved" })
+    }
+
+    @Test
+    fun `color lab shot postprocess failure still completes with degraded save`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        val filteredShot = shot.copy(
+            saveRequest = shot.saveRequest.copy(
+                metadata = shot.saveRequest.metadata.copy(
+                    customTags = shot.saveRequest.metadata.customTags + mapOf(
+                        "filterProfile" to "custom-lab-vivid",
+                        "filterSpec.version" to "1",
+                        "filterSpec.brightnessShift" to "5",
+                        "filterSpec.saturation" to "1.2"
+                    )
+                )
+            )
+        )
+        session.dispatch(SessionIntent.ShotStarted(filteredShot))
+        advanceUntilIdle()
+
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = filteredShot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/color-lab-degraded.jpg",
+                    saveRequest = filteredShot.saveRequest,
+                    thumbnailSource = ThumbnailSource.SavedMedia(
+                        outputPath = "Pictures/OpenCamera/color-lab-degraded.jpg"
+                    ),
+                    metadata = filteredShot.saveRequest.metadata,
+                    pipelineNotes = listOf("algorithm-render:failed:render-exception")
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(CaptureStatus.COMPLETED, session.state.value.captureStatus)
+        assertNull(session.state.value.activeShot)
+        assertEquals("Pictures/OpenCamera/color-lab-degraded.jpg", session.state.value.latestCapturePath)
+        assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.SavedMedia)
+        assertTrue(session.state.value.latestPipelineNotes.contains("algorithm-render:failed:render-exception"))
+        assertTrue(trace.snapshot().any { it.name == "capture.saved" })
+    }
+
+    @Test
     fun `non default frame ratio suppresses raw capture feedback`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace, this)
