@@ -110,7 +110,11 @@ import com.opencamera.core.media.primaryStillNode
 import com.opencamera.core.media.primaryVideoNode
 import com.opencamera.core.media.temporaryFrameNode
 import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
+import com.opencamera.app.camera.live.MotionPhotoFileMaterializer
+import com.opencamera.app.camera.live.MotionSegmentFrameSource
+import com.opencamera.core.media.MotionPhotoContainerSpec
 import com.opencamera.core.media.StillCaptureQualityPreference
+import com.opencamera.core.settings.LiveSaveFormat
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.CoroutineScope
@@ -695,7 +699,7 @@ internal fun resolvedStillCaptureQuality(
         CaptureTemplate.STILL_CAPTURE ->
             deviceGraph.stillCapture.qualityPreference
         CaptureTemplate.VIDEO_RECORDING ->
-            deviceRequest?.stillCaptureQuality ?: deviceGraph.stillCapture.qualityPreference
+            deviceGraph.stillCapture.qualityPreference
     }
 }
 
@@ -1710,8 +1714,21 @@ class CameraXCaptureAdapter(
             is PhotoCaptureOutcome.Success -> {
                 val resolvedSpec = plan.saveTask.livePhotoSpec
                     ?: com.opencamera.core.media.LivePhotoCaptureSpec()
+                val saveFormat = resolvedSpec.saveFormat
 
-                // Use frame source if available
+                // STILL_JPEG_ONLY: skip live entirely, return still with diagnostics
+                if (saveFormat == LiveSaveFormat.STILL_JPEG_ONLY) {
+                    return result.copy(
+                        livePhotoBundle = null,
+                        diagnostics = result.diagnostics + listOf(
+                            "live-export:format=still-jpeg-only",
+                            "live-export:share-target=still",
+                            "live-export:fallback=disabled-by-format"
+                        )
+                    )
+                }
+
+                // Resolve motion source from preview
                 val frameSource = livePreviewFrameSource
                 val motionSourceResult = if (frameSource != null) {
                     resolveLiveMotionSource(
@@ -1757,31 +1774,89 @@ class CameraXCaptureAdapter(
                     watermarkDegradeReason = resolvedWatermark.degradeReason
                 )
 
-                // If we have real frames, try to create Google Motion Photo
-                val finalBundle = if (motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
-                    motionSourceResult.selectedFrameSet.frames.isNotEmpty()
-                ) {
-                    val materializer = com.opencamera.app.camera.live.MotionPhotoFileMaterializer()
-                    val motionPhotoResult = materializer.materialize(
-                        stillPath = result.outputPath,
-                        motionPath = livePhotoBundle.motionPath,
-                        outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
-                        spec = com.opencamera.core.media.MotionPhotoContainerSpec(
-                            motionLengthBytes = 0 // Will be calculated by materializer
-                        ),
-                        cleanupTempMotion = false
-                    )
-                    if (motionPhotoResult.isSuccess) {
-                        livePhotoBundle.copy(
-                            stillPath = motionPhotoResult.getOrDefault(livePhotoBundle.stillPath)
+                // Materialize based on selected save format
+                val motionFrameSource = frameSource as? MotionSegmentFrameSource
+                var materializationDiagnostics: List<String> = emptyList()
+                val finalBundle = when (saveFormat) {
+                    LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG -> {
+                        val materialization = materializeMotionPhotoBundleIfPossible(
+                            bundle = livePhotoBundle,
+                            motionSourceResult = motionSourceResult,
+                            prepareMotionSegment = { frames, outputPath ->
+                                motionFrameSource?.materializeMotionSegment(frames, outputPath)
+                                    ?: Result.failure(
+                                        IllegalStateException("motion segment source unavailable")
+                                    )
+                            },
+                            materialize = { motionPath ->
+                                val materializer = MotionPhotoFileMaterializer()
+                                val motionFile = File(motionPath)
+                                materializer.materialize(
+                                    stillPath = result.outputPath,
+                                    motionPath = motionPath,
+                                    outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
+                                    spec = MotionPhotoContainerSpec(
+                                        motionLengthBytes = motionFile.takeIf { it.exists() }?.length() ?: 0L
+                                    ),
+                                    cleanupTempMotion = false
+                                )
+                            }
                         )
-                    } else {
-                        livePhotoBundle.copy(
-                            bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK
+                        materializationDiagnostics = materialization.diagnostics
+                        materialization.bundle
+                    }
+
+                    LiveSaveFormat.MOTION_MP4_SIDECAR -> {
+                        val selectedFrames = motionSourceResult.selectedFrameSet.frames
+                        if (selectedFrames.isEmpty()) {
+                            materializationDiagnostics =
+                                listOf("motion-photo:motion-segment=unavailable")
+                            livePhotoBundle.copy(bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK)
+                        } else {
+                            val motionSegmentResult = motionFrameSource?.materializeMotionSegment(
+                                selectedFrames,
+                                livePhotoBundle.motionPath
+                            ) ?: Result.failure(
+                                IllegalStateException("motion segment source unavailable")
+                            )
+                            motionSegmentResult.fold(
+                                onSuccess = { motionPath ->
+                                    val mp4File = File(motionPath)
+                                    materializationDiagnostics = listOf(
+                                        "motion-photo:motion-segment=materialized",
+                                        "motion-photo:appended-mp4-bytes=${mp4File.takeIf { it.exists() }?.length() ?: 0}"
+                                    )
+                                    livePhotoBundle.copy(
+                                        motionPath = motionPath,
+                                        motionHandle = livePhotoBundle.motionHandle.copy(
+                                            displayPath = motionPath,
+                                            filePath = motionPath.takeIf { File(it).isAbsolute }
+                                        )
+                                    )
+                                },
+                                onFailure = { throwable ->
+                                    materializationDiagnostics = listOf(
+                                        "motion-photo:motion-segment=failed:${throwable.message ?: "unknown"}"
+                                    )
+                                    livePhotoBundle.copy(
+                                        bundleStatus = com.opencamera.core.media.LiveBundleStatus.STILL_ONLY_FALLBACK
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    LiveSaveFormat.STILL_JPEG_ONLY -> {
+                        // Unreachable due to early return above
+                        return result.copy(
+                            livePhotoBundle = null,
+                            diagnostics = result.diagnostics + listOf(
+                                "live-export:format=still-jpeg-only",
+                                "live-export:share-target=still",
+                                "live-export:fallback=disabled-by-format"
+                            )
                         )
                     }
-                } else {
-                    livePhotoBundle
                 }
 
                 val sidecarResult = runCatching {
@@ -1792,12 +1867,46 @@ class CameraXCaptureAdapter(
                 }
 
                 val diagnosisBuilder = buildList {
+                    add("live-export:format=${saveFormat.storageKey}")
                     add("device:live-photo=bundle")
                     addAll(motionSourceResult.diagnostics)
-                    if (motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
-                        motionSourceResult.selectedFrameSet.frames.isNotEmpty()
-                    ) {
-                        add("motion-photo:container=google-jpeg")
+                    addAll(materializationDiagnostics)
+                    add("live-format:intended=${saveFormat.storageKey}")
+                    add("live-format:actual=${
+                        when {
+                            saveFormat == LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG &&
+                                materializationDiagnostics.any {
+                                    it == "motion-photo:container=google-jpeg"
+                                } -> saveFormat.storageKey
+                            materializationDiagnostics.any {
+                                it.startsWith("motion-photo:motion-segment=materialized")
+                            } && saveFormat == LiveSaveFormat.MOTION_MP4_SIDECAR ->
+                                saveFormat.storageKey
+                            else -> "still-jpeg-only"
+                        }
+                    }")
+                    add("live-motion:status=${
+                        materializationDiagnostics.firstOrNull {
+                            it.startsWith("motion-photo:motion-segment=")
+                        }?.substringAfter("motion-photo:motion-segment=") ?: "missing"
+                    }")
+                    add("gallery-recognition=untested")
+                    when (saveFormat) {
+                        LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG -> {
+                            add("live-export:share-target=motion-photo")
+                            val mp4File = File(finalBundle.motionPath)
+                            if (mp4File.exists()) {
+                                add("motion-photo:appended-mp4-bytes=${mp4File.length()}")
+                            }
+                        }
+
+                        LiveSaveFormat.MOTION_MP4_SIDECAR -> {
+                            add("live-export:share-target=mp4")
+                        }
+
+                        LiveSaveFormat.STILL_JPEG_ONLY -> {
+                            add("live-export:share-target=still")
+                        }
                     }
                     if (sidecarResult.isSuccess) {
                         add(

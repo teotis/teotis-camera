@@ -148,8 +148,7 @@ class AppContainer(
         context = appContext,
         shotExecutor = shotExecutor,
         mediaPostProcessor = mediaPostProcessor,
-        livePreviewFrameSource = livePreviewFrameSource,
-        sceneMaskSource = sceneMaskSource
+        livePreviewFrameSource = livePreviewFrameSource
     )
 
     val effectCapabilityResolver = EffectCapabilityResolver(
