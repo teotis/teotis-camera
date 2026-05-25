@@ -345,7 +345,7 @@
     <string name="watermark_selector_current_default"> | 当前默认</string>
     <string name="watermark_selector_edit_attrs_frame">位置、大小、透明度、背景</string>
     <string name="watermark_selector_edit_attrs_classic">位置、大小、透明度</string>
-    <string name="watermark_selector_footer_supported">经典叠加保持其边框背景固定；旅行拍立得和复古边框在其专属样式页上提供边框背景变体。</string>
+    <string name="watermark_selector_footer_supported">经典叠加保持其边框背景固定；旅行拍立得和复古边框在其专属样式页上提供边框背景变体。所有静态照片水印均内嵌可逆原始 JPEG 归档，可通过工具脚本提取。</string>
     <string name="watermark_selector_footer_unsupported">此设备不支持拍照，水印实验室保持只读状态。</string>
 
     <!-- Watermark detail -->

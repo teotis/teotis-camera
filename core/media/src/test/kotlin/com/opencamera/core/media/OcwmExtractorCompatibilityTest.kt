@@ -37,6 +37,28 @@ class OcwmExtractorCompatibilityTest {
     }
 
     @Test
+    fun `kotlinRoundTripProducesOriginalPayload with professional-bottom-bar template`() {
+        val visible = syntheticVisibleJpeg()
+        val original = syntheticOriginalJpeg()
+
+        val manifest = ReversibleWatermarkArchiveManifest(
+            watermarkTemplateId = "professional-bottom-bar",
+            visibleImageSha256 = sha256Hex(visible),
+            payloadSha256 = sha256Hex(original),
+            payloadLength = original.size.toLong()
+        )
+        val archive = OcwmJpegContainer.EmbeddedArchive(manifest, original)
+
+        val archived = OcwmJpegContainer.embedArchive(visible, archive)
+        val extracted = OcwmJpegContainer.extractArchive(archived)
+
+        assertNotNull(extracted, "extractArchive must return non-null for professional-bottom-bar template")
+        assertEquals(manifest, extracted.manifest)
+        assertEquals("professional-bottom-bar", extracted.manifest.watermarkTemplateId)
+        assertContentEquals(original, extracted.payload, "extracted payload must match original")
+    }
+
+    @Test
     fun archivedJpegIsValidJpegStructure() {
         val visible = syntheticVisibleJpeg()
         val original = syntheticOriginalJpeg()
