@@ -2,6 +2,8 @@ package com.opencamera.core.effect
 
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PerceptualColorRecipe
+import com.opencamera.core.settings.PreviewColorFidelity
 import com.opencamera.core.settings.WatermarkStyleSettings
 import com.opencamera.core.settings.WatermarkTextOpacity
 import com.opencamera.core.settings.WatermarkFrameBackground
@@ -221,5 +223,117 @@ class PreviewEffectAdapterTest {
         )
 
         assertEquals(WatermarkPreviewShape.BACKED_TEXT, model.watermarkHint?.shape)
+    }
+
+    @Test
+    fun `strong warm deep recipe produces non-neutral color transform`() {
+        val recipe = PerceptualColorRecipe(
+            toneDepth = 0.5f,
+            chromaBoost = 0.3f,
+            warmthBias = 0.4f,
+            tintBias = -0.1f,
+            neutralProtection = 0.75f,
+            skinProtection = 0.70f
+        )
+        val effect = FilterEffect(profileId = "color-lab", renderSpec = null, recipe = recipe)
+        val model = adapter.adapt(EffectSpec(listOf(effect)))
+
+        val transform = model.colorTransform
+        assertTrue(transform != PreviewColorTransform.NONE, "Non-neutral recipe should produce non-NONE transform")
+        assertEquals(PreviewColorFidelity.APPROXIMATE, transform.fidelity)
+        assertTrue(transform.tintAlpha > 0f, "Transform alpha should be positive for non-neutral recipe")
+
+        val r = (transform.tintColor ushr 16) and 0xFF
+        val b = transform.tintColor and 0xFF
+        assertTrue(r > 128, "Warm recipe should have R > 128 (was $r)")
+        assertTrue(b < 128, "Warm recipe should have B < 128 (was $b)")
+    }
+
+    @Test
+    fun `strong cool airy recipe produces directionally different transform`() {
+        val recipe = PerceptualColorRecipe(
+            toneLift = 0.4f,
+            chromaBoost = 0.25f,
+            warmthBias = -0.35f,
+            tintBias = 0.1f
+        )
+        val effect = FilterEffect(profileId = "color-lab", renderSpec = null, recipe = recipe)
+        val model = adapter.adapt(EffectSpec(listOf(effect)))
+
+        val transform = model.colorTransform
+        assertTrue(transform != PreviewColorTransform.NONE, "Non-neutral recipe should produce non-NONE transform")
+
+        val r = (transform.tintColor ushr 16) and 0xFF
+        val b = transform.tintColor and 0xFF
+        assertTrue(r < 128, "Cool recipe should have R < 128 (was $r)")
+        assertTrue(b > 128, "Cool recipe should have B > 128 (was $b)")
+    }
+
+    @Test
+    fun `neutral recipe does not produce color transform`() {
+        val effect = FilterEffect(
+            profileId = "vivid",
+            renderSpec = FilterRenderSpec(contrast = 1.1f),
+            recipe = PerceptualColorRecipe.NEUTRAL
+        )
+        val model = adapter.adapt(EffectSpec(listOf(effect)))
+
+        assertEquals(PreviewColorTransform.NONE, model.colorTransform)
+    }
+
+    @Test
+    fun `recipe transform persists when mask is unavailable`() {
+        val recipe = PerceptualColorRecipe(
+            warmthBias = 0.3f,
+            chromaBoost = 0.2f
+        )
+        val effect = FilterEffect(profileId = "color-lab", renderSpec = null, recipe = recipe)
+        val model = adapter.adapt(
+            EffectSpec(listOf(effect)),
+            maskSnapshot = PreviewSceneMaskSnapshot.UNAVAILABLE
+        )
+
+        assertTrue(model.colorTransform != PreviewColorTransform.NONE,
+            "Recipe transform should not be erased by unavailable mask")
+        assertEquals(PreviewColorFidelity.APPROXIMATE, model.colorTransform.fidelity)
+    }
+
+    @Test
+    fun `recipe transform takes priority over mask-only fallback`() {
+        val recipe = PerceptualColorRecipe(
+            warmthBias = 0.3f,
+            chromaBoost = 0.2f
+        )
+        val effect = FilterEffect(profileId = "color-lab", renderSpec = null, recipe = recipe)
+        val staleMask = PreviewSceneMaskSnapshot.UNAVAILABLE.copy(
+            backendId = "mlkit-selfie",
+            isStale = true,
+            isAvailable = false
+        )
+        val model = adapter.adapt(
+            EffectSpec(listOf(effect)),
+            maskSnapshot = staleMask
+        )
+
+        assertEquals(PreviewColorFidelity.APPROXIMATE, model.colorTransform.fidelity,
+            "Recipe transform should take priority over mask fallback")
+    }
+
+    @Test
+    fun `warm and cool recipes produce opposite tint directions`() {
+        val warm = PerceptualColorRecipe(warmthBias = 0.5f, chromaBoost = 0.3f)
+        val cool = PerceptualColorRecipe(warmthBias = -0.5f, chromaBoost = 0.3f)
+
+        val warmModel = adapter.adapt(EffectSpec(listOf(
+            FilterEffect("cl", null, recipe = warm)
+        )))
+        val coolModel = adapter.adapt(EffectSpec(listOf(
+            FilterEffect("cl", null, recipe = cool)
+        )))
+
+        val warmR = (warmModel.colorTransform.tintColor ushr 16) and 0xFF
+        val coolR = (coolModel.colorTransform.tintColor ushr 16) and 0xFF
+
+        assertTrue(warmR > coolR, "Warm R=$warmR should be > cool R=$coolR")
     }
 }

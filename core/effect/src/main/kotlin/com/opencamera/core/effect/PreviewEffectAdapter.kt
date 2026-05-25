@@ -1,6 +1,7 @@
 package com.opencamera.core.effect
 
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PerceptualColorRecipe
 import com.opencamera.core.settings.PreviewColorFidelity
 
 import com.opencamera.core.media.SceneMaskQuality
@@ -26,7 +27,7 @@ class PreviewEffectAdapter {
             frameGuideline = frame?.let { buildFrameGuideline(it) },
             compositionGrid = null,
             subjectMaskPreview = buildSubjectMaskPreview(maskSnapshot),
-            colorTransform = resolveColorTransform(maskSnapshot)
+            colorTransform = resolveColorTransform(maskSnapshot, filter?.recipe)
         )
     }
 
@@ -41,13 +42,35 @@ class PreviewEffectAdapter {
     }
 
     private fun resolveColorTransform(
-        snapshot: PreviewSceneMaskSnapshot
+        snapshot: PreviewSceneMaskSnapshot,
+        recipe: PerceptualColorRecipe? = null
     ): PreviewColorTransform {
-        return when {
+        val recipeTransform = recipe?.takeUnless { it.isNeutral }?.let { buildRecipeColorTransform(it) }
+        val maskTransform = when {
             snapshot.isAvailable -> PreviewColorTransform.MASK_AWARE
             snapshot.backendId != "none" && snapshot.isStale -> PreviewColorTransform.FALLBACK
-            else -> PreviewColorTransform.NONE
+            else -> null
         }
+        return recipeTransform ?: maskTransform ?: PreviewColorTransform.NONE
+    }
+
+    private fun buildRecipeColorTransform(recipe: PerceptualColorRecipe): PreviewColorTransform {
+        val warmth = recipe.warmthBias * 20f
+        val tint = recipe.tintBias * 8f
+        val chromaStrength = (recipe.chromaBoost * 0.3f).coerceIn(0f, 0.5f)
+        val toneStrength = (recipe.toneLift + recipe.toneDepth).coerceIn(0f, 1f) * 0.15f
+        val alpha = (chromaStrength + toneStrength).coerceIn(0.05f, 0.45f)
+
+        val r = (128 + warmth * 5f + tint * 2f).toInt().coerceIn(0, 255)
+        val g = (128 - tint * 2.5f).toInt().coerceIn(0, 255)
+        val b = (128 - warmth * 5f + tint * 2f).toInt().coerceIn(0, 255)
+        val color = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+
+        return PreviewColorTransform(
+            tintColor = color,
+            tintAlpha = alpha,
+            fidelity = PreviewColorFidelity.APPROXIMATE
+        )
     }
 
     private fun buildFilterOverlay(effect: FilterEffect): FilterOverlaySpec {
