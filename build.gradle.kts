@@ -4,7 +4,13 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "1.9.24" apply false
 }
 
-val sharedBuildRoot = file("${System.getProperty("user.home")}/.codex-build/OpenCamera")
+val sharedBuildRoot = file(
+    (project.findProperty("opencamera.buildRoot") as? String)
+        ?: System.getProperty("opencamera.buildRoot")
+        ?: System.getenv("OPENCAMERA_BUILD_ROOT")
+        ?: System.getenv("CODEX_BUILD_ROOT")
+        ?: "${System.getProperty("user.home")}/.codex-build/OpenCamera"
+)
 
 allprojects {
     val projectBuildPath = if (path == ":") {

@@ -22,4 +22,5 @@ export OPENCAMERA_BUILD_ROOT="${HOME}/.codex-build/OpenCamera-${workspace_id}"
 echo "[isolated-gradle] project_root=${project_root}"
 echo "[isolated-gradle] build_root=${OPENCAMERA_BUILD_ROOT}"
 
+cd "${project_root}"
 exec ./gradlew "$@" --no-daemon
