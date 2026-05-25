@@ -67,10 +67,28 @@ Codex/user retained:
 
 ## Completion Notes
 
-Package status is `planned`. Update this section after implementation lands with:
+Package status is `implemented`. Three sub-plans landed on branch `feat/rendering-2-0-upgrade`.
 
-- implemented commits or file changes;
-- verification commands and results;
-- real-device evidence links or residual device-only risks;
-- package status: `implemented`, `validated`, `blocked`, or `superseded`.
+## Implemented Commits
+
+| Commit | Sub-Plan | Summary |
+| --- | --- | --- |
+| cc76237 | Capture Save Reliability | `captureStillImage` 和视频路径中 postprocess 异常不再删除已保存的照片，改为 emit ShotFailed |
+| ce250f3 | Render Recipe Single Truth | `PerceptualColorRecipe` metadata 迁移到 canonical `recipe.` 前缀，兼容旧格式，添加 round-trip 测试 |
+| 3612c32 | Color Lab Perceptual Rendering | 配色曲线死区+加速边缘，预览变换综合使用多参数，弱变换报告 DEGRADED，添加 corner/protection/monochrome 测试 |
+
+## Verification Results
+
+- `:app:assembleDebug` — BUILD SUCCESSFUL
+- `:core:media:test` (CompositeMediaPostProcessorTest) — PASS
+- `:core:settings:test` (PerceptualColorRecipeTest, StyleColorPipelineTest, ColorLabSpecTest) — PASS
+- `:core:effect:test` (PreviewEffectAdapterTest, RenderRecipeTest, EffectBridgeTest) — PASS
+- `:app:testDebugUnitTest` (PhotoAlgorithmPostProcessorTest) — PASS
+- `DefaultCameraSessionTest` — pre-existing OOM (exit 143) in local environment, not caused by these changes
+
+## Residual Device-Only Risks
+
+- Real-device Color Lab visual acceptance (corner/edge naturalness, preview vs saved alignment) remains with Codex/user.
+- DefaultCameraSessionTest needs real-device or larger-memory CI for reliable execution.
+- Preview color matrix fidelity vs per-pixel saved render cannot be proven with unit tests alone.
 
