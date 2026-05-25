@@ -802,6 +802,63 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `blur four border cycles only bottom placements`() {
+        val model = watermarkLabDetailRenderModel(
+            state = defaultSessionState(),
+            templateId = "blur-four-border",
+            text = TestAppTextResolver()
+        )
+
+        val action = model.placementControl.nextAction
+        assertNotNull(action)
+        assertTrue(action is PersistedSettingsAction.UpdateWatermarkTextPlacement)
+        val placementAction = action as PersistedSettingsAction.UpdateWatermarkTextPlacement
+        assertTrue(
+            placementAction.placement in setOf(
+                WatermarkTextPlacement.BOTTOM_LEFT,
+                WatermarkTextPlacement.BOTTOM_CENTER,
+                WatermarkTextPlacement.BOTTOM_RIGHT
+            ),
+            "Expected bottom-only placement but got ${placementAction.placement}"
+        )
+    }
+
+    @Test
+    fun `blur four border selector shows descriptive copy`() {
+        val model = watermarkLabSelectorRenderModel(defaultSessionState(), TestAppTextResolver())
+        val blurItem = model.items.first { it.templateId == "blur-four-border" }
+
+        assertTrue(
+            blurItem.supportingText.contains("Blur four border") ||
+            blurItem.supportingText.contains("blur-four-border"),
+            "Expected blur-four-border descriptive copy in supporting text: ${blurItem.supportingText}"
+        )
+        assertTrue(
+            blurItem.supportingText.contains("Expanded frame") ||
+            blurItem.supportingText.contains("expanded") ||
+            blurItem.title.contains("Blur"),
+            "Expected blur-four-border title or expanded frame hint: ${blurItem.title} / ${blurItem.supportingText}"
+        )
+    }
+
+    @Test
+    fun `blur four border detail footer mentions frame behavior`() {
+        val model = watermarkLabDetailRenderModel(
+            state = defaultSessionState(),
+            templateId = "blur-four-border",
+            text = TestAppTextResolver()
+        )
+
+        assertNotNull(model.frameBackgroundControl)
+        assertTrue(
+            model.footer.contains("frame") || model.footer.contains("Frame"),
+            "Expected footer to mention frame behavior: ${model.footer}"
+        )
+        assertTrue(model.footer.contains("Model") || model.footer.contains("model"),
+            "Expected footer to list tokens: ${model.footer}")
+    }
+
+    @Test
     fun `filter lab render model follows active portrait mode and cycles portrait defaults`() {
         val model = filterLabPageRenderModel(
             defaultSessionState(
