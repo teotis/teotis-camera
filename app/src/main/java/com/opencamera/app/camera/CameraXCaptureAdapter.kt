@@ -93,7 +93,9 @@ import com.opencamera.core.media.FlashMode as CaptureFlashMode
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.LiveMotionSource
 import com.opencamera.core.media.LiveTemporalPlannerInput
+import com.opencamera.core.media.LiveWatermarkResult
 import com.opencamera.core.media.planLiveTemporalAssembly
+import com.opencamera.core.media.temporalNotes
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaOutputHandle
@@ -505,6 +507,46 @@ internal fun resolveLiveMotionSource(
     }
 }
 
+internal data class LiveWatermarkOutcome(
+    val requested: String?,
+    val result: LiveWatermarkResult?,
+    val degradeReason: String?
+)
+
+internal fun resolveLiveWatermarkOutcome(plan: ShotPlan): LiveWatermarkOutcome {
+    val customTags = plan.saveTask.saveRequest.metadata.customTags
+    val watermarkText = plan.saveTask.postProcessSpec.watermarkText
+    val requestedBehavior = customTags["liveWatermarkBehavior"]
+
+    if (requestedBehavior == null && watermarkText == null) {
+        return LiveWatermarkOutcome(
+            requested = null,
+            result = null,
+            degradeReason = null
+        )
+    }
+
+    val hasStillWatermark = !watermarkText.isNullOrBlank()
+
+    return if (hasStillWatermark) {
+        LiveWatermarkOutcome(
+            requested = requestedBehavior,
+            result = LiveWatermarkResult.STILL_ONLY,
+            degradeReason = if (requestedBehavior != null) {
+                "motion-burn-in-not-implemented"
+            } else {
+                null
+            }
+        )
+    } else {
+        LiveWatermarkOutcome(
+            requested = requestedBehavior,
+            result = LiveWatermarkResult.UNSUPPORTED,
+            degradeReason = null
+        )
+    }
+}
+
 internal fun buildLivePhotoSidecarPayload(
     bundle: LivePhotoBundle
 ): String {
@@ -545,6 +587,21 @@ internal fun buildLivePhotoSidecarPayload(
         append(",\n")
         append("  \"bundleStatus\": ")
         append(jsonStringLiteral(bundle.bundleStatus.name.lowercase().replace('_', '-')))
+        bundle.watermarkRequested?.let { requested ->
+            append(",\n")
+            append("  \"watermarkRequested\": ")
+            append(jsonStringLiteral(requested))
+        }
+        bundle.watermarkResult?.let { result ->
+            append(",\n")
+            append("  \"watermarkResult\": ")
+            append(jsonStringLiteral(result.storageKey))
+        }
+        bundle.watermarkDegradeReason?.let { reason ->
+            append(",\n")
+            append("  \"watermarkDegradeReason\": ")
+            append(jsonStringLiteral(reason))
+        }
         append("\n")
         append("}")
     }
@@ -1624,13 +1681,17 @@ class CameraXCaptureAdapter(
                         postShutterBudgetMillis = motionSourceResult.postShutterBudgetMillis
                     )
                 )
+                val resolvedWatermark = resolveLiveWatermarkOutcome(plan)
                 val livePhotoBundle = createLivePhotoBundle(
                     stillPath = result.outputPath,
                     stillOutputHandle = result.outputHandle,
                     relativePath = plan.saveTask.saveRequest.relativePath,
                     livePhotoSpec = plan.saveTask.livePhotoSpec,
                     bundleStatus = temporalPlan.expectedBundleStatus,
-                    temporalWindow = temporalPlan.temporalWindow
+                    temporalWindow = temporalPlan.temporalWindow,
+                    watermarkRequested = resolvedWatermark.requested,
+                    watermarkResult = resolvedWatermark.result,
+                    watermarkDegradeReason = resolvedWatermark.degradeReason
                 )
 
                 // If we have real frames, try to create Google Motion Photo
@@ -1689,6 +1750,7 @@ class CameraXCaptureAdapter(
                         add("device:live-photo=still-only-fallback")
                         finalBundle.sidecarHandle.contentUri?.let { deleteContentUriQuietly(it) }
                     }
+                    addAll(finalBundle.temporalNotes().filter { it.startsWith("live-watermark:") })
                 }
 
                 // Sidecar failure is non-fatal: still photo was already saved.
@@ -1963,7 +2025,10 @@ class CameraXCaptureAdapter(
         relativePath: String,
         livePhotoSpec: com.opencamera.core.media.LivePhotoCaptureSpec?,
         bundleStatus: com.opencamera.core.media.LiveBundleStatus = com.opencamera.core.media.LiveBundleStatus.COMPLETE,
-        temporalWindow: com.opencamera.core.media.LiveTemporalWindow? = null
+        temporalWindow: com.opencamera.core.media.LiveTemporalWindow? = null,
+        watermarkRequested: String? = null,
+        watermarkResult: LiveWatermarkResult? = null,
+        watermarkDegradeReason: String? = null
     ): LivePhotoBundle {
         val resolvedSpec = livePhotoSpec ?: com.opencamera.core.media.LivePhotoCaptureSpec()
         val baseName = stillPath
@@ -2016,7 +2081,10 @@ class CameraXCaptureAdapter(
             sidecarHandle = sidecarHandle,
             thumbnailHandle = stillOutputHandle,
             bundleStatus = bundleStatus,
-            temporalWindow = temporalWindow
+            temporalWindow = temporalWindow,
+            watermarkRequested = watermarkRequested,
+            watermarkResult = watermarkResult,
+            watermarkDegradeReason = watermarkDegradeReason
         )
     }
 

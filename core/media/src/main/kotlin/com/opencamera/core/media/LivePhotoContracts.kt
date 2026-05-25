@@ -6,6 +6,21 @@ data class LivePhotoCaptureSpec(
     val sidecarMimeType: String = "application/vnd.opencamera.live+json"
 )
 
+enum class LiveWatermarkResult(
+    val storageKey: String,
+    val label: String
+) {
+    STILL_ONLY("still-only", "Still Only"),
+    MOTION_METADATA_ONLY("metadata-only", "Motion Metadata Only"),
+    MOTION_BURNED_IN("burned-in", "Motion Burned In"),
+    UNSUPPORTED("unsupported", "Unsupported");
+
+    companion object {
+        fun fromStorageKey(value: String?): LiveWatermarkResult? =
+            entries.firstOrNull { it.storageKey == value }
+    }
+}
+
 data class LivePhotoBundle(
     val stillPath: String,
     val motionPath: String,
@@ -18,7 +33,10 @@ data class LivePhotoBundle(
     val sidecarHandle: MediaOutputHandle = MediaOutputHandle(displayPath = sidecarPath),
     val thumbnailHandle: MediaOutputHandle = MediaOutputHandle(displayPath = thumbnailPath),
     val bundleStatus: LiveBundleStatus = LiveBundleStatus.COMPLETE,
-    val temporalWindow: LiveTemporalWindow? = null
+    val temporalWindow: LiveTemporalWindow? = null,
+    val watermarkRequested: String? = null,
+    val watermarkResult: LiveWatermarkResult? = null,
+    val watermarkDegradeReason: String? = null
 )
 
 enum class LiveMotionSource {
@@ -42,6 +60,28 @@ data class LiveTemporalWindow(
     val source: LiveMotionSource
 )
 
+fun LiveWatermarkResult?.statusLabel(): String? {
+    return this?.let { result ->
+        when (result) {
+            LiveWatermarkResult.STILL_ONLY -> "Watermark: Still Only"
+            LiveWatermarkResult.MOTION_METADATA_ONLY -> "Watermark: Metadata Only"
+            LiveWatermarkResult.MOTION_BURNED_IN -> "Watermark: Burned In"
+            LiveWatermarkResult.UNSUPPORTED -> "Watermark: Unsupported"
+        }
+    }
+}
+
+fun LivePhotoBundle.watermarkStatusLine(): String? {
+    val result = watermarkResult ?: return null
+    val requestedLabel = watermarkRequested
+        ?.replace("-", " ")
+        ?.replaceFirstChar { it.uppercase() }
+    return buildString {
+        append(result.statusLabel())
+        requestedLabel?.let { append(" (requested: $it)") }
+    }
+}
+
 fun LivePhotoBundle.isTemporalMedia(): Boolean {
     return bundleStatus == LiveBundleStatus.COMPLETE ||
         bundleStatus == LiveBundleStatus.DEGRADED_MOTION
@@ -57,6 +97,11 @@ fun LivePhotoBundle.temporalNotes(): List<String> {
         }
         if (bundleStatus == LiveBundleStatus.STILL_ONLY_FALLBACK) {
             add("live:degraded=metadata-only")
+        }
+        watermarkRequested?.let { add("live-watermark:requested=$it") }
+        watermarkResult?.let { result ->
+            add("live-watermark:actual=${result.storageKey}")
+            watermarkDegradeReason?.let { add("live-watermark:reason=$it") }
         }
     }
 }
