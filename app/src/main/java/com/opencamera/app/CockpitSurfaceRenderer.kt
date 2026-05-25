@@ -78,25 +78,53 @@ internal class CockpitSurfaceRenderer(
         }
     }
 
-    private var sliderInitialized = false
-
-    fun renderFocalLengthSlider(model: FocalLengthSliderRenderModel) {
-        val slider = bottomCockpit.focalLengthSlider
-        slider.setSliderVisible(model.isVisible)
-        if (!model.isVisible) return
-
-        if (!sliderInitialized) {
-            sliderInitialized = true
-            slider.onRatioChanged = { ratio ->
-                callbacks.onZoomRatioChanged?.invoke(ratio)
-            }
-            slider.onRatioSnapped = { ratio ->
-                callbacks.onZoomRatioSelected(ratio)
-            }
+    fun renderZoomCapsules(controls: SessionControlsRenderModel) {
+        bottomCockpit.zoomScroll.isVisible = controls.isZoomCapsuleRowVisible
+        if (!controls.isZoomCapsuleRowVisible) return
+        val existingCount = bottomCockpit.zoomRow.childCount
+        val targetCount = controls.zoomCapsules.size
+        for (i in existingCount - 1 downTo targetCount) {
+            bottomCockpit.zoomRow.removeViewAt(i)
         }
-
-        slider.setPresetRatios(model.presetRatios)
-        slider.setCurrentRatio(model.currentRatio)
+        controls.zoomCapsules.forEachIndexed { index, capsule ->
+            val chip: TextView = if (index < bottomCockpit.zoomRow.childCount) {
+                bottomCockpit.zoomRow.getChildAt(index) as TextView
+            } else {
+                TextView(context).apply {
+                    textSize = context.resources.getDimension(R.dimen.text_size_zoom_chip) / context.resources.displayMetrics.density
+                    minWidth = context.resources.getDimension(R.dimen.zoom_chip_min_width).toInt()
+                    minHeight = context.resources.getDimension(R.dimen.zoom_chip_min_height).toInt()
+                    gravity = Gravity.CENTER
+                    typeface = Typeface.DEFAULT
+                    setPadding(
+                        context.resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
+                        context.resources.getDimension(R.dimen.zoom_chip_padding_v).toInt(),
+                        context.resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
+                        context.resources.getDimension(R.dimen.zoom_chip_padding_v).toInt()
+                    )
+                }.also { newChip ->
+                    val params = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        marginStart = if (index == 0) 0 else 4.dp
+                    }
+                    bottomCockpit.zoomRow.addView(newChip, params)
+                }
+            }
+            chip.text = capsule.label
+            if (capsule.isActive) {
+                chip.setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+                chip.setBackgroundResource(R.drawable.bg_zoom_chip_active)
+            } else {
+                chip.setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                chip.setBackgroundResource(R.drawable.bg_zoom_chip)
+            }
+            chip.setOnClickListener {
+                callbacks.onZoomRatioSelected(capsule.ratio)
+            }
+            chip.rotation = controlRotationDegrees
+        }
     }
 
     private fun quickRowLabel(row: QuickPanelRowRenderModel): String {

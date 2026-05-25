@@ -8,6 +8,9 @@ sealed interface GestureEvent {
     data class HorizontalScroll(val deltaX: Float, val x: Float, val y: Float) : GestureEvent
     data class PinchZoom(val scaleFactor: Float, val focusX: Float, val focusY: Float) : GestureEvent
     data object ScaleEnd : GestureEvent
+    data class DragStart(val x: Float, val y: Float) : GestureEvent
+    data class DragMove(val x: Float, val y: Float) : GestureEvent
+    data object DragEnd : GestureEvent
     data object DragCancel : GestureEvent
 }
 
