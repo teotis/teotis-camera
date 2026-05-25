@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private lateinit var mainRenderer: MainActivityRenderer
     private lateinit var actionBinder: MainActivityActionBinder
     private lateinit var documentBatchRailRenderer: DocumentBatchRailRenderer
+    private lateinit var documentBatchOrganizerRenderer: DocumentBatchOrganizerRenderer
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -157,6 +158,16 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         documentBatchRailRenderer = DocumentBatchRailRenderer(
             views = views.documentBatchRail,
             onRemoveItemClick = { itemId -> dispatch(SessionIntent.DocumentBatchRemoveItem(itemId)) }
+        )
+        documentBatchOrganizerRenderer = DocumentBatchOrganizerRenderer(
+            views = views.documentBatchOrganizer,
+            onRemoveItemClick = { itemId -> dispatch(SessionIntent.DocumentBatchRemoveItem(itemId)) },
+            onMoveUpItemClick = { itemId ->
+                dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.UP))
+            },
+            onMoveDownItemClick = { itemId ->
+                dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.DOWN))
+            }
         )
         mainRenderer = MainActivityRenderer(
             views, cockpitRenderer, settingsRenderer, filterLabRenderer, devConsoleRenderer
@@ -303,6 +314,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         cockpitRenderer.renderQuickBubble(settingsPage, sheet)
         cockpitRenderer.renderLowLightNightPrompt(lowLightNightPromptRenderModel(state, text))
         documentBatchRailRenderer.render(documentBatchRailRenderModel(state, text))
+        documentBatchOrganizerRenderer.render(documentBatchOrganizerRenderModel(state, text))
         mainRenderer.renderDevEntryVisibility(com.opencamera.app.BuildConfig.DEBUG)
         val devLogModel = devLogRenderModel(
             state = state,

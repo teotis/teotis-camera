@@ -177,6 +177,14 @@ internal data class DocumentBatchRailViews(
     val list: LinearLayout
 )
 
+internal data class DocumentBatchOrganizerViews(
+    val panel: NestedScrollView,
+    val title: TextView,
+    val count: TextView,
+    val itemList: LinearLayout,
+    val close: Button
+)
+
 internal data class BottomCockpitViews(
     val shutter: Button,
     val lensFacing: Button,
@@ -191,6 +199,7 @@ internal data class MainActivityViews(
     val quickPanel: QuickPanelViews,
     val floatingUtility: FloatingUtilityViews,
     val documentBatchRail: DocumentBatchRailViews,
+    val documentBatchOrganizer: DocumentBatchOrganizerViews,
     val settingsPanel: SettingsPanelViews,
     val filterLab: FilterLabViews,
     val devConsole: DevConsoleViews,
@@ -357,6 +366,13 @@ internal data class MainActivityViews(
                 header = activity.findViewById(R.id.documentBatchRailHeader),
                 list = activity.findViewById(R.id.documentBatchRailList)
             )
+            val documentBatchOrganizer = DocumentBatchOrganizerViews(
+                panel = activity.findViewById(R.id.documentBatchOrganizerPanel),
+                title = activity.findViewById(R.id.documentBatchOrganizerTitle),
+                count = activity.findViewById(R.id.documentBatchOrganizerCount),
+                itemList = activity.findViewById(R.id.documentBatchOrganizerItemList),
+                close = activity.findViewById(R.id.buttonCloseDocumentBatchOrganizer)
+            )
             val bottomCockpit = BottomCockpitViews(
                 shutter = activity.findViewById(R.id.buttonShutter),
                 lensFacing = activity.findViewById(R.id.buttonLensFacing),
@@ -370,6 +386,7 @@ internal data class MainActivityViews(
                 quickPanel = quickPanel,
                 floatingUtility = floatingUtility,
                 documentBatchRail = documentBatchRail,
+                documentBatchOrganizer = documentBatchOrganizer,
                 settingsPanel = settingsPanel,
                 filterLab = filterLab,
                 devConsole = devConsole,

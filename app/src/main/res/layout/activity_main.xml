@@ -1341,6 +1341,63 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
+    <!-- Document batch organizer panel -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/documentBatchOrganizerPanel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_settings_panel"
+        android:contentDescription="@string/document_batch_organizer_title"
+        android:elevation="8dp"
+        android:fillViewport="true"
+        android:padding="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/panel_padding">
+
+            <TextView
+                android:id="@+id/documentBatchOrganizerTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/oc_text_primary"
+                android:textSize="@dimen/text_size_panel_title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/documentBatchOrganizerCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/oc_text_secondary"
+                android:textSize="@dimen/text_size_support" />
+
+            <LinearLayout
+                android:id="@+id/documentBatchOrganizerItemList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/buttonCloseDocumentBatchOrganizer"
+                style="@style/Widget.OpenCamera.PillButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/button_settings_close" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
     <!-- Dev console overlay -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/devConsolePanel"

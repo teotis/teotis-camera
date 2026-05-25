@@ -68,6 +68,10 @@ internal class MainActivityActionBinder(
             callbacks.reducePanel(CockpitPanelCommand.ToggleDocumentBatchOrganizer)
             callbacks.renderAfterPanelChange()
         }
+        views.documentBatchOrganizer.close.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+            callbacks.renderAfterPanelChange()
+        }
     }
 
     private fun bindCaptureActions() {
