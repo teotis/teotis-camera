@@ -1631,7 +1631,7 @@ class CameraXCaptureAdapter(
             }
 
             is PhotoCaptureOutcome.Success -> {
-                runCatching {
+                try {
                     emitShotCompleted(
                         plan = plan,
                         outputPath = execution.outputPath,
@@ -1645,15 +1645,12 @@ class CameraXCaptureAdapter(
                         deviceCaptureStartedAtElapsedMillis = execution.deviceCaptureStartedAtElapsedMillis,
                         deviceCaptureCompletedAtElapsedMillis = execution.deviceCaptureCompletedAtElapsedMillis
                     )
-                }.getOrElse { throwable ->
-                    cleanupStillCaptureArtifacts(
-                        outputPath = execution.outputPath,
-                        outputHandle = execution.outputHandle,
-                        livePhotoBundle = execution.livePhotoBundle,
-                        intermediateOutputPaths = execution.intermediateOutputPaths,
-                        deleteContentUri = ::deleteContentUriQuietly
+                } catch (throwable: Throwable) {
+                    emitShotFailure(
+                        shotId = plan.request.shotId,
+                        mediaType = plan.request.mediaType,
+                        reason = "postprocess-failed:${throwable.message ?: "unknown"}"
                     )
-                    throw throwable
                 }
             }
         }
@@ -2232,15 +2229,23 @@ class CameraXCaptureAdapter(
                             }
                         } else if (!wasLifecycleInterrupted) {
                             adapterScope.launch {
-                                emitShotCompleted(
-                                    plan = plan,
-                                    outputPath = request.outputPath,
-                                    outputHandle = request.resolveOutputHandle(
-                                        event.outputResults.outputUri
-                                    ),
-                                    deviceDiagnostics = deviceRequest.diagnostics + runtimeDiagnostics,
-                                    requestedAtElapsedMillis = requestedAt
-                                )
+                                try {
+                                    emitShotCompleted(
+                                        plan = plan,
+                                        outputPath = request.outputPath,
+                                        outputHandle = request.resolveOutputHandle(
+                                            event.outputResults.outputUri
+                                        ),
+                                        deviceDiagnostics = deviceRequest.diagnostics + runtimeDiagnostics,
+                                        requestedAtElapsedMillis = requestedAt
+                                    )
+                                } catch (throwable: Throwable) {
+                                    emitShotFailure(
+                                        shotId = finalizeShotId,
+                                        mediaType = plan.request.mediaType,
+                                        reason = "postprocess-failed:${throwable.message ?: "unknown"}"
+                                    )
+                                }
                             }
                         }
                     }
