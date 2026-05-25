@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.FilterProfile
-import com.opencamera.core.settings.renderStyleColorSpec
 import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 
 class VideoModePlugin : CameraModePlugin {
@@ -247,7 +246,7 @@ private class VideoModeController(
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
-            FilterEffect(filter.id, adjustedRenderSpec, recipe)
+            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe)
         ))
     }
 
@@ -387,8 +386,7 @@ private class VideoModeController(
             enablePreviewSnapshots = runtimeState().deviceCapabilities.supportsPreviewSnapshots,
             audioEnabledWhenPermitted = runtimeState().deviceCapabilities.supportsAudioRecording,
             requestedVideoSpec = requestedVideoSpec,
-            resolvedVideoSpec = resolvedVideoSpec,
-            stillResolutionPreset = runtimeState().stillCaptureResolutionPreset
+            resolvedVideoSpec = resolvedVideoSpec
         )
     }
 

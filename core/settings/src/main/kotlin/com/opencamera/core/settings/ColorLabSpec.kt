@@ -115,6 +115,33 @@ fun renderStyleColorSpec(
     ).finalRenderSpec
 }
 
+data class StyleColorRecipeResult(
+    val finalRenderSpec: FilterRenderSpec,
+    val recipe: PerceptualColorRecipe
+)
+
+fun renderStyleColorSpecWithRecipe(
+    profileId: String,
+    baseRenderSpec: FilterRenderSpec?,
+    colorLabSpec: ColorLabSpec,
+    styleStrength: Float
+): StyleColorRecipeResult? {
+    val base = baseRenderSpec ?: return null
+    val pipelineResult = StyleColorPipeline.render(
+        StyleColorPipelineRequest(
+            styleProfileId = profileId,
+            baseRenderSpec = base,
+            colorLabSpec = colorLabSpec,
+            styleStrength = styleStrength
+        )
+    )
+    val recipe = colorLabSpec.toRecipe(pipelineResult.colorScience)
+    return StyleColorRecipeResult(
+        finalRenderSpec = pipelineResult.finalRenderSpec,
+        recipe = recipe
+    )
+}
+
 private fun signedPaletteCurve(value: Float): Float {
     val normalized = value.coerceIn(-1f, 1f)
     val magnitude = abs(normalized)

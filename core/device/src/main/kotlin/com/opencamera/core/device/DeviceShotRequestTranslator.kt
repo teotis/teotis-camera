@@ -1,5 +1,6 @@
 package com.opencamera.core.device
 
+import com.opencamera.core.media.CaptureLatencyPriority
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
@@ -20,6 +21,7 @@ data class DeviceShotRequest(
         DeviceCapabilities.DEFAULT.resolvedManualControlCapabilities,
     val frameCount: Int = 1,
     val interFrameDelayMillis: Long = 0L,
+    val latencyPriority: CaptureLatencyPriority = CaptureLatencyPriority.DEFAULT,
     val diagnostics: List<String> = emptyList()
 )
 

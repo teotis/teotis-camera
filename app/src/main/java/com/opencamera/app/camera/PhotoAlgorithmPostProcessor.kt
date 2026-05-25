@@ -12,6 +12,7 @@ import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.SceneMaskPayload
 import com.opencamera.core.media.SceneMaskPipelineNotes
 import com.opencamera.core.media.SceneMaskSupport
 import com.opencamera.core.media.addPipelineNotes
@@ -155,12 +156,18 @@ internal class PhotoAlgorithmPostProcessor(
                                 customTags = withNotes.metadata.customTags + sceneMaskTags
                             )
                         )
+                    } catch (_: Throwable) {
+                        result.addPipelineNotes("algorithm-render:failed:render-exception")
                     } finally {
                         maskResult.first.recycle()
                     }
                 } else {
                     maskResult?.first?.recycle()
-                    applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
+                    try {
+                        applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
+                    } catch (_: Throwable) {
+                        result.addPipelineNotes("algorithm-render:failed:render-exception")
+                    }
                 }
                 renderResult
             }
@@ -258,12 +265,18 @@ internal class AndroidPhotoAlgorithmEditor(
             return@withContext ProcessorEditorResult.Skipped("empty-source")
         }
 
-        val preservedExif = readPreservedExif(sourceBytes)
-        val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-            ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
-        val mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
-        if (mutableBitmap !== decoded) {
-            decoded.recycle()
+        val mutableBitmap: Bitmap
+        val preservedExif: Map<String, String>
+        try {
+            preservedExif = readPreservedExif(sourceBytes)
+            val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+                ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
+            mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
+            if (mutableBitmap !== decoded) {
+                decoded.recycle()
+            }
+        } catch (_: Throwable) {
+            return@withContext ProcessorEditorResult.Failed("render-exception")
         }
 
         try {
@@ -288,7 +301,7 @@ internal class AndroidPhotoAlgorithmEditor(
     override suspend fun applyWithMask(
         bitmap: Bitmap,
         spec: PhotoAlgorithmSpec,
-        mask: SceneMaskPayload
+        mask: SavedPhotoMaskPixels
     ): Pair<ProcessorEditorResult, List<String>> {
         val notes = applyStyleWithMask(bitmap, spec, mask)
         return Pair(PhotoAlgorithmApplied(), notes)

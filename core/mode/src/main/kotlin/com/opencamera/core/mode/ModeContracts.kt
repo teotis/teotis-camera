@@ -14,6 +14,7 @@ import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import kotlinx.coroutines.flow.StateFlow
@@ -113,7 +114,8 @@ fun ModeContext.captureAidMetadataTags(): Map<String, String> {
 data class ModeRuntimeState(
     val deviceCapabilities: DeviceCapabilities,
     val lensFacing: LensFacing,
-    val stillCaptureResolutionPreset: StillCaptureResolutionPreset
+    val stillCaptureResolutionPreset: StillCaptureResolutionPreset,
+    val stillCaptureQuality: StillCaptureQualityPreference = StillCaptureQualityPreference.LATENCY
 )
 
 data class PhotoLowLightRuntimeState(

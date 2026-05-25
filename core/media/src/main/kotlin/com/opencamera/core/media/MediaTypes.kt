@@ -47,6 +47,14 @@ enum class StillCaptureQualityPreference(
     }
 }
 
+enum class CaptureLatencyPriority(
+    val tagValue: String
+) {
+    DEFAULT(tagValue = "default"),
+    QUICK_SNAP(tagValue = "quick-snap"),
+    ZSL_WHEN_SUPPORTED(tagValue = "zsl-when-supported")
+}
+
 data class StillCaptureResolutionOption(
     val tagValue: String,
     val label: String,
