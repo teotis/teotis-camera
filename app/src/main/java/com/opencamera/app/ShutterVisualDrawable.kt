@@ -28,7 +28,8 @@ internal enum class ShutterVisualState {
 internal class ShutterVisualDrawable : Drawable() {
 
     companion object {
-        private val SHUTTER_GRAY = Color.rgb(220, 220, 220)
+        private val SHUTTER_RING_GRAY = Color.rgb(224, 224, 224)
+        private val SHUTTER_FILL_GRAY = Color.rgb(208, 208, 208)
     }
 
     var visualState: ShutterVisualState = ShutterVisualState.PHOTO_READY
@@ -83,23 +84,23 @@ internal class ShutterVisualDrawable : Drawable() {
 
         when (visualState) {
             ShutterVisualState.PHOTO_READY -> {
-                ringPaint.color = SHUTTER_GRAY
+                ringPaint.color = SHUTTER_RING_GRAY
                 ringPaint.alpha = ringAlpha
-                fillPaint.color = SHUTTER_GRAY
+                fillPaint.color = SHUTTER_FILL_GRAY
                 fillPaint.alpha = fillAlpha
                 drawPhotoReady(canvas, cx, cy, ringRadius, innerRadius)
             }
             ShutterVisualState.PHOTO_PRESSED -> {
-                ringPaint.color = SHUTTER_GRAY
+                ringPaint.color = SHUTTER_RING_GRAY
                 ringPaint.alpha = ringAlpha
-                fillPaint.color = SHUTTER_GRAY
+                fillPaint.color = SHUTTER_FILL_GRAY
                 fillPaint.alpha = (fillAlpha * 0.6f).toInt()
                 drawPhotoReady(canvas, cx, cy, ringRadius, innerRadius * 0.85f)
             }
             ShutterVisualState.COUNTDOWN -> {
-                ringPaint.color = SHUTTER_GRAY
+                ringPaint.color = SHUTTER_RING_GRAY
                 ringPaint.alpha = ringAlpha
-                fillPaint.color = Color.argb(85, 220, 220, 220)
+                fillPaint.color = Color.argb(85, 208, 208, 208)
                 fillPaint.alpha = fillAlpha
                 progressPaint.color = Color.rgb(133, 214, 190)
                 progressPaint.alpha = progressAlpha

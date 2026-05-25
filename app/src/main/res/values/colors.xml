@@ -26,8 +26,8 @@
 =======
     <color name="oc_shutter_default">#FFE0E0E0</color>
     <color name="oc_shutter_ring">#CCE0E0E0</color>
-    <color name="oc_shutter_fill_pressed">#B3E0E0E0</color>
-    <color name="oc_shutter_fill_disabled">#4DE0E0E0</color>
+    <color name="oc_shutter_fill_pressed">#B3D0D0D0</color>
+    <color name="oc_shutter_fill_disabled">#4DD0D0D0</color>
     <color name="oc_shutter_ring_disabled">#33E0E0E0</color>
 >>>>>>> afe46c7 (fix: 拍照按钮颜色从纯白改为浅灰 #DCDCDC)
     <color name="oc_shutter_recording_pressed">#CCFF3B30</color>
