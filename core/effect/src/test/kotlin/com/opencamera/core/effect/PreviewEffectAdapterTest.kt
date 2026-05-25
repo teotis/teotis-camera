@@ -13,6 +13,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class PreviewEffectAdapterTest {
 
@@ -26,10 +27,12 @@ class PreviewEffectAdapterTest {
         assertNull(model.watermarkHint)
         assertNull(model.frameGuideline)
         assertNull(model.compositionGrid)
+        assertNull(model.colorTransform)
+        assertEquals(PreviewColorFidelity.NONE, model.colorFidelity)
     }
 
     @Test
-    fun `filter effect produces overlay spec`() {
+    fun `filter effect produces overlay spec and color transform`() {
         val renderSpec = FilterRenderSpec(
             warmthShift = 3,
             tintShift = 1,
@@ -45,6 +48,20 @@ class PreviewEffectAdapterTest {
         assertNotNull(model.filterOverlay)
         assertEquals(3f, model.filterOverlay!!.warmthShift)
         assertEquals(0.5f, model.filterOverlay!!.vignetteStrength)
+
+        assertNotNull(model.colorTransform)
+        assertFalse(model.colorTransform!!.isIdentity)
+        assertEquals(PreviewColorFidelity.GOOD, model.colorFidelity)
+    }
+
+    @Test
+    fun `filter with default spec produces identity color transform`() {
+        val effect = FilterEffect(profileId = "original", renderSpec = FilterRenderSpec())
+        val model = adapter.adapt(EffectSpec(listOf(effect)))
+
+        assertNotNull(model.colorTransform)
+        assertTrue(model.colorTransform!!.isIdentity)
+        assertEquals(PreviewColorFidelity.NONE, model.colorFidelity)
     }
 
     @Test

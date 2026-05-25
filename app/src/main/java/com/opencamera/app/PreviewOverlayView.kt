@@ -3,6 +3,7 @@ package com.opencamera.app
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -102,6 +103,8 @@ class PreviewOverlayView @JvmOverloads constructor(
     private var lastVignetteKey: Float = -1f
 
     private var focusReticle: FocusReticleRenderModel? = null
+    private var previewView: androidx.camera.view.PreviewView? = null
+    private var lastAppliedColorFilter: ColorMatrixColorFilter? = null
 
     private var renderModel = PreviewOverlayRenderModel(
         gridMode = CompositionGridMode.OFF,
@@ -124,7 +127,31 @@ class PreviewOverlayView @JvmOverloads constructor(
         renderModel = model
         visibility = if (model.isVisible) VISIBLE else GONE
         prepareVignetteCache(model)
+        applyColorTransformToPreview(model)
         invalidate()
+    }
+
+    private fun applyColorTransformToPreview(model: PreviewOverlayRenderModel) {
+        if (previewView == null) {
+            previewView = (parent as? android.view.ViewGroup)?.let { vg ->
+                (0 until vg.childCount)
+                    .map { vg.getChildAt(it) }
+                    .filterIsInstance<androidx.camera.view.PreviewView>()
+                    .firstOrNull()
+            }
+        }
+        val pv = previewView ?: return
+        val transform = model.effectModel?.colorTransform
+        val filter = if (transform != null && !transform.isIdentity) {
+            ColorMatrixColorFilter(transform.colorMatrix)
+        } else {
+            null
+        }
+        if (lastAppliedColorFilter != filter) {
+            pv.paint.colorFilter = filter
+            lastAppliedColorFilter = filter
+            pv.invalidate()
+        }
     }
 
     internal fun updateFocusReticle(model: FocusReticleRenderModel?) {
@@ -243,10 +270,15 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawFilterOverlay(canvas: Canvas, spec: FilterOverlaySpec) {
-        if (spec.tintAlpha <= 0f) return
-        filterOverlayPaint.color = spec.tintColor
-        filterOverlayPaint.alpha = (spec.tintAlpha * 255).toInt().coerceIn(0, 255)
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), filterOverlayPaint)
+        // Color matrix is applied to previewView.paint (TextureView mode),
+        // so the overlay only handles tint and vignette.
+        filterOverlayPaint.colorFilter = null
+
+        if (spec.tintAlpha > 0f) {
+            filterOverlayPaint.color = spec.tintColor
+            filterOverlayPaint.alpha = (spec.tintAlpha * 255).toInt().coerceIn(0, 255)
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), filterOverlayPaint)
+        }
 
         val gradient = vignetteGradient
         val rect = vignetteOverlayRect

@@ -22,13 +22,19 @@ class PreviewEffectAdapter {
         val watermark = spec.find<WatermarkEffect>()
         val frame = spec.find<FrameEffect>()
 
+        val colorTransform = filter?.let { buildColorTransform(it) }
+        val fidelity = when {
+            colorTransform == null || colorTransform.isIdentity -> PreviewColorFidelity.NONE
+            else -> PreviewColorFidelity.GOOD
+        }
+
         return PreviewEffectRenderModel(
             filterOverlay = filter?.let { buildFilterOverlay(it) },
             watermarkHint = watermark?.let { buildWatermarkHint(it) },
             frameGuideline = frame?.let { buildFrameGuideline(it) },
             compositionGrid = null,
             subjectMaskPreview = buildSubjectMaskPreview(maskSnapshot),
-            colorTransform = resolveColorTransform(maskSnapshot, filter?.recipe)
+            colorTransform = resolveColorTransform(maskSnapshot, filter?.recipe, colorTransform)
         )
     }
 
@@ -44,8 +50,13 @@ class PreviewEffectAdapter {
 
     private fun resolveColorTransform(
         snapshot: PreviewSceneMaskSnapshot,
-        recipe: PerceptualColorRecipe? = null
+        recipe: PerceptualColorRecipe? = null,
+        specTransform: PreviewColorTransform? = null
     ): PreviewColorTransform {
+        // Prefer the spec-based color matrix (from FilterRenderSpec) when available
+        if (specTransform != null && !specTransform.isIdentity) {
+            return specTransform
+        }
         val recipeTransform = recipe?.takeUnless { it.isNeutral }?.let { buildRecipeColorTransform(it) }
         val maskTransform = when {
             snapshot.isAvailable -> PreviewColorTransform.MASK_AWARE
@@ -87,6 +98,10 @@ class PreviewEffectAdapter {
             tintAlpha = alpha,
             fidelity = fidelity
         )
+    }
+
+    private fun buildColorTransform(effect: FilterEffect): PreviewColorTransform {
+        return PreviewColorTransform.fromSpec(effect.renderSpec)
     }
 
     private fun buildFilterOverlay(effect: FilterEffect): FilterOverlaySpec {
@@ -141,7 +156,9 @@ class PreviewEffectAdapter {
     private fun resolveOverlayOpacity(spec: FilterRenderSpec?): Float {
         val saturation = spec?.saturation ?: 1f
         val contrast = spec?.contrast ?: 1f
-        return ((2f - saturation) * 0.15f + (contrast - 1f) * 0.1f)
-            .coerceIn(0f, 0.4f)
+        // Overlay provides warm/cool tint supplement on top of the color matrix
+        // applied to the preview surface (TextureView mode).
+        return ((2f - saturation) * 0.10f + (contrast - 1f) * 0.08f)
+            .coerceIn(0f, 0.30f)
     }
 }

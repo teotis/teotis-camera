@@ -16,7 +16,7 @@
         android:id="@+id/cameraPreview"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:implementationMode="compatible"
+        app:implementationMode="performance"
         app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
