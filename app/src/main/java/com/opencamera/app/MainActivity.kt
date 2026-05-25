@@ -704,6 +704,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
         mainRenderer.renderPanelVisibility(activePanelRoute)
         devConsoleRenderer.renderVisibility(activePanelRoute)
+        if (activePanelRoute.isSettingsOpen) {
+            renderLatestSettingsSurfaces()
+        }
     }
 
     override fun reducePanel(command: CockpitPanelCommand) {

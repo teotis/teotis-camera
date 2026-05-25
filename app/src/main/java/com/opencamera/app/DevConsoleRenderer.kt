@@ -11,7 +11,7 @@ internal class DevConsoleRenderer(
         val isDevVisible = activePanelRoute is CockpitPanelRoute.DevConsole
         val wasVisible = views.panel.isVisible
         views.panel.isVisible = isDevVisible
-        views.entry.alpha = if (isDevVisible) 1f else 0.78f
+        views.entry.alpha = if (isDevVisible) 1f else 0.86f
         if (isDevVisible && !wasVisible) {
             (views.panel.getChildAt(0) as? androidx.core.widget.NestedScrollView)?.scrollTo(0, 0)
         }
