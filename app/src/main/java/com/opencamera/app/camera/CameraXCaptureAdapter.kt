@@ -109,6 +109,7 @@ import com.opencamera.core.media.primaryVideoNode
 import com.opencamera.core.media.temporaryFrameNode
 import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
 import com.opencamera.core.media.StillCaptureResolutionOption
+import com.opencamera.core.media.CaptureLatencyPriority
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
 // smartFilterResolutionOptions is now in ResolutionFilterUtils.kt (local)
@@ -627,18 +628,6 @@ private fun jsonStringLiteral(value: String): String {
             }
         }
         append('"')
-    }
-}
-
-internal fun resolvedStillCaptureQuality(
-    deviceGraph: DeviceGraphSpec,
-    deviceRequest: DeviceShotRequest? = null
-): StillCaptureQualityPreference {
-    return when (deviceGraph.template) {
-        CaptureTemplate.STILL_CAPTURE ->
-            deviceGraph.stillCapture.qualityPreference
-        CaptureTemplate.VIDEO_RECORDING ->
-            deviceRequest?.stillCaptureQuality ?: deviceGraph.stillCapture.qualityPreference
     }
 }
 
@@ -1223,9 +1212,9 @@ class CameraXCaptureAdapter(
     private var cameraStateLiveData: LiveData<CameraState>? = null
     private var cameraStateObserver: Observer<CameraState>? = null
     private var lastCameraRuntimeIssueSignature: String? = null
-    private var currentStillCaptureQuality: StillCaptureQualityPreference? = null
     private var currentStillCaptureResolutionPreset: StillCaptureResolutionPreset? = null
     private var currentStillCaptureOutputSize: StillCaptureOutputSize? = null
+    private var currentLatencyPriority: CaptureLatencyPriority? = null
     private var currentManualCaptureConfig: Camera2ManualCaptureConfig? = null
     private var currentVideoSpec: VideoSpec? = null
     private var previewSnapshotGeneration: Int = 0
@@ -1259,7 +1248,6 @@ class CameraXCaptureAdapter(
                     lifecycleOwner = lifecycleOwner,
                     previewView = previewView,
                     deviceGraph = deviceGraph,
-                    stillCaptureQuality = resolvedStillCaptureQuality(deviceGraph),
                     stillCaptureResolutionPreset = resolvedStillCaptureResolutionPreset(deviceGraph),
                     resetPreviewObserver = true,
                     resetPreviewMetrics = true,
@@ -1555,9 +1543,9 @@ class CameraXCaptureAdapter(
             currentGraph = null
             boundLifecycleOwner = null
             boundPreviewView = null
-            currentStillCaptureQuality = null
             currentStillCaptureResolutionPreset = null
             currentStillCaptureOutputSize = null
+            currentLatencyPriority = null
             currentManualCaptureConfig = null
             currentVideoSpec = null
             currentTorchEnabled = false
@@ -2456,20 +2444,17 @@ class CameraXCaptureAdapter(
         check(deviceGraph.template == CaptureTemplate.STILL_CAPTURE) {
             "Cannot apply still capture request while bound graph is ${deviceGraph.template}"
         }
-        val requestedQuality = resolvedStillCaptureQuality(
-            deviceGraph = deviceGraph,
-            deviceRequest = deviceRequest
-        )
         val requestedResolutionPreset = resolvedStillCaptureResolutionPreset(deviceGraph)
         val requestedOutputSize = resolvedStillCaptureOutputSize(
             deviceGraph = deviceGraph,
             availableOutputSizes = capabilitiesFor(deviceGraph).availableStillCaptureOutputSizes
         )
+        val requestedLatencyPriority = deviceRequest.latencyPriority
         val requestedManualCaptureConfig = resolveCamera2ManualCaptureConfig(deviceRequest)
         if (
-            currentStillCaptureQuality == requestedQuality &&
             currentStillCaptureResolutionPreset == requestedResolutionPreset &&
             currentStillCaptureOutputSize == requestedOutputSize &&
+            currentLatencyPriority == requestedLatencyPriority &&
             currentManualCaptureConfig == requestedManualCaptureConfig
         ) {
             return
@@ -2481,8 +2466,8 @@ class CameraXCaptureAdapter(
                 lifecycleOwner = lifecycleOwner,
                 previewView = previewView,
                 deviceGraph = deviceGraph,
-                stillCaptureQuality = requestedQuality,
                 stillCaptureResolutionPreset = requestedResolutionPreset,
+                latencyPriority = requestedLatencyPriority,
                 manualCaptureConfigOverride = requestedManualCaptureConfig,
                 resetPreviewObserver = false,
                 resetPreviewMetrics = false,
@@ -2509,7 +2494,6 @@ class CameraXCaptureAdapter(
                 lifecycleOwner = lifecycleOwner,
                 previewView = previewView,
                 deviceGraph = deviceGraph,
-                stillCaptureQuality = deviceGraph.stillCapture.qualityPreference,
                 stillCaptureResolutionPreset = deviceGraph.stillCapture.resolutionPreset,
                 resetPreviewObserver = false,
                 resetPreviewMetrics = false,
@@ -2524,13 +2508,13 @@ class CameraXCaptureAdapter(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
         deviceGraph: DeviceGraphSpec,
-        stillCaptureQuality: StillCaptureQualityPreference,
         stillCaptureResolutionPreset: StillCaptureResolutionPreset,
         resetPreviewObserver: Boolean,
         resetPreviewMetrics: Boolean,
         closeActiveRecording: Boolean,
         videoSpecOverride: VideoSpec? = null,
-        manualCaptureConfigOverride: Camera2ManualCaptureConfig? = null
+        manualCaptureConfigOverride: Camera2ManualCaptureConfig? = null,
+        latencyPriority: CaptureLatencyPriority = CaptureLatencyPriority.DEFAULT
     ) {
         val selector = cameraSelectorFor(deviceGraph.preferredLensFacing)
 
@@ -2562,27 +2546,33 @@ class CameraXCaptureAdapter(
             CaptureTemplate.STILL_CAPTURE -> {
                 val capture = createImageCapture(
                     deviceGraph = deviceGraph,
-                    stillCaptureQuality = stillCaptureQuality,
                     stillCaptureResolutionPreset = stillCaptureResolutionPreset,
+                    latencyPriority = latencyPriority,
                     manualCaptureConfig = manualCaptureConfigOverride
                 )
 
                 // Build use cases list, including ImageAnalysis if live preview frame source is available
                 val useCases = mutableListOf<androidx.camera.core.UseCase>(preview, capture)
                 if (livePreviewFrameSource != null || sceneMaskSource != null) {
+                    val fanout = PreviewAnalysisFanout(
+                        sceneMaskConsumer = if (sceneMaskSource != null) {
+                            { image, rotation -> sceneMaskSource.onAnalyzeFrame(image, rotation) }
+                        } else null,
+                        livePreviewConsumer = if (livePreviewFrameSource != null) {
+                            { image, rotation ->
+                                (livePreviewFrameSource as? CameraXLivePreviewFrameSource)?.onAnalyzeFrame(
+                                    image, rotation
+                                )
+                            }
+                        } else null
+                    )
                     val analysis = ImageAnalysis.Builder()
                         .setTargetResolution(android.util.Size(720, 480))
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                     analysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
                         val rotation = imageProxy.imageInfo.rotationDegrees
-                        // Scene mask processes first (needs raw ImageProxy for ML Kit input)
-                        sceneMaskSource?.onAnalyzeFrame(imageProxy, rotation)
-                        // Live preview copies YUV bytes and closes ImageProxy in its finally block
-                        (livePreviewFrameSource as? CameraXLivePreviewFrameSource)?.onAnalyzeFrame(
-                            imageProxy,
-                            rotation
-                        ) ?: imageProxy.close()
+                        fanout.analyze(imageProxy, rotation)
                     }
                     useCases.add(analysis)
                 }
@@ -2594,12 +2584,12 @@ class CameraXCaptureAdapter(
                 )
                 imageCapture = capture
                 videoCapture = null
-                currentStillCaptureQuality = stillCaptureQuality
                 currentStillCaptureResolutionPreset = stillCaptureResolutionPreset
                 currentStillCaptureOutputSize = resolvedStillCaptureOutputSize(
                     deviceGraph = deviceGraph,
                     availableOutputSizes = capabilitiesFor(deviceGraph).availableStillCaptureOutputSizes
                 )
+                currentLatencyPriority = latencyPriority
                 currentManualCaptureConfig = manualCaptureConfigOverride
                 currentVideoSpec = null
                 camera
@@ -2628,7 +2618,6 @@ class CameraXCaptureAdapter(
                 )
                 imageCapture = null
                 videoCapture = capture
-                currentStillCaptureQuality = deviceGraph.stillCapture.qualityPreference
                 currentStillCaptureResolutionPreset = deviceGraph.stillCapture.resolutionPreset
                 currentStillCaptureOutputSize = deviceGraph.stillCapture.outputSize
                 currentManualCaptureConfig = null
@@ -2666,14 +2655,13 @@ class CameraXCaptureAdapter(
 
     private fun createImageCapture(
         deviceGraph: DeviceGraphSpec,
-        stillCaptureQuality: StillCaptureQualityPreference,
         stillCaptureResolutionPreset: StillCaptureResolutionPreset,
+        latencyPriority: CaptureLatencyPriority = CaptureLatencyPriority.DEFAULT,
         manualCaptureConfig: Camera2ManualCaptureConfig? = null
     ): ImageCapture {
-        val captureMode = when (stillCaptureQuality) {
-            StillCaptureQualityPreference.LATENCY -> ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
-            StillCaptureQualityPreference.QUALITY -> ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
-        }
+        val captureMode = resolveImageCaptureMode(
+            latencyPriority = latencyPriority
+        )
         val resolvedOutputSize = resolvedStillCaptureOutputSize(
             deviceGraph = deviceGraph,
             availableOutputSizes = capabilitiesFor(deviceGraph).availableStillCaptureOutputSizes
@@ -2712,6 +2700,19 @@ class CameraXCaptureAdapter(
                 ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
             StillCaptureResolutionPreset.SMALL_2MP ->
                 ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER
+        }
+    }
+
+    private fun resolveImageCaptureMode(
+        latencyPriority: CaptureLatencyPriority
+    ): Int {
+        return when (latencyPriority) {
+            CaptureLatencyPriority.ZSL_WHEN_SUPPORTED ->
+                ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
+            CaptureLatencyPriority.QUICK_SNAP ->
+                ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY
+            CaptureLatencyPriority.DEFAULT ->
+                ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
         }
     }
 

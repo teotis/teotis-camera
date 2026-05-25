@@ -1,10 +1,16 @@
 package com.opencamera.app.camera
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import android.graphics.YuvImage
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -56,35 +62,29 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
     override fun latestMask(): PreviewSceneMaskPayload? = latestMaskHolder.get()
 
     override fun onAnalyzeFrame(image: ImageProxy, rotationDegrees: Int) {
-        if (!isRunning.get()) {
-            image.close()
-            return
-        }
+        if (!isRunning.get()) return
 
         framesReceived.incrementAndGet()
 
         if (inferenceInFlight.getAndSet(true)) {
             framesDropped.incrementAndGet()
-            image.close()
             return
         }
 
         val currentSegmenter = segmenter
         if (currentSegmenter == null) {
             inferenceInFlight.set(false)
-            image.close()
             return
         }
 
-        val mediaImage = image.image
-        if (mediaImage == null) {
+        val bitmap = imageProxyToBitmap(image)
+        if (bitmap == null) {
             inferenceInFlight.set(false)
             framesDropped.incrementAndGet()
-            image.close()
             return
         }
 
-        val inputImage = InputImage.fromMediaImage(mediaImage, rotationDegrees)
+        val inputImage = InputImage.fromBitmap(bitmap, rotationDegrees)
         val captureTimestamp = System.currentTimeMillis()
 
         currentSegmenter.process(inputImage)
@@ -119,13 +119,41 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
                         )
                     )
                 )
+                bitmap.recycle()
             }
             .addOnFailureListener { e ->
                 inferenceInFlight.set(false)
                 inferenceErrors.incrementAndGet()
                 Log.w(TAG, "Segmentation failed", e)
+                bitmap.recycle()
             }
+    }
 
-        image.close()
+    private fun imageProxyToBitmap(image: ImageProxy): Bitmap? {
+        val planes = image.planes
+        if (planes.size < 3) return null
+
+        val width = image.width
+        val height = image.height
+
+        if (width <= 0 || height <= 0) return null
+
+        val yBuffer = planes[0].buffer
+        val uBuffer = planes[1].buffer
+        val vBuffer = planes[2].buffer
+
+        val ySize = yBuffer.remaining()
+        val uSize = uBuffer.remaining()
+        val vSize = vBuffer.remaining()
+
+        val nv21 = ByteArray(ySize + vSize + uSize)
+        yBuffer.get(nv21, 0, ySize)
+        vBuffer.get(nv21, ySize, vSize)
+        uBuffer.get(nv21, ySize + vSize, uSize)
+
+        val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
+        val out = ByteArrayOutputStream()
+        yuvImage.compressToJpeg(Rect(0, 0, width, height), 90, out)
+        return BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size())
     }
 }

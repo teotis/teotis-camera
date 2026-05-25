@@ -22,6 +22,6 @@ class NoOpPreviewSceneMaskSource : PreviewSceneMaskSource {
     override fun latestMask(): PreviewSceneMaskPayload? = null
 
     override fun onAnalyzeFrame(image: ImageProxy, rotationDegrees: Int) {
-        image.close()
+        // No-op: fanout owns ImageProxy lifecycle
     }
 }

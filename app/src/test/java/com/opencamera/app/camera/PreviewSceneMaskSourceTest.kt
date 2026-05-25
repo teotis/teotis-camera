@@ -75,7 +75,7 @@ class PreviewSceneMaskSourceTest {
     }
 
     @Test
-    fun `NoOp closes image proxy on analyze frame`() {
+    fun `NoOp onAnalyzeFrame does not close ImageProxy`() {
         val source = NoOpPreviewSceneMaskSource()
         var closeCount = 0
         val proxy = object : ImageProxy {
@@ -90,11 +90,11 @@ class PreviewSceneMaskSourceTest {
             override fun setCropRect(rect: android.graphics.Rect?) {}
         }
         source.onAnalyzeFrame(proxy, 0)
-        assertEquals(1, closeCount)
+        assertEquals(0, closeCount)
     }
 
     @Test
-    fun `MlKit source handles null media image gracefully`() {
+    fun `MlKit source handles null image planes gracefully`() {
         val source = MlKitSelfiePreviewSceneMaskSource()
         source.start(PreviewSceneMaskConfig())
 
@@ -121,7 +121,7 @@ class PreviewSceneMaskSourceTest {
             override fun setCropRect(rect: android.graphics.Rect?) {}
         }
         source.onAnalyzeFrame(proxy, 90)
-        assertEquals(1, closeCount)
+        assertEquals(0, closeCount)
         assertNull(source.latestMask())
     }
 

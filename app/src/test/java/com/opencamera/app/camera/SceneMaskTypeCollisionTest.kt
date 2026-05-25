@@ -19,14 +19,14 @@ class SceneMaskTypeCollisionTest {
     fun `core SceneMaskPayload and app SavedPhotoMaskPixels are distinct types`() {
         val coreClass = SceneMaskPayload::class.java
         val appClass = SavedPhotoMaskPixels::class.java
-        assertNotEquals(coreClass, appClass, "Core interface and app data class must be different types")
+        assertNotEquals<Any>(coreClass, appClass, "Core interface and app data class must be different types")
     }
 
     @Test
     fun `core SceneMaskCapability and app PreviewSceneMaskCapability are distinct types`() {
         val coreClass = com.opencamera.core.media.SceneMaskCapability::class.java
         val appClass = PreviewSceneMaskCapability::class.java
-        assertNotEquals(coreClass, appClass, "Core data class and app enum must be different types")
+        assertNotEquals<Any>(coreClass, appClass, "Core data class and app enum must be different types")
     }
 
     @Test

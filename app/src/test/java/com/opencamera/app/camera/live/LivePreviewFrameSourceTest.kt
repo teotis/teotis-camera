@@ -1,5 +1,6 @@
 package com.opencamera.app.camera.live
 
+import androidx.camera.core.ImageProxy
 import com.opencamera.core.media.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -73,6 +74,26 @@ class LivePreviewFrameSourceTest {
         // Verify CameraXLivePreviewFrameSource implements LivePreviewFrameSource
         val source: LivePreviewFrameSource = CameraXLivePreviewFrameSource()
         assertFalse(source.isActive)
+    }
+
+    @Test
+    fun `CameraXLivePreviewFrameSource onAnalyzeFrame does not close when not started`() {
+        val source = CameraXLivePreviewFrameSource()
+        var closeCount = 0
+        val proxy = object : ImageProxy {
+            override fun close() { closeCount++ }
+            override fun getImage() = null
+            override fun getPlanes() = emptyArray<ImageProxy.PlaneProxy>()
+            override fun getWidth() = 0
+            override fun getHeight() = 0
+            override fun getImageInfo() = throw UnsupportedOperationException()
+            override fun getFormat() = 0
+            override fun getCropRect() = throw UnsupportedOperationException()
+            override fun setCropRect(rect: android.graphics.Rect?) {}
+        }
+
+        source.onAnalyzeFrame(proxy, 0)
+        assertEquals(0, closeCount)
     }
 
     @Test
