@@ -36,12 +36,12 @@
 
 1. [Color Lab Capture Save Regression Plan](2026-05-25-color-lab-capture-save-regression.md)
    - Purpose: 解决选择 Color Lab 后拍照没有最终图片。
-   - Status: blocked after validation.
+   - Status: locally validated after Codex repair; real-device smoke pending.
    - Owner: non-multimodal implementation agent for code/tests/logging; Codex/user for real-device smoke.
 
 2. [Color Lab Perceptual Strength And Consistency Plan](2026-05-25-color-lab-perceptual-strength-and-consistency.md)
    - Purpose: 解决最大效果偏淡。
-   - Status: blocked after validation.
+   - Status: implemented locally after Codex repair; real-device visual QA pending.
    - Owner: non-multimodal implementation agent for code/tests; Codex/user for visual QA.
 
 ## Validation Result After External-Agent Delivery
@@ -56,8 +56,18 @@
 Follow-up package:
 
 - [Color Lab Validation Blocker Follow-Up Index](2026-05-25-color-lab-validation-blocker-followup-index.md)
-  - Status: planned.
+  - Status: validated locally after Codex repair.
   - Purpose: 把上述验收失败拆成 postprocess fail-soft、recipe metadata bridge、preview recipe transform 三个阻断修复包。
+
+## Completion Notes After Codex Repair
+
+本地确定性验收已经收口，但真机视觉/媒体验收仍需设备复测：
+
+- `PerceptualColorRecipe` 已进入 capture metadata，saved-photo postprocess 使用 shared parser。
+- `PreviewEffectAdapter` 产出的 recipe `colorTransform` 已由 app overlay 层绘制，不再停在 core model。
+- optional mask source/decode/render 失败现在包在 fail-soft 边界内，新增 throwing mask source 回归。
+- Stage app 子门禁暴露的 Humanistic 主模式回归和 native output fallback 回归已修复。
+- `rtk ./scripts/verify_stage_7_observability.sh` 未自然完成：卡在全量 `DefaultCameraSessionTest` 段后被停止。已使用 focused session tests、Stage app 子门禁、tap-focus 脚本和 assembleDebug 替代验证本轮触达范围。
 
 ## Recommended Order
 

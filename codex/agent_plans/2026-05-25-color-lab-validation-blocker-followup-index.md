@@ -26,9 +26,9 @@
 
 | Work Package | Owner | Status | Purpose |
 | --- | --- | --- | --- |
-| [Color Lab Recipe Metadata Bridge Repair](2026-05-25-color-lab-recipe-metadata-bridge-repair.md) | Text/code agent | planned | 修复 non-neutral recipe 未进入 capture metadata/saved JPEG render 的断链。 |
-| [Color Lab Preview Recipe Transform Repair](2026-05-25-color-lab-preview-recipe-transform-repair.md) | Text/code agent + Codex/user visual QA | planned | 让 preview 消费同一 recipe，至少给出 truthful approximate/degraded transform。 |
-| [Color Lab Postprocess Fail-Soft And Test Repair](2026-05-25-color-lab-postprocess-failsoft-test-repair.md) | Text/code agent | planned | 修复 mask/后处理 fail-soft 缺口和当前 app focused test failures。 |
+| [Color Lab Recipe Metadata Bridge Repair](2026-05-25-color-lab-recipe-metadata-bridge-repair.md) | Text/code agent | validated locally | 修复 non-neutral recipe 未进入 capture metadata/saved JPEG render 的断链。 |
+| [Color Lab Preview Recipe Transform Repair](2026-05-25-color-lab-preview-recipe-transform-repair.md) | Text/code agent + Codex/user visual QA | implemented, visual QA pending | 让 preview 消费同一 recipe，至少给出 truthful approximate/degraded transform。 |
+| [Color Lab Postprocess Fail-Soft And Test Repair](2026-05-25-color-lab-postprocess-failsoft-test-repair.md) | Text/code agent | validated locally | 修复 mask/后处理 fail-soft 缺口和当前 app focused test failures。 |
 
 ## Dependencies And Recommended Order
 
@@ -53,6 +53,35 @@
 - Preview consumes the same recipe contract and reports approximate/degraded fidelity honestly.
 - Current focused app tests and relevant core settings/effect tests pass.
 - Stage 7 gate is rerun only after focused failures are green.
+
+## Validation After Codex Repair
+
+Status: locally validated for deterministic code/test gates; real-device visual QA remains pending.
+
+External-agent delivery had made progress, but Codex found and repaired additional gaps:
+
+- `PreviewEffectAdapter` produced `colorTransform`, but `PreviewOverlayView` did not draw it. Added app-layer transform-to-overlay wiring and `PreviewColorTransformOverlayTest`.
+- `PhotoAlgorithmPostProcessor.resolveMask(...)` still ran before the fail-soft `try` block. Added a regression for throwing `maskBitmapSource` and moved mask resolution inside the protected boundary.
+- `PreviewColorTransform.equals(...)` treated two null matrices as unequal. Fixed equality so `NONE` and neutral-transform assertions are reliable.
+- Stage app gate exposed unrelated UI regressions from the delivery: `Humanistic` had reappeared in the main mode track/directory and humanistic styles were expanded in a way that broke existing product tests. Restored hidden main-mode behavior while keeping the Photo Style subitems.
+- Stage app gate exposed a UI fallback regression for native still output size. `SessionStateRender` now uses closest preset-size fallback for display when the graph lacks an explicit output size.
+
+Verification evidence:
+
+```bash
+rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoAlgorithmPostProcessorTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest --tests com.opencamera.app.PreviewColorTransformOverlayTest --tests com.opencamera.app.SessionUiRenderModelTest
+rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:settings:test --tests com.opencamera.core.settings.ColorLabSpecTest --tests com.opencamera.core.settings.StyleColorPipelineTest --tests com.opencamera.core.settings.PerceptualColorRecipeTest
+rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:effect:test --tests com.opencamera.core.effect.PreviewEffectAdapterTest --tests com.opencamera.core.effect.EffectBridgeTest
+rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.SessionDiagnosticsTest --tests com.opencamera.core.session.ThermalBudgetBridgeTest --tests "com.opencamera.core.session.DefaultCameraSessionTest.color lab filtered photo suppresses raw capture feedback"
+rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitorTest --tests com.opencamera.app.camera.CameraXCaptureAdapterCapabilityDetectionTest --tests com.opencamera.app.camera.CameraXCaptureAdapterRuntimeIssueTest --tests com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitorTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.SessionStateRenderTest --tests com.opencamera.app.DevLogRenderModelTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest
+rtk ./gradlew --no-daemon :app:assembleDebug
+rtk ./scripts/verify_tap_focus_camerax_execution.sh
+```
+
+Notes:
+
+- Full `rtk ./scripts/verify_stage_7_observability.sh` was attempted, but the all-`DefaultCameraSessionTest` segment ran for an extended period with no output and was stopped via `rtk ./gradlew --stop`. The focused session tests above passed, including the Color Lab capture-feedback regression.
+- `rtk ./scripts/verify_tap_focus_camerax_execution.sh` first hit sandbox/Gradle wrapper lock and transient Kotlin build-output corruption; after rebuilding `:core:settings:jar`, the same script passed.
 
 ## Verification Commands
 
