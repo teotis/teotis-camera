@@ -1178,7 +1178,8 @@ class CameraXCaptureAdapter(
             PipelineMetadataPostProcessor()
         )
     ),
-    private val livePreviewFrameSource: com.opencamera.app.camera.live.LivePreviewFrameSource? = null
+    private val livePreviewFrameSource: com.opencamera.app.camera.live.LivePreviewFrameSource? = null,
+    private val sceneMaskSource: PreviewSceneMaskSource? = null
 ) : CameraDeviceAdapter {
     private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var cameraProvider: ProcessCameraProvider? = null
@@ -1503,6 +1504,7 @@ class CameraXCaptureAdapter(
             removeCameraStateObserver()
             applyVideoTorch(false)
             livePreviewFrameSource?.stop("release")
+            sceneMaskSource?.stop("release")
             if (activeRecording != null) {
                 activeVideoPlan?.request?.shotId?.let { lifecycleInterruptedShotIds.add(it) }
                 val interruptedPlan = activeVideoPlan
@@ -2517,6 +2519,7 @@ class CameraXCaptureAdapter(
         }
 
         livePreviewFrameSource?.stop("unbind")
+        sceneMaskSource?.stop("unbind")
         provider.unbindAll()
         if (closeActiveRecording) {
             activeRecording?.close()
@@ -2535,15 +2538,19 @@ class CameraXCaptureAdapter(
 
                 // Build use cases list, including ImageAnalysis if live preview frame source is available
                 val useCases = mutableListOf<androidx.camera.core.UseCase>(preview, capture)
-                if (livePreviewFrameSource != null) {
+                if (livePreviewFrameSource != null || sceneMaskSource != null) {
                     val analysis = ImageAnalysis.Builder()
                         .setTargetResolution(android.util.Size(720, 480))
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                     analysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
+                        val rotation = imageProxy.imageInfo.rotationDegrees
+                        // Scene mask processes first (needs raw ImageProxy for ML Kit input)
+                        sceneMaskSource?.onAnalyzeFrame(imageProxy, rotation)
+                        // Live preview copies YUV bytes and closes ImageProxy in its finally block
                         (livePreviewFrameSource as? CameraXLivePreviewFrameSource)?.onAnalyzeFrame(
                             imageProxy,
-                            imageProxy.imageInfo.rotationDegrees
+                            rotation
                         ) ?: imageProxy.close()
                     }
                     useCases.add(analysis)
@@ -2620,6 +2627,7 @@ class CameraXCaptureAdapter(
             livePreviewFrameSource?.start(
                 com.opencamera.core.media.FrameBufferPolicy.LIVE_PREVIEW_DEFAULT
             )
+            sceneMaskSource?.start(PreviewSceneMaskConfig())
         }
 
         suppressPreviewStateEvents = false

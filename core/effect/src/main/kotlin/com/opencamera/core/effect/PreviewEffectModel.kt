@@ -15,10 +15,26 @@ data class PreviewEffectRenderModel(
     val filterOverlay: FilterOverlaySpec?,
     val watermarkHint: WatermarkHintSpec?,
     val frameGuideline: FrameGuidelineSpec?,
-    val compositionGrid: CompositionGridSpec?
+    val compositionGrid: CompositionGridSpec?,
+    val colorTransform: PreviewColorTransform = PreviewColorTransform.NONE,
+    val subjectMaskPreview: SubjectMaskPreviewDescriptor = SubjectMaskPreviewDescriptor.UNAVAILABLE
 ) {
     companion object {
         val EMPTY = PreviewEffectRenderModel(null, null, null, null)
+    }
+}
+
+data class SubjectMaskPreviewDescriptor(
+    val isAvailable: Boolean,
+    val backendId: String,
+    val isApproximate: Boolean
+) {
+    companion object {
+        val UNAVAILABLE = SubjectMaskPreviewDescriptor(
+            isAvailable = false,
+            backendId = "none",
+            isApproximate = true
+        )
     }
 }
 

@@ -7,6 +7,10 @@ import com.opencamera.app.camera.AndroidPhotoSelfieMirrorEditor
 import com.opencamera.app.camera.AndroidPortraitRenderEditor
 import com.opencamera.app.camera.AndroidPhotoWatermarkEditor
 import com.opencamera.app.camera.AndroidPhotoAlgorithmEditor
+import com.opencamera.app.camera.MlKitSelfiePreviewSceneMaskSource
+import com.opencamera.app.camera.NoOpPreviewSceneMaskSource
+import com.opencamera.app.camera.NoOpSavedPhotoSceneMaskProvider
+import com.opencamera.app.camera.PreviewSceneMaskSource
 import com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitor
 import com.opencamera.app.camera.CameraSessionCoordinator
 import com.opencamera.app.camera.CameraXCaptureAdapter
@@ -72,7 +76,8 @@ class AppContainer(
                 AndroidPortraitRenderEditor(appContext)
             ),
             PhotoAlgorithmPostProcessor(
-                AndroidPhotoAlgorithmEditor(appContext)
+                AndroidPhotoAlgorithmEditor(appContext),
+                NoOpSavedPhotoSceneMaskProvider()
             ),
             PhotoWatermarkPostProcessor(
                 AndroidPhotoWatermarkEditor(appContext)
@@ -98,11 +103,18 @@ class AppContainer(
 
     private val livePreviewFrameSource = CameraXLivePreviewFrameSource()
 
+    private val sceneMaskSource: PreviewSceneMaskSource = try {
+        MlKitSelfiePreviewSceneMaskSource()
+    } catch (_: Throwable) {
+        NoOpPreviewSceneMaskSource()
+    }
+
     private val cameraAdapter: CameraDeviceAdapter = CameraXCaptureAdapter(
         context = appContext,
         shotExecutor = shotExecutor,
         mediaPostProcessor = mediaPostProcessor,
-        livePreviewFrameSource = livePreviewFrameSource
+        livePreviewFrameSource = livePreviewFrameSource,
+        sceneMaskSource = sceneMaskSource
     )
 
     val effectCapabilityResolver = EffectCapabilityResolver(
