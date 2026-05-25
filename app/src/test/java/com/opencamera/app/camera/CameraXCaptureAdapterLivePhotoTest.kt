@@ -631,6 +631,188 @@ class CameraXCaptureAdapterLivePhotoTest {
         assertFalse(result.diagnostics.contains("motion-photo:xmp=present"))
     }
 
+    @Test
+    fun `resolveLiveWatermarkOutcome returns STILL_ONLY when still watermark is configured`() {
+        val plan = buildShotPlan(
+            watermarkText = "PHOTO Auto",
+            liveWatermarkBehavior = "follow-frame-luma-and-motion"
+        )
+        val outcome = resolveLiveWatermarkOutcome(plan)
+
+        assertEquals("follow-frame-luma-and-motion", outcome.requested)
+        assertEquals(LiveWatermarkResult.STILL_ONLY, outcome.result)
+        assertEquals("motion-burn-in-not-implemented", outcome.degradeReason)
+    }
+
+    @Test
+    fun `resolveLiveWatermarkOutcome returns null result when no watermark is configured`() {
+        val plan = buildShotPlan(watermarkText = null, liveWatermarkBehavior = null)
+        val outcome = resolveLiveWatermarkOutcome(plan)
+
+        assertEquals(null, outcome.requested)
+        assertEquals(null, outcome.result)
+        assertEquals(null, outcome.degradeReason)
+    }
+
+    @Test
+    fun `resolveLiveWatermarkOutcome returns UNSUPPORTED when behavior is set but no watermark text`() {
+        val plan = buildShotPlan(
+            watermarkText = null,
+            liveWatermarkBehavior = "follow-frame-luma-and-motion"
+        )
+        val outcome = resolveLiveWatermarkOutcome(plan)
+
+        assertEquals("follow-frame-luma-and-motion", outcome.requested)
+        assertEquals(LiveWatermarkResult.UNSUPPORTED, outcome.result)
+        assertEquals(null, outcome.degradeReason)
+    }
+
+    @Test
+    fun `resolveLiveWatermarkOutcome never returns MOTION_BURNED_IN`() {
+        val testCases = listOf(
+            buildShotPlan(watermarkText = "PHOTO Auto", liveWatermarkBehavior = "follow-frame-luma"),
+            buildShotPlan(watermarkText = "PHOTO Flash", liveWatermarkBehavior = "static-overlay"),
+            buildShotPlan(watermarkText = null, liveWatermarkBehavior = null),
+            buildShotPlan(watermarkText = null, liveWatermarkBehavior = "follow-frame-luma-and-motion")
+        )
+        for (plan in testCases) {
+            val outcome = resolveLiveWatermarkOutcome(plan)
+            assertTrue(
+                outcome.result != LiveWatermarkResult.MOTION_BURNED_IN,
+                "MOTION_BURNED_IN should never be returned but got ${outcome.result}"
+            )
+        }
+    }
+
+    @Test
+    fun `sidecar payload includes watermark fields when present`() {
+        val tempDir = Files.createTempDirectory("live-watermark-sidecar").toFile()
+        try {
+            val sidecarFile = File(tempDir, "capture.live.json")
+            val bundle = LivePhotoBundle(
+                stillPath = File(tempDir, "capture.jpg").absolutePath,
+                motionPath = File(tempDir, "capture.live.mp4").absolutePath,
+                sidecarPath = sidecarFile.absolutePath,
+                motionDurationMillis = 1_500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json",
+                watermarkRequested = "follow-frame-luma",
+                watermarkResult = LiveWatermarkResult.STILL_ONLY,
+                watermarkDegradeReason = "motion-burn-in-not-implemented"
+            )
+
+            materializeLivePhotoSidecar(bundle)
+
+            val payload = sidecarFile.readText()
+            assertTrue(payload.contains("\"watermarkRequested\": \"follow-frame-luma\""))
+            assertTrue(payload.contains("\"watermarkResult\": \"still-only\""))
+            assertTrue(payload.contains("\"watermarkDegradeReason\": \"motion-burn-in-not-implemented\""))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `sidecar payload omits watermark fields when absent`() {
+        val tempDir = Files.createTempDirectory("live-watermark-no-wm").toFile()
+        try {
+            val sidecarFile = File(tempDir, "capture.live.json")
+            val bundle = LivePhotoBundle(
+                stillPath = File(tempDir, "capture.jpg").absolutePath,
+                motionPath = File(tempDir, "capture.live.mp4").absolutePath,
+                sidecarPath = sidecarFile.absolutePath,
+                motionDurationMillis = 1_500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json"
+            )
+
+            materializeLivePhotoSidecar(bundle)
+
+            val payload = sidecarFile.readText()
+            assertFalse(payload.contains("watermarkRequested"))
+            assertFalse(payload.contains("watermarkResult"))
+            assertFalse(payload.contains("watermarkDegradeReason"))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `temporalNotes includes watermark diagnostics when watermark is present`() {
+        val bundle = LivePhotoBundle(
+            stillPath = "Pictures/OpenCamera/capture.jpg",
+            motionPath = "Pictures/OpenCamera/capture.live.mp4",
+            sidecarPath = "Pictures/OpenCamera/capture.live.json",
+            motionDurationMillis = 1_500,
+            motionMimeType = "video/mp4",
+            sidecarMimeType = "application/vnd.opencamera.live+json",
+            watermarkRequested = "follow-frame-luma-and-motion",
+            watermarkResult = LiveWatermarkResult.STILL_ONLY,
+            watermarkDegradeReason = "motion-burn-in-not-implemented"
+        )
+
+        val notes = bundle.temporalNotes()
+
+        assertTrue(notes.contains("live-watermark:requested=follow-frame-luma-and-motion"))
+        assertTrue(notes.contains("live-watermark:actual=still-only"))
+        assertTrue(notes.contains("live-watermark:reason=motion-burn-in-not-implemented"))
+    }
+
+    @Test
+    fun `temporalNotes omits watermark diagnostics when watermark is absent`() {
+        val bundle = LivePhotoBundle(
+            stillPath = "Pictures/OpenCamera/capture.jpg",
+            motionPath = "Pictures/OpenCamera/capture.live.mp4",
+            sidecarPath = "Pictures/OpenCamera/capture.live.json",
+            motionDurationMillis = 1_500,
+            motionMimeType = "video/mp4",
+            sidecarMimeType = "application/vnd.opencamera.live+json"
+        )
+
+        val notes = bundle.temporalNotes()
+
+        assertFalse(notes.any { it.startsWith("live-watermark:") })
+    }
+
+    private fun buildShotPlan(
+        watermarkText: String?,
+        liveWatermarkBehavior: String?
+    ): ShotPlan {
+        val customTags = buildMap {
+            put("mode", "photo")
+            liveWatermarkBehavior?.let { put("liveWatermarkBehavior", it) }
+        }
+        return ShotPlan(
+            request = ShotRequest(
+                shotId = "test-shot",
+                shotKind = ShotKind.LIVE_PHOTO,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(
+                    metadata = MediaMetadata(customTags = customTags)
+                ),
+                thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+                postProcessSpec = PostProcessSpec(watermarkText = watermarkText),
+                captureProfile = CaptureProfile()
+            ),
+            saveTask = MediaSaveTask(
+                shotId = "test-shot",
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(
+                    metadata = MediaMetadata(customTags = customTags)
+                ),
+                thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+                postProcessSpec = PostProcessSpec(watermarkText = watermarkText),
+                captureProfile = CaptureProfile()
+            ),
+            graph = ShotGraph(
+                shotId = "test-shot",
+                captureNodes = emptyList(),
+                algorithmNodes = emptyList(),
+                outputNodes = emptyList()
+            )
+        )
+    }
+
     private fun makeDescriptor(
         frameId: String,
         timestampNanos: Long,
