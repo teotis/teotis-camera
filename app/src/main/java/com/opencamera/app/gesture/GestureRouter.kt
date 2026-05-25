@@ -51,6 +51,10 @@ class GestureRouter(
             onGesture(GestureEvent.PinchZoom(detector.scaleFactor, detector.focusX, detector.focusY))
             return true
         }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            onGesture(GestureEvent.ScaleEnd)
+        }
     })
 
     private var isDragging = false

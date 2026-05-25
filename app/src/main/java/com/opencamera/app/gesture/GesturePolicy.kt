@@ -12,12 +12,16 @@ sealed interface GestureAction {
 }
 
 class GesturePolicy {
-    private var cumulativeScaleFactor = 1.0f
+    private var localZoomRatio = 1.0f
     private var lastPinchTimestamp = 0L
 
     fun resetZoomAccumulation() {
-        cumulativeScaleFactor = 1.0f
+        localZoomRatio = 1.0f
         lastPinchTimestamp = 0L
+    }
+
+    fun syncZoomRatio(ratio: Float) {
+        localZoomRatio = ratio
     }
 
     fun map(event: GestureEvent, @Suppress("UNUSED_PARAMETER") activeMode: ModeId, currentZoomRatio: Float = 1.0f): GestureAction {
@@ -25,15 +29,18 @@ class GesturePolicy {
             is GestureEvent.Tap -> GestureAction.FocusAt(event.x, event.y)
             is GestureEvent.DoubleTap -> GestureAction.DispatchSession(SessionIntent.LensFacingToggled)
             is GestureEvent.PinchZoom -> {
-                cumulativeScaleFactor *= event.scaleFactor
+                localZoomRatio = (localZoomRatio * event.scaleFactor).coerceIn(0.5f, 10.0f)
                 val now = System.currentTimeMillis()
-                if (now - lastPinchTimestamp > 50) {
+                if (now - lastPinchTimestamp > 16) {
                     lastPinchTimestamp = now
-                    val targetRatio = (currentZoomRatio * cumulativeScaleFactor).coerceIn(0.5f, 10.0f)
-                    GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(targetRatio))
+                    GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(localZoomRatio))
                 } else {
                     GestureAction.Ignore
                 }
+            }
+            is GestureEvent.ScaleEnd -> {
+                resetZoomAccumulation()
+                GestureAction.Ignore
             }
             is GestureEvent.VerticalScroll -> GestureAction.ShowExposureHint(event.deltaY)
             is GestureEvent.HorizontalScroll -> GestureAction.AssistModeSwitch(event.deltaX)

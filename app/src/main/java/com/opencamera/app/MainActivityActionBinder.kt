@@ -366,6 +366,9 @@ internal class MainActivityActionBinder(
             }
             val activeMode = snap.sessionState?.activeMode ?: return@GestureRouter
             val currentZoom = snap.sessionState?.activeDeviceGraph?.preview?.zoomRatio ?: 1.0f
+            if (event !is GestureEvent.PinchZoom) {
+                gesturePolicy.syncZoomRatio(currentZoom)
+            }
             when (val action = gesturePolicy.map(event, activeMode, currentZoom)) {
                 is GestureAction.DispatchSession -> callbacks.dispatch(action.intent)
                 is GestureAction.FocusAt -> {
