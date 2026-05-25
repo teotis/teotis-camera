@@ -70,15 +70,12 @@ fun ModeId.catalogProfile(): ModeCatalogProfile {
 data class ModeContext(
     val deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
     val initialLensFacing: LensFacing = LensFacing.BACK,
-    val initialStillCaptureQuality: StillCaptureQualityPreference =
-        StillCaptureQualityPreference.LATENCY,
     val initialStillCaptureResolutionPreset: StillCaptureResolutionPreset =
         StillCaptureResolutionPreset.LARGE_12MP,
     val runtimeState: () -> ModeRuntimeState = {
         ModeRuntimeState(
             deviceCapabilities = deviceCapabilities,
             lensFacing = initialLensFacing,
-            stillCaptureQuality = initialStillCaptureQuality,
             stillCaptureResolutionPreset = initialStillCaptureResolutionPreset
         )
     },
@@ -117,8 +114,8 @@ fun ModeContext.captureAidMetadataTags(): Map<String, String> {
 data class ModeRuntimeState(
     val deviceCapabilities: DeviceCapabilities,
     val lensFacing: LensFacing,
-    val stillCaptureQuality: StillCaptureQualityPreference,
-    val stillCaptureResolutionPreset: StillCaptureResolutionPreset
+    val stillCaptureResolutionPreset: StillCaptureResolutionPreset,
+    val stillCaptureQuality: StillCaptureQualityPreference = StillCaptureQualityPreference.LATENCY
 )
 
 data class PhotoLowLightRuntimeState(
@@ -193,10 +190,6 @@ interface ModeController {
     suspend fun onDeviceCapabilitiesChanged(deviceCapabilities: DeviceCapabilities) = Unit
 
     suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
-
-    suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) = Unit
 
     suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset

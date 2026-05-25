@@ -11,7 +11,6 @@ import com.opencamera.core.media.MediaMetadata
 
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
@@ -77,18 +76,6 @@ private class DocumentModeController(
     }
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
-
-    override suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (enhancementEnabled()) {
-                "Document quality updated"
-            } else {
-                "Archive quality updated"
-            }
-        )
-    }
 
     override suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
@@ -184,7 +171,6 @@ private class DocumentModeController(
                             put("profile", profile.id)
                             put("scanMode", if (enhancementEnabled()) "enhanced" else "basic")
                             put("outputClass", "scan")
-                            put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                             putAll(context.captureAidMetadataTags())
                             putAll(bridgeTags)
@@ -193,7 +179,6 @@ private class DocumentModeController(
                 ),
                 postProcessSpec = postProcessSpec,
                 captureProfile = com.opencamera.core.media.CaptureProfile(
-                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
             )
@@ -258,9 +243,9 @@ private class DocumentModeController(
 
     private fun profileSummary(profile: DocumentProfile): String {
         return if (enhancementEnabled()) {
-            "Style ${profile.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Auto crop ${profile.autoCrop} | Contrast ${profile.contrastLabel} | Output tuned for scanned documents."
+            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Auto crop ${profile.autoCrop} | Contrast ${profile.contrastLabel} | Output tuned for scanned documents."
         } else {
-            "Style ${profile.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only because document enhancement is unavailable on this device."
+            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only because document enhancement is unavailable on this device."
         }
     }
 

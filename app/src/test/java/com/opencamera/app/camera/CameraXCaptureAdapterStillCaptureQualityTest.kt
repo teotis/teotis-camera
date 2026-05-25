@@ -1,51 +1,22 @@
 package com.opencamera.app.camera
 
-import com.opencamera.core.device.DeviceGraphSpec
-import com.opencamera.core.device.DeviceShotRequest
 import com.opencamera.core.device.CaptureTemplate
+import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.device.StillCaptureConfig
 import com.opencamera.core.device.StillCaptureOutputSize
-import com.opencamera.core.media.ShotKind
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class CameraXCaptureAdapterStillCaptureQualityTest {
-    @Test
-    fun `still graph quality drives adapter binding preference`() {
-        val graph = DeviceGraphSpec.stillCapture(
-            qualityPreference = StillCaptureQualityPreference.QUALITY
-        )
-
-        val quality = resolvedStillCaptureQuality(graph)
-
-        assertEquals(StillCaptureQualityPreference.QUALITY, quality)
-    }
-
-    @Test
-    fun `non still graph falls back to device request quality`() {
-        val graph = DeviceGraphSpec.videoRecording(
-            stillQualityPreference = StillCaptureQualityPreference.LATENCY
-        )
-        val request = DeviceShotRequest(
-            shotId = "shot-1",
-            template = CaptureTemplate.STILL_CAPTURE,
-            shotKind = ShotKind.STILL_CAPTURE,
-            stillCaptureQuality = StillCaptureQualityPreference.QUALITY
-        )
-
-        val quality = resolvedStillCaptureQuality(
-            deviceGraph = graph,
-            deviceRequest = request
-        )
-
-        assertEquals(StillCaptureQualityPreference.QUALITY, quality)
-    }
 
     @Test
     fun `still graph resolution drives adapter binding preference`() {
-        val graph = DeviceGraphSpec.stillCapture(
-            resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
+        val graph = DeviceGraphSpec(
+            template = CaptureTemplate.STILL_CAPTURE,
+            stillCapture = StillCaptureConfig(
+                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
+            )
         )
 
         val preset = resolvedStillCaptureResolutionPreset(graph)

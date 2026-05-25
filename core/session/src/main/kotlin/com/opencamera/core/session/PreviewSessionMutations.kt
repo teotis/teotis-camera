@@ -22,6 +22,7 @@ internal interface PreviewSessionMutations {
     fun updateCaptureFeedback(shotId: String, outputPath: String)
     fun updatePreviewMeteringRequested(requestId: String, point: PreviewMeteringPoint)
     fun updatePreviewMeteringCompleted(result: PreviewMeteringResult)
+    fun clearPreviewMeteringFeedback(requestId: String)
     fun updatePreviewHostAttached(lastAction: String)
     fun updatePreviewHostDetached(reason: String, hasPermission: Boolean)
     fun updatePreviewSurfaceLost(reason: String)

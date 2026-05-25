@@ -139,7 +139,7 @@ val DEFAULT_FILTER_PROFILES: List<FilterProfile> = listOf(
     ),
     builtInFilterProfile(
         id = "humanistic-street",
-        label = "Humanistic Street",
+        label = "街头 Street",
         category = FilterProfileCategory.HUMANISTIC,
         renderSpec = renderSpec(
             brightnessShift = 9,
@@ -150,7 +150,7 @@ val DEFAULT_FILTER_PROFILES: List<FilterProfile> = listOf(
     ),
     builtInFilterProfile(
         id = "humanistic-portrait",
-        label = "Humanistic Portrait",
+        label = "人像 Portrait",
         category = FilterProfileCategory.HUMANISTIC,
         renderSpec = renderSpec(
             brightnessShift = 6,
@@ -162,7 +162,7 @@ val DEFAULT_FILTER_PROFILES: List<FilterProfile> = listOf(
     ),
     builtInFilterProfile(
         id = "humanistic-life",
-        label = "Humanistic Life",
+        label = "生活 Life",
         category = FilterProfileCategory.HUMANISTIC,
         renderSpec = renderSpec(
             contrast = 1.12f,

@@ -84,6 +84,7 @@ internal fun captureFeedbackPolicyFor(shot: ShotRequest): CaptureFeedbackPolicy 
     val suppressRawFeedback = metadataFilterSpec.requiresTrustedSavedMedia(
         profileId = recipe.filterProfileId
     ) ||
+        !recipe.perceptualColorRecipe.isNeutral ||
         recipe.frameRatio != null && recipe.frameRatio != FrameRatio.RATIO_4_3 ||
         recipe.selfieMirror ||
         recipe.watermarkTemplateId?.let { it != "classic-overlay" } == true
@@ -187,7 +188,8 @@ data class SessionPresentationState(
     val photoSceneSignal: com.opencamera.core.device.PhotoSceneSignal = com.opencamera.core.device.PhotoSceneSignal(),
     val photoLowLightPrompt: PhotoLowLightPrompt? = null,
     val recordingStartedAtElapsedMillis: Long? = null,
-    val recordingElapsedMillis: Long? = null
+    val recordingElapsedMillis: Long? = null,
+    val documentBatch: DocumentBatchState = DocumentBatchState.inactive()
 )
 
 data class SessionState(
@@ -324,6 +326,12 @@ sealed interface SessionIntent {
         val signal: com.opencamera.core.device.PhotoSceneSignal
     ) : SessionIntent
     data object PhotoLowLightPromptExpired : SessionIntent
+    data class PreviewMeteringFeedbackExpired(val requestId: String) : SessionIntent
+    data object DocumentBatchClear : SessionIntent
+    data class DocumentBatchRemoveItem(val itemId: String) : SessionIntent
+    data class DocumentBatchMoveItem(val itemId: String, val direction: DocumentBatchMoveDirection) : SessionIntent
+    data class DocumentBatchReorder(val orderedItemIds: List<String>) : SessionIntent
+    data object DocumentBatchFinish : SessionIntent
 }
 
 sealed interface SessionEffect {

@@ -18,6 +18,9 @@ sealed interface PersistedSettingsAction {
     data class UpdatePortraitBokehEffect(
         val effect: PortraitBokehEffect
     ) : PersistedSettingsAction
+    data class UpdatePortraitDepthStrength(
+        val strength: Int
+    ) : PersistedSettingsAction
     data class UpdatePhotoWatermarkTemplate(val templateId: String) : PersistedSettingsAction
     data class UpdateWatermarkTextPlacement(
         val templateId: String,
@@ -88,6 +91,10 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
 
         is PersistedSettingsAction.UpdatePortraitBokehEffect -> copy(
             photo = photo.copy(portraitBokehEffect = action.effect)
+        )
+
+        is PersistedSettingsAction.UpdatePortraitDepthStrength -> copy(
+            photo = photo.copy(portraitDepthStrength = action.strength.coerceIn(0, 100))
         )
 
         is PersistedSettingsAction.UpdatePhotoWatermarkTemplate -> copy(

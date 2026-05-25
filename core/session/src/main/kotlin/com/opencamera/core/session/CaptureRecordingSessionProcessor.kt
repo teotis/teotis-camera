@@ -13,8 +13,10 @@ import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.hasPostProcessFailures
 import com.opencamera.core.media.isTemporalMedia
 import com.opencamera.core.media.outputPathOrNull
+import com.opencamera.core.media.renderUriOrNull
 import com.opencamera.core.media.postProcessFailureSummary
 import com.opencamera.core.mode.ModeController
+import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSessionEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -344,7 +346,39 @@ internal class CaptureRecordingSessionProcessor(
                     },
                     latestPipelineNotes = result.pipelineNotes,
                     pendingCaptureFeedback = null,
-                    lastError = result.postProcessFailureSummary()
+                    lastError = result.postProcessFailureSummary(),
+                    documentBatch = if (s.activeMode == ModeId.DOCUMENT &&
+                        s.presentation.documentBatch.status == DocumentBatchStatus.ACTIVE &&
+                        result.mediaType == MediaType.PHOTO
+                    ) {
+                        val currentBatch = s.presentation.documentBatch
+                        val cropStatus = documentCropStatusFrom(result.pipelineNotes)
+                        val cropSuffix = when (cropStatus) {
+                            DocumentBatchCropStatus.APPLIED -> " • auto-cropped"
+                            DocumentBatchCropStatus.SKIPPED -> " • original kept"
+                            DocumentBatchCropStatus.FAILED -> " • processing degraded"
+                            DocumentBatchCropStatus.NOT_REQUESTED -> ""
+                        }
+                        val newItem = DocumentBatchItem(
+                            itemId = result.shotId,
+                            shotId = result.shotId,
+                            orderIndex = currentBatch.items.size,
+                            outputPath = result.outputPath,
+                            renderUri = result.thumbnailSource.renderUriOrNull(),
+                            thumbnailSource = result.thumbnailSource,
+                            profileId = result.metadata.customTags["profile"],
+                            scanMode = result.metadata.customTags["scanMode"],
+                            cropStatus = cropStatus,
+                            pipelineNotes = result.pipelineNotes
+                        )
+                        currentBatch.copy(
+                            items = currentBatch.items + newItem,
+                            latestItemId = newItem.itemId,
+                            lastMessage = "Page added$cropSuffix"
+                        )
+                    } else {
+                        s.presentation.documentBatch
+                    }
                 )
             )
         }
@@ -546,4 +580,13 @@ internal class CaptureRecordingSessionProcessor(
             saveTask = updatedSaveTask
         )
     }
+}
+
+internal fun documentCropStatusFrom(notes: List<String>): DocumentBatchCropStatus {
+    for (note in notes) {
+        if (note == "document:auto-crop:applied") return DocumentBatchCropStatus.APPLIED
+        if (note.startsWith("document:auto-crop:skipped:")) return DocumentBatchCropStatus.SKIPPED
+        if (note.startsWith("document:auto-crop:failed:")) return DocumentBatchCropStatus.FAILED
+    }
+    return DocumentBatchCropStatus.NOT_REQUESTED
 }

@@ -332,6 +332,29 @@ class PersistedSettingsSerializerTest {
     }
 
     @Test
+    fun `all portrait enum storage keys deserialize correctly for backward compatibility`() {
+        // PortraitProfile
+        assertEquals(PortraitProfile.NATIVE, PortraitProfile.fromStorageKey("native"))
+        assertEquals(PortraitProfile.LUMINOUS, PortraitProfile.fromStorageKey("luminous"))
+
+        // PortraitBeautyPreset
+        assertEquals(PortraitBeautyPreset.AUTHENTIC, PortraitBeautyPreset.fromStorageKey("authentic"))
+        assertEquals(PortraitBeautyPreset.CLEAR, PortraitBeautyPreset.fromStorageKey("clear"))
+        assertEquals(PortraitBeautyPreset.RADIANT, PortraitBeautyPreset.fromStorageKey("radiant"))
+
+        // PortraitBeautyStrength
+        assertEquals(PortraitBeautyStrength.OFF, PortraitBeautyStrength.fromStorageKey("off"))
+        assertEquals(PortraitBeautyStrength.SOFT, PortraitBeautyStrength.fromStorageKey("soft"))
+        assertEquals(PortraitBeautyStrength.BALANCED, PortraitBeautyStrength.fromStorageKey("balanced"))
+        assertEquals(PortraitBeautyStrength.ELEVATED, PortraitBeautyStrength.fromStorageKey("elevated"))
+
+        // PortraitBokehEffect
+        assertEquals(PortraitBokehEffect.NATURAL, PortraitBokehEffect.fromStorageKey("natural"))
+        assertEquals(PortraitBokehEffect.CREAMY, PortraitBokehEffect.fromStorageKey("creamy"))
+        assertEquals(PortraitBokehEffect.DREAMY, PortraitBokehEffect.fromStorageKey("dreamy"))
+    }
+
+    @Test
     fun `default watermark catalog includes pure text and blur four border`() {
         val catalog = FeatureCatalog()
         val pureText = catalog.watermarkTemplates.first { it.id == "pure-text" }
@@ -349,5 +372,65 @@ class PersistedSettingsSerializerTest {
             ),
             blurBorder.allowedFrameBackgrounds
         )
+    }
+
+    @Test
+    fun `default portrait depth strength is 50`() {
+        val settings = PhotoSettings()
+        assertEquals(50, settings.portraitDepthStrength)
+    }
+
+    @Test
+    fun `reducer updates portrait depth strength`() {
+        val initial = PersistedSettings()
+        val reduced = initial.reduce(
+            PersistedSettingsAction.UpdatePortraitDepthStrength(75)
+        )
+        assertEquals(75, reduced.photo.portraitDepthStrength)
+        assertEquals(initial.photo.defaultFilterProfileId, reduced.photo.defaultFilterProfileId)
+        assertEquals(initial.photo.portraitBokehEffect, reduced.photo.portraitBokehEffect)
+        assertEquals(initial.common, reduced.common)
+        assertEquals(initial.video, reduced.video)
+    }
+
+    @Test
+    fun `reducer clamps portrait depth strength to 0`() {
+        val reduced = PersistedSettings().reduce(
+            PersistedSettingsAction.UpdatePortraitDepthStrength(-10)
+        )
+        assertEquals(0, reduced.photo.portraitDepthStrength)
+    }
+
+    @Test
+    fun `reducer clamps portrait depth strength to 100`() {
+        val reduced = PersistedSettings().reduce(
+            PersistedSettingsAction.UpdatePortraitDepthStrength(150)
+        )
+        assertEquals(100, reduced.photo.portraitDepthStrength)
+    }
+
+    @Test
+    fun `serializer round trips portrait depth strength`() {
+        val settings = PersistedSettings(
+            photo = PhotoSettings(portraitDepthStrength = 75)
+        )
+        val serialized = PersistedSettingsSerializer.toMap(settings)
+        assertEquals("75", serialized["photo.portrait.depthStrength"])
+        val decoded = PersistedSettingsSerializer.fromMap(serialized)
+        assertEquals(75, decoded.photo.portraitDepthStrength)
+    }
+
+    @Test
+    fun `serializer falls back to 50 when depth strength key is missing`() {
+        val decoded = PersistedSettingsSerializer.fromMap(emptyMap())
+        assertEquals(50, decoded.photo.portraitDepthStrength)
+    }
+
+    @Test
+    fun `serializer falls back to 50 for invalid depth strength value`() {
+        val decoded = PersistedSettingsSerializer.fromMap(
+            mapOf("photo.portrait.depthStrength" to "abc")
+        )
+        assertEquals(50, decoded.photo.portraitDepthStrength)
     }
 }

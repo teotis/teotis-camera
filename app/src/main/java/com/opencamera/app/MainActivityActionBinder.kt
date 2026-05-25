@@ -2,6 +2,7 @@ package com.opencamera.app
 
 import android.Manifest
 import android.view.View
+import android.widget.SeekBar
 import com.opencamera.app.gesture.GestureAction
 import com.opencamera.app.gesture.GestureEvent
 import com.opencamera.app.gesture.GestureGuard
@@ -9,10 +10,12 @@ import com.opencamera.app.gesture.GestureGuardState
 import com.opencamera.app.gesture.GesturePolicy
 import com.opencamera.app.gesture.GestureRouter
 import com.opencamera.app.gesture.GestureZone
+import com.opencamera.app.i18n.AppTextResolver
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
+import com.opencamera.core.settings.PersistedSettingsAction
 
 internal class MainActivityActionBinder(
     private val views: MainActivityViews,
@@ -61,6 +64,14 @@ internal class MainActivityActionBinder(
             callbacks.toggleLowLightNightAssist()
             callbacks.renderAfterPanelChange()
         }
+        views.documentBatchRail.header.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+            callbacks.renderAfterPanelChange()
+        }
+        views.documentBatchOrganizer.close.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+            callbacks.renderAfterPanelChange()
+        }
     }
 
     private fun bindCaptureActions() {
@@ -68,6 +79,11 @@ internal class MainActivityActionBinder(
             val state = snapshot().sessionState
             if (state?.permissionState?.cameraGranted != true) {
                 callbacks.requestCameraPermissionIfNeeded()
+                return@setOnClickListener
+            }
+            val disabledReason = state?.let { shutterDisabledReason(it, AppTextResolver(views.bottomCockpit.shutter.context)) }
+            if (disabledReason != null) {
+                callbacks.showDisabledReason(disabledReason)
                 return@setOnClickListener
             }
             callbacks.dispatch(SessionIntent.ShutterPressed)
@@ -108,33 +124,25 @@ internal class MainActivityActionBinder(
             callbacks.applySettingsControl(snapshot().settingsPage?.commonSection?.gridMode)
         }
         views.quickPanel.flash.setOnClickListener {
-            val mode = snapshot().sessionState?.activeMode
-            if (mode == ModeId.VIDEO) {
-                callbacks.dispatch(SessionIntent.TertiaryActionPressed)
-            } else {
-                callbacks.dispatch(SessionIntent.StillCaptureQualityToggled)
-            }
+            callbacks.dispatch(SessionIntent.SecondaryActionPressed)
         }
         views.quickPanel.resolution.setOnClickListener {
             callbacks.dispatch(SessionIntent.StillCaptureResolutionToggled)
         }
-        views.quickPanel.brightnessMinus.setOnClickListener {
-            callbacks.dispatch(SessionIntent.DecreasePreviewBrightness)
-        }
-        views.quickPanel.brightnessValue.setOnClickListener {
-            callbacks.dispatch(SessionIntent.ResetPreviewBrightness)
-        }
-        views.quickPanel.brightnessPlus.setOnClickListener {
-            callbacks.dispatch(SessionIntent.IncreasePreviewBrightness)
-        }
-        views.quickPanel.frame43.setOnClickListener {
-            callbacks.dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_4_3))
-        }
-        views.quickPanel.frame169.setOnClickListener {
-            callbacks.dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_16_9))
-        }
-        views.quickPanel.frame11.setOnClickListener {
-            callbacks.dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_1_1))
+        views.quickPanel.brightnessSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                val snap = snapshot()
+                val brightness = snap.quickPanelSheet?.brightnessRow ?: return
+                val targetSteps = brightness.minSteps + progress
+                callbacks.dispatch(SessionIntent.ApplyPreviewBrightness(targetSteps))
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+        views.quickPanel.frameRatio.setOnClickListener {
+            val nextRatio = snapshot().quickPanelSheet?.frameRatioNext ?: return@setOnClickListener
+            callbacks.dispatch(SessionIntent.FrameRatioSelected(nextRatio))
         }
         views.quickPanel.livePhoto.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.livePhoto)
@@ -197,6 +205,19 @@ internal class MainActivityActionBinder(
         views.settingsPanel.portraitBokehEffect.setOnClickListener {
             callbacks.applySettingsControl(snapshot().portraitLabPage?.bokehEffectControl)
         }
+        views.settingsPanel.portraitDepthStrengthSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                views.settingsPanel.portraitDepthStrengthValue.text = "$progress%"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                val progress = seekBar?.progress ?: return
+                callbacks.applySettingsAction(
+                    PersistedSettingsAction.UpdatePortraitDepthStrength(progress)
+                )
+            }
+        })
 
         // Watermark detail
         views.settingsPanel.watermarkPlacement.setOnClickListener {
@@ -303,14 +324,13 @@ internal class MainActivityActionBinder(
     private fun bindModeTrack() {
         val buttons = listOf(
             views.modeTrack.photo to ModeId.PHOTO,
+            views.modeTrack.humanistic to ModeId.HUMANISTIC,
             views.modeTrack.night to ModeId.NIGHT,
             views.modeTrack.portrait to ModeId.PORTRAIT,
             views.modeTrack.pro to ModeId.PRO,
             views.modeTrack.video to ModeId.VIDEO,
             views.modeTrack.document to ModeId.DOCUMENT
         )
-        views.modeTrack.humanistic.visibility = View.GONE
-        views.modeTrack.humanistic.setOnClickListener(null)
         modeTrackScrollGuard.attach(views.modeTrack.scroll)
         buttons.forEach { (button, modeId) ->
             button.setOnClickListener {

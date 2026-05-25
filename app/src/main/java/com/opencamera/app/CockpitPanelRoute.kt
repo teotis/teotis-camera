@@ -14,6 +14,7 @@ sealed class CockpitPanelRoute {
     data class Settings(val subpage: SettingsSubpage = SettingsSubpage.ROOT) : CockpitPanelRoute()
     data object StyleLab : CockpitPanelRoute()
     data object ColorLab : CockpitPanelRoute()
+    data object DocumentBatchOrganizer : CockpitPanelRoute()
 }
 
 internal val CockpitPanelRoute.isSettingsOpen: Boolean

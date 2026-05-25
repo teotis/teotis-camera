@@ -146,6 +146,44 @@ class OcwmExtractorCompatibilityTest {
         }
     }
 
+    @Test
+    fun fixtureWrittenWhenRequestedByVerificationScript() {
+        val fixtureDir = System.getenv("OCWM_FIXTURE_DIR")
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+        val visible = syntheticVisibleJpeg()
+        val original = syntheticOriginalJpeg()
+        val archived = archivedJpeg(
+            visible = visible,
+            original = original,
+            templateId = "script-compat"
+        )
+
+        val directory = File(fixtureDir)
+        require(directory.exists() || directory.mkdirs()) {
+            "failed to create OCWM fixture directory: $fixtureDir"
+        }
+        File(directory, "test-archived.jpg").writeBytes(archived)
+        File(directory, "test-original.jpg").writeBytes(original)
+    }
+
+    private fun archivedJpeg(
+        visible: ByteArray,
+        original: ByteArray,
+        templateId: String
+    ): ByteArray {
+        val manifest = ReversibleWatermarkArchiveManifest(
+            watermarkTemplateId = templateId,
+            visibleImageSha256 = sha256Hex(visible),
+            payloadSha256 = sha256Hex(original),
+            payloadLength = original.size.toLong()
+        )
+        return OcwmJpegContainer.embedArchive(
+            visibleJpeg = visible,
+            archive = OcwmJpegContainer.EmbeddedArchive(manifest, original)
+        )
+    }
+
     private fun findPythonExtractor(): String? {
         val candidates = listOf(
             "scripts/extract_ocwm_original.py",

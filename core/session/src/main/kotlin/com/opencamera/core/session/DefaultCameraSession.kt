@@ -22,7 +22,6 @@ import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.outputPathOrNull
@@ -42,6 +41,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 import kotlinx.coroutines.launch
 
 class DefaultCameraSession(
@@ -62,7 +62,6 @@ class DefaultCameraSession(
         ?: supportedModes.firstOrNull()
         ?: error("No supported camera modes for $baseDeviceCapabilities")
     private val initialLensFacing = defaultLensFacing(baseDeviceCapabilities.availableLensFacings)
-    private val initialStillCaptureQuality = StillCaptureQualityPreference.LATENCY
     private val initialStillCaptureResolutionPreset = clampStillCaptureResolutionPreset(
         StillCaptureResolutionPreset.LARGE_12MP,
         baseDeviceCapabilities.availableStillCaptureResolutionPresets
@@ -74,7 +73,6 @@ class DefaultCameraSession(
     )
     private var sessionDeviceCapabilities = baseDeviceCapabilities
     private var sessionLensFacing = initialLensFacing
-    private var sessionStillCaptureQuality = initialStillCaptureQuality
     private var sessionStillCaptureResolutionPreset = initialStillCaptureResolutionPreset
     private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
     private var sessionSettingsSnapshot = settingsSnapshot
@@ -82,7 +80,6 @@ class DefaultCameraSession(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
         lensFacing = initialLensFacing,
-        stillCaptureQuality = initialStillCaptureQuality,
         stillCaptureResolutionPreset = initialStillCaptureResolutionPreset
     )
     private val _effects = MutableSharedFlow<SessionEffect>(extraBufferCapacity = 8)
@@ -223,6 +220,12 @@ class DefaultCameraSession(
             )
         }
 
+        override fun clearPreviewMeteringFeedback(requestId: String) {
+            val currentFeedback = _state.value.presentation.previewMeteringFeedback ?: return
+            if (currentFeedback.requestId != requestId) return
+            updateState(previewMeteringFeedback = null)
+        }
+
         override fun updatePreviewHostAttached(lastAction: String) {
             updateState(
                 previewHostAvailable = true,
@@ -270,7 +273,9 @@ class DefaultCameraSession(
         trace = trace,
         mutations = previewSessionMutations,
         countdownInProgress = { captureRecordingProcessor.countdownInProgress() },
-        cancelPendingCountdown = { reason -> captureRecordingProcessor.cancelPendingCountdown(reason) }
+        cancelPendingCountdown = { reason -> captureRecordingProcessor.cancelPendingCountdown(reason) },
+        scope = scope,
+        dispatch = { intent -> dispatch(intent) }
     )
 
     init {
@@ -331,6 +336,11 @@ class DefaultCameraSession(
             SessionIntent.DecreasePreviewBrightness -> handleStepPreviewBrightness(-1)
             SessionIntent.ResetPreviewBrightness -> handleApplyPreviewBrightness(0)
             is SessionIntent.PreviewBrightnessApplied -> handlePreviewBrightnessApplied(intent.result)
+            SessionIntent.DocumentBatchClear -> handleDocumentBatchClear()
+            is SessionIntent.DocumentBatchRemoveItem -> handleDocumentBatchRemoveItem(intent.itemId)
+            is SessionIntent.DocumentBatchMoveItem -> handleDocumentBatchMoveItem(intent.itemId, intent.direction)
+            is SessionIntent.DocumentBatchReorder -> handleDocumentBatchReorder(intent.orderedItemIds)
+            SessionIntent.DocumentBatchFinish -> handleDocumentBatchFinish()
             else -> error("Unexpected mode control intent: $intent")
         }
     }
@@ -448,12 +458,21 @@ class DefaultCameraSession(
             modeId = modeId,
             deviceCapabilities = sessionDeviceCapabilities,
             lensFacing = sessionLensFacing,
-            stillCaptureQuality = sessionStillCaptureQuality,
             stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset
         )
         currentController.onEnter()
         resetPreviewBrightness()
 
+        val newDocumentBatch = if (currentController.id == ModeId.DOCUMENT &&
+            _state.value.presentation.documentBatch.status != DocumentBatchStatus.ACTIVE
+        ) {
+            DocumentBatchState(
+                batchId = UUID.randomUUID().toString(),
+                status = DocumentBatchStatus.ACTIVE
+            )
+        } else {
+            _state.value.presentation.documentBatch
+        }
         updateState(
             activeMode = currentController.id,
             captureStatus = CaptureStatus.IDLE,
@@ -462,6 +481,7 @@ class DefaultCameraSession(
             modeSnapshot = currentController.snapshot.value,
             activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
             activeDeviceGraph = resolvedActiveDeviceGraph(),
+            documentBatch = newDocumentBatch,
             lastAction = "Switched to ${currentController.snapshot.value.uiSpec.title}",
             lastError = null
         )
@@ -717,20 +737,8 @@ class DefaultCameraSession(
             return
         }
 
-        val nextQuality = nextStillCaptureQuality(
-            sessionStillCaptureQuality
-        )
-        sessionStillCaptureQuality = nextQuality
-        currentController.onStillCaptureQualityChanged(nextQuality)
-        updateState(
-            modeSnapshot = currentController.snapshot.value,
-            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
-            activeDeviceGraph = resolvedActiveDeviceGraph(),
-            lastAction = "Still quality set to ${nextQuality.label}",
-            lastError = null
-        )
-        trace.record("still-quality.updated", nextQuality.tagValue)
-        previewRecoveryProcessor.requestPreviewBinding(reason = "still quality updated to ${nextQuality.tagValue}")
+        // TODO: re-enable when StillCaptureQualityPreference is merged
+        trace.record("still-quality.skipped", "not-yet-implemented")
     }
 
     private suspend fun handleStillCaptureResolutionToggled() {
@@ -763,61 +771,8 @@ class DefaultCameraSession(
             return
         }
 
-        val availableOutputSizes = _state.value.activeDeviceCapabilities.availableStillCaptureOutputSizes
-        val currentOutputSize = resolvedStillCaptureOutputSizeSelection(
-            current = _state.value.activeDeviceGraph.stillCapture.outputSize,
-            available = availableOutputSizes,
-            fallbackPreset = _state.value.activeDeviceGraph.stillCapture.resolutionPreset
-        )
-        val nextOutputSize = if (availableOutputSizes.size >= 2) {
-            nextStillCaptureOutputSize(
-                current = currentOutputSize,
-                available = availableOutputSizes
-            )
-        } else {
-            null
-        }
-        val nextPreset = if (nextOutputSize != null) {
-            resolutionPresetForOutputSize(nextOutputSize)
-        } else {
-            val availablePresets = _state.value.activeDeviceCapabilities
-                .availableStillCaptureResolutionPresets
-            if (availablePresets.size < 2) {
-                updateState(lastAction = "No alternate still resolution available on this lens")
-                trace.record(
-                    "still-resolution.single",
-                    availablePresets.joinToString { it.tagValue }
-                )
-                return
-            }
-            nextStillCaptureResolutionPreset(
-                current = _state.value.activeDeviceGraph.stillCapture.resolutionPreset,
-                available = availablePresets
-            )
-        }
-        sessionStillCaptureResolutionPreset = nextPreset
-        currentController.onStillCaptureResolutionChanged(nextPreset)
-        updateState(
-            modeSnapshot = currentController.snapshot.value,
-            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
-            activeDeviceGraph = resolveActiveDeviceGraph(
-                baseGraph = currentController.deviceGraph(),
-                deviceCapabilities = _state.value.activeDeviceCapabilities,
-                requestedOutputSize = nextOutputSize
-            ),
-            lastAction = if (nextOutputSize != null) {
-                "Still resolution set to ${nextOutputSize.width}x${nextOutputSize.height}"
-            } else {
-                "Still resolution set to ${nextPreset.label}"
-            },
-            lastError = null
-        )
-        trace.record(
-            "still-resolution.updated",
-            nextOutputSize?.let { "${it.width}x${it.height}:${nextPreset.tagValue}" }
-                ?: nextPreset.tagValue
-        )
-        previewRecoveryProcessor.requestPreviewBinding(reason = "still resolution updated to ${nextPreset.tagValue}")
+        // TODO: re-enable when StillCaptureResolutionPreset is merged
+        trace.record("still-resolution.skipped", "not-yet-implemented")
     }
 
     private suspend fun handlePreviewRatioToggled() {
@@ -984,7 +939,7 @@ class DefaultCameraSession(
                 deviceCapabilities = deviceCapabilities
             ),
             lastAction = if (
-                clampedResolutionPreset != _state.value.activeDeviceGraph.stillCapture.resolutionPreset
+                clampedResolutionPreset != sessionStillCaptureResolutionPreset
             ) {
                 "Still resolution adjusted to ${clampedResolutionPreset.label} for current lens"
             } else {
@@ -1205,6 +1160,95 @@ class DefaultCameraSession(
         }
     }
 
+    private fun handleDocumentBatchClear() {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status == DocumentBatchStatus.INACTIVE) {
+            updateState(lastAction = "No active document batch to clear")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.copy(
+                items = emptyList(),
+                latestItemId = null,
+                lastMessage = "Batch cleared"
+            ),
+            lastAction = "Document batch cleared"
+        )
+    }
+
+    private fun handleDocumentBatchRemoveItem(itemId: String) {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot remove item: batch is not active")
+            return
+        }
+        val item = currentBatch.items.find { it.itemId == itemId }
+        if (item == null) {
+            updateState(lastAction = "Cannot remove item: $itemId not in batch")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.removeItem(itemId),
+            lastAction = "Removed document page from batch"
+        )
+    }
+
+    private fun handleDocumentBatchMoveItem(itemId: String, direction: DocumentBatchMoveDirection) {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot move item: batch is not active")
+            return
+        }
+        if (currentBatch.items.size < 2) {
+            updateState(lastAction = "Cannot reorder: batch has fewer than 2 items")
+            return
+        }
+        val currentIndex = currentBatch.items.indexOfFirst { it.itemId == itemId }
+        if (currentIndex == -1) {
+            updateState(lastAction = "Cannot move: $itemId not in batch")
+            return
+        }
+        val targetIndex = when (direction) {
+            DocumentBatchMoveDirection.UP -> (currentIndex - 1).coerceAtLeast(0)
+            DocumentBatchMoveDirection.DOWN -> (currentIndex + 1).coerceAtMost(currentBatch.items.lastIndex)
+        }
+        if (targetIndex == currentIndex) {
+            updateState(lastAction = "Item already at target position")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.moveItem(itemId, direction),
+            lastAction = "Reordered document pages"
+        )
+    }
+
+    private fun handleDocumentBatchReorder(orderedItemIds: List<String>) {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot reorder: batch is not active")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.reorder(orderedItemIds),
+            lastAction = "Document pages reordered"
+        )
+    }
+
+    private fun handleDocumentBatchFinish() {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot finish: batch is not active")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.copy(
+                status = DocumentBatchStatus.FINISHED,
+                lastMessage = "Batch finished"
+            ),
+            lastAction = "Document batch finished"
+        )
+    }
+
     private fun brightnessLabel(steps: Int): String {
         return if (steps >= 0) "+$steps" else "$steps"
     }
@@ -1244,7 +1288,8 @@ class DefaultCameraSession(
         previewBrightnessSteps: Int = _state.value.presentation.previewBrightnessSteps,
         previewBrightnessFeedback: PreviewBrightnessFeedback? = _state.value.presentation.previewBrightnessFeedback,
         photoSceneSignal: com.opencamera.core.device.PhotoSceneSignal = _state.value.presentation.photoSceneSignal,
-        photoLowLightPrompt: PhotoLowLightPrompt? = _state.value.presentation.photoLowLightPrompt
+        photoLowLightPrompt: PhotoLowLightPrompt? = _state.value.presentation.photoLowLightPrompt,
+        documentBatch: DocumentBatchState = _state.value.presentation.documentBatch
     ) {
         _state.value = _state.value.copy(
             lifecycle = lifecycle,
@@ -1282,7 +1327,8 @@ class DefaultCameraSession(
                 previewBrightnessSteps = previewBrightnessSteps,
                 previewBrightnessFeedback = previewBrightnessFeedback,
                 photoSceneSignal = photoSceneSignal,
-                photoLowLightPrompt = photoLowLightPrompt
+                photoLowLightPrompt = photoLowLightPrompt,
+                documentBatch = documentBatch
             )
         )
     }
@@ -1316,24 +1362,17 @@ class DefaultCameraSession(
         val resolvedOutputSize = resolvedStillCaptureOutputSizeSelection(
             current = requestedOutputSize,
             available = deviceCapabilities.availableStillCaptureOutputSizes,
-            fallbackPreset = baseGraph.stillCapture.resolutionPreset
+            fallbackPreset = sessionStillCaptureResolutionPreset
         )
         val resolvedZoomRatio = resolvedZoomRatioSelection(
             current = requestedZoomRatio,
             capability = deviceCapabilities.zoomRatioCapability
         )
-        val resolvedPreset = resolvedOutputSize
-            ?.let(::resolutionPresetForOutputSize)
-            ?: clampStillCaptureResolutionPreset(
-                current = baseGraph.stillCapture.resolutionPreset,
-                available = deviceCapabilities.availableStillCaptureResolutionPresets
-            )
         return baseGraph.copy(
             preview = baseGraph.preview.copy(
                 zoomRatio = resolvedZoomRatio
             ),
             stillCapture = baseGraph.stillCapture.copy(
-                resolutionPreset = resolvedPreset,
                 outputSize = resolvedOutputSize
             )
         )
@@ -1345,7 +1384,6 @@ class DefaultCameraSession(
         modeId: ModeId,
         deviceCapabilities: DeviceCapabilities,
         lensFacing: LensFacing,
-        stillCaptureQuality: StillCaptureQualityPreference,
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
     ): ModeController {
         val clampedStillCaptureResolutionPreset = clampStillCaptureResolutionPreset(
@@ -1354,20 +1392,17 @@ class DefaultCameraSession(
         )
         sessionDeviceCapabilities = deviceCapabilities
         sessionLensFacing = lensFacing
-        sessionStillCaptureQuality = stillCaptureQuality
         sessionStillCaptureResolutionPreset = clampedStillCaptureResolutionPreset
         return registry.createController(
             modeId = modeId,
             context = ModeContext(
                 deviceCapabilities = deviceCapabilities,
                 initialLensFacing = lensFacing,
-                initialStillCaptureQuality = stillCaptureQuality,
                 initialStillCaptureResolutionPreset = clampedStillCaptureResolutionPreset,
                 runtimeState = {
                     ModeRuntimeState(
                         deviceCapabilities = sessionDeviceCapabilities,
                         lensFacing = sessionLensFacing,
-                        stillCaptureQuality = sessionStillCaptureQuality,
                         stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset
                     )
                 },
@@ -1426,15 +1461,6 @@ class DefaultCameraSession(
         val ordered = PreviewRatio.entries
         val currentIndex = ordered.indexOf(current)
         return ordered[(currentIndex + 1) % ordered.size]
-    }
-
-    private fun nextStillCaptureQuality(
-        current: StillCaptureQualityPreference
-    ): StillCaptureQualityPreference {
-        return when (current) {
-            StillCaptureQualityPreference.LATENCY -> StillCaptureQualityPreference.QUALITY
-            StillCaptureQualityPreference.QUALITY -> StillCaptureQualityPreference.LATENCY
-        }
     }
 
     private fun clampStillCaptureResolutionPreset(

@@ -15,7 +15,6 @@ import com.opencamera.core.media.MediaMetadata
 
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
@@ -34,15 +33,13 @@ import com.opencamera.core.mode.ProVariantState
 import com.opencamera.core.mode.captureAidMetadataTags
 import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.settings.CountdownDuration
-import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.WatermarkTemplate
-import com.opencamera.core.settings.renderStyleColorSpec
+import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.liveWatermarkMetadataTags
-import com.opencamera.core.settings.toMetadataTags
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,13 +89,6 @@ private class HumanisticModeController(
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
 
-    override suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = "Humanistic quality updated"
-        )
-    }
 
     override suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
@@ -194,7 +184,6 @@ private class HumanisticModeController(
                                 put("watermarkTemplate", selectedWatermarkTemplate().id)
                                 put("livePhotoDefault", "on")
                                 putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
-                                put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                                 put("modeVariant", proVariantState.modeVariantTag())
                                 if (proVariantEnabled) {
@@ -208,7 +197,6 @@ private class HumanisticModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     ),
                     livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft.toCaptureSpec()
@@ -226,7 +214,6 @@ private class HumanisticModeController(
                                 put("algorithmProfile", style.algorithmProfile)
                                 put("watermarkTemplate", selectedWatermarkTemplate().id)
                                 put("livePhotoDefault", "off")
-                                put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                                 put("modeVariant", proVariantState.modeVariantTag())
                                 if (proVariantEnabled) {
@@ -240,7 +227,6 @@ private class HumanisticModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )
@@ -252,14 +238,17 @@ private class HumanisticModeController(
     private fun buildEffectSpec(): EffectSpec {
         val style = currentStyle()
         val photoSettings = context.settingsSnapshot.persisted.photo
-        val adjustedRenderSpec = renderStyleColorSpec(
+        val pipelineResult = renderStyleColorSpecWithRecipe(
             profileId = style.id,
             baseRenderSpec = style.renderSpec,
             colorLabSpec = photoSettings.colorLabSpec,
             styleStrength = photoSettings.styleStrength
         )
+        val adjustedRenderSpec = pipelineResult?.finalRenderSpec
+        val recipe = pipelineResult?.recipe
+            ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
-            FilterEffect(style.id, adjustedRenderSpec),
+            FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
             FrameEffect(currentFrameRatio())
         ))
     }
@@ -335,7 +324,6 @@ private class HumanisticModeController(
         val style = currentStyle()
         val standardSummary = buildString {
             append("Default style ${style.label}")
-            append(" | Still ${runtimeState().stillCaptureQuality.label}")
             append(" | Size ${runtimeState().stillCaptureResolutionPreset.label}")
             append(" | Watermark ${selectedWatermarkTemplate().label}")
             append(" | Live ${onOffLabel(livePhotoEnabledByDefault())}")

@@ -11,6 +11,7 @@ import com.opencamera.core.session.CameraSession
 import com.opencamera.core.session.SessionEffect
 import com.opencamera.core.session.SessionIntent
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 class CameraSessionCoordinator(
@@ -24,6 +25,7 @@ class CameraSessionCoordinator(
     private var previewView: PreviewView? = null
     private var attachedMode: ModeId? = null
     private var pendingPreviewBind: PendingPreviewBind? = null
+    private var previewBrightnessJob: Job? = null
 
     init {
         scope.launch {
@@ -97,9 +99,17 @@ class CameraSessionCoordinator(
                 DeviceCommand.UpdateOutputRotation(effect.rotation)
             )
             is SessionEffect.ApplyPreviewBrightness -> cameraAdapter.dispatch(
-                DeviceCommand.ApplyPreviewBrightness(effect.request)
+                latestPreviewBrightnessCommand(effect)
             )
         }
+    }
+
+    private fun latestPreviewBrightnessCommand(effect: SessionEffect.ApplyPreviewBrightness): DeviceCommand {
+        previewBrightnessJob?.cancel()
+        previewBrightnessJob = scope.launch {
+            cameraAdapter.dispatch(DeviceCommand.ApplyPreviewBrightness(effect.request))
+        }
+        return DeviceCommand.ApplyPreviewBrightness(effect.request)
     }
 
     private suspend fun handleDeviceEvent(event: DeviceEvent) {

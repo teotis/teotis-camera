@@ -9,6 +9,7 @@ import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PerceptualColorRecipe
 import com.opencamera.core.settings.toMetadataTags
 import com.opencamera.core.settings.WatermarkStyleSettings
 import com.opencamera.core.settings.WatermarkTextOpacity
@@ -30,6 +31,7 @@ class RenderRecipeTest {
         assertFalse(recipe.requiresFinalOutputPostprocess)
         assertNull(recipe.filterProfileId)
         assertNull(recipe.filterRenderSpec)
+        assertEquals(PerceptualColorRecipe.NEUTRAL, recipe.perceptualColorRecipe)
         assertNull(recipe.frameRatio)
         assertNull(recipe.watermarkTemplateId)
         assertNull(recipe.watermarkText)
@@ -137,6 +139,36 @@ class RenderRecipeTest {
         assertEquals("retro-frame", recipe.watermarkTemplateId)
     }
 
+    @Test
+    fun `FilterEffect with non-neutral recipe extracts perceptualColorRecipe`() {
+        val expected = PerceptualColorRecipe(
+            toneLift = 0.5f,
+            chromaBoost = 0.2f,
+            warmthBias = 0.3f,
+            neutralProtection = 0.75f,
+            skinProtection = 0.70f
+        )
+        val spec = EffectSpec(
+            listOf(FilterEffect(profileId = "color-lab", renderSpec = null, recipe = expected))
+        )
+        val recipe = RenderRecipe.from(spec)
+
+        assertEquals(expected, recipe.perceptualColorRecipe)
+        assertTrue(recipe.requiresFinalOutputPostprocess)
+    }
+
+    @Test
+    fun `FilterEffect with neutral recipe does not trigger postprocess from recipe alone`() {
+        val spec = EffectSpec(
+            listOf(FilterEffect(profileId = "x", renderSpec = null, recipe = PerceptualColorRecipe.NEUTRAL))
+        )
+        val recipe = RenderRecipe.from(spec)
+
+        assertEquals(PerceptualColorRecipe.NEUTRAL, recipe.perceptualColorRecipe)
+        // profileId "x" still triggers postprocess
+        assertTrue(recipe.requiresFinalOutputPostprocess)
+    }
+
     // --- from(ShotRequest) ---
 
     @Test
@@ -207,6 +239,32 @@ class RenderRecipeTest {
 
         assertTrue(recipe.requiresFinalOutputPostprocess)
         assertEquals("photo-vivid", recipe.filterProfileId)
+    }
+
+    @Test
+    fun `ShotRequest with recipe tags extracts perceptualColorRecipe`() {
+        val expected = PerceptualColorRecipe(
+            toneLift = 0.4f,
+            toneDepth = 0.2f,
+            chromaBoost = 0.15f,
+            warmthBias = 0.3f,
+            neutralProtection = 0.75f,
+            skinProtection = 0.70f
+        )
+        val shot = buildShotRequest(customTags = expected.toMetadataTags())
+        val recipe = RenderRecipe.from(shot)
+
+        assertEquals(expected, recipe.perceptualColorRecipe)
+        assertTrue(recipe.requiresFinalOutputPostprocess)
+    }
+
+    @Test
+    fun `ShotRequest with no recipe tags yields neutral recipe`() {
+        val shot = buildShotRequest()
+        val recipe = RenderRecipe.from(shot)
+
+        assertEquals(PerceptualColorRecipe.NEUTRAL, recipe.perceptualColorRecipe)
+        assertFalse(recipe.requiresFinalOutputPostprocess)
     }
 
     private fun buildShotRequest(

@@ -55,6 +55,10 @@ class PreviewSessionMutationsTest {
             calls.add("meteringCompleted:${result.requestId},status=${result.status}")
         }
 
+        override fun clearPreviewMeteringFeedback(requestId: String) {
+            calls.add("clearMetering:$requestId")
+        }
+
         override fun updatePreviewHostAttached(lastAction: String) {
             calls.add("hostAttached:$lastAction")
         }
@@ -206,7 +210,7 @@ class PreviewSessionMutationsTest {
     }
 
     @Test
-    fun `all fourteen methods are callable through interface`() {
+    fun `all fifteen methods are callable through interface`() {
         val mutations: PreviewSessionMutations = RecordingMutations()
 
         mutations.updatePreviewBlocked("r")
@@ -220,12 +224,13 @@ class PreviewSessionMutationsTest {
         mutations.updatePreviewMeteringCompleted(
             PreviewMeteringResult("id", PreviewMeteringPoint(0f, 0f), PreviewMeteringResultStatus.FAILED)
         )
+        mutations.clearPreviewMeteringFeedback("id")
         mutations.updatePreviewHostAttached("attached")
         mutations.updatePreviewHostDetached("detached", true)
         mutations.updatePreviewSurfaceLost("lost")
         mutations.updatePreviewRuntimeError("error", "action")
         mutations.updatePreviewMetrics(PreviewMetrics())
 
-        assertEquals(14, (mutations as RecordingMutations).calls.size)
+        assertEquals(15, (mutations as RecordingMutations).calls.size)
     }
 }

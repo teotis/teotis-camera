@@ -6,6 +6,8 @@ import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.device.resolveVideoSpec
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.CaptureStatus
+import com.opencamera.core.session.DocumentBatchCropStatus
+import com.opencamera.core.session.DocumentBatchStatus
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SessionState
@@ -146,6 +148,9 @@ internal data class PortraitLabPageRenderModel(
     val beautyPresetControl: SettingsControlRenderModel,
     val beautyStrengthControl: SettingsControlRenderModel,
     val bokehEffectControl: SettingsControlRenderModel,
+    val depthStrength: Int,
+    val depthStrengthLabel: String,
+    val updateDepthStrengthAction: PersistedSettingsAction.UpdatePortraitDepthStrength?,
     val footer: String
 )
 
@@ -1082,6 +1087,15 @@ internal fun portraitLabPageRenderModel(
                 null
             }
         ),
+        depthStrength = settings.photo.portraitDepthStrength,
+        depthStrengthLabel = "${settings.photo.portraitDepthStrength}%",
+        updateDepthStrengthAction = if (supportsStillCapture && editingEnabled) {
+            PersistedSettingsAction.UpdatePortraitDepthStrength(
+                settings.photo.portraitDepthStrength
+            )
+        } else {
+            null
+        },
         footer = text.portraitLabFooter()
     )
 }
@@ -1781,8 +1795,12 @@ private fun filterLabFamilyState(
         FilterLabFamily.HUMANISTIC -> FilterLabFamilyState(
             family = selectedFamily,
             label = text.filterFamilyHumanistic(),
-            currentFilterId = settings.photo.defaultHumanisticFilterProfileId,
-            filters = catalog.filterProfilesFor(FilterProfileCategory.HUMANISTIC, includeCustom = true),
+            currentFilterId = catalog.humanisticStyleSubitems().let { filters ->
+                settings.photo.defaultHumanisticFilterProfileId.takeIf { current ->
+                    filters.any { profile -> profile.id == current }
+                } ?: filters.firstOrNull()?.id ?: settings.photo.defaultHumanisticFilterProfileId
+            },
+            filters = catalog.humanisticStyleSubitems(),
             supported = state.activeDeviceCapabilities.supportsStillCapture,
             unsupportedReason = text.stillCaptureUnavailable(),
             updateAction = PersistedSettingsAction::UpdateHumanisticFilter
@@ -1807,6 +1825,14 @@ private fun filterLabFamilyState(
             unsupportedReason = text.videoRecordingUnavailable(),
             updateAction = PersistedSettingsAction::UpdateVideoFilter
         )
+    }
+}
+
+private fun com.opencamera.core.settings.FeatureCatalog.humanisticStyleSubitems(): List<FilterProfile> {
+    val primaryIds = setOf("humanistic-street", "humanistic-portrait", "humanistic-life")
+    return filterProfiles.filter { profile ->
+        profile.category == FilterProfileCategory.HUMANISTIC &&
+            (profile.id in primaryIds || !profile.builtIn)
     }
 }
 
@@ -2083,4 +2109,121 @@ private fun nearestBrightnessLevel(value: Int): FilterAdjustmentLevel {
     return FilterAdjustmentLevel.entries.minBy { level ->
         kotlin.math.abs(level.brightnessValue - value)
     }
+}
+
+internal data class DocumentBatchOrganizerRenderModel(
+    val visible: Boolean,
+    val title: String,
+    val countText: String,
+    val items: List<DocumentBatchOrganizerItemRenderModel>
+)
+
+internal data class DocumentBatchOrganizerItemRenderModel(
+    val itemId: String,
+    val pageNumber: Int,
+    val renderUri: String?,
+    val cropStatusLabel: String?,
+    val canMoveUp: Boolean,
+    val canMoveDown: Boolean
+)
+
+internal fun documentBatchOrganizerRenderModel(
+    state: SessionState,
+    text: AppTextResolver
+): DocumentBatchOrganizerRenderModel {
+    val batch = state.presentation.documentBatch
+    val isDocumentMode = state.activeMode == ModeId.DOCUMENT
+    val isActive = batch.status == DocumentBatchStatus.ACTIVE
+
+    if (!isDocumentMode || !isActive) {
+        return DocumentBatchOrganizerRenderModel(
+            visible = false,
+            title = text.documentBatchOrganizerTitle(),
+            countText = "",
+            items = emptyList()
+        )
+    }
+
+    val items = batch.items.mapIndexed { index, item ->
+        DocumentBatchOrganizerItemRenderModel(
+            itemId = item.itemId,
+            pageNumber = index + 1,
+            renderUri = item.renderUri ?: item.outputPath,
+            cropStatusLabel = item.cropStatus.toLabel(text),
+            canMoveUp = index > 0,
+            canMoveDown = index < batch.items.lastIndex
+        )
+    }
+
+    return DocumentBatchOrganizerRenderModel(
+        visible = true,
+        title = text.documentBatchOrganizerTitle(),
+        countText = text.documentBatchPageCount(items.size),
+        items = items
+    )
+}
+
+private fun DocumentBatchCropStatus.toLabel(text: AppTextResolver): String? {
+    return when (this) {
+        DocumentBatchCropStatus.NOT_REQUESTED -> null
+        DocumentBatchCropStatus.APPLIED -> text.documentBatchCropApplied()
+        DocumentBatchCropStatus.SKIPPED -> text.documentBatchCropSkipped()
+        DocumentBatchCropStatus.FAILED -> text.documentBatchCropFailed()
+    }
+}
+
+internal data class DocumentBatchRailRenderModel(
+    val visible: Boolean,
+    val countText: String,
+    val items: List<DocumentBatchRailItemRenderModel>,
+    val latestItemId: String?,
+    val organizeEnabled: Boolean
+)
+
+internal data class DocumentBatchRailItemRenderModel(
+    val itemId: String,
+    val pageNumber: Int,
+    val renderUri: String?,
+    val statusLabel: String?,
+    val isLatest: Boolean,
+    val removeContentDescription: String
+)
+
+internal fun documentBatchRailRenderModel(
+    state: SessionState,
+    text: AppTextResolver
+): DocumentBatchRailRenderModel {
+    val batch = state.presentation.documentBatch
+    val isDocumentMode = state.activeMode == ModeId.DOCUMENT
+    val isActive = batch.status == DocumentBatchStatus.ACTIVE
+
+    if (!isDocumentMode || !isActive) {
+        return DocumentBatchRailRenderModel(
+            visible = false,
+            countText = "",
+            items = emptyList(),
+            latestItemId = null,
+            organizeEnabled = false
+        )
+    }
+
+    val sortedItems = batch.items.sortedBy { it.orderIndex }
+    val items = sortedItems.mapIndexed { index, item ->
+        DocumentBatchRailItemRenderModel(
+            itemId = item.itemId,
+            pageNumber = index + 1,
+            renderUri = item.renderUri ?: item.outputPath,
+            statusLabel = item.cropStatus.toLabel(text),
+            isLatest = item.itemId == batch.latestItemId,
+            removeContentDescription = text.documentBatchRemoveLabel()
+        )
+    }
+
+    return DocumentBatchRailRenderModel(
+        visible = items.isNotEmpty(),
+        countText = text.documentBatchPageCount(items.size),
+        items = items,
+        latestItemId = batch.latestItemId,
+        organizeEnabled = items.isNotEmpty()
+    )
 }

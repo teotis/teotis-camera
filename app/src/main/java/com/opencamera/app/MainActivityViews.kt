@@ -3,6 +3,7 @@ package com.opencamera.app
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -30,12 +31,9 @@ internal data class QuickPanelViews(
     val grid: Button,
     val flash: Button,
     val resolution: Button,
-    val brightnessMinus: Button,
-    val brightnessValue: Button,
-    val brightnessPlus: Button,
-    val frame43: Button,
-    val frame169: Button,
-    val frame11: Button,
+    val brightnessSlider: SeekBar,
+    val brightnessValueText: TextView,
+    val frameRatio: Button,
     val livePhoto: Button,
     val timer: Button,
     val launcher: Button
@@ -84,6 +82,8 @@ internal data class SettingsPanelViews(
     val portraitBeautyPreset: Button,
     val portraitBeautyStrength: Button,
     val portraitBokehEffect: Button,
+    val portraitDepthStrengthSeekBar: SeekBar,
+    val portraitDepthStrengthValue: TextView,
     val portraitFooter: TextView,
     val watermarkSelectorHeadline: TextView,
     val watermarkSelectorSupportingText: TextView,
@@ -171,6 +171,20 @@ internal data class FloatingUtilityViews(
     val lowLightNightPrompt: Button
 )
 
+internal data class DocumentBatchRailViews(
+    val rail: LinearLayout,
+    val header: Button,
+    val list: LinearLayout
+)
+
+internal data class DocumentBatchOrganizerViews(
+    val panel: NestedScrollView,
+    val title: TextView,
+    val count: TextView,
+    val itemList: LinearLayout,
+    val close: Button
+)
+
 internal data class BottomCockpitViews(
     val shutter: Button,
     val lensFacing: Button,
@@ -184,6 +198,8 @@ internal data class MainActivityViews(
     val topBar: TopBarViews,
     val quickPanel: QuickPanelViews,
     val floatingUtility: FloatingUtilityViews,
+    val documentBatchRail: DocumentBatchRailViews,
+    val documentBatchOrganizer: DocumentBatchOrganizerViews,
     val settingsPanel: SettingsPanelViews,
     val filterLab: FilterLabViews,
     val devConsole: DevConsoleViews,
@@ -211,12 +227,9 @@ internal data class MainActivityViews(
                 grid = activity.findViewById(R.id.buttonQuickGrid),
                 flash = activity.findViewById(R.id.buttonQuickFlash),
                 resolution = activity.findViewById(R.id.buttonQuickResolution),
-                brightnessMinus = activity.findViewById(R.id.buttonBrightnessMinus),
-                brightnessValue = activity.findViewById(R.id.buttonBrightnessValue),
-                brightnessPlus = activity.findViewById(R.id.buttonBrightnessPlus),
-                frame43 = activity.findViewById(R.id.buttonFrameRatio43),
-                frame169 = activity.findViewById(R.id.buttonFrameRatio169),
-                frame11 = activity.findViewById(R.id.buttonFrameRatio11),
+                brightnessSlider = activity.findViewById(R.id.brightnessSlider),
+                brightnessValueText = activity.findViewById(R.id.brightnessValueText),
+                frameRatio = activity.findViewById(R.id.buttonQuickFrameRatio),
                 livePhoto = activity.findViewById(R.id.buttonQuickLivePhoto),
                 timer = activity.findViewById(R.id.buttonQuickTimer),
                 launcher = activity.findViewById(R.id.buttonQuickLauncher)
@@ -268,6 +281,8 @@ internal data class MainActivityViews(
                 portraitBeautyPreset = activity.findViewById(R.id.buttonPortraitBeautyPreset),
                 portraitBeautyStrength = activity.findViewById(R.id.buttonPortraitBeautyStrength),
                 portraitBokehEffect = activity.findViewById(R.id.buttonPortraitBokehEffect),
+                portraitDepthStrengthSeekBar = activity.findViewById(R.id.portraitDepthStrengthSeekBar),
+                portraitDepthStrengthValue = activity.findViewById(R.id.portraitDepthStrengthValue),
                 portraitFooter = activity.findViewById(R.id.portraitLabFooter),
                 watermarkSelectorHeadline = activity.findViewById(R.id.watermarkSelectorHeadline),
                 watermarkSelectorSupportingText = activity.findViewById(R.id.watermarkSelectorSupportingText),
@@ -346,6 +361,18 @@ internal data class MainActivityViews(
                 document = activity.findViewById(R.id.buttonDocumentMode),
                 humanistic = activity.findViewById(R.id.buttonHumanisticMode)
             )
+            val documentBatchRail = DocumentBatchRailViews(
+                rail = activity.findViewById(R.id.documentBatchRail),
+                header = activity.findViewById(R.id.documentBatchRailHeader),
+                list = activity.findViewById(R.id.documentBatchRailList)
+            )
+            val documentBatchOrganizer = DocumentBatchOrganizerViews(
+                panel = activity.findViewById(R.id.documentBatchOrganizerPanel),
+                title = activity.findViewById(R.id.documentBatchOrganizerTitle),
+                count = activity.findViewById(R.id.documentBatchOrganizerCount),
+                itemList = activity.findViewById(R.id.documentBatchOrganizerItemList),
+                close = activity.findViewById(R.id.buttonCloseDocumentBatchOrganizer)
+            )
             val bottomCockpit = BottomCockpitViews(
                 shutter = activity.findViewById(R.id.buttonShutter),
                 lensFacing = activity.findViewById(R.id.buttonLensFacing),
@@ -358,6 +385,8 @@ internal data class MainActivityViews(
                 topBar = topBar,
                 quickPanel = quickPanel,
                 floatingUtility = floatingUtility,
+                documentBatchRail = documentBatchRail,
+                documentBatchOrganizer = documentBatchOrganizer,
                 settingsPanel = settingsPanel,
                 filterLab = filterLab,
                 devConsole = devConsole,

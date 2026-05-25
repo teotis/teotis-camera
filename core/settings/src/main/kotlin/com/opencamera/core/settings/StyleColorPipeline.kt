@@ -33,6 +33,7 @@ data class StyleColorPipelineResult(
     val colorScience: StyleColorScience,
     val inheritedBaseSpec: FilterRenderSpec,
     val finalRenderSpec: FilterRenderSpec,
+    val perceptualColorRecipe: PerceptualColorRecipe,
     val baseLutId: String,
     val stages: List<StyleColorStage>,
     val notes: List<String>
@@ -68,6 +69,7 @@ object StyleColorPipeline {
             colorScience = request.colorScience,
             inheritedBaseSpec = inheritedBase,
             finalRenderSpec = secondary.renderSpec,
+            perceptualColorRecipe = request.colorLabSpec.toRecipe(request.colorScience),
             baseLutId = request.colorScience.baseLutId,
             stages = listOf(
                 StyleColorStage.STYLE_BASE,

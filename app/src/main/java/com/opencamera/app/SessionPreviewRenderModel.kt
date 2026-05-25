@@ -3,6 +3,7 @@ package com.opencamera.app
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.effect.PreviewEffectRenderModel
+import com.opencamera.core.effect.PreviewSceneMaskSnapshot
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewMeteringFeedback
@@ -46,8 +47,10 @@ internal fun focusReticleRenderModel(
 
 internal fun previewOverlayRenderModel(
     state: SessionState,
-    effectAdapter: PreviewEffectAdapter? = null
+    effectAdapter: PreviewEffectAdapter? = null,
+    maskSnapshot: PreviewSceneMaskSnapshot? = null
 ): PreviewOverlayRenderModel {
+    val resolvedSnapshot = maskSnapshot ?: PreviewSceneMaskSnapshot.UNAVAILABLE
     val gridMode = state.settings.persisted.common.gridMode
     val previewSupportsOverlay = state.permissionState.cameraGranted &&
         state.previewHostAvailable &&
@@ -57,7 +60,7 @@ internal fun previewOverlayRenderModel(
             PreviewStatus.RECOVERING
         )
     val countdownLabel = state.countdownRemainingSeconds?.let { "${it}s" }
-    val effectModel = effectAdapter?.adapt(state.activeEffectSpec)
+    val effectModel = effectAdapter?.adapt(state.activeEffectSpec, resolvedSnapshot)
     val frameRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio
     val frame = if (previewSupportsOverlay && frameRatio != null) {
         PreviewFrameRenderModel(

@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var selectedDevLogTab = DevLogTab.KEY
     private var latestDevLogRenderModel: DevLogRenderModel? = null
     private lateinit var devLogExporter: DevLogExporter
+    private var latestQuickPanelSheetRenderModel: QuickPanelSheetRenderModel? = null
     private var latestSettingsPageRenderModel: SessionSettingsPageRenderModel? = null
     private var latestPortraitLabRenderModel: PortraitLabPageRenderModel? = null
     private var latestWatermarkLabSelectorRenderModel: WatermarkLabSelectorRenderModel? = null
@@ -70,6 +71,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private lateinit var devConsoleRenderer: DevConsoleRenderer
     private lateinit var mainRenderer: MainActivityRenderer
     private lateinit var actionBinder: MainActivityActionBinder
+    private lateinit var documentBatchRailRenderer: DocumentBatchRailRenderer
+    private lateinit var documentBatchOrganizerRenderer: DocumentBatchOrganizerRenderer
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -152,6 +155,20 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             isFilterAdjustmentVisible = { panelState.isFilterAdjustmentVisible }
         )
         devConsoleRenderer = DevConsoleRenderer(this, views.devConsole)
+        documentBatchRailRenderer = DocumentBatchRailRenderer(
+            views = views.documentBatchRail,
+            onRemoveItemClick = { itemId -> dispatch(SessionIntent.DocumentBatchRemoveItem(itemId)) }
+        )
+        documentBatchOrganizerRenderer = DocumentBatchOrganizerRenderer(
+            views = views.documentBatchOrganizer,
+            onRemoveItemClick = { itemId -> dispatch(SessionIntent.DocumentBatchRemoveItem(itemId)) },
+            onMoveUpItemClick = { itemId ->
+                dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.UP))
+            },
+            onMoveDownItemClick = { itemId ->
+                dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.DOWN))
+            }
+        )
         mainRenderer = MainActivityRenderer(
             views, cockpitRenderer, settingsRenderer, filterLabRenderer, devConsoleRenderer
         )
@@ -172,9 +189,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             views.bottomCockpit.shutter,
             views.bottomCockpit.lensFacing,
             // Quick panel text-bearing buttons
-            views.quickPanel.frame43,
-            views.quickPanel.frame169,
-            views.quickPanel.frame11,
+            views.quickPanel.frameRatio,
             views.settingsPanel.gridMode
         ).forEach { it.rotation = degrees }
         cockpitRenderer.controlRotationDegrees = degrees
@@ -281,22 +296,25 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         settingsRenderer.renderWatermarkDetailPage(watermarkDetailPage)
         filterLabRenderer.renderPage(filterLabPage)
         mainRenderer.renderPanelVisibility(activePanelRoute)
-        views.preview.overlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter))
+        views.preview.overlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter, container.previewMaskSnapshot))
         views.preview.overlayView.updateFocusReticle(
             state.presentation.previewMeteringFeedback?.let { focusReticleRenderModel(it) }
         )
         cockpitRenderer.renderPreviewMirror(state)
         maybePlayShutterSound(state)
 
-        cockpitRenderer.renderShutter(state, controls)
+        cockpitRenderer.renderShutter(state, controls, shutterDisabledReason(state, text) == null)
         cockpitRenderer.renderRecordingIndicator(
             recordingIndicatorRenderModel(state, text)
         )
         cockpitRenderer.renderCaptureOutput(sessionCaptureOutputText(state, sessionUiStrings()))
         cockpitRenderer.renderZoomCapsules(controls)
         val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
+        latestQuickPanelSheetRenderModel = sheet
         cockpitRenderer.renderQuickBubble(settingsPage, sheet)
         cockpitRenderer.renderLowLightNightPrompt(lowLightNightPromptRenderModel(state, text))
+        documentBatchRailRenderer.render(documentBatchRailRenderModel(state, text))
+        documentBatchOrganizerRenderer.render(documentBatchOrganizerRenderModel(state, text))
         mainRenderer.renderDevEntryVisibility(com.opencamera.app.BuildConfig.DEBUG)
         val devLogModel = devLogRenderModel(
             state = state,
@@ -421,6 +439,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             activePanelRoute = activePanelRoute,
             isFilterAdjustmentVisible = panelState.isFilterAdjustmentVisible,
             settingsPage = latestSettingsPageRenderModel,
+            quickPanelSheet = latestQuickPanelSheetRenderModel,
             portraitLabPage = latestPortraitLabRenderModel,
             watermarkDetailPage = latestWatermarkLabDetailRenderModel,
             filterLabPage = latestFilterLabRenderModel,

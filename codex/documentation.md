@@ -22,6 +22,12 @@
   第 `6` 阶段的 feature 完成/冻结判断继续成立，不回退去扩写 `6B-6/6B-7/6B-8`；
   第 `7` 阶段优先做 recovery / observability / automation owner，不在这个阶段抢跑新的模式 feature；
   对显著依赖底层和硬件的稳定性项，优先先把仓内可验证语义与 diagnostics owner 做实，再决定是否进入真机/平台专项。
+- `2026-05-25` 用户已认可人像 2.0 的下一组规划项：`Mask-aware` 人像成片、背景光斑/高光形态、景深/虚化强度滑杆、人像 Profile 体系重整。新增总包索引 [`2026-05-25-portrait-2-0-approved-upgrade-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-portrait-2-0-approved-upgrade-index.md)，并补充 [`2026-05-25-portrait-2-0-profile-system-realignment.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-portrait-2-0-profile-system-realignment.md)、[`2026-05-25-portrait-2-0-depth-slider-and-bokeh-strength.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-portrait-2-0-depth-slider-and-bokeh-strength.md)、[`2026-05-25-portrait-2-0-background-light-spot-highlight.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-portrait-2-0-background-light-spot-highlight.md) 三份非多模态 agent 执行包；既有 [`2026-05-25-mask-aware-portrait-saved-rendering.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-mask-aware-portrait-saved-rendering.md) 被纳入人像 2.0 首个实现闭环。本轮只新增/更新规划文档，未改运行时代码。
+- `2026-05-25` 外部 agent 完成人像 2.0 后，当前验收结论为 `blocked`：settings/effect 层验证通过，但 app 后处理聚焦测试失败。通过命令：`rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:settings:test --tests com.opencamera.core.settings.PersistedSettingsSerializerTest :core:effect:test --tests com.opencamera.core.effect.EffectBridgeTest --tests com.opencamera.core.effect.EffectSpecTest --tests com.opencamera.core.effect.PortraitLayeredEffectResolverTest`；失败命令：`rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PortraitRenderPostProcessorTest --tests com.opencamera.app.camera.SceneMaskPayloadTest`，失败项为 mask-aware editor 路由、mask-aware metadata/downstream 保留、scene mask edge softness。静态核验还发现 `AndroidPortraitRenderEditor.applyWithMask(...)` 只修改解码 bitmap，未写回输出 JPEG，并且 mask-aware 路径未真正应用/记录 light-spot notes。新增 blocker 修复包 [`2026-05-25-portrait-2-0-landing-validation-blockers.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-portrait-2-0-landing-validation-blockers.md)；总包索引状态已更新为 `blocked`。
+- `2026-05-25` 用户已认可 UI 组件与动效 2.0 的下一组规划项：对焦/曝光反馈 V2、快门状态动画 V2、Zoom Cockpit V2、面板转场和路由连续性、Quick Panel 语义控件升级。新增总包索引 [`2026-05-25-ui-animation-v2-upgrade-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-ui-animation-v2-upgrade-index.md)，并补充 [`2026-05-25-focus-exposure-feedback-v2.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-focus-exposure-feedback-v2.md)、[`2026-05-25-shutter-state-animation-v2.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-shutter-state-animation-v2.md)、[`2026-05-25-zoom-cockpit-v2.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-zoom-cockpit-v2.md)、[`2026-05-25-panel-transition-route-continuity.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-panel-transition-route-continuity.md)、[`2026-05-25-quick-panel-semantic-controls-v2.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-quick-panel-semantic-controls-v2.md) 五份非多模态 agent 执行包；本轮只新增/更新规划文档，未改运行时代码。
+- `2026-05-25` Color Lab 真机问题外部 agent 交付后的落地验收未通过：当前确认 app focused tests 仍失败，`PerceptualColorRecipe` 未通过 `EffectBridge` 写入 capture metadata，`PreviewEffectAdapter` 也未消费 `FilterEffect.recipe`，因此“最大效果偏淡”和“拍照动画后无图片”的原验收不能放行。已新增阻断后续总包 [`2026-05-25-color-lab-validation-blocker-followup-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-color-lab-validation-blocker-followup-index.md)，并拆成 [`2026-05-25-color-lab-postprocess-failsoft-test-repair.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-color-lab-postprocess-failsoft-test-repair.md)、[`2026-05-25-color-lab-recipe-metadata-bridge-repair.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-color-lab-recipe-metadata-bridge-repair.md)、[`2026-05-25-color-lab-preview-recipe-transform-repair.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-color-lab-preview-recipe-transform-repair.md) 三份可交给非多模态 agent 的阻断修复包；本轮只新增/更新规划文档，未改运行时代码。
+- `2026-05-25` Color Lab 阻断后续已由 Codex 完成本地验收与补修：外部 agent 已接上部分 recipe metadata / preview adapter / postprocess 测试，但仍遗留 `PreviewOverlayView` 未实际绘制 `colorTransform`、`PhotoAlgorithmPostProcessor.resolveMask()` 在 fail-soft `try` 外、`PreviewColorTransform.equals()` 对 null matrix 判等错误，以及 Stage app gate 暴露的 Humanistic 主模式回归和 native output fallback 回归。本轮新增 [`PreviewColorTransformOverlay.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/PreviewColorTransformOverlay.kt) 与 [`PreviewColorTransformOverlayTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/PreviewColorTransformOverlayTest.kt)，并修复 [`PreviewOverlayView.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/PreviewOverlayView.kt)、[`PhotoAlgorithmPostProcessor.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/PhotoAlgorithmPostProcessor.kt)、[`PreviewColorTransform.kt`](/Volumes/Extreme_SSD/project/open_camera/core/effect/src/main/kotlin/com/opencamera/core/effect/PreviewColorTransform.kt)、[`SessionCockpitRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt)、[`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt)、[`SessionStateRender.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionStateRender.kt) 与 humanistic filter catalog labels。通过验证：Color Lab app focused tests、core settings/effect focused tests、focused session diagnostics/thermal/Color Lab regression、Stage app 子门禁、`rtk ./gradlew --no-daemon :app:assembleDebug`、`rtk ./scripts/verify_tap_focus_camerax_execution.sh`。完整 `rtk ./scripts/verify_stage_7_observability.sh` 曾尝试运行，但在全量 `DefaultCameraSessionTest` 段长时间无输出后被 `rtk ./gradlew --stop` 中断；因此本轮不宣称完整 Stage 7 脚本自然通过。最终“最大效果明显但自然”和“真机一定保存到相册/缩略图可打开”仍需安装新 APK 做真机视觉/媒体 smoke。
+- `2026-05-25` 本轮 repo health 排查曾确认外部 agent 并行后存在三类阻断：普通 `rtk git status --short --branch` 会因 `.claude/worktrees/orientation-adaptive-camera-ui/.git` 指向旧 `/Volumes/Extreme_SSD/project/codex_camera/.git/worktrees/orientation-adaptive-camera-ui` 而失败，Stage 7 当时被 `DefaultDeviceShotRequestTranslatorTest.kt` 的 `stillCaptureQuality` 旧字段编译错误阻断，app focused command 仍有 `CameraSessionCoordinatorTest` 2 项与 `PhotoAlgorithmPostProcessorTest` 4 项失败；同时 `rtk ./gradlew --no-daemon :app:assembleDebug` 通过。新增总包 [`2026-05-25-repo-health-triage-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-repo-health-triage-index.md) 与 git 修复包 [`2026-05-25-git-worktree-hygiene-and-status-repair.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-git-worktree-hygiene-and-status-repair.md)。后续文档模式复核已确认 focused `DefaultDeviceShotRequestTranslatorTest` 通过，旧的 still-quality 编译阻断不再作为当前剩余工作。
 
 ## 当前阶段判断
 
@@ -46,7 +52,7 @@
 
 ## 当前验证基线
 
-- `cd OpenCamera && ./scripts/verify_stage_7_observability.sh`
+- `cd OpenCamera && rtk ./scripts/verify_stage_7_observability.sh`
 - 该脚本当前覆盖：
   `DefaultCameraSessionTest`
   `SessionDiagnosticsTest`
@@ -58,6 +64,14 @@
   `CameraSessionCoordinatorTest`
   `:app:assembleDebug`
 - 本轮通过：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:media:test --tests com.opencamera.core.media.FrameRingBufferTest --tests com.opencamera.core.media.MotionPhotoJpegContainerTest --tests com.opencamera.core.media.LiveTemporalAssemblyPlannerTest :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest --tests com.opencamera.app.camera.live.MotionPhotoFileMaterializerTest`
+  `rtk ./gradlew --no-daemon :core:media:test --tests com.opencamera.core.media.ShotExecutorTest`
+  `rtk ./gradlew --no-daemon :core:device:test --tests com.opencamera.core.device.DefaultDeviceShotRequestTranslatorTest`
+  `rtk ./gradlew --no-daemon :core:session:test --tests "com.opencamera.core.session.DefaultCameraSessionTest.live photo completion stores bundle and uses live saved action" --tests "com.opencamera.core.session.DefaultCameraSessionTest.live photo completion with still-only fallback does not store bundle" --tests "com.opencamera.core.session.DefaultCameraSessionTest.live photo completion with degraded motion still stores bundle" --tests "com.opencamera.core.session.DefaultCameraSessionTest.portrait mode uses live photo shot kind when live default is enabled" --tests "com.opencamera.core.session.DefaultCameraSessionTest.humanistic mode uses live photo shot kind when live default is enabled"`
+  `rtk ./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
+  `rtk ./gradlew --no-daemon :app:assembleDebug`
   `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.camera.PhotoFrameRatioPostProcessorTest`
   `./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest`
   `./gradlew --no-daemon :app:assembleDebug`
@@ -68,6 +82,7 @@
 
 ## 当前遗留风险
 
+- Live / Google Motion Photo 本地代码闭环已从 metadata-only 推进到 `ImageAnalysis` YUV payload 缓冲、预览帧 MP4 motion segment 编码、Google Motion Photo JPEG container 物化和诚实降级诊断；但 Android `MediaCodec/MediaMuxer` 编码质量、设备兼容性、文件是否能被 Google Photos/系统相册识别为 Motion Photo，仍需要真机 smoke 采证后才能判为产品级 pass。
 - 点击预览对焦/自动 EV 的 session/device/coordinator/UI feedback 链路已经存在，但 `CameraXCaptureAdapter` 的 `DeviceCommand.ApplyPreviewMetering` 分支仍是 `UNSUPPORTED` stub，尚未真正调用 CameraX `FocusMeteringAction`；已补充可转交 agent 的修复方案与反 stub 验证方案，落地前不应再把该能力判为真实完成。
 - `CameraXCaptureAdapter` 已能输出 `bind/provider heuristic + CameraState` runtime issue，并在 `provider/fatal` issue 上清理缓存 provider；但 `ProcessCameraProvider` 真正 provider death 仍没有平台级强信号，当前 `provider failure` 里依然包含基于异常文案的保守分类。
 - 第 `7` 阶段的 `recovery failure`、`切变焦`、`thermal`、`后台恢复` 与 `preview startup stall` 仓内 owner 已建立，但 `provider death` 真信号与更长时间维度的真机矩阵仍缺少可信来源，继续硬推容易只剩 contract。
@@ -76,9 +91,12 @@
 
 ## 下一步建议
 
+- `2026-05-25` 文档模式 V2 外部 agent 交付后验收仍为 `blocked`：`DocumentBatchOrganizerRenderModelTest`/`DocumentBatchRailRenderModelTest`、document batch session focused test、`DefaultDeviceShotRequestTranslatorTest` 和 `:app:assembleDebug` 均通过；但静态核验仍未发现 `DocumentBatchOrganizerRenderer`、organizer panel/container、`MainActivityViews` organizer binding，且 `MainActivityRenderer.renderPanelVisibility()` 没有 `DocumentBatchOrganizer` 分支。也就是说 route 与 render model 存在，但用户打开 organizer 后仍没有可见整理面板。已将 [`2026-05-25-document-v2-repair-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-document-v2-repair-index.md) 和 [`2026-05-25-document-v2-organizer-ui-wiring.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-document-v2-organizer-ui-wiring.md) 更新为 `blocked`。
+- `2026-05-25` 文档模式 V2 剩余工作已重新收窄：`DocumentBatchRailRenderModelTest`/`DocumentBatchOrganizerRenderModelTest` 通过，`CaptureRecordingSessionProcessorTest` 通过，`DefaultDeviceShotRequestTranslatorTest` 通过；当前只剩 Organizer UI 可见面板与 move/remove 动作绑定没有落地。已更新 [`2026-05-25-document-v2-repair-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-document-v2-repair-index.md) 与 [`2026-05-25-document-v2-organizer-ui-wiring.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-document-v2-organizer-ui-wiring.md)，要求外部 agent 不再重复修 side rail、metadata 或 device compile blocker，专注补 `DocumentBatchOrganizerRenderer`、organizer layout/binding、`MainActivityRenderer` 可见性分支和 `DocumentBatchMoveItem/RemoveItem` dispatch。
+- `2026-05-25` 历史记录：第二轮修复交接包最初包含 side rail、capture metadata、organizer UI 和 device still-quality compile blocker；本轮复核后，前两项和 focused device translator test 已通过，旧的“side rail 缺失 / metadata 未解析 / stillCaptureQuality 编译阻断”结论不再代表当前状态。
 - `2026-05-24` 多种水印（纯文字、模糊四边框及既有模板扩展）已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-multi-watermark-design-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-multi-watermark-design-index.md) 将工作拆成设置契约、渲染管线、UI 预览与验证三份文档。核心口径是模板选择和样式仍由 `core:settings`/`EffectSpec` 承接，最终 JPEG 像素只在 `PhotoWatermarkPostProcessor` 中渲染；纯文字不画底卡，模糊四边框必须在保存图四边显示源图模糊边框，并通过设置能力过滤避免无效控件。本轮只新增方案文档，不改运行时代码；最终美观验收需由多模态 owner 对保存 JPEG、缩略图和窄屏设置页做视觉复验。
 - `2026-05-24` 拍照/录像模式 `快捷` 中画质/分辨率切换能力已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-quick-quality-resolution-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-quick-quality-resolution-index.md) 将工作拆为拍照快捷画质/像素、录像快捷组合规格和验证门禁三份文档；拍照侧要求复用既有 `StillCaptureQualityToggled / StillCaptureResolutionToggled` session owner，录像侧要求把 quick quality 改为能力过滤后的 `VideoSpec(resolution, fps)` 组合项，例如 `4K30 / 1080p60`，不再把 fps 做成独立快捷项。本轮只做方案交接，不改运行时代码；精确 Apple/vivo 视觉对齐登记为后续多模态 QA。
-- `2026-05-24` 拍照模式 Live / Google Motion Photo 能力已归纳为 1 个总索引和 3 个可交给非多模态 agent 的实施方案：[`2026-05-24-live-motion-photo-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-index.md)、[`2026-05-24-live-motion-photo-preview-ring-buffer.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-preview-ring-buffer.md)、[`2026-05-24-live-motion-photo-google-container.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-google-container.md)、[`2026-05-24-live-motion-photo-session-integration.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-live-motion-photo-session-integration.md)。本轮只设计交接，不改运行时代码；方案明确先用预览低分辨率 ring buffer 作为 motion segment 来源，再写 Google Motion Photo JPEG container，最后接回 session/media/product 语义。该工作属于 feature / capability-kernel 增强，不是第 `7` 阶段 exit 必要项，落地前需要用户明确授权回 feature 侧。
+- `2026-05-24` 拍照模式 Live / Google Motion Photo 已完成本地实现核查与补强：当前仓内有预览低分辨率 YUV ring buffer、MP4 motion segment encoder、Google Motion Photo JPEG container writer、sidecar 和 session bundle 语义；后续最高价值不是继续写 contract，而是真机 smoke：拍一张 Live Photo，确认输出 JPEG 含 appended MP4/XMP，系统相册或 Google Photos 能识别动态效果，并记录失败设备型号与 diagnostics notes。
 - `2026-05-24` 视频模式真机反馈已归纳为 1 个总索引和 2 个可交给非多模态 agent 的实施方案：[`2026-05-24-video-mode-real-device-feedback-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-mode-real-device-feedback-index.md)、[`2026-05-24-video-thumbnail-and-gallery-preload.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-thumbnail-and-gallery-preload.md)、[`2026-05-24-video-recording-elapsed-time.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-video-recording-elapsed-time.md)。本轮只设计交接，不改运行时代码；视频缩略图方案限定在 saved media 查询、视频首帧 materialize 和 gallery MIME 语义，录像时间方案限定在 session-owned elapsed presentation。视频滤镜/水印烧录、转码、内置播放器和长录稳定性阈值登记为非本轮范围。
 - `2026-05-24` 拍照模式新增产品需求已归纳为可交给非多模态 agent 的方案包：总索引 [`2026-05-24-photo-low-light-brightness-index.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/agent_plans/2026-05-24-photo-low-light-brightness-index.md) 将工作拆为低光/夜景 assist、快捷亮度调节和联合验证三份文档。核心口径是低光策略保持 `PHOTO` 模式内的 session-owned adaptive capture，不自动切到 `NIGHT/Scenery`；快捷亮度走 session/device preview EV，不把 Color Lab 的后处理亮度当作实时曝光；图标精修、阈值调参和真机画质判断登记为后续多模态/真机 QA。
 - 第 `7` 阶段若继续推进，最高优先级已切到 `provider death / provider restart 真信号` 这类更依赖平台和真机信号的项；当前仓内结构已允许继续挂接，但缺少可信验证来源。
@@ -116,6 +134,75 @@
 ---
 
 # 最近有效闭环
+
+## 2026-05-25：文档模式 V2 第二轮修复交接包
+
+- 目标：承接上一轮“文档模式 V2 外部实现验收”为 `blocked / partial` 的结论，把已验证缺口整理成可直接交给外部 agent 的第二轮修复包；后续复核后进一步收窄当前剩余工作。
+- 核心判断：
+  session-owned batch state、batch intents、capture metadata/crop status 解析、side rail render model/layout/renderer 和 rail header route trigger 均已有当前仓内证据；
+  `DocumentBatchOrganizerRenderModelTest` 通过，`CockpitPanelRoute.DocumentBatchOrganizer` 和 `ToggleDocumentBatchOrganizer` 存在，但 `MainActivityRenderer.renderPanelVisibility()` 没有 organizer panel 分支，也未发现 `DocumentBatchOrganizerRenderer` / organizer view binding；
+  早先记录的 `DefaultDeviceShotRequestTranslatorTest.kt` still-quality compile blocker 在当前工作区已不复现，focused device translator test 通过。
+- 核心结果：
+  新增修复总索引 [`2026-05-25-document-v2-repair-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-document-v2-repair-index.md)；
+  新增 capture metadata/crop status 修复包 [`2026-05-25-document-v2-capture-metadata-status-repair.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-document-v2-capture-metadata-status-repair.md)；
+  新增 side rail 主体验补齐包 [`2026-05-25-document-v2-side-rail-completion.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-document-v2-side-rail-completion.md)；
+  新增 organizer UI/action wiring 修复包 [`2026-05-25-document-v2-organizer-ui-wiring.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-document-v2-organizer-ui-wiring.md)；
+  新增 Stage 7 device still-quality 测试阻断修复包 [`2026-05-25-stage7-device-still-quality-test-repair.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-stage7-device-still-quality-test-repair.md)。
+- 验证：本轮仍只更新方案文档、规划索引和状态记录，未改运行时代码；已复核 `DocumentBatchRailRenderModelTest`/`DocumentBatchOrganizerRenderModelTest`、`CaptureRecordingSessionProcessorTest`、`DefaultDeviceShotRequestTranslatorTest` 均通过。下一轮实现后应重点补 organizer UI 可见面板与 action dispatch，再跑 app focused tests、`:app:assembleDebug` 和必要的 Stage 7 gate。
+- 结论：
+  当前文档模式 V2 仍不应判为完成，但剩余代码工作已经收敛到 Organizer UI：补可见面板、绑定 move/remove 操作，并保留 Codex/user 的最终可见体验验收。
+
+## 2026-05-25：Live Photo 2.0 产品化升级拆包
+
+- 目标：把用户认可的 Live 升级方向“Live 水印/边框的诚实版本、产品级兼容验证与诊断、分享导出并可在设置中选择 Live 保存格式”整理为可交给非多模态 agent 的执行包。
+- 核心判断：
+  当前 Live / Google Motion Photo 本地链路已有 `LivePhotoBundle / LiveTemporalWindow / Preview ring buffer / MP4 motion segment / Google Motion Photo JPEG container / sidecar / diagnostics`，但产品级缺口仍在真机相册识别、格式选择、导出语义和 Live 水印不过度宣称；
+  当前 `LiveMediaBundle` 已有 `motionDurationMillis / motionContainer / sidecarMimeType / watermarkMotionBehavior`，但保存格式仍不是持久化产品设置，`LiveWatermarkMotionBehavior` 也不能等同于真实 motion watermark burn-in。
+- 核心结果：
+  新增总索引 [`2026-05-25-live-photo-2-product-upgrade-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-live-photo-2-product-upgrade-index.md)；
+  新增 Live 水印诚实策略方案 [`2026-05-25-live-watermark-honest-strategy.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-live-watermark-honest-strategy.md)，要求区分 `still-only / metadata-only / burned-in / unsupported`，并禁止在未烧录 motion frame 时宣称动态水印；
+  新增 Live 兼容诊断方案 [`2026-05-25-live-compatibility-diagnostics.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-live-compatibility-diagnostics.md)，要求输出 intended/actual format、motion/container/XMP/appended MP4 bytes 等诊断，并把 gallery recognition 保留为真机证据；
+  新增 Live 导出格式设置方案 [`2026-05-25-live-export-format-settings.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-live-export-format-settings.md)，要求新增持久化 `LiveSaveFormat`，默认 Google Motion Photo，并支持 MP4 sidecar 与 still JPEG only 语义。
+- 验证：本轮只新增/更新方案文档和规划索引，未改运行时代码；已交叉阅读 2026-05-24 Live Motion Photo 方案包、2026-05-25 Watermark 2.0 方案包、当前 settings Live/水印模型、`CameraXCaptureAdapter` Live materialization/sidecar 路径、`MotionPhotoJpegContainer` 和相关 render model/test 入口。实现后应先跑 Live/Settings/App focused tests，再跑 `rtk ./scripts/verify_stage_6b7_live_photo.sh` 和 Stage 7 gate。
+
+## 2026-05-25：水印 2.0 产品化升级拆包
+
+- 目标：把用户认可的水印 2.0 方向“专业参数底栏水印、极简文字水印、模糊四边框水印、可还原水印”整理为可交给非多模态 agent 的执行包。
+- 核心判断：
+  当前水印链路已经不是旧的三模板状态；`DEFAULT_WATERMARK_TEMPLATES` 已包含 `classic-overlay / travel-polaroid / retro-frame / pure-text / blur-four-border`，`PhotoWatermarkPostProcessor` 已识别并渲染 `pure-text` 与 `blur-four-border`，也已在可见写入和 EXIF 恢复后嵌入 OCWM 可逆归档；
+  因此本轮不应重复 2026-05-24 的基础多模板/可逆归档计划，而应把 `pure-text`、`blur-four-border` 和 OCWM 作为已存在基础上的产品化补强，并把新增实现重点放在 `professional-bottom-bar`。
+- 核心结果：
+  新增总索引 [`2026-05-25-watermark-2-product-upgrade-index.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-watermark-2-product-upgrade-index.md)；
+  新增专业参数底栏方案 [`2026-05-25-watermark-2-professional-parameter-bottom-bar.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-watermark-2-professional-parameter-bottom-bar.md)，要求新增 `professional-bottom-bar` 模板并复用现有 metadata/EXIF/媒体后处理边界；
+  新增极简文字补强方案 [`2026-05-25-watermark-2-minimalist-text-polish.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-watermark-2-minimalist-text-polish.md)，限定为 `pure-text` 的控件过滤、文案和可读性补强；
+  新增模糊四边框补强方案 [`2026-05-25-watermark-2-blur-four-border-polish.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-watermark-2-blur-four-border-polish.md)，限定为 `blur-four-border` 的 blur-only 背景、底部文字和 renderer/archive 验证；
+  新增可还原水印产品化方案 [`2026-05-25-watermark-2-reversible-productization.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-watermark-2-reversible-productization.md)，保留 OCWM 格式不变，要求验证所有 Watermark 2.0 静态图模板的 pre-watermark JPEG 可提取。
+- 验证：本轮只新增/更新方案文档和规划索引，未改运行时代码；已交叉阅读 2026-05-24 多模板水印/可逆归档计划、当前 settings 默认模板、`PhotoWatermarkPostProcessor` resolver/render/archive 路径、Watermark Lab render model 入口和相关验证脚本。最终实现后应先跑 `rtk ./scripts/verify_stage_6b3_watermark_v2.sh` 与 `rtk ./scripts/verify_reversible_watermark_archive.sh`，再跑 Stage 7 gate。
+
+## 2026-05-24：Live / Google Motion Photo 外部落地核验与本地闭环补强
+
+- 目标：核查外部 agent 对拍照模式实况能力的落地是否满足“预览流作为短视频部分 + Google Motion Photo 格式”需求；若发现问题则就地修复。
+- 核心判断：
+  外部实现已补上 `CameraXLivePreviewFrameSource` 注入、`ImageAnalysis` 预览帧接入、ring buffer 选择、sidecar 物化和 Google Motion Photo JPEG container writer 测试，比原先硬编码 `METADATA_ONLY` 有实质推进；
+  但初版预览帧源仍是 metadata descriptor，缺少 preview frames -> MP4 motion segment 编码器，`captureLivePhoto()` 传给 `MotionPhotoFileMaterializer` 的 `.live.mp4` 实际不会被创建；
+  原实现会在选到预览帧但 materializer 失败时仍追加 `motion-photo:container=google-jpeg` 诊断，造成“Google Motion Photo 已成功”的假阳性。
+- 核心结果：
+  [`CameraXLivePreviewFrameSource.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/live/CameraXLivePreviewFrameSource.kt) 现会从 `ImageProxy` 复制 YUV payload，以 `FramePayloadAccess.CPU_YUV` descriptor 进入 ring buffer，并可按选中帧集合物化 motion segment；
+  [`PreviewMotionSegmentEncoder.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/live/PreviewMotionSegmentEncoder.kt) 新增 Android `MediaCodec + MediaMuxer` H.264/MP4 encoder，把有界预览 YUV 帧编码为 `.live.mp4`；
+  [`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 新增 `materializeMotionPhotoBundleIfPossible(...)`，只有 materializer 真成功时才把 bundle 指向单文件 Motion Photo 并追加 `motion-photo:container=google-jpeg`；
+  `captureLivePhoto()` 现会先调用 `MotionSegmentFrameSource.materializeMotionSegment(...)` 生成 motionPath，再交给 `MotionPhotoFileMaterializer` 写 Google Motion Photo 容器；
+  本轮继续收口了运行时硬化：Motion Photo 成功时同步更新 bundle `motionPath` 为真实 encoded MP4，`ImageAnalysis` 帧复制异常会记录 warning 并确保 `ImageProxy.close()`，encoder 若无法送入 EOS 会直接失败而不是长时间等待；
+  materializer 失败时 bundle 改为 `STILL_ONLY_FALLBACK`，诊断追加 `motion-photo:container=failed:<reason>`，避免上层和后续 agent 误判；
+  [`CameraXCaptureAdapterLivePhotoTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/CameraXCaptureAdapterLivePhotoTest.kt) 新增 motion segment 准备、materializer 成功/失败路径测试，锁住“不宣称 google container 成功”的行为；
+  [`LivePreviewFrameSourceTest.kt`](/Volumes/Extreme_SSD/project/codex_camera/app/src/test/java/com/opencamera/app/camera/live/LivePreviewFrameSourceTest.kt) 新增 fake encoder 测试，锁定选中 YUV payload 能交给 motion segment encoder；
+  [`verify_stage_6b7_live_photo.sh`](/Volumes/Extreme_SSD/project/codex_camera/scripts/verify_stage_6b7_live_photo.sh) 内部 Gradle 调用已改为 `rtk ./gradlew`，符合当前仓库命令规则。
+- 验证：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest` 已通过；
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:media:test --tests com.opencamera.core.media.FrameRingBufferTest --tests com.opencamera.core.media.MotionPhotoJpegContainerTest --tests com.opencamera.core.media.LiveTemporalAssemblyPlannerTest :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest --tests com.opencamera.app.camera.live.MotionPhotoFileMaterializerTest` 已通过；
+  `rtk ./gradlew --no-daemon :core:media:test --tests com.opencamera.core.media.ShotExecutorTest`、`rtk ./gradlew --no-daemon :core:device:test --tests com.opencamera.core.device.DefaultDeviceShotRequestTranslatorTest`、Live Photo 相关 `DefaultCameraSessionTest` 子集、`rtk ./gradlew --no-daemon :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`、`rtk ./gradlew --no-daemon :app:assembleDebug` 均已通过；
+  `rtk ./scripts/verify_stage_6b7_live_photo.sh` 在 sandbox 中启动时因 Gradle wrapper 访问 `~/.gradle/.../gradle-8.7-bin.zip.lck` 被拒绝，未作为失败判断；同等子命令已逐条验证。
+- 结论：
+  当前需求在本地代码/单元/编译层面已可判为 pass：预览流会作为短视频来源，生成 `.live.mp4` 后写入 Google Motion Photo JPEG container；产品级 pass 仍需要真机 smoke 证明 `MediaCodec/MediaMuxer` 输出和 Google Motion Photo XMP/appended MP4 能被目标相册识别。
 
 ## 2026-05-24：多种水印与模糊四边框方案文档
 
@@ -1069,3 +1156,22 @@
 - 目标：修复此前 tap focus/AE 链路只落到 session/device/coordinator，但 `CameraXCaptureAdapter` 仍返回 `UNSUPPORTED` stub 的问题。
 - 核心结果：`DeviceCommand.ApplyPreviewMetering` 现在通过 CameraX `FocusMeteringAction` 执行 AF+AE metering，并在 AE-only、unsupported、failed 情况下回传结构化 `PreviewMeteringResultStatus`。
 - 验证：`./scripts/verify_tap_focus_camerax_execution.sh` 与 `./scripts/verify_stage_7_observability.sh` 通过；真机仍需 smoke 复验具体机型的 AF/AE 区域支持。
+- `2026-05-25` Live Photo 兼容性诊断落地完成：`CameraXCaptureAdapter.captureLivePhoto()` 现已输出标准化诊断字段（`live-format:intended`, `live-format:actual`, `live-motion:status`, `motion-photo:xmp`, `motion-photo:appended-mp4-bytes`, `gallery-recognition`）；`MotionPhotoJpegContainerTest` 新增字节级断言（无末尾额外字节、`Item:Length` 与实际 MP4 字节数一致）；`SessionCockpitRenderModelTest` 新增 QA 诊断可见性测试。
+
+## Live Photo 真机兼容性冒烟检查清单
+
+以下检查项只能在真机上完成，无法由 JVM 单元测试覆盖：
+
+1. **构建并安装 APK**：`./gradlew :app:assembleDebug` 或通过 Android Studio 安装
+2. **启用 Live Photo**：在 Quick Panel 中切换 Live Photo 开关为开启
+3. **拍摄测试**：分别拍摄明亮场景和室内场景的 Live Photo 各一张
+4. **诊断字段验证**：在 Session Cockpit 输出中确认以下诊断均存在：
+   - `live-format:intended=google-motion-photo-jpeg`
+   - `live-format:actual=<格式>`（成功时为 `google-motion-photo-jpeg`，失败时为 `still-jpeg`）
+   - `live-motion:status=<状态>`（`encoded` / `failed` / `missing`）
+   - `motion-photo:appended-mp4-bytes=<n>`（成功时）
+   - `gallery-recognition=untested`
+5. **图库识别测试**：在目标图库应用（Google Photos 或 OEM 图库）中打开保存的照片，记录是否以动态媒体形式播放
+6. **文件验证**：通过 `adb pull` 拉取保存的 JPEG 文件，确认末尾附加了 MP4 字节
+
+注意：图库识别结果因 OEM 图库、Google Photos 版本、文件名、MediaStore MIME 处理及 XMP 严格程度而异，应作为产品证据记录，不作为确定性测试断言。

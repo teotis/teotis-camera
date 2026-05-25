@@ -1,6 +1,7 @@
 package com.opencamera.core.media
 
 import com.opencamera.core.settings.ManualCaptureParams
+import kotlin.math.roundToInt
 
 enum class MediaType {
     PHOTO,
@@ -46,6 +47,37 @@ enum class StillCaptureQualityPreference(
     }
 }
 
+enum class CaptureLatencyPriority(
+    val tagValue: String
+) {
+    DEFAULT(tagValue = "default"),
+    QUICK_SNAP(tagValue = "quick-snap"),
+    ZSL_WHEN_SUPPORTED(tagValue = "zsl-when-supported")
+}
+
+data class StillCaptureResolutionOption(
+    val tagValue: String,
+    val label: String,
+    val targetWidth: Int,
+    val targetHeight: Int,
+    val pixelCount: Long = targetWidth.toLong() * targetHeight.toLong()
+) {
+    companion object {
+        fun fromOutputSize(width: Int, height: Int): StillCaptureResolutionOption {
+            val megapixels = (width.toLong() * height.toLong() / 1_000_000.0).roundToInt()
+            return StillCaptureResolutionOption(
+                tagValue = "${megapixels}mp",
+                label = "${megapixels}MP",
+                targetWidth = width,
+                targetHeight = height
+            )
+        }
+    }
+}
+
+/**
+ * 保留旧的枚举用于向后兼容（内部使用）
+ */
 enum class StillCaptureResolutionPreset(
     val tagValue: String,
     val label: String,

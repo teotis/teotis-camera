@@ -17,10 +17,12 @@ internal class MainActivityRenderer(
         lastRenderedPanelRoute = route
         views.settingsPanel.panel.isVisible = route.isSettingsOpen
         views.filterLab.panel.isVisible = route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.ColorLab
+        views.documentBatchOrganizer.panel.isVisible = route is CockpitPanelRoute.DocumentBatchOrganizer
         views.panelDismissScrim.isVisible = route.isAnyPanelOpen
         if (routeChanged) {
             if (views.settingsPanel.panel.isVisible) views.settingsPanel.panel.scrollTo(0, 0)
             if (views.filterLab.panel.isVisible) views.filterLab.panel.scrollTo(0, 0)
+            if (views.documentBatchOrganizer.panel.isVisible) views.documentBatchOrganizer.panel.scrollTo(0, 0)
         }
 
         val subpage = (route as? CockpitPanelRoute.Settings)?.subpage

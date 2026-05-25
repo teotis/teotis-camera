@@ -1,5 +1,6 @@
 package com.opencamera.core.device
 
+import com.opencamera.core.media.CaptureLatencyPriority
 import com.opencamera.core.media.CaptureNodeRole
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
@@ -7,7 +8,6 @@ import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.LivePhotoCaptureSpec
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.ShotExecutor
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.primaryVideoNode
 import com.opencamera.core.settings.ManualCaptureParams
@@ -30,10 +30,8 @@ class DefaultDeviceShotRequestTranslatorTest {
 
         assertEquals("shot-photo", request.shotId)
         assertEquals(CaptureTemplate.STILL_CAPTURE, request.template)
-        assertEquals(StillCaptureQualityPreference.LATENCY, request.stillCaptureQuality)
         assertEquals(1, request.frameCount)
         assertEquals(0L, request.interFrameDelayMillis)
-        assertTrue("device:capture-mode=minimize-latency" in request.diagnostics)
     }
 
     @Test
@@ -56,16 +54,13 @@ class DefaultDeviceShotRequestTranslatorTest {
     fun `single frame shot honors explicit still quality preference`() {
         val plan = ShotExecutor(idGenerator = { "shot-photo-quality" }).plan(
             CaptureStrategy.SingleFrame(
-                captureProfile = CaptureProfile(
-                    stillCaptureQuality = StillCaptureQualityPreference.QUALITY
-                )
+                captureProfile = CaptureProfile()
             )
         )
 
         val request = translator.translate(plan)
 
-        assertEquals(StillCaptureQualityPreference.QUALITY, request.stillCaptureQuality)
-        assertTrue("device:capture-mode=max-quality" in request.diagnostics)
+        assertEquals(CaptureTemplate.STILL_CAPTURE, request.template)
     }
 
     @Test
@@ -193,31 +188,28 @@ class DefaultDeviceShotRequestTranslatorTest {
 
         assertEquals("shot-night", request.shotId)
         assertEquals(CaptureTemplate.STILL_CAPTURE, request.template)
-        assertEquals(StillCaptureQualityPreference.QUALITY, request.stillCaptureQuality)
         assertEquals(12, request.frameCount)
         assertEquals(116L, request.interFrameDelayMillis)
-        assertTrue("device:capture-mode=max-quality" in request.diagnostics)
         assertTrue("device:frame-count=12" in request.diagnostics)
         assertTrue("device:long-exposure=1400ms" in request.diagnostics)
         assertTrue("device:stability=tripod" in request.diagnostics)
     }
 
     @Test
-    fun `multi frame shot can downgrade still capture quality when requested`() {
+    fun `multi frame shot preserves latency priority in device request`() {
         val plan = ShotExecutor(idGenerator = { "shot-night-fast" }).plan(
             CaptureStrategy.MultiFrame(
                 captureProfile = CaptureProfile(
                     frameCount = 8,
-                    longExposureMillis = 800L,
-                    stillCaptureQuality = StillCaptureQualityPreference.LATENCY
+                    longExposureMillis = 800L
                 )
             )
         )
 
         val request = translator.translate(plan)
 
-        assertEquals(StillCaptureQualityPreference.LATENCY, request.stillCaptureQuality)
-        assertTrue("device:capture-mode=minimize-latency" in request.diagnostics)
+        assertEquals(CaptureLatencyPriority.DEFAULT, request.latencyPriority)
+        assertEquals(8, request.frameCount)
     }
 
     @Test
@@ -251,7 +243,6 @@ class DefaultDeviceShotRequestTranslatorTest {
 
         assertEquals("shot-video", request.shotId)
         assertEquals(CaptureTemplate.VIDEO_RECORDING, request.template)
-        assertEquals(null, request.stillCaptureQuality)
         assertTrue(request.torchEnabled)
         assertTrue("device:template=video-recording" in request.diagnostics)
         assertTrue("device:torch=on" in request.diagnostics)
@@ -362,7 +353,6 @@ class DefaultDeviceShotRequestTranslatorTest {
                 shotId = "shot-single-multi",
                 template = CaptureTemplate.STILL_CAPTURE,
                 shotKind = com.opencamera.core.media.ShotKind.MULTI_FRAME_CAPTURE,
-                stillCaptureQuality = StillCaptureQualityPreference.QUALITY,
                 frameCount = 1
             )
         )
@@ -380,8 +370,7 @@ class DefaultDeviceShotRequestTranslatorTest {
                 DeviceShotRequest(
                     shotId = "shot-photo",
                     template = CaptureTemplate.STILL_CAPTURE,
-                    shotKind = com.opencamera.core.media.ShotKind.STILL_CAPTURE,
-                    stillCaptureQuality = StillCaptureQualityPreference.LATENCY
+                    shotKind = com.opencamera.core.media.ShotKind.STILL_CAPTURE
                 )
             )
         }

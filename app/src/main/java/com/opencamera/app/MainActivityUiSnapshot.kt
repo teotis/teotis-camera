@@ -7,6 +7,7 @@ internal data class MainActivityUiSnapshot(
     val activePanelRoute: CockpitPanelRoute,
     val isFilterAdjustmentVisible: Boolean,
     val settingsPage: SessionSettingsPageRenderModel?,
+    val quickPanelSheet: QuickPanelSheetRenderModel?,
     val portraitLabPage: PortraitLabPageRenderModel?,
     val watermarkDetailPage: WatermarkLabDetailRenderModel?,
     val filterLabPage: FilterLabPageRenderModel?,

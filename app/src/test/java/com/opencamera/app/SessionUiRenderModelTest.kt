@@ -19,7 +19,7 @@ import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ThumbnailPolicy
-import com.opencamera.core.media.StillCaptureQualityPreference
+
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
@@ -85,8 +85,6 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
-                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -102,8 +100,7 @@ class SessionUiRenderModelTest {
         val state = defaultSessionState(
             activeDeviceGraph = DeviceGraphSpec.videoRecording(
                 preferredLensFacing = LensFacing.FRONT,
-                enablePreviewSnapshots = true,
-                stillResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
+                enablePreviewSnapshots = true
             ),
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 availableLensFacings = setOf(LensFacing.FRONT)
@@ -232,8 +229,6 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.FRONT,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
-                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -700,6 +695,49 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `portrait lab render model exposes depth strength slider`() {
+        val baseline = defaultSessionState()
+        val model = portraitLabPageRenderModel(
+            baseline.copy(
+                settings = baseline.settings.copy(
+                    persisted = baseline.settings.persisted.copy(
+                        photo = baseline.settings.persisted.photo.copy(
+                            portraitDepthStrength = 75
+                        )
+                    )
+                )
+            ),
+            TestAppTextResolver()
+        )
+
+        assertEquals(75, model.depthStrength)
+        assertEquals("75%", model.depthStrengthLabel)
+        assertNotNull(model.updateDepthStrengthAction)
+    }
+
+    @Test
+    fun `portrait lab depth strength action is null when editing disabled`() {
+        val model = portraitLabPageRenderModel(
+            defaultSessionState(
+                activeShot = ShotRequest(
+                    shotId = "shot-depth",
+                    shotKind = ShotKind.STILL_CAPTURE,
+                    mediaType = MediaType.PHOTO,
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+                    postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+                    captureProfile = CaptureProfile()
+                ),
+                persistedPhotoSettings = PhotoSettings(portraitDepthStrength = 75)
+            ),
+            TestAppTextResolver()
+        )
+
+        assertEquals(75, model.depthStrength)
+        assertNull(model.updateDepthStrengthAction)
+    }
+
+    @Test
     fun `watermark lab detail render model exposes frame controls for frame templates`() {
         val baselineState = defaultSessionState()
         val model = watermarkLabDetailRenderModel(
@@ -903,14 +941,14 @@ class SessionUiRenderModelTest {
 
         assertTrue(model.humanisticTab.isSelected)
         assertEquals(
-            "Next Humanistic look\nHumanistic Street\n可用 • 5 looks | import/export deferred",
+            "Next Humanistic look\n街头 Street\n可用 • 3 looks | import/export deferred",
             model.cycleControl.buttonLabel
         )
         assertEquals(
             PersistedSettingsAction.UpdateHumanisticFilter("humanistic-portrait"),
             model.cycleControl.nextAction
         )
-        assertTrue(model.rosterText.contains("• Humanistic Street"))
+        assertTrue(model.rosterText.contains("• 街头 Street"))
         assertTrue(model.saveCustomControl.isEnabled)
         assertTrue(model.supportingText.contains("Import and export stay deferred"))
     }
@@ -1103,9 +1141,7 @@ class SessionUiRenderModelTest {
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.LATENCY,
-            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+            enablePreviewSnapshots = true
         ),
         previewStatus: PreviewStatus = PreviewStatus.ACTIVE,
         previewMetrics: PreviewMetrics = PreviewMetrics(),
@@ -1208,8 +1244,6 @@ class SessionUiRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 1f,
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
-                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -1320,8 +1354,8 @@ class SessionUiRenderModelTest {
         )
 
         assertTrue(model.photoTab.isSelected)
-        assertTrue(model.rosterText.contains("Humanistic Street"))
-        assertTrue(model.rosterText.contains("Humanistic Life"))
+        assertTrue(model.rosterText.contains("街头 Street"))
+        assertTrue(model.rosterText.contains("生活 Life"))
     }
 
     @Test
@@ -1684,10 +1718,20 @@ class SessionUiRenderModelTest {
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Grid", sheet.gridRow.title)
+        assertEquals("3x3", sheet.gridRow.value)
         assertEquals("Quality", sheet.qualityRow.title)
+        assertEquals("Still Max", sheet.qualityRow.value)
+        assertTrue(sheet.qualityRow.value != sheet.gridRow.value,
+            "Quality row value should show still quality, not grid value")
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
+
+        // Brightness row has slider fields
+        assertEquals("Brightness", sheet.brightnessRow.title)
+        assertTrue(sheet.brightnessRow.isVisible)
+        assertEquals(0, sheet.brightnessRow.steps)
+        assertTrue(sheet.brightnessRow.maxSteps >= sheet.brightnessRow.minSteps)
     }
 
     @Test

@@ -12,15 +12,16 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.PhotoSceneSignal
 import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.device.SceneLightState
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.RecordingQualityPreset
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.StillCaptureResolutionOption
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
-import com.opencamera.core.media.StillCaptureQualityPreference
-import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.mode.ModeId
@@ -539,12 +540,18 @@ class CameraSessionCoordinatorTest {
         val initialGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
             enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.LATENCY
+            resolutionOption = StillCaptureResolutionOption(
+                tagValue = "12mp", label = "12MP",
+                targetWidth = 4000, targetHeight = 3000
+            )
         )
         val updatedGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
             enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.QUALITY
+            resolutionOption = StillCaptureResolutionOption(
+                tagValue = "48mp", label = "48MP",
+                targetWidth = 8000, targetHeight = 6000
+            )
         )
         val session = FakeCameraSession(
             initialState = defaultSessionState(
@@ -594,12 +601,16 @@ class CameraSessionCoordinatorTest {
         val initialGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
             enablePreviewSnapshots = true,
-            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+            outputSize = com.opencamera.core.device.StillCaptureOutputSize(
+                width = 4000, height = 3000
+            )
         )
         val updatedGraph = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
             enablePreviewSnapshots = true,
-            resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
+            outputSize = com.opencamera.core.device.StillCaptureOutputSize(
+                width = 8000, height = 6000
+            )
         )
         val session = FakeCameraSession(
             initialState = defaultSessionState(
@@ -1076,6 +1087,52 @@ class CameraSessionCoordinatorTest {
         data object Success : BindResult
 
         data class Failure(val reason: String) : BindResult
+    }
+
+    @Test
+    fun `scene brightness source signals are forwarded as PhotoSceneSignalUpdated`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val sceneSource = FakeSceneBrightnessSignalSource()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope,
+            sceneBrightnessSource = sceneSource
+        )
+        advanceUntilIdle()
+
+        val signal = PhotoSceneSignal(
+            lightState = SceneLightState.LOW_LIGHT,
+            brightnessScore = 0.15f,
+            source = "test"
+        )
+        sceneSource.emit(signal)
+        advanceUntilIdle()
+
+        assertTrue(
+            session.recordedIntents.contains(
+                SessionIntent.PhotoSceneSignalUpdated(signal)
+            )
+        )
+    }
+
+    private class FakeSceneBrightnessSignalSource : SceneBrightnessSignalSource {
+        private val mutableSignals = MutableSharedFlow<PhotoSceneSignal>(
+            replay = 4,
+            extraBufferCapacity = 4
+        )
+
+        override val signals: Flow<PhotoSceneSignal> = mutableSignals.asSharedFlow()
+
+        override fun onPreviewStarted() {}
+        override fun onPreviewStopped() {}
+        override fun onPreviewHostDetached() {}
+
+        suspend fun emit(signal: PhotoSceneSignal) {
+            mutableSignals.emit(signal)
+        }
     }
 
     private class TestLifecycleOwner : LifecycleOwner {

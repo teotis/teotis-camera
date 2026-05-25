@@ -15,7 +15,6 @@ import com.opencamera.core.media.LivePhotoCaptureSpec
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
@@ -38,7 +37,7 @@ import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PhotoSettings
-import com.opencamera.core.settings.renderStyleColorSpec
+import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.filterProfilesFor
@@ -97,18 +96,6 @@ private class PortraitModeController(
     }
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
-
-    override suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (depthEffectEnabled()) {
-                "Portrait quality updated"
-            } else {
-                "Focus quality updated"
-            }
-        )
-    }
 
     override suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
@@ -204,7 +191,6 @@ private class PortraitModeController(
                                 put("watermarkModeName", "Portrait")
                                 put("watermarkProfileName", style.label)
                                 putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
-                                put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                 put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                                 put("modeVariant", proVariantState.modeVariantTag())
                                 if (proVariantEnabled) {
@@ -219,7 +205,6 @@ private class PortraitModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     ),
                     livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft.toCaptureSpec()
@@ -237,7 +222,6 @@ private class PortraitModeController(
                             put("livePhotoDefault", "off")
                             put("watermarkModeName", "Portrait")
                             put("watermarkProfileName", style.label)
-                            put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
                             put("modeVariant", if (proVariantEnabled) "pro" else "standard")
                             if (proVariantEnabled) {
@@ -254,7 +238,6 @@ private class PortraitModeController(
                 postProcessSpec = postProcessSpec,
                 captureProfile = CaptureProfile(
                     manualCaptureParams = currentManualDraftOrNull(),
-                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
                 )
@@ -267,20 +250,24 @@ private class PortraitModeController(
         val style = currentStyle()
         val portraitSettings = portraitSettings()
         val photoSettings = context.settingsSnapshot.persisted.photo
-        val adjustedRenderSpec = renderStyleColorSpec(
+        val pipelineResult = renderStyleColorSpecWithRecipe(
             profileId = style.id,
             baseRenderSpec = style.renderSpec,
             colorLabSpec = photoSettings.colorLabSpec,
             styleStrength = photoSettings.styleStrength
         )
+        val adjustedRenderSpec = pipelineResult?.finalRenderSpec
+        val recipe = pipelineResult?.recipe
+            ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
-            FilterEffect(style.id, adjustedRenderSpec),
+            FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
             PortraitEffect(
                 profileId = portraitSettings.portraitProfile.storageKey,
                 renderPath = if (depthEffectEnabled()) "depth" else "focus",
                 beautyPreset = portraitSettings.portraitBeautyPreset.storageKey,
                 beautyStrength = portraitSettings.portraitBeautyStrength.storageKey,
-                bokehEffect = portraitSettings.portraitBokehEffect.storageKey
+                bokehEffect = portraitSettings.portraitBokehEffect.storageKey,
+                depthStrength = portraitSettings.portraitDepthStrength
             ),
             FrameEffect(currentFrameRatio())
         ))
@@ -302,6 +289,7 @@ private class PortraitModeController(
         put("PortraitBokehEffect", portraitSettings.portraitBokehEffect.label)
         put("DepthEffect", if (depthEffectEnabled()) "simulated-bokeh" else "focus-priority")
         style.bokehStrength?.let { put("DepthStrength", "${it}f") }
+        put("PortraitDepthStrength", portraitSettings.portraitDepthStrength.toString())
     }
 
     private fun resolvedWatermarkText(style: PortraitStyle): String {
@@ -454,9 +442,9 @@ private class PortraitModeController(
             append(" | Bokeh ${portraitSettings.portraitBokehEffect.label}")
         }
         val standardSummary = if (depthEffectEnabled()) {
-            "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Depth strength ${style.bokehStrength} | Subject tracking ${style.subjectTracking} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Portrait depth rendering active."
+            "Style ${style.label} | $commonSummary | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Depth strength ${style.bokehStrength} | Subject tracking ${style.subjectTracking} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Portrait depth rendering active."
         } else {
-            "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Focus-priority portrait fallback because depth effect is unavailable on this device."
+            "Style ${style.label} | $commonSummary | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Focus-priority portrait fallback because depth effect is unavailable on this device."
         }
         if (!proVariantEnabled) {
             return standardSummary

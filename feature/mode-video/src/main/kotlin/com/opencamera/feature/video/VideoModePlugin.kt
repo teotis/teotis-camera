@@ -26,14 +26,13 @@ import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.FilterProfile
-import com.opencamera.core.settings.renderStyleColorSpec
+import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 
 class VideoModePlugin : CameraModePlugin {
     override val id: ModeId = ModeId.VIDEO
@@ -84,10 +83,6 @@ private class VideoModeController(
     }
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
-
-    override suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) = Unit
 
     override suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
@@ -241,14 +236,17 @@ private class VideoModeController(
     private fun buildEffectSpec(): EffectSpec {
         val filter = selectedFilter()
         val photoSettings = context.settingsSnapshot.persisted.photo
-        val adjustedRenderSpec = renderStyleColorSpec(
+        val pipelineResult = renderStyleColorSpecWithRecipe(
             profileId = filter.id,
             baseRenderSpec = filter.renderSpec,
             colorLabSpec = photoSettings.colorLabSpec,
             styleStrength = photoSettings.styleStrength
         )
+        val adjustedRenderSpec = pipelineResult?.finalRenderSpec
+        val recipe = pipelineResult?.recipe
+            ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
-            FilterEffect(filter.id, adjustedRenderSpec)
+            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe)
         ))
     }
 
@@ -388,9 +386,7 @@ private class VideoModeController(
             enablePreviewSnapshots = runtimeState().deviceCapabilities.supportsPreviewSnapshots,
             audioEnabledWhenPermitted = runtimeState().deviceCapabilities.supportsAudioRecording,
             requestedVideoSpec = requestedVideoSpec,
-            resolvedVideoSpec = resolvedVideoSpec,
-            stillQualityPreference = runtimeState().stillCaptureQuality,
-            stillResolutionPreset = runtimeState().stillCaptureResolutionPreset
+            resolvedVideoSpec = resolvedVideoSpec
         )
     }
 

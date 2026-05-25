@@ -2,6 +2,7 @@ package com.opencamera.core.effect
 
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PerceptualColorRecipe
 import com.opencamera.core.settings.WatermarkStyleSettings
 
 enum class EffectTarget { PREVIEW, CAPTURE, BOTH }
@@ -13,7 +14,8 @@ sealed interface EffectEntry {
 data class FilterEffect(
     val profileId: String,
     val renderSpec: FilterRenderSpec?,
-    override val target: EffectTarget = EffectTarget.BOTH
+    override val target: EffectTarget = EffectTarget.BOTH,
+    val recipe: PerceptualColorRecipe = PerceptualColorRecipe.NEUTRAL
 ) : EffectEntry
 
 data class WatermarkEffect(
@@ -34,6 +36,7 @@ data class PortraitEffect(
     val beautyPreset: String,
     val beautyStrength: String,
     val bokehEffect: String,
+    val depthStrength: Int = 50,
     override val target: EffectTarget = EffectTarget.CAPTURE
 ) : EffectEntry
 

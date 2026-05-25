@@ -11,6 +11,7 @@ import android.util.TypedValue
 import android.view.View
 import com.opencamera.core.effect.FilterOverlaySpec
 import com.opencamera.core.effect.FrameGuidelineSpec
+import com.opencamera.core.effect.PreviewColorTransform
 import com.opencamera.core.effect.WatermarkHintSpec
 import com.opencamera.core.effect.WatermarkPreviewShape
 import com.opencamera.core.settings.CompositionGridMode
@@ -163,6 +164,9 @@ class PreviewOverlayView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         renderModel.effectModel?.filterOverlay?.let { drawFilterOverlay(canvas, it) }
+        renderModel.effectModel?.colorTransform
+            ?.let(::previewColorTransformOverlaySpec)
+            ?.let { drawColorTransformOverlay(canvas, it) }
         renderModel.effectModel?.frameGuideline?.let { drawFrameGuideline(canvas, it) }
         renderModel.frame?.let { drawPreviewFrame(canvas, it) }
         if (renderModel.isGridVisible) {
@@ -251,6 +255,13 @@ class PreviewOverlayView @JvmOverloads constructor(
             canvas.drawRect(rect, vignettePaint)
             vignettePaint.shader = null
         }
+    }
+
+    private fun drawColorTransformOverlay(canvas: Canvas, spec: FilterOverlaySpec) {
+        if (spec.tintAlpha <= 0f) return
+        filterOverlayPaint.color = spec.tintColor
+        filterOverlayPaint.alpha = (spec.tintAlpha * 255).toInt().coerceIn(0, 255)
+        canvas.drawRect(activeFrameRectOrFullView(), filterOverlayPaint)
     }
 
     private fun drawFrameGuideline(canvas: Canvas, spec: FrameGuidelineSpec) {
@@ -360,10 +371,14 @@ class PreviewOverlayView @JvmOverloads constructor(
 
     private fun drawFocusReticle(canvas: Canvas) {
         val model = focusReticle ?: return
-        val cx = model.normalizedX.coerceIn(0f, 1f) * width
-        val cy = model.normalizedY.coerceIn(0f, 1f) * height
+        val rawCx = model.normalizedX.coerceIn(0f, 1f) * width
+        val rawCy = model.normalizedY.coerceIn(0f, 1f) * height
         val radius = 24f * density
         val tickLength = 8f * density
+        val bounds = activeFrameRectOrFullView()
+        val clamped = clampReticleCenter(rawCx, rawCy, radius, tickLength, bounds.left, bounds.top, bounds.right, bounds.bottom)
+        val cx = clamped.x
+        val cy = clamped.y
 
         when (model.status) {
             FocusReticleStatus.REQUESTED -> {
@@ -428,6 +443,25 @@ internal data class FocusReticleRenderModel(
     val normalizedY: Float,
     val status: FocusReticleStatus
 )
+
+internal data class ReticlePoint(val x: Float, val y: Float)
+
+internal fun clampReticleCenter(
+    cx: Float,
+    cy: Float,
+    radius: Float,
+    tickLength: Float,
+    boundsLeft: Float,
+    boundsTop: Float,
+    boundsRight: Float,
+    boundsBottom: Float
+): ReticlePoint {
+    val extent = radius + tickLength
+    return ReticlePoint(
+        x = cx.coerceIn(boundsLeft + extent, boundsRight - extent),
+        y = cy.coerceIn(boundsTop + extent, boundsBottom - extent)
+    )
+}
 
 /**
  * Build [PreviewContentGeometry] for the given view dimensions and optional frame ratio.

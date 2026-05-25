@@ -10,8 +10,12 @@ import com.opencamera.core.device.photoLowLightStrategySupport
 import com.opencamera.core.device.recoveryReason
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.outputPathOrNull
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * Processes all preview lifecycle and recovery intents.
@@ -26,10 +30,18 @@ internal class PreviewRecoverySessionProcessor(
     private val trace: SessionTrace,
     private val mutations: PreviewSessionMutations,
     private val countdownInProgress: () -> Boolean,
-    private val cancelPendingCountdown: (String) -> Unit
+    private val cancelPendingCountdown: (String) -> Unit,
+    private val scope: CoroutineScope,
+    private val dispatch: suspend (SessionIntent) -> Unit
 ) {
     private var pendingPreviewHostRecoveryReason: String? = null
     private var meteringCounter: Int = 0
+    private var promptExpiryJob: Job? = null
+
+    companion object {
+        private const val METERING_FEEDBACK_DISPLAY_MS = 1_500L
+        private const val METERING_FEEDBACK_TIMEOUT_MS = 5_000L
+    }
 
     suspend fun process(intent: SessionIntent) {
         when (intent) {
@@ -47,6 +59,7 @@ internal class PreviewRecoverySessionProcessor(
             is SessionIntent.PreviewStopped -> handlePreviewStopped(intent.reason)
             is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
             is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
+            is SessionIntent.PreviewMeteringFeedbackExpired -> handlePreviewMeteringFeedbackExpired(intent.requestId)
             is SessionIntent.PhotoSceneSignalUpdated -> handlePhotoSceneSignalUpdated(intent.signal)
             SessionIntent.PhotoLowLightPromptExpired -> handlePhotoLowLightPromptExpired()
             else -> error("Unexpected preview intent: $intent")
@@ -310,6 +323,7 @@ internal class PreviewRecoverySessionProcessor(
         )
         mutations.updatePreviewMeteringRequested(requestId, point)
         effects.emit(SessionEffect.ApplyPreviewMetering(request))
+        scheduleMeteringFeedbackExpiry(requestId, METERING_FEEDBACK_TIMEOUT_MS)
         trace.record(
             "preview.metering.requested",
             "requestId=$requestId,x=${"%.2f".format(point.normalizedX)},y=${"%.2f".format(point.normalizedY)},mode=focus+ae"
@@ -323,6 +337,7 @@ internal class PreviewRecoverySessionProcessor(
             return
         }
         mutations.updatePreviewMeteringCompleted(result)
+        scheduleMeteringFeedbackExpiry(result.requestId, METERING_FEEDBACK_DISPLAY_MS)
         val traceLabel = when (result.status) {
             PreviewMeteringResultStatus.SUCCEEDED -> "preview.metering.succeeded"
             PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> "preview.metering.degraded"
@@ -330,6 +345,23 @@ internal class PreviewRecoverySessionProcessor(
             PreviewMeteringResultStatus.UNSUPPORTED -> "preview.metering.unsupported"
         }
         trace.record(traceLabel, "requestId=${result.requestId}")
+    }
+
+    private fun handlePreviewMeteringFeedbackExpired(requestId: String) {
+        val currentFeedback = state.value.presentation.previewMeteringFeedback
+        if (currentFeedback == null || currentFeedback.requestId != requestId) {
+            trace.record("preview.metering.expiry.stale", "requestId=$requestId,currentId=${currentFeedback?.requestId}")
+            return
+        }
+        mutations.clearPreviewMeteringFeedback(requestId)
+        trace.record("preview.metering.expired", "requestId=$requestId")
+    }
+
+    private fun scheduleMeteringFeedbackExpiry(requestId: String, delayMs: Long) {
+        scope.launch {
+            delay(delayMs)
+            dispatch(SessionIntent.PreviewMeteringFeedbackExpired(requestId))
+        }
     }
 
     // -- Low-light scene signal --
@@ -383,14 +415,17 @@ internal class PreviewRecoverySessionProcessor(
                 "photo.low-light.prompt.visible",
                 "untilElapsedMillis=$visibleUntil"
             )
+            promptExpiryJob?.cancel()
+            promptExpiryJob = scope.launch {
+                delay(3000L)
+                dispatch(SessionIntent.PhotoLowLightPromptExpired)
+            }
         }
     }
 
     private fun handlePhotoLowLightPromptExpired() {
         val prompt = state.value.presentation.photoLowLightPrompt ?: return
-        val now = System.currentTimeMillis()
-        val visibleUntil = prompt.visibleUntilElapsedMillis
-        if (visibleUntil != null && now >= visibleUntil) {
+        if (prompt.visibleUntilElapsedMillis != null) {
             state.value = state.value.copy(
                 presentation = state.value.presentation.copy(
                     photoLowLightPrompt = prompt.copy(

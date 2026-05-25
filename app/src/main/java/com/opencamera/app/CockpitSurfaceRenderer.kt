@@ -35,7 +35,7 @@ internal class CockpitSurfaceRenderer(
         topBar.titleText.text = context.getString(R.string.app_name)
     }
 
-    fun renderShutter(state: SessionState, controls: SessionControlsRenderModel) {
+    fun renderShutter(state: SessionState, controls: SessionControlsRenderModel, isShutterEnabled: Boolean = state.modeSnapshot.state.isShutterEnabled) {
         val shutterLabel = when (state.recordingStatus) {
             com.opencamera.core.session.RecordingStatus.IDLE -> context.getString(R.string.button_photo_capture)
             com.opencamera.core.session.RecordingStatus.REQUESTING -> context.getString(R.string.button_recording_starting)
@@ -49,7 +49,7 @@ internal class CockpitSurfaceRenderer(
         } else {
             bottomCockpit.shutter.setBackgroundResource(R.drawable.bg_shutter_selector)
         }
-        bottomCockpit.shutter.isEnabled = state.modeSnapshot.state.isShutterEnabled
+        bottomCockpit.shutter.isEnabled = isShutterEnabled
         bottomCockpit.lensFacing.text = controls.lensFacingButtonLabel
         bottomCockpit.lensFacing.isEnabled = controls.lensFacingEnabled
     }
@@ -131,40 +131,20 @@ internal class CockpitSurfaceRenderer(
 
         val brightness = sheet.brightnessRow
         if (brightness.isVisible) {
-            quickPanel.brightnessMinus.visibility = android.view.View.VISIBLE
-            quickPanel.brightnessValue.visibility = android.view.View.VISIBLE
-            quickPanel.brightnessPlus.visibility = android.view.View.VISIBLE
-            quickPanel.brightnessMinus.isEnabled = brightness.canDecrease
-            quickPanel.brightnessValue.text = brightness.value
-            quickPanel.brightnessValue.isEnabled = brightness.canReset
-            quickPanel.brightnessPlus.isEnabled = brightness.canIncrease
-            val alpha = if (brightness.disabledReason != null) 0.4f else 1f
-            quickPanel.brightnessMinus.alpha = if (brightness.canDecrease) alpha else 0.3f
-            quickPanel.brightnessValue.alpha = if (brightness.disabledReason != null) 0.4f else 1f
-            quickPanel.brightnessPlus.alpha = if (brightness.canIncrease) alpha else 0.3f
+            quickPanel.brightnessSlider.visibility = View.VISIBLE
+            quickPanel.brightnessValueText.visibility = View.VISIBLE
+            quickPanel.brightnessSlider.max = brightness.maxSteps - brightness.minSteps
+            quickPanel.brightnessSlider.progress = brightness.steps - brightness.minSteps
+            quickPanel.brightnessSlider.isEnabled = brightness.isInteractive
+            quickPanel.brightnessValueText.text = brightness.value
+            quickPanel.brightnessValueText.alpha = if (brightness.disabledReason != null) 0.4f else 1f
         } else {
-            quickPanel.brightnessMinus.visibility = android.view.View.GONE
-            quickPanel.brightnessValue.visibility = android.view.View.GONE
-            quickPanel.brightnessPlus.visibility = android.view.View.GONE
+            quickPanel.brightnessSlider.visibility = View.GONE
+            quickPanel.brightnessValueText.visibility = View.GONE
         }
 
-        quickPanel.frame43.isEnabled = sheet.frameRatioEnabled
-        quickPanel.frame169.isEnabled = sheet.frameRatioEnabled
-        quickPanel.frame11.isEnabled = sheet.frameRatioEnabled
-        sheet.frameRatioOptions.forEach { option ->
-            val button = when (option.ratio) {
-                com.opencamera.core.media.FrameRatio.RATIO_4_3 -> quickPanel.frame43
-                com.opencamera.core.media.FrameRatio.RATIO_16_9 -> quickPanel.frame169
-                com.opencamera.core.media.FrameRatio.RATIO_1_1 -> quickPanel.frame11
-            }
-            if (option.isSelected) {
-                button.alpha = 1f
-                button.setBackgroundResource(R.drawable.bg_quick_chip_selected)
-            } else {
-                button.alpha = if (sheet.frameRatioEnabled) 0.85f else 0.4f
-                button.setBackgroundResource(R.drawable.bg_quick_chip)
-            }
-        }
+        quickPanel.frameRatio.text = "${sheet.frameRatioRow.title} ${sheet.frameRatioRow.value}"
+        quickPanel.frameRatio.isEnabled = sheet.frameRatioEnabled
 
         quickPanel.livePhoto.text = "${sheet.liveRow.title} ${sheet.liveRow.value}"
         quickPanel.livePhoto.isEnabled = sheet.liveRow.isEnabled
@@ -176,46 +156,39 @@ internal class CockpitSurfaceRenderer(
     private var lastAutoScrolledActiveMode: com.opencamera.core.mode.ModeId? = null
 
     fun renderModeTrack(model: ModeTrackRenderModel) {
-        val buttons = listOf(
-            modeTrack.photo,
-            modeTrack.video,
-            modeTrack.document
+        val buttonMap = mapOf(
+            com.opencamera.core.mode.ModeId.PHOTO to modeTrack.photo,
+            com.opencamera.core.mode.ModeId.HUMANISTIC to modeTrack.humanistic,
+            com.opencamera.core.mode.ModeId.VIDEO to modeTrack.video,
+            com.opencamera.core.mode.ModeId.DOCUMENT to modeTrack.document
         )
         modeTrack.night.visibility = View.GONE
         modeTrack.portrait.visibility = View.GONE
         modeTrack.pro.visibility = View.GONE
-        modeTrack.humanistic.visibility = View.GONE
-        model.items.forEachIndexed { index, item ->
-            if (index < buttons.size) {
-                val button = buttons[index]
-                button.visibility = View.VISIBLE
-                button.text = item.trackLabel
-                button.isEnabled = item.isAvailable
-                if (item.isActive) {
-                    button.setTextColor(ContextCompat.getColor(context, R.color.oc_accent))
-                    button.setTypeface(null, Typeface.BOLD)
-                    button.setBackgroundResource(R.drawable.bg_mode_track_active_chip)
-                    button.alpha = 1f
-                } else {
-                    button.setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
-                    button.setTypeface(null, Typeface.NORMAL)
-                    button.background = null
-                    button.alpha = if (item.isAvailable) 0.78f else 0.42f
-                }
+        buttonMap.values.forEach { it.visibility = View.GONE }
+        model.items.forEach { item ->
+            val button = buttonMap[item.modeId] ?: return@forEach
+            button.visibility = View.VISIBLE
+            button.text = item.trackLabel
+            button.isEnabled = item.isAvailable
+            if (item.isActive) {
+                button.setTextColor(ContextCompat.getColor(context, R.color.oc_accent))
+                button.setTypeface(null, Typeface.BOLD)
+                button.setBackgroundResource(R.drawable.bg_mode_track_active_chip)
+                button.alpha = 1f
+            } else {
+                button.setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+                button.setTypeface(null, Typeface.NORMAL)
+                button.background = null
+                button.alpha = if (item.isAvailable) 0.78f else 0.42f
             }
-        }
-        buttons.drop(model.items.size).forEach { button ->
-            button.visibility = View.GONE
         }
         val activeItem = model.items.firstOrNull { it.isActive }
         val activeModeId = activeItem?.modeId
         if (activeModeId != null && activeModeId != lastAutoScrolledActiveMode && !isModeTrackScrolling()) {
             lastAutoScrolledActiveMode = activeModeId
             modeTrack.scroll.post {
-                val activeButton = buttons.firstOrNull { b ->
-                    val idx = buttons.indexOf(b)
-                    idx < model.items.size && model.items[idx].isActive
-                }
+                val activeButton = buttonMap[activeModeId]
                 activeButton?.let {
                     val viewWidth = modeTrack.scroll.width
                     val chipCenter = it.left + it.width / 2

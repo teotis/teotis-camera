@@ -12,9 +12,13 @@ import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
+import com.opencamera.core.media.SceneMaskPayload
+import com.opencamera.core.media.SceneMaskPipelineNotes
+import com.opencamera.core.media.SceneMaskSupport
 import com.opencamera.core.media.addPipelineNotes
 import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PerceptualColorRecipe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
@@ -23,6 +27,16 @@ import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
+
+internal sealed class MaskResolveResult {
+    data class Available(
+        val bitmap: Bitmap,
+        val mask: SavedPhotoMaskPixels,
+        val extraNotes: List<String>
+    ) : MaskResolveResult()
+
+    data class Fallback(val extraNotes: List<String>) : MaskResolveResult()
+}
 
 internal data class PhotoAlgorithmPayload(
     val target: ProcessorTarget,
@@ -45,7 +59,8 @@ internal data class PhotoAlgorithmSpec(
     val highlightCompression: Float = 0f,
     val shadowLift: Float = 0f,
     val warmBoost: Float = 0f,
-    val coolBoost: Float = 0f
+    val coolBoost: Float = 0f,
+    val recipe: PerceptualColorRecipe = PerceptualColorRecipe.NEUTRAL
 )
 
 internal data class PhotoAlgorithmApplied(val warning: String? = null) : ProcessorEditorResult
@@ -68,11 +83,14 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
         ?.trim()
         ?.takeIf(String::isNotEmpty)
 
+    val recipe = parseRecipeFromTags(result.metadata.customTags)
+
     val spec = FilterRenderSpec.fromMetadataTags(result.metadata.customTags)?.toPhotoAlgorithmSpec(
         profile = result.metadata.customTags["filterProfile"]
             ?: profile
-            ?: "shared-filter"
-    ) ?: profile?.let(::resolvePhotoAlgorithmSpec)
+            ?: "shared-filter",
+        recipe = recipe
+    ) ?: profile?.let { resolvePhotoAlgorithmSpec(it, recipe) }
         ?: return ProcessorWork.None
     val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
@@ -80,7 +98,10 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
     return ProcessorWork.Execute(PhotoAlgorithmPayload(target, spec))
 }
 
-private fun FilterRenderSpec.toPhotoAlgorithmSpec(profile: String): PhotoAlgorithmSpec {
+private fun FilterRenderSpec.toPhotoAlgorithmSpec(
+    profile: String,
+    recipe: PerceptualColorRecipe = PerceptualColorRecipe.NEUTRAL
+): PhotoAlgorithmSpec {
     return PhotoAlgorithmSpec(
         profile = profile,
         brightnessShift = brightnessShift,
@@ -97,12 +118,15 @@ private fun FilterRenderSpec.toPhotoAlgorithmSpec(profile: String): PhotoAlgorit
         highlightCompression = highlightCompression,
         shadowLift = shadowLift,
         warmBoost = warmBoost,
-        coolBoost = coolBoost
+        coolBoost = coolBoost,
+        recipe = recipe
     )
 }
 
 internal class PhotoAlgorithmPostProcessor(
-    private val editor: PhotoAlgorithmEditor
+    private val editor: PhotoAlgorithmEditor,
+    private val maskProvider: SavedPhotoSceneMaskProvider? = null,
+    private val maskBitmapSource: ((ProcessorTarget) -> android.graphics.Bitmap?)? = null
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoAlgorithmWork(result)) {
@@ -113,38 +137,156 @@ internal class PhotoAlgorithmPostProcessor(
 
             is ProcessorWork.Execute -> {
                 val payload = work.payload
-                when (val renderResult = editor.apply(payload.target, payload.spec)) {
-                    is PhotoAlgorithmApplied -> {
-                        if (renderResult.warning == null) {
-                            result.addPipelineNotes(
-                                "algorithm-render:applied:${payload.spec.profile}"
-                            )
-                        } else {
-                            result.addPipelineNotes(
-                                "algorithm-render:applied:${payload.spec.profile}",
-                                "algorithm-render:warning:${renderResult.warning}"
-                            )
+                var maskResolve: MaskResolveResult? = null
+                try {
+                    val resolvedMask = resolveMask(result).also { maskResolve = it }
+                    when (resolvedMask) {
+                        is MaskResolveResult.Available -> {
+                            if (editor is MaskAwarePhotoAlgorithmEditor) {
+                                val (editorResult, maskNotes) = editor.applyWithMask(
+                                    resolvedMask.bitmap, payload.spec, resolvedMask.mask
+                                )
+                                val baseResult = applyEditorResult(result, payload, editorResult)
+                                val descriptor = resolvedMask.mask.toDescriptor(
+                                    maskId = result.shotId,
+                                    sourceWidth = resolvedMask.bitmap.width,
+                                    sourceHeight = resolvedMask.bitmap.height
+                                )
+                                val withNotes = (maskNotes + resolvedMask.extraNotes + listOf(
+                                    SceneMaskPipelineNotes.preview(SceneMaskSupport.UNSUPPORTED)
+                                )).fold(baseResult) { acc, note ->
+                                    acc.addPipelineNotes(note)
+                                }
+                                val sceneMaskTags = descriptor.toMetadataTags()
+                                withNotes.copy(
+                                    metadata = withNotes.metadata.copy(
+                                        customTags = withNotes.metadata.customTags + sceneMaskTags
+                                    )
+                                )
+                            } else {
+                                val fallbackNotes = listOf(
+                                    SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED) + ":editor-not-mask-aware",
+                                    SceneMaskPipelineNotes.preview(SceneMaskSupport.UNSUPPORTED)
+                                )
+                                (resolvedMask.extraNotes + fallbackNotes).fold(
+                                    applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
+                                ) { acc, note -> acc.addPipelineNotes(note) }
+                            }
+                        }
+                        is MaskResolveResult.Fallback -> {
+                            resolvedMask.extraNotes.fold(
+                                applyEditorResult(result, payload, editor.apply(payload.target, payload.spec))
+                            ) { acc, note -> acc.addPipelineNotes(note) }
                         }
                     }
-
-                    is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
-                        "algorithm-render:skipped:${renderResult.reason}"
-                    )
-
-                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
-                        "algorithm-render:failed:${renderResult.reason}"
-                    )
-
-                    else -> result
+                } catch (_: Throwable) {
+                    result.addPipelineNotes("algorithm-render:failed:render-exception")
+                } finally {
+                    val resolvedMask = maskResolve
+                    if (resolvedMask is MaskResolveResult.Available) {
+                        resolvedMask.bitmap.recycle()
+                    }
                 }
             }
+        }
+    }
+
+    private suspend fun resolveMask(result: ShotResult): MaskResolveResult {
+        val provider = maskProvider ?: return MaskResolveResult.Fallback(emptyList())
+        val target = result.outputHandle.toProcessorTargetOrNull()
+            ?: return MaskResolveResult.Fallback(emptyList())
+        val decoded = if (maskBitmapSource != null) {
+            maskBitmapSource.invoke(target)
+                ?: return MaskResolveResult.Fallback(emptyList())
+        } else {
+            val sourceBytes = readSourceBytesForMask(target)
+                ?: return MaskResolveResult.Fallback(emptyList())
+            if (sourceBytes.isEmpty()) return MaskResolveResult.Fallback(emptyList())
+            android.graphics.BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+                ?: return MaskResolveResult.Fallback(emptyList())
+        }
+        return try {
+            val maskRequest = SavedPhotoSceneMaskRequest(
+                shotId = result.shotId,
+                outputHandleTag = result.outputHandle.displayPath
+            )
+            when (val maskResult = provider.createSubjectMask(decoded, maskRequest)) {
+                is SceneMaskResult.Available -> MaskResolveResult.Available(
+                    bitmap = decoded,
+                    mask = maskResult.mask,
+                    extraNotes = listOf(
+                        SceneMaskPipelineNotes.saved(SceneMaskSupport.SUPPORTED)
+                    )
+                )
+                is SceneMaskResult.Unavailable -> {
+                    decoded.recycle()
+                    MaskResolveResult.Fallback(listOf(
+                        SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),
+                        SceneMaskPipelineNotes.reason(maskResult.reason)
+                    ))
+                }
+                is SceneMaskResult.Failed -> {
+                    decoded.recycle()
+                    MaskResolveResult.Fallback(listOf(
+                        SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                        SceneMaskPipelineNotes.reason(maskResult.reason)
+                    ))
+                }
+            }
+        } catch (_: Throwable) {
+            decoded.recycle()
+            MaskResolveResult.Fallback(listOf(
+                SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),
+                SceneMaskPipelineNotes.reason("mask-resolve-exception")
+            ))
+        }
+    }
+
+    private fun readSourceBytesForMask(target: ProcessorTarget): ByteArray? {
+        return when (target) {
+            is ProcessorTarget.FilePath -> {
+                val file = java.io.File(target.path)
+                if (!file.exists()) null else file.readBytes()
+            }
+            is ProcessorTarget.ContentUri -> null
+        }
+    }
+
+    private fun applyEditorResult(
+        result: ShotResult,
+        payload: PhotoAlgorithmPayload,
+        renderResult: ProcessorEditorResult
+    ): ShotResult {
+        return when (renderResult) {
+            is PhotoAlgorithmApplied -> {
+                if (renderResult.warning == null) {
+                    result.addPipelineNotes(
+                        "algorithm-render:applied:${payload.spec.profile}"
+                    )
+                } else {
+                    result.addPipelineNotes(
+                        "algorithm-render:applied:${payload.spec.profile}",
+                        "algorithm-render:warning:${renderResult.warning}"
+                    )
+                }
+            }
+
+            is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
+                "algorithm-render:skipped:${renderResult.reason}"
+            )
+
+            is ProcessorEditorResult.Failed -> result.addPipelineNotes(
+                "algorithm-render:failed:${renderResult.reason}"
+            )
+
+            else -> result
         }
     }
 }
 
 internal class AndroidPhotoAlgorithmEditor(
     context: Context
-) : PhotoAlgorithmEditor {
+) : MaskAwarePhotoAlgorithmEditor {
     private val appContext = context.applicationContext
     private val contentResolver: ContentResolver = appContext.contentResolver
 
@@ -158,12 +300,18 @@ internal class AndroidPhotoAlgorithmEditor(
             return@withContext ProcessorEditorResult.Skipped("empty-source")
         }
 
-        val preservedExif = readPreservedExif(sourceBytes)
-        val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-            ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
-        val mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
-        if (mutableBitmap !== decoded) {
-            decoded.recycle()
+        val mutableBitmap: Bitmap
+        val preservedExif: Map<String, String>
+        try {
+            preservedExif = readPreservedExif(sourceBytes)
+            val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+                ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
+            mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
+            if (mutableBitmap !== decoded) {
+                decoded.recycle()
+            }
+        } catch (_: Throwable) {
+            return@withContext ProcessorEditorResult.Failed("render-exception")
         }
 
         try {
@@ -171,12 +319,7 @@ internal class AndroidPhotoAlgorithmEditor(
                 bitmap = mutableBitmap,
                 spec = spec
             )
-            val encodedBytes = ByteArrayOutputStream().use { output ->
-                check(mutableBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
-                    "Algorithm JPEG compression failed"
-                }
-                output.toByteArray()
-            }
+            val encodedBytes = encodeJpeg(mutableBitmap)
             if (!writeEncodedBytes(target, encodedBytes)) {
                 return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
@@ -188,6 +331,15 @@ internal class AndroidPhotoAlgorithmEditor(
         } finally {
             mutableBitmap.recycle()
         }
+    }
+
+    override suspend fun applyWithMask(
+        bitmap: Bitmap,
+        spec: PhotoAlgorithmSpec,
+        mask: SavedPhotoMaskPixels
+    ): Pair<ProcessorEditorResult, List<String>> {
+        val notes = applyStyleWithMask(bitmap, spec, mask)
+        return Pair(PhotoAlgorithmApplied(), notes)
     }
 
     private fun applyStyle(
@@ -269,6 +421,15 @@ internal class AndroidPhotoAlgorithmEditor(
                     blue += (spec.coolBoost * 24f) - (spec.warmBoost * 12f)
                 }
 
+                if (!spec.recipe.isNeutral) {
+                    val result = applyPerceptualAdjustments(
+                        red, green, blue, spec.recipe
+                    )
+                    red = result[0]
+                    green = result[1]
+                    blue = result[2]
+                }
+
                 if (spec.grainStrength > 0f) {
                     val grain = deterministicGrain(x, y) * spec.grainStrength.coerceIn(0f, 0.35f) * 36f
                     red += grain
@@ -294,6 +455,200 @@ internal class AndroidPhotoAlgorithmEditor(
         }
 
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+    }
+
+    private fun applyStyleWithMask(
+        bitmap: Bitmap,
+        spec: PhotoAlgorithmSpec,
+        mask: SavedPhotoMaskPixels
+    ): List<String> {
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val originalPixels = pixels.copyOf()
+
+        val transform = SceneMaskCoordinateMapper(
+            maskWidth = mask.maskWidth,
+            maskHeight = mask.maskHeight,
+            targetWidth = width,
+            targetHeight = height
+        )
+
+        val centerX = width / 2f
+        val centerY = height / 2f
+        val maxDistance = max(1f, sqrt(centerX * centerX + centerY * centerY))
+        val hasVignette = spec.vignetteStrength > 0f
+
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val index = y * width + x
+                val color = pixels[index]
+                val alpha = color ushr 24 and 0xFF
+                val originalRed = color ushr 16 and 0xFF
+                val originalGreen = color ushr 8 and 0xFF
+                val originalBlue = color and 0xFF
+                val blurredRed = averagedChannel(originalPixels, x, y, width, height, 16)
+                val blurredGreen = averagedChannel(originalPixels, x, y, width, height, 8)
+                val blurredBlue = averagedChannel(originalPixels, x, y, width, height, 0)
+
+                val mx = transform.maskX(x)
+                val my = transform.maskY(y)
+                val rawMaskAlpha = mask.sampleAlpha(mx, my)
+                val subjectWeight = smoothstep(0.15f, 0.85f, rawMaskAlpha)
+
+                val grayscale = originalRed * 0.299f + originalGreen * 0.587f + originalBlue * 0.114f
+                var red = grayscale + (originalRed - grayscale) * spec.saturation
+                var green = grayscale + (originalGreen - grayscale) * spec.saturation
+                var blue = grayscale + (originalBlue - grayscale) * spec.saturation
+
+                if (spec.monochromeMix > 0f) {
+                    red = mix(red, grayscale, spec.monochromeMix)
+                    green = mix(green, grayscale, spec.monochromeMix)
+                    blue = mix(blue, grayscale, spec.monochromeMix)
+                }
+
+                if (spec.softGlowStrength > 0f) {
+                    val glowAmount = spec.softGlowStrength.coerceIn(0f, 0.35f) * (1f - subjectWeight * 0.6f)
+                    red = mix(red, blurredRed + 8f, glowAmount)
+                    green = mix(green, blurredGreen + 8f, glowAmount)
+                    blue = mix(blue, blurredBlue + 8f, glowAmount)
+                }
+
+                if (spec.haloStrength > 0f) {
+                    val haloAmount = spec.haloStrength.coerceIn(0f, 0.35f) * (1f - subjectWeight * 0.6f)
+                    val highlightMask =
+                        (((maxOf(originalRed, originalGreen, originalBlue) - 172f) / 83f)
+                            .coerceIn(0f, 1f)) * haloAmount
+                    red = mix(red, blurredRed + 18f, highlightMask)
+                    green = mix(green, blurredGreen + 16f, highlightMask)
+                    blue = mix(blue, blurredBlue + 20f, highlightMask)
+                }
+
+                if (spec.shadowLift > 0f || spec.highlightCompression > 0f) {
+                    val subjectScale = 1f - subjectWeight * 0.5f
+                    red = applyHighlightShadow(red, spec.highlightCompression * subjectScale, spec.shadowLift * subjectScale)
+                    green = applyHighlightShadow(green, spec.highlightCompression * subjectScale, spec.shadowLift * subjectScale)
+                    blue = applyHighlightShadow(blue, spec.highlightCompression * subjectScale, spec.shadowLift * subjectScale)
+                }
+
+                val warmthScale = 1f - subjectWeight * 0.6f
+                val tintCompensation = spec.tintShift * 0.7f * warmthScale
+                val adjustedWarmth = spec.warmthShift * warmthScale
+                val adjustedTint = spec.tintShift * warmthScale
+                red = applyContrast(red, spec.contrast) + spec.brightnessShift + adjustedWarmth + tintCompensation
+                green = applyContrast(green, spec.contrast) + spec.brightnessShift - adjustedTint
+                blue = applyContrast(blue, spec.contrast) + spec.brightnessShift - adjustedWarmth + tintCompensation
+
+                if (spec.sharpnessBoost > 0f) {
+                    val sharpenAmount = spec.sharpnessBoost.coerceIn(0f, 0.4f) * 1.6f
+                    red += (originalRed - blurredRed) * sharpenAmount
+                    green += (originalGreen - blurredGreen) * sharpenAmount
+                    blue += (originalBlue - blurredBlue) * sharpenAmount
+                }
+
+                if (spec.warmBoost > 0f || spec.coolBoost > 0f) {
+                    val warmScale = 1f - subjectWeight * 0.4f
+                    red += ((spec.warmBoost * 24f) - (spec.coolBoost * 12f)) * warmScale
+                    green += ((spec.warmBoost - spec.coolBoost) * 4f) * warmScale
+                    blue += ((spec.coolBoost * 24f) - (spec.warmBoost * 12f)) * warmScale
+                }
+
+                if (!spec.recipe.isNeutral) {
+                    val result = applyPerceptualAdjustmentsMaskAware(
+                        red, green, blue, spec.recipe, subjectWeight
+                    )
+                    red = result[0]
+                    green = result[1]
+                    blue = result[2]
+                }
+
+                if (spec.grainStrength > 0f) {
+                    val grain = deterministicGrain(x, y) * spec.grainStrength.coerceIn(0f, 0.35f) * 36f
+                    red += grain
+                    green += grain
+                    blue += grain
+                }
+
+                if (hasVignette) {
+                    val dx = x - centerX
+                    val dy = y - centerY
+                    val distance = sqrt(dx * dx + dy * dy)
+                    val vignetteScale = 1f - subjectWeight * 0.5f
+                    val falloff = 1f - ((distance / maxDistance) * spec.vignetteStrength * vignetteScale).coerceIn(0f, 0.85f)
+                    red *= falloff
+                    green *= falloff
+                    blue *= falloff
+                }
+
+                pixels[index] = (alpha shl 24) or
+                    (clampChannel(red).toInt() shl 16) or
+                    (clampChannel(green).toInt() shl 8) or
+                    clampChannel(blue).toInt()
+            }
+        }
+
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        return listOf("scene-mask:saved=applied", "color-render:subject-protected", "color-render:background-adjusted")
+    }
+
+    private fun applyPerceptualAdjustmentsMaskAware(
+        rIn: Float,
+        gIn: Float,
+        bIn: Float,
+        recipe: PerceptualColorRecipe,
+        subjectWeight: Float
+    ): FloatArray {
+        val luma = rIn * 0.2126f + gIn * 0.7152f + bIn * 0.0722f
+        val lumaNorm = (luma / 255f).coerceIn(0f, 1f)
+
+        val shadowMask = (1f - lumaNorm).coerceIn(0f, 1f)
+        val highlightMask = lumaNorm.coerceIn(0f, 1f)
+
+        val subjectToneScale = 1f - subjectWeight * 0.4f
+        var r = rIn + recipe.toneLift * shadowMask * 28f * subjectToneScale - recipe.toneDepth * highlightMask * 22f * subjectToneScale
+        var g = gIn + recipe.toneLift * shadowMask * 26f * subjectToneScale - recipe.toneDepth * highlightMask * 20f * subjectToneScale
+        var b = bIn + recipe.toneLift * shadowMask * 24f * subjectToneScale - recipe.toneDepth * highlightMask * 18f * subjectToneScale
+
+        val chroma = maxOf(r, g, b) - minOf(r, g, b)
+        val chromaNorm = (chroma / 255f).coerceIn(0f, 1f)
+        val neutralMask = (1f - chromaNorm * 2f).coerceIn(0f, 1f)
+        val protectionFactor = neutralMask * recipe.neutralProtection
+
+        val chromaScale = 1f + recipe.chromaBoost * 0.3f * (1f - protectionFactor) * (1f - subjectWeight * 0.3f)
+        val gray = r * 0.2126f + g * 0.7152f + b * 0.0722f
+        r = gray + (r - gray) * chromaScale
+        g = gray + (g - gray) * chromaScale
+        b = gray + (b - gray) * chromaScale
+
+        val skinMask = detectSkinMask(r, g, b)
+        val combinedSkinProtect = (skinMask + subjectWeight * 0.5f).coerceAtMost(1f) * recipe.skinProtection
+
+        val warmR = recipe.warmthBias.coerceAtLeast(0f)
+        val coolB = (-recipe.warmthBias).coerceAtLeast(0f)
+        val warmAmount = (warmR * 18f - coolB * 10f) * (1f - combinedSkinProtect * 0.6f)
+        val coolAmount = (coolB * 18f - warmR * 10f) * (1f - combinedSkinProtect * 0.6f)
+        r += warmAmount
+        b += coolAmount
+
+        val shadowR = recipe.shadowTint * shadowMask * 12f
+        val highlightB = recipe.highlightTint * highlightMask * 10f
+        r += shadowR
+        b += highlightB
+
+        val tintAmount = recipe.tintBias * 8f * (1f - combinedSkinProtect * 0.5f)
+        g -= tintAmount
+
+        return floatArrayOf(r, g, b)
+    }
+
+    private fun encodeJpeg(bitmap: Bitmap): ByteArray {
+        return ByteArrayOutputStream().use { output ->
+            check(bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
+                "Algorithm JPEG compression failed"
+            }
+            output.toByteArray()
+        }
     }
 
     private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
@@ -375,6 +730,68 @@ internal class AndroidPhotoAlgorithmEditor(
         }
     }
 
+    private fun applyPerceptualAdjustments(
+        rIn: Float,
+        gIn: Float,
+        bIn: Float,
+        recipe: PerceptualColorRecipe
+    ): FloatArray {
+        val luma = rIn * 0.2126f + gIn * 0.7152f + bIn * 0.0722f
+        val lumaNorm = (luma / 255f).coerceIn(0f, 1f)
+
+        val shadowMask = (1f - lumaNorm).coerceIn(0f, 1f)
+        val highlightMask = lumaNorm.coerceIn(0f, 1f)
+
+        var r = rIn + recipe.toneLift * shadowMask * 28f - recipe.toneDepth * highlightMask * 22f
+        var g = gIn + recipe.toneLift * shadowMask * 26f - recipe.toneDepth * highlightMask * 20f
+        var b = bIn + recipe.toneLift * shadowMask * 24f - recipe.toneDepth * highlightMask * 18f
+
+        val chroma = maxOf(r, g, b) - minOf(r, g, b)
+        val chromaNorm = (chroma / 255f).coerceIn(0f, 1f)
+        val neutralMask = (1f - chromaNorm * 2f).coerceIn(0f, 1f)
+        val protectionFactor = neutralMask * recipe.neutralProtection
+
+        val chromaScale = 1f + recipe.chromaBoost * 0.3f * (1f - protectionFactor)
+        val gray = r * 0.2126f + g * 0.7152f + b * 0.0722f
+        r = gray + (r - gray) * chromaScale
+        g = gray + (g - gray) * chromaScale
+        b = gray + (b - gray) * chromaScale
+
+        val skinMask = detectSkinMask(r, g, b)
+        val skinProtect = skinMask * recipe.skinProtection
+
+        val warmR = recipe.warmthBias.coerceAtLeast(0f)
+        val coolB = (-recipe.warmthBias).coerceAtLeast(0f)
+        val warmAmount = (warmR * 18f - coolB * 10f) * (1f - skinProtect * 0.6f)
+        val coolAmount = (coolB * 18f - warmR * 10f) * (1f - skinProtect * 0.6f)
+        r += warmAmount
+        b += coolAmount
+
+        val shadowR = recipe.shadowTint * shadowMask * 12f
+        val highlightB = recipe.highlightTint * highlightMask * 10f
+        r += shadowR
+        b += highlightB
+
+        val tintAmount = recipe.tintBias * 8f * (1f - skinProtect * 0.5f)
+        g -= tintAmount
+
+        return floatArrayOf(r, g, b)
+    }
+
+    private fun detectSkinMask(r: Float, g: Float, b: Float): Float {
+        if (r < 60f || g < 40f || b < 20f) return 0f
+        val max = maxOf(r, g, b)
+        val min = minOf(r, g, b)
+        if (max - min < 10f) return 0f
+        val rRatio = r / max
+        val gRatio = g / max
+        if (rRatio > 0.8f && gRatio > 0.5f && gRatio < 0.85f && r > g && g > b) {
+            return ((rRatio - 0.8f) * 5f).coerceIn(0f, 1f) *
+                ((gRatio - 0.5f) * 2.86f).coerceIn(0f, 1f)
+        }
+        return 0f
+    }
+
     companion object {
         private const val JPEG_QUALITY = 92
 
@@ -406,7 +823,14 @@ internal class AndroidPhotoAlgorithmEditor(
     }
 }
 
-internal fun resolvePhotoAlgorithmSpec(profile: String): PhotoAlgorithmSpec? {
+private fun parseRecipeFromTags(tags: Map<String, String>): PerceptualColorRecipe {
+    return com.opencamera.core.settings.parsePerceptualColorRecipe(tags)
+}
+
+internal fun resolvePhotoAlgorithmSpec(
+    profile: String,
+    recipe: PerceptualColorRecipe = PerceptualColorRecipe.NEUTRAL
+): PhotoAlgorithmSpec? {
     return when (profile) {
         "photo-default" -> PhotoAlgorithmSpec(
             profile = profile,
@@ -592,7 +1016,7 @@ internal fun resolvePhotoAlgorithmSpec(profile: String): PhotoAlgorithmSpec? {
         )
 
         else -> null
-    }
+    }?.let { if (recipe.isNeutral) it else it.copy(recipe = recipe) }
 }
 
 private fun applyContrast(channel: Float, contrast: Float): Float {
@@ -650,4 +1074,10 @@ private fun mix(base: Float, target: Float, amount: Float): Float {
 private fun deterministicGrain(x: Int, y: Int): Float {
     val noise = ((x * 73856093) xor (y * 19349663)) and 0xFF
     return (noise / 255f) - 0.5f
+}
+
+private fun smoothstep(edge0: Float, edge1: Float, value: Float): Float {
+    if (edge0 == edge1) return if (value >= edge1) 1f else 0f
+    val t = ((value - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
 }

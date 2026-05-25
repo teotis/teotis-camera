@@ -8,10 +8,20 @@ class CompositeMediaPostProcessor(
     override suspend fun process(result: ShotResult): ShotResult {
         var current = result
         processors.forEach { processor ->
-            current = processor.process(current)
+            current = try {
+                processor.process(current)
+            } catch (_: Throwable) {
+                val name = processor.diagnosticName()
+                current.addPipelineNotes("postprocess:failed:$name")
+            }
         }
         return current
     }
+}
+
+private fun MediaPostProcessor.diagnosticName(): String {
+    val raw = this::class.java.simpleName
+    return raw.removeSuffix("PostProcessor").ifEmpty { raw }
 }
 
 class PipelineMetadataPostProcessor : MediaPostProcessor {

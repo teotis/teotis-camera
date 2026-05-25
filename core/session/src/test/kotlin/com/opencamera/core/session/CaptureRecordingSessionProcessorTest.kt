@@ -416,4 +416,97 @@ class CaptureRecordingSessionProcessorTest {
         }
         assertTrue(threw)
     }
+
+    // ── Document Crop Status Parsing ──────────────────────────────────
+
+    @Test
+    fun `documentCropStatusFrom returns APPLIED for applied note`() {
+        val notes = listOf("document:auto-crop:applied", "document:auto-crop:bounds=10,20,300,400")
+        assertEquals(DocumentBatchCropStatus.APPLIED, documentCropStatusFrom(notes))
+    }
+
+    @Test
+    fun `documentCropStatusFrom returns SKIPPED for skipped note`() {
+        val notes = listOf("document:auto-crop:skipped:unsupported-mime")
+        assertEquals(DocumentBatchCropStatus.SKIPPED, documentCropStatusFrom(notes))
+    }
+
+    @Test
+    fun `documentCropStatusFrom returns FAILED for failed note`() {
+        val notes = listOf("document:auto-crop:failed:decode-failed")
+        assertEquals(DocumentBatchCropStatus.FAILED, documentCropStatusFrom(notes))
+    }
+
+    @Test
+    fun `documentCropStatusFrom returns NOT_REQUESTED for empty notes`() {
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, documentCropStatusFrom(emptyList()))
+    }
+
+    @Test
+    fun `documentCropStatusFrom returns NOT_REQUESTED when no crop notes present`() {
+        val notes = listOf("some-other-note", "another-note")
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, documentCropStatusFrom(notes))
+    }
+
+    @Test
+    fun `documentCropStatusFrom prefers APPLIED over later notes`() {
+        val notes = listOf("document:auto-crop:applied", "document:auto-crop:skipped:reason")
+        assertEquals(DocumentBatchCropStatus.APPLIED, documentCropStatusFrom(notes))
+    }
+
+    // ── Document Batch Capture Integration ────────────────────────────
+
+    @Test
+    fun `document photo ShotCompleted appends batch item with metadata`() = runTest {
+        val documentState = runningState().copy(
+            activeMode = ModeId.DOCUMENT,
+            presentation = SessionPresentationState(
+                documentBatch = DocumentBatchState(
+                    batchId = "batch-1",
+                    status = DocumentBatchStatus.ACTIVE
+                )
+            )
+        )
+        val harness = Harness(documentState)
+        val result = testShotResult("doc-shot-1", MediaType.PHOTO).copy(
+            metadata = com.opencamera.core.media.MediaMetadata(
+                customTags = mapOf(
+                    "mode" to "document",
+                    "profile" to "receipt",
+                    "scanMode" to "enhanced"
+                )
+            ),
+            pipelineNotes = listOf("document:auto-crop:applied")
+        )
+        harness.process(SessionIntent.ShotCompleted(result))
+
+        val batch = harness.state.value.presentation.documentBatch
+        assertEquals(1, batch.items.size)
+        assertEquals("doc-shot-1", batch.items[0].shotId)
+        assertEquals("receipt", batch.items[0].profileId)
+        assertEquals("enhanced", batch.items[0].scanMode)
+        assertEquals(DocumentBatchCropStatus.APPLIED, batch.items[0].cropStatus)
+        assertEquals("doc-shot-1", batch.latestItemId)
+        assertTrue(batch.lastMessage?.contains("auto-cropped") == true)
+    }
+
+    @Test
+    fun `video ShotCompleted does not append to document batch`() = runTest {
+        val documentState = runningState().copy(
+            activeMode = ModeId.DOCUMENT,
+            recordingStatus = RecordingStatus.RECORDING,
+            presentation = SessionPresentationState(
+                documentBatch = DocumentBatchState(
+                    batchId = "batch-1",
+                    status = DocumentBatchStatus.ACTIVE
+                )
+            )
+        )
+        val harness = Harness(documentState)
+        val result = testShotResult("video-1", MediaType.VIDEO, "/sdcard/video.mp4")
+        harness.process(SessionIntent.ShotCompleted(result))
+
+        val batch = harness.state.value.presentation.documentBatch
+        assertEquals(0, batch.items.size)
+    }
 }

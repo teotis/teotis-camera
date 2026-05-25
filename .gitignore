@@ -9,3 +9,4 @@ __pycache__/
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/

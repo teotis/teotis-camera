@@ -1,15 +1,26 @@
 package com.opencamera.app
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.net.Uri
 import com.opencamera.app.camera.AndroidDocumentAutoCropEditor
 import com.opencamera.app.camera.AndroidPhotoFrameRatioEditor
 import com.opencamera.app.camera.AndroidPhotoSelfieMirrorEditor
 import com.opencamera.app.camera.AndroidPortraitRenderEditor
 import com.opencamera.app.camera.AndroidPhotoWatermarkEditor
 import com.opencamera.app.camera.AndroidPhotoAlgorithmEditor
+import com.opencamera.app.camera.MlKitSelfiePreviewSceneMaskSource
+import com.opencamera.app.camera.NoOpPreviewSceneMaskSource
+import com.opencamera.app.camera.MlKitSavedPhotoSceneMaskProvider
+import com.opencamera.app.camera.NoOpSavedPhotoSceneMaskProvider
+import com.opencamera.app.camera.PreviewSceneMaskSource
+import com.opencamera.app.camera.SavedPhotoSceneMaskProvider
+import com.opencamera.app.camera.toSnapshot
 import com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitor
 import com.opencamera.app.camera.CameraSessionCoordinator
 import com.opencamera.app.camera.CameraXCaptureAdapter
+import com.opencamera.app.camera.PreviewSceneBrightnessMonitor
+import com.opencamera.app.camera.toSignalSource
 import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
 import com.opencamera.app.camera.CompositeRuntimeIssueMonitor
 import com.opencamera.app.camera.DocumentAutoCropPostProcessor
@@ -24,6 +35,7 @@ import com.opencamera.core.capability.CapabilityGraphResolver
 import com.opencamera.core.device.asCapabilityGraphQuery
 import com.opencamera.core.effect.EffectCapabilityResolver
 import com.opencamera.core.effect.PreviewEffectAdapter
+import com.opencamera.core.effect.PreviewSceneMaskSnapshot
 import com.opencamera.core.media.MediaProcessorAvailability
 import com.opencamera.core.media.CompositeMediaPostProcessor
 import com.opencamera.core.media.MultiFrameMergePlaceholderPostProcessor
@@ -59,6 +71,12 @@ class AppContainer(
 
     val trace = InMemorySessionTrace()
     private val shotExecutor = ShotExecutor()
+    private val savedMaskProvider: SavedPhotoSceneMaskProvider = try {
+        MlKitSavedPhotoSceneMaskProvider()
+    } catch (_: Throwable) {
+        NoOpSavedPhotoSceneMaskProvider()
+    }
+
     private val mediaPostProcessor = CompositeMediaPostProcessor(
         listOf(
             MultiFrameMergePlaceholderPostProcessor(),
@@ -69,10 +87,32 @@ class AppContainer(
                 AndroidPhotoFrameRatioEditor(appContext)
             ),
             PortraitRenderPostProcessor(
-                AndroidPortraitRenderEditor(appContext)
+                AndroidPortraitRenderEditor(appContext),
+                savedMaskProvider,
+                maskBitmapSource = { target ->
+                    when (target) {
+                        is com.opencamera.core.media.ProcessorTarget.FilePath ->
+                            BitmapFactory.decodeFile(target.path)
+                        is com.opencamera.core.media.ProcessorTarget.ContentUri ->
+                            appContext.contentResolver.openInputStream(Uri.parse(target.value))?.use {
+                                BitmapFactory.decodeStream(it)
+                            }
+                    }
+                }
             ),
             PhotoAlgorithmPostProcessor(
-                AndroidPhotoAlgorithmEditor(appContext)
+                AndroidPhotoAlgorithmEditor(appContext),
+                savedMaskProvider,
+                maskBitmapSource = { target ->
+                    when (target) {
+                        is com.opencamera.core.media.ProcessorTarget.FilePath ->
+                            BitmapFactory.decodeFile(target.path)
+                        is com.opencamera.core.media.ProcessorTarget.ContentUri ->
+                            appContext.contentResolver.openInputStream(Uri.parse(target.value))?.use {
+                                BitmapFactory.decodeStream(it)
+                            }
+                    }
+                }
             ),
             PhotoWatermarkPostProcessor(
                 AndroidPhotoWatermarkEditor(appContext)
@@ -98,11 +138,18 @@ class AppContainer(
 
     private val livePreviewFrameSource = CameraXLivePreviewFrameSource()
 
+    private val sceneMaskSource: PreviewSceneMaskSource = try {
+        MlKitSelfiePreviewSceneMaskSource()
+    } catch (_: Throwable) {
+        NoOpPreviewSceneMaskSource()
+    }
+
     private val cameraAdapter: CameraDeviceAdapter = CameraXCaptureAdapter(
         context = appContext,
         shotExecutor = shotExecutor,
         mediaPostProcessor = mediaPostProcessor,
-        livePreviewFrameSource = livePreviewFrameSource
+        livePreviewFrameSource = livePreviewFrameSource,
+        sceneMaskSource = sceneMaskSource
     )
 
     val effectCapabilityResolver = EffectCapabilityResolver(
@@ -113,6 +160,9 @@ class AppContainer(
         mediaProcessors = MediaProcessorAvailability.ALL_AVAILABLE
     )
     val previewEffectAdapter = PreviewEffectAdapter()
+
+    val previewMaskSnapshot: PreviewSceneMaskSnapshot
+        get() = sceneMaskSource.latestMask().toSnapshot()
 
     val cameraSession: CameraSession = DefaultCameraSession(
         registry = modeRegistry,
@@ -138,6 +188,7 @@ class AppContainer(
         runtimeIssueMonitor = CompositeRuntimeIssueMonitor(
             AndroidThermalRuntimeIssueMonitor(appContext),
             PreviewStartupRuntimeIssueMonitor(applicationScope)
-        )
+        ),
+        sceneBrightnessSource = PreviewSceneBrightnessMonitor(applicationScope).toSignalSource()
     )
 }

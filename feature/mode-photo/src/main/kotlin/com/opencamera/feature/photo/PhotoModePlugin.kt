@@ -34,13 +34,12 @@ import com.opencamera.core.media.LivePhotoCaptureSpec
 
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.WatermarkTemplate
-import com.opencamera.core.settings.renderStyleColorSpec
+import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.liveWatermarkMetadataTags
 import com.opencamera.core.settings.watermarkStyleFor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,14 +93,6 @@ private class PhotoModeController(
     }
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
-
-    override suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = "Photo quality updated"
-        )
-    }
 
     override suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
@@ -173,7 +164,6 @@ private class PhotoModeController(
                                             context.settingsSnapshot.catalog.liveMediaBundleDraft
                                                 .liveWatermarkMetadataTags()
                                         )
-                                        put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                         put(
                                             "stillResolution",
                                             runtimeState().stillCaptureResolutionPreset.tagValue
@@ -186,7 +176,6 @@ private class PhotoModeController(
                             postProcessSpec = postProcessSpec,
                             captureProfile = CaptureProfile(
                                 flashMode = flashMode,
-                                stillCaptureQuality = runtimeState().stillCaptureQuality,
                                 stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                             ),
                             livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft
@@ -202,7 +191,6 @@ private class PhotoModeController(
                                         put("livePhotoDefault", "off")
                                         put("watermarkModeName", "Photo")
                                         put("watermarkProfileName", flashLabel)
-                                        put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
                                         put(
                                             "stillResolution",
                                             runtimeState().stillCaptureResolutionPreset.tagValue
@@ -215,7 +203,6 @@ private class PhotoModeController(
                             postProcessSpec = postProcessSpec,
                             captureProfile = CaptureProfile(
                                 flashMode = flashMode,
-                                stillCaptureQuality = runtimeState().stillCaptureQuality,
                                 stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                             )
                         )
@@ -291,9 +278,9 @@ private class PhotoModeController(
 
     private fun defaultDetail(): String {
         return if (currentFlashSupported()) {
-            "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash ${currentFlashMode().label} | Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
+            "Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash ${currentFlashMode().label} | Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
         } else {
-            "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash control unavailable on this device. Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
+            "Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash control unavailable on this device. Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
         }
     }
 
@@ -326,7 +313,6 @@ private class PhotoModeController(
             put("photoLowLightNightAssist", "on")
             put("photoLowLightBrightnessScore", signal.brightnessScore?.toString() ?: "unknown")
             put("photoLowLightSignalSource", signal.source)
-            put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
             putAll(context.captureAidMetadataTags())
             putAll(bridgeTags)
@@ -348,7 +334,6 @@ private class PhotoModeController(
                         longExposureMillis = 450L,
                         requiresTripod = false,
                         flashMode = flashMode,
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )
@@ -368,7 +353,6 @@ private class PhotoModeController(
                     ),
                     captureProfile = CaptureProfile(
                         flashMode = flashMode,
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )
@@ -385,7 +369,6 @@ private class PhotoModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         flashMode = flashMode,
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )
@@ -396,17 +379,20 @@ private class PhotoModeController(
     private fun buildEffectSpec(flashMode: FlashMode): EffectSpec {
         val filter = selectedFilter
         val photoSettings = context.settingsSnapshot.persisted.photo
-        val adjustedRenderSpec = renderStyleColorSpec(
+        val pipelineResult = renderStyleColorSpecWithRecipe(
             profileId = filter.id,
             baseRenderSpec = filter.renderSpec,
             colorLabSpec = photoSettings.colorLabSpec,
             styleStrength = photoSettings.styleStrength
         )
+        val adjustedRenderSpec = pipelineResult?.finalRenderSpec
+        val recipe = pipelineResult?.recipe
+            ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         val selectedWatermarkTemplate = selectedWatermarkTemplate()
         val watermarkStyle = context.settingsSnapshot.persisted.photo
             .watermarkStyleFor(selectedWatermarkTemplate.id)
         return EffectSpec(listOf(
-            FilterEffect(filter.id, adjustedRenderSpec),
+            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe),
             WatermarkEffect(
                 templateId = selectedWatermarkTemplate.id,
                 tokens = mapOf(
