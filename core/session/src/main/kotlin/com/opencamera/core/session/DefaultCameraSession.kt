@@ -22,7 +22,6 @@ import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.outputPathOrNull
@@ -62,7 +61,6 @@ class DefaultCameraSession(
         ?: supportedModes.firstOrNull()
         ?: error("No supported camera modes for $baseDeviceCapabilities")
     private val initialLensFacing = defaultLensFacing(baseDeviceCapabilities.availableLensFacings)
-    private val initialStillCaptureQuality = StillCaptureQualityPreference.LATENCY
     private val initialStillCaptureResolutionPreset = clampStillCaptureResolutionPreset(
         StillCaptureResolutionPreset.LARGE_12MP,
         baseDeviceCapabilities.availableStillCaptureResolutionPresets
@@ -74,7 +72,6 @@ class DefaultCameraSession(
     )
     private var sessionDeviceCapabilities = baseDeviceCapabilities
     private var sessionLensFacing = initialLensFacing
-    private var sessionStillCaptureQuality = initialStillCaptureQuality
     private var sessionStillCaptureResolutionPreset = initialStillCaptureResolutionPreset
     private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
     private var sessionSettingsSnapshot = settingsSnapshot
@@ -82,7 +79,6 @@ class DefaultCameraSession(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
         lensFacing = initialLensFacing,
-        stillCaptureQuality = initialStillCaptureQuality,
         stillCaptureResolutionPreset = initialStillCaptureResolutionPreset
     )
     private val _effects = MutableSharedFlow<SessionEffect>(extraBufferCapacity = 8)
@@ -448,7 +444,6 @@ class DefaultCameraSession(
             modeId = modeId,
             deviceCapabilities = sessionDeviceCapabilities,
             lensFacing = sessionLensFacing,
-            stillCaptureQuality = sessionStillCaptureQuality,
             stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset
         )
         currentController.onEnter()
@@ -1345,7 +1340,6 @@ class DefaultCameraSession(
         modeId: ModeId,
         deviceCapabilities: DeviceCapabilities,
         lensFacing: LensFacing,
-        stillCaptureQuality: StillCaptureQualityPreference,
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
     ): ModeController {
         val clampedStillCaptureResolutionPreset = clampStillCaptureResolutionPreset(
@@ -1354,20 +1348,17 @@ class DefaultCameraSession(
         )
         sessionDeviceCapabilities = deviceCapabilities
         sessionLensFacing = lensFacing
-        sessionStillCaptureQuality = stillCaptureQuality
         sessionStillCaptureResolutionPreset = clampedStillCaptureResolutionPreset
         return registry.createController(
             modeId = modeId,
             context = ModeContext(
                 deviceCapabilities = deviceCapabilities,
                 initialLensFacing = lensFacing,
-                initialStillCaptureQuality = stillCaptureQuality,
                 initialStillCaptureResolutionPreset = clampedStillCaptureResolutionPreset,
                 runtimeState = {
                     ModeRuntimeState(
                         deviceCapabilities = sessionDeviceCapabilities,
                         lensFacing = sessionLensFacing,
-                        stillCaptureQuality = sessionStillCaptureQuality,
                         stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset
                     )
                 },
@@ -1426,15 +1417,6 @@ class DefaultCameraSession(
         val ordered = PreviewRatio.entries
         val currentIndex = ordered.indexOf(current)
         return ordered[(currentIndex + 1) % ordered.size]
-    }
-
-    private fun nextStillCaptureQuality(
-        current: StillCaptureQualityPreference
-    ): StillCaptureQualityPreference {
-        return when (current) {
-            StillCaptureQualityPreference.LATENCY -> StillCaptureQualityPreference.QUALITY
-            StillCaptureQualityPreference.QUALITY -> StillCaptureQualityPreference.LATENCY
-        }
     }
 
     private fun clampStillCaptureResolutionPreset(

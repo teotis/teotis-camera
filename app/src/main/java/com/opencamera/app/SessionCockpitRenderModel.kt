@@ -9,7 +9,6 @@ import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LivePhotoBundle
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.SavedMediaType
@@ -17,6 +16,7 @@ import com.opencamera.core.mode.modeDirectoryDeclaration
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
+import com.opencamera.core.session.PreviewBrightnessFeedbackStatus
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.PhotoLowLightPromptStatus
@@ -62,12 +62,20 @@ internal data class QuickPanelRowRenderModel(
 internal data class QuickBrightnessRenderModel(
     val title: String,
     val value: String,
-    val canDecrease: Boolean,
-    val canIncrease: Boolean,
-    val canReset: Boolean,
+    val steps: Int,
+    val minSteps: Int,
+    val maxSteps: Int,
+    val isInteractive: Boolean,
     val isVisible: Boolean,
     val disabledReason: String?
-)
+) {
+    val canDecrease: Boolean
+        get() = isInteractive && steps > minSteps
+    val canReset: Boolean
+        get() = isInteractive && steps != 0
+    val canIncrease: Boolean
+        get() = isInteractive && steps < maxSteps
+}
 
 internal data class LowLightNightPromptRenderModel(
     val label: String,
@@ -78,10 +86,10 @@ internal data class LowLightNightPromptRenderModel(
 
 internal data class QuickPanelSheetRenderModel(
     val gridRow: QuickPanelRowRenderModel,
-    val qualityRow: QuickPanelRowRenderModel,
     val resolutionRow: QuickPanelRowRenderModel,
     val brightnessRow: QuickBrightnessRenderModel,
     val frameRatioRow: QuickPanelRowRenderModel,
+    val frameRatioNext: FrameRatio?,
     val frameRatioOptions: List<FrameRatioOptionRenderModel>,
     val frameRatioEnabled: Boolean,
     val frameRatioDisabledReason: String?,
@@ -129,6 +137,25 @@ internal fun captureDisabledReason(state: SessionState, text: AppTextResolver): 
     return null
 }
 
+/**
+ * Shutter-specific disabled reason.
+ * Unlike [captureDisabledReason], this keeps the shutter enabled during active recording
+ * (shutter is the stop-recording command) and when camera permission is missing
+ * (shutter tap requests permission).
+ */
+internal fun shutterDisabledReason(state: SessionState, text: AppTextResolver): String? {
+    if (state.previewStatus == PreviewStatus.RECOVERING) return text.disabledPreviewRecovering()
+    if (state.countdownRemainingSeconds != null) return text.disabledCountdown()
+    val activeShot = state.activeShot
+    if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
+        return text.disabledSavingPhoto()
+    }
+    if (state.captureStatus == CaptureStatus.SAVING) return text.disabledSavingPhoto()
+    if (state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
+    if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
+    return null
+}
+
 internal fun sessionControlsRenderModel(
     state: SessionState,
     strings: SessionUiStrings
@@ -156,7 +183,12 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
     val isVisible = isPhotoMode
     val range = state.activeDeviceCapabilities.previewBrightnessRange
     val isUnsupported = range == com.opencamera.core.device.PreviewBrightnessRange.UNSUPPORTED
-    val steps = state.presentation.previewBrightnessSteps
+    val feedback = state.presentation.previewBrightnessFeedback
+    val steps = if (feedback?.status == PreviewBrightnessFeedbackStatus.REQUESTED) {
+        feedback.requestedSteps
+    } else {
+        state.presentation.previewBrightnessSteps
+    }
     val canInteract = isPhotoMode && isPreviewActive && !isBusy && !isUnsupported
 
     val valueLabel = if (isUnsupported) {
@@ -175,9 +207,10 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
     return QuickBrightnessRenderModel(
         title = text.quickBrightness(),
         value = valueLabel,
-        canDecrease = canInteract && steps > range.minSteps,
-        canIncrease = canInteract && steps < range.maxSteps,
-        canReset = canInteract && steps != 0,
+        steps = steps,
+        minSteps = range.minSteps,
+        maxSteps = range.maxSteps,
+        isInteractive = canInteract,
         isVisible = isVisible,
         disabledReason = disabledReason
     )
@@ -241,17 +274,6 @@ internal fun frameRatioControlRenderModel(state: SessionState, text: AppTextReso
     )
 }
 
-private fun videoQualityQuickLabel(state: SessionState): String {
-    val requested = state.activeDeviceGraph.recording.requestedVideoSpec
-    val applied = state.activeDeviceGraph.recording.videoSpec
-    val appliedLabel = "${applied.resolution.quickLabel}${applied.frameRate.fps}"
-    return if (requested.resolution == applied.resolution && requested.frameRate == applied.frameRate) {
-        appliedLabel
-    } else {
-        "$appliedLabel*"
-    }
-}
-
 internal fun quickPanelSheetRenderModel(
     state: SessionState,
     text: AppTextResolver,
@@ -265,28 +287,24 @@ internal fun quickPanelSheetRenderModel(
     val brightnessControl = brightnessRenderModel(state, text)
 
     val stillTemplate = state.activeDeviceGraph.template == CaptureTemplate.STILL_CAPTURE
-    val videoTemplate = state.activeDeviceGraph.template == CaptureTemplate.VIDEO_RECORDING
     val stillBusy = state.activeShot != null || state.countdownRemainingSeconds != null
     val stillQualityEnabled = stillTemplate && !stillBusy && state.activeDeviceCapabilities.supportsStillCapture
-    val videoQualityEnabled = videoTemplate && state.recordingStatus == RecordingStatus.IDLE
-    val qualityEnabled = stillQualityEnabled || videoQualityEnabled
-    val qualityValue = if (videoTemplate) {
-        videoQualityQuickLabel(state)
-    } else {
-        stillQualityQuickLabel(state, strings)
-    }
     val resolutionEnabled = stillQualityEnabled && isStillResolutionToggleEnabled(state)
+
+    val currentRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio ?: FrameRatio.RATIO_4_3
+    val entries = FrameRatio.entries
+    val nextRatio = if (frameControl.isEnabled) {
+        val nextIndex = (entries.indexOf(currentRatio) + 1) % entries.size
+        entries[nextIndex]
+    } else {
+        null
+    }
 
     return QuickPanelSheetRenderModel(
         gridRow = QuickPanelRowRenderModel(
             title = text.quickGrid(),
             value = grid.value,
             isEnabled = grid.isInteractive
-        ),
-        qualityRow = QuickPanelRowRenderModel(
-            title = text.quickQuality(),
-            value = qualityValue,
-            isEnabled = qualityEnabled
         ),
         resolutionRow = QuickPanelRowRenderModel(
             title = text.quickResolution(),
@@ -300,6 +318,7 @@ internal fun quickPanelSheetRenderModel(
             isEnabled = frameControl.isEnabled,
             disabledReason = frameControl.disabledReason
         ),
+        frameRatioNext = nextRatio,
         frameRatioOptions = frameControl.options,
         frameRatioEnabled = frameControl.isEnabled,
         frameRatioDisabledReason = frameControl.disabledReason,
@@ -350,13 +369,10 @@ internal fun sessionSummaryText(state: SessionState, text: AppTextResolver): Str
                 "(available: ${state.activeDeviceCapabilities.zoomRatioCapability.zoomRatioSummary()})"
         )
         appendLine(
-            "Still quality: ${state.activeDeviceGraph.stillCapture.qualityPreference.label}"
-        )
-        appendLine(
-            "Still resolution: ${state.activeDeviceGraph.stillCapture.resolutionPreset.label} " +
+            "Still resolution: ${state.activeDeviceGraph.stillCapture.resolutionOption?.label ?: "Auto"} " +
                 "(available: ${
-                    state.activeDeviceCapabilities.availableStillCaptureResolutionPresets
-                        .stillResolutionPresetSummary()
+                    state.activeDeviceCapabilities.availableStillCaptureResolutionOptions
+                        .joinToString("/") { it.label }
                 })"
         )
         appendLine(
@@ -631,17 +647,11 @@ private fun List<StillCaptureOutputSize>.stillCaptureOutputSizeSummary(): String
     return this.take(4).joinToString(separator = "/") { it.label }
 }
 
-private fun stillQualityQuickLabel(state: SessionState, strings: SessionUiStrings): String {
-    return when (state.activeDeviceGraph.stillCapture.qualityPreference) {
-        StillCaptureQualityPreference.LATENCY -> strings.buttonStillFast
-        StillCaptureQualityPreference.QUALITY -> strings.buttonStillMax
-    }
-}
-
 private fun stillResolutionQuickLabel(state: SessionState, strings: SessionUiStrings): String {
     val native = selectedNativeStillCaptureOutputSizeOrNull(state)
     return native?.quickMegapixelLabel()
-        ?: state.activeDeviceGraph.stillCapture.resolutionPreset.label
+        ?: state.activeDeviceGraph.stillCapture.resolutionOption?.label
+        ?: "Auto"
 }
 
 private fun StillCaptureOutputSize.quickMegapixelLabel(): String {

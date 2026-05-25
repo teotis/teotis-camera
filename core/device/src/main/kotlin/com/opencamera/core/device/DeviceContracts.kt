@@ -4,7 +4,7 @@ import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotPlan
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
-import com.opencamera.core.media.StillCaptureQualityPreference
+import com.opencamera.core.media.StillCaptureResolutionOption
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.settings.ManualCaptureParams
@@ -146,6 +146,7 @@ data class DeviceCapabilities(
     val supportsFlashControl: Boolean = true,
     val availableLensFacings: Set<LensFacing> = setOf(LensFacing.BACK),
     val availableStillCaptureOutputSizes: List<StillCaptureOutputSize> = emptyList(),
+    val availableStillCaptureResolutionOptions: List<StillCaptureResolutionOption> = emptyList(),
     val availableStillCaptureResolutionPresets: Set<StillCaptureResolutionPreset> =
         StillCaptureResolutionPreset.entries.toSet(),
     val videoSpecConstraints: VideoSpecConstraints = VideoSpecConstraints(
@@ -415,9 +416,7 @@ fun nextZoomRatio(
 }
 
 data class StillCaptureConfig(
-    val qualityPreference: StillCaptureQualityPreference = StillCaptureQualityPreference.LATENCY,
-    val resolutionPreset: StillCaptureResolutionPreset =
-        StillCaptureResolutionPreset.LARGE_12MP,
+    val resolutionOption: StillCaptureResolutionOption? = null,
     val outputSize: StillCaptureOutputSize? = null
 )
 
@@ -462,18 +461,14 @@ data class DeviceGraphSpec(
             preferredLensFacing: LensFacing = LensFacing.BACK,
             enablePreviewSnapshots: Boolean = true,
             zoomRatio: Float = 1f,
-            qualityPreference: StillCaptureQualityPreference =
-                StillCaptureQualityPreference.LATENCY,
-            resolutionPreset: StillCaptureResolutionPreset =
-                StillCaptureResolutionPreset.LARGE_12MP,
+            resolutionOption: StillCaptureResolutionOption? = null,
             outputSize: StillCaptureOutputSize? = null
         ): DeviceGraphSpec {
             return DeviceGraphSpec(
                 template = CaptureTemplate.STILL_CAPTURE,
                 preferredLensFacing = preferredLensFacing,
                 stillCapture = StillCaptureConfig(
-                    qualityPreference = qualityPreference,
-                    resolutionPreset = resolutionPreset,
+                    resolutionOption = resolutionOption,
                     outputSize = outputSize
                 ),
                 preview = PreviewConfig(
@@ -491,10 +486,7 @@ data class DeviceGraphSpec(
             requestedVideoSpec: VideoSpec? = null,
             resolvedVideoSpec: VideoSpec? = null,
             qualityPreset: RecordingQualityPreset = RecordingQualityPreset.UHD,
-            stillQualityPreference: StillCaptureQualityPreference =
-                StillCaptureQualityPreference.LATENCY,
-            stillResolutionPreset: StillCaptureResolutionPreset =
-                StillCaptureResolutionPreset.LARGE_12MP,
+            stillResolutionOption: StillCaptureResolutionOption? = null,
             stillOutputSize: StillCaptureOutputSize? = null
         ): DeviceGraphSpec {
             val requestSpec = requestedVideoSpec ?: qualityPreset.defaultVideoSpec()
@@ -503,8 +495,7 @@ data class DeviceGraphSpec(
                 template = CaptureTemplate.VIDEO_RECORDING,
                 preferredLensFacing = preferredLensFacing,
                 stillCapture = StillCaptureConfig(
-                    qualityPreference = stillQualityPreference,
-                    resolutionPreset = stillResolutionPreset,
+                    resolutionOption = stillResolutionOption,
                     outputSize = stillOutputSize
                 ),
                 preview = PreviewConfig(

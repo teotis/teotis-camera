@@ -15,7 +15,6 @@ import com.opencamera.core.media.MediaMetadata
 
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
@@ -39,6 +38,7 @@ import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.WatermarkTemplate
 import com.opencamera.core.settings.renderStyleColorSpec
+import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.liveWatermarkMetadataTags
@@ -92,13 +92,6 @@ private class HumanisticModeController(
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
 
-    override suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = "Humanistic quality updated"
-        )
-    }
 
     override suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
@@ -252,14 +245,17 @@ private class HumanisticModeController(
     private fun buildEffectSpec(): EffectSpec {
         val style = currentStyle()
         val photoSettings = context.settingsSnapshot.persisted.photo
-        val adjustedRenderSpec = renderStyleColorSpec(
+        val pipelineResult = renderStyleColorSpecWithRecipe(
             profileId = style.id,
             baseRenderSpec = style.renderSpec,
             colorLabSpec = photoSettings.colorLabSpec,
             styleStrength = photoSettings.styleStrength
         )
+        val adjustedRenderSpec = pipelineResult?.finalRenderSpec
+        val recipe = pipelineResult?.recipe
+            ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
-            FilterEffect(style.id, adjustedRenderSpec),
+            FilterEffect(style.id, adjustedRenderSpec, recipe),
             FrameEffect(currentFrameRatio())
         ))
     }

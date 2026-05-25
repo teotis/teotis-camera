@@ -14,7 +14,6 @@ import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import kotlinx.coroutines.flow.StateFlow
@@ -70,15 +69,12 @@ fun ModeId.catalogProfile(): ModeCatalogProfile {
 data class ModeContext(
     val deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
     val initialLensFacing: LensFacing = LensFacing.BACK,
-    val initialStillCaptureQuality: StillCaptureQualityPreference =
-        StillCaptureQualityPreference.LATENCY,
     val initialStillCaptureResolutionPreset: StillCaptureResolutionPreset =
         StillCaptureResolutionPreset.LARGE_12MP,
     val runtimeState: () -> ModeRuntimeState = {
         ModeRuntimeState(
             deviceCapabilities = deviceCapabilities,
             lensFacing = initialLensFacing,
-            stillCaptureQuality = initialStillCaptureQuality,
             stillCaptureResolutionPreset = initialStillCaptureResolutionPreset
         )
     },
@@ -117,7 +113,6 @@ fun ModeContext.captureAidMetadataTags(): Map<String, String> {
 data class ModeRuntimeState(
     val deviceCapabilities: DeviceCapabilities,
     val lensFacing: LensFacing,
-    val stillCaptureQuality: StillCaptureQualityPreference,
     val stillCaptureResolutionPreset: StillCaptureResolutionPreset
 )
 
@@ -193,10 +188,6 @@ interface ModeController {
     suspend fun onDeviceCapabilitiesChanged(deviceCapabilities: DeviceCapabilities) = Unit
 
     suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
-
-    suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) = Unit
 
     suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset

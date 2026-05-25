@@ -11,7 +11,6 @@ import com.opencamera.core.media.MediaMetadata
 
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
-import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
@@ -78,13 +77,6 @@ private class DocumentModeController(
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
 
-    override suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: StillCaptureQualityPreference
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (enhancementEnabled()) {
-                "Document quality updated"
-            } else {
                 "Archive quality updated"
             }
         )
