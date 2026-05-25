@@ -813,8 +813,12 @@ class SessionUiRenderModelTest {
             text = TestAppTextResolver()
         )
 
+        assertEquals("Pure Text", model.headline)
         assertEquals(null, model.frameBackgroundControl)
         assertNotNull(model.placementControl.nextAction)
+        assertNotNull(model.textScaleControl.nextAction)
+        assertNotNull(model.textOpacityControl.nextAction)
+        assertTrue(model.footer.contains("Clean text sits directly on the source image"))
     }
 
     @Test

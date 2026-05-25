@@ -1301,10 +1301,10 @@ internal fun watermarkLabDetailRenderModel(
             append(template.tokenKeys.prettyWatermarkTokens(text))
             append(". ")
             append(
-                if (template.supportsFrameBorder) {
-                    text.watermarkDetailFooterFrame()
-                } else {
-                    text.watermarkDetailFooterOverlay()
+                when {
+                    template.id == "pure-text" -> text.watermarkDetailFooterPureText()
+                    template.supportsFrameBorder -> text.watermarkDetailFooterFrame()
+                    else -> text.watermarkDetailFooterOverlay()
                 }
             )
         }

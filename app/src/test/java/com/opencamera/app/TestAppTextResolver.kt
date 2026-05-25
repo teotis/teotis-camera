@@ -320,6 +320,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun watermarkDetailSupportingNotSelected(): String = "This template is not yet the current default. Adjust here first, then switch from the selector page when ready."
     override fun watermarkDetailFooterFrame(): String = "Frame border rendering is live for static-photo export."
     override fun watermarkDetailFooterOverlay(): String = "Classic overlay stays inside the source image without an expanded border."
+    override fun watermarkDetailFooterPureText(): String = "Clean text sits directly on the source image with no border or background container."
     override fun watermarkDetailTokensPrefix(): String = "Tokens: "
 
     // Watermark attribute prefixes
