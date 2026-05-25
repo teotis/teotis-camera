@@ -140,7 +140,7 @@ internal fun captureDisabledReason(state: SessionState, text: AppTextResolver): 
     if (state.activeShot != null && state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
     if (state.recordingStatus == RecordingStatus.RECORDING) return text.disabledRecording()
     if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
-    if (state.captureStatus == CaptureStatus.SAVING) return text.disabledSavingPhoto()
+    if (state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED) return text.disabledSavingPhoto()
     return null
 }
 
@@ -157,7 +157,7 @@ internal fun shutterDisabledReason(state: SessionState, text: AppTextResolver): 
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
         return text.disabledSavingPhoto()
     }
-    if (state.captureStatus == CaptureStatus.SAVING) return text.disabledSavingPhoto()
+    if (state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED) return text.disabledSavingPhoto()
     if (state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
     if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
     return null

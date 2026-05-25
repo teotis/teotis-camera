@@ -579,6 +579,7 @@ sealed interface DeviceEvent {
     data class PreviewError(val reason: String) : DeviceEvent
     data class RuntimeIssue(val issue: DeviceRuntimeIssue) : DeviceEvent
     data class ShotStarted(val shot: ShotRequest) : DeviceEvent
+    data class DataReceived(val shotId: String, val mediaType: MediaType) : DeviceEvent
     data class ShotCompleted(val result: ShotResult) : DeviceEvent
     data class ShotFailed(
         val shotId: String,

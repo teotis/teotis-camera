@@ -780,7 +780,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             return getString(R.string.disabled_preparing_recording)
         if (state.recordingStatus == RecordingStatus.RECORDING) return getString(R.string.disabled_recording)
         if (state.recordingStatus == RecordingStatus.STOPPING) return getString(R.string.disabled_stopping_recording)
-        if (state.captureStatus == com.opencamera.core.session.CaptureStatus.SAVING)
+        if (state.captureStatus == com.opencamera.core.session.CaptureStatus.SAVING ||
+            state.captureStatus == com.opencamera.core.session.CaptureStatus.DATA_RECEIVED)
             return getString(R.string.disabled_saving_photo)
         return null
     }

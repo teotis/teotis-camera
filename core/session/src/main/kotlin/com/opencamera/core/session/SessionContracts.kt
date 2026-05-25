@@ -45,6 +45,7 @@ enum class CaptureStatus {
     IDLE,
     REQUESTED,
     SAVING,
+    DATA_RECEIVED,
     COMPLETED,
     FAILED
 }
@@ -304,6 +305,7 @@ sealed interface SessionIntent {
     data class PreviewRuntimeIssue(val issue: DeviceRuntimeIssue) : SessionIntent
     data class PreviewStopped(val reason: String) : SessionIntent
     data class ShotStarted(val shot: ShotRequest) : SessionIntent
+    data class DataReceived(val shotId: String, val mediaType: MediaType) : SessionIntent
     data class ShotCompleted(val result: ShotResult) : SessionIntent
     data class ShotFailed(
         val shotId: String,

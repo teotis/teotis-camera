@@ -73,6 +73,7 @@ internal class CaptureRecordingSessionProcessor(
             is SessionIntent.CountdownTick -> handleCountdownTick(intent.remainingSeconds)
             SessionIntent.CountdownCompleted -> handleCountdownCompleted()
             is SessionIntent.ShotStarted -> handleShotStarted(intent.shot)
+            is SessionIntent.DataReceived -> handleDataReceived(intent.shotId, intent.mediaType)
             is SessionIntent.ShotCompleted -> handleShotCompleted(intent.result)
             is SessionIntent.ShotFailed -> handleShotFailed(
                 shotId = intent.shotId,
@@ -280,6 +281,17 @@ internal class CaptureRecordingSessionProcessor(
             if (shot.mediaType == MediaType.PHOTO) "capture.saving" else "recording.started",
             "shot=${shot.shotId},mode=${currentController().id}"
         )
+    }
+
+    private suspend fun handleDataReceived(shotId: String, mediaType: MediaType) {
+        updateState.update { s ->
+            if (s.activeShot?.shotId == shotId && mediaType == MediaType.PHOTO) {
+                s.copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+            } else {
+                s
+            }
+        }
+        trace.record("capture.data.received", "shotId=$shotId")
     }
 
     private suspend fun handleShotCompleted(result: ShotResult) {

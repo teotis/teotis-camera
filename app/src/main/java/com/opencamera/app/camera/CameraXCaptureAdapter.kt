@@ -1676,6 +1676,10 @@ class CameraXCaptureAdapter(
             }
 
             is PhotoCaptureOutcome.Success -> {
+                _events.emit(DeviceEvent.DataReceived(
+                    shotId = plan.request.shotId,
+                    mediaType = plan.request.mediaType
+                ))
                 runCatching {
                     emitShotCompleted(
                         plan = plan,

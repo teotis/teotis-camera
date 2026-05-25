@@ -144,6 +144,9 @@ class CameraSessionCoordinator(
             is DeviceEvent.ShotStarted -> session.dispatch(
                 SessionIntent.ShotStarted(event.shot)
             )
+            is DeviceEvent.DataReceived -> session.dispatch(
+                SessionIntent.DataReceived(event.shotId, event.mediaType)
+            )
             is DeviceEvent.ShotCompleted -> session.dispatch(
                 SessionIntent.ShotCompleted(event.result)
             )
