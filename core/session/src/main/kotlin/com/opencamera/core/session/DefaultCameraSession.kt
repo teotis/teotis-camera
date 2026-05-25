@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 import kotlinx.coroutines.launch
 
 class DefaultCameraSession(
@@ -266,7 +267,9 @@ class DefaultCameraSession(
         trace = trace,
         mutations = previewSessionMutations,
         countdownInProgress = { captureRecordingProcessor.countdownInProgress() },
-        cancelPendingCountdown = { reason -> captureRecordingProcessor.cancelPendingCountdown(reason) }
+        cancelPendingCountdown = { reason -> captureRecordingProcessor.cancelPendingCountdown(reason) },
+        scope = scope,
+        dispatch = { intent -> dispatch(intent) }
     )
 
     init {
@@ -327,6 +330,11 @@ class DefaultCameraSession(
             SessionIntent.DecreasePreviewBrightness -> handleStepPreviewBrightness(-1)
             SessionIntent.ResetPreviewBrightness -> handleApplyPreviewBrightness(0)
             is SessionIntent.PreviewBrightnessApplied -> handlePreviewBrightnessApplied(intent.result)
+            SessionIntent.DocumentBatchClear -> handleDocumentBatchClear()
+            is SessionIntent.DocumentBatchRemoveItem -> handleDocumentBatchRemoveItem(intent.itemId)
+            is SessionIntent.DocumentBatchMoveItem -> handleDocumentBatchMoveItem(intent.itemId, intent.direction)
+            is SessionIntent.DocumentBatchReorder -> handleDocumentBatchReorder(intent.orderedItemIds)
+            SessionIntent.DocumentBatchFinish -> handleDocumentBatchFinish()
             else -> error("Unexpected mode control intent: $intent")
         }
     }
@@ -449,6 +457,16 @@ class DefaultCameraSession(
         currentController.onEnter()
         resetPreviewBrightness()
 
+        val newDocumentBatch = if (currentController.id == ModeId.DOCUMENT &&
+            _state.value.presentation.documentBatch.status != DocumentBatchStatus.ACTIVE
+        ) {
+            DocumentBatchState(
+                batchId = UUID.randomUUID().toString(),
+                status = DocumentBatchStatus.ACTIVE
+            )
+        } else {
+            _state.value.presentation.documentBatch
+        }
         updateState(
             activeMode = currentController.id,
             captureStatus = CaptureStatus.IDLE,
@@ -457,6 +475,7 @@ class DefaultCameraSession(
             modeSnapshot = currentController.snapshot.value,
             activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
             activeDeviceGraph = resolvedActiveDeviceGraph(),
+            documentBatch = newDocumentBatch,
             lastAction = "Switched to ${currentController.snapshot.value.uiSpec.title}",
             lastError = null
         )
@@ -1200,6 +1219,95 @@ class DefaultCameraSession(
         }
     }
 
+    private fun handleDocumentBatchClear() {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status == DocumentBatchStatus.INACTIVE) {
+            updateState(lastAction = "No active document batch to clear")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.copy(
+                items = emptyList(),
+                latestItemId = null,
+                lastMessage = "Batch cleared"
+            ),
+            lastAction = "Document batch cleared"
+        )
+    }
+
+    private fun handleDocumentBatchRemoveItem(itemId: String) {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot remove item: batch is not active")
+            return
+        }
+        val item = currentBatch.items.find { it.itemId == itemId }
+        if (item == null) {
+            updateState(lastAction = "Cannot remove item: $itemId not in batch")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.removeItem(itemId),
+            lastAction = "Removed document page from batch"
+        )
+    }
+
+    private fun handleDocumentBatchMoveItem(itemId: String, direction: DocumentBatchMoveDirection) {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot move item: batch is not active")
+            return
+        }
+        if (currentBatch.items.size < 2) {
+            updateState(lastAction = "Cannot reorder: batch has fewer than 2 items")
+            return
+        }
+        val currentIndex = currentBatch.items.indexOfFirst { it.itemId == itemId }
+        if (currentIndex == -1) {
+            updateState(lastAction = "Cannot move: $itemId not in batch")
+            return
+        }
+        val targetIndex = when (direction) {
+            DocumentBatchMoveDirection.UP -> (currentIndex - 1).coerceAtLeast(0)
+            DocumentBatchMoveDirection.DOWN -> (currentIndex + 1).coerceAtMost(currentBatch.items.lastIndex)
+        }
+        if (targetIndex == currentIndex) {
+            updateState(lastAction = "Item already at target position")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.moveItem(itemId, direction),
+            lastAction = "Reordered document pages"
+        )
+    }
+
+    private fun handleDocumentBatchReorder(orderedItemIds: List<String>) {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot reorder: batch is not active")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.reorder(orderedItemIds),
+            lastAction = "Document pages reordered"
+        )
+    }
+
+    private fun handleDocumentBatchFinish() {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot finish: batch is not active")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.copy(
+                status = DocumentBatchStatus.FINISHED,
+                lastMessage = "Batch finished"
+            ),
+            lastAction = "Document batch finished"
+        )
+    }
+
     private fun brightnessLabel(steps: Int): String {
         return if (steps >= 0) "+$steps" else "$steps"
     }
@@ -1239,7 +1347,8 @@ class DefaultCameraSession(
         previewBrightnessSteps: Int = _state.value.presentation.previewBrightnessSteps,
         previewBrightnessFeedback: PreviewBrightnessFeedback? = _state.value.presentation.previewBrightnessFeedback,
         photoSceneSignal: com.opencamera.core.device.PhotoSceneSignal = _state.value.presentation.photoSceneSignal,
-        photoLowLightPrompt: PhotoLowLightPrompt? = _state.value.presentation.photoLowLightPrompt
+        photoLowLightPrompt: PhotoLowLightPrompt? = _state.value.presentation.photoLowLightPrompt,
+        documentBatch: DocumentBatchState = _state.value.presentation.documentBatch
     ) {
         _state.value = _state.value.copy(
             lifecycle = lifecycle,
@@ -1277,7 +1386,8 @@ class DefaultCameraSession(
                 previewBrightnessSteps = previewBrightnessSteps,
                 previewBrightnessFeedback = previewBrightnessFeedback,
                 photoSceneSignal = photoSceneSignal,
-                photoLowLightPrompt = photoLowLightPrompt
+                photoLowLightPrompt = photoLowLightPrompt,
+                documentBatch = documentBatch
             )
         )
     }

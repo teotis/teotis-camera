@@ -32,7 +32,12 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     SessionIntent.IncreasePreviewBrightness,
     SessionIntent.DecreasePreviewBrightness,
     SessionIntent.ResetPreviewBrightness,
-    is SessionIntent.PreviewBrightnessApplied -> SessionIntentOwner.MODE_CONTROL
+    is SessionIntent.PreviewBrightnessApplied,
+    SessionIntent.DocumentBatchClear,
+    is SessionIntent.DocumentBatchRemoveItem,
+    is SessionIntent.DocumentBatchMoveItem,
+    is SessionIntent.DocumentBatchReorder,
+    SessionIntent.DocumentBatchFinish -> SessionIntentOwner.MODE_CONTROL
 
     SessionIntent.PreviewHostAttached,
     is SessionIntent.PreviewHostDetached,

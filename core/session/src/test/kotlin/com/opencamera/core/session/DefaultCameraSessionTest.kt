@@ -4188,4 +4188,495 @@ class DefaultCameraSessionTest {
 
         assertEquals(signal, session.state.value.presentation.photoSceneSignal)
     }
+
+    // ── Document batch ────────────────────────────────────────────
+
+    @Test
+    fun `switching to document mode creates active batch with fresh batchId`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        assertEquals(
+            DocumentBatchStatus.INACTIVE,
+            session.state.value.presentation.documentBatch.status
+        )
+        assertTrue(session.state.value.presentation.documentBatch.batchId.isEmpty())
+
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        assertEquals(
+            DocumentBatchStatus.ACTIVE,
+            session.state.value.presentation.documentBatch.status
+        )
+        assertTrue(session.state.value.presentation.documentBatch.batchId.isNotEmpty())
+        assertTrue(session.state.value.presentation.documentBatch.items.isEmpty())
+    }
+
+    @Test
+    fun `re-entering document mode after clear reuses existing active batch`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        val firstBatchId = session.state.value.presentation.documentBatch.batchId
+
+        session.dispatch(SessionIntent.DocumentBatchClear)
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.SwitchMode(ModeId.PHOTO))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        assertEquals(firstBatchId, session.state.value.presentation.documentBatch.batchId)
+    }
+
+    @Test
+    fun `clearing document batch removes all items but keeps batch active`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        suspend fun dispatchShot(path: String) {
+            session.dispatch(SessionIntent.ShutterPressed)
+            advanceUntilIdle()
+            val shot = assertNotNull(session.state.value.activeShot)
+            session.dispatch(SessionIntent.ShotStarted(shot))
+            session.dispatch(
+                SessionIntent.ShotCompleted(
+                    ShotResult(
+                        shotId = shot.shotId,
+                        mediaType = MediaType.PHOTO,
+                        outputPath = path,
+                        saveRequest = SaveRequest.photoLibrary(),
+                        thumbnailSource = ThumbnailSource.SavedMedia(path),
+                        metadata = SaveRequest.photoLibrary().metadata
+                    )
+                )
+            )
+            advanceUntilIdle()
+        }
+
+        dispatchShot("Pictures/OpenCamera/doc1.jpg")
+
+        assertTrue(session.state.value.presentation.documentBatch.items.isNotEmpty())
+
+        session.dispatch(SessionIntent.DocumentBatchClear)
+        advanceUntilIdle()
+
+        assertEquals(
+            DocumentBatchStatus.ACTIVE,
+            session.state.value.presentation.documentBatch.status
+        )
+        assertTrue(session.state.value.presentation.documentBatch.items.isEmpty())
+        assertNull(session.state.value.presentation.documentBatch.latestItemId)
+    }
+
+    @Test
+    fun `removing item from batch renumbers remaining items`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        suspend fun dispatchShot(path: String) {
+            session.dispatch(SessionIntent.ShutterPressed)
+            advanceUntilIdle()
+            val shot = assertNotNull(session.state.value.activeShot)
+            session.dispatch(SessionIntent.ShotStarted(shot))
+            session.dispatch(
+                SessionIntent.ShotCompleted(
+                    ShotResult(
+                        shotId = shot.shotId,
+                        mediaType = MediaType.PHOTO,
+                        outputPath = path,
+                        saveRequest = SaveRequest.photoLibrary(),
+                        thumbnailSource = ThumbnailSource.SavedMedia(path),
+                        metadata = SaveRequest.photoLibrary().metadata
+                    )
+                )
+            )
+            advanceUntilIdle()
+        }
+
+        dispatchShot("Pictures/OpenCamera/doc1.jpg")
+        dispatchShot("Pictures/OpenCamera/doc2.jpg")
+
+        val items = session.state.value.presentation.documentBatch.items
+        assertEquals(2, items.size)
+        assertEquals(0, items[0].orderIndex)
+        assertEquals(1, items[1].orderIndex)
+
+        session.dispatch(SessionIntent.DocumentBatchRemoveItem(items[0].itemId))
+        advanceUntilIdle()
+
+        val remaining = session.state.value.presentation.documentBatch.items
+        assertEquals(1, remaining.size)
+        assertEquals(0, remaining[0].orderIndex)
+        assertEquals(items[1].itemId, remaining[0].itemId)
+    }
+
+    @Test
+    fun `removing unknown item does not corrupt batch`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.DocumentBatchRemoveItem("non-existent-id"))
+        advanceUntilIdle()
+
+        assertTrue(session.state.value.presentation.documentBatch.items.isEmpty())
+        assertEquals(
+            "Cannot remove item: non-existent-id not in batch",
+            session.state.value.lastAction
+        )
+    }
+
+    @Test
+    fun `moving item up changes order deterministically`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        suspend fun dispatchShot(path: String) {
+            session.dispatch(SessionIntent.ShutterPressed)
+            advanceUntilIdle()
+            val shot = assertNotNull(session.state.value.activeShot)
+            session.dispatch(SessionIntent.ShotStarted(shot))
+            session.dispatch(
+                SessionIntent.ShotCompleted(
+                    ShotResult(
+                        shotId = shot.shotId,
+                        mediaType = MediaType.PHOTO,
+                        outputPath = path,
+                        saveRequest = SaveRequest.photoLibrary(),
+                        thumbnailSource = ThumbnailSource.SavedMedia(path),
+                        metadata = SaveRequest.photoLibrary().metadata
+                    )
+                )
+            )
+            advanceUntilIdle()
+        }
+
+        dispatchShot("Pictures/OpenCamera/doc1.jpg")
+        dispatchShot("Pictures/OpenCamera/doc2.jpg")
+        dispatchShot("Pictures/OpenCamera/doc3.jpg")
+
+        val items = session.state.value.presentation.documentBatch.items
+        assertEquals(3, items.size)
+
+        session.dispatch(SessionIntent.DocumentBatchMoveItem(items[2].itemId, DocumentBatchMoveDirection.UP))
+        advanceUntilIdle()
+
+        val moved = session.state.value.presentation.documentBatch.items
+        assertEquals(3, moved.size)
+        assertEquals(items[0].itemId, moved[0].itemId)
+        assertEquals(items[2].itemId, moved[1].itemId)
+        assertEquals(items[1].itemId, moved[2].itemId)
+        assertEquals(0, moved[0].orderIndex)
+        assertEquals(1, moved[1].orderIndex)
+        assertEquals(2, moved[2].orderIndex)
+    }
+
+    @Test
+    fun `moving item down changes order deterministically`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        suspend fun dispatchShot(path: String) {
+            session.dispatch(SessionIntent.ShutterPressed)
+            advanceUntilIdle()
+            val shot = assertNotNull(session.state.value.activeShot)
+            session.dispatch(SessionIntent.ShotStarted(shot))
+            session.dispatch(
+                SessionIntent.ShotCompleted(
+                    ShotResult(
+                        shotId = shot.shotId,
+                        mediaType = MediaType.PHOTO,
+                        outputPath = path,
+                        saveRequest = SaveRequest.photoLibrary(),
+                        thumbnailSource = ThumbnailSource.SavedMedia(path),
+                        metadata = SaveRequest.photoLibrary().metadata
+                    )
+                )
+            )
+            advanceUntilIdle()
+        }
+
+        dispatchShot("Pictures/OpenCamera/doc1.jpg")
+        dispatchShot("Pictures/OpenCamera/doc2.jpg")
+        dispatchShot("Pictures/OpenCamera/doc3.jpg")
+
+        val items = session.state.value.presentation.documentBatch.items
+        assertEquals(3, items.size)
+
+        session.dispatch(SessionIntent.DocumentBatchMoveItem(items[0].itemId, DocumentBatchMoveDirection.DOWN))
+        advanceUntilIdle()
+
+        val moved = session.state.value.presentation.documentBatch.items
+        assertEquals(3, moved.size)
+        assertEquals(items[1].itemId, moved[0].itemId)
+        assertEquals(items[0].itemId, moved[1].itemId)
+        assertEquals(items[2].itemId, moved[2].itemId)
+        assertEquals(0, moved[0].orderIndex)
+        assertEquals(1, moved[1].orderIndex)
+        assertEquals(2, moved[2].orderIndex)
+    }
+
+    @Test
+    fun `moving unknown item does not alter batch state`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        val batchBefore = session.state.value.presentation.documentBatch
+        session.dispatch(SessionIntent.DocumentBatchMoveItem("non-existent-id", DocumentBatchMoveDirection.DOWN))
+        advanceUntilIdle()
+
+        val batchAfter = session.state.value.presentation.documentBatch
+        assertEquals(batchBefore.items, batchAfter.items)
+        assertEquals("Cannot move: non-existent-id not in batch", session.state.value.lastAction)
+    }
+
+    @Test
+    fun `shot completed in non-document mode does not append to batch`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        assertEquals(
+            DocumentBatchStatus.INACTIVE,
+            session.state.value.presentation.documentBatch.status
+        )
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/photo.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/photo.jpg"),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertTrue(session.state.value.presentation.documentBatch.items.isEmpty())
+    }
+
+    @Test
+    fun `shot completed in document mode auto-appends to batch`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/doc_page.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/doc_page.jpg"),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val batch = session.state.value.presentation.documentBatch
+        assertEquals(1, batch.items.size)
+        val item = batch.items[0]
+        assertEquals(shot.shotId, item.itemId)
+        assertEquals(shot.shotId, item.shotId)
+        assertEquals(0, item.orderIndex)
+        assertEquals("Pictures/OpenCamera/doc_page.jpg", item.outputPath)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, item.cropStatus)
+        assertEquals(item.itemId, batch.latestItemId)
+    }
+
+    @Test
+    fun `latestThumbnailSource unchanged after document batch clear`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/doc_page.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/doc_page.jpg"),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val thumbBeforeClear = session.state.value.presentation.latestThumbnailSource
+        assertTrue(thumbBeforeClear is ThumbnailSource.SavedMedia)
+
+        session.dispatch(SessionIntent.DocumentBatchClear)
+        advanceUntilIdle()
+
+        val thumbAfterClear = session.state.value.presentation.latestThumbnailSource
+        assertTrue(thumbAfterClear is ThumbnailSource.SavedMedia)
+        assertEquals(
+            (thumbBeforeClear as ThumbnailSource.SavedMedia).outputPath,
+            (thumbAfterClear as ThumbnailSource.SavedMedia).outputPath
+        )
+    }
+
+    @Test
+    fun `removing last item sets latestItemId to null`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/doc_page.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/doc_page.jpg"),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        assertNotNull(session.state.value.presentation.documentBatch.latestItemId)
+
+        session.dispatch(SessionIntent.DocumentBatchRemoveItem(shot.shotId))
+        advanceUntilIdle()
+
+        assertNull(session.state.value.presentation.documentBatch.latestItemId)
+    }
+
+    @Test
+    fun `moving item at boundary is clamped without error`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.DOCUMENT))
+        advanceUntilIdle()
+
+        suspend fun dispatchShot(path: String) {
+            session.dispatch(SessionIntent.ShutterPressed)
+            advanceUntilIdle()
+            val shot = assertNotNull(session.state.value.activeShot)
+            session.dispatch(SessionIntent.ShotStarted(shot))
+            session.dispatch(
+                SessionIntent.ShotCompleted(
+                    ShotResult(
+                        shotId = shot.shotId,
+                        mediaType = MediaType.PHOTO,
+                        outputPath = path,
+                        saveRequest = SaveRequest.photoLibrary(),
+                        thumbnailSource = ThumbnailSource.SavedMedia(path),
+                        metadata = SaveRequest.photoLibrary().metadata
+                    )
+                )
+            )
+            advanceUntilIdle()
+        }
+
+        dispatchShot("Pictures/OpenCamera/doc1.jpg")
+        dispatchShot("Pictures/OpenCamera/doc2.jpg")
+
+        val itemsBefore = session.state.value.presentation.documentBatch.items
+
+        session.dispatch(SessionIntent.DocumentBatchMoveItem(itemsBefore[0].itemId, DocumentBatchMoveDirection.UP))
+        advanceUntilIdle()
+
+        val itemsAfter = session.state.value.presentation.documentBatch.items
+        assertEquals(itemsBefore[0].itemId, itemsAfter[0].itemId)
+        assertEquals(itemsBefore[1].itemId, itemsAfter[1].itemId)
+        assertEquals("Item already at target position", session.state.value.lastAction)
+    }
 }
