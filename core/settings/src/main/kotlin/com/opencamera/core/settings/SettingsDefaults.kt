@@ -292,5 +292,24 @@ val DEFAULT_WATERMARK_TEMPLATES: List<WatermarkTemplate> = listOf(
             WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
             WatermarkFrameBackground.SOURCE_VIVID_BLUR
         )
+    ),
+    WatermarkTemplate(
+        id = "professional-bottom-bar",
+        label = "Professional Bottom Bar",
+        tokenKeys = setOf("model", "datetime", "camera-params"),
+        supportsFrameBorder = true,
+        kind = WatermarkTemplateKind.EXPANDED_FRAME,
+        allowedPlacements = setOf(
+            WatermarkTextPlacement.BOTTOM_LEFT,
+            WatermarkTextPlacement.BOTTOM_CENTER,
+            WatermarkTextPlacement.BOTTOM_RIGHT
+        ),
+        allowedFrameBackgrounds = setOf(
+            WatermarkFrameBackground.DARK,
+            WatermarkFrameBackground.WHITE,
+            WatermarkFrameBackground.SOURCE_BLUR,
+            WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
+            WatermarkFrameBackground.SOURCE_VIVID_BLUR
+        )
     )
 )

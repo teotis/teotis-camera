@@ -33,6 +33,10 @@ object PersistedSettingsSerializer {
     private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_SCALE = "photo.watermark.blurFourBorder.scale"
     private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_OPACITY = "photo.watermark.blurFourBorder.opacity"
     private const val KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_BACKGROUND = "photo.watermark.blurFourBorder.background"
+    private const val KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_POSITION = "photo.watermark.professionalBottomBar.position"
+    private const val KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_SCALE = "photo.watermark.professionalBottomBar.scale"
+    private const val KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_OPACITY = "photo.watermark.professionalBottomBar.opacity"
+    private const val KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_BACKGROUND = "photo.watermark.professionalBottomBar.background"
     private const val KEY_PHOTO_LIVE_DEFAULT = "photo.livePhotoEnabledByDefault"
     private const val KEY_PHOTO_COUNTDOWN = "photo.countdownDuration"
     private const val KEY_VIDEO_FILTER = "video.defaultFilterProfileId"
@@ -82,6 +86,10 @@ object PersistedSettingsSerializer {
             KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_SCALE to settings.photo.blurFourBorderWatermarkStyle.textScale.storageKey,
             KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_OPACITY to settings.photo.blurFourBorderWatermarkStyle.textOpacity.storageKey,
             KEY_PHOTO_WATERMARK_BLUR_FOUR_BORDER_BACKGROUND to settings.photo.blurFourBorderWatermarkStyle.frameBackground.storageKey,
+            KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_POSITION to settings.photo.professionalBottomBarWatermarkStyle.textPlacement.storageKey,
+            KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_SCALE to settings.photo.professionalBottomBarWatermarkStyle.textScale.storageKey,
+            KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_OPACITY to settings.photo.professionalBottomBarWatermarkStyle.textOpacity.storageKey,
+            KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_BACKGROUND to settings.photo.professionalBottomBarWatermarkStyle.frameBackground.storageKey,
             KEY_PHOTO_LIVE_DEFAULT to settings.photo.livePhotoEnabledByDefault.toString(),
             KEY_PHOTO_COUNTDOWN to settings.photo.countdownDuration.storageKey,
             KEY_VIDEO_FILTER to settings.video.defaultFilterProfileId,
