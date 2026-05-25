@@ -22,6 +22,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -68,15 +69,22 @@ class PreviewRecoverySessionProcessorTest {
         val mutations = RecordingMutations(state)
         var countdownActive = false
         val countdownCancellations = mutableListOf<String>()
+        val testScope = TestScope()
 
-        val processor = PreviewRecoverySessionProcessor(
-            state = state,
-            effects = effects,
-            trace = trace,
-            mutations = mutations,
-            countdownInProgress = { countdownActive },
-            cancelPendingCountdown = { reason -> countdownCancellations.add(reason) }
-        )
+        lateinit var processor: PreviewRecoverySessionProcessor
+
+        init {
+            processor = PreviewRecoverySessionProcessor(
+                state = state,
+                effects = effects,
+                trace = trace,
+                mutations = mutations,
+                countdownInProgress = { countdownActive },
+                cancelPendingCountdown = { reason -> countdownCancellations.add(reason) },
+                scope = testScope,
+                dispatch = { intent -> processor.process(intent) }
+            )
+        }
 
         suspend fun dispatch(intent: SessionIntent) = processor.process(intent)
 
@@ -165,6 +173,15 @@ class PreviewRecoverySessionProcessorTest {
 
         override fun updatePreviewMeteringCompleted(result: PreviewMeteringResult) {
             calls.add("meteringCompleted:${result.requestId}")
+        }
+
+        override fun clearPreviewMeteringFeedback(requestId: String) {
+            calls.add("clearMetering:$requestId")
+            flow.value = flow.value.copy(
+                presentation = flow.value.presentation.copy(
+                    previewMeteringFeedback = null
+                )
+            )
         }
 
         override fun updatePreviewHostAttached(lastAction: String) {

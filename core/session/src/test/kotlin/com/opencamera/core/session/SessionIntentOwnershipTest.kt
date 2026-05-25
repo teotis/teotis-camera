@@ -102,4 +102,12 @@ class SessionIntentOwnershipTest {
             SessionIntent.OutputRotationChanged(CameraOutputRotation.ROTATION_0).owner()
         )
     }
+
+    @Test
+    fun `PreviewMeteringFeedbackExpired maps to PREVIEW_RECOVERY`() {
+        assertEquals(
+            SessionIntentOwner.PREVIEW_RECOVERY,
+            SessionIntent.PreviewMeteringFeedbackExpired(requestId = "meter-1").owner()
+        )
+    }
 }
