@@ -128,8 +128,47 @@ class PerceptualColorRecipeTest {
     }
 
     @Test
-    fun `missing recipeToneLift in tags returns neutral recipe`() {
-        val parsed = parsePerceptualColorRecipe(mapOf("recipeChromaBoost" to "0.5"))
+    fun `missing recipe toneLift in tags returns neutral recipe`() {
+        val parsed = parsePerceptualColorRecipe(mapOf("recipe.chromaBoost" to "0.5"))
         assertTrue(parsed.isNeutral)
+    }
+
+    @Test
+    fun `codec round trip preserves recipe values`() {
+        val original = PerceptualColorRecipe(
+            toneLift = 0.4f,
+            toneDepth = 0.25f,
+            chromaBoost = 0.18f,
+            warmthBias = 0.32f,
+            tintBias = -0.08f,
+            shadowTint = 0.12f,
+            highlightTint = 0.05f,
+            neutralProtection = 0.75f,
+            skinProtection = 0.70f
+        )
+        val tags = original.toMetadataTags()
+        val parsed = parsePerceptualColorRecipe(tags)
+        assertEquals(original, parsed)
+        assertFalse(parsed.isNeutral)
+    }
+
+    @Test
+    fun `legacy recipe tag keys are still parseable`() {
+        val tags = mapOf(
+            "recipeToneLift" to "0.3",
+            "recipeToneDepth" to "0.2",
+            "recipeChromaBoost" to "0.1",
+            "recipeWarmthBias" to "0.15",
+            "recipeTintBias" to "0.0",
+            "recipeNeutralProtection" to "0.8",
+            "recipeSkinProtection" to "0.7"
+        )
+        val parsed = parsePerceptualColorRecipe(tags)
+        assertEquals(0.3f, parsed.toneLift)
+        assertEquals(0.2f, parsed.toneDepth)
+        assertEquals(0.1f, parsed.chromaBoost)
+        assertEquals(0.15f, parsed.warmthBias)
+        assertEquals(0.0f, parsed.tintBias)
+        assertFalse(parsed.isNeutral)
     }
 }
