@@ -170,13 +170,13 @@ class EffectBridgeTest {
         val tags = EffectBridge.toMetadataTags(spec)
 
         assertEquals("color-lab", tags["filterProfile"])
-        assertEquals("0.5", tags["recipeToneLift"])
-        assertEquals("0.3", tags["recipeToneDepth"])
-        assertEquals("0.2", tags["recipeChromaBoost"])
-        assertEquals("0.4", tags["recipeWarmthBias"])
-        assertEquals("-0.1", tags["recipeTintBias"])
-        assertEquals("0.75", tags["recipeNeutralProtection"])
-        assertEquals("0.7", tags["recipeSkinProtection"])
+        assertEquals("0.5", tags["recipe.toneLift"])
+        assertEquals("0.3", tags["recipe.toneDepth"])
+        assertEquals("0.2", tags["recipe.chromaBoost"])
+        assertEquals("0.4", tags["recipe.warmthBias"])
+        assertEquals("-0.1", tags["recipe.tintBias"])
+        assertEquals("0.75", tags["recipe.neutralProtection"])
+        assertEquals("0.7", tags["recipe.skinProtection"])
     }
 
     @Test
@@ -187,7 +187,7 @@ class EffectBridgeTest {
         val tags = EffectBridge.toMetadataTags(spec)
 
         assertEquals("vivid", tags["filterProfile"])
-        assertNull(tags["recipeToneLift"])
-        assertNull(tags["recipeChromaBoost"])
+        assertNull(tags["recipe.toneLift"])
+        assertNull(tags["recipe.chromaBoost"])
     }
 }
