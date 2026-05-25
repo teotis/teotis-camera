@@ -1670,6 +1670,19 @@ class CameraXCaptureAdapter(
             is PhotoCaptureOutcome.Success -> {
                 val resolvedSpec = plan.saveTask.livePhotoSpec
                     ?: com.opencamera.core.media.LivePhotoCaptureSpec()
+                val saveFormat = resolvedSpec.saveFormat
+
+                // STILL_JPEG_ONLY: skip live entirely, return still with diagnostic
+                if (saveFormat == com.opencamera.core.settings.LiveSaveFormat.STILL_JPEG_ONLY) {
+                    return result.copy(
+                        livePhotoBundle = null,
+                        diagnostics = result.diagnostics + listOf(
+                            "live-export:format=still-jpeg-only",
+                            "live-export:share-target=still",
+                            "live-export:fallback=disabled-by-format"
+                        )
+                    )
+                }
 
                 // Use frame source if available
                 val frameSource = livePreviewFrameSource
@@ -1713,28 +1726,50 @@ class CameraXCaptureAdapter(
                     temporalWindow = temporalPlan.temporalWindow
                 )
 
-                val motionPhotoMaterialization = materializeMotionPhotoBundleIfPossible(
-                    bundle = livePhotoBundle,
-                    motionSourceResult = motionSourceResult,
-                    prepareMotionSegment = { frames, motionPath ->
-                        (frameSource as? com.opencamera.app.camera.live.MotionSegmentFrameSource)
-                            ?.materializeMotionSegment(frames, motionPath)
-                            ?: Result.failure(
-                                IllegalStateException("Motion segment source is not available")
+                // Branch by save format for container materialization
+                val livePhotoResult = when (saveFormat) {
+                    com.opencamera.core.settings.LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG -> {
+                        materializeMotionPhotoBundleIfPossible(
+                            bundle = livePhotoBundle,
+                            motionSourceResult = motionSourceResult,
+                            prepareMotionSegment = { frames, motionPath ->
+                                (frameSource as? com.opencamera.app.camera.live.MotionSegmentFrameSource)
+                                    ?.materializeMotionSegment(frames, motionPath)
+                                    ?: Result.failure(
+                                        IllegalStateException("Motion segment source is not available")
+                                    )
+                            }
+                        ) { motionPath ->
+                            com.opencamera.app.camera.live.MotionPhotoFileMaterializer().materialize(
+                                stillPath = result.outputPath,
+                                motionPath = motionPath,
+                                outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
+                                spec = com.opencamera.core.media.MotionPhotoContainerSpec(
+                                    motionLengthBytes = 0
+                                ),
+                                cleanupTempMotion = false
                             )
+                        }
                     }
-                ) { motionPath ->
-                    com.opencamera.app.camera.live.MotionPhotoFileMaterializer().materialize(
-                        stillPath = result.outputPath,
-                        motionPath = motionPath,
-                        outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
-                        spec = com.opencamera.core.media.MotionPhotoContainerSpec(
-                            motionLengthBytes = 0
-                        ),
-                        cleanupTempMotion = false
-                    )
+                    com.opencamera.core.settings.LiveSaveFormat.MOTION_MP4_SIDECAR -> {
+                        LiveMotionPhotoMaterializationResult(
+                            bundle = livePhotoBundle,
+                            diagnostics = emptyList()
+                        )
+                    }
+                    com.opencamera.core.settings.LiveSaveFormat.STILL_JPEG_ONLY -> {
+                        // Unreachable due to early return above, but exhaustive
+                        return result.copy(
+                            livePhotoBundle = null,
+                            diagnostics = result.diagnostics + listOf(
+                                "live-export:format=still-jpeg-only",
+                                "live-export:share-target=still",
+                                "live-export:fallback=disabled-by-format"
+                            )
+                        )
+                    }
                 }
-                val finalBundle = motionPhotoMaterialization.bundle
+                val finalBundle = livePhotoResult.bundle
 
                 val sidecarResult = runCatching {
                     materializeLivePhotoSidecar(
@@ -1743,28 +1778,25 @@ class CameraXCaptureAdapter(
                     )
                 }
 
-                val containerSucceeded = motionPhotoMaterialization.diagnostics
+                val containerSucceeded = livePhotoResult.diagnostics
                     .any { it == "motion-photo:container=google-jpeg" }
-                val containerFailed = motionPhotoMaterialization.diagnostics
+                val containerFailed = livePhotoResult.diagnostics
                     .any { it.startsWith("motion-photo:container=failed:") }
-                val motionMissing = motionPhotoMaterialization.diagnostics
+                val motionMissing = livePhotoResult.diagnostics
                     .any { it.startsWith("motion-photo:motion-segment=failed:") }
 
                 val diagnosisBuilder = buildList {
-                    add("live-format:intended=google-motion-photo-jpeg")
-                    add("live-format:actual=${
-                        if (containerSucceeded) "google-motion-photo-jpeg" else "still-jpeg"
-                    }")
-                    add("live-motion:status=${
-                        when {
-                            containerSucceeded -> "encoded"
-                            containerFailed || motionMissing -> "failed"
-                            else -> "missing"
+                    add("live-export:format=${saveFormat.storageKey}")
+                    add("live-export:share-target=${
+                        when (saveFormat) {
+                            com.opencamera.core.settings.LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG -> "motion-photo"
+                            com.opencamera.core.settings.LiveSaveFormat.MOTION_MP4_SIDECAR -> "mp4"
+                            com.opencamera.core.settings.LiveSaveFormat.STILL_JPEG_ONLY -> "still"
                         }
                     }")
                     add("device:live-photo=bundle")
                     addAll(motionSourceResult.diagnostics)
-                    addAll(motionPhotoMaterialization.diagnostics)
+                    addAll(livePhotoResult.diagnostics)
                     if (containerSucceeded) {
                         val motionFile = File(finalBundle.motionPath)
                         if (motionFile.exists()) {
@@ -1788,9 +1820,6 @@ class CameraXCaptureAdapter(
                     }
                 }
 
-                // Sidecar failure is non-fatal: still photo was already saved.
-                // Return Success with livePhotoBundle = null so consumers
-                // treat it as a regular still photo, not a live photo.
                 result.copy(
                     livePhotoBundle = if (sidecarResult.isSuccess) finalBundle else null,
                     diagnostics = result.diagnostics + diagnosisBuilder

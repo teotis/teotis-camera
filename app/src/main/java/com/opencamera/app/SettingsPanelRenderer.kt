@@ -39,6 +39,7 @@ internal class SettingsPanelRenderer(
         views.photoWatermark.isEnabled = model.editingEnabled &&
             model.photoSection.watermarkTemplate.availability != SettingsControlAvailability.UNSUPPORTED
         renderControl(views.photoLive, model.photoSection.livePhoto, model.editingEnabled)
+        renderControl(views.photoLiveSaveFormat, model.photoSection.liveSaveFormat, model.editingEnabled)
         renderControl(views.photoTimer, model.photoSection.countdown, model.editingEnabled)
         renderControl(views.videoResolution, model.videoSection.resolution, model.editingEnabled)
         renderControl(views.videoFrameRate, model.videoSection.frameRate, model.editingEnabled)

@@ -39,6 +39,7 @@ sealed interface PersistedSettingsAction {
         val background: WatermarkFrameBackground
     ) : PersistedSettingsAction
     data class UpdateLivePhotoDefault(val enabled: Boolean) : PersistedSettingsAction
+    data class UpdateLiveSaveFormat(val format: LiveSaveFormat) : PersistedSettingsAction
     data class UpdateCountdownDuration(val countdownDuration: CountdownDuration) :
         PersistedSettingsAction
     data class UpdateDefaultVideoSpec(val videoSpec: VideoSpec) : PersistedSettingsAction
@@ -127,6 +128,10 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
 
         is PersistedSettingsAction.UpdateLivePhotoDefault -> copy(
             photo = photo.copy(livePhotoEnabledByDefault = action.enabled)
+        )
+
+        is PersistedSettingsAction.UpdateLiveSaveFormat -> copy(
+            photo = photo.copy(liveSaveFormat = action.format)
         )
 
         is PersistedSettingsAction.UpdateCountdownDuration -> copy(

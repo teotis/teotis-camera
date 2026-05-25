@@ -248,7 +248,7 @@ class SessionUiRenderModelTest {
         assertTrue(summary.contains("Settings: Grid 3x3 | Shutter sound Off | Selfie mirror On"))
         assertTrue(
             summary.contains(
-                "Photo defaults: Filter Portrait Retro | Portrait Native Portrait | Watermark Travel Polaroid | Live On | Timer 3s"
+                "Photo defaults: Filter Portrait Retro | Portrait Native Portrait | Watermark Travel Polaroid | Live On (Motion Photo) | Timer 3s"
             )
         )
         assertTrue(summary.contains("Video defaults: 4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich"))
@@ -334,7 +334,7 @@ class SessionUiRenderModelTest {
 
         assertEquals("Grid 3x3 | Shutter sound Off | Selfie mirror On", model.commonSummary)
         assertEquals(
-            "Filter Portrait Retro | Portrait Native Portrait | Watermark Travel Polaroid | Live On | Timer 3s",
+            "Filter Portrait Retro | Portrait Native Portrait | Watermark Travel Polaroid | Live On (Motion Photo) | Timer 3s",
             model.photoSummary
         )
         assertEquals(
@@ -586,6 +586,9 @@ class SessionUiRenderModelTest {
 
         assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.photoSection.livePhoto.availability)
         assertTrue(supportedModel.photoSection.livePhoto.isInteractive)
+        assertEquals(SettingsControlAvailability.SUPPORTED, supportedModel.photoSection.liveSaveFormat.availability)
+        assertTrue(supportedModel.photoSection.liveSaveFormat.isInteractive)
+        assertNotNull(supportedModel.photoSection.liveSaveFormat.nextAction)
         assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.photoSection.portraitLab.availability)
         assertFalse(supportedModel.photoSection.portraitLab.isInteractive)
         assertEquals(
@@ -613,6 +616,9 @@ class SessionUiRenderModelTest {
 
         assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.livePhoto.availability)
         assertFalse(unsupportedModel.photoSection.livePhoto.isInteractive)
+        assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.liveSaveFormat.availability)
+        assertFalse(unsupportedModel.photoSection.liveSaveFormat.isInteractive)
+        assertEquals(null, unsupportedModel.photoSection.liveSaveFormat.nextAction)
         assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.portraitLab.availability)
         assertFalse(unsupportedModel.photoSection.portraitLab.isInteractive)
         assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.watermarkTemplate.availability)

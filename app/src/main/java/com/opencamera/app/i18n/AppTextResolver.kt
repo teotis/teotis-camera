@@ -243,6 +243,8 @@ open class AppTextResolver(private val context: Context?) {
     open fun portraitLabSettingLabel(): String = str(R.string.label_portrait_lab, "Portrait Lab")
     open fun watermarkLabSettingLabel(): String = str(R.string.label_watermark_lab, "Watermark Lab")
     open fun livePhotoDefaultLabel(): String = str(R.string.label_live_photo_default, "Live photo default")
+    open fun liveSaveFormatLabel(): String = str(R.string.label_live_save_format, "Live save format")
+    open fun liveSaveFormatSupportLabel(count: Int): String = String.format(str(R.string.format_live_save_format_support, "%d formats: Motion Photo, MP4 Sidecar, JPEG Only"), count)
     open fun countdownLabel(): String = str(R.string.label_countdown, "Countdown")
     open fun resolutionLabel(): String = str(R.string.label_resolution, "Resolution")
     open fun frameRateLabel(): String = str(R.string.label_frame_rate, "Frame rate")

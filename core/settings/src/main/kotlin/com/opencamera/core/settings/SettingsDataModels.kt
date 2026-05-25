@@ -189,6 +189,7 @@ data class PhotoSettings(
         frameBackground = WatermarkFrameBackground.DARK
     ),
     val livePhotoEnabledByDefault: Boolean = false,
+    val liveSaveFormat: LiveSaveFormat = LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG,
     val countdownDuration: CountdownDuration = CountdownDuration.OFF,
     val colorLabSpec: ColorLabSpec = ColorLabSpec(),
     val styleStrength: Float = 1f,
