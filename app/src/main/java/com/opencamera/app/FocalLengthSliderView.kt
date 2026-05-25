@@ -254,11 +254,7 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     }
 
     private fun formatRatio(ratio: Float): String {
-        return if (ratio == ratio.toLong().toFloat()) {
-            "${ratio.toLong()}x"
-        } else {
-            String.format(java.util.Locale.US, "%.1fx", ratio)
-        }
+        return String.format(java.util.Locale.US, "%.1fx", ratio)
     }
 
     private fun startLabelFadeOut() {
