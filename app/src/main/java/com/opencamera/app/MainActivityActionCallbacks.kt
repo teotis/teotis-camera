@@ -33,4 +33,6 @@ internal interface MainActivityActionCallbacks {
     fun selectDevLogTab(tab: DevLogTab)
     fun neutralColorLabAction(): PersistedSettingsAction
     fun toggleLowLightNightAssist()
+    fun onBrightnessDragStart()
+    fun onBrightnessDragEnd()
 }

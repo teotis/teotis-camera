@@ -9,8 +9,6 @@ import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.CaptureProfile
-import com.opencamera.core.media.StillCaptureQualityPreference
-import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.PostProcessSpec
@@ -71,8 +69,6 @@ class SessionCockpitRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
-                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -88,8 +84,7 @@ class SessionCockpitRenderModelTest {
         val state = defaultSessionState(
             activeDeviceGraph = DeviceGraphSpec.videoRecording(
                 preferredLensFacing = LensFacing.FRONT,
-                enablePreviewSnapshots = true,
-                stillResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
+                enablePreviewSnapshots = true
             ),
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 availableLensFacings = setOf(LensFacing.FRONT)
@@ -387,30 +382,10 @@ class SessionCockpitRenderModelTest {
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Grid", sheet.gridRow.title)
-        assertEquals("Quality", sheet.qualityRow.title)
         assertEquals("Size", sheet.resolutionRow.title)
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
-    }
-
-    @Test
-    fun `quick panel sheet exposes photo quality and resolution rows`() {
-        val state = defaultSessionState(
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                qualityPreference = StillCaptureQualityPreference.QUALITY,
-                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
-            )
-        )
-
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertEquals("Quality", sheet.qualityRow.title)
-        assertEquals("Still Max", sheet.qualityRow.value)
-        assertEquals("Size", sheet.resolutionRow.title)
-        assertEquals("8MP", sheet.resolutionRow.value)
-        assertTrue(sheet.qualityRow.isEnabled)
-        assertTrue(sheet.resolutionRow.isEnabled)
     }
 
     @Test
@@ -566,66 +541,6 @@ class SessionCockpitRenderModelTest {
         assertEquals("Camera permission required", reason)
     }
 
-    @Test
-    fun `quick quality row shows combined video spec in video mode`() {
-        val state = defaultSessionState(
-            activeMode = ModeId.VIDEO,
-            activeDeviceGraph = DeviceGraphSpec.videoRecording(
-                requestedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.FHD_1080P,
-                    frameRate = VideoFrameRate.FPS_60
-                ),
-                resolvedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.FHD_1080P,
-                    frameRate = VideoFrameRate.FPS_60
-                )
-            )
-        )
-
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertEquals("1080p60", sheet.qualityRow.value)
-        assertTrue(sheet.qualityRow.isEnabled)
-    }
-
-    @Test
-    fun `quick quality row shows degraded video spec with asterisk`() {
-        val state = defaultSessionState(
-            activeMode = ModeId.VIDEO,
-            activeDeviceGraph = DeviceGraphSpec.videoRecording(
-                requestedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.UHD_4K,
-                    frameRate = VideoFrameRate.FPS_60
-                ),
-                resolvedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.UHD_4K,
-                    frameRate = VideoFrameRate.FPS_30
-                )
-            )
-        )
-
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertEquals("4K30*", sheet.qualityRow.value)
-    }
-
-    @Test
-    fun `quick quality row disabled during video recording`() {
-        val state = defaultSessionState(
-            activeMode = ModeId.VIDEO,
-            activeDeviceGraph = DeviceGraphSpec.videoRecording(
-                requestedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.FHD_1080P,
-                    frameRate = VideoFrameRate.FPS_30
-                )
-            )
-        ).copy(recordingStatus = RecordingStatus.RECORDING)
-
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertFalse(sheet.qualityRow.isEnabled)
-    }
-
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",
@@ -653,9 +568,7 @@ class SessionCockpitRenderModelTest {
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true,
-            qualityPreference = StillCaptureQualityPreference.LATENCY,
-            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
+            enablePreviewSnapshots = true
         ),
         previewStatus: PreviewStatus = PreviewStatus.ACTIVE,
         previewMetrics: PreviewMetrics = PreviewMetrics(),

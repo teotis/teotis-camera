@@ -920,6 +920,30 @@ class CameraSessionCoordinatorTest {
         )
     }
 
+    @Test
+    fun `single brightness effect produces exactly one device command`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        val request = com.opencamera.core.device.PreviewBrightnessRequest(
+            requestId = "bright-1",
+            exposureCompensationSteps = 120
+        )
+        session.emitEffect(SessionEffect.ApplyPreviewBrightness(request))
+        advanceUntilIdle()
+
+        val brightnessCommands = adapter.recordedCommands.filterIsInstance<DeviceCommand.ApplyPreviewBrightness>()
+        assertEquals(1, brightnessCommands.size, "Expected exactly one ApplyPreviewBrightness command but got ${brightnessCommands.size}")
+        assertEquals(request, brightnessCommands[0].request)
+    }
+
     private class FakeCameraSession(
         initialState: SessionState = defaultSessionState()
     ) : CameraSession {
