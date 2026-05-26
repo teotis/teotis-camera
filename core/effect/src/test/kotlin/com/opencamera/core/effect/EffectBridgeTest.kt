@@ -154,7 +154,6 @@ class EffectBridgeTest {
     }
 
     @Test
-<<<<<<< HEAD
     fun `toMetadataTags with non-neutral recipe emits recipe tags`() {
         val recipe = PerceptualColorRecipe(
             toneLift = 0.5f,
@@ -190,7 +189,9 @@ class EffectBridgeTest {
         assertEquals("vivid", tags["filterProfile"])
         assertNull(tags["recipe.toneLift"])
         assertNull(tags["recipe.chromaBoost"])
-=======
+    }
+
+    @Test
     fun `toMetadataTags with DocumentEffect and WatermarkEffect`() {
         val document = DocumentEffect(autoCrop = true, contrastProfile = "high")
         val watermark = WatermarkEffect(
@@ -273,6 +274,5 @@ class EffectBridgeTest {
         assertEquals(WatermarkTextScale.LARGE.multiplier.toString(), tags["watermarkTextScale"])
         assertEquals(WatermarkFrameBackground.SOURCE_VIVID_BLUR.storageKey, tags["watermarkFrameBackground"])
         assertEquals("4:3", tags["frameRatio"])
->>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
     }
 }
