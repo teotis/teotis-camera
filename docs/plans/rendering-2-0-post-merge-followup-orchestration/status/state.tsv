@@ -1,0 +1,4 @@
+package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
+01-app-unit-test-gate-cleanup	ready			agent-render-v2-followup-01-app-gate	agent/rendering-2-0-post-merge-followup/01-app-unit-test-gate-cleanup	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/rendering-2-0-post-merge-followup-01-app-unit-test-gate-cleanup						 
+02-ledger-status-reconciliation	ready			agent-render-v2-followup-02-ledger	agent/rendering-2-0-post-merge-followup/02-ledger-status-reconciliation	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/rendering-2-0-post-merge-followup-02-ledger-status-reconciliation						 
+99-finalize	pending			agent-render-v2-followup-99-finalize	agent/rendering-2-0-post-merge-followup/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/rendering-2-0-post-merge-followup-99-finalize						 

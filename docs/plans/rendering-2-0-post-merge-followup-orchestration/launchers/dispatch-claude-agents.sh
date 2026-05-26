@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")" && git rev-parse --show-toplevel)"
 PLAN_DIR="$REPO_ROOT/docs/plans/rendering-2-0-post-merge-followup-orchestration"
 
 cd "$REPO_ROOT"

@@ -1,14 +1,15 @@
-# Package Status: 99-integration-audit
+# Package Status: 99-finalize
 
-- **Agent**: Codex
+- **Agent**: —
 - **Status**: pending
 - **Started**:
 - **Completed**:
 
 ## Worktree
 
-- Path:
-- Branch:
+- Path: `/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-polish/99-finalize`
+- Branch: `agent/real-device-ux-polish/99-finalize`
+- Base commit:
 
 ## Changes
 
@@ -25,6 +26,8 @@
 
 - Commit hash:
 - PR link:
+- Integration branch:
+- Mainline merge commit:
 
 ## Acceptance Criteria Status
 
@@ -34,7 +37,8 @@
 
 - [ ] Only touched allowed paths
 - [ ] Did not edit forbidden paths
-- [ ] Did not edit package agents' status files except during final audit summary if explicitly needed
+- [ ] Did not delete unrecorded branches/worktrees
+- [ ] Did not force-push or hard reset
 
 ## Unresolved Risks
 

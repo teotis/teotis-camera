@@ -9,6 +9,8 @@
 
 - Path:
 - Branch:
+- Base commit:
+- Commit hash:
 
 ## Changes
 
@@ -21,6 +23,8 @@
 - Commands run:
 - Test results:
 - Hang/process evidence:
+- Integration:
+- Cleanup:
 
 ## Evidence
 

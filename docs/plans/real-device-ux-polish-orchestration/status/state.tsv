@@ -1,0 +1,8 @@
+package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
+00-mode-entry-visibility	pending			agent-00-mode-entry-visibility	agent/real-device-ux-polish/00-mode-entry-visibility	/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-polish/00-mode-entry-visibility						
+03-quick-panel-outside-dismiss	pending			agent-03-quick-panel-outside-dismiss	agent/real-device-ux-polish/03-quick-panel-outside-dismiss	/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-polish/03-quick-panel-outside-dismiss						
+05-dev-log-storage-governance	pending			agent-05-dev-log-storage-governance	agent/real-device-ux-polish/05-dev-log-storage-governance	/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-polish/05-dev-log-storage-governance						
+01-style-copy-noise-cleanup	pending			agent-01-style-copy-noise-cleanup	agent/real-device-ux-polish/01-style-copy-noise-cleanup	/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-polish/01-style-copy-noise-cleanup						
+02-settings-third-level-navigation	pending			agent-02-settings-third-level-navigation	agent/real-device-ux-polish/02-settings-third-level-navigation	/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-polish/02-settings-third-level-navigation						
+04-persistence-reset-unification	pending			agent-04-persistence-reset-unification	agent/real-device-ux-polish/04-persistence-reset-unification	/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-polish/04-persistence-reset-unification						
+99-finalize	pending			agent-99-finalize	agent/real-device-ux-polish/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-polish/99-finalize						

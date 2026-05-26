@@ -1,7 +1,7 @@
 # Package Status: 01-session-test-hang-diagnosis-and-repair
 
 - **Agent**: -
-- **Status**: pending
+- **Status**: ready
 - **Started**: -
 - **Completed**: -
 
@@ -9,6 +9,8 @@
 
 - Path:
 - Branch:
+- Base commit:
+- Commit hash:
 
 ## Changes
 
@@ -21,6 +23,8 @@
 - Commands run:
 - Test results:
 - Hang/process evidence:
+- Integration:
+- Cleanup:
 
 ## Evidence
 

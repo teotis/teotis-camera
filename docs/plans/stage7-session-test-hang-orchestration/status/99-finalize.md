@@ -1,14 +1,16 @@
-# Package Status: 99-integration-audit
+# Package Status: 99-finalize
 
-- **Agent**: Codex
+- **Agent**: -
 - **Status**: pending
-- **Started**:
-- **Completed**:
+- **Started**: -
+- **Completed**: -
 
 ## Worktree
 
 - Path:
 - Branch:
+- Base commit:
+- Commit hash:
 
 ## Changes
 
@@ -20,10 +22,20 @@
 
 - Commands run:
 - Test results:
+- Integration:
+- Cleanup:
+
+## Evidence
+
+- Finalize stage:
+- Evidence reviewed:
+- Acceptance criteria status:
+- Recommended decision:
 
 ## Delivery
 
-- Commit hash:
+- Integration branch:
+- Mainline merge commit:
 - PR link:
 
 ## Self-Certification
@@ -34,4 +46,4 @@
 
 ## Unresolved Risks
 
-- Pending final audit after packages 01 and 02.
+- <none | list>

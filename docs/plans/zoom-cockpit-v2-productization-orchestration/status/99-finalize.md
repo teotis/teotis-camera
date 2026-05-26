@@ -1,6 +1,6 @@
-# Package Status: 99-integration-audit
+# Package Status: 99-finalize
 
-- **Agent**: Codex
+- **Agent**: —
 - **Status**: pending
 - **Started**: —
 - **Completed**: —
@@ -23,14 +23,22 @@
 
 ## Delivery
 
+- Integration branch:
+- Mainline merge commit:
 - Commit hash:
 - PR link:
+
+## Cleanup
+
+- Deleted local worktrees:
+- Deleted local branches:
 
 ## Self-Certification
 
 - [ ] Only touched allowed paths
 - [ ] Did not edit forbidden paths
-- [ ] Did not edit INDEX.md or other status files
+- [ ] Did not edit INDEX.md or other package status files
+- [ ] Deleted only recorded local orchestration resources after success
 
 ## Unresolved Risks
 

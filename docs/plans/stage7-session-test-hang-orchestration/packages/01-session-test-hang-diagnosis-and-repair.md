@@ -18,6 +18,7 @@ Make the Stage 7 session verification deterministic again. The observed mainline
 - `core/session/src/main/**` only after confirming the hang root cause is production session behavior
 - `scripts/run_isolated_gradle.sh` only if the root cause is build-root isolation behavior
 - `docs/plans/stage7-session-test-hang-orchestration/status/01-session-test-hang-diagnosis-and-repair.md`
+- `docs/plans/stage7-session-test-hang-orchestration/status/state.tsv` only your own row
 
 ## Forbidden Paths
 
@@ -25,6 +26,25 @@ Make the Stage 7 session verification deterministic again. The observed mainline
 - unrelated feature modules
 - any other package status file
 - `docs/plans/stage7-session-test-hang-orchestration/INDEX.md`
+
+## Branch And Worktree Policy
+
+- Branch: `agent/stage7-session-test-hang/01-session-test-hang-diagnosis-and-repair`
+- Worktree: `/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/stage7-session-test-hang-01-session-test-hang-diagnosis-and-repair`
+- Create or reuse only this worktree/branch.
+- Do not rely on worktree-local status files; write coordinator status to `/Volumes/Extreme_SSD/project/open_camera/docs/plans/stage7-session-test-hang-orchestration/status/01-session-test-hang-diagnosis-and-repair.md`.
+- Update your row in `/Volumes/Extreme_SSD/project/open_camera/docs/plans/stage7-session-test-hang-orchestration/status/state.tsv` before calling `advance`.
+
+## Unlock Conditions
+
+- Mark coordinator status as `completed` only after the required verification commands pass or after a justified blocked result is recorded.
+- Set `state.tsv` to `completed` or `blocked`.
+- Record worktree, branch, base commit, commit hash, changed files, verification commands/results, process evidence for any hang, and unresolved risks.
+- Call the shared advancement command after writing evidence:
+
+```bash
+bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/stage7-session-test-hang-orchestration/launchers/orchestrate.sh advance --from 01-session-test-hang-diagnosis-and-repair
+```
 
 ## Required Investigation
 
