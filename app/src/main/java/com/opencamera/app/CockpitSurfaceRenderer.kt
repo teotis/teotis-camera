@@ -176,46 +176,39 @@ internal class CockpitSurfaceRenderer(
     private var lastAutoScrolledActiveMode: com.opencamera.core.mode.ModeId? = null
 
     fun renderModeTrack(model: ModeTrackRenderModel) {
-        val buttons = listOf(
-            modeTrack.photo,
-            modeTrack.video,
-            modeTrack.document
+        val buttonMap = mapOf(
+            com.opencamera.core.mode.ModeId.PHOTO to modeTrack.photo,
+            com.opencamera.core.mode.ModeId.HUMANISTIC to modeTrack.humanistic,
+            com.opencamera.core.mode.ModeId.NIGHT to modeTrack.night,
+            com.opencamera.core.mode.ModeId.PORTRAIT to modeTrack.portrait,
+            com.opencamera.core.mode.ModeId.PRO to modeTrack.pro,
+            com.opencamera.core.mode.ModeId.VIDEO to modeTrack.video,
+            com.opencamera.core.mode.ModeId.DOCUMENT to modeTrack.document
         )
-        modeTrack.night.visibility = View.GONE
-        modeTrack.portrait.visibility = View.GONE
-        modeTrack.pro.visibility = View.GONE
-        modeTrack.humanistic.visibility = View.GONE
-        model.items.forEachIndexed { index, item ->
-            if (index < buttons.size) {
-                val button = buttons[index]
-                button.visibility = View.VISIBLE
-                button.text = item.trackLabel
-                button.isEnabled = item.isAvailable
-                if (item.isActive) {
-                    button.setTextColor(ContextCompat.getColor(context, R.color.oc_accent))
-                    button.setTypeface(null, Typeface.BOLD)
-                    button.setBackgroundResource(R.drawable.bg_mode_track_active_chip)
-                    button.alpha = 1f
-                } else {
-                    button.setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
-                    button.setTypeface(null, Typeface.NORMAL)
-                    button.background = null
-                    button.alpha = if (item.isAvailable) 0.78f else 0.42f
-                }
+        buttonMap.values.forEach { it.visibility = View.GONE }
+        model.items.forEach { item ->
+            val button = buttonMap[item.modeId] ?: return@forEach
+            button.visibility = View.VISIBLE
+            button.text = item.trackLabel
+            button.isEnabled = item.isAvailable
+            if (item.isActive) {
+                button.setTextColor(ContextCompat.getColor(context, R.color.oc_accent))
+                button.setTypeface(null, Typeface.BOLD)
+                button.setBackgroundResource(R.drawable.bg_mode_track_active_chip)
+                button.alpha = 1f
+            } else {
+                button.setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+                button.setTypeface(null, Typeface.NORMAL)
+                button.background = null
+                button.alpha = if (item.isAvailable) 0.78f else 0.42f
             }
-        }
-        buttons.drop(model.items.size).forEach { button ->
-            button.visibility = View.GONE
         }
         val activeItem = model.items.firstOrNull { it.isActive }
         val activeModeId = activeItem?.modeId
         if (activeModeId != null && activeModeId != lastAutoScrolledActiveMode && !isModeTrackScrolling()) {
             lastAutoScrolledActiveMode = activeModeId
             modeTrack.scroll.post {
-                val activeButton = buttons.firstOrNull { b ->
-                    val idx = buttons.indexOf(b)
-                    idx < model.items.size && model.items[idx].isActive
-                }
+                val activeButton = buttonMap[activeModeId]
                 activeButton?.let {
                     val viewWidth = modeTrack.scroll.width
                     val chipCenter = it.left + it.width / 2
