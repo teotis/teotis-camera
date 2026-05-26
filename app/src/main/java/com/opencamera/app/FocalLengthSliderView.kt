@@ -31,6 +31,17 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
             return String.format(java.util.Locale.US, "%.1fx", ratio)
         }
 
+        /** Compact label for preset dot nodes: "1x", "2", "5", "0.6". */
+        internal fun formatCompactNodeLabel(ratio: Float): String {
+            val rounded = (ratio * 10).toInt()
+            val isInteger = rounded % 10 == 0
+            return if (isInteger) "${rounded / 10}x"
+            else String.format(java.util.Locale.US, "%.1f", ratio)
+        }
+
+        /** Returns true if external setCurrentRatio should be suppressed (active drag). */
+        internal fun shouldSuppressExternalUpdate(isDragging: Boolean): Boolean = isDragging
+
         /**
          * Pure logic: returns true if [ratio] is within [SNAP_THRESHOLD_FRACTION]
          * of the nearest preset in [sortedPresets].
@@ -84,6 +95,14 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     private val dotRadius = 3f * density
     private val dotActiveRadius = 4.5f * density
 
+    // Node label (persistent labels under preset dots)
+    private val nodeLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = ContextCompat.getColor(context, R.color.oc_text_muted)
+        textSize = 10f * scaledDensity
+        textAlign = Paint.Align.CENTER
+    }
+    private val nodeLabelMarginTop = 3f * density
+
     // Thumb
     private val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = ContextCompat.getColor(context, R.color.oc_text_primary)
@@ -110,8 +129,11 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
 
     private var labelAlpha: Int = 0
     private var labelAnimator: ValueAnimator? = null
-    private var isDragging = false
+    internal var isDragging = false
     private var showLabel = false
+
+    /** Current ratio value, exposed for testing. */
+    internal val currentRatioValue: Float get() = currentRatio
 
     // Layout constants
     private val verticalOffset = thumbRadius + labelBottomMargin + 13f * scaledDensity + labelPaddingV * 2
@@ -122,7 +144,8 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     private val trackWidth get() = (trackRight - trackLeft).coerceAtLeast(0f)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val desiredHeight = (verticalOffset + thumbRadius * 2 + 8f * density).toInt()
+        val nodeLabelHeight = nodeLabelPaint.textSize + nodeLabelMarginTop
+        val desiredHeight = (verticalOffset + thumbRadius * 2 + 8f * density + nodeLabelHeight).toInt()
         val height = resolveSize(desiredHeight, heightMeasureSpec)
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), height)
     }
@@ -144,13 +167,23 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
             canvas.drawRoundRect(activeRect, trackHeight / 2, trackHeight / 2, activeTrackPaint)
         }
 
-        // Draw preset dots
+        // Draw preset dots with node labels
         for (ratio in presetRatios) {
             val x = ratioToX(ratio)
             val isActive = abs(ratio - currentRatio) < 0.05f
             val r = if (isActive) dotActiveRadius else dotRadius
             val paint = if (isActive) dotActivePaint else dotPaint
             canvas.drawCircle(x, cy, r, paint)
+
+            // Persistent node label below dot
+            val label = formatCompactNodeLabel(ratio)
+            val labelY = cy + r + nodeLabelMarginTop + nodeLabelPaint.textSize
+            if (isActive) {
+                nodeLabelPaint.color = ContextCompat.getColor(context, R.color.oc_accent)
+            } else {
+                nodeLabelPaint.color = ContextCompat.getColor(context, R.color.oc_text_muted)
+            }
+            canvas.drawText(label, x, labelY, nodeLabelPaint)
         }
 
         // Draw thumb
@@ -279,10 +312,11 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     }
 
     fun setCurrentRatio(ratio: Float) {
+        if (isDragging) return
         val clamped = ratio.coerceIn(minRatio, maxRatio)
         if (abs(clamped - currentRatio) < 0.005f) return
         currentRatio = clamped
-        if (!isDragging) invalidate()
+        invalidate()
     }
 
     fun setSliderVisible(visible: Boolean) {
