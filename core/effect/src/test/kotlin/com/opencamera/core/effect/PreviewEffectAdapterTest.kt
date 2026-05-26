@@ -51,7 +51,7 @@ class PreviewEffectAdapterTest {
 
         assertNotNull(model.colorTransform)
         assertFalse(model.colorTransform.isIdentity)
-        assertEquals(PreviewColorFidelity.APPROXIMATE, model.colorTransform.fidelity)
+        assertEquals(PreviewColorFidelity.NONE, model.colorTransform.fidelity)
     }
 
     @Test
@@ -61,7 +61,7 @@ class PreviewEffectAdapterTest {
 
         assertNotNull(model.colorTransform)
         assertTrue(model.colorTransform.isIdentity)
-        assertEquals(PreviewColorFidelity.APPROXIMATE, model.colorTransform.fidelity)
+        assertEquals(PreviewColorFidelity.NONE, model.colorTransform.fidelity)
     }
 
     @Test

@@ -17,7 +17,7 @@ project_root="$(cd "$project_root" && pwd)"
 # Derive stable short workspace id from absolute root path
 workspace_id="$(echo -n "$project_root" | shasum -a 256 | cut -c1-8)"
 
-export OPENCAMERA_BUILD_ROOT="${HOME}/.codex-build/OpenCamera-${workspace_id}"
+export OPENCAMERA_BUILD_ROOT="${OPENCAMERA_BUILD_ROOT:-${CODEX_BUILD_ROOT:-${HOME}/.codex-build/OpenCamera-${workspace_id}}}"
 
 echo "[isolated-gradle] project_root=${project_root}"
 echo "[isolated-gradle] build_root=${OPENCAMERA_BUILD_ROOT}"

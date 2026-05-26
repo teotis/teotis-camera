@@ -3,7 +3,6 @@ package com.opencamera.app
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -12,7 +11,6 @@ import android.util.TypedValue
 import android.view.View
 import com.opencamera.core.effect.FilterOverlaySpec
 import com.opencamera.core.effect.FrameGuidelineSpec
-import com.opencamera.core.effect.PreviewColorTransform
 import com.opencamera.core.effect.WatermarkHintSpec
 import com.opencamera.core.effect.WatermarkPreviewShape
 import com.opencamera.core.settings.CompositionGridMode
@@ -103,8 +101,6 @@ class PreviewOverlayView @JvmOverloads constructor(
     private var lastVignetteKey: Float = -1f
 
     private var focusReticle: FocusReticleRenderModel? = null
-    private var previewView: androidx.camera.view.PreviewView? = null
-    private var lastAppliedColorFilter: ColorMatrixColorFilter? = null
 
     private var renderModel = PreviewOverlayRenderModel(
         gridMode = CompositionGridMode.OFF,
@@ -127,32 +123,7 @@ class PreviewOverlayView @JvmOverloads constructor(
         renderModel = model
         visibility = if (model.isVisible) VISIBLE else GONE
         prepareVignetteCache(model)
-        applyColorTransformToPreview(model)
         invalidate()
-    }
-
-    private fun applyColorTransformToPreview(model: PreviewOverlayRenderModel) {
-        if (previewView == null) {
-            previewView = (parent as? android.view.ViewGroup)?.let { vg ->
-                (0 until vg.childCount)
-                    .map { vg.getChildAt(it) }
-                    .filterIsInstance<androidx.camera.view.PreviewView>()
-                    .firstOrNull()
-            }
-        }
-        val pv = previewView ?: return
-        val transform = model.effectModel?.colorTransform
-        val filter = if (transform != null && !transform.isIdentity) {
-            transform.matrix?.let { ColorMatrixColorFilter(it) }
-        } else {
-            null
-        }
-        if (lastAppliedColorFilter != filter) {
-            // TODO: re-enable when PreviewView.paint API is available
-            // pv.paint.colorFilter = filter
-            lastAppliedColorFilter = filter
-            pv.invalidate()
-        }
     }
 
     internal fun updateFocusReticle(model: FocusReticleRenderModel?) {
@@ -173,9 +144,10 @@ class PreviewOverlayView @JvmOverloads constructor(
             lastVignetteKey = -1f
             return
         }
-        val cx = width / 2f
-        val cy = height / 2f
-        val radius = min(width, height) * 0.7f
+        val rect = activeFrameRectOrFullView()
+        val cx = rect.centerX()
+        val cy = rect.centerY()
+        val radius = min(rect.width(), rect.height()) * 0.7f
         val vignetteKey = overlay.vignetteStrength
         if (vignetteKey != lastVignetteKey || vignetteGradient == null) {
             vignetteGradient = android.graphics.RadialGradient(
@@ -186,7 +158,7 @@ class PreviewOverlayView @JvmOverloads constructor(
             )
             lastVignetteKey = vignetteKey
         }
-        vignetteOverlayRect = RectF(0f, 0f, width.toFloat(), height.toFloat())
+        vignetteOverlayRect = RectF(rect)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -277,14 +249,12 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawFilterOverlay(canvas: Canvas, spec: FilterOverlaySpec) {
-        // Color matrix is applied to previewView.paint (TextureView mode),
-        // so the overlay only handles tint and vignette.
         filterOverlayPaint.colorFilter = null
 
         if (spec.tintAlpha > 0f) {
             filterOverlayPaint.color = spec.tintColor
             filterOverlayPaint.alpha = (spec.tintAlpha * 255).toInt().coerceIn(0, 255)
-            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), filterOverlayPaint)
+            canvas.drawRect(activeFrameRectOrFullView(), filterOverlayPaint)
         }
 
         val gradient = vignetteGradient

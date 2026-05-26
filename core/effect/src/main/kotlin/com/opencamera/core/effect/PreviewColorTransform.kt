@@ -23,6 +23,7 @@ data class PreviewColorTransform(
 
     val isIdentity: Boolean
         get() {
+            if (tintAlpha > 0f) return false
             if (matrix == null) return true
             if (matrix.size != 20) return false
             val identity = floatArrayOf(
@@ -35,7 +36,7 @@ data class PreviewColorTransform(
         }
 
     companion object {
-        val NONE = PreviewColorTransform()
+        val NONE = PreviewColorTransform(fidelity = PreviewColorFidelity.NONE)
         val MASK_AWARE = PreviewColorTransform(fidelity = PreviewColorFidelity.MASK_AWARE)
         val FALLBACK = PreviewColorTransform(fidelity = PreviewColorFidelity.FALLBACK)
 
@@ -45,7 +46,8 @@ data class PreviewColorTransform(
                 0f, 1f, 0f, 0f, 0f,
                 0f, 0f, 1f, 0f, 0f,
                 0f, 0f, 0f, 1f, 0f
-            )
+            ),
+            fidelity = PreviewColorFidelity.NONE
         )
 
         /**
@@ -95,7 +97,7 @@ data class PreviewColorTransform(
                 m = multiply(m, highlightCompressionMatrix(spec.highlightCompression))
             }
 
-            return PreviewColorTransform(matrix = m)
+            return PreviewColorTransform(matrix = m, fidelity = PreviewColorFidelity.APPROXIMATE)
         }
 
         private fun isNoOp(spec: FilterRenderSpec): Boolean {
@@ -231,5 +233,25 @@ data class PreviewColorTransform(
         result = 31 * result + tintAlpha.hashCode()
         result = 31 * result + fidelity.hashCode()
         return result
+    }
+}
+
+object PreviewColorMatrixBuilder {
+    val IDENTITY: FloatArray = floatArrayOf(
+        1f, 0f, 0f, 0f, 0f,
+        0f, 1f, 0f, 0f, 0f,
+        0f, 0f, 1f, 0f, 0f,
+        0f, 0f, 0f, 1f, 0f
+    )
+
+    fun isIdentity(matrix: FloatArray?): Boolean {
+        if (matrix == null) return true
+        if (matrix.size != 20) return false
+        return matrix.indices.all { kotlin.math.abs(matrix[it] - IDENTITY[it]) <= 0.001f }
+    }
+
+    fun buildMatrix(spec: FilterRenderSpec?): FloatArray? {
+        val transform = PreviewColorTransform.fromSpec(spec)
+        return transform.matrix?.takeUnless(::isIdentity)
     }
 }

@@ -94,6 +94,7 @@ Current Stage 7 verification entry:
 
 - **主 workspace（本仓库根目录）**：直接使用 `rtk ./gradlew ...` 即可，构建输出在 `~/.codex-build/OpenCamera/`。
 - **worktree 或外部 agent 执行**：必须使用 `rtk ./scripts/run_isolated_gradle.sh <gradle-args>` 以隔离构建根目录。wrapper 会根据 `git rev-parse --show-toplevel` 的 hash 自动派生独立输出路径 `~/.codex-build/OpenCamera-<hash>/`。
+- **旧 stage 验证脚本**：`verify_stage_6b0/6b1/6b2/6b3` 已支持 `OPENCAMERA_BUILD_ROOT > CODEX_BUILD_ROOT > 默认根`，外部 agent 单独调用这些脚本时必须传入隔离根。
 - 不得依赖"从主 root 执行"作为唯一的隔离手段。并行 worktree 同时编译时，共享构建输出会导致 class 文件/ jar 元数据污染。
 - 遇到 `CODEX_BUILD_ROOT` 下出现缺失 Kotlin 类、部分 jar、metadata checksum/read 失败、或来自另一 workspace 的 source path 时，先用隔离构建根重新运行最小失败命令，再判定为产品回归。
 
