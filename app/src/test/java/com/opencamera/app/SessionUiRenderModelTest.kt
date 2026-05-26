@@ -2188,4 +2188,49 @@ class SessionUiRenderModelTest {
         assertFalse(model.hasStyleUserAdjustments)
         assertEquals(null, model.resetStyleAction)
     }
+
+    private class ChineseUiTextResolver : TestAppTextResolver() {
+        override fun stylePanelTitle(): String = "风格"
+        override fun filterFamilyPhoto(): String = "照片"
+        override fun currentDefault(): String = "当前默认"
+        override fun selectedDefault(): String = "当前默认"
+        override fun filterLabCurrentDefault(filterLabel: String): String = "当前默认 $filterLabel"
+        override fun filterLabSelectedDefault(): String = " | 当前默认"
+        override fun watermarkLab(): String = "水印"
+        override fun watermarkSelectorSupporting(): String =
+            "水印选择位于设置下一级。在此选择活跃模板，然后进入模板专属样式页面进行编辑。"
+        override fun watermarkSelectorEditingEnabled(): String =
+            "默认模板更改即时保存。每个模板保留自己的位置、大小、透明度和边框背景预设。"
+        override fun watermarkDetailEditingEnabled(): String =
+            "模板专属样式即时保存，并保持与此水印预设关联。"
+        override fun watermarkDetailSupportingSelected(): String =
+            "这是当前活跃的默认水印。此处更改将影响使用此模板渲染的下一张静态照片。"
+        override fun watermarkSelectorCurrentDefault(): String = " | 当前默认"
+        override fun watermarkEditAttrsFrame(): String = "位置、大小、透明度、背景"
+        override fun watermarkEditAttrsClassic(): String = "位置、大小、透明度"
+        override fun watermarkTemplateClassicOverlay(): String = "经典叠加"
+        override fun watermarkTemplateExpandedFrame(): String = "扩展边框"
+        override fun watermarkTemplatePureText(): String = "纯文字"
+        override fun watermarkTemplateBlurFourBorder(): String = "模糊四边框"
+        override fun tokensLabel(): String = "标记"
+        override fun watermarkTokenCameraParams(): String = "相机参数"
+        override fun watermarkTokenDateTime(): String = "日期/时间"
+        override fun watermarkTokenLocation(): String = "位置"
+        override fun watermarkTokenModel(): String = "机型"
+        override fun watermarkAttrPlacementPrefix(): String = "位置 "
+        override fun watermarkAttrScalePrefix(): String = "大小 "
+        override fun watermarkAttrOpacityPrefix(): String = "透明度 "
+        override fun watermarkAttrBackgroundPrefix(): String = "背景 "
+        override fun textPlacementLabel(): String = "文字位置"
+        override fun textScaleLabel(): String = "文字大小"
+        override fun textOpacityLabel(): String = "文字透明度"
+        override fun frameBackgroundLabel(): String = "边框背景"
+        override fun placementsCount(count: Int): String = "$count 个位置"
+        override fun stepsCount(count: Int): String = "$count 档"
+        override fun moodsCount(count: Int): String = "$count 种背景"
+        override fun watermarkDetailTokensPrefix(): String = "标记："
+        override fun watermarkDetailFooterOverlay(): String =
+            "经典叠加保持在源图像内，不扩展边框。"
+        override fun openStylePage(): String = "样式"
+    }
 }
