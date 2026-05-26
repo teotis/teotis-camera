@@ -13,7 +13,6 @@ import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.FrameRatio
 
-import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
@@ -462,15 +461,13 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `quick panel sheet exposes resolution row`() {
         val state = defaultSessionState(
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
-            )
+            activeDeviceGraph = DeviceGraphSpec.stillCapture()
         )
 
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Size", sheet.resolutionRow.title)
-        assertEquals("8MP", sheet.resolutionRow.value)
+        assertEquals("12MP", sheet.resolutionRow.value)
         assertTrue(sheet.resolutionRow.isEnabled)
     }
 
