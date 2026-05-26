@@ -19,6 +19,31 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
+    companion object {
+        /** Fraction of distance to nearest neighbor; within this, release snaps to preset. */
+        internal const val SNAP_THRESHOLD_FRACTION = 0.15f
+        /** Max px movement from ACTION_DOWN to count as a tap (quick-jump). */
+        internal const val TAP_SLOP_PX = 24f
+        /** Max px distance from a preset dot center to count as a tap on that dot. */
+        internal const val DOT_TAP_RADIUS_PX = 32f
+
+        internal fun formatRatio(ratio: Float): String {
+            return String.format(java.util.Locale.US, "%.1fx", ratio)
+        }
+
+        /**
+         * Pure logic: returns true if [ratio] is within [SNAP_THRESHOLD_FRACTION]
+         * of the nearest preset in [sortedPresets].
+         */
+        internal fun shouldSnap(ratio: Float, sortedPresets: List<Float>): Boolean {
+            if (sortedPresets.size < 2) return sortedPresets.isNotEmpty()
+            val nearest = sortedPresets.minByOrNull { kotlin.math.abs(it - ratio) } ?: return false
+            val second = sortedPresets.sortedBy { kotlin.math.abs(it - ratio) }.getOrNull(1) ?: return true
+            val neighborDist = kotlin.math.abs(second - nearest)
+            return kotlin.math.abs(ratio - nearest) < neighborDist * SNAP_THRESHOLD_FRACTION
+        }
+    }
+
     var onRatioChanged: ((Float) -> Unit)? = null
     var onRatioSnapped: ((Float) -> Unit)? = null
 
@@ -26,6 +51,7 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     private var currentRatio: Float = 1f
     private var minRatio: Float = 1f
     private var maxRatio: Float = 1f
+    private var actionDownX: Float = 0f
 
     private val density = context.resources.displayMetrics.density
     private val scaledDensity = context.resources.displayMetrics.scaledDensity
@@ -178,6 +204,7 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
 
                 if (abs(y - cy) < thumbRadius * 2.5f) {
                     isDragging = true
+                    actionDownX = x
                     showLabel = true
                     labelAlpha = 255
                     labelAnimator?.cancel()
@@ -194,16 +221,41 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
                 }
                 return false
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP -> {
                 if (isDragging) {
                     isDragging = false
-                    // Snap to nearest preset on release
-                    val snapped = findNearestPreset(currentRatio)
-                    if (snapped != null) {
-                        currentRatio = snapped
-                        onRatioSnapped?.invoke(snapped)
-                        onRatioChanged?.invoke(snapped)
+                    val upX = event.x
+                    val isTap = abs(upX - actionDownX) < TAP_SLOP_PX * density
+                    val presetAtTap = if (isTap) findPresetNearX(upX) else null
+
+                    when {
+                        // Tap on/near a preset dot → quick-jump snap
+                        presetAtTap != null -> {
+                            currentRatio = presetAtTap
+                            onRatioSnapped?.invoke(presetAtTap)
+                            onRatioChanged?.invoke(presetAtTap)
+                        }
+                        // Release within snap threshold → snap to nearest preset
+                        shouldSnap(currentRatio) -> {
+                            val snapped = findNearestPreset(currentRatio)!!
+                            currentRatio = snapped
+                            onRatioSnapped?.invoke(snapped)
+                            onRatioChanged?.invoke(snapped)
+                        }
+                        // Otherwise keep the continuous value
+                        else -> {
+                            onRatioSnapped?.invoke(currentRatio)
+                        }
                     }
+                    invalidate()
+                    startLabelFadeOut()
+                    return true
+                }
+                return false
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                if (isDragging) {
+                    isDragging = false
                     invalidate()
                     startLabelFadeOut()
                     return true
@@ -248,14 +300,32 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
         return trackLeft + fraction * trackWidth
     }
 
+    private fun xToRatio(x: Float): Float {
+        if (trackWidth <= 0) return minRatio
+        val fraction = ((x - trackLeft) / trackWidth).coerceIn(0f, 1f)
+        return minRatio + fraction * (maxRatio - minRatio)
+    }
+
     private fun findNearestPreset(ratio: Float): Float? {
         if (presetRatios.isEmpty()) return null
         return presetRatios.minByOrNull { abs(it - ratio) }
     }
 
-    private fun formatRatio(ratio: Float): String {
-        return String.format(java.util.Locale.US, "%.1fx", ratio)
+    /** Returns true if [ratio] is within [SNAP_THRESHOLD_FRACTION] of the nearest preset. */
+    private fun shouldSnap(ratio: Float): Boolean = Companion.shouldSnap(ratio, presetRatios)
+
+    /** If ACTION_DOWN+UP is a tap and lands near a preset dot, return that preset. */
+    private fun findPresetNearX(x: Float): Float? {
+        val ratio = xToRatio(x)
+        // Check pixel distance from each preset dot center
+        for (p in presetRatios) {
+            val dotX = ratioToX(p)
+            if (abs(x - dotX) < DOT_TAP_RADIUS_PX * density) return p
+        }
+        return null
     }
+
+    private fun formatRatio(ratio: Float): String = Companion.formatRatio(ratio)
 
     private fun startLabelFadeOut() {
         labelAnimator?.cancel()
