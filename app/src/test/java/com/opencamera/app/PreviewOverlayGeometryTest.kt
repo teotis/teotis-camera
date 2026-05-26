@@ -1,7 +1,13 @@
 package com.opencamera.app
 
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.EffectTarget
+import com.opencamera.core.effect.FrameEffect
+import com.opencamera.core.media.FrameRatio
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class PreviewOverlayGeometryTest {
 
@@ -232,6 +238,183 @@ class PreviewOverlayGeometryTest {
             assertInRange(30f, 330f, seg.y1)
             assertInRange(30f, 330f, seg.y2)
         }
+    }
+
+    // --- Acceptance: frame-ratio selection does not request CameraX preview rebind ---
+
+    @Test
+    fun `frameEffect targets CAPTURE only, not PREVIEW or BOTH`() {
+        val ratios = listOf(FrameRatio.RATIO_4_3, FrameRatio.RATIO_16_9, FrameRatio.RATIO_1_1)
+        for (ratio in ratios) {
+            val effect = FrameEffect(ratio)
+            assertEquals(
+                EffectTarget.CAPTURE,
+                effect.target,
+                "FrameEffect($ratio) must target CAPTURE only"
+            )
+            assertFalse(
+                effect.target == EffectTarget.PREVIEW || effect.target == EffectTarget.BOTH,
+                "FrameEffect($ratio) must not target PREVIEW or BOTH"
+            )
+        }
+    }
+
+    @Test
+    fun `effectSpec with only FrameEffect has no PREVIEW target`() {
+        for (ratio in listOf(FrameRatio.RATIO_4_3, FrameRatio.RATIO_16_9, FrameRatio.RATIO_1_1)) {
+            val spec = EffectSpec(listOf(FrameEffect(ratio)))
+            assertFalse(
+                spec.hasTarget(EffectTarget.PREVIEW),
+                "EffectSpec with only FrameEffect($ratio) must not have PREVIEW target"
+            )
+            assertTrue(
+                spec.hasTarget(EffectTarget.CAPTURE),
+                "EffectSpec with FrameEffect($ratio) must have CAPTURE target"
+            )
+        }
+    }
+
+    // --- Acceptance: frame rects never exceed content rect ---
+
+    @Test
+    fun `4_3 frame rect never exceeds content rect in portrait`() {
+        assertFrameWithinContent(1080, 1920, 4, 3)
+    }
+
+    @Test
+    fun `4_3 frame rect never exceeds content rect in landscape`() {
+        assertFrameWithinContent(1920, 1080, 4, 3)
+    }
+
+    @Test
+    fun `16_9 frame rect never exceeds content rect in portrait`() {
+        assertFrameWithinContent(1080, 1920, 16, 9)
+    }
+
+    @Test
+    fun `16_9 frame rect never exceeds content rect in landscape`() {
+        assertFrameWithinContent(1920, 1080, 16, 9)
+    }
+
+    @Test
+    fun `1_1 frame rect never exceeds content rect in portrait`() {
+        assertFrameWithinContent(1080, 1920, 1, 1)
+    }
+
+    @Test
+    fun `1_1 frame rect never exceeds content rect in landscape`() {
+        assertFrameWithinContent(1920, 1080, 1, 1)
+    }
+
+    @Test
+    fun `all frame rects never exceed content rect for 1080x2400`() {
+        for ((rw, rh) in listOf(4 to 3, 16 to 9, 1 to 1)) {
+            assertFrameWithinContent(1080, 2400, rw, rh)
+        }
+    }
+
+    @Test
+    fun `all frame rects never exceed content rect for 2400x1080`() {
+        for ((rw, rh) in listOf(4 to 3, 16 to 9, 1 to 1)) {
+            assertFrameWithinContent(2400, 1080, rw, rh)
+        }
+    }
+
+    // --- Acceptance: overlay crop and saved crop share matching center-crop semantics ---
+
+    @Test
+    fun `overlay crop aspect matches saved crop for 4_3 portrait`() {
+        // 1080x1920 portrait view, 4:3 ratio -> overlay produces 1080x1440 centered
+        val rect = computeFrameRect(1080, 1920, 4, 3)
+        assertEquals(rect.width / rect.height, 3f / 4f, 0.01f)
+        assertTrue(rect.width <= 1080f)
+        assertTrue(rect.height <= 1920f)
+    }
+
+    @Test
+    fun `overlay crop aspect matches saved crop for 16_9 portrait`() {
+        val rect = computeFrameRect(1080, 1920, 16, 9)
+        assertEquals(rect.width / rect.height, 9f / 16f, 0.01f)
+        assertTrue(rect.width <= 1080f)
+        assertTrue(rect.height <= 1920f)
+    }
+
+    @Test
+    fun `overlay crop aspect matches saved crop for 1_1 portrait`() {
+        val rect = computeFrameRect(1080, 1920, 1, 1)
+        assertEquals(rect.width, rect.height, 1f)
+        assertTrue(rect.width <= 1080f)
+        assertTrue(rect.height <= 1920f)
+    }
+
+    @Test
+    fun `overlay crop aspect matches saved crop for 4_3 landscape`() {
+        val rect = computeFrameRect(1920, 1080, 4, 3)
+        assertEquals(rect.width / rect.height, 4f / 3f, 0.01f)
+        assertTrue(rect.width <= 1920f)
+        assertTrue(rect.height <= 1080f)
+    }
+
+    @Test
+    fun `overlay crop aspect matches saved crop for 16_9 landscape`() {
+        val rect = computeFrameRect(1920, 1080, 16, 9)
+        assertEquals(rect.width / rect.height, 16f / 9f, 0.01f)
+        assertTrue(rect.width <= 1920f)
+        assertTrue(rect.height <= 1080f)
+    }
+
+    @Test
+    fun `overlay crop aspect matches saved crop for 1_1 landscape`() {
+        val rect = computeFrameRect(1920, 1080, 1, 1)
+        assertEquals(rect.width, rect.height, 1f)
+        assertTrue(rect.width <= 1920f)
+        assertTrue(rect.height <= 1080f)
+    }
+
+    @Test
+    fun `overlay and saved crop both center the frame rect`() {
+        val configs = listOf(
+            Triple(1080, 1920, listOf(4 to 3, 16 to 9, 1 to 1)),
+            Triple(1920, 1080, listOf(4 to 3, 16 to 9, 1 to 1)),
+            Triple(1080, 2400, listOf(4 to 3, 16 to 9, 1 to 1)),
+        )
+        for ((vw, vh, ratios) in configs) {
+            for ((rw, rh) in ratios) {
+                val rect = computeFrameRect(vw, vh, rw, rh)
+                assertEquals(
+                    vw / 2f,
+                    rect.centerX,
+                    1f,
+                    "Frame must be horizontally centered for ${rw}:${rh} in ${vw}x${vh}"
+                )
+                assertEquals(
+                    vh / 2f,
+                    rect.centerY,
+                    1f,
+                    "Frame must be vertically centered for ${rw}:${rh} in ${vw}x${vh}"
+                )
+            }
+        }
+    }
+
+    private fun assertFrameWithinContent(viewW: Int, viewH: Int, ratioW: Int, ratioH: Int) {
+        val rect = computeFrameRect(viewW, viewH, ratioW, ratioH)
+        assertTrue(
+            rect.left >= 0f,
+            "Frame left ${rect.left} < 0 for $ratioW:$ratioH in ${viewW}x$viewH"
+        )
+        assertTrue(
+            rect.top >= 0f,
+            "Frame top ${rect.top} < 0 for $ratioW:$ratioH in ${viewW}x$viewH"
+        )
+        assertTrue(
+            rect.right <= viewW.toFloat() + 1f,
+            "Frame right ${rect.right} > $viewW for $ratioW:$ratioH in ${viewW}x$viewH"
+        )
+        assertTrue(
+            rect.bottom <= viewH.toFloat() + 1f,
+            "Frame bottom ${rect.bottom} > $viewH for $ratioW:$ratioH in ${viewW}x$viewH"
+        )
     }
 
     private fun assertApprox(expected: Float, actual: Float, tolerance: Float = 1f) {

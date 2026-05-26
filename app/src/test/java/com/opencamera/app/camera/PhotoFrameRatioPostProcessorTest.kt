@@ -255,6 +255,59 @@ class PhotoFrameRatioPostProcessorTest {
         assertEquals(562, zoomBounds.top)
     }
 
+    // --- Acceptance: saved crop uses center-crop semantics matching overlay ---
+
+    @Test
+    fun `saved crop is always centered for all ratios`() {
+        val configs = listOf(
+            4000 to 3000,  // landscape
+            3000 to 4000,  // portrait
+            4000 to 4000,  // square
+        )
+        val ratios = listOf(FrameRatio.RATIO_4_3, FrameRatio.RATIO_16_9, FrameRatio.RATIO_1_1)
+        for ((w, h) in configs) {
+            for (ratio in ratios) {
+                val bounds = computeCenterCropBounds(w, h, ratio) ?: continue
+                val cropCenterX = (bounds.left + bounds.right) / 2
+                val cropCenterY = (bounds.top + bounds.bottom) / 2
+                assertEquals(
+                    w / 2,
+                    cropCenterX,
+                    "Crop must be horizontally centered for $ratio on ${w}x$h"
+                )
+                assertEquals(
+                    h / 2,
+                    cropCenterY,
+                    "Crop must be vertically centered for $ratio on ${w}x$h"
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `saved crop aspect ratio matches requested ratio for all orientations`() {
+        val configs = listOf(4000 to 3000, 3000 to 4000)
+        for ((w, h) in configs) {
+            for (ratio in listOf(FrameRatio.RATIO_16_9, FrameRatio.RATIO_1_1)) {
+                val bounds = computeCenterCropBounds(w, h, ratio) ?: continue
+                val cropW = bounds.right - bounds.left
+                val cropH = bounds.bottom - bounds.top
+                val expectedRatio = if (w <= h) {
+                    minOf(ratio.width, ratio.height).toDouble() / maxOf(ratio.width, ratio.height).toDouble()
+                } else {
+                    maxOf(ratio.width, ratio.height).toDouble() / minOf(ratio.width, ratio.height).toDouble()
+                }
+                val actualRatio = cropW.toDouble() / cropH.toDouble()
+                assertEquals(
+                    expectedRatio,
+                    actualRatio,
+                    0.02,
+                    "Crop aspect ratio must match $ratio for ${w}x$h image"
+                )
+            }
+        }
+    }
+
     private fun photoResult(
         frameRatio: String?,
         captureCropZoom: String? = null,
