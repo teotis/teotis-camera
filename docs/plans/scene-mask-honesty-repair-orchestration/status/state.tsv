@@ -3,4 +3,3 @@ package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	comm
 02-preview-analysis-budget-contract	pending			agent-02-preview-budget	agent/scene-mask-honesty-repair/02-preview-analysis-budget-contract	/private/tmp/open_camera-orchestration/scene-mask-honesty-repair/02-preview-analysis-budget-contract	-	-	-	-	-	-
 03-scene-mask-verification-gate	pending			agent-03-scene-mask-gate	agent/scene-mask-honesty-repair/03-scene-mask-verification-gate	/private/tmp/open_camera-orchestration/scene-mask-honesty-repair/03-scene-mask-verification-gate	-	-	-	-	-	-
 99-finalize	pending			agent-99-scene-mask-finalize	agent/scene-mask-honesty-repair/integration	/private/tmp/open_camera-orchestration/scene-mask-honesty-repair/99-finalize	-	-	-	-	-	-
-

@@ -1,0 +1,6 @@
+package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
+01-zoom-slider-render-latch	pending
+02-brightness-dispatch-and-latch	pending
+03-pinch-zoom-basis-repair	pending
+04-integration-verification-and-smoke	pending
+99-finalize	pending
