@@ -580,7 +580,7 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `focal slider stays enabled during active video recording`() {
+    fun `focal slider stays enabled during active video recording with continuous capability`() {
         val state = defaultSessionState(
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 zoomRatioCapability = ZoomRatioCapability(
@@ -595,6 +595,24 @@ class SessionCockpitRenderModelTest {
         assertTrue(controls.focalLengthSlider.isVisible)
         assertTrue(controls.focalLengthSlider.isEnabled)
         assertNull(controls.focalLengthSlider.disabledReason)
+    }
+
+    @Test
+    fun `focal slider disabled during active video recording with discrete preset capability`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        ).copy(recordingStatus = RecordingStatus.RECORDING)
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.focalLengthSlider.isVisible)
+        assertFalse(controls.focalLengthSlider.isEnabled)
+        assertNotNull(controls.focalLengthSlider.disabledReason)
     }
 
     @Test

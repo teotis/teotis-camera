@@ -3,6 +3,7 @@ package com.opencamera.app
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.StillCaptureOutputSize
+import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.effect.FrameEffect
@@ -204,9 +205,9 @@ internal fun sessionControlsRenderModel(
     val currentRatio = normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
     val presets = capability.normalizedSupportedRatios
     val exactMatch = currentRatio in presets
-    val sliderEnabled = capability.isSwitchingSupported && !isZoomBlockedBySession(state)
+    val sliderEnabled = capability.isSwitchingSupported && !isZoomBlockedBySession(state, capability.support)
     val sliderDisabledReason = if (capability.isSwitchingSupported && !sliderEnabled) {
-        zoomDisabledReasonText(state)
+        zoomDisabledReasonText(state, capability.support)
     } else null
 
     return SessionControlsRenderModel(
@@ -661,21 +662,23 @@ private fun compactZoomLabel(ratio: Float): String {
     return if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
 }
 
-private fun isZoomBlockedBySession(state: SessionState): Boolean {
+private fun isZoomBlockedBySession(state: SessionState, zoomSupport: ZoomControlSupport = ZoomControlSupport.UNSUPPORTED): Boolean {
     if (state.countdownRemainingSeconds != null) return true
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) return true
     if (state.recordingStatus == RecordingStatus.REQUESTING) return true
     if (state.recordingStatus == RecordingStatus.STOPPING) return true
+    if (state.recordingStatus == RecordingStatus.RECORDING && zoomSupport == ZoomControlSupport.DISCRETE_PRESET) return true
     return false
 }
 
-private fun zoomDisabledReasonText(state: SessionState): String {
+private fun zoomDisabledReasonText(state: SessionState, zoomSupport: ZoomControlSupport = ZoomControlSupport.UNSUPPORTED): String {
     if (state.countdownRemainingSeconds != null) return "Countdown in progress"
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) return "Saving previous photo"
     if (state.recordingStatus == RecordingStatus.REQUESTING) return "Preparing to record"
     if (state.recordingStatus == RecordingStatus.STOPPING) return "Stopping and saving"
+    if (state.recordingStatus == RecordingStatus.RECORDING && zoomSupport == ZoomControlSupport.DISCRETE_PRESET) return "Preset switching unavailable during recording"
     return "Zoom unavailable"
 }
 
