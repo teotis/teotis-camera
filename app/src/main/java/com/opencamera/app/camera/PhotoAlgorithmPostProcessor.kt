@@ -165,7 +165,7 @@ internal class PhotoAlgorithmPostProcessor(
                         is MaskResolveResult.Available -> {
                             if (editor is MaskAwarePhotoAlgorithmEditor) {
                                 val (editorResult, maskNotes) = editor.applyWithMask(
-                                    resolvedMask.bitmap, payload.spec, resolvedMask.mask
+                                    payload.target, resolvedMask.bitmap, payload.spec, resolvedMask.mask
                                 )
                                 val baseResult = applyEditorResult(result, payload, editorResult)
                                 val descriptor = resolvedMask.mask.toDescriptor(
@@ -355,12 +355,24 @@ internal class AndroidPhotoAlgorithmEditor(
     }
 
     override suspend fun applyWithMask(
+        target: ProcessorTarget,
         bitmap: Bitmap,
         spec: PhotoAlgorithmSpec,
         mask: SavedPhotoMaskPixels
     ): Pair<ProcessorEditorResult, List<String>> {
+        val sourceBytes = readSourceBytes(target)
+        val preservedExif: Map<String, String> = if (sourceBytes != null && sourceBytes.isNotEmpty()) {
+            readPreservedExif(sourceBytes)
+        } else {
+            emptyMap()
+        }
         val notes = applyStyleWithMask(bitmap, spec, mask)
-        return Pair(PhotoAlgorithmApplied(), notes)
+        val encodedBytes = encodeJpeg(bitmap)
+        if (!writeEncodedBytes(target, encodedBytes)) {
+            return Pair(ProcessorEditorResult.Failed("output-unavailable"), notes)
+        }
+        val exifWarning = restorePreservedExif(target, preservedExif)
+        return Pair(PhotoAlgorithmApplied(exifWarning), notes)
     }
 
     private fun applyStyle(

@@ -474,6 +474,7 @@ class PhotoAlgorithmPostProcessorTest {
         }
 
         override suspend fun applyWithMask(
+            target: ProcessorTarget,
             bitmap: Bitmap,
             spec: PhotoAlgorithmSpec,
             mask: SavedPhotoMaskPixels
