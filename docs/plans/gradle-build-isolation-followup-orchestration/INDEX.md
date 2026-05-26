@@ -8,7 +8,7 @@ Finish the build-isolation hardening after the external-agent repair. The curren
 
 - Recommended mode: AGENT_VIEW
 - Why: The remaining work splits cleanly into script hardening and documentation/ledger hardening, with disjoint file ownership and one Codex final audit.
-- Alternatives rejected: SINGLE_AGENT — possible, but slower than two small focused agents; CLAUDE_BG_SCRIPT — generated as an option, but Agent View is safer while repository state is active; BATCH — not a repo-wide mechanical transform; AGENT_TEAM — unnecessary for implementation.
+- Alternatives rejected: SINGLE_AGENT — possible, but slower than two small focused agents; CLAUDE_BG_SCRIPT — not used for the current Claude Code `2.1.142` setup because this CLI no longer exposes top-level `claude --bg`; background work is dispatched from Agent View via `claude agents`. BATCH — not a repo-wide mechanical transform; AGENT_TEAM — unnecessary for implementation.
 - Max parallel agents: 2
 - Codex-retained work: final integration audit, verification of actual build roots, and decision on whether the external fix is fully accepted.
 
@@ -127,7 +127,6 @@ Evidence pack must include:
 
 ## Launch Options
 
-- Option A: Agent View manual dispatch — copy prompts from `launchers/agent-view-prompts.md`.
-- Option B: `claude --bg` script — run `bash docs/plans/gradle-build-isolation-followup-orchestration/launchers/dispatch-claude-agents.sh`.
+- Option A: Agent View manual dispatch — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high`, then copy prompts from `launchers/agent-view-prompts.md`.
+- Option B: Agent View helper script — run `bash docs/plans/gradle-build-isolation-followup-orchestration/launchers/dispatch-claude-agents.sh`. The script performs preflight checks and opens Agent View; it does not auto-dispatch packages.
 - Option C: Final integration audit — give `validation/final-audit-prompt.md` to Codex.
-

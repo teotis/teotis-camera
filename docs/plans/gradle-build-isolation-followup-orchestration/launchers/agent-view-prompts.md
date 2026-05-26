@@ -1,5 +1,15 @@
 # Agent View Prompts
 
+Use these prompts in Claude Code Agent View. This package is updated for Claude Code `2.1.142`, where background sessions are managed with `claude agents` rather than top-level `claude --bg`.
+
+Open Agent View from the repo root with:
+
+```bash
+claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high
+```
+
+Packages 01 and 02 may be launched in parallel. Run the Codex final audit only after both status files are completed.
+
 ## Package: 01-stage-script-isolation — Stage Script Isolation
 
 Copy the block below into Claude Code Agent View.
@@ -39,4 +49,3 @@ Copy the block below into Claude Code Agent View.
 **Evidence pack**: when done, write completion evidence to your status file, not INDEX.md. Include worktree path, branch, git diff --stat, changed files, commands run, test results, commit/PR, unresolved risks, and self-certification that you only touched allowed paths.
 
 ---
-
