@@ -97,7 +97,7 @@ is_package_ready() {
     local deps
     deps=$(awk -F'\t' -v pkg="$pkg" '$1 == pkg {print $4}' "$GRAPH")
 
-    if [[ -z "$deps" ]]; then
+    if [[ -z "$deps" || "$deps" == "none" ]]; then
         return 0
     fi
 
@@ -115,7 +115,7 @@ is_package_ready() {
 
 # Count running agents
 count_running_agents() {
-    grep -c "launched\|in_progress" "$STATE" 2>/dev/null || echo "0"
+    tail -n +2 "$STATE" | grep -c "launched\|in_progress" 2>/dev/null || echo "0"
 }
 
 # Launch a package agent
@@ -213,7 +213,7 @@ cmd_start() {
     running=$(count_running_agents)
 
     # Find ready packages in wave 1
-    while IFS=$'\t' read -r pkg _ _ _ _ wave _ _ _ _; do
+    while IFS=$'\t' read -r pkg _1 _2 _3 _4 wave _6 _7 _8 _9; do
         [[ "$pkg" == "package_id" ]] && continue  # skip header
         [[ "$wave" != "1" ]] && continue
 
@@ -253,7 +253,7 @@ cmd_advance() {
     local all_completed=true
     local any_blocked=false
 
-    while IFS=$'\t' read -r pkg _ _ _ _ _ _ _ _ _ finalize; do
+    while IFS=$'\t' read -r pkg _1 _2 _3 _4 _5 _6 _7 _8 _9 finalize; do
         [[ "$pkg" == "package_id" ]] && continue  # skip header
         [[ "$finalize" == "1" ]] && continue  # skip finalize package
 
@@ -290,7 +290,7 @@ cmd_advance() {
     local running
     running=$(count_running_agents)
 
-    while IFS=$'\t' read -r pkg _ _ _ _ wave _ _ _ _ finalize; do
+    while IFS=$'\t' read -r pkg _1 _2 _3 _4 wave _6 _7 _8 _9 finalize; do
         [[ "$pkg" == "package_id" ]] && continue  # skip header
         [[ "$finalize" == "1" ]] && continue  # skip finalize for now
 

@@ -1,8 +1,8 @@
 package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-architecture-structural-analysis	packages/01-architecture-structural-analysis.md	status/01-architecture-structural-analysis.md		status	1	agent/deep-audit/01-architecture-structural-analysis	.worktrees/01-architecture-structural-analysis	0	0
-02-technical-debt-audit	packages/02-technical-debt-audit.md	status/02-technical-debt-audit.md		status	1	agent/deep-audit/02-technical-debt-audit	.worktrees/02-technical-debt-audit	0	0
-03-module-dependency-analysis	packages/03-module-dependency-analysis.md	status/03-module-dependency-analysis.md		status	1	agent/deep-audit/03-module-dependency-analysis	.worktrees/03-module-dependency-analysis	0	0
-04-code-quality-metrics	packages/04-code-quality-metrics.md	status/04-code-quality-metrics.md		status	1	agent/deep-audit/04-code-quality-metrics	.worktrees/04-code-quality-metrics	0	0
+01-architecture-structural-analysis	packages/01-architecture-structural-analysis.md	status/01-architecture-structural-analysis.md	none	status	1	agent/deep-audit/01-architecture-structural-analysis	.worktrees/01-architecture-structural-analysis	0	0
+02-technical-debt-audit	packages/02-technical-debt-audit.md	status/02-technical-debt-audit.md	none	status	1	agent/deep-audit/02-technical-debt-audit	.worktrees/02-technical-debt-audit	0	0
+03-module-dependency-analysis	packages/03-module-dependency-analysis.md	status/03-module-dependency-analysis.md	none	status	1	agent/deep-audit/03-module-dependency-analysis	.worktrees/03-module-dependency-analysis	0	0
+04-code-quality-metrics	packages/04-code-quality-metrics.md	status/04-code-quality-metrics.md	none	status	1	agent/deep-audit/04-code-quality-metrics	.worktrees/04-code-quality-metrics	0	0
 05-session-kernel-deep-dive	packages/05-session-kernel-deep-dive.md	status/05-session-kernel-deep-dive.md	01-architecture-structural-analysis	status	2	agent/deep-audit/05-session-kernel-deep-dive	.worktrees/05-session-kernel-deep-dive	0	0
 06-performance-optimization-analysis	packages/06-performance-optimization-analysis.md	status/06-performance-optimization-analysis.md	03-module-dependency-analysis	status	2	agent/deep-audit/06-performance-optimization-analysis	.worktrees/06-performance-optimization-analysis	0	0
 07-test-coverage-gap-analysis	packages/07-test-coverage-gap-analysis.md	status/07-test-coverage-gap-analysis.md	04-code-quality-metrics	status	2	agent/deep-audit/07-test-coverage-gap-analysis	.worktrees/07-test-coverage-gap-analysis	0	0
