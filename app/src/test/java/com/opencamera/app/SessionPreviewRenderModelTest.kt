@@ -11,6 +11,8 @@ import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PermissionState
+import com.opencamera.core.session.PreviewMeteringFeedback
+import com.opencamera.core.session.PreviewMeteringFeedbackStatus
 import com.opencamera.core.session.PreviewMetrics
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
@@ -78,6 +80,52 @@ class SessionPreviewRenderModelTest {
         assertFalse(offGridModel.isGridVisible)
         assertFalse(offGridModel.isCountdownVisible)
     }
+
+    // --- focusReticleRenderModel metering status mapping ---
+
+    @Test
+    fun `focusReticleRenderModel maps REQUESTED correctly`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.REQUESTED)
+        val model = focusReticleRenderModel(feedback)
+        assertEquals(FocusReticleStatus.REQUESTED, model.status)
+        assertEquals(0.5f, model.normalizedX)
+        assertEquals(0.3f, model.normalizedY)
+    }
+
+    @Test
+    fun `focusReticleRenderModel maps SUCCEEDED correctly`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.SUCCEEDED)
+        val model = focusReticleRenderModel(feedback)
+        assertEquals(FocusReticleStatus.SUCCEEDED, model.status)
+    }
+
+    @Test
+    fun `focusReticleRenderModel maps DEGRADED_AUTO_EXPOSURE_ONLY to DEGRADED`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY)
+        val model = focusReticleRenderModel(feedback)
+        assertEquals(FocusReticleStatus.DEGRADED, model.status)
+    }
+
+    @Test
+    fun `focusReticleRenderModel maps FAILED correctly`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.FAILED)
+        val model = focusReticleRenderModel(feedback)
+        assertEquals(FocusReticleStatus.FAILED, model.status)
+    }
+
+    @Test
+    fun `focusReticleRenderModel maps UNSUPPORTED correctly`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.UNSUPPORTED)
+        val model = focusReticleRenderModel(feedback)
+        assertEquals(FocusReticleStatus.UNSUPPORTED, model.status)
+    }
+
+    private fun meteringFeedback(status: PreviewMeteringFeedbackStatus) = PreviewMeteringFeedback(
+        requestId = "test-req-1",
+        normalizedX = 0.5f,
+        normalizedY = 0.3f,
+        status = status
+    )
 
     private fun defaultSessionState(): SessionState {
         return SessionState(
