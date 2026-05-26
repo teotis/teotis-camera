@@ -39,7 +39,7 @@ class GesturePolicy {
                 }
             }
             is GestureEvent.ScaleEnd -> {
-                resetZoomAccumulation()
+                lastPinchTimestamp = 0L
                 GestureAction.Ignore
             }
             is GestureEvent.VerticalScroll -> GestureAction.ShowExposureHint(event.deltaY)
