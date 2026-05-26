@@ -59,11 +59,20 @@ internal data class FrameRatioControlRenderModel(
     val disabledReason: String?
 )
 
+internal enum class QuickControlKind {
+    TOGGLE,
+    CYCLE,
+    SLIDER,
+    SEGMENTED
+}
+
 internal data class QuickPanelRowRenderModel(
     val title: String,
     val value: String,
     val isEnabled: Boolean,
-    val disabledReason: String? = null
+    val disabledReason: String? = null,
+    val controlKind: QuickControlKind = QuickControlKind.CYCLE,
+    val isSelected: Boolean = false
 )
 
 internal data class QuickBrightnessRenderModel(
@@ -323,20 +332,32 @@ internal fun quickPanelSheetRenderModel(
         gridRow = QuickPanelRowRenderModel(
             title = text.quickGrid(),
             value = grid.value,
-            isEnabled = grid.isInteractive
+            isEnabled = grid.isInteractive,
+            controlKind = QuickControlKind.CYCLE
         ),
+<<<<<<< Updated upstream
 
+=======
+        qualityRow = QuickPanelRowRenderModel(
+            title = text.quickQuality(),
+            value = qualityValue,
+            isEnabled = qualityEnabled,
+            controlKind = QuickControlKind.CYCLE
+        ),
+>>>>>>> Stashed changes
         resolutionRow = QuickPanelRowRenderModel(
             title = text.quickResolution(),
             value = stillResolutionQuickLabel(state, strings),
-            isEnabled = resolutionEnabled
+            isEnabled = resolutionEnabled,
+            controlKind = QuickControlKind.CYCLE
         ),
         brightnessRow = brightnessControl,
         frameRatioRow = QuickPanelRowRenderModel(
             title = text.frameRatioTitle(),
             value = frameControl.currentLabel,
             isEnabled = frameControl.isEnabled,
-            disabledReason = frameControl.disabledReason
+            disabledReason = frameControl.disabledReason,
+            controlKind = QuickControlKind.SEGMENTED
         ),
         frameRatioNext = nextRatio,
         frameRatioOptions = frameControl.options,
@@ -345,12 +366,15 @@ internal fun quickPanelSheetRenderModel(
         liveRow = QuickPanelRowRenderModel(
             title = text.quickLive(),
             value = live.value,
-            isEnabled = live.isInteractive
+            isEnabled = live.isInteractive,
+            controlKind = QuickControlKind.TOGGLE,
+            isSelected = live.value.equals(text.onOff(true), ignoreCase = true)
         ),
         timerRow = QuickPanelRowRenderModel(
             title = text.quickTimer(),
             value = timer.value,
-            isEnabled = timer.isInteractive
+            isEnabled = timer.isInteractive,
+            controlKind = QuickControlKind.CYCLE
         )
     )
 }

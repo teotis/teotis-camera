@@ -555,6 +555,59 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `quick panel rows expose correct control kinds`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(QuickControlKind.CYCLE, sheet.gridRow.controlKind)
+        assertEquals(QuickControlKind.CYCLE, sheet.qualityRow.controlKind)
+        assertEquals(QuickControlKind.CYCLE, sheet.resolutionRow.controlKind)
+        assertEquals(QuickControlKind.SEGMENTED, sheet.frameRatioRow.controlKind)
+        assertEquals(QuickControlKind.TOGGLE, sheet.liveRow.controlKind)
+        assertEquals(QuickControlKind.CYCLE, sheet.timerRow.controlKind)
+    }
+
+    @Test
+    fun `quick panel live row isSelected reflects on-off state`() {
+        val stateOn = defaultSessionState(
+            settings = defaultSessionState().settings.copy(
+                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = true)
+            )
+        )
+        val sheetOn = quickPanelSheetRenderModel(stateOn, TestAppTextResolver(), strings)
+        assertTrue(sheetOn.liveRow.isSelected)
+        assertEquals("On", sheetOn.liveRow.value)
+
+        val stateOff = defaultSessionState(
+            settings = defaultSessionState().settings.copy(
+                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = false)
+            )
+        )
+        val sheetOff = quickPanelSheetRenderModel(stateOff, TestAppTextResolver(), strings)
+        assertFalse(sheetOff.liveRow.isSelected)
+        assertEquals("Off", sheetOff.liveRow.value)
+    }
+
+    @Test
+    fun `quick panel rows show disabled reason when present`() {
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "test-shot",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertNotNull(sheet.frameRatioRow.disabledReason)
+        assertFalse(sheet.frameRatioRow.isEnabled)
+    }
+
+    @Test
     fun `primary status shows recording starting`() {
         val state = defaultSessionState().copy(recordingStatus = RecordingStatus.REQUESTING)
         val model = primaryStatusRenderModel(state, TestAppTextResolver())

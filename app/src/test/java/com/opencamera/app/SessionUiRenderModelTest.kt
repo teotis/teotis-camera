@@ -1800,6 +1800,36 @@ class SessionUiRenderModelTest {
     }
 
     @Test
+    fun `quick panel rows expose correct control kinds`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(QuickControlKind.TOGGLE, sheet.liveRow.controlKind)
+        assertEquals(QuickControlKind.CYCLE, sheet.gridRow.controlKind)
+        assertEquals(QuickControlKind.CYCLE, sheet.timerRow.controlKind)
+        assertEquals(QuickControlKind.SEGMENTED, sheet.frameRatioRow.controlKind)
+    }
+
+    @Test
+    fun `quick panel live toggle isSelected matches on-off state`() {
+        val stateOn = defaultSessionState(
+            settings = defaultSessionState().settings.copy(
+                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = true)
+            )
+        )
+        val sheetOn = quickPanelSheetRenderModel(stateOn, TestAppTextResolver(), strings)
+        assertTrue(sheetOn.liveRow.isSelected)
+
+        val stateOff = defaultSessionState(
+            settings = defaultSessionState().settings.copy(
+                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = false)
+            )
+        )
+        val sheetOff = quickPanelSheetRenderModel(stateOff, TestAppTextResolver(), strings)
+        assertFalse(sheetOff.liveRow.isSelected)
+    }
+
+    @Test
     fun `color lab panel render model title is color lab`() {
         val state = defaultSessionState()
         val model = colorLabPanelRenderModel(state, TestAppTextResolver())

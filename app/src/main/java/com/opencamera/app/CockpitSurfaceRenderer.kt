@@ -96,15 +96,30 @@ internal class CockpitSurfaceRenderer(
         slider.setCurrentRatio(model.currentRatio)
     }
 
+    private fun quickRowLabel(row: QuickPanelRowRenderModel): String {
+        val base = "${row.title} ${row.value}"
+        return if (row.disabledReason != null) "$base (${row.disabledReason})" else base
+    }
+
     fun renderQuickBubble(
         settingsPage: SessionSettingsPageRenderModel,
         sheet: QuickPanelSheetRenderModel
     ) {
-        quickPanel.grid.text = "${sheet.gridRow.title} ${sheet.gridRow.value}"
+        quickPanel.grid.text = quickRowLabel(sheet.gridRow)
         quickPanel.grid.isEnabled = sheet.gridRow.isEnabled
+        quickPanel.grid.alpha = if (sheet.gridRow.isEnabled) 1f else 0.4f
 
+<<<<<<< Updated upstream
         quickPanel.resolution.text = "${sheet.resolutionRow.title} ${sheet.resolutionRow.value}"
+=======
+        quickPanel.flash.text = quickRowLabel(sheet.qualityRow)
+        quickPanel.flash.isEnabled = sheet.qualityRow.isEnabled
+        quickPanel.flash.alpha = if (sheet.qualityRow.isEnabled) 1f else 0.4f
+
+        quickPanel.resolution.text = quickRowLabel(sheet.resolutionRow)
+>>>>>>> Stashed changes
         quickPanel.resolution.isEnabled = sheet.resolutionRow.isEnabled
+        quickPanel.resolution.alpha = if (sheet.resolutionRow.isEnabled) 1f else 0.4f
 
         val brightness = sheet.brightnessRow
         if (brightness.isVisible) {
@@ -123,11 +138,19 @@ internal class CockpitSurfaceRenderer(
         quickPanel.frameRatio.text = "${sheet.frameRatioRow.title} ${sheet.frameRatioRow.value}"
         quickPanel.frameRatio.isEnabled = sheet.frameRatioEnabled
 
-        quickPanel.livePhoto.text = "${sheet.liveRow.title} ${sheet.liveRow.value}"
+        quickPanel.livePhoto.text = quickRowLabel(sheet.liveRow)
         quickPanel.livePhoto.isEnabled = sheet.liveRow.isEnabled
+        if (sheet.liveRow.isSelected) {
+            quickPanel.livePhoto.alpha = 1f
+            quickPanel.livePhoto.setBackgroundResource(R.drawable.bg_quick_chip_selected)
+        } else {
+            quickPanel.livePhoto.alpha = if (sheet.liveRow.isEnabled) 0.85f else 0.4f
+            quickPanel.livePhoto.setBackgroundResource(R.drawable.bg_quick_chip)
+        }
 
-        quickPanel.timer.text = "${sheet.timerRow.title} ${sheet.timerRow.value}"
+        quickPanel.timer.text = quickRowLabel(sheet.timerRow)
         quickPanel.timer.isEnabled = sheet.timerRow.isEnabled
+        quickPanel.timer.alpha = if (sheet.timerRow.isEnabled) 1f else 0.4f
     }
 
     private var lastAutoScrolledActiveMode: com.opencamera.core.mode.ModeId? = null
