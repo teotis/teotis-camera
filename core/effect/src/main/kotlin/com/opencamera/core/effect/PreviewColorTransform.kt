@@ -35,7 +35,7 @@ data class PreviewColorTransform(
         }
 
     companion object {
-        val NONE = PreviewColorTransform(fidelity = PreviewColorFidelity.NONE)
+        val NONE = PreviewColorTransform()
         val MASK_AWARE = PreviewColorTransform(fidelity = PreviewColorFidelity.MASK_AWARE)
         val FALLBACK = PreviewColorTransform(fidelity = PreviewColorFidelity.FALLBACK)
 
@@ -95,7 +95,7 @@ data class PreviewColorTransform(
                 m = multiply(m, highlightCompressionMatrix(spec.highlightCompression))
             }
 
-            return PreviewColorTransform(matrix = m, fidelity = PreviewColorFidelity.GOOD)
+            return PreviewColorTransform(matrix = m)
         }
 
         private fun isNoOp(spec: FilterRenderSpec): Boolean {

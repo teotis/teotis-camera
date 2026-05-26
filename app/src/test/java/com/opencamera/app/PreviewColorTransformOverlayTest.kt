@@ -1,46 +1,58 @@
 package com.opencamera.app
 
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FilterEffect
 import com.opencamera.core.effect.PreviewColorTransform
+import com.opencamera.core.effect.PreviewEffectAdapter
+import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.PerceptualColorRecipe
 import com.opencamera.core.settings.PreviewColorFidelity
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class PreviewColorTransformOverlayTest {
 
     @Test
-    fun `non-neutral color transform becomes drawable overlay`() {
-        val overlay = previewColorTransformOverlaySpec(
-            PreviewColorTransform(
-                tintColor = 0xFFFF8844.toInt(),
-                tintAlpha = 0.24f,
-                fidelity = PreviewColorFidelity.APPROXIMATE
-            )
-        )
+    fun `none transform is identity and hidden by overlay contract`() {
+        val transform = PreviewColorTransform.NONE
 
-        assertNotNull(overlay)
-        assertEquals(0xFFFF8844.toInt(), overlay.tintColor)
-        assertEquals(0.24f, overlay.tintAlpha)
-        assertEquals(0f, overlay.vignetteStrength)
-        assertEquals(0f, overlay.warmthShift)
+        assertTrue(transform.isIdentity)
+        assertEquals(PreviewColorFidelity.NONE, transform.fidelity)
     }
 
     @Test
-    fun `none color transform does not create overlay`() {
-        assertNull(previewColorTransformOverlaySpec(PreviewColorTransform.NONE))
-    }
-
-    @Test
-    fun `zero alpha color transform does not create overlay`() {
-        val overlay = previewColorTransformOverlaySpec(
-            PreviewColorTransform(
-                tintColor = 0xFFFF8844.toInt(),
-                tintAlpha = 0f,
-                fidelity = PreviewColorFidelity.APPROXIMATE
+    fun `adapter produces approximate fidelity for active filter preview`() {
+        val adapter = PreviewEffectAdapter()
+        val effect = FilterEffect(
+            profileId = "test",
+            renderSpec = FilterRenderSpec(
+                saturation = 0.7f,
+                contrast = 1.3f,
+                warmthShift = 4
             )
         )
 
-        assertNull(overlay)
+        val transform = adapter.adapt(EffectSpec(listOf(effect))).colorTransform
+
+        assertEquals(PreviewColorFidelity.APPROXIMATE, transform.fidelity)
+        assertNotNull(transform.matrix)
+        assertFalse(transform.isIdentity)
+    }
+
+    @Test
+    fun `recipe-only color lab effect produces approximate overlay transform`() {
+        val recipe = PerceptualColorRecipe(warmthBias = 0.45f, chromaBoost = 0.3f)
+        val adapter = PreviewEffectAdapter()
+
+        val transform = adapter.adapt(
+            EffectSpec(listOf(FilterEffect("color-lab", null, recipe = recipe)))
+        ).colorTransform
+
+        assertEquals(PreviewColorFidelity.APPROXIMATE, transform.fidelity)
+        assertTrue(transform.tintAlpha > 0f)
+        assertFalse(transform.isIdentity)
     }
 }
