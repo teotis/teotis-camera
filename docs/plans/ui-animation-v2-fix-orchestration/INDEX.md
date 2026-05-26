@@ -162,6 +162,6 @@ Evidence pack must include:
 ## Launch Options
 
 - Option A: Agent View manual dispatch — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high`, then copy prompts from `launchers/agent-view-prompts.md`.
-- Option B: Agent View helper script — run `bash launchers/dispatch-claude-agents.sh` from this repo. The script performs preflight checks and opens Agent View; it does not auto-dispatch every package.
+- Option B: Agent View opener script — run `bash launchers/dispatch-claude-agents.sh` from this repo. The script performs preflight checks and opens Agent View; it creates no task units. Create each task in Agent View by pasting prompts from `launchers/agent-view-prompts.md`.
 - Option C: `/batch` — not recommended for this non-mechanical UI work.
 - Option D: Final integration audit — give `validation/final-audit-prompt.md` to Codex after all status files are complete.

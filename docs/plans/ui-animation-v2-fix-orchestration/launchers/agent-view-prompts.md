@@ -2,6 +2,8 @@
 
 Use these prompts in Claude Code Agent View. This package is updated for Claude Code `2.1.142`, where background sessions are managed with `claude agents`.
 
+Important: `claude agents` opens Agent View, but it does not create package task units by itself. Create each task unit inside Agent View by pasting the relevant package block below. The helper script opens the view and prints the launch order only.
+
 Open Agent View from the repo root with:
 
 ```bash

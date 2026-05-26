@@ -22,7 +22,9 @@ echo "Claude Code version:"
 claude --version
 echo
 echo "Claude Code 2.1 uses Agent View through 'claude agents'."
-echo "This helper does not dispatch all packages automatically."
+echo "Important: this CLI helper opens Agent View only."
+echo "It does NOT create task units inside Agent View."
+echo "Task units must be created from the Agent View UI by pasting the package prompts."
 echo
 echo "Open Agent View, then paste package prompts from:"
 echo "$PROMPT_FILE"
@@ -36,6 +38,10 @@ echo "5. 05-quick-panel-semantic-controls-v2"
 echo "6. 99-integration-audit"
 echo
 echo "Tip: pass --print-only to stop here without opening Agent View."
+echo
+echo "If you expected automatic task creation: Claude Code 2.1.142 exposes"
+echo "'claude agents' as an Agent View manager, but this local help output does"
+echo "not expose a CLI subcommand for creating Agent View task units."
 
 if [[ "${1:-}" == "--print-only" ]]; then
   exit 0
