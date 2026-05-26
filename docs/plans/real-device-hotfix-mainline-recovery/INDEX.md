@@ -16,7 +16,8 @@ Recover the failed hotfix integration by landing the completed watermark and zoo
 - Local version checked: `claude --version` -> `2.1.142 (Claude Code)`.
 - Local Agents View checked: `claude agents --help` supports `--cwd`, `--model`, `--effort`, `--permission-mode`, and `--setting-sources`.
 - Official CLI reference documents `claude agents`, `--bg`, `--name`, and `--permission-mode`.
-- Auto mode note: `--permission-mode auto` cannot be silently granted by a repository or background script. The user must either opt in once interactively with `claude --permission-mode auto` or configure user-level settings. Therefore the generated background script defaults to `CLAUDE_PERMISSION_MODE=default`; use `CLAUDE_PERMISSION_MODE=auto` only after opt-in.
+- Permission mode note: the generated background script omits `--permission-mode` by default so each background task inherits the user's configured Claude Code permissions. If the user has `permissions.defaultMode` set to `bypassPermissions` in `~/.claude/settings.json`, the package sessions inherit bypass mode without the repository hard-coding it.
+- Explicit override note: set `CLAUDE_PERMISSION_MODE=bypassPermissions`, `auto`, `default`, or another supported mode only when an override is intentional. `auto` still requires one interactive opt-in with `claude --permission-mode auto` before `claude --bg` can create sessions.
 
 ## Execution Authorization
 
@@ -135,7 +136,8 @@ Evidence pack must include:
 ## Launch Options
 - Option A: Agent View manual dispatch — copy prompts from `launchers/agent-view-prompts.md`.
 - Option B: background agent script — run `bash docs/plans/real-device-hotfix-mainline-recovery/launchers/dispatch-claude-agents.sh` and monitor with `claude agents`.
-  - Default permission mode is `default`.
+  - Default behavior omits `--permission-mode` and inherits the user's configured permissions. This preserves user-level `bypassPermissions` settings instead of overriding them per task.
+  - To force bypass for this run only, use `CLAUDE_PERMISSION_MODE=bypassPermissions bash docs/plans/real-device-hotfix-mainline-recovery/launchers/dispatch-claude-agents.sh`.
   - To use auto mode, first run `claude --permission-mode auto` interactively and accept the opt-in prompt, then run `CLAUDE_PERMISSION_MODE=auto bash docs/plans/real-device-hotfix-mainline-recovery/launchers/dispatch-claude-agents.sh`.
-  - If `--bg` fails before creating sessions because auto mode is not opted in, rerun the interactive opt-in command above or use the default mode.
+  - If `--bg` fails before creating sessions because auto mode is not opted in, rerun the interactive opt-in command above or unset `CLAUDE_PERMISSION_MODE` to inherit configured permissions.
 - Option C: Final integration audit — give `validation/final-audit-prompt.md` to Codex.

@@ -10,7 +10,7 @@
 - Why: 五个包中 01/02 都涉及 `core/effect` 与 `PreviewOverlayView`，03/04 都涉及 overlay/session/device/media 语义，05 独立在焦距滑条 UI。按依赖分组执行能减少文件冲突，又允许 01 与 05 并行。
 - Alternatives rejected:
   - SINGLE_AGENT — 修复面跨 effect、overlay、device adapter、media crop、UI control，串行会慢且容易漏验。
-  - BACKGROUND_AGENT_SCRIPT — 可用作 G1 启动选项，但当前需要人工按依赖顺序观察 01/02 与 03/04 的质量，不建议一次性全量后台启动；新版脚本默认 `CLAUDE_PERMISSION_MODE=default`，若用户显式改成 `auto`，必须先交互执行一次 `claude --permission-mode auto` 完成用户级 opt-in。
+  - BACKGROUND_AGENT_SCRIPT — 可用作 G1 启动选项，但当前需要人工按依赖顺序观察 01/02 与 03/04 的质量，不建议一次性全量后台启动；新版脚本默认不传 `--permission-mode`，继承用户级 Claude Code 设置，只有显式设置 `CLAUDE_PERMISSION_MODE=bypassPermissions|auto|default` 等值时才覆盖。
   - BATCH — 不是机械迁移，涉及产品语义和测试修复。
   - AGENT_TEAM — 当前是实现修复，不是多假设研究。
 - Max parallel agents: 2
@@ -154,15 +154,18 @@ Evidence pack must include:
 ## Claude Background Permission Notes
 
 - `claude --bg --name` is valid for creating Claude Code background sessions that appear in Agents View.
-- Generated scripts MUST default to `CLAUDE_PERMISSION_MODE=default`; they must not silently grant `auto` from the repository.
+- Generated scripts MUST default to inheriting the user's configured Claude Code permission mode by omitting `--permission-mode`.
+- If the user has set `permissions.defaultMode` to `bypassPermissions` in `~/.claude/settings.json`, generated background sessions inherit bypass mode without the repository hard-coding it.
+- Use `CLAUDE_PERMISSION_MODE=bypassPermissions`, `auto`, `default`, or another supported mode only when an explicit per-dispatch override is needed.
 - If the user wants `CLAUDE_PERMISSION_MODE=auto`, run `claude --permission-mode auto` once interactively first. Without that opt-in, the first `claude --bg` command can fail before creating a session, leaving Agents View empty.
 - If auto opt-in fails, rerun with:
   ```bash
   CLAUDE_PERMISSION_MODE=default rtk bash docs/plans/real-device-ui-upgrade-remediation/launchers/dispatch-claude-agents.sh
   ```
+- Do not use `--dangerously-skip-permissions`.
 
 ## Launch Options
 
 - **Option A**: Agent View manual dispatch — copy prompts from `launchers/agent-view-prompts.md`.
-- **Option B**: `claude --bg` script — run `rtk bash docs/plans/real-device-ui-upgrade-remediation/launchers/dispatch-claude-agents.sh` for G1 only; launch later groups manually after dependencies pass. The script defaults to `permission-mode=default`; use `auto` only after interactive opt-in.
+- **Option B**: `claude --bg` script — run `rtk bash docs/plans/real-device-ui-upgrade-remediation/launchers/dispatch-claude-agents.sh` for G1 only; launch later groups manually after dependencies pass. The script inherits user-level permission settings by default and prints the matching `claude agents --cwd ...` monitor command. Set `CLAUDE_OPEN_AGENT_VIEW=1` only if you want the script to open Agents View after dispatch.
 - **Option C**: Final integration audit — give `validation/final-audit-prompt.md` to Codex.

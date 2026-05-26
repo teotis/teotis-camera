@@ -136,13 +136,17 @@ Evidence pack must include:
 
 - Option A: Agent View manual dispatch - copy prompts from `launchers/agent-view-prompts.md`.
 - Option B: background agent script - run `bash docs/plans/rendering-2-0-validation-fix-orchestration-v2/launchers/dispatch-claude-agents.sh`.
-- Option B with auto mode: first opt in interactively with `claude --permission-mode auto`, then run `CLAUDE_PERMISSION_MODE=auto bash docs/plans/rendering-2-0-validation-fix-orchestration-v2/launchers/dispatch-claude-agents.sh`.
+- Option B with explicit mode override - set `CLAUDE_PERMISSION_MODE=acceptEdits|auto|default|dontAsk|bypassPermissions` only when you want to override Claude Code settings for this dispatch.
+- Option B with auto mode - first opt in interactively with `claude --permission-mode auto`, then run `CLAUDE_PERMISSION_MODE=auto bash docs/plans/rendering-2-0-validation-fix-orchestration-v2/launchers/dispatch-claude-agents.sh`.
+- Option B with bypass permissions - configure an allowed user-level `permissions.defaultMode` or explicitly run `CLAUDE_PERMISSION_MODE=bypassPermissions bash docs/plans/rendering-2-0-validation-fix-orchestration-v2/launchers/dispatch-claude-agents.sh` only in an isolated environment you are comfortable granting.
 - Option C: final integration audit - give `validation/final-audit-prompt.md` to Codex after packages complete.
 
 ## CLI Basis
 
 This package was generated after checking local Claude Code `2.1.142` and the official Claude Code CLI and Agent View references. The dispatch script uses `claude --bg --name` for background sessions and `claude agents --cwd` for monitoring, with configurable `--model`, `--effort`, `--permission-mode`, and `--setting-sources`.
 
-The script defaults to `CLAUDE_PERMISSION_MODE=default`. Auto mode is not silently granted by this repo. If the user wants auto mode for `claude --bg`, they must opt in once interactively with `claude --permission-mode auto` or configure an allowed user-level default, then rerun the script with `CLAUDE_PERMISSION_MODE=auto`. If Agent View shows no tasks after running the script, check whether the first `claude --bg` failed before creating a background session because auto mode required opt-in.
+The script defaults to no `--permission-mode` flag. That means each `claude --bg` task unit inherits the effective Claude Code settings from the repo directory, including user-level or project-level `permissions.defaultMode`. If the user has configured `permissions.defaultMode` to `bypassPermissions` in an allowed settings scope, the generated background sessions can start in bypass mode without this repo hard-coding a dangerous flag.
+
+If the user wants an explicit one-run override, set `CLAUDE_PERMISSION_MODE=bypassPermissions`, `auto`, `default`, `acceptEdits`, or another supported mode before running the script. Auto mode is not silently granted by this repo: if the user wants auto mode for `claude --bg`, they must opt in once interactively with `claude --permission-mode auto` or configure an allowed user-level default, then rerun the script with `CLAUDE_PERMISSION_MODE=auto`. If Agent View shows no tasks after running the script, check whether the first `claude --bg` failed before creating a background session because the requested permission mode was not authorized.
 
 The script intentionally does not use `--dangerously-skip-permissions`.

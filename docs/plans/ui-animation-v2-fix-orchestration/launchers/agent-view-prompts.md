@@ -2,12 +2,12 @@
 
 Use these prompts in Claude Code Agent View as a fallback or for manual inspection. The preferred launcher is now the background dispatch script, which creates `claude --bg --name` sessions by phase.
 
-Compatibility note: the local `claude --help` for `2.1.142` may omit `--bg`, but the official Claude Code CLI reference says `--help` does not list every flag and documents `--bg` as the background-agent flag. The dispatch script defaults to `--permission-mode default`; if you want `auto`, first run `bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh opt-in-auto` and accept the interactive prompt.
+Compatibility note: the local `claude --help` for `2.1.142` may omit `--bg`, but the official Claude Code CLI reference says `--help` does not list every flag and documents `--bg` as the background-agent flag. The dispatch script omits `--permission-mode` by default so user-level Claude Code settings apply, including `permissions.defaultMode: bypassPermissions` when the user has enabled it. If you want to override with `auto`, first run `bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh opt-in-auto` and accept the interactive prompt.
 
 Open Agent View from the repo root with:
 
 ```bash
-claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high
+claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --effort high
 ```
 
 Start with package 00. Do not launch later dependency packages until their "Must wait for" packages are complete.

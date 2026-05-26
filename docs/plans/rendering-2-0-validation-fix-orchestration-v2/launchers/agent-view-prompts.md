@@ -2,7 +2,7 @@
 
 Copy one block into Claude Code Agent View, or use `dispatch-claude-agents.sh` to launch the implementation packages as background agents.
 
-The dispatch script defaults to `CLAUDE_PERMISSION_MODE=default`. To use `auto`, first run `claude --permission-mode auto` once interactively and accept the opt-in prompt, then launch with `CLAUDE_PERMISSION_MODE=auto`.
+The dispatch script defaults to no explicit `--permission-mode`, so task units inherit Claude Code settings such as `permissions.defaultMode`. To use `auto`, first run `claude --permission-mode auto` once interactively and accept the opt-in prompt, then launch with `CLAUDE_PERMISSION_MODE=auto`. To use `bypassPermissions`, configure an allowed user-level default or pass `CLAUDE_PERMISSION_MODE=bypassPermissions` only in an isolated environment.
 
 ## Package: 01-postprocess-outer-guard
 

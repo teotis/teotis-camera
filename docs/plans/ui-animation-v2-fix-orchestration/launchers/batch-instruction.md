@@ -15,7 +15,9 @@ bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agen
 bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh audit
 ```
 
-The dispatch script defaults to `CLAUDE_PERMISSION_MODE=default`. To use auto mode, run the interactive opt-in once first:
+The dispatch script omits `--permission-mode` by default, so user-level Claude Code settings apply. If the user has configured `permissions.defaultMode: bypassPermissions` in `~/.claude/settings.json`, background sessions inherit that without the project hard-coding bypass mode.
+
+To explicitly use auto mode, run the interactive opt-in once first:
 
 ```bash
 bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh opt-in-auto

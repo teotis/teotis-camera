@@ -13,14 +13,24 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "ERROR: not a git repository";
 CLAUDE_VERSION="$(claude --version || true)"
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_EFFORT="${CLAUDE_EFFORT:-xhigh}"
-CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-default}"
+CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
-CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-1}"
+CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-0}"
+CLAUDE_PERMISSION_ARGS=()
+if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+  CLAUDE_PERMISSION_ARGS=(--permission-mode "$CLAUDE_PERMISSION_MODE")
+fi
 
 echo "=== Claude Code ==="
 echo "$CLAUDE_VERSION"
 echo
 echo "=== Launching Rendering 2.0 V2 background agents ==="
+if [ -z "$CLAUDE_PERMISSION_MODE" ]; then
+  echo "Permission mode override: <none>"
+  echo "Background sessions will inherit Claude Code settings, including permissions.defaultMode."
+  echo "To force an explicit mode for this dispatch, set CLAUDE_PERMISSION_MODE=acceptEdits|auto|default|dontAsk|bypassPermissions."
+  echo
+fi
 if [ "$CLAUDE_PERMISSION_MODE" = "auto" ]; then
   echo "Using Claude Code auto mode."
   echo "If this has not been opted into interactively yet, run once first:"
@@ -46,7 +56,7 @@ Read $PLAN_DIR/INDEX.md and $package_doc. Implement ONLY package $package_id. Cr
     --worktree "$name" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
-    --permission-mode "$CLAUDE_PERMISSION_MODE" \
+    "${CLAUDE_PERMISSION_ARGS[@]}" \
     --setting-sources "$CLAUDE_SETTING_SOURCES" \
     "$prompt" 2>&1)"
   status=$?
@@ -61,7 +71,7 @@ Read $PLAN_DIR/INDEX.md and $package_doc. Implement ONLY package $package_id. Cr
       echo "  claude --permission-mode auto" >&2
       echo "Alternatively, configure auto mode in user-level Claude Code settings, then rerun with CLAUDE_PERMISSION_MODE=auto." >&2
       echo "Or rerun this script without auto mode:" >&2
-      echo "  CLAUDE_PERMISSION_MODE=default bash docs/plans/rendering-2-0-validation-fix-orchestration-v2/launchers/dispatch-claude-agents.sh" >&2
+      echo "  bash docs/plans/rendering-2-0-validation-fix-orchestration-v2/launchers/dispatch-claude-agents.sh" >&2
     fi
     return "$status"
   fi
@@ -77,7 +87,11 @@ launch_agent "04-ledger-and-gate-honesty" "$PLAN_DIR/packages/04-ledger-and-gate
 echo
 echo "=== Background agents launched ==="
 echo "View them with:"
-echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --permission-mode \"$CLAUDE_PERMISSION_MODE\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+  echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --permission-mode \"$CLAUDE_PERMISSION_MODE\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+else
+  echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+fi
 echo
 echo "After all package status files are completed, run the Codex audit prompt:"
 echo "  $PLAN_DIR/validation/final-audit-prompt.md"
@@ -87,6 +101,6 @@ if [ "$CLAUDE_OPEN_AGENT_VIEW" = "1" ] && [ -t 1 ]; then
     --cwd "$REPO_ROOT" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
-    --permission-mode "$CLAUDE_PERMISSION_MODE" \
+    "${CLAUDE_PERMISSION_ARGS[@]}" \
     --setting-sources "$CLAUDE_SETTING_SOURCES"
 fi

@@ -15,13 +15,21 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "ERROR: not a git repository";
 CLAUDE_VERSION="$(claude --version || true)"
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_EFFORT="${CLAUDE_EFFORT:-xhigh}"
-CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-default}"
+CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
-CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-1}"
+CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-0}"
+CLAUDE_PERMISSION_ARGS=()
+if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+  CLAUDE_PERMISSION_ARGS=(--permission-mode "$CLAUDE_PERMISSION_MODE")
+fi
 
 echo "=== Claude Code ==="
 echo "$CLAUDE_VERSION"
-echo "permission-mode=$CLAUDE_PERMISSION_MODE"
+if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+  echo "permission-mode override=$CLAUDE_PERMISSION_MODE"
+else
+  echo "permission-mode inherited from Claude Code user settings"
+fi
 echo
 echo "=== Launching Group 1 agents ==="
 echo "Only G1 is launched by script. Launch later groups after dependencies pass."
@@ -41,7 +49,7 @@ launch_agent() {
     --name "$name" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
-    --permission-mode "$CLAUDE_PERMISSION_MODE" \
+    "${CLAUDE_PERMISSION_ARGS[@]}" \
     --setting-sources "$CLAUDE_SETTING_SOURCES" \
     "$prompt" 2>&1)"
   status=$?
@@ -75,7 +83,12 @@ launch_agent \
   "agent-05-focal-slider"
 
 echo "=== Group 1 agents launched ==="
-echo "Run 'claude agents --cwd \"$REPO_ROOT\"' to check status."
+echo "View them with:"
+if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+  echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --permission-mode \"$CLAUDE_PERMISSION_MODE\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+else
+  echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+fi
 echo "After package 01 passes, launch package 02 and package 03 from launchers/agent-view-prompts.md."
 echo "After package 03 passes, launch package 04."
 echo "After all packages complete, run the integration audit."
@@ -85,6 +98,6 @@ if [ "$CLAUDE_OPEN_AGENT_VIEW" = "1" ] && [ -t 1 ]; then
     --cwd "$REPO_ROOT" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
-    --permission-mode "$CLAUDE_PERMISSION_MODE" \
+    "${CLAUDE_PERMISSION_ARGS[@]}" \
     --setting-sources "$CLAUDE_SETTING_SOURCES"
 fi
