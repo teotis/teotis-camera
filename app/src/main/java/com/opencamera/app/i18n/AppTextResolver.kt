@@ -114,7 +114,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun switchToBack(): String = str(R.string.button_switch_to_back, "Switch to Back")
     open fun singleLens(): String = str(R.string.button_single_lens, "Single Lens")
     open fun tone(): String = str(R.string.label_tone, "Tone")
-    open fun styleEntry(): String = str(R.string.button_palette_entry, "Lens")
+    open fun styleEntry(): String = str(R.string.button_palette_entry, "Style")
     open fun colorLabEntry(): String = str(R.string.button_color_lab_entry, "Color Lab")
     open fun stylePanelTitle(): String = str(R.string.style_panel_title, "Style")
     open fun colorLabPanelTitle(): String = str(R.string.color_lab_panel_title, "Color Lab")
@@ -277,7 +277,6 @@ open class AppTextResolver(private val context: Context?) {
     open fun autoLabel(): String = str(R.string.label_auto, "Auto")
 
     // Button labels
-    open fun adjustSelected(): String = str(R.string.button_adjust_selected, "Adjust Selected")
     open fun saveAsCustom(): String = str(R.string.button_save_as_custom, "Save as Custom")
     open fun useThisTemplate(): String = str(R.string.button_use_this_template, "Use This Template")
     open fun useThisLook(): String = str(R.string.button_use_this_look, "Use This Look")
@@ -311,7 +310,6 @@ open class AppTextResolver(private val context: Context?) {
     open fun rendererPending(): String = str(R.string.status_renderer_pending, "Renderer pending")
     open fun statusCustom(): String = str(R.string.status_custom, "Custom")
     open fun unavailableMissingProfile(): String = str(R.string.status_unavailable_missing_profile, "Unavailable • Missing source profile")
-    open fun readyEditableCopy(): String = str(R.string.status_ready_editable_copy, "Ready • Opens an editable custom copy")
     open fun readyEditingCustom(): String = str(R.string.status_ready_editing_custom, "Ready • Editing current custom look")
     open fun unavailableAlreadyCustom(): String = str(R.string.status_unavailable_already_custom, "Unavailable • Current default already custom")
     open fun readyBecomesDefault(): String = str(R.string.status_ready_becomes_default, "Ready • Becomes the default")
