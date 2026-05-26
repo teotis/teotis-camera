@@ -70,10 +70,17 @@ get_package_status() {
 set_package_status() {
     local package_id=$1
     local status=$2
+    local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
     local temp_file=$(mktemp)
-    awk -F'\t' -v pkg="$package_id" -v st="$status" '{
+    awk -F'\t' -v pkg="$package_id" -v st="$status" -v ts="$timestamp" 'BEGIN{OFS="\t"} {
         if ($1 == pkg) {
             $2 = st
+            if (st == "launched" && $3 == "") {
+                $3 = ts
+            }
+            if (st == "completed" && $4 == "") {
+                $4 = ts
+            }
         }
         print
     }' "$STATE_FILE" > "$temp_file"
@@ -114,8 +121,14 @@ launch_package() {
 
     log_info "Launching package: $package_id"
 
-    # Extract prompt for this package
-    local prompt=$(sed -n "/^## Package: ${package_id}/,/^## Package:/p" "$prompt_file" | head -n -1)
+    # Extract prompt for this package (from package header to next package header or end of file)
+    local prompt=$(awk -v pkg="$package_id" '
+        /^## Package: / {
+            if (found) exit
+            if ($0 ~ "## Package: " pkg) found=1
+        }
+        found { print }
+    ' "$prompt_file")
 
     # Launch Claude Code background agent
     claude --bg --name "multimodal-${package_id}" \
@@ -258,8 +271,8 @@ advance() {
 status() {
     log_info "Orchestration Status"
     echo ""
-    echo "Package ID | Status | Branch | Verification | Integration | Last Error"
-    echo "-----------+--------+--------+--------------+-------------+------------"
+    echo "Package ID | Status | Launched At | Completed At | Last Error"
+    echo "-----------+--------+-------------+--------------+------------"
 
     while IFS=$'\t' read -r package_id rest; do
         if [ "$package_id" = "package_id" ]; then
@@ -267,12 +280,11 @@ status() {
         fi
 
         local status=$(get_package_status "$package_id")
-        local branch=$(awk -F'\t' -v pkg="$package_id" '$1 == pkg {print $7}' "$GRAPH_FILE")
-        local verification=$(awk -F'\t' -v pkg="$package_id" '$1 == pkg {print $10}' "$STATE_FILE")
-        local integration=$(awk -F'\t' -v pkg="$package_id" '$1 == pkg {print $11}' "$STATE_FILE")
+        local launched_at=$(awk -F'\t' -v pkg="$package_id" '$1 == pkg {print $3}' "$STATE_FILE")
+        local completed_at=$(awk -F'\t' -v pkg="$package_id" '$1 == pkg {print $4}' "$STATE_FILE")
         local last_error=$(awk -F'\t' -v pkg="$package_id" '$1 == pkg {print $13}' "$STATE_FILE")
 
-        echo "$package_id | $status | $branch | $verification | $integration | $last_error"
+        echo "$package_id | $status | $launched_at | $completed_at | $last_error"
     done < "$GRAPH_FILE"
 }
 
