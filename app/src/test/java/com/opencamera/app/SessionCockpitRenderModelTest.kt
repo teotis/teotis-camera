@@ -569,8 +569,8 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `quick panel live row isSelected reflects on-off state`() {
         val stateOn = defaultSessionState(
-            settings = defaultSessionState().settings.copy(
-                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = true)
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                livePhotoEnabledByDefault = true
             )
         )
         val sheetOn = quickPanelSheetRenderModel(stateOn, TestAppTextResolver(), strings)
@@ -578,8 +578,8 @@ class SessionCockpitRenderModelTest {
         assertEquals("On", sheetOn.liveRow.value)
 
         val stateOff = defaultSessionState(
-            settings = defaultSessionState().settings.copy(
-                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = false)
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                livePhotoEnabledByDefault = false
             )
         )
         val sheetOff = quickPanelSheetRenderModel(stateOff, TestAppTextResolver(), strings)
