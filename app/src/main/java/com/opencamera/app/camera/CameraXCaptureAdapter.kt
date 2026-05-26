@@ -1637,6 +1637,18 @@ class CameraXCaptureAdapter(
         }
     }
 
+    private data class ShotCompletedParams(
+        val plan: ShotPlan,
+        val outputPath: String,
+        val outputHandle: MediaOutputHandle,
+        val livePhotoBundle: LivePhotoBundle?,
+        val intermediateOutputPaths: List<String>,
+        val deviceDiagnostics: List<String>,
+        val requestedAtElapsedMillis: Long,
+        val deviceCaptureStartedAtElapsedMillis: Long,
+        val deviceCaptureCompletedAtElapsedMillis: Long
+    )
+
     private suspend fun captureStillImage(
         plan: ShotPlan,
         deviceRequest: DeviceShotRequest,
@@ -1687,29 +1699,76 @@ class CameraXCaptureAdapter(
                     shotId = plan.request.shotId,
                     mediaType = plan.request.mediaType
                 ))
-                runCatching {
-                    emitShotCompleted(
-                        plan = plan,
-                        outputPath = execution.outputPath,
-                        outputHandle = execution.outputHandle,
-                        livePhotoBundle = execution.livePhotoBundle,
-                        intermediateOutputPaths = execution.intermediateOutputPaths,
-                        deviceDiagnostics = deviceRequest.diagnostics +
-                            adapterManualDiagnostics +
-                            execution.diagnostics,
-                        requestedAtElapsedMillis = requestedAt,
-                        deviceCaptureStartedAtElapsedMillis = execution.deviceCaptureStartedAtElapsedMillis,
-                        deviceCaptureCompletedAtElapsedMillis = execution.deviceCaptureCompletedAtElapsedMillis
-                    )
-                }.getOrElse { throwable ->
-                    cleanupStillCaptureArtifacts(
-                        outputPath = execution.outputPath,
-                        outputHandle = execution.outputHandle,
-                        livePhotoBundle = execution.livePhotoBundle,
-                        intermediateOutputPaths = execution.intermediateOutputPaths,
-                        deleteContentUri = ::deleteContentUriQuietly
-                    )
-                    throw throwable
+                val shotCompletedParams = ShotCompletedParams(
+                    plan = plan,
+                    outputPath = execution.outputPath,
+                    outputHandle = execution.outputHandle,
+                    livePhotoBundle = execution.livePhotoBundle,
+                    intermediateOutputPaths = execution.intermediateOutputPaths,
+                    deviceDiagnostics = deviceRequest.diagnostics +
+                        adapterManualDiagnostics +
+                        execution.diagnostics,
+                    requestedAtElapsedMillis = requestedAt,
+                    deviceCaptureStartedAtElapsedMillis = execution.deviceCaptureStartedAtElapsedMillis,
+                    deviceCaptureCompletedAtElapsedMillis = execution.deviceCaptureCompletedAtElapsedMillis
+                )
+                if (plan.request.shotKind == ShotKind.STILL_CAPTURE) {
+                    // Ordinary still capture: postprocess and ShotCompleted delivery
+                    // run off the critical path so the session can re-arm the shutter
+                    // after DataReceived without waiting for postprocess.
+                    adapterScope.launch {
+                        runCatching {
+                            emitShotCompleted(
+                                plan = shotCompletedParams.plan,
+                                outputPath = shotCompletedParams.outputPath,
+                                outputHandle = shotCompletedParams.outputHandle,
+                                livePhotoBundle = shotCompletedParams.livePhotoBundle,
+                                intermediateOutputPaths = shotCompletedParams.intermediateOutputPaths,
+                                deviceDiagnostics = shotCompletedParams.deviceDiagnostics,
+                                requestedAtElapsedMillis = shotCompletedParams.requestedAtElapsedMillis,
+                                deviceCaptureStartedAtElapsedMillis = shotCompletedParams.deviceCaptureStartedAtElapsedMillis,
+                                deviceCaptureCompletedAtElapsedMillis = shotCompletedParams.deviceCaptureCompletedAtElapsedMillis
+                            )
+                        }.getOrElse { throwable ->
+                            cleanupStillCaptureArtifacts(
+                                outputPath = shotCompletedParams.outputPath,
+                                outputHandle = shotCompletedParams.outputHandle,
+                                livePhotoBundle = shotCompletedParams.livePhotoBundle,
+                                intermediateOutputPaths = shotCompletedParams.intermediateOutputPaths,
+                                deleteContentUri = ::deleteContentUriQuietly
+                            )
+                            emitShotFailure(
+                                shotId = plan.request.shotId,
+                                mediaType = plan.request.mediaType,
+                                reason = "Postprocess failed: ${throwable.message}"
+                            )
+                        }
+                    }
+                } else {
+                    // Multi-frame and live photo: keep conservative synchronous
+                    // semantics until real-device evidence proves otherwise.
+                    runCatching {
+                        emitShotCompleted(
+                            plan = shotCompletedParams.plan,
+                            outputPath = shotCompletedParams.outputPath,
+                            outputHandle = shotCompletedParams.outputHandle,
+                            livePhotoBundle = shotCompletedParams.livePhotoBundle,
+                            intermediateOutputPaths = shotCompletedParams.intermediateOutputPaths,
+                            deviceDiagnostics = shotCompletedParams.deviceDiagnostics,
+                            requestedAtElapsedMillis = shotCompletedParams.requestedAtElapsedMillis,
+                            deviceCaptureStartedAtElapsedMillis = shotCompletedParams.deviceCaptureStartedAtElapsedMillis,
+                            deviceCaptureCompletedAtElapsedMillis = shotCompletedParams.deviceCaptureCompletedAtElapsedMillis
+                        )
+                    }.getOrElse { throwable ->
+                        cleanupStillCaptureArtifacts(
+                            outputPath = shotCompletedParams.outputPath,
+                            outputHandle = shotCompletedParams.outputHandle,
+                            livePhotoBundle = shotCompletedParams.livePhotoBundle,
+                            intermediateOutputPaths = shotCompletedParams.intermediateOutputPaths,
+                            deleteContentUri = ::deleteContentUriQuietly
+                        )
+                        throw throwable
+                    }
                 }
             }
         }
