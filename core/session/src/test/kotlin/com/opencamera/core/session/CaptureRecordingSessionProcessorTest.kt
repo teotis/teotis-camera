@@ -314,6 +314,33 @@ class CaptureRecordingSessionProcessorTest {
     }
 
     @Test
+    fun `handleDataReceived transitions capture status for photo`() = runTest {
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+        val harness = Harness(runningState().copy(activeShot = shot))
+        harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
+
+        assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
+        assertEquals(shot, harness.state.value.activeShot)
+    }
+
+    @Test
+    fun `SAVING to DATA_RECEIVED to COMPLETED lifecycle`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+
+        harness.process(SessionIntent.ShotStarted(shot))
+        assertEquals(CaptureStatus.SAVING, harness.state.value.captureStatus)
+
+        harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
+        assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
+        assertNotNull(harness.state.value.activeShot)
+
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
+        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+        assertNull(harness.state.value.activeShot)
+    }
+
+    @Test
     fun `handleShotCompleted for video sets recording status to IDLE`() = runTest {
         val harness = Harness(runningState().copy(
             activeShot = testShotRequest("shot-v", MediaType.VIDEO),
