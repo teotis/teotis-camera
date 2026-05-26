@@ -1,6 +1,6 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-01-pixel-capability-enumeration	pending
-03-shutter-lifecycle-contract	pending
+01-pixel-capability-enumeration	launched	2026-05-26T16:39:23Z		vivo-x300-01-pixel-capability-enumeration
+03-shutter-lifecycle-contract	launched	2026-05-26T16:39:23Z		vivo-x300-03-shutter-lifecycle-contract
 02-quick-pixel-surface-design	pending
 04-real-device-verification-protocol	pending
 99-finalize	pending

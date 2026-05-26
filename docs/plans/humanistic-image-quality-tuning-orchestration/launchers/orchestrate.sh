@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 PLAN_DIR="$REPO_ROOT/docs/plans/humanistic-image-quality-tuning-orchestration"
 GRAPH="$PLAN_DIR/launchers/package-graph.tsv"
 STATE="$PLAN_DIR/status/state.tsv"
