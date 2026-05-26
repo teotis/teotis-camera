@@ -136,13 +136,13 @@ internal fun cameraCockpitRenderModel(
         bottomCockpit = BottomCockpitRenderModel(
             captureOutputText = captureOutput,
             shutterLabel = text.shutterShort(),
-            isShutterEnabled = captureDisabledReason(state, text) == null,
+            isShutterEnabled = shutterDisabledReason(state, text) == null,
             isRecording = state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE,
             lensButtonLabel = controls.lensFacingButtonLabel,
             lensButtonEnabled = controls.lensFacingEnabled,
             recordingIndicator = recordingIndicatorRenderModel(state, text),
             shutterVisualState = shutterVisualState(state),
-            disabledReason = captureDisabledReason(state, text)
+            disabledReason = shutterDisabledReason(state, text)
         ),
         previewRatioChip = PreviewRatioChipRenderModel(
             label = state.previewRatio.label,
