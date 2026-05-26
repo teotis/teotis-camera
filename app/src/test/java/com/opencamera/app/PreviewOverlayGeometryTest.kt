@@ -388,8 +388,8 @@ class PreviewOverlayGeometryTest {
     fun `nested frame is centered within content rect`() {
         val content = computeFrameRect(1080, 1920, 4, 3)
         val frame = computeFrameRect(content.width.toInt(), content.height.toInt(), 16, 9)
-        // Frame center should align with content center
-        assertEquals(content.centerX, frame.centerX, 1f)
-        assertEquals(content.centerY, frame.centerY, 1f)
+        // Nested frame is local to the content rect; offset it before comparing.
+        assertEquals(content.centerX, content.left + frame.centerX, 1f)
+        assertEquals(content.centerY, content.top + frame.centerY, 1f)
     }
 }

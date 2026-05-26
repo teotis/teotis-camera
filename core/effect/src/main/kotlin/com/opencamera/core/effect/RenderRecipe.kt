@@ -2,6 +2,7 @@ package com.opencamera.core.effect
 
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.ShotRequest
+import com.opencamera.core.media.ShotResult
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PerceptualColorRecipe
 import com.opencamera.core.settings.parsePerceptualColorRecipe
@@ -67,6 +68,32 @@ data class RenderRecipe(
                 ?.takeIf(String::isNotEmpty)
             val selfieMirror = tags["selfieMirrorApply"].toBoolean()
 
+            val perceptualColorRecipe = parsePerceptualColorRecipe(tags)
+
+            return RenderRecipe(
+                filterProfileId = filterProfileId,
+                filterRenderSpec = filterRenderSpec,
+                perceptualColorRecipe = perceptualColorRecipe,
+                frameRatio = frameRatio,
+                watermarkTemplateId = watermarkTemplateId,
+                watermarkText = watermarkText,
+                selfieMirror = selfieMirror
+            )
+        }
+
+        fun from(result: ShotResult): RenderRecipe {
+            val tags = result.metadata.customTags
+            val filterRenderSpec = FilterRenderSpec.fromMetadataTags(tags)
+            val filterProfileId = tags["filterProfile"]
+                ?: result.metadata.algorithmProfile
+            val frameRatio = FrameRatio.fromTag(tags["frameRatio"])
+            val watermarkText = result.metadata.watermarkText
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+            val watermarkTemplateId = tags["watermarkTemplate"]
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+            val selfieMirror = tags["selfieMirrorApply"].toBoolean()
             val perceptualColorRecipe = parsePerceptualColorRecipe(tags)
 
             return RenderRecipe(

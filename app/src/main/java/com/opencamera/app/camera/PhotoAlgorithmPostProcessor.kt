@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import com.opencamera.core.effect.RenderRecipe
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ProcessorEditorResult
@@ -91,6 +92,13 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
             ?: "shared-filter",
         recipe = recipe
     ) ?: profile?.let { resolvePhotoAlgorithmSpec(it, recipe) }
+        ?: RenderRecipe.from(result).let { renderRecipe ->
+            if (renderRecipe.requiresFinalOutputPostprocess) {
+                renderRecipe.toPhotoAlgorithmSpec()
+            } else {
+                null
+            }
+        }
         ?: return ProcessorWork.None
     val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
@@ -121,6 +129,19 @@ private fun FilterRenderSpec.toPhotoAlgorithmSpec(
         coolBoost = coolBoost,
         recipe = recipe
     )
+}
+
+private fun RenderRecipe.toPhotoAlgorithmSpec(): PhotoAlgorithmSpec {
+    val profileId = filterProfileId ?: "recipe-only"
+    val spec = filterRenderSpec
+    return if (spec != null) {
+        spec.toPhotoAlgorithmSpec(profile = profileId, recipe = perceptualColorRecipe)
+    } else {
+        PhotoAlgorithmSpec(
+            profile = profileId,
+            recipe = perceptualColorRecipe
+        )
+    }
 }
 
 internal class PhotoAlgorithmPostProcessor(

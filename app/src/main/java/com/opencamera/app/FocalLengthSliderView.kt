@@ -40,7 +40,7 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
             val nearest = sortedPresets.minByOrNull { kotlin.math.abs(it - ratio) } ?: return false
             val second = sortedPresets.sortedBy { kotlin.math.abs(it - ratio) }.getOrNull(1) ?: return true
             val neighborDist = kotlin.math.abs(second - nearest)
-            return kotlin.math.abs(ratio - nearest) < neighborDist * SNAP_THRESHOLD_FRACTION
+            return kotlin.math.abs(ratio - nearest) + 1e-6f < neighborDist * SNAP_THRESHOLD_FRACTION
         }
     }
 

@@ -89,6 +89,7 @@ import com.opencamera.core.settings.VideoResolution
 import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
 import com.opencamera.core.media.CompositeMediaPostProcessor
+import com.opencamera.core.media.addPipelineNotes
 import com.opencamera.core.media.FlashMode as CaptureFlashMode
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.LiveMotionSource
@@ -105,6 +106,7 @@ import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
+import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ShotTiming
 import com.opencamera.core.media.primaryStillNode
 import com.opencamera.core.media.primaryVideoNode
@@ -2118,7 +2120,7 @@ class CameraXCaptureAdapter(
                 deviceCaptureCompletedAtElapsedMillis = deviceCaptureCompletedAtElapsedMillis
             )
         )
-        val processedResult = mediaPostProcessor.process(rawResult)
+        val processedResult = guardedPostProcess(mediaPostProcessor, rawResult)
         val postProcessCompletedAt = SystemClock.elapsedRealtime()
         val timedResult = processedResult.copy(
             timing = processedResult.timing.copy(
@@ -3059,4 +3061,15 @@ internal fun mapOutputRotationToSurface(
     com.opencamera.core.device.CameraOutputRotation.ROTATION_90 -> Surface.ROTATION_90
     com.opencamera.core.device.CameraOutputRotation.ROTATION_180 -> Surface.ROTATION_180
     com.opencamera.core.device.CameraOutputRotation.ROTATION_270 -> Surface.ROTATION_270
+}
+
+internal suspend fun guardedPostProcess(
+    postProcessor: MediaPostProcessor,
+    rawResult: ShotResult
+): ShotResult {
+    return try {
+        postProcessor.process(rawResult)
+    } catch (error: Throwable) {
+        rawResult.addPipelineNotes("postprocess:failed:composite:${error::class.simpleName}")
+    }
 }
