@@ -25,7 +25,8 @@ import kotlin.math.roundToInt
 
 internal data class PhotoFrameRatioPayload(
     val target: ProcessorTarget,
-    val frameRatio: FrameRatio
+    val frameRatio: FrameRatio,
+    val captureCropZoom: Float = 1f
 )
 
 internal data class PhotoFrameRatioApplied(
@@ -37,7 +38,8 @@ internal data class PhotoFrameRatioApplied(
 internal interface PhotoFrameRatioEditor {
     suspend fun apply(
         target: ProcessorTarget,
-        frameRatio: FrameRatio
+        frameRatio: FrameRatio,
+        captureCropZoom: Float = 1f
     ): ProcessorEditorResult
 }
 
@@ -67,7 +69,9 @@ internal fun decidePhotoFrameRatioWork(result: ShotResult): ProcessorWork<PhotoF
     val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
 
-    return ProcessorWork.Execute(PhotoFrameRatioPayload(target, frameRatio))
+    val captureCropZoom = result.metadata.customTags["captureCropZoom"]?.toFloatOrNull() ?: 1f
+
+    return ProcessorWork.Execute(PhotoFrameRatioPayload(target, frameRatio, captureCropZoom))
 }
 
 internal fun computeCenterCropBounds(
@@ -108,6 +112,25 @@ internal fun computeCenterCropBounds(
     }
 }
 
+internal fun computeZoomCropBounds(
+    width: Int,
+    height: Int,
+    zoomRatio: Float
+): CropBounds? {
+    if (zoomRatio <= 1f || width <= 1 || height <= 1) {
+        return null
+    }
+    val scale = 1f / zoomRatio
+    val croppedWidth = (width * scale).roundToInt().coerceIn(1, width)
+    val croppedHeight = (height * scale).roundToInt().coerceIn(1, height)
+    if (croppedWidth >= width && croppedHeight >= height) {
+        return null
+    }
+    val left = ((width - croppedWidth) / 2).coerceAtLeast(0)
+    val top = ((height - croppedHeight) / 2).coerceAtLeast(0)
+    return CropBounds(left, top, left + croppedWidth, top + croppedHeight)
+}
+
 private fun orientedFrameRatioValue(
     width: Int,
     height: Int,
@@ -134,7 +157,7 @@ internal class PhotoFrameRatioPostProcessor(
 
             is ProcessorWork.Execute -> {
                 val payload = work.payload
-                when (val cropResult = editor.apply(payload.target, payload.frameRatio)) {
+                when (val cropResult = editor.apply(payload.target, payload.frameRatio, payload.captureCropZoom)) {
                     is PhotoFrameRatioApplied -> {
                         val bounds = cropResult.cropBounds
                         val notes = buildList {
@@ -168,7 +191,8 @@ internal class AndroidPhotoFrameRatioEditor(
 
     override suspend fun apply(
         target: ProcessorTarget,
-        frameRatio: FrameRatio
+        frameRatio: FrameRatio,
+        captureCropZoom: Float
     ): ProcessorEditorResult = withContext(Dispatchers.IO) {
         val sourceBytes = readSourceBytes(target)
             ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
@@ -181,34 +205,71 @@ internal class AndroidPhotoFrameRatioEditor(
             ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
 
         try {
-            val cropBounds = computeCenterCropBounds(
+            val frameCropBounds = computeCenterCropBounds(
                 width = decoded.width,
                 height = decoded.height,
                 frameRatio = frameRatio
-            ) ?: return@withContext ProcessorEditorResult.Skipped("already-matched")
-
-            val cropped = Bitmap.createBitmap(
-                decoded,
-                cropBounds.left,
-                cropBounds.top,
-                cropBounds.width(),
-                cropBounds.height()
             )
+            val intermediate = if (frameCropBounds != null) {
+                Bitmap.createBitmap(
+                    decoded,
+                    frameCropBounds.left,
+                    frameCropBounds.top,
+                    frameCropBounds.width(),
+                    frameCropBounds.height()
+                )
+            } else {
+                decoded
+            }
+
+            val zoomCropBounds = computeZoomCropBounds(
+                width = intermediate.width,
+                height = intermediate.height,
+                zoomRatio = captureCropZoom
+            )
+            val finalBitmap = if (zoomCropBounds != null) {
+                val cropped = Bitmap.createBitmap(
+                    intermediate,
+                    zoomCropBounds.left,
+                    zoomCropBounds.top,
+                    zoomCropBounds.width(),
+                    zoomCropBounds.height()
+                )
+                if (intermediate !== decoded) intermediate.recycle()
+                cropped
+            } else {
+                intermediate
+            }
+
+            if (finalBitmap === decoded && frameCropBounds == null) {
+                return@withContext ProcessorEditorResult.Skipped("already-matched")
+            }
+
             val encodedBytes = ByteArrayOutputStream().use { output ->
-                check(cropped.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
+                check(finalBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
                     "Frame ratio JPEG compression failed"
                 }
                 output.toByteArray()
             }
-            cropped.recycle()
+            if (finalBitmap !== decoded) finalBitmap.recycle()
             if (!writeEncodedBytes(target, encodedBytes)) {
                 return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
 
             val exifWarning = restorePreservedExif(target, preservedExif)
+            val combinedBounds = if (zoomCropBounds != null && frameCropBounds != null) {
+                CropBounds(
+                    left = frameCropBounds.left + zoomCropBounds.left,
+                    top = frameCropBounds.top + zoomCropBounds.top,
+                    right = frameCropBounds.left + zoomCropBounds.left + zoomCropBounds.width(),
+                    bottom = frameCropBounds.top + zoomCropBounds.top + zoomCropBounds.height()
+                )
+            } else {
+                frameCropBounds ?: zoomCropBounds
+            }
             PhotoFrameRatioApplied(
                 frameRatio = frameRatio,
-                cropBounds = cropBounds,
+                cropBounds = combinedBounds ?: CropBounds(0, 0, decoded.width, decoded.height),
                 warning = exifWarning
             )
         } catch (_: Throwable) {

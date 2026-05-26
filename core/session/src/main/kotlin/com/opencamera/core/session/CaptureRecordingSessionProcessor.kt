@@ -512,7 +512,7 @@ internal class CaptureRecordingSessionProcessor(
                 activeShot = state.value.activeShot
             )
         }.map { createdPlan ->
-            enrichPlanWithStillOutputSize(createdPlan)
+            enrichPlanWithZoomCrop(enrichPlanWithStillOutputSize(createdPlan))
         }.getOrElse { throwable ->
             updateState.update { s ->
                 s.copy(
@@ -591,6 +591,26 @@ internal class CaptureRecordingSessionProcessor(
             request = updatedRequest,
             saveTask = updatedSaveTask
         )
+    }
+
+    private fun enrichPlanWithZoomCrop(plan: ShotPlan): ShotPlan {
+        if (plan.request.mediaType != MediaType.PHOTO) {
+            return plan
+        }
+        val zoomRatio = state.value.activeDeviceGraph.preview.zoomRatio
+        if (zoomRatio <= 1f) {
+            return plan
+        }
+        val updatedSaveRequest = plan.request.saveRequest.copy(
+            metadata = plan.request.saveRequest.metadata.copy(
+                customTags = plan.request.saveRequest.metadata.customTags + mapOf(
+                    "captureCropZoom" to zoomRatio.toString()
+                )
+            )
+        )
+        val updatedRequest = plan.request.copy(saveRequest = updatedSaveRequest)
+        val updatedSaveTask = plan.saveTask.copy(saveRequest = updatedSaveRequest)
+        return plan.copy(request = updatedRequest, saveTask = updatedSaveTask)
     }
 }
 

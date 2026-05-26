@@ -162,8 +162,102 @@ class PhotoFrameRatioPostProcessorTest {
         assertEquals(4000, bounds.bottom)
     }
 
+    // --- computeZoomCropBounds tests ---
+
+    @Test
+    fun `zoom 1x returns null crop bounds`() {
+        assertNull(computeZoomCropBounds(4000, 3000, 1f))
+    }
+
+    @Test
+    fun `zoom 2x halves dimensions centered`() {
+        val bounds = computeZoomCropBounds(4000, 3000, 2f)
+        assertNotNull(bounds)
+        assertEquals(1000, bounds.left)
+        assertEquals(750, bounds.top)
+        assertEquals(3000, bounds.right)
+        assertEquals(2250, bounds.bottom)
+        assertEquals(2000, bounds.width())
+        assertEquals(1500, bounds.height())
+    }
+
+    @Test
+    fun `zoom 3x produces third-sized crop centered`() {
+        val bounds = computeZoomCropBounds(3000, 3000, 3f)
+        assertNotNull(bounds)
+        assertEquals(1000, bounds.left)
+        assertEquals(1000, bounds.top)
+        assertEquals(2000, bounds.right)
+        assertEquals(2000, bounds.bottom)
+    }
+
+    @Test
+    fun `zoom crop preserves center point`() {
+        val bounds = computeZoomCropBounds(4000, 3000, 2f)
+        assertNotNull(bounds)
+        assertEquals(2000, (bounds.left + bounds.right) / 2)
+        assertEquals(1500, (bounds.top + bounds.bottom) / 2)
+    }
+
+    // --- zoom crop integration via decidePhotoFrameRatioWork ---
+
+    @Test
+    fun `capture crop zoom tag is passed through payload`() = runTest {
+        val editor = FakePhotoFrameRatioEditor(
+            result = PhotoFrameRatioApplied(
+                frameRatio = FrameRatio.RATIO_4_3,
+                cropBounds = CropBounds(0, 0, 4000, 3000)
+            )
+        )
+        val processor = PhotoFrameRatioPostProcessor(editor)
+        processor.process(
+            photoResult(
+                frameRatio = "4:3",
+                captureCropZoom = "2.0"
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        assertEquals(2f, editor.invocations.single().captureCropZoom)
+    }
+
+    @Test
+    fun `missing capture crop zoom defaults to 1x`() = runTest {
+        val editor = FakePhotoFrameRatioEditor(
+            result = PhotoFrameRatioApplied(
+                frameRatio = FrameRatio.RATIO_4_3,
+                cropBounds = CropBounds(0, 0, 4000, 3000)
+            )
+        )
+        val processor = PhotoFrameRatioPostProcessor(editor)
+        processor.process(photoResult(frameRatio = "4:3"))
+
+        assertEquals(1f, editor.invocations.single().captureCropZoom)
+    }
+
+    // --- frame ratio plus zoom crop composition ---
+
+    @Test
+    fun `frame ratio plus zoom crop composes deterministically`() {
+        // 4000x3000 image, 16:9 frame ratio, 2x zoom
+        // Step 1: frame ratio crop → 4000x2250 (top=375, bottom=2625)
+        val frameBounds = computeCenterCropBounds(4000, 3000, FrameRatio.RATIO_16_9)
+        assertNotNull(frameBounds)
+        assertEquals(4000, frameBounds.width())
+        assertEquals(2250, frameBounds.height())
+
+        // Step 2: zoom 2x crop on 4000x2250 → 2000x1125
+        val zoomBounds = computeZoomCropBounds(frameBounds.width(), frameBounds.height(), 2f)
+        assertNotNull(zoomBounds)
+        assertEquals(2000, zoomBounds.width())
+        assertEquals(1125, zoomBounds.height())
+        assertEquals(1000, zoomBounds.left)
+        assertEquals(562, zoomBounds.top)
+    }
+
     private fun photoResult(
         frameRatio: String?,
+        captureCropZoom: String? = null,
         outputHandle: MediaOutputHandle = MediaOutputHandle(
             displayPath = "/tmp/frame-ratio.jpg",
             filePath = "/tmp/frame-ratio.jpg"
@@ -171,6 +265,7 @@ class PhotoFrameRatioPostProcessorTest {
     ): ShotResult {
         val tags = buildMap {
             frameRatio?.let { put("frameRatio", it) }
+            captureCropZoom?.let { put("captureCropZoom", it) }
         }
         val saveRequest = SaveRequest.photoLibrary(
             metadata = MediaMetadata(
@@ -198,15 +293,17 @@ class PhotoFrameRatioPostProcessorTest {
 
         override suspend fun apply(
             target: ProcessorTarget,
-            frameRatio: FrameRatio
+            frameRatio: FrameRatio,
+            captureCropZoom: Float
         ): ProcessorEditorResult {
-            invocations += Invocation(target, frameRatio)
+            invocations += Invocation(target, frameRatio, captureCropZoom)
             return result
         }
     }
 
     private data class Invocation(
         val target: ProcessorTarget,
-        val frameRatio: FrameRatio
+        val frameRatio: FrameRatio,
+        val captureCropZoom: Float = 1f
     )
 }

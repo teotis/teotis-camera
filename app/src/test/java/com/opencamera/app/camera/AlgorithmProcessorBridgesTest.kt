@@ -103,7 +103,8 @@ class AlgorithmProcessorBridgesTest {
 
         override suspend fun apply(
             target: ProcessorTarget,
-            frameRatio: com.opencamera.core.media.FrameRatio
+            frameRatio: com.opencamera.core.media.FrameRatio,
+            captureCropZoom: Float
         ): ProcessorEditorResult {
             callCount++
             return result
