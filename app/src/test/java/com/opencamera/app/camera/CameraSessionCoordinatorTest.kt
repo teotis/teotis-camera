@@ -1090,6 +1090,56 @@ class CameraSessionCoordinatorTest {
     }
 
     @Test
+    fun `still capture data received arrives before shot completed`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        val shot = ShotRequest(
+            shotId = "shot-still-1",
+            shotKind = com.opencamera.core.media.ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(relativePath = "Pictures/OpenCamera"),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+            captureProfile = com.opencamera.core.media.CaptureProfile()
+        )
+
+        adapter.emit(DeviceEvent.ShotStarted(shot))
+        adapter.emit(DeviceEvent.DataReceived(shotId = shot.shotId, mediaType = MediaType.PHOTO))
+        adapter.emit(
+            DeviceEvent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "/tmp/test.jpg",
+                    saveRequest = shot.saveRequest,
+                    thumbnailSource = com.opencamera.core.media.ThumbnailSource.Pending,
+                    metadata = com.opencamera.core.media.MediaMetadata()
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val intentTypes = session.recordedIntents.map { it::class.simpleName }
+        val dataReceivedIndex = intentTypes.indexOf("DataReceived")
+        val shotCompletedIndex = intentTypes.indexOf("ShotCompleted")
+
+        assertTrue(dataReceivedIndex >= 0, "DataReceived intent should be forwarded")
+        assertTrue(shotCompletedIndex >= 0, "ShotCompleted intent should be forwarded")
+        assertTrue(
+            dataReceivedIndex < shotCompletedIndex,
+            "DataReceived must arrive before ShotCompleted but got indices $dataReceivedIndex, $shotCompletedIndex"
+        )
+    }
+
+    @Test
     fun `scene brightness source signals are forwarded as PhotoSceneSignalUpdated`() = runTest {
         val session = FakeCameraSession()
         val adapter = FakeCameraDeviceAdapter()
