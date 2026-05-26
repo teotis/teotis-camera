@@ -286,7 +286,7 @@ class PreviewEffectAdapterTest {
     }
 
     @Test
-    fun `neutral recipe does not produce color transform`() {
+    fun `neutral recipe with non-identity spec still produces spec transform`() {
         val effect = FilterEffect(
             profileId = "vivid",
             renderSpec = FilterRenderSpec(),
@@ -294,7 +294,9 @@ class PreviewEffectAdapterTest {
         )
         val model = adapter.adapt(EffectSpec(listOf(effect)))
 
-        assertEquals(PreviewColorTransform.NONE, model.colorTransform)
+        // Non-identity spec takes priority over neutral recipe
+        assertFalse(model.colorTransform.isIdentity)
+        assertEquals(PreviewColorFidelity.APPROXIMATE, model.colorTransform.fidelity)
     }
 
     @Test

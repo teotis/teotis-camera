@@ -23,10 +23,6 @@ class PreviewEffectAdapter {
         val frame = spec.find<FrameEffect>()
 
         val colorTransform = filter?.let { buildColorTransform(it) }
-        val fidelity = when {
-            colorTransform == null || colorTransform.isIdentity -> PreviewColorFidelity.NONE
-            else -> PreviewColorFidelity.GOOD
-        }
 
         return PreviewEffectRenderModel(
             filterOverlay = filter?.let { buildFilterOverlay(it) },
