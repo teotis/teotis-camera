@@ -1,5 +1,5 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
 01-adapter-data-boundary	launched	2026-05-26T19:00:29Z		shutter-boundary-01-adapter-data-boundary	agent/shutter-data-boundary-v1/01-adapter-data-boundary	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-data-boundary-v1-01-adapter-data-boundary						
-02-session-rearm-policy	pending				agent/shutter-data-boundary-v1/02-session-rearm-policy	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-data-boundary-v1-02-session-rearm-policy						
+02-session-rearm-policy	launched	2026-05-26T19:02:33Z		shutter-boundary-02-session-rearm-policy	agent/shutter-data-boundary-v1/02-session-rearm-policy	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-data-boundary-v1-02-session-rearm-policy						
 03-ui-shutter-gate-and-qa	pending				agent/shutter-data-boundary-v1/03-ui-shutter-gate-and-qa	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-data-boundary-v1-03-ui-shutter-gate-and-qa						
 99-finalize	pending				agent/shutter-data-boundary-v1/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-data-boundary-v1-99-finalize						

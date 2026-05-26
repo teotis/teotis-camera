@@ -650,7 +650,7 @@ class SessionUiRenderModelTest {
         assertTrue(selected.isSelected)
         assertEquals(null, selected.useAction)
         assertTrue(selected.supportingText.contains("Current default"))
-        assertEquals("Open Style Page", selected.editButtonLabel)
+        assertEquals("Style", selected.editButtonLabel)
         assertEquals(
             PersistedSettingsAction.UpdatePhotoWatermarkTemplate("classic-overlay"),
             classic.useAction
@@ -807,7 +807,7 @@ class SessionUiRenderModelTest {
             text = TestAppTextResolver()
         )
 
-        assertEquals("Classic Overlay", model.headline)
+        assertEquals("Classic overlay", model.headline)
         assertEquals(null, model.frameBackgroundControl)
         assertTrue(model.footer.contains("Classic overlay stays inside the source image"))
     }
@@ -820,7 +820,7 @@ class SessionUiRenderModelTest {
             text = TestAppTextResolver()
         )
 
-        assertEquals("Pure Text", model.headline)
+        assertEquals("Pure text", model.headline)
         assertEquals(null, model.frameBackgroundControl)
         assertNotNull(model.placementControl.nextAction)
         assertNotNull(model.textScaleControl.nextAction)
@@ -971,14 +971,14 @@ class SessionUiRenderModelTest {
 
         assertTrue(model.humanisticTab.isSelected)
         assertEquals(
-            "Next Humanistic look\n街头 Street\n可用 • 3 looks | import/export deferred",
+            "Next Humanistic look\nStreet\n可用 • 3 looks | import/export deferred",
             model.cycleControl.buttonLabel
         )
         assertEquals(
             PersistedSettingsAction.UpdateHumanisticFilter("humanistic-portrait"),
             model.cycleControl.nextAction
         )
-        assertTrue(model.rosterText.contains("• 街头 Street"))
+        assertTrue(model.rosterText.contains("• Street"))
         assertTrue(model.saveCustomControl.isEnabled)
         assertTrue(model.supportingText.contains("Import and export stay deferred"))
     }
@@ -1381,8 +1381,8 @@ class SessionUiRenderModelTest {
         )
 
         assertTrue(model.photoTab.isSelected)
-        assertTrue(model.rosterText.contains("街头 Street"))
-        assertTrue(model.rosterText.contains("生活 Life"))
+        assertTrue(model.rosterText.contains("Street"))
+        assertTrue(model.rosterText.contains("Life"))
     }
 
     @Test
@@ -2212,6 +2212,43 @@ class SessionUiRenderModelTest {
         override fun watermarkTemplateExpandedFrame(): String = "扩展边框"
         override fun watermarkTemplatePureText(): String = "纯文字"
         override fun watermarkTemplateBlurFourBorder(): String = "模糊四边框"
+        override fun watermarkTemplateTravelPolaroid(): String = "旅行拍立得"
+        override fun watermarkTemplateRetroFrame(): String = "复古边框"
+        override fun watermarkStylePageShort(): String = "样式"
+        override fun watermarkPlacementLabel(value: com.opencamera.core.settings.WatermarkTextPlacement): String =
+            when (value) {
+                com.opencamera.core.settings.WatermarkTextPlacement.TOP_LEFT -> "左上"
+                com.opencamera.core.settings.WatermarkTextPlacement.TOP_RIGHT -> "右上"
+                com.opencamera.core.settings.WatermarkTextPlacement.BOTTOM_LEFT -> "左下"
+                com.opencamera.core.settings.WatermarkTextPlacement.BOTTOM_RIGHT -> "右下"
+                com.opencamera.core.settings.WatermarkTextPlacement.BOTTOM_CENTER -> "底部居中"
+            }
+        override fun watermarkTextScaleLabel(value: com.opencamera.core.settings.WatermarkTextScale): String =
+            when (value) {
+                com.opencamera.core.settings.WatermarkTextScale.COMPACT -> "紧凑"
+                com.opencamera.core.settings.WatermarkTextScale.NORMAL -> "正常"
+                com.opencamera.core.settings.WatermarkTextScale.LARGE -> "大"
+            }
+        override fun watermarkTextOpacityLabel(value: com.opencamera.core.settings.WatermarkTextOpacity): String =
+            when (value) {
+                com.opencamera.core.settings.WatermarkTextOpacity.SUBTLE -> "淡"
+                com.opencamera.core.settings.WatermarkTextOpacity.SOFT -> "柔和"
+                com.opencamera.core.settings.WatermarkTextOpacity.SOLID -> "清晰"
+            }
+        override fun watermarkFrameBackgroundLabel(value: com.opencamera.core.settings.WatermarkFrameBackground): String =
+            when (value) {
+                com.opencamera.core.settings.WatermarkFrameBackground.DARK -> "深色"
+                com.opencamera.core.settings.WatermarkFrameBackground.WHITE -> "白色"
+                com.opencamera.core.settings.WatermarkFrameBackground.SOURCE_BLUR -> "原图模糊"
+                com.opencamera.core.settings.WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> "浅色模糊"
+                com.opencamera.core.settings.WatermarkFrameBackground.SOURCE_VIVID_BLUR -> "鲜明模糊"
+            }
+        override fun filterProfileLabel(profileId: String, fallback: String): String =
+            when (profileId) {
+                "photo-vivid" -> "鲜明"
+                "photo-original" -> "原色"
+                else -> fallback
+            }
         override fun tokensLabel(): String = "标记"
         override fun watermarkTokenCameraParams(): String = "相机参数"
         override fun watermarkTokenDateTime(): String = "日期/时间"
