@@ -87,6 +87,12 @@
     <string name="dev_tab_error">Error</string>
     <string name="dev_tab_all">All</string>
     <string name="dev_export_log">Export Log</string>
+    <string name="dev_cleanup_key">Clear Summary</string>
+    <string name="dev_cleanup_core">Clear Pipeline</string>
+    <string name="dev_cleanup_error">Clear Error</string>
+    <string name="dev_cleanup_all">Clear All</string>
+    <string name="dev_storage_format">Storage: %1$s / %2$s</string>
+    <string name="dev_cleanup_done">Cleared %d files</string>
     <string name="dev_close">Close</string>
     <string name="dev_console_content_description">Debug console overlay</string>
     <string name="button_palette_entry">Lens</string>

@@ -151,6 +151,11 @@ internal data class DevConsoleViews(
     val title: TextView,
     val summary: TextView,
     val content: TextView,
+    val storageInfo: TextView,
+    val cleanupKey: Button,
+    val cleanupCore: Button,
+    val cleanupError: Button,
+    val cleanupAll: Button,
     val export: Button,
     val close: Button
 )
@@ -333,6 +338,11 @@ internal data class MainActivityViews(
                 title = activity.findViewById(R.id.devConsoleTitle),
                 summary = activity.findViewById(R.id.devConsoleSummary),
                 content = activity.findViewById(R.id.devConsoleContent),
+                storageInfo = activity.findViewById(R.id.devConsoleStorageInfo),
+                cleanupKey = activity.findViewById(R.id.buttonDevCleanupKey),
+                cleanupCore = activity.findViewById(R.id.buttonDevCleanupCore),
+                cleanupError = activity.findViewById(R.id.buttonDevCleanupError),
+                cleanupAll = activity.findViewById(R.id.buttonDevCleanupAll),
                 export = activity.findViewById(R.id.buttonDevExport),
                 close = activity.findViewById(R.id.buttonDevClose)
             )

@@ -250,6 +250,53 @@ class DevLogRenderModelTest {
         assertFalse(model.exportContent.contains("=== RESOURCE DIAGNOSTICS ==="))
     }
 
+    @Test
+    fun `storage summary populates display fields when provided`() {
+        val summary = StorageSummary(5L * 1024 * 1024, 20L * 1024 * 1024)
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            storageSummary = summary
+        )
+        assertEquals("5 MB", model.storageUsedDisplay)
+        assertEquals("20 MB", model.storageCapacityDisplay)
+        assertEquals(0.25f, model.storageUsageRatio)
+        assertTrue(model.canCleanup)
+    }
+
+    @Test
+    fun `storage summary defaults when null`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            storageSummary = null
+        )
+        assertEquals("", model.storageUsedDisplay)
+        assertEquals("", model.storageCapacityDisplay)
+        assertEquals(0f, model.storageUsageRatio)
+        assertFalse(model.canCleanup)
+    }
+
+    @Test
+    fun `canCleanup is false when storage is empty`() {
+        val summary = StorageSummary(0L, 20L * 1024 * 1024)
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            storageSummary = summary
+        )
+        assertFalse(model.canCleanup)
+    }
+
     private fun defaultTestSessionState(): SessionState {
         return SessionState(
             lifecycle = SessionLifecycle.RUNNING,
