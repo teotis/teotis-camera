@@ -1,5 +1,5 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-01-zoom-state-arbitration-audit	pending
+01-zoom-state-arbitration-audit	launched	2026-05-26T16:42:26Z			agent/zoom-brightness-arbitration/01-zoom-state-arbitration-audit
 02-brightness-state-arbitration-audit	completed			brightness-audit-02	worktree-brightness-audit-02	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/brightness-audit-02	f5367d3	f5367d3	pass	pending	pending
 03-shared-control-state-strategy	pending
 04-verification-real-device-protocol	pending
