@@ -7,10 +7,14 @@ REPO_ROOT="$(cd "$PLAN_DIR/../../.." && pwd)"
 
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_EFFORT="${CLAUDE_EFFORT:-xhigh}"
-CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-default}"
+CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
 CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-0}"
 PHASE="${1:-g0}"
+CLAUDE_PERMISSION_ARGS=()
+if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+  CLAUDE_PERMISSION_ARGS=(--permission-mode "$CLAUDE_PERMISSION_MODE")
+fi
 
 cd "$REPO_ROOT"
 
@@ -54,7 +58,7 @@ When done, write the full evidence pack to $status_file: worktree path, branch, 
     --name "$name" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
-    --permission-mode "$CLAUDE_PERMISSION_MODE" \
+    "${CLAUDE_PERMISSION_ARGS[@]}" \
     --setting-sources "$CLAUDE_SETTING_SOURCES" \
     "$prompt" 2>&1)"
   status=$?
@@ -75,14 +79,18 @@ When done, write the full evidence pack to $status_file: worktree path, branch, 
 open_agent_view() {
   echo
   echo "View background sessions with:"
-  echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --permission-mode \"$CLAUDE_PERMISSION_MODE\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+  if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+    echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --permission-mode \"$CLAUDE_PERMISSION_MODE\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+  else
+    echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+  fi
 
   if [ "$CLAUDE_OPEN_AGENT_VIEW" = "1" ] && [ -t 1 ]; then
     claude agents \
       --cwd "$REPO_ROOT" \
       --model "$CLAUDE_MODEL" \
       --effort "$CLAUDE_EFFORT" \
-      --permission-mode "$CLAUDE_PERMISSION_MODE" \
+      "${CLAUDE_PERMISSION_ARGS[@]}" \
       --setting-sources "$CLAUDE_SETTING_SOURCES"
   fi
 }
@@ -93,7 +101,11 @@ echo "Phase: $PHASE"
 echo "Claude Code: $(claude --version || true)"
 echo "Model: $CLAUDE_MODEL"
 echo "Effort: $CLAUDE_EFFORT"
-echo "Permission mode: $CLAUDE_PERMISSION_MODE"
+if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+  echo "Permission mode override: $CLAUDE_PERMISSION_MODE"
+else
+  echo "Permission mode: inherited from Claude Code settings"
+fi
 echo "Setting sources: $CLAUDE_SETTING_SOURCES"
 if [ "$CLAUDE_PERMISSION_MODE" = "auto" ]; then
   echo
