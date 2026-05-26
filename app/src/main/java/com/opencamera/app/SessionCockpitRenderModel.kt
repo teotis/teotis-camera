@@ -177,6 +177,10 @@ internal fun shutterDisabledReason(state: SessionState, text: AppTextResolver): 
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
         return text.disabledSavingPhoto()
     }
+    // Session rearm policy: ordinary still capture clears activeShot at DATA_RECEIVED,
+    // so the shutter is safe to re-arm even though postprocess/save may still be finishing.
+    // Conservative capture kinds (multi-frame, live photo) keep activeShot until ShotCompleted.
+    if (state.captureStatus == CaptureStatus.DATA_RECEIVED && activeShot == null) return null
     if (state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED) return text.disabledSavingPhoto()
     if (state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
     if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
