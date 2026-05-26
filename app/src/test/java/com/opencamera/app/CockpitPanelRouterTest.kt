@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -291,5 +292,80 @@ class CockpitPanelRouterTest {
         val result = nextState(initial, CockpitPanelCommand.DismissAll)
 
         assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    // --- Outside-dismiss coverage: DismissAll is the command fired by panelDismissScrim ---
+
+    @Test
+    fun `DismissAll from StyleLab closes to None and resets filter state`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.StyleLab,
+            selectedFilterLabFamilyOverride = FilterLabFamily.VIDEO,
+            isFilterAdjustmentVisible = true,
+            filterAdjustmentMode = FilterAdjustmentMode.ADVANCED
+        )
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+        assertNull(result.selectedFilterLabFamilyOverride)
+        assertEquals(false, result.isFilterAdjustmentVisible)
+        assertEquals(FilterAdjustmentMode.LIGHT, result.filterAdjustmentMode)
+    }
+
+    @Test
+    fun `DismissAll from ColorLab closes to None and resets filter state`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.ColorLab,
+            selectedFilterLabFamilyOverride = FilterLabFamily.HUMANISTIC,
+            isFilterAdjustmentVisible = true,
+            filterAdjustmentMode = FilterAdjustmentMode.ADVANCED
+        )
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+        assertNull(result.selectedFilterLabFamilyOverride)
+        assertEquals(false, result.isFilterAdjustmentVisible)
+        assertEquals(FilterAdjustmentMode.LIGHT, result.filterAdjustmentMode)
+    }
+
+    @Test
+    fun `DismissAll from DevConsole closes to None`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.DevConsole)
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `DismissAll from DocumentBatchOrganizer closes to None`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.DocumentBatchOrganizer)
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `DismissAll from Settings closes to None and resets tab`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.Settings(SettingsSubpage.ROOT),
+            selectedSettingsTab = SettingsTab.VIDEO
+        )
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+        assertEquals(SettingsTab.COMMON, result.selectedSettingsTab)
+    }
+
+    @Test
+    fun `scrim dismiss path ToggleQuickBubble then DismissAll returns to None`() {
+        var state = CockpitPanelUiState()
+
+        state = nextState(state, CockpitPanelCommand.ToggleQuickBubble)
+        assertEquals(CockpitPanelRoute.QuickBubble, state.route)
+        assertTrue(state.route.isAnyPanelOpen)
+
+        state = nextState(state, CockpitPanelCommand.DismissAll)
+        assertEquals(CockpitPanelRoute.None, state.route)
+        assertFalse(state.route.isAnyPanelOpen)
     }
 }
