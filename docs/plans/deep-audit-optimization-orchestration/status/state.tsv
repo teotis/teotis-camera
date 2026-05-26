@@ -1,8 +1,8 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-01-architecture-structural-analysis	launched
-02-technical-debt-audit	launched
-03-module-dependency-analysis	launched
-04-code-quality-metrics	launched
+01-architecture-structural-analysis	pending
+02-technical-debt-audit	pending
+03-module-dependency-analysis	pending
+04-code-quality-metrics	pending
 05-session-kernel-deep-dive	pending
 06-performance-optimization-analysis	pending
 07-test-coverage-gap-analysis	pending
