@@ -135,8 +135,12 @@ internal class MainActivityActionBinder(
                 val targetSteps = brightness.minSteps + progress
                 callbacks.dispatch(SessionIntent.ApplyPreviewBrightness(targetSteps))
             }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                callbacks.onBrightnessDragStart()
+            }
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                callbacks.onBrightnessDragEnd()
+            }
         })
         views.quickPanel.frameRatio.setOnClickListener {
             val nextRatio = snapshot().quickPanelSheet?.frameRatioNext ?: return@setOnClickListener
