@@ -1,5 +1,12 @@
 # Agent View Prompts
 
+## Launch Notes
+
+- Manual Agent View dispatch: copy one package block below into Claude Code Agent View when its dependencies are ready.
+- Background dispatch: use `rtk bash docs/plans/real-device-ui-upgrade-remediation/launchers/dispatch-claude-agents.sh` for G1 only (`01` + `05`).
+- The background script defaults to `CLAUDE_PERMISSION_MODE=default`. If you intentionally use `CLAUDE_PERMISSION_MODE=auto`, run `claude --permission-mode auto` once interactively first; otherwise `claude --bg` can fail before a session is created, so Agents View will remain empty.
+- After launching background sessions, monitor with `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera`.
+
 ## Package: 01-effect-test-contract — Effect Preview Contract/Test Repair
 
 Copy the block below into Claude Code Agent View.
