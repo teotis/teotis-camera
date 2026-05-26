@@ -1,30 +1,29 @@
-# Package: [PACKAGE_ID]
+# Package: 04-code-quality-metrics
 
 ## Status
-- State: [pending|launched|in_progress|completed|blocked]
-- Launched at: [TIMESTAMP]
-- Completed at: [TIMESTAMP]
-- Agent: [AGENT_NAME]
+- State: launched
+- Launched at: 2026-05-26T22:17:08Z
+- Agent: pending
 
 ## Evidence
-- Worktree: [WORKTREE_PATH]
-- Branch: [BRANCH_NAME]
-- Base commit: [COMMIT_HASH]
-- Commit hash: [COMMIT_HASH]
-- Changed files: [FILE_LIST]
-- Verification commands: [COMMANDS]
-- Verification results: [RESULTS]
-- Risks: [RISK_LIST]
+- Worktree: pending
+- Branch: pending
+- Base commit: pending
+- Commit hash: pending
+- Changed files: pending
+- Verification commands: pending
+- Verification results: pending
+- Risks: pending
 
 ## Analysis Results
-[ANALYSIS_CONTENT]
+[PENDING]
 
 ## Key Findings
-[FINDINGS_LIST]
+[PENDING]
 
 ## Recommendations
-[RECOMMENDATIONS_LIST]
+[PENDING]
 
 ## Notes
+- Launched by orchestrate.sh
 - This is a pure analysis task - do NOT modify any source code
-- [ADDITIONAL_NOTES]
