@@ -427,6 +427,7 @@ internal fun modeTrackRenderModel(
 
 private val PRODUCT_MODE_ENTRY_ORDER = listOf(
     ModeId.PHOTO,
+    ModeId.HUMANISTIC,
     ModeId.VIDEO,
     ModeId.DOCUMENT
 )
