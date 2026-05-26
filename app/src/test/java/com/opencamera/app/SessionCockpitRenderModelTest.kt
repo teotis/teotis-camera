@@ -1069,6 +1069,58 @@ class SessionCockpitRenderModelTest {
         assertEquals(ShutterVisualState.FAILURE_OR_DEGRADED, shutterVisualState(state))
     }
 
+    // --- Session rearm policy: DATA_RECEIVED with null activeShot ---
+
+    @Test
+    fun `shutter disabled reason returns null for DATA_RECEIVED after session rearm`() {
+        // After package 02 rearm: ordinary still capture clears activeShot at DATA_RECEIVED.
+        // Shutter must be re-enabled even though postprocess may still be finishing.
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null
+        )
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
+    fun `shutter disabled reason blocks DATA_RECEIVED before rearm for conservative capture`() {
+        // Conservative capture (multi-frame, live photo) keeps activeShot until ShotCompleted.
+        // Shutter must stay blocked.
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "mf-1",
+                shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.NONE,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        ).copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
+    fun `shutter visual state is PHOTO_READY for DATA_RECEIVED after session rearm`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null
+        )
+        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter remains clickable via cockpit render model after DATA_RECEIVED rearm`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null
+        )
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(cockpit.bottomCockpit.isShutterEnabled)
+        assertNull(cockpit.bottomCockpit.disabledReason)
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",
