@@ -6,6 +6,7 @@ import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ShotExecutor
+import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
@@ -283,12 +284,23 @@ internal class CaptureRecordingSessionProcessor(
         )
     }
 
+    private fun canRearmOnDataReceived(shot: ShotRequest): Boolean {
+        if (shot.mediaType != MediaType.PHOTO) return false
+        if (shot.livePhotoSpec != null) return false
+        return shot.shotKind == ShotKind.STILL_CAPTURE
+    }
+
     private suspend fun handleDataReceived(shotId: String, mediaType: MediaType) {
         updateState.update { s ->
-            if (s.activeShot?.shotId == shotId && mediaType == MediaType.PHOTO) {
-                s.copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+            val activeShot = s.activeShot ?: return@update s
+            if (activeShot.shotId != shotId || mediaType != MediaType.PHOTO) return@update s
+            if (canRearmOnDataReceived(activeShot)) {
+                s.copy(
+                    captureStatus = CaptureStatus.DATA_RECEIVED,
+                    activeShot = null
+                )
             } else {
-                s
+                s.copy(captureStatus = CaptureStatus.DATA_RECEIVED)
             }
         }
         trace.record("capture.data.received", "shotId=$shotId")

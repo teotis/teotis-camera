@@ -142,6 +142,31 @@ class CaptureRecordingSessionProcessorTest {
             captureProfile = CaptureProfile()
         )
 
+        private fun multiFrameShotRequest(
+            shotId: String = "shot-mf-1"
+        ) = ShotRequest(
+            shotId = shotId,
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile(frameCount = 3)
+        )
+
+        private fun livePhotoShotRequest(
+            shotId: String = "shot-live-1"
+        ) = ShotRequest(
+            shotId = shotId,
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile(),
+            livePhotoSpec = com.opencamera.core.media.LivePhotoCaptureSpec()
+        )
+
         private fun testShotResult(
             shotId: String = "shot-1",
             mediaType: MediaType = MediaType.PHOTO,
@@ -314,17 +339,17 @@ class CaptureRecordingSessionProcessorTest {
     }
 
     @Test
-    fun `handleDataReceived transitions capture status for photo`() = runTest {
+    fun `handleDataReceived for ordinary still releases activeShot`() = runTest {
         val shot = testShotRequest("shot-1", MediaType.PHOTO)
         val harness = Harness(runningState().copy(activeShot = shot))
         harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
 
         assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
-        assertEquals(shot, harness.state.value.activeShot)
+        assertNull(harness.state.value.activeShot)
     }
 
     @Test
-    fun `SAVING to DATA_RECEIVED to COMPLETED lifecycle`() = runTest {
+    fun `SAVING to DATA_RECEIVED to COMPLETED lifecycle for ordinary still`() = runTest {
         val harness = Harness()
         val shot = testShotRequest("shot-1", MediaType.PHOTO)
 
@@ -333,11 +358,61 @@ class CaptureRecordingSessionProcessorTest {
 
         harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
         assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
-        assertNotNull(harness.state.value.activeShot)
+        assertNull(harness.state.value.activeShot)
 
         harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
         assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
         assertNull(harness.state.value.activeShot)
+    }
+
+    @Test
+    fun `handleDataReceived for multi-frame keeps activeShot blocked`() = runTest {
+        val shot = multiFrameShotRequest("shot-mf-1")
+        val harness = Harness(runningState().copy(activeShot = shot))
+        harness.process(SessionIntent.DataReceived("shot-mf-1", MediaType.PHOTO))
+
+        assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
+        assertEquals(shot, harness.state.value.activeShot)
+    }
+
+    @Test
+    fun `handleDataReceived for live photo keeps activeShot blocked`() = runTest {
+        val shot = livePhotoShotRequest("shot-live-1")
+        val harness = Harness(runningState().copy(activeShot = shot))
+        harness.process(SessionIntent.DataReceived("shot-live-1", MediaType.PHOTO))
+
+        assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
+        assertEquals(shot, harness.state.value.activeShot)
+    }
+
+    @Test
+    fun `multi-frame DataReceived then ShotCompleted clears activeShot and updates presentation`() = runTest {
+        val shot = multiFrameShotRequest("shot-mf-1")
+        val harness = Harness(runningState().copy(activeShot = shot))
+        harness.process(SessionIntent.DataReceived("shot-mf-1", MediaType.PHOTO))
+        assertNotNull(harness.state.value.activeShot)
+
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-mf-1", MediaType.PHOTO)))
+        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+        assertNull(harness.state.value.activeShot)
+        assertEquals("/sdcard/photo.jpg", harness.state.value.presentation.latestCapturePath)
+        assertEquals("Photo saved", harness.state.value.presentation.lastAction)
+    }
+
+    @Test
+    fun `ordinary still early rearm then ShotCompleted still updates presentation`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
+        assertNull(harness.state.value.activeShot)
+
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
+        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+        assertNull(harness.state.value.activeShot)
+        assertEquals("/sdcard/photo.jpg", harness.state.value.presentation.latestCapturePath)
+        assertEquals("Photo saved", harness.state.value.presentation.lastAction)
+        assertTrue(harness.state.value.presentation.latestThumbnailSource is ThumbnailSource.SavedMedia)
     }
 
     @Test
@@ -353,6 +428,20 @@ class CaptureRecordingSessionProcessorTest {
         assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
         assertEquals(RecordingStatus.IDLE, harness.state.value.recordingStatus)
         assertEquals("Video saved", harness.state.value.presentation.lastAction)
+    }
+
+    @Test
+    fun `video DataReceived does not affect activeShot or capture status`() = runTest {
+        val shot = testShotRequest("shot-v", MediaType.VIDEO)
+        val harness = Harness(runningState().copy(
+            activeShot = shot,
+            recordingStatus = RecordingStatus.RECORDING
+        ))
+        harness.process(SessionIntent.DataReceived("shot-v", MediaType.VIDEO))
+
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertEquals(shot, harness.state.value.activeShot)
+        assertEquals(RecordingStatus.RECORDING, harness.state.value.recordingStatus)
     }
 
     // ── Capture Strategy Tests ──────────────────────────────────────────
