@@ -28,10 +28,10 @@ The user approved upgrading the watermark plan with:
 
 | Package | Owner | Status | Purpose |
 | --- | --- | --- | --- |
-| [Professional Parameter Bottom Bar](./2026-05-25-watermark-2-professional-parameter-bottom-bar.md) | Text/code agent + Codex visual QA | planned | Add a new still-photo template for OPPO/Hasselblad-style bottom parameter bar without copying OEM branding. |
-| [Minimalist Text Polish](./2026-05-25-watermark-2-minimalist-text-polish.md) | Text/code agent + Codex visual QA | planned | Productize existing `pure-text` so it is quiet, legible, and does not expose frame-only controls. |
-| [Blurred Four-Border Polish](./2026-05-25-watermark-2-blur-four-border-polish.md) | Text/code agent + Codex visual QA | planned | Tighten existing `blur-four-border` template behavior, controls, and renderer evidence. |
-| [Reversible Watermark Productization](./2026-05-25-watermark-2-reversible-productization.md) | Text/code agent + Codex/user acceptance | planned | Surface and verify OCWM reversible watermark behavior without changing the archive format. |
+| [Professional Parameter Bottom Bar](./2026-05-25-watermark-2-professional-parameter-bottom-bar.md) | Text/code agent + Codex visual QA | implemented | Added still-photo `professional-bottom-bar` template, persisted style, resolver, renderer branch, UI model coverage, and archive tests; final visual QA remains. |
+| [Minimalist Text Polish](./2026-05-25-watermark-2-minimalist-text-polish.md) | Text/code agent + Codex visual QA | validated | Existing `pure-text` remains typography-only in renderer and hides frame background in Watermark Lab; final visual QA remains. |
+| [Blurred Four-Border Polish](./2026-05-25-watermark-2-blur-four-border-polish.md) | Text/code agent + Codex visual QA | blocked | UI cycles only blur backgrounds and resolver clamps invalid background, but direct persisted action still accepts invalid solid backgrounds; see validation notes. |
+| [Reversible Watermark Productization](./2026-05-25-watermark-2-reversible-productization.md) | Text/code agent + Codex/user acceptance | validated | OCWM archive verification passes, including byte-identical Python extraction; final gallery/device smoke remains. |
 
 ## Recommended Execution Order
 
@@ -75,3 +75,38 @@ rtk ./scripts/verify_stage_7_observability.sh
 ```
 
 Final product acceptance still needs Codex/user visual review of saved JPEGs for at least a bright scene, dark scene, portrait-or-human subject scene, and narrow/tall crop.
+
+## Validation 2026-05-26
+
+Status: `blocked`, not an overall pass.
+
+What passed:
+
+- Focused Gradle subset passed:
+
+```bash
+rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:settings:test --tests com.opencamera.core.settings.PersistedSettingsSerializerTest :app:testDebugUnitTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.camera.PhotoWatermarkPostProcessorTest --tests com.opencamera.app.camera.PhotoWatermarkTemplateResolverTest --tests com.opencamera.app.camera.PhotoWatermarkArchiveEditorTest
+```
+
+- Reversible archive gate passed outside the sandbox after the in-sandbox Gradle wrapper lock failed:
+
+```bash
+rtk ./scripts/verify_reversible_watermark_archive.sh
+```
+
+Evidence from code inspection:
+
+- `professional-bottom-bar` is present in `DEFAULT_WATERMARK_TEMPLATES`, `PhotoSettings`, `SettingsActions.watermarkStyleFor`, `PersistedSettingsSerializer`, `PhotoWatermarkPostProcessor` resolver/render path, and archive tests.
+- `pure-text` hides frame background control in Watermark Lab and still renders through the photo watermark postprocessor.
+- `blur-four-border` UI cycles blur-family backgrounds and bottom placements, and resolver clamps unsupported solid backgrounds.
+- OCWM archive embedding still runs in the watermark editor path and extractor verification produced a byte-identical payload.
+
+Blocking gaps:
+
+- `rtk ./scripts/verify_stage_6b3_watermark_v2.sh` fails in `:core:effect:compileTestKotlin` because tests still reference removed/renamed `PreviewColorTransform.colorMatrix` and `PreviewEffectRenderModel.colorFidelity`. This blocks the official focused Watermark V2 gate even though the watermark-specific subset passed.
+- `blur-four-border` is still not fully protected at the persisted-action boundary: `PersistedSettingsAction.UpdateWatermarkFrameBackground(templateId = "blur-four-border", background = WHITE/DARK)` can store an invalid solid background even though UI does not generate it and the resolver clamps at render time.
+
+Not completed:
+
+- Stage 7 gate was started but hung for several minutes at `:core:session:test`; the run was stopped and is not counted as pass evidence.
+- No Codex/user visual QA of saved JPEGs has been performed.

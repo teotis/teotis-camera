@@ -180,6 +180,15 @@
   新增可还原水印产品化方案 [`2026-05-25-watermark-2-reversible-productization.md`](/Volumes/Extreme_SSD/project/open_camera/codex/agent_plans/2026-05-25-watermark-2-reversible-productization.md)，保留 OCWM 格式不变，要求验证所有 Watermark 2.0 静态图模板的 pre-watermark JPEG 可提取。
 - 验证：本轮只新增/更新方案文档和规划索引，未改运行时代码；已交叉阅读 2026-05-24 多模板水印/可逆归档计划、当前 settings 默认模板、`PhotoWatermarkPostProcessor` resolver/render/archive 路径、Watermark Lab render model 入口和相关验证脚本。最终实现后应先跑 `rtk ./scripts/verify_stage_6b3_watermark_v2.sh` 与 `rtk ./scripts/verify_reversible_watermark_archive.sh`，再跑 Stage 7 gate。
 
+### 2026-05-26 验收更新
+
+- 外部落地总体方向基本恰当：`professional-bottom-bar` 已接入 settings/catalog、持久化、样式 action、resolver、最终 JPEG renderer、Watermark Lab render model 和 OCWM archive tests；`pure-text` 保持无边框控件；`blur-four-border` UI 只循环 blur-family 背景；OCWM 可逆归档脚本通过。
+- 但不能判定整体 pass：
+  `rtk ./scripts/verify_stage_6b3_watermark_v2.sh` 在 `:core:effect:compileTestKotlin` 编译失败，原因是 `PreviewColorTransformTest` 和 `PreviewEffectAdapterTest` 仍引用已不存在的 `colorMatrix / colorFidelity`；
+  `blur-four-border` 仍可通过直接 `PersistedSettingsAction.UpdateWatermarkFrameBackground` 写入 solid 背景，虽然 UI 不生成该 action 且 renderer resolver 会 clamp；
+  Stage 7 gate 启动后在 `:core:session:test` 长时间无输出，被手动停止，不作为通过证据。
+- 当前验收状态：水印 2.0 外部落地为“部分有效，但 blocked”；下一步应先修复 `core:effect` 测试 API 漂移，再补 `blur-four-border` persisted-action 边界测试/约束，最后重跑 6B3 与 Stage 7 gates。
+
 ## 2026-05-24：Live / Google Motion Photo 外部落地核验与本地闭环补强
 
 - 目标：核查外部 agent 对拍照模式实况能力的落地是否满足“预览流作为短视频部分 + Google Motion Photo 格式”需求；若发现问题则就地修复。
