@@ -1,6 +1,6 @@
 # 00-mode-entry-visibility — Evidence Pack
 
-## Status: DONE
+- **Status**: completed
 
 ## Worktree
 

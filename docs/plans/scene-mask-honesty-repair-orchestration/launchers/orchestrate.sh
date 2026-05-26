@@ -223,6 +223,8 @@ launch_ready() {
 }
 
 launch_finalize() {
+  preflight
+  stop_on_bad_states
   local pkg="99-finalize"
   local current
   current="$(state_of "$pkg")"
@@ -233,6 +235,10 @@ launch_finalize() {
   if [ "$current" = "launched" ] || [ "$current" = "finalizing" ]; then
     echo "99-finalize already launched."
     return 0
+  fi
+  if ! functional_completed; then
+    echo "ERROR: cannot launch 99-finalize before all functional packages are completed." >&2
+    exit 1
   fi
   set_state "$pkg" "finalizing"
   launch_package "$pkg"
@@ -304,4 +310,3 @@ main() {
 }
 
 main "$@"
-

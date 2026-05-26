@@ -1,7 +1,7 @@
 # Package Status: 03-quick-panel-outside-dismiss
 
 - **Agent**: Claude Code
-- **Status**: DONE
+- **Status**: completed
 - **Started**: 2026-05-27
 - **Completed**: 2026-05-27
 
