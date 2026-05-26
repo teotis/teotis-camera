@@ -1200,3 +1200,15 @@
 6. **文件验证**：通过 `adb pull` 拉取保存的 JPEG 文件，确认末尾附加了 MP4 字节
 
 注意：图库识别结果因 OEM 图库、Google Photos 版本、文件名、MediaStore MIME 处理及 XMP 严格程度而异，应作为产品证据记录，不作为确定性测试断言。
+
+## 2026-05-27：Scene Mask 诚实性修复验证门禁（实施修复包）
+
+- 目标：为 Scene Mask 建立聚焦验证门禁，确保 saved-photo mask 写回、preview analysis budget/lifecycle、诊断诚实性等本地合约在进入真机 QA 前可被证明。
+- 性质：实施修复包（implementation repair），不是产品视觉验收。
+- 核心结果：
+  `scripts/verify_scene_mask_honesty.sh` 新增，覆盖 8 组 Scene Mask 相关本地测试；
+  文档不再过宣 Scene Mask 能力——Phase-1 仅支持人像主体 mask，saved-photo mask 必须重新分割并写回输出字节，preview mask 为近似值且不能成为 saved 输出真值，`ImageProxy` 生命周期 owner 为 `PreviewAnalysisFanout`，true depth / 语义区域 / 非人像主体分割在无单独实现的情况下仍为 unsupported。
+- 验证：
+  `rtk ./scripts/verify_scene_mask_honesty.sh` — 6/8 组通过，2 组有 main 上已存在的预存失败（`PhotoAlgorithmPostProcessorTest.unsupported profile`、`MaskAwarePortraitRenderMathTest.mask alpha edge`），无新增回归；
+  `rtk ./gradlew --no-daemon :app:assembleDebug` 通过。
+- 结论：本地合约验证门禁已建立；真机 Color Lab / 人像 / 背景边缘视觉 QA 仍为单独待验项。
