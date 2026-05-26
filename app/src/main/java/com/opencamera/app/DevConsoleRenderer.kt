@@ -33,5 +33,17 @@ internal class DevConsoleRenderer(
         views.tabCore.alpha = if (model.selectedTab == DevLogTab.CORE) activeAlpha else inactiveAlpha
         views.tabError.alpha = if (model.selectedTab == DevLogTab.ERROR) activeAlpha else inactiveAlpha
         views.tabAll.alpha = if (model.selectedTab == DevLogTab.ALL) activeAlpha else inactiveAlpha
+
+        val hasStorage = model.storageUsedDisplay.isNotBlank()
+        views.storageInfo.isVisible = hasStorage
+        if (hasStorage) {
+            views.storageInfo.text = context.getString(
+                R.string.dev_storage_format, model.storageUsedDisplay, model.storageCapacityDisplay
+            )
+        }
+        views.cleanupKey.isVisible = model.canCleanup
+        views.cleanupCore.isVisible = model.canCleanup
+        views.cleanupError.isVisible = model.canCleanup
+        views.cleanupAll.isVisible = model.canCleanup
     }
 }

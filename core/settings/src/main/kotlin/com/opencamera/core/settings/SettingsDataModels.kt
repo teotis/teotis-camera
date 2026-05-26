@@ -235,3 +235,20 @@ data class SessionSettingsSnapshot(
     val persisted: PersistedSettings = PersistedSettings(),
     val catalog: FeatureCatalog = FeatureCatalog()
 )
+
+fun PersistedSettings.hasUserAdjustments(target: ResetTarget): Boolean {
+    val defaults = PersistedSettings()
+    return when (target) {
+        ResetTarget.SETTINGS -> common != defaults.common
+        ResetTarget.STYLE -> photo.defaultFilterProfileId != defaults.photo.defaultFilterProfileId ||
+            photo.defaultHumanisticFilterProfileId != defaults.photo.defaultHumanisticFilterProfileId ||
+            photo.defaultPortraitFilterProfileId != defaults.photo.defaultPortraitFilterProfileId ||
+            photo.styleStrength != defaults.photo.styleStrength ||
+            photo.colorLabSpec != defaults.photo.colorLabSpec
+        ResetTarget.COLOR_LAB -> photo.colorLabSpec != defaults.photo.colorLabSpec
+        ResetTarget.QUICK -> common.gridMode != defaults.common.gridMode ||
+            photo.livePhotoEnabledByDefault != defaults.photo.livePhotoEnabledByDefault ||
+            photo.countdownDuration != defaults.photo.countdownDuration ||
+            video.defaultVideoSpec != defaults.video.defaultVideoSpec
+    }
+}

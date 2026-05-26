@@ -7,6 +7,7 @@ import com.opencamera.core.settings.FilterProfileShareCodec
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.PersistedSettings
 import com.opencamera.core.settings.PersistedSettingsStore
+import com.opencamera.core.settings.ResetTarget
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.MapFeatureCatalogStore
 import com.opencamera.core.settings.FilterRenderSpec
@@ -38,6 +39,10 @@ class SessionSettingsManager(
         return apply(
             session.state.value.settings.persisted.reduce(action)
         )
+    }
+
+    suspend fun resetToDefaults(target: ResetTarget): SessionSettingsApplyResult {
+        return apply(PersistedSettingsAction.ResetToDefaults(target))
     }
 
     suspend fun apply(action: FeatureCatalogAction): SessionSettingsApplyResult {

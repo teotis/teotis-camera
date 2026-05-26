@@ -47,6 +47,7 @@ import com.opencamera.core.settings.PortraitBeautyStrength
 import com.opencamera.core.settings.PortraitBokehEffect
 import com.opencamera.core.settings.PortraitProfile
 import com.opencamera.core.settings.PersistedSettingsAction
+import com.opencamera.core.settings.ResetTarget
 import com.opencamera.core.settings.PersistedSettings
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.VideoFrameRate
@@ -1028,7 +1029,7 @@ class SessionUiRenderModelTest {
         val selectedItem = model.filterItems.first { it.filterProfileId == "custom-portrait-original-1" }
         assertTrue(selectedItem.isSelected)
         assertTrue(selectedItem.supportingText.contains("Selected default"))
-        assertTrue(selectedItem.adjustButtonLabel?.contains("Adjust Selected") == true)
+        assertNull(selectedItem.adjustButtonLabel)
     }
 
     @Test
@@ -1061,7 +1062,7 @@ class SessionUiRenderModelTest {
         )
         val selectedItem = model.filterItems.first { it.filterProfileId == "portrait-original" }
         val unselectedItem = model.filterItems.first { it.filterProfileId == "portrait-blue" }
-        assertTrue(selectedItem.adjustButtonLabel?.contains("editable custom copy") == true)
+        assertNull(selectedItem.adjustButtonLabel)
         assertEquals(null, unselectedItem.adjustButtonLabel)
     }
 
@@ -1490,7 +1491,7 @@ class SessionUiRenderModelTest {
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
         assertEquals(3, visibleEntries.size)
-        assertEquals("Lens", visibleEntries[0].label)
+        assertEquals("Style", visibleEntries[0].label)
         assertEquals("Quick", visibleEntries[1].label)
         assertEquals("DEV", visibleEntries[2].label)
 
@@ -1513,7 +1514,7 @@ class SessionUiRenderModelTest {
     @Test
     fun `style entry label is Chinese via text resolver`() {
         val chineseResolver = object : TestAppTextResolver() {
-            override fun styleEntry(): String = "镜头"
+            override fun styleEntry(): String = "风格"
             override fun quickLauncher(): String = "快捷"
             override fun colorLabEntry(): String = "色彩实验室"
             override fun settingsEntry(): String = "设置"
@@ -1522,7 +1523,7 @@ class SessionUiRenderModelTest {
         val cockpit = cameraCockpitRenderModel(state, chineseResolver, strings)
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
-        assertEquals("镜头", visibleEntries[0].label)
+        assertEquals("风格", visibleEntries[0].label)
         assertEquals("快捷", visibleEntries[1].label)
         assertEquals("色彩实验室", cockpit.topStatus.labEntryLabel)
         assertEquals("设置", cockpit.topStatus.settingsEntryLabel)
@@ -2104,5 +2105,87 @@ class SessionUiRenderModelTest {
         val reason = captureDisabledReason(state, TestAppTextResolver())
 
         assertEquals("Camera permission required", reason)
+    }
+
+    @Test
+    fun `settings page has reset action when user adjustments exist`() {
+        val state = defaultSessionState()
+        val model = sessionSettingsPageRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.hasSettingsUserAdjustments)
+        assertEquals(
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.SETTINGS),
+            model.resetSettingsAction
+        )
+    }
+
+    @Test
+    fun `settings page has no reset action when at defaults`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = com.opencamera.core.settings.PhotoSettings()
+        ).copy(
+            settings = com.opencamera.core.settings.SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings()
+            )
+        )
+        val model = sessionSettingsPageRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.hasSettingsUserAdjustments)
+        assertEquals(null, model.resetSettingsAction)
+    }
+
+    @Test
+    fun `color lab panel has hasUserAdjustments flag when spec differs from defaults`() {
+        val state = defaultSessionState().copy(
+            settings = com.opencamera.core.settings.SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings(
+                    photo = com.opencamera.core.settings.PhotoSettings(
+                        colorLabSpec = com.opencamera.core.settings.ColorLabSpec(colorAxis = 0.3f)
+                    )
+                )
+            )
+        )
+        val model = colorLabPanelRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.hasUserAdjustments)
+    }
+
+    @Test
+    fun `color lab panel has no hasUserAdjustments flag when at defaults`() {
+        val state = defaultSessionState().copy(
+            settings = com.opencamera.core.settings.SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings()
+            )
+        )
+        val model = colorLabPanelRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.hasUserAdjustments)
+    }
+
+    @Test
+    fun `filter lab page has reset action when style adjustments exist`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.hasStyleUserAdjustments)
+        assertEquals(
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.STYLE),
+            model.resetStyleAction
+        )
+    }
+
+    @Test
+    fun `filter lab page has no reset action when at defaults`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = com.opencamera.core.settings.PhotoSettings()
+        ).copy(
+            settings = com.opencamera.core.settings.SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings()
+            )
+        )
+        val model = filterLabPageRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.hasStyleUserAdjustments)
+        assertEquals(null, model.resetStyleAction)
     }
 }

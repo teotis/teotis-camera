@@ -87,9 +87,15 @@
     <string name="dev_tab_error">Error</string>
     <string name="dev_tab_all">All</string>
     <string name="dev_export_log">Export Log</string>
+    <string name="dev_cleanup_key">Clear Summary</string>
+    <string name="dev_cleanup_core">Clear Pipeline</string>
+    <string name="dev_cleanup_error">Clear Error</string>
+    <string name="dev_cleanup_all">Clear All</string>
+    <string name="dev_storage_format">Storage: %1$s / %2$s</string>
+    <string name="dev_cleanup_done">Cleared %d files</string>
     <string name="dev_close">Close</string>
     <string name="dev_console_content_description">Debug console overlay</string>
-    <string name="button_palette_entry">Lens</string>
+    <string name="button_palette_entry">Style</string>
     <string name="button_quick_launcher">Quick</string>
     <string name="quick_bubble_panel_content_description">Quick camera controls</string>
     <string name="floating_utility_group_content_description">Floating camera tools</string>
@@ -140,7 +146,7 @@
     <string name="label_aperture">Aperture</string>
     <string name="label_wb">WB</string>
     <string name="label_auto">Auto</string>
-    <string name="button_adjust_selected">Adjust Selected</string>
+
     <string name="button_save_as_custom">Save as Custom</string>
     <string name="button_use_this_template">Use This Template</string>
     <string name="button_use_this_look">Use This Look</string>
@@ -184,7 +190,7 @@
     <string name="status_renderer_pending">Renderer pending</string>
     <string name="status_custom">Custom</string>
     <string name="status_unavailable_missing_profile">Unavailable • Missing source profile</string>
-    <string name="status_ready_editable_copy">Ready • Opens an editable custom copy</string>
+
     <string name="status_ready_editing_custom">Ready • Editing current custom look</string>
     <string name="status_unavailable_already_custom">Unavailable • Current default already custom</string>
     <string name="status_ready_becomes_default">Ready • Becomes the default</string>

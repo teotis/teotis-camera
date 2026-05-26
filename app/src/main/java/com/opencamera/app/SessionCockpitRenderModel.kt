@@ -18,6 +18,9 @@ import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.PreviewBrightnessFeedbackStatus
 import com.opencamera.core.settings.VideoSpec
+import com.opencamera.core.settings.PersistedSettingsAction
+import com.opencamera.core.settings.ResetTarget
+import com.opencamera.core.settings.hasUserAdjustments
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.PhotoLowLightPromptStatus
@@ -116,7 +119,9 @@ internal data class QuickPanelSheetRenderModel(
     val frameRatioEnabled: Boolean,
     val frameRatioDisabledReason: String?,
     val liveRow: QuickPanelRowRenderModel,
-    val timerRow: QuickPanelRowRenderModel
+    val timerRow: QuickPanelRowRenderModel,
+    val hasQuickUserAdjustments: Boolean = false,
+    val resetQuickAction: PersistedSettingsAction.ResetToDefaults? = null
 )
 
 internal data class ModeDirectoryItemRenderModel(
@@ -400,7 +405,13 @@ internal fun quickPanelSheetRenderModel(
             value = timer.value,
             isEnabled = timer.isInteractive,
             controlKind = QuickControlKind.CYCLE
-        )
+        ),
+        hasQuickUserAdjustments = state.settings.persisted.hasUserAdjustments(ResetTarget.QUICK),
+        resetQuickAction = if (state.settings.persisted.hasUserAdjustments(ResetTarget.QUICK)) {
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.QUICK)
+        } else {
+            null
+        }
     )
 }
 
