@@ -38,7 +38,9 @@ import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.CommonSettings
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
+import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.PersistedSettings
+import com.opencamera.core.settings.ResetTarget
 import com.opencamera.core.settings.PhotoSettings
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.VideoFrameRate
@@ -1149,5 +1151,30 @@ class SessionCockpitRenderModelTest {
                 lastError = lastError
             )
         )
+    }
+
+    @Test
+    fun `quick panel sheet has reset action when adjustments exist`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(sheet.hasQuickUserAdjustments)
+        assertEquals(
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.QUICK),
+            sheet.resetQuickAction
+        )
+    }
+
+    @Test
+    fun `quick panel sheet has no reset action when at defaults`() {
+        val state = defaultSessionState().copy(
+            settings = SessionSettingsSnapshot(
+                persisted = PersistedSettings()
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.hasQuickUserAdjustments)
+        assertNull(sheet.resetQuickAction)
     }
 }

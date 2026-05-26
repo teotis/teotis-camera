@@ -17,6 +17,7 @@ import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.ColorLabSpec
+import com.opencamera.core.settings.CommonSettings
 import com.opencamera.core.settings.FeatureCatalog
 import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
@@ -30,6 +31,7 @@ import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.PersistedSettings
 import com.opencamera.core.settings.PersistedSettingsSerializer
 import com.opencamera.core.settings.PhotoSettings
+import com.opencamera.core.settings.ResetTarget
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.VideoFrameRate
 import com.opencamera.core.settings.VideoResolution
@@ -521,5 +523,81 @@ class SessionSettingsManagerTest {
             "toneAxis should be normalized to [-1,1]: ${saved.photo.colorLabSpec.toneAxis}")
         assertTrue(saved.photo.colorLabSpec.strength in 0f..1f,
             "strength should be normalized to [0,1]: ${saved.photo.colorLabSpec.strength}")
+    }
+
+    @Test
+    fun `resetToDefaults settings restores common settings and persists`() = runTest {
+        val modifiedState = defaultSessionState().copy(
+            settings = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    common = CommonSettings(
+                        gridMode = com.opencamera.core.settings.CompositionGridMode.GOLDEN_RATIO,
+                        shutterSoundEnabled = false,
+                        selfieMirrorEnabled = true
+                    )
+                )
+            )
+        )
+        val session = FakeCameraSession(initialState = modifiedState)
+        val store = MapPersistedSettingsStore()
+        val manager = SessionSettingsManager(session = session, store = store)
+
+        val result = manager.resetToDefaults(ResetTarget.SETTINGS)
+        assertIs<SessionSettingsApplyResult.Applied>(result)
+        val saved = store.load()
+        assertEquals(PersistedSettings().common, saved.common)
+    }
+
+    @Test
+    fun `resetToDefaults color lab restores default spec`() = runTest {
+        val modifiedState = defaultSessionState().copy(
+            settings = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(
+                        colorLabSpec = ColorLabSpec(colorAxis = 0.5f, toneAxis = -0.3f, strength = 0.7f)
+                    )
+                )
+            )
+        )
+        val session = FakeCameraSession(initialState = modifiedState)
+        val store = MapPersistedSettingsStore()
+        val manager = SessionSettingsManager(session = session, store = store)
+
+        val result = manager.resetToDefaults(ResetTarget.COLOR_LAB)
+        assertIs<SessionSettingsApplyResult.Applied>(result)
+        val saved = store.load()
+        assertEquals(PersistedSettings().photo.colorLabSpec, saved.photo.colorLabSpec)
+    }
+
+    @Test
+    fun `resetToDefaults returns NoOp when already at defaults`() = runTest {
+        val session = FakeCameraSession()
+        val store = MapPersistedSettingsStore()
+        store.save(PersistedSettings())
+        val manager = SessionSettingsManager(session = session, store = store)
+
+        val result = manager.resetToDefaults(ResetTarget.SETTINGS)
+        assertIs<SessionSettingsApplyResult.NoOp>(result)
+    }
+
+    @Test
+    fun `resetToDefaults blocked during active shot`() = runTest {
+        val activeShot = ShotRequest(
+            shotId = "test",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val session = FakeCameraSession(
+            initialState = defaultSessionState().copy(activeShot = activeShot)
+        )
+        val store = MapPersistedSettingsStore()
+        val manager = SessionSettingsManager(session = session, store = store)
+
+        val result = manager.resetToDefaults(ResetTarget.SETTINGS)
+        assertIs<SessionSettingsApplyResult.BlockedByActiveShot>(result)
     }
 }

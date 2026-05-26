@@ -553,4 +553,117 @@ class PersistedSettingsSerializerTest {
         )
         assertEquals(50, decoded.photo.portraitDepthStrength)
     }
+
+    @Test
+    fun `reset to defaults settings restores common settings`() {
+        val modified = PersistedSettings(
+            common = CommonSettings(
+                gridMode = CompositionGridMode.GOLDEN_RATIO,
+                shutterSoundEnabled = false,
+                selfieMirrorEnabled = true
+            )
+        )
+        val reset = modified.reduce(PersistedSettingsAction.ResetToDefaults(ResetTarget.SETTINGS))
+        assertEquals(PersistedSettings().common, reset.common)
+        assertEquals(modified.photo, reset.photo)
+        assertEquals(modified.video, reset.video)
+    }
+
+    @Test
+    fun `reset to defaults style restores style-related photo settings`() {
+        val modified = PersistedSettings(
+            photo = PhotoSettings(
+                defaultFilterProfileId = "custom-filter",
+                defaultHumanisticFilterProfileId = "custom-humanistic",
+                defaultPortraitFilterProfileId = "custom-portrait",
+                styleStrength = 0.5f,
+                colorLabSpec = ColorLabSpec(colorAxis = 0.3f, toneAxis = -0.2f, strength = 0.8f)
+            )
+        )
+        val defaults = PersistedSettings()
+        val reset = modified.reduce(PersistedSettingsAction.ResetToDefaults(ResetTarget.STYLE))
+        assertEquals(defaults.photo.defaultFilterProfileId, reset.photo.defaultFilterProfileId)
+        assertEquals(defaults.photo.defaultHumanisticFilterProfileId, reset.photo.defaultHumanisticFilterProfileId)
+        assertEquals(defaults.photo.defaultPortraitFilterProfileId, reset.photo.defaultPortraitFilterProfileId)
+        assertEquals(defaults.photo.styleStrength, reset.photo.styleStrength)
+        assertEquals(defaults.photo.colorLabSpec, reset.photo.colorLabSpec)
+        assertEquals(modified.photo.portraitProfile, reset.photo.portraitProfile)
+    }
+
+    @Test
+    fun `reset to defaults color lab restores only color lab spec`() {
+        val modified = PersistedSettings(
+            photo = PhotoSettings(
+                colorLabSpec = ColorLabSpec(colorAxis = 0.5f, toneAxis = -0.3f, strength = 0.7f),
+                styleStrength = 0.5f
+            )
+        )
+        val defaults = PersistedSettings()
+        val reset = modified.reduce(PersistedSettingsAction.ResetToDefaults(ResetTarget.COLOR_LAB))
+        assertEquals(defaults.photo.colorLabSpec, reset.photo.colorLabSpec)
+        assertEquals(modified.photo.styleStrength, reset.photo.styleStrength)
+    }
+
+    @Test
+    fun `reset to defaults quick restores grid, live, timer, and video spec`() {
+        val modified = PersistedSettings(
+            common = CommonSettings(gridMode = CompositionGridMode.GOLDEN_RATIO),
+            photo = PhotoSettings(
+                livePhotoEnabledByDefault = true,
+                countdownDuration = CountdownDuration.SECONDS_10
+            ),
+            video = VideoSettings(
+                defaultVideoSpec = VideoSpec(resolution = VideoResolution.UHD_8K, frameRate = VideoFrameRate.FPS_60)
+            )
+        )
+        val defaults = PersistedSettings()
+        val reset = modified.reduce(PersistedSettingsAction.ResetToDefaults(ResetTarget.QUICK))
+        assertEquals(defaults.common.gridMode, reset.common.gridMode)
+        assertEquals(defaults.photo.livePhotoEnabledByDefault, reset.photo.livePhotoEnabledByDefault)
+        assertEquals(defaults.photo.countdownDuration, reset.photo.countdownDuration)
+        assertEquals(defaults.video.defaultVideoSpec, reset.video.defaultVideoSpec)
+    }
+
+    @Test
+    fun `hasUserAdjustments returns false for default settings`() {
+        val defaults = PersistedSettings()
+        assertFalse(defaults.hasUserAdjustments(ResetTarget.SETTINGS))
+        assertFalse(defaults.hasUserAdjustments(ResetTarget.STYLE))
+        assertFalse(defaults.hasUserAdjustments(ResetTarget.COLOR_LAB))
+        assertFalse(defaults.hasUserAdjustments(ResetTarget.QUICK))
+    }
+
+    @Test
+    fun `hasUserAdjustments settings detects common changes`() {
+        val modified = PersistedSettings(
+            common = CommonSettings(gridMode = CompositionGridMode.GOLDEN_RATIO)
+        )
+        assertTrue(modified.hasUserAdjustments(ResetTarget.SETTINGS))
+    }
+
+    @Test
+    fun `hasUserAdjustments style detects filter and strength changes`() {
+        val modified = PersistedSettings(
+            photo = PhotoSettings(styleStrength = 0.5f)
+        )
+        assertTrue(modified.hasUserAdjustments(ResetTarget.STYLE))
+        assertFalse(modified.hasUserAdjustments(ResetTarget.SETTINGS))
+    }
+
+    @Test
+    fun `hasUserAdjustments color lab detects spec changes`() {
+        val modified = PersistedSettings(
+            photo = PhotoSettings(colorLabSpec = ColorLabSpec(colorAxis = 0.3f))
+        )
+        assertTrue(modified.hasUserAdjustments(ResetTarget.COLOR_LAB))
+    }
+
+    @Test
+    fun `hasUserAdjustments quick detects grid and video changes`() {
+        val modified = PersistedSettings(
+            video = VideoSettings(defaultVideoSpec = VideoSpec(resolution = VideoResolution.UHD_8K))
+        )
+        assertTrue(modified.hasUserAdjustments(ResetTarget.QUICK))
+        assertFalse(modified.hasUserAdjustments(ResetTarget.SETTINGS))
+    }
 }

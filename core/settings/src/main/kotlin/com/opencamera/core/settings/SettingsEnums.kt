@@ -248,3 +248,10 @@ enum class LiveSaveFormat(
         fun fromStorageKey(value: String?): LiveSaveFormat? = storageKeyFrom(value)
     }
 }
+
+enum class ResetTarget {
+    SETTINGS,
+    STYLE,
+    COLOR_LAB,
+    QUICK
+}

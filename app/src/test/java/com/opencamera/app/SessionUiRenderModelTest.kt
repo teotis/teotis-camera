@@ -47,6 +47,7 @@ import com.opencamera.core.settings.PortraitBeautyStrength
 import com.opencamera.core.settings.PortraitBokehEffect
 import com.opencamera.core.settings.PortraitProfile
 import com.opencamera.core.settings.PersistedSettingsAction
+import com.opencamera.core.settings.ResetTarget
 import com.opencamera.core.settings.PersistedSettings
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.VideoFrameRate
@@ -2104,5 +2105,87 @@ class SessionUiRenderModelTest {
         val reason = captureDisabledReason(state, TestAppTextResolver())
 
         assertEquals("Camera permission required", reason)
+    }
+
+    @Test
+    fun `settings page has reset action when user adjustments exist`() {
+        val state = defaultSessionState()
+        val model = sessionSettingsPageRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.hasSettingsUserAdjustments)
+        assertEquals(
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.SETTINGS),
+            model.resetSettingsAction
+        )
+    }
+
+    @Test
+    fun `settings page has no reset action when at defaults`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = com.opencamera.core.settings.PhotoSettings()
+        ).copy(
+            settings = com.opencamera.core.settings.SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings()
+            )
+        )
+        val model = sessionSettingsPageRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.hasSettingsUserAdjustments)
+        assertEquals(null, model.resetSettingsAction)
+    }
+
+    @Test
+    fun `color lab panel has hasUserAdjustments flag when spec differs from defaults`() {
+        val state = defaultSessionState().copy(
+            settings = com.opencamera.core.settings.SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings(
+                    photo = com.opencamera.core.settings.PhotoSettings(
+                        colorLabSpec = com.opencamera.core.settings.ColorLabSpec(colorAxis = 0.3f)
+                    )
+                )
+            )
+        )
+        val model = colorLabPanelRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.hasUserAdjustments)
+    }
+
+    @Test
+    fun `color lab panel has no hasUserAdjustments flag when at defaults`() {
+        val state = defaultSessionState().copy(
+            settings = com.opencamera.core.settings.SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings()
+            )
+        )
+        val model = colorLabPanelRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.hasUserAdjustments)
+    }
+
+    @Test
+    fun `filter lab page has reset action when style adjustments exist`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.hasStyleUserAdjustments)
+        assertEquals(
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.STYLE),
+            model.resetStyleAction
+        )
+    }
+
+    @Test
+    fun `filter lab page has no reset action when at defaults`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = com.opencamera.core.settings.PhotoSettings()
+        ).copy(
+            settings = com.opencamera.core.settings.SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings()
+            )
+        )
+        val model = filterLabPageRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.hasStyleUserAdjustments)
+        assertEquals(null, model.resetStyleAction)
     }
 }

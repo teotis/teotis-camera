@@ -154,6 +154,8 @@ internal class CockpitSurfaceRenderer(
         quickPanel.timer.text = quickRowLabel(sheet.timerRow)
         quickPanel.timer.isEnabled = sheet.timerRow.isEnabled
         quickPanel.timer.alpha = if (sheet.timerRow.isEnabled) 1f else 0.4f
+
+        quickPanel.resetDefaults.visibility = if (sheet.hasQuickUserAdjustments) View.VISIBLE else View.GONE
     }
 
     private var lastAutoScrolledActiveMode: com.opencamera.core.mode.ModeId? = null
