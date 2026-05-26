@@ -11,10 +11,6 @@ CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
 CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-0}"
 PHASE="${1:-g0}"
-CLAUDE_PERMISSION_ARGS=()
-if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
-  CLAUDE_PERMISSION_ARGS=(--permission-mode "$CLAUDE_PERMISSION_MODE")
-fi
 
 cd "$REPO_ROOT"
 
@@ -53,14 +49,24 @@ When done, write the full evidence pack to $status_file: worktree path, branch, 
 
   echo "Launching $name"
   set +e
-  output="$(claude \
-    --bg \
-    --name "$name" \
-    --model "$CLAUDE_MODEL" \
-    --effort "$CLAUDE_EFFORT" \
-    "${CLAUDE_PERMISSION_ARGS[@]}" \
-    --setting-sources "$CLAUDE_SETTING_SOURCES" \
-    "$prompt" 2>&1)"
+  if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+    output="$(claude \
+      --bg \
+      --name "$name" \
+      --model "$CLAUDE_MODEL" \
+      --effort "$CLAUDE_EFFORT" \
+      --permission-mode "$CLAUDE_PERMISSION_MODE" \
+      --setting-sources "$CLAUDE_SETTING_SOURCES" \
+      "$prompt" 2>&1)"
+  else
+    output="$(claude \
+      --bg \
+      --name "$name" \
+      --model "$CLAUDE_MODEL" \
+      --effort "$CLAUDE_EFFORT" \
+      --setting-sources "$CLAUDE_SETTING_SOURCES" \
+      "$prompt" 2>&1)"
+  fi
   status=$?
   set -e
   if [ "$status" -ne 0 ]; then
@@ -86,12 +92,20 @@ open_agent_view() {
   fi
 
   if [ "$CLAUDE_OPEN_AGENT_VIEW" = "1" ] && [ -t 1 ]; then
-    claude agents \
-      --cwd "$REPO_ROOT" \
-      --model "$CLAUDE_MODEL" \
-      --effort "$CLAUDE_EFFORT" \
-      "${CLAUDE_PERMISSION_ARGS[@]}" \
-      --setting-sources "$CLAUDE_SETTING_SOURCES"
+    if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+      claude agents \
+        --cwd "$REPO_ROOT" \
+        --model "$CLAUDE_MODEL" \
+        --effort "$CLAUDE_EFFORT" \
+        --permission-mode "$CLAUDE_PERMISSION_MODE" \
+        --setting-sources "$CLAUDE_SETTING_SOURCES"
+    else
+      claude agents \
+        --cwd "$REPO_ROOT" \
+        --model "$CLAUDE_MODEL" \
+        --effort "$CLAUDE_EFFORT" \
+        --setting-sources "$CLAUDE_SETTING_SOURCES"
+    fi
   fi
 }
 
