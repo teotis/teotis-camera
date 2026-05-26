@@ -297,7 +297,14 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         settingsRenderer.renderWatermarkDetailPage(watermarkDetailPage)
         filterLabRenderer.renderPage(filterLabPage)
         mainRenderer.renderPanelVisibility(activePanelRoute)
-        views.preview.overlayView.render(previewOverlayRenderModel(state, container.previewEffectAdapter, container.previewMaskSnapshot))
+        views.preview.overlayView.render(
+            previewOverlayRenderModel(
+                state = state,
+                effectAdapter = container.previewEffectAdapter,
+                maskSnapshot = container.previewMaskSnapshot,
+                previewContentAspect = previewRatioToContentAspect(state.previewRatio)
+            )
+        )
         views.preview.overlayView.updateFocusReticle(
             state.presentation.previewMeteringFeedback?.let { focusReticleRenderModel(it) }
         )

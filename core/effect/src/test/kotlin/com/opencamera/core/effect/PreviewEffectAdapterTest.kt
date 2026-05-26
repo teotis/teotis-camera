@@ -28,7 +28,7 @@ class PreviewEffectAdapterTest {
         assertNull(model.frameGuideline)
         assertNull(model.compositionGrid)
         assertEquals(PreviewColorTransform.NONE, model.colorTransform)
-        assertEquals(PreviewColorFidelity.APPROXIMATE, model.colorTransform.fidelity)
+        assertEquals(PreviewColorFidelity.NONE, model.colorTransform.fidelity)
     }
 
     @Test
@@ -51,7 +51,7 @@ class PreviewEffectAdapterTest {
 
         assertNotNull(model.colorTransform)
         assertFalse(model.colorTransform.isIdentity)
-        assertEquals(PreviewColorFidelity.NONE, model.colorTransform.fidelity)
+        assertEquals(PreviewColorFidelity.APPROXIMATE, model.colorTransform.fidelity)
     }
 
     @Test

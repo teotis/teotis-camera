@@ -186,7 +186,8 @@ class PreviewOverlayView @JvmOverloads constructor(
             viewWidth = width,
             viewHeight = height,
             ratioWidth = frameRatio?.width ?: 0,
-            ratioHeight = frameRatio?.height ?: 0
+            ratioHeight = frameRatio?.height ?: 0,
+            previewContentAspect = renderModel.previewContentAspect
         )
         val zoom = renderModel.frame?.zoomRatio ?: 1f
         if (zoom <= 1f) return geometry
@@ -465,32 +466,53 @@ internal fun clampReticleCenter(
 /**
  * Build [PreviewContentGeometry] for the given view dimensions and optional frame ratio.
  *
+ * When [previewContentAspect] is provided, [contentRect] is the fitCenter content area
+ * within the view (e.g. a 4:3 camera preview letterboxed in a 16:9 view). Otherwise
+ * [contentRect] equals the full view.
+ *
  * When [ratioWidth] / [ratioHeight] are both > 0 the active frame is a centered
  * sub-rect of [contentRect] matching that ratio. Otherwise the active frame
  * equals [contentRect] (full-view capture).
  *
  * UI chrome must not shrink this geometry. Toolbars and capture controls may
  * overlap the preview, but the visible capture frame must stay centered in the
- * same full preview content rect used by saved JPEG center-crop postprocessing.
+ * same preview content rect used by saved JPEG center-crop postprocessing.
  */
 internal fun previewContentGeometry(
     viewWidth: Int,
     viewHeight: Int,
     ratioWidth: Int = 0,
-    ratioHeight: Int = 0
+    ratioHeight: Int = 0,
+    previewContentAspect: PreviewContentAspect? = null
 ): PreviewContentGeometry {
-    val contentRect = RectF(
-        0f,
-        0f,
-        viewWidth.coerceAtLeast(0).toFloat(),
-        viewHeight.coerceAtLeast(0).toFloat()
-    )
+    val contentRect = if (previewContentAspect != null &&
+        previewContentAspect.width > 0 && previewContentAspect.height > 0
+    ) {
+        val fitRect = computeFrameRect(
+            viewWidth, viewHeight,
+            previewContentAspect.width, previewContentAspect.height
+        )
+        RectF(fitRect.left, fitRect.top, fitRect.right, fitRect.bottom)
+    } else {
+        RectF(
+            0f,
+            0f,
+            viewWidth.coerceAtLeast(0).toFloat(),
+            viewHeight.coerceAtLeast(0).toFloat()
+        )
+    }
     val activeFrameRect = if (ratioWidth > 0 && ratioHeight > 0) {
         val fr = computeFrameRect(
-            viewWidth, viewHeight,
+            contentRect.width().toInt(),
+            contentRect.height().toInt(),
             ratioWidth, ratioHeight
         )
-        RectF(fr.left, fr.top, fr.right, fr.bottom)
+        RectF(
+            contentRect.left + fr.left,
+            contentRect.top + fr.top,
+            contentRect.left + fr.right,
+            contentRect.top + fr.bottom
+        )
     } else {
         RectF(contentRect)
     }

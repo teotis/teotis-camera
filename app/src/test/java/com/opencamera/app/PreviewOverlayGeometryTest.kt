@@ -295,4 +295,101 @@ class PreviewOverlayGeometryTest {
         assertEquals(32f, result.x)
         assertEquals(32f, result.y)
     }
+
+    // --- content-bounds-aware frame rect tests ---
+    // When the preview content aspect differs from the view, the content rect
+    // is a fitCenter sub-rect of the view. Frame overlays must fit inside it.
+
+    @Test
+    fun `4_3 preview content in portrait 16_9 view is letterboxed`() {
+        // View: 1080x1920 (9:16). Preview 4:3 => content = 1080x1440 centered.
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        assertApprox(1080f, content.width)
+        assertApprox(1440f, content.height)
+        assertRectCentered(1080, 1920, content)
+        // Content is smaller than full view
+        assert(content.height < 1920f) { "Content should be letterboxed" }
+    }
+
+    @Test
+    fun `4_3 preview content in landscape 16_9 view is pillarboxed`() {
+        // View: 1920x1080. Preview 4:3 => content = 1440x1080 centered.
+        val content = computeFrameRect(1920, 1080, 4, 3)
+        assertApprox(1440f, content.width)
+        assertApprox(1080f, content.height)
+        assertRectCentered(1920, 1080, content)
+        assert(content.width < 1920f) { "Content should be pillarboxed" }
+    }
+
+    @Test
+    fun `16_9 preview content in portrait 4_3 view fills width`() {
+        // View: 1080x1920. Preview 16:9 => content = 1080x1920 (9:16 = 16:9 portrait).
+        val content = computeFrameRect(1080, 1920, 16, 9)
+        assertApprox(1080f, content.width)
+        assertApprox(1920f, content.height)
+    }
+
+    @Test
+    fun `16_9 preview content in landscape 4_3 view is letterboxed`() {
+        // View: 1920x1080. Preview 16:9 => content = 1920x1080 (exact match).
+        val content = computeFrameRect(1920, 1080, 16, 9)
+        assertApprox(1920f, content.width)
+        assertApprox(1080f, content.height)
+    }
+
+    @Test
+    fun `1_1 preview content in portrait view is centered square`() {
+        val content = computeFrameRect(1080, 1920, 1, 1)
+        assertApprox(1080f, content.width)
+        assertApprox(1080f, content.height)
+        assertRectCentered(1080, 1920, content)
+    }
+
+    @Test
+    fun `1_1 preview content in landscape view is centered square`() {
+        val content = computeFrameRect(1920, 1080, 1, 1)
+        assertApprox(1080f, content.width)
+        assertApprox(1080f, content.height)
+        assertRectCentered(1920, 1080, content)
+    }
+
+    // --- nested frame inside preview content ---
+
+    @Test
+    fun `16_9 frame nested inside 4_3 preview content fits within content`() {
+        // View: 1080x1920. Preview: 4:3 => content = 1080x1440.
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        // Frame: 16:9 inside content
+        val frame = computeFrameRect(content.width.toInt(), content.height.toInt(), 16, 9)
+        // Frame must not exceed content
+        assert(frame.width <= content.width + 1f) { "Frame width exceeds content" }
+        assert(frame.height <= content.height + 1f) { "Frame height exceeds content" }
+    }
+
+    @Test
+    fun `4_3 frame nested inside 16_9 preview content fits within content`() {
+        // View: 1920x1080. Preview: 16:9 => content = 1920x1080.
+        val content = computeFrameRect(1920, 1080, 16, 9)
+        val frame = computeFrameRect(content.width.toInt(), content.height.toInt(), 4, 3)
+        assert(frame.width <= content.width + 1f) { "Frame width exceeds content" }
+        assert(frame.height <= content.height + 1f) { "Frame height exceeds content" }
+    }
+
+    @Test
+    fun `1_1 frame nested inside letterboxed preview content fits`() {
+        // View: 1080x1920. Preview: 4:3 => content = 1080x1440.
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val frame = computeFrameRect(content.width.toInt(), content.height.toInt(), 1, 1)
+        assert(frame.width <= content.width + 1f) { "Frame width exceeds content" }
+        assert(frame.height <= content.height + 1f) { "Frame height exceeds content" }
+    }
+
+    @Test
+    fun `nested frame is centered within content rect`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val frame = computeFrameRect(content.width.toInt(), content.height.toInt(), 16, 9)
+        // Frame center should align with content center
+        assertEquals(content.centerX, frame.centerX, 1f)
+        assertEquals(content.centerY, frame.centerY, 1f)
+    }
 }

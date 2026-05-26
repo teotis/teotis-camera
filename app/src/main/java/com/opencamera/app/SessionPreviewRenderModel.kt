@@ -8,6 +8,7 @@ import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewMeteringFeedback
 import com.opencamera.core.session.PreviewMeteringFeedbackStatus
+import com.opencamera.core.session.PreviewRatio
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.settings.CompositionGridMode
@@ -18,11 +19,17 @@ internal data class PreviewOverlayRenderModel(
     val countdownLabel: String?,
     val isCountdownVisible: Boolean,
     val effectModel: PreviewEffectRenderModel? = null,
-    val frame: PreviewFrameRenderModel? = null
+    val frame: PreviewFrameRenderModel? = null,
+    val previewContentAspect: PreviewContentAspect? = null
 ) {
     val isVisible: Boolean
         get() = isGridVisible || isCountdownVisible || effectModel != null || frame != null
 }
+
+internal data class PreviewContentAspect(
+    val width: Int,
+    val height: Int
+)
 
 internal data class PreviewFrameRenderModel(
     val ratio: FrameRatio,
@@ -49,7 +56,8 @@ internal fun focusReticleRenderModel(
 internal fun previewOverlayRenderModel(
     state: SessionState,
     effectAdapter: PreviewEffectAdapter? = null,
-    maskSnapshot: PreviewSceneMaskSnapshot? = null
+    maskSnapshot: PreviewSceneMaskSnapshot? = null,
+    previewContentAspect: PreviewContentAspect? = null
 ): PreviewOverlayRenderModel {
     val resolvedSnapshot = maskSnapshot ?: PreviewSceneMaskSnapshot.UNAVAILABLE
     val gridMode = state.settings.persisted.common.gridMode
@@ -81,6 +89,14 @@ internal fun previewOverlayRenderModel(
             countdownLabel != null &&
             state.permissionState.cameraGranted,
         effectModel = effectModel,
-        frame = frame
+        frame = frame,
+        previewContentAspect = previewContentAspect
     )
+}
+
+internal fun previewRatioToContentAspect(ratio: PreviewRatio): PreviewContentAspect? = when (ratio) {
+    PreviewRatio.FULL -> null
+    PreviewRatio.RATIO_4_3 -> PreviewContentAspect(4, 3)
+    PreviewRatio.RATIO_16_9 -> PreviewContentAspect(16, 9)
+    PreviewRatio.RATIO_1_1 -> PreviewContentAspect(1, 1)
 }
