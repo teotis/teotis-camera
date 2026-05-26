@@ -1,0 +1,4 @@
+package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
+01-preview-frame-contract	pending
+02-natural-blur-border-rendering	completed
+99-finalize	pending

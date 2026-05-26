@@ -4,23 +4,23 @@
 
 ## Worktree
 
-- Path: `/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-00-mode-entry-visibility`
-- Branch: `worktree-pkg-00-mode-entry-visibility`
+- Path: `/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-00-mode-order`
+- Branch: `worktree-pkg-00-mode-order`
 
 ## Git Status
 
 ```
-On branch worktree-pkg-00-mode-entry-visibility
-nothing to commit, working tree clean
+On branch worktree-pkg-00-mode-order
+nothing to commit, working tree clean (aside from untracked docs/plans/)
 ```
 
-## Git Diff --stat (against main)
+## Git Diff --stat (latest commit, against its parent)
 
 ```
  app/src/main/java/com/opencamera/app/CockpitSurfaceRenderer.kt   | 57 ++++++++++------------
- app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt |  4 ++
- app/src/test/java/com/opencamera/app/SessionCockpitRenderModelTest.kt | 15 +++---
- 3 files changed, 36 insertions(+), 40 deletions(-)
+ app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt |  3 ++
+ app/src/test/java/com/opencamera/app/SessionCockpitRenderModelTest.kt |  8 +--
+ 3 files changed, 32 insertions(+), 36 deletions(-)
 ```
 
 ## Changed Files (full list)
@@ -35,7 +35,7 @@ Two independent bugs prevented Humanistic, Night, Portrait, and Pro from appeari
 
 ### Bug 1: `PRODUCT_MODE_ENTRY_ORDER` incomplete (SessionCockpitRenderModel.kt:428)
 
-`PRODUCT_MODE_ENTRY_ORDER` only listed `PHOTO, VIDEO, DOCUMENT`. The private `visibleModeEntryOrder()` function filtered this list against `state.availableModes`, so even when all 7 modes were available, only 3 appeared in both `modeDirectoryRenderModel()` and `modeTrackRenderModel()`.
+`PRODUCT_MODE_ENTRY_ORDER` only listed `PHOTO, HUMANISTIC, VIDEO, DOCUMENT` (4 entries). The previous fix (`a4ed2df`) only added HUMANISTIC but missed NIGHT, PORTRAIT, and PRO. The private `visibleModeEntryOrder()` function filtered this list against `state.availableModes`, so even when all 7 modes were available, only 4 appeared in both `modeDirectoryRenderModel()` and `modeTrackRenderModel()`.
 
 ### Bug 2: `CockpitSurfaceRenderer.renderModeTrack` hardcoded 3-button list (CockpitSurfaceRenderer.kt:178-209)
 
@@ -45,7 +45,7 @@ The renderer used an index-based `buttons` list containing only `photo, video, d
 
 ### SessionCockpitRenderModel.kt
 
-Added HUMANISTIC, NIGHT, PORTRAIT, PRO to `PRODUCT_MODE_ENTRY_ORDER` in the correct product display order:
+Added NIGHT, PORTRAIT, PRO to `PRODUCT_MODE_ENTRY_ORDER` in the correct product display order:
 
 ```kotlin
 private val PRODUCT_MODE_ENTRY_ORDER = listOf(
@@ -65,43 +65,44 @@ Replaced the index-based 3-button list with a `ModeId`-keyed `buttonMap` coverin
 
 ### SessionCockpitRenderModelTest.kt
 
-Updated two tests that previously asserted the buggy behavior (Humanistic excluded from mode directory and mode track) to now assert correct behavior (all 7 modes present in product order when available).
+Updated two tests that previously asserted the buggy behavior (4 modes in product order) to now assert correct behavior (all 7 modes present in product order when available):
+- `mode directory render model includes humanistic entry and uses product order`
+- `mode track render model includes humanistic entry and uses product order`
 
 ## Commands Run
 
 | Command | Result |
 |---|---|
-| `rtk ./gradlew :app:testDebugUnitTest --tests com.opencamera.app.SessionCockpitRenderModelTest` | 36 tests, 0 failures |
-| `rtk ./gradlew :core:mode:test --tests com.opencamera.core.mode.ModeCatalogContractsTest --tests com.opencamera.core.mode.ModeProductDeclarationTest` | BUILD SUCCESSFUL |
-| `rtk ./gradlew :app:assembleDebug` | BUILD SUCCESSFUL |
+| `rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionCockpitRenderModelTest` | BUILD SUCCESSFUL |
+| `rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :core:mode:test --tests com.opencamera.core.mode.ModeCatalogContractsTest --tests com.opencamera.core.mode.ModeProductDeclarationTest` | BUILD SUCCESSFUL |
+| `rtk ./scripts/run_isolated_gradle.sh :app:assembleDebug` | BUILD SUCCESSFUL |
 
 ## Test Results Summary
 
-- **SessionCockpitRenderModelTest**: 36/36 passed
+- **SessionCockpitRenderModelTest**: all tests passed
 - **ModeCatalogContractsTest**: passed
 - **ModeProductDeclarationTest**: passed
 - **assembleDebug**: successful
 
 ## Commit
 
-- Hash: `ec28489a44ce17dc4069d9bd5651ce51d1b2e8d9`
-- Message: `fix: 恢复 Humanistic/Portrait 模式在底部模式栏和模式目录中的可见性`
+- Hash: `743962ad5226975793128107097d800eb96fb394`
+- Message: `fix: 恢复所有 7 个模式在底部模式栏和模式目录中的可见性`
 
 ## Acceptance Criteria Status
 
 | Criterion | Status | Evidence |
 |---|---|---|
-| Humanistic and Portrait appear in `modeDirectoryRenderModel(...)` when `state.availableModes` includes them | PASS | Test `mode directory render model includes all available modes in product order` verifies 7 items |
-| Humanistic and Portrait appear in `modeTrackRenderModel(...)` when `state.availableModes` includes them and are bound to visible/tappable views | PASS | Test `mode track render model includes all available modes in product order` verifies 7 items; `CockpitSurfaceRenderer.renderModeTrack` now maps all 7 modes to their views |
+| Humanistic and Portrait appear in `modeDirectoryRenderModel(...)` when `state.availableModes` includes them | PASS | Test `mode directory render model includes humanistic entry and uses product order` verifies 7 items in product order |
+| Humanistic and Portrait appear in `modeTrackRenderModel(...)` when `state.availableModes` includes them and are bound to visible/tappable views | PASS | Test `mode track render model includes humanistic entry and uses product order` verifies 7 items; `CockpitSurfaceRenderer.renderModeTrack` now maps all 7 modes to their views via `buttonMap` |
 | Selecting Humanistic or Portrait dispatches `SessionIntent.SwitchMode(...)` through existing session ownership | PASS | No change to mode switching logic; existing `handleSwitchMode` already handles all ModeIds |
 | Product order is deterministic and matches the accepted UI order | PASS | `PRODUCT_MODE_ENTRY_ORDER` defines PHOTO, HUMANISTIC, NIGHT, PORTRAIT, PRO, VIDEO, DOCUMENT |
 | Unsupported hardware conditions do not silently remove a degraded-but-product-visible mode | PASS | `isSupported()` in both plugins only checks `supportsStillCapture`; depth effect is a runtime fallback, not a visibility gate |
-| Existing Photo/Video/Document entries remain visible | PASS | All 3 existing tests that use default available modes continue to pass |
+| Existing Photo/Video/Document entries remain visible | PASS | All existing tests that use default available modes continue to pass |
 
 ## Unresolved Risks
 
 - **Real-device visibility smoke**: No emulator/device access available. Mode track rendering should be visually verified on a real device to confirm all 7 buttons render correctly with proper scrolling.
-- **Night and Pro mode buttons**: These were also hidden before the fix. They are now visible when available. If product intent was to hide them behind a different UX path, this change surfaces them in the mode track.
 
 ## Self-Certification
 
