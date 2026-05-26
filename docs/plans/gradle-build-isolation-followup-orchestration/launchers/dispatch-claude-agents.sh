@@ -18,23 +18,12 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "ERROR: not a git repository";
 CLAUDE_VERSION="$(claude --version || true)"
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_EFFORT="${CLAUDE_EFFORT:-xhigh}"
-CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-default}"
+CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
-CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-1}"
-
-if [[ "$CLAUDE_PERMISSION_MODE" == "auto" && "${CLAUDE_AUTO_MODE_OPTED_IN:-0}" != "1" ]]; then
-  cat >&2 <<'EOF'
-ERROR: CLAUDE_PERMISSION_MODE=auto requires user opt-in before background launch.
-
-Run this once interactively and accept the auto-mode opt-in prompt:
-  claude --permission-mode auto
-
-Then rerun this launcher with:
-  CLAUDE_PERMISSION_MODE=auto CLAUDE_AUTO_MODE_OPTED_IN=1 bash docs/plans/gradle-build-isolation-followup-orchestration/launchers/dispatch-claude-agents.sh
-
-This repository must not silently grant auto mode on the user's behalf.
-EOF
-  exit 1
+CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-0}"
+CLAUDE_PERMISSION_ARGS=()
+if [[ -n "$CLAUDE_PERMISSION_MODE" ]]; then
+  CLAUDE_PERMISSION_ARGS=(--permission-mode "$CLAUDE_PERMISSION_MODE")
 fi
 
 echo "=== Gradle Build Isolation Follow-Up Orchestration ==="
@@ -45,13 +34,12 @@ echo "$CLAUDE_VERSION"
 echo
 echo "Claude model: $CLAUDE_MODEL"
 echo "Claude effort: $CLAUDE_EFFORT"
-echo "Claude permission mode: $CLAUDE_PERMISSION_MODE"
-echo "Claude setting sources: $CLAUDE_SETTING_SOURCES"
-if [[ "$CLAUDE_PERMISSION_MODE" == "auto" ]]; then
-  echo "Auto mode opt-in: acknowledged by CLAUDE_AUTO_MODE_OPTED_IN=1"
+if [[ -n "$CLAUDE_PERMISSION_MODE" ]]; then
+  echo "Claude permission mode override: $CLAUDE_PERMISSION_MODE"
 else
-  echo "Auto mode: not requested; using permission prompts/default policy"
+  echo "Claude permission mode: inherited from user/project Claude Code settings"
 fi
+echo "Claude setting sources: $CLAUDE_SETTING_SOURCES"
 echo
 echo "Manual Agent View prompts:"
 echo "$PROMPT_FILE"
@@ -77,14 +65,28 @@ launch_agent() {
     return 0
   fi
 
-  claude \
+  set +e
+  output="$(claude \
     --bg \
     --name "$name" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
-    --permission-mode "$CLAUDE_PERMISSION_MODE" \
+    "${CLAUDE_PERMISSION_ARGS[@]}" \
     --setting-sources "$CLAUDE_SETTING_SOURCES" \
-    "$prompt"
+    "$prompt" 2>&1)"
+  status=$?
+  set -e
+  if [[ "$status" -ne 0 ]]; then
+    echo "$output" >&2
+    if [[ "$CLAUDE_PERMISSION_MODE" == "auto" && "$output" == *"requires opting in"* ]]; then
+      echo >&2
+      echo "ERROR: Claude Code requires one interactive auto-mode opt-in before --bg can use --permission-mode auto." >&2
+      echo "Run once interactively: claude --permission-mode auto" >&2
+      echo "Or rerun this script without a permission override so user settings apply." >&2
+    fi
+    return "$status"
+  fi
+  echo "$output"
 }
 
 if [[ "${1:-}" == "--print-only" ]]; then
@@ -101,7 +103,11 @@ launch_agent "02-ledger-and-rules-restoration" "$PLAN_DIR/packages/02-ledger-and
 echo
 echo "=== Background agents launched ==="
 echo "View them with:"
-echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --permission-mode \"$CLAUDE_PERMISSION_MODE\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+if [[ -n "$CLAUDE_PERMISSION_MODE" ]]; then
+  echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --permission-mode \"$CLAUDE_PERMISSION_MODE\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+else
+  echo "  claude agents --cwd \"$REPO_ROOT\" --model \"$CLAUDE_MODEL\" --effort \"$CLAUDE_EFFORT\" --setting-sources \"$CLAUDE_SETTING_SOURCES\""
+fi
 echo
 echo "After both agents complete, run the integration audit in:"
 echo "$PLAN_DIR/validation/final-audit-prompt.md"
@@ -111,6 +117,6 @@ if [[ "$CLAUDE_OPEN_AGENT_VIEW" == "1" && -t 1 ]]; then
     --cwd "$REPO_ROOT" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
-    --permission-mode "$CLAUDE_PERMISSION_MODE" \
+    "${CLAUDE_PERMISSION_ARGS[@]}" \
     --setting-sources "$CLAUDE_SETTING_SOURCES"
 fi
