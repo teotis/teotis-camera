@@ -189,6 +189,82 @@ class CockpitPanelRouterTest {
     }
 
     @Test
+    fun `OpenPortraitLab sets route to Settings PORTRAIT_LAB`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.Settings(SettingsSubpage.ROOT),
+            selectedSettingsTab = SettingsTab.PHOTO
+        )
+        val result = nextState(initial, CockpitPanelCommand.OpenPortraitLab)
+
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.PORTRAIT_LAB), result.route)
+        assertEquals(SettingsTab.PHOTO, result.selectedSettingsTab)
+    }
+
+    @Test
+    fun `OpenPortraitLab from None sets route to Settings PORTRAIT_LAB`() {
+        val initial = CockpitPanelUiState()
+        val result = nextState(initial, CockpitPanelCommand.OpenPortraitLab)
+
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.PORTRAIT_LAB), result.route)
+    }
+
+    @Test
+    fun `OpenWatermarkSelector sets route to Settings WATERMARK_SELECTOR`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.Settings(SettingsSubpage.ROOT),
+            selectedSettingsTab = SettingsTab.PHOTO
+        )
+        val result = nextState(initial, CockpitPanelCommand.OpenWatermarkSelector)
+
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR), result.route)
+        assertNull(result.selectedWatermarkDetailTemplateId)
+    }
+
+    @Test
+    fun `OpenWatermarkSelector clears previous template id`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_DETAIL),
+            selectedWatermarkDetailTemplateId = "old-template"
+        )
+        val result = nextState(initial, CockpitPanelCommand.OpenWatermarkSelector)
+
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR), result.route)
+        assertNull(result.selectedWatermarkDetailTemplateId)
+    }
+
+    @Test
+    fun `Portrait lab back chain - PORTRAIT_LAB to ROOT then close`() {
+        val atPortraitLab = CockpitPanelUiState(
+            route = CockpitPanelRoute.Settings(SettingsSubpage.PORTRAIT_LAB),
+            selectedSettingsTab = SettingsTab.PHOTO
+        )
+        val atRoot = nextState(atPortraitLab, CockpitPanelCommand.SettingsBack)
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.ROOT), atRoot.route)
+        assertEquals(SettingsTab.PHOTO, atRoot.selectedSettingsTab)
+
+        val closed = nextState(atRoot, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, closed.route)
+        assertEquals(SettingsTab.COMMON, closed.selectedSettingsTab)
+    }
+
+    @Test
+    fun `Watermark navigation chain - detail to selector to root to close`() {
+        val atDetail = CockpitPanelUiState(
+            route = CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_DETAIL),
+            selectedWatermarkDetailTemplateId = "tpl-1"
+        )
+        val atSelector = nextState(atDetail, CockpitPanelCommand.SettingsBack)
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.WATERMARK_SELECTOR), atSelector.route)
+        assertNull(atSelector.selectedWatermarkDetailTemplateId)
+
+        val atRoot = nextState(atSelector, CockpitPanelCommand.SettingsBack)
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.ROOT), atRoot.route)
+
+        val closed = nextState(atRoot, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, closed.route)
+    }
+
+    @Test
     fun `SelectSettingsTab updates only the selected tab`() {
         val initial = CockpitPanelUiState(
             route = CockpitPanelRoute.Settings(),
