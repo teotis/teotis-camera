@@ -84,7 +84,7 @@ After completing your assigned package:
 
 ## Agent Budget
 
-- Recommended Claude Code agents: 5 implementation agents plus Codex final audit.
+- Recommended Claude Code agents: 6 implementation agents plus Codex final audit.
 - Max parallel agents: 2.
 - Codex usage: final audit, visual QA, device smoke, and conflict resolution if package evidence disagrees.
 - When to pause: any package edits outside allowed paths, focused app tests fail after a package claims completion, or two agents report overlapping changes in `CockpitSurfaceRenderer.kt`, `activity_main.xml`, or `MainActivityActionBinder.kt`.

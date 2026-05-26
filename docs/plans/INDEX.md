@@ -6,6 +6,7 @@ Future handoff documents should be added here and linked from this index instead
 
 | Plan | Owner | Status | Date | Outcome / Next Action |
 | --- | --- | --- | --- | --- |
+| [UI Animation V2 Fix Orchestration](./ui-animation-v2-fix-orchestration/INDEX.md) | Multi-agent implementation + Codex final audit | planned | 2026-05-26 | Dispatch package for repairing the blocked UI Components And Animation V2 landing: mode order prerequisite first, then focus/EV, panel transitions, zoom, shutter, quick semantics, and final integration audit. |
 | [Gradle Build Isolation Follow-Up Orchestration](./gradle-build-isolation-followup-orchestration/INDEX.md) | Multi-agent implementation + Codex final audit | planned | 2026-05-26 | Dispatch package for finishing old verification-script isolation and restoring the build-isolation planning ledger after external-agent repair. |
 | [Rendering 2.0 Validation Fixes Orchestration](./rendering-2-0-validation-fix-orchestration/INDEX.md) | Multi-agent implementation + Codex final audit | planned | 2026-05-26 | External landing is partly valid but not acceptance-ready; dispatch packages for postprocess outer guard, recipe single truth gap, preview fidelity honesty, and ledger/gate honesty. |
 | [Repo Health Triage Handoff Index](./2026-05-25-repo-health-triage-index.md) | Codex planning + implementation agents | planned | 2026-05-25 | Verified git/status, Stage 7 compile, and app focused test blockers after external-agent work; execute git hygiene first, then test repairs. |
