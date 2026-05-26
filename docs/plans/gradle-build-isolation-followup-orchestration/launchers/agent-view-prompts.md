@@ -1,11 +1,11 @@
 # Agent View Prompts
 
-Use these prompts in Claude Code Agent View. This package is updated for Claude Code `2.1.142`, where background sessions are managed with `claude agents` rather than top-level `claude --bg`.
+Use these prompts in Claude Code Agent View if you choose manual dispatch instead of the background launcher. This package is updated for Claude Code `2.1.142`: use `dispatch-claude-agents.sh` for automatic `claude --bg --name` package sessions, and use `claude agents` to monitor or manually dispatch.
 
 Open Agent View from the repo root with:
 
 ```bash
-claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high
+claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode auto --effort xhigh
 ```
 
 Packages 01 and 02 may be launched in parallel. Run the Codex final audit only after both status files are completed.

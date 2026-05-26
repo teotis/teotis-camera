@@ -6,9 +6,9 @@ Finish the build-isolation hardening after the external-agent repair. The curren
 
 ## Execution Mode Recommendation
 
-- Recommended mode: AGENT_VIEW
-- Why: The remaining work splits cleanly into script hardening and documentation/ledger hardening, with disjoint file ownership and one Codex final audit.
-- Alternatives rejected: SINGLE_AGENT — possible, but slower than two small focused agents; CLAUDE_BG_SCRIPT — not used for the current Claude Code `2.1.142` setup because this CLI no longer exposes top-level `claude --bg`; background work is dispatched from Agent View via `claude agents`. BATCH — not a repo-wide mechanical transform; AGENT_TEAM — unnecessary for implementation.
+- Recommended mode: BACKGROUND_AGENT_SCRIPT
+- Why: The remaining work splits cleanly into two independently launchable packages, and the current Claude Code `2.1.142` setup supports `claude --bg` background sessions plus `claude agents` for monitoring.
+- Alternatives rejected: SINGLE_AGENT — possible, but slower than two small focused agents; AGENT_VIEW — still available as the manual fallback, but the user asked for the latest task package and background script is now the preferred launcher; BATCH — not a repo-wide mechanical transform; AGENT_TEAM — unnecessary for implementation.
 - Max parallel agents: 2
 - Codex-retained work: final integration audit, verification of actual build roots, and decision on whether the external fix is fully accepted.
 
@@ -74,8 +74,8 @@ After completing your assigned package:
 
 | Package | Mode | Agent Name | Prompt File | Status File |
 | --- | --- | --- | --- | --- |
-| 01-stage-script-isolation | agent-view | agent-01-stage-script-isolation | `launchers/agent-view-prompts.md#package-01-stage-script-isolation` | `status/01-stage-script-isolation.md` |
-| 02-ledger-and-rules-restoration | agent-view | agent-02-ledger-and-rules-restoration | `launchers/agent-view-prompts.md#package-02-ledger-and-rules-restoration` | `status/02-ledger-and-rules-restoration.md` |
+| 01-stage-script-isolation | background-agent-script | agent-01-stage-script-isolation | `launchers/agent-view-prompts.md#package-01-stage-script-isolation` | `status/01-stage-script-isolation.md` |
+| 02-ledger-and-rules-restoration | background-agent-script | agent-02-ledger-and-rules-restoration | `launchers/agent-view-prompts.md#package-02-ledger-and-rules-restoration` | `status/02-ledger-and-rules-restoration.md` |
 | 99-integration-audit | codex | — | `validation/final-audit-prompt.md` | `status/99-integration-audit.md` |
 
 ## Status Ledger
@@ -127,6 +127,6 @@ Evidence pack must include:
 
 ## Launch Options
 
-- Option A: Agent View manual dispatch — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high`, then copy prompts from `launchers/agent-view-prompts.md`.
-- Option B: Agent View helper script — run `bash docs/plans/gradle-build-isolation-followup-orchestration/launchers/dispatch-claude-agents.sh`. The script performs preflight checks and opens Agent View; it does not auto-dispatch packages.
+- Option A: background agent script — run `bash docs/plans/gradle-build-isolation-followup-orchestration/launchers/dispatch-claude-agents.sh` to launch both package agents with `claude --bg --name`, then monitor in `claude agents`.
+- Option B: Agent View manual fallback — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode auto --effort xhigh`, then copy prompts from `launchers/agent-view-prompts.md`.
 - Option C: Final integration audit — give `validation/final-audit-prompt.md` to Codex.
