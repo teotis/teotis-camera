@@ -210,7 +210,7 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `mode directory render model hides humanistic entry and uses product order`() {
+    fun `mode directory render model includes humanistic entry and uses product order`() {
         val state = defaultSessionState(
             activeMode = ModeId.NIGHT,
             availableModes = listOf(
@@ -227,11 +227,11 @@ class SessionCockpitRenderModelTest {
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Scenery", "Port", "Pro", "Video", "Doc"),
+            listOf("Photo", "Humanistic", "Scenery", "Port", "Pro", "Video", "Doc"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
         )
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
@@ -320,7 +320,7 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `mode track render model hides humanistic entry and uses product order`() {
+    fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
             ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
             ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
@@ -328,13 +328,13 @@ class SessionCockpitRenderModelTest {
         val state = defaultSessionState(activeMode = ModeId.HUMANISTIC, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(6, model.items.size)
+        assertEquals(7, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map { it.modeId }
         )
-        assertTrue(model.items.none { it.modeId == ModeId.HUMANISTIC })
-        assertFalse(model.items.any { it.isActive })
+        assertTrue(model.items.any { it.modeId == ModeId.HUMANISTIC })
+        assertTrue(model.items.first { it.modeId == ModeId.HUMANISTIC }.isActive)
     }
 
     @Test
