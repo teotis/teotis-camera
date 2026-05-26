@@ -124,6 +124,7 @@ finalize_package() {
 
 validate_status_state() {
   local package_id status_rel status_file md st
+  package_id="$1"
   status_rel="$(graph_field "$package_id" status_file)"
   status_file="$PLAN_DIR/$status_rel"
   [ -f "$status_file" ] || die "missing status file for $package_id: $status_file"
@@ -142,6 +143,7 @@ validate_status_state() {
 
 deps_completed() {
   local package_id deps dep dep_state
+  package_id="$1"
   deps="$(graph_field "$package_id" dependencies)"
   [ -z "$deps" ] && return 0
   IFS=',' read -r -a dep_array <<< "$deps"

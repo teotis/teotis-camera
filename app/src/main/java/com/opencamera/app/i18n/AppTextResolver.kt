@@ -7,6 +7,10 @@ import com.opencamera.core.mode.ModeId
 import com.opencamera.core.settings.AppLanguage
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
+import com.opencamera.core.settings.WatermarkFrameBackground
+import com.opencamera.core.settings.WatermarkTextOpacity
+import com.opencamera.core.settings.WatermarkTextPlacement
+import com.opencamera.core.settings.WatermarkTextScale
 import com.opencamera.core.settings.PersistedSettings
 
 open class AppTextResolver(private val context: Context?) {
@@ -457,6 +461,61 @@ open class AppTextResolver(private val context: Context?) {
     open fun watermarkTemplateClassicOverlay(): String = str(R.string.watermark_template_classic_overlay, "Classic overlay")
     open fun watermarkTemplatePureText(): String = str(R.string.watermark_template_pure_text, "纯文字")
     open fun watermarkTemplateBlurFourBorder(): String = str(R.string.watermark_template_blur_four_border, "模糊四边框")
+    open fun watermarkTemplateTravelPolaroid(): String = str(R.string.watermark_template_travel_polaroid, "Travel Polaroid")
+    open fun watermarkTemplateRetroFrame(): String = str(R.string.watermark_template_retro_frame, "Retro Frame")
+    open fun watermarkTemplateProfessionalBottomBar(): String =
+        str(R.string.watermark_template_professional_bottom_bar, "Professional Bottom Bar")
+    open fun watermarkStylePageShort(): String = str(R.string.button_watermark_style_short, "Style")
+
+    open fun watermarkPlacementLabel(value: WatermarkTextPlacement): String = when (value) {
+        WatermarkTextPlacement.TOP_LEFT -> str(R.string.watermark_placement_top_left, "Top Left")
+        WatermarkTextPlacement.TOP_RIGHT -> str(R.string.watermark_placement_top_right, "Top Right")
+        WatermarkTextPlacement.BOTTOM_LEFT -> str(R.string.watermark_placement_bottom_left, "Bottom Left")
+        WatermarkTextPlacement.BOTTOM_RIGHT -> str(R.string.watermark_placement_bottom_right, "Bottom Right")
+        WatermarkTextPlacement.BOTTOM_CENTER -> str(R.string.watermark_placement_bottom_center, "Bottom Center")
+    }
+
+    open fun watermarkTextScaleLabel(value: WatermarkTextScale): String = when (value) {
+        WatermarkTextScale.COMPACT -> str(R.string.watermark_scale_compact, "Compact")
+        WatermarkTextScale.NORMAL -> str(R.string.watermark_scale_normal, "Normal")
+        WatermarkTextScale.LARGE -> str(R.string.watermark_scale_large, "Large")
+    }
+
+    open fun watermarkTextOpacityLabel(value: WatermarkTextOpacity): String = when (value) {
+        WatermarkTextOpacity.SUBTLE -> str(R.string.watermark_opacity_subtle, "Subtle")
+        WatermarkTextOpacity.SOFT -> str(R.string.watermark_opacity_soft, "Soft")
+        WatermarkTextOpacity.SOLID -> str(R.string.watermark_opacity_solid, "Solid")
+    }
+
+    open fun watermarkFrameBackgroundLabel(value: WatermarkFrameBackground): String = when (value) {
+        WatermarkFrameBackground.DARK -> str(R.string.watermark_background_dark, "Dark")
+        WatermarkFrameBackground.WHITE -> str(R.string.watermark_background_white, "White")
+        WatermarkFrameBackground.SOURCE_BLUR -> str(R.string.watermark_background_source_blur, "Source Blur")
+        WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> str(R.string.watermark_background_light_blur, "Light Blur")
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> str(R.string.watermark_background_vivid_blur, "Vivid Blur")
+    }
+
+    open fun filterProfileLabel(profileId: String, fallback: String): String = when (profileId) {
+        "photo-vivid" -> str(R.string.filter_profile_photo_vivid, "Vivid")
+        "photo-original" -> str(R.string.filter_profile_photo_original, "Original")
+        "photo-chasing-light" -> str(R.string.filter_profile_photo_chasing_light, "Chasing Light")
+        "photo-rich" -> str(R.string.filter_profile_photo_rich, "Rich")
+        "photo-texture" -> str(R.string.filter_profile_photo_texture, "Texture")
+        "photo-bw" -> str(R.string.filter_profile_photo_bw, "B&W")
+        "humanistic-original" -> str(R.string.filter_profile_humanistic_original, "Humanistic Original")
+        "humanistic-vivid" -> str(R.string.filter_profile_humanistic_vivid, "Humanistic Vivid")
+        "humanistic-street" -> str(R.string.filter_profile_humanistic_street, "Street")
+        "humanistic-portrait" -> str(R.string.filter_profile_humanistic_portrait, "Portrait")
+        "humanistic-life" -> str(R.string.filter_profile_humanistic_life, "Life")
+        "portrait-blue" -> str(R.string.filter_profile_portrait_blue, "Portrait Blue")
+        "portrait-retro" -> str(R.string.filter_profile_portrait_retro, "Portrait Retro")
+        "portrait-ccd" -> str(R.string.filter_profile_portrait_ccd, "Portrait CCD")
+        "portrait-vivid" -> str(R.string.filter_profile_portrait_vivid, "Portrait Vivid")
+        "portrait-original" -> str(R.string.filter_profile_portrait_original, "Portrait Original")
+        "portrait-chasing-light" -> str(R.string.filter_profile_portrait_chasing_light, "Portrait Chasing Light")
+        "portrait-rich" -> str(R.string.filter_profile_portrait_rich, "Portrait Rich")
+        else -> fallback
+    }
 
     // Portrait lab
     open fun portraitLabSupporting(): String = str(R.string.portrait_lab_supporting, "Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.")
