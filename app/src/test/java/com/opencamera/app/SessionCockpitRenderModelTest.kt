@@ -238,19 +238,22 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `mode directory render model degrades scenery and portrait features with capability fallback`() {
+    fun `mode directory render model degrades features with capability fallback`() {
         val state = defaultSessionState(
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 supportsPortraitDepthEffect = false,
                 supportsNightMultiFrame = false
             ),
-            availableModes = listOf(ModeId.NIGHT, ModeId.PORTRAIT)
+            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT)
         )
 
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
-        assertEquals("Balanced", model.items.first { it.modeId == ModeId.NIGHT }.defaultStyleLabel)
-        assertEquals("Portrait Original", model.items.first { it.modeId == ModeId.PORTRAIT }.defaultStyleLabel)
+        assertEquals(4, model.items.size)
+        assertEquals(
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT),
+            model.items.map { it.modeId }
+        )
     }
 
     @Test
@@ -356,12 +359,12 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `active mode track item has distinct visual state`() {
         val state = defaultSessionState(
-            activeMode = ModeId.NIGHT,
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
+            activeMode = ModeId.HUMANISTIC,
+            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT)
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        val active = model.items.first { it.modeId == ModeId.NIGHT }
+        val active = model.items.first { it.modeId == ModeId.HUMANISTIC }
         val inactive = model.items.first { it.modeId == ModeId.PHOTO }
 
         assertTrue(active.isActive)
