@@ -14,3 +14,10 @@ bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agen
 bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g4
 bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh audit
 ```
+
+The dispatch script defaults to `CLAUDE_PERMISSION_MODE=default`. To use auto mode, run the interactive opt-in once first:
+
+```bash
+bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh opt-in-auto
+CLAUDE_PERMISSION_MODE=auto bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g0
+```

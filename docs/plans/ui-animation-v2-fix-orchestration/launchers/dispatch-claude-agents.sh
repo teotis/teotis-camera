@@ -7,7 +7,7 @@ REPO_ROOT="$(cd "$PLAN_DIR/../../.." && pwd)"
 
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_EFFORT="${CLAUDE_EFFORT:-xhigh}"
-CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-auto}"
+CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-default}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
 CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-1}"
 PHASE="${1:-g0}"
@@ -48,14 +48,28 @@ Read INDEX.md, your package doc, and AGENTS.md before editing. Use an isolated g
 When done, write the full evidence pack to $status_file: worktree path, branch, git status, git diff --stat, changed files, commands run, test results, commit/PR, unresolved risks, and self-certification that you only touched allowed paths."
 
   echo "Launching $name"
-  claude \
+  set +e
+  output="$(claude \
     --bg \
     --name "$name" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
     --permission-mode "$CLAUDE_PERMISSION_MODE" \
     --setting-sources "$CLAUDE_SETTING_SOURCES" \
-    "$prompt"
+    "$prompt" 2>&1)"
+  status=$?
+  set -e
+  if [ "$status" -ne 0 ]; then
+    echo "$output" >&2
+    if [ "$CLAUDE_PERMISSION_MODE" = "auto" ] && grep -qi "requires opting in" <<<"$output"; then
+      echo >&2
+      echo "ERROR: Claude Code requires one interactive auto-mode opt-in before --bg can use --permission-mode auto." >&2
+      echo "Run once interactively: claude --permission-mode auto" >&2
+      echo "Or rerun this script without auto mode: CLAUDE_PERMISSION_MODE=default bash launchers/dispatch-claude-agents.sh" >&2
+    fi
+    return "$status"
+  fi
+  echo "$output"
 }
 
 open_agent_view() {
@@ -81,9 +95,19 @@ echo "Model: $CLAUDE_MODEL"
 echo "Effort: $CLAUDE_EFFORT"
 echo "Permission mode: $CLAUDE_PERMISSION_MODE"
 echo "Setting sources: $CLAUDE_SETTING_SOURCES"
+if [ "$CLAUDE_PERMISSION_MODE" = "auto" ]; then
+  echo
+  echo "Auto mode requested. Claude Code requires user opt-in before --bg can create auto-mode sessions."
+  echo "If you have not opted in yet, run: bash $0 opt-in-auto"
+fi
 echo
 
 case "$PHASE" in
+  opt-in-auto)
+    echo "Opening one interactive Claude Code session for auto-mode opt-in."
+    echo "Accept the auto-mode prompt, then exit Claude Code and rerun the desired dispatch phase."
+    exec claude --permission-mode auto
+    ;;
   g0)
     launch_agent "00-mode-order-regression" "none"
     ;;
@@ -113,12 +137,12 @@ case "$PHASE" in
     launch_agent "05-quick-panel-semantic-controls-v2" "00-mode-order-regression completed; packages 02 and 03 settled if they changed shared UI files"
     ;;
   --print-only)
-    echo "No agents launched. Use one of: g0, g1, g2, g3, g4, audit, all."
+    echo "No agents launched. Use one of: opt-in-auto, g0, g1, g2, g3, g4, audit, all."
     exit 0
     ;;
   *)
     echo "ERROR: unknown phase '$PHASE'"
-    echo "Use one of: g0, g1, g2, g3, g4, audit, all, --print-only"
+    echo "Use one of: opt-in-auto, g0, g1, g2, g3, g4, audit, all, --print-only"
     exit 1
     ;;
 esac

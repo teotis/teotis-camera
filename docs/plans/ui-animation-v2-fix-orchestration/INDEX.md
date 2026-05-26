@@ -7,7 +7,7 @@ Repair the blocked UI Components And Animation V2 landing so OpenCamera has trut
 ## Execution Mode Recommendation
 
 - Recommended mode: `BACKGROUND_AGENT_SCRIPT`
-- Why: The user wants task units to be created automatically. Official Claude Code CLI reference documents `--bg` for background agents and notes that `claude --help` may omit supported flags, so the launcher now creates background sessions by phase and then opens Agent View.
+- Why: The user wants task units to be created automatically. Official Claude Code CLI reference documents `--bg` for background agents and notes that `claude --help` may omit supported flags, so the launcher now creates background sessions by phase and then opens Agent View. The script defaults to `--permission-mode default` because `--bg` with `auto` requires a prior user opt-in.
 - Alternatives rejected:
   - `SINGLE_AGENT` — possible, but slower and less auditable for the five distinct UI surfaces.
   - `AGENT_VIEW` — still available as a fallback, but manual prompt pasting is no longer the preferred launch path.
@@ -161,7 +161,8 @@ Evidence pack must include:
 
 ## Launch Options
 
-- Option A: Background agent script — run `bash launchers/dispatch-claude-agents.sh g0`, then later `g1`, `g2`, `g3`, `g4`, and `audit`. The script creates `claude --bg --name` sessions for the requested phase and opens `claude agents` when interactive.
-- Option B: Agent View manual fallback — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode auto --effort xhigh`, then copy prompts from `launchers/agent-view-prompts.md`.
-- Option C: `/batch` — not recommended; see `launchers/batch-instruction.md`.
-- Option D: Final integration audit — give `validation/final-audit-prompt.md` to Codex after all status files are complete.
+- Option A: Background agent script — run `bash launchers/dispatch-claude-agents.sh g0`, then later `g1`, `g2`, `g3`, `g4`, and `audit`. The script creates `claude --bg --name` sessions for the requested phase and opens `claude agents` when interactive. Default permission mode is `default`.
+- Option B: Auto-mode opt-in, optional — if you want background sessions to use auto mode, first run `bash launchers/dispatch-claude-agents.sh opt-in-auto` and accept the interactive prompt. Then dispatch with `CLAUDE_PERMISSION_MODE=auto bash launchers/dispatch-claude-agents.sh g0`.
+- Option C: Agent View manual fallback — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort xhigh`, then copy prompts from `launchers/agent-view-prompts.md`.
+- Option D: `/batch` — not recommended; see `launchers/batch-instruction.md`.
+- Option E: Final integration audit — give `validation/final-audit-prompt.md` to Codex after all status files are complete.

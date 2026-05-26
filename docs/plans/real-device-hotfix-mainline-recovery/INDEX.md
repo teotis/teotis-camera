@@ -11,10 +11,12 @@ Recover the failed hotfix integration by landing the completed watermark and zoo
 - Codex-retained work: final integration audit and product-level assessment of shutter animation and zoom feel.
 
 ## CLI Reference Check
-- Official reference checked: Anthropic Claude Code CLI reference at `https://docs.anthropic.com/en/docs/claude-code/cli-usage`.
+- Official reference checked: Claude Code CLI reference at `https://code.claude.com/docs/en/cli-usage`.
+- Official permission reference checked: Claude Code permission modes at `https://code.claude.com/docs/en/permission-modes`.
 - Local version checked: `claude --version` -> `2.1.142 (Claude Code)`.
 - Local Agents View checked: `claude agents --help` supports `--cwd`, `--model`, `--effort`, `--permission-mode`, and `--setting-sources`.
-- Note: local top-level `claude --help` may omit hidden/background flags; this package uses the `claude --bg --name` form already used by this workflow, and opens `claude agents` for monitoring.
+- Official CLI reference documents `claude agents`, `--bg`, `--name`, and `--permission-mode`.
+- Auto mode note: `--permission-mode auto` cannot be silently granted by a repository or background script. The user must either opt in once interactively with `claude --permission-mode auto` or configure user-level settings. Therefore the generated background script defaults to `CLAUDE_PERMISSION_MODE=default`; use `CLAUDE_PERMISSION_MODE=auto` only after opt-in.
 
 ## Execution Authorization
 
@@ -133,4 +135,7 @@ Evidence pack must include:
 ## Launch Options
 - Option A: Agent View manual dispatch — copy prompts from `launchers/agent-view-prompts.md`.
 - Option B: background agent script — run `bash docs/plans/real-device-hotfix-mainline-recovery/launchers/dispatch-claude-agents.sh` and monitor with `claude agents`.
+  - Default permission mode is `default`.
+  - To use auto mode, first run `claude --permission-mode auto` interactively and accept the opt-in prompt, then run `CLAUDE_PERMISSION_MODE=auto bash docs/plans/real-device-hotfix-mainline-recovery/launchers/dispatch-claude-agents.sh`.
+  - If `--bg` fails before creating sessions because auto mode is not opted in, rerun the interactive opt-in command above or use the default mode.
 - Option C: Final integration audit — give `validation/final-audit-prompt.md` to Codex.

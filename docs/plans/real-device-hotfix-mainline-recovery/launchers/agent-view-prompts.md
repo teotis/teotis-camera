@@ -1,5 +1,8 @@
 # Agent View Prompts
 
+## Permission Note
+Agent View can monitor sessions created with `claude --bg --name`, but `--permission-mode auto` must be opted into by the user before background sessions start. If you dispatch via the generated script, the default is `CLAUDE_PERMISSION_MODE=default`. To use auto mode, first run `claude --permission-mode auto` interactively and accept the prompt, then rerun the script with `CLAUDE_PERMISSION_MODE=auto`.
+
 ## Package: 01-watermark-mainline-recovery — Watermark Mainline Recovery
 
 Copy the block below into Claude Code Agent View.

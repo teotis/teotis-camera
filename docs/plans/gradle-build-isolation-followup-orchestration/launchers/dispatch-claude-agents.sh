@@ -18,9 +18,24 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "ERROR: not a git repository";
 CLAUDE_VERSION="$(claude --version || true)"
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_EFFORT="${CLAUDE_EFFORT:-xhigh}"
-CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-auto}"
+CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-default}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
 CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-1}"
+
+if [[ "$CLAUDE_PERMISSION_MODE" == "auto" && "${CLAUDE_AUTO_MODE_OPTED_IN:-0}" != "1" ]]; then
+  cat >&2 <<'EOF'
+ERROR: CLAUDE_PERMISSION_MODE=auto requires user opt-in before background launch.
+
+Run this once interactively and accept the auto-mode opt-in prompt:
+  claude --permission-mode auto
+
+Then rerun this launcher with:
+  CLAUDE_PERMISSION_MODE=auto CLAUDE_AUTO_MODE_OPTED_IN=1 bash docs/plans/gradle-build-isolation-followup-orchestration/launchers/dispatch-claude-agents.sh
+
+This repository must not silently grant auto mode on the user's behalf.
+EOF
+  exit 1
+fi
 
 echo "=== Gradle Build Isolation Follow-Up Orchestration ==="
 echo "Plan: $PLAN_DIR"
@@ -32,6 +47,11 @@ echo "Claude model: $CLAUDE_MODEL"
 echo "Claude effort: $CLAUDE_EFFORT"
 echo "Claude permission mode: $CLAUDE_PERMISSION_MODE"
 echo "Claude setting sources: $CLAUDE_SETTING_SOURCES"
+if [[ "$CLAUDE_PERMISSION_MODE" == "auto" ]]; then
+  echo "Auto mode opt-in: acknowledged by CLAUDE_AUTO_MODE_OPTED_IN=1"
+else
+  echo "Auto mode: not requested; using permission prompts/default policy"
+fi
 echo
 echo "Manual Agent View prompts:"
 echo "$PROMPT_FILE"

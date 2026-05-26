@@ -16,13 +16,21 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "ERROR: not a git repository";
 CLAUDE_VERSION="$(claude --version || true)"
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_EFFORT="${CLAUDE_EFFORT:-xhigh}"
-CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-auto}"
+CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-default}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
 CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-1}"
 
 echo "=== Claude Code ==="
 echo "$CLAUDE_VERSION"
 echo
+echo "Permission mode: $CLAUDE_PERMISSION_MODE"
+if [ "$CLAUDE_PERMISSION_MODE" = "auto" ]; then
+  echo "Auto mode requires prior interactive opt-in. If launch fails, run:"
+  echo "  claude --permission-mode auto"
+  echo "Then rerun this script, or use the default mode:"
+  echo "  CLAUDE_PERMISSION_MODE=default bash $0"
+  echo
+fi
 echo "=== Launching background agents ==="
 
 launch_agent() {
@@ -31,16 +39,35 @@ launch_agent() {
   local status_file="$3"
   local name="agent-${package_id}"
   local prompt
+  local output
+  local status
   prompt="Read $PLAN_DIR/INDEX.md and $package_doc. Implement package $package_id. Write evidence to $status_file when done. Do NOT edit INDEX.md or other status files. Rebase on current main before final verification and merge/PR when complete."
   echo "Launching $name"
-  claude \
+  set +e
+  output="$(claude \
     --bg \
     --name "$name" \
     --model "$CLAUDE_MODEL" \
     --effort "$CLAUDE_EFFORT" \
     --permission-mode "$CLAUDE_PERMISSION_MODE" \
     --setting-sources "$CLAUDE_SETTING_SOURCES" \
-    "$prompt"
+    "$prompt" 2>&1)"
+  status=$?
+  set -e
+  if [ "$status" -ne 0 ]; then
+    echo "$output" >&2
+    if [ "$CLAUDE_PERMISSION_MODE" = "auto" ]; then
+      echo >&2
+      echo "ERROR: Claude Code background launch did not create a session." >&2
+      echo "Auto mode requires one interactive opt-in before --bg can start with --permission-mode auto." >&2
+      echo "Run once interactively:" >&2
+      echo "  claude --permission-mode auto" >&2
+      echo "Or rerun without auto mode:" >&2
+      echo "  CLAUDE_PERMISSION_MODE=default bash $0" >&2
+    fi
+    return "$status"
+  fi
+  echo "$output"
 }
 
 launch_agent "01-watermark-mainline-recovery" "$PLAN_DIR/packages/01-watermark-mainline-recovery.md" "$PLAN_DIR/status/01-watermark-mainline-recovery.md"

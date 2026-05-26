@@ -2,7 +2,7 @@
 
 Use these prompts in Claude Code Agent View as a fallback or for manual inspection. The preferred launcher is now the background dispatch script, which creates `claude --bg --name` sessions by phase.
 
-Compatibility note: the local `claude --help` for `2.1.142` may omit `--bg`, but the official Claude Code CLI reference says `--help` does not list every flag and documents `--bg` as the background-agent flag.
+Compatibility note: the local `claude --help` for `2.1.142` may omit `--bg`, but the official Claude Code CLI reference says `--help` does not list every flag and documents `--bg` as the background-agent flag. The dispatch script defaults to `--permission-mode default`; if you want `auto`, first run `bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh opt-in-auto` and accept the interactive prompt.
 
 Open Agent View from the repo root with:
 
@@ -21,6 +21,13 @@ bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orc
 bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g3
 bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g4
 bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh audit
+```
+
+Optional auto-mode launch after opt-in:
+
+```bash
+bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh opt-in-auto
+CLAUDE_PERMISSION_MODE=auto bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g0
 ```
 
 ## Package: 00-mode-order-regression
