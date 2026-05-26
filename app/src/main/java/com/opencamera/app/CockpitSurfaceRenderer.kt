@@ -2,16 +2,17 @@ package com.opencamera.app
 
 import android.content.Context
 import android.graphics.Typeface
+import android.view.Gravity
 import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.opencamera.core.session.SessionState
 
 internal data class CockpitCallbacks(
-    val onZoomRatioSelected: (Float) -> Unit,
-    val onZoomRatioChanged: ((Float) -> Unit)? = null
+    val onZoomRatioSelected: (Float) -> Unit
 )
 
 internal class CockpitSurfaceRenderer(
@@ -27,9 +28,6 @@ internal class CockpitSurfaceRenderer(
 ) {
     var controlRotationDegrees: Float = 0f
 
-    private val shutterVisualDrawable = ShutterVisualDrawable()
-    private var shutterDrawableAttached = false
-
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
 
@@ -37,11 +35,7 @@ internal class CockpitSurfaceRenderer(
         topBar.titleText.text = context.getString(R.string.app_name)
     }
 
-    fun renderShutter(state: SessionState, controls: SessionControlsRenderModel, isShutterEnabled: Boolean = state.modeSnapshot.state.isShutterEnabled) {
-        if (!shutterDrawableAttached) {
-            shutterDrawableAttached = true
-            bottomCockpit.shutter.background = shutterVisualDrawable
-        }
+    fun renderShutter(state: SessionState, controls: SessionControlsRenderModel) {
         val shutterLabel = when (state.recordingStatus) {
             com.opencamera.core.session.RecordingStatus.IDLE -> context.getString(R.string.button_photo_capture)
             com.opencamera.core.session.RecordingStatus.REQUESTING -> context.getString(R.string.button_recording_starting)
@@ -50,8 +44,12 @@ internal class CockpitSurfaceRenderer(
         }
         bottomCockpit.shutter.contentDescription = shutterLabel
         bottomCockpit.shutter.text = ""
-        shutterVisualDrawable.visualState = shutterVisualState(state)
-        bottomCockpit.shutter.isEnabled = isShutterEnabled
+        if (state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE) {
+            bottomCockpit.shutter.setBackgroundResource(R.drawable.bg_shutter_recording_selector)
+        } else {
+            bottomCockpit.shutter.setBackgroundResource(R.drawable.bg_shutter_selector)
+        }
+        bottomCockpit.shutter.isEnabled = state.modeSnapshot.state.isShutterEnabled
         bottomCockpit.lensFacing.text = controls.lensFacingButtonLabel
         bottomCockpit.lensFacing.isEnabled = controls.lensFacingEnabled
     }
@@ -78,82 +76,101 @@ internal class CockpitSurfaceRenderer(
         }
     }
 
-    private var sliderInitialized = false
-
-    fun renderFocalLengthSlider(model: FocalLengthSliderRenderModel) {
-        val slider = bottomCockpit.focalLengthSlider
-        slider.setSliderVisible(model.isVisible)
-        if (!model.isVisible) return
-
-        if (!sliderInitialized) {
-            sliderInitialized = true
-            slider.onRatioChanged = { ratio ->
-                callbacks.onZoomRatioChanged?.invoke(ratio)
+    fun renderZoomCapsules(controls: SessionControlsRenderModel) {
+        bottomCockpit.zoomScroll.isVisible = controls.isZoomCapsuleRowVisible
+        if (!controls.isZoomCapsuleRowVisible) return
+        bottomCockpit.zoomRow.removeAllViews()
+        controls.zoomCapsules.forEach { capsule ->
+            val chip = TextView(context).apply {
+                text = capsule.label
+                textSize = context.resources.getDimension(R.dimen.text_size_zoom_chip) / context.resources.displayMetrics.density
+                minWidth = context.resources.getDimension(R.dimen.zoom_chip_min_width).toInt()
+                minHeight = context.resources.getDimension(R.dimen.zoom_chip_min_height).toInt()
+                gravity = Gravity.CENTER
+                typeface = Typeface.DEFAULT
+                setPadding(
+                    context.resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
+                    context.resources.getDimension(R.dimen.zoom_chip_padding_v).toInt(),
+                    context.resources.getDimension(R.dimen.zoom_chip_padding_h).toInt(),
+                    context.resources.getDimension(R.dimen.zoom_chip_padding_v).toInt()
+                )
+                if (capsule.isActive) {
+                    setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+                    setBackgroundResource(R.drawable.bg_zoom_chip_active)
+                } else {
+                    setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                    setBackgroundResource(R.drawable.bg_zoom_chip)
+                }
+                setOnClickListener {
+                    callbacks.onZoomRatioSelected(capsule.ratio)
+                }
+                rotation = controlRotationDegrees
             }
-            slider.onRatioSnapped = { ratio ->
-                callbacks.onZoomRatioSelected(ratio)
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = if (bottomCockpit.zoomRow.childCount == 0) 0 else 4.dp
             }
+            bottomCockpit.zoomRow.addView(chip, params)
         }
-
-        slider.isInteractive = model.isEnabled
-        slider.alpha = if (model.isEnabled) 1f else 0.4f
-        slider.contentDescription = if (model.disabledReason != null) {
-            "Zoom slider: ${model.disabledReason}"
-        } else {
-            "Zoom slider: ${String.format(java.util.Locale.US, "%.1fx", model.currentRatio)}"
-        }
-
-        slider.setPresetRatios(model.presetRatios)
-        slider.setCurrentRatio(model.currentRatio)
-    }
-
-    private fun quickRowLabel(row: QuickPanelRowRenderModel): String {
-        val base = "${row.title} ${row.value}"
-        return if (row.disabledReason != null) "$base (${row.disabledReason})" else base
     }
 
     fun renderQuickBubble(
         settingsPage: SessionSettingsPageRenderModel,
         sheet: QuickPanelSheetRenderModel
     ) {
-        quickPanel.grid.text = quickRowLabel(sheet.gridRow)
+        quickPanel.grid.text = "${sheet.gridRow.title} ${sheet.gridRow.value}"
         quickPanel.grid.isEnabled = sheet.gridRow.isEnabled
-        quickPanel.grid.alpha = if (sheet.gridRow.isEnabled) 1f else 0.4f
 
-        quickPanel.resolution.text = quickRowLabel(sheet.resolutionRow)
+        quickPanel.flash.text = "${sheet.qualityRow.title} ${sheet.qualityRow.value}"
+        quickPanel.flash.isEnabled = sheet.qualityRow.isEnabled
+
+        quickPanel.resolution.text = "${sheet.resolutionRow.title} ${sheet.resolutionRow.value}"
         quickPanel.resolution.isEnabled = sheet.resolutionRow.isEnabled
-        quickPanel.resolution.alpha = if (sheet.resolutionRow.isEnabled) 1f else 0.4f
 
         val brightness = sheet.brightnessRow
         if (brightness.isVisible) {
-            quickPanel.brightnessSlider.visibility = View.VISIBLE
-            quickPanel.brightnessValueText.visibility = View.VISIBLE
-            quickPanel.brightnessSlider.max = brightness.maxSteps - brightness.minSteps
-            quickPanel.brightnessSlider.progress = brightness.steps - brightness.minSteps
-            quickPanel.brightnessSlider.isEnabled = brightness.isInteractive
-            quickPanel.brightnessValueText.text = brightness.value
-            quickPanel.brightnessValueText.alpha = if (brightness.disabledReason != null) 0.4f else 1f
+            quickPanel.brightnessMinus.visibility = android.view.View.VISIBLE
+            quickPanel.brightnessValue.visibility = android.view.View.VISIBLE
+            quickPanel.brightnessPlus.visibility = android.view.View.VISIBLE
+            quickPanel.brightnessMinus.isEnabled = brightness.canDecrease
+            quickPanel.brightnessValue.text = brightness.value
+            quickPanel.brightnessValue.isEnabled = brightness.canReset
+            quickPanel.brightnessPlus.isEnabled = brightness.canIncrease
+            val alpha = if (brightness.disabledReason != null) 0.4f else 1f
+            quickPanel.brightnessMinus.alpha = if (brightness.canDecrease) alpha else 0.3f
+            quickPanel.brightnessValue.alpha = if (brightness.disabledReason != null) 0.4f else 1f
+            quickPanel.brightnessPlus.alpha = if (brightness.canIncrease) alpha else 0.3f
         } else {
-            quickPanel.brightnessSlider.visibility = View.GONE
-            quickPanel.brightnessValueText.visibility = View.GONE
+            quickPanel.brightnessMinus.visibility = android.view.View.GONE
+            quickPanel.brightnessValue.visibility = android.view.View.GONE
+            quickPanel.brightnessPlus.visibility = android.view.View.GONE
         }
 
-        quickPanel.frameRatio.text = "${sheet.frameRatioRow.title} ${sheet.frameRatioRow.value}"
-        quickPanel.frameRatio.isEnabled = sheet.frameRatioEnabled
+        quickPanel.frame43.isEnabled = sheet.frameRatioEnabled
+        quickPanel.frame169.isEnabled = sheet.frameRatioEnabled
+        quickPanel.frame11.isEnabled = sheet.frameRatioEnabled
+        sheet.frameRatioOptions.forEach { option ->
+            val button = when (option.ratio) {
+                com.opencamera.core.media.FrameRatio.RATIO_4_3 -> quickPanel.frame43
+                com.opencamera.core.media.FrameRatio.RATIO_16_9 -> quickPanel.frame169
+                com.opencamera.core.media.FrameRatio.RATIO_1_1 -> quickPanel.frame11
+            }
+            if (option.isSelected) {
+                button.alpha = 1f
+                button.setBackgroundResource(R.drawable.bg_quick_chip_selected)
+            } else {
+                button.alpha = if (sheet.frameRatioEnabled) 0.85f else 0.4f
+                button.setBackgroundResource(R.drawable.bg_quick_chip)
+            }
+        }
 
-        quickPanel.livePhoto.text = quickRowLabel(sheet.liveRow)
+        quickPanel.livePhoto.text = "${sheet.liveRow.title} ${sheet.liveRow.value}"
         quickPanel.livePhoto.isEnabled = sheet.liveRow.isEnabled
-        if (sheet.liveRow.isSelected) {
-            quickPanel.livePhoto.alpha = 1f
-            quickPanel.livePhoto.setBackgroundResource(R.drawable.bg_quick_chip_selected)
-        } else {
-            quickPanel.livePhoto.alpha = if (sheet.liveRow.isEnabled) 0.85f else 0.4f
-            quickPanel.livePhoto.setBackgroundResource(R.drawable.bg_quick_chip)
-        }
 
-        quickPanel.timer.text = quickRowLabel(sheet.timerRow)
+        quickPanel.timer.text = "${sheet.timerRow.title} ${sheet.timerRow.value}"
         quickPanel.timer.isEnabled = sheet.timerRow.isEnabled
-        quickPanel.timer.alpha = if (sheet.timerRow.isEnabled) 1f else 0.4f
     }
 
     private var lastAutoScrolledActiveMode: com.opencamera.core.mode.ModeId? = null
@@ -162,12 +179,12 @@ internal class CockpitSurfaceRenderer(
         val buttonMap = mapOf(
             com.opencamera.core.mode.ModeId.PHOTO to modeTrack.photo,
             com.opencamera.core.mode.ModeId.HUMANISTIC to modeTrack.humanistic,
+            com.opencamera.core.mode.ModeId.NIGHT to modeTrack.night,
+            com.opencamera.core.mode.ModeId.PORTRAIT to modeTrack.portrait,
+            com.opencamera.core.mode.ModeId.PRO to modeTrack.pro,
             com.opencamera.core.mode.ModeId.VIDEO to modeTrack.video,
             com.opencamera.core.mode.ModeId.DOCUMENT to modeTrack.document
         )
-        modeTrack.night.visibility = View.GONE
-        modeTrack.portrait.visibility = View.GONE
-        modeTrack.pro.visibility = View.GONE
         buttonMap.values.forEach { it.visibility = View.GONE }
         model.items.forEach { item ->
             val button = buttonMap[item.modeId] ?: return@forEach

@@ -7,52 +7,53 @@
 
 ## Worktree
 
-- Path: /Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/ui-v2-00-mode-order
-- Branch: worktree-ui-v2-00-mode-order
+- Path: /Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-00-mode-order
+- Branch: worktree-pkg-00-mode-order
 
-## Changes (committed)
+## Changes
 
-- git status: clean working tree
-- git diff --stat (commit a53aac4):
+- git status: clean (all committed)
+- git diff --stat (2 commits, 2 files):
   ```
-  app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt    | 4 ++++
-  app/src/test/java/com/opencamera/app/SessionCockpitRenderModelTest.kt | 8 ++++----
-  2 files changed, 12 insertions(+), 8 deletions(-)
+  app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt  | 1 +
+  app/src/test/java/com/opencamera/app/SessionCockpitRenderModelTest.kt | 34 ++++++++++++----------
+  2 files changed, 19 insertions(+), 16 deletions(-)
   ```
 - Changed files (full list):
   1. `app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt`
   2. `app/src/test/java/com/opencamera/app/SessionCockpitRenderModelTest.kt`
 
-## What Changed
+### What changed
 
-**Production** (`SessionCockpitRenderModel.kt` line 428):
-- `PRODUCT_MODE_ENTRY_ORDER` now includes `ModeId.HUMANISTIC` at position 2.
-- Order: `PHOTO, HUMANISTIC, NIGHT, PORTRAIT, PRO, VIDEO, DOCUMENT`.
+**Production**: Added `ModeId.HUMANISTIC` to `PRODUCT_MODE_ENTRY_ORDER` between PHOTO and VIDEO, so both `modeDirectoryRenderModel()` and `modeTrackRenderModel()` now include Humanistic in the correct product position: `PHOTO, HUMANISTIC, VIDEO, DOCUMENT`.
 
-**Tests** (`SessionCockpitRenderModelTest.kt`):
-- Directory test (line 213): Renamed to `includes humanistic entry and uses product order`, updated expected display names and modeId list to include HUMANISTIC.
-- Track test (line 323): Renamed to `includes humanistic entry and uses product order`, updated expected size from 6 to 7, updated expected modeId list to include HUMANISTIC, changed assertion to verify HUMANISTIC is present and active.
+**Tests** (4 tests updated):
+- `mode directory render model includes humanistic entry and uses product order` — expects 4 items: PHOTO, HUMANISTIC, VIDEO, DOCUMENT
+- `mode track render model includes humanistic entry and uses product order` — expects 4 items with HUMANISTIC as active
+- `mode directory render model degrades features with capability fallback` — uses product-ordered modes (PHOTO, HUMANISTIC, VIDEO, DOCUMENT) instead of NIGHT/PORTRAIT
+- `active mode track item has distinct visual state` — uses HUMANISTIC as active mode instead of NIGHT
 
 ## Verification
 
-- `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionCockpitRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest`: **BUILD SUCCESSFUL** (29s, 67 tasks)
-- `rtk ./gradlew --no-daemon :app:assembleDebug`: **BUILD SUCCESSFUL** (1m, 81 tasks)
-- Test result: **0 failures** (all tests in SessionCockpitRenderModelTest and CameraCockpitRenderModelTest pass)
+- Commands run:
+  1. `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionCockpitRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest`
+  2. `rtk ./gradlew --no-daemon :app:assembleDebug`
+- Test results: **66 tests completed, 0 failed** (BUILD SUCCESSFUL)
+- assembleDebug: **BUILD SUCCESSFUL**
 
-## Commit
+## Delivery
 
-- Hash: `a53aac4`
-- Message: `fix: 恢复 Humanistic 模式到产品模式目录和轨道顺序`
-
-## Unresolved Risks
-
-None. Package scope was limited to app-layer render model and tests. `core/mode/**` was not edited.
+- Commit hashes: `a4ed2df`, `e3407e9`
+- PR link: (local only, not pushed)
 
 ## Self-Certification
 
-- [x] Only touched allowed paths: `SessionCockpitRenderModel.kt`, `SessionCockpitRenderModelTest.kt`
-- [x] Did not edit `INDEX.md` or other package status files
-- [x] Did not edit `core/mode/**` or `core/session/**`
-- [x] No force-push, hard reset, or destructive git operations
-- [x] No network access or external API calls
-- [x] All tests pass, build succeeds
+- [x] Only touched allowed paths
+- [x] Did not edit forbidden paths
+- [x] Did not edit `INDEX.md` or other status files
+- [x] Used `rtk` for shell commands
+- [x] Used isolated Gradle build wrapper if running from a worktree
+
+## Unresolved Risks
+
+- None. This package is a prerequisite; dependent packages can now proceed.

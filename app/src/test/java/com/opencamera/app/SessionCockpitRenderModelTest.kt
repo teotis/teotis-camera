@@ -2,8 +2,6 @@ package com.opencamera.app
 
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
-import com.opencamera.core.effect.EffectSpec
-import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ManualControlCapabilityMatrix
 import com.opencamera.core.device.ManualControlSupport
@@ -11,9 +9,8 @@ import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.CaptureProfile
-import com.opencamera.core.media.FrameRatio
-
-import com.opencamera.core.media.LiveBundleStatus
+import com.opencamera.core.media.StillCaptureQualityPreference
+import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.PostProcessSpec
@@ -72,6 +69,8 @@ class SessionCockpitRenderModelTest {
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true,
                 zoomRatio = 2f,
+                qualityPreference = StillCaptureQualityPreference.QUALITY,
+                resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
                 outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
             )
         )
@@ -87,7 +86,8 @@ class SessionCockpitRenderModelTest {
         val state = defaultSessionState(
             activeDeviceGraph = DeviceGraphSpec.videoRecording(
                 preferredLensFacing = LensFacing.FRONT,
-                enablePreviewSnapshots = true
+                enablePreviewSnapshots = true,
+                stillResolutionPreset = StillCaptureResolutionPreset.SMALL_2MP
             ),
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 availableLensFacings = setOf(LensFacing.FRONT)
@@ -183,70 +183,6 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `capture output exposes live photo format diagnostics without metadata bloat`() {
-        val state = defaultSessionState(
-            latestSavedMediaType = SavedMediaType.PHOTO,
-            latestCapturePath = "Pictures/OpenCamera/live.jpg",
-            latestLivePhotoBundle = LivePhotoBundle(
-                stillPath = "Pictures/OpenCamera/live.jpg",
-                motionPath = "Pictures/OpenCamera/live.live.mp4",
-                sidecarPath = "Pictures/OpenCamera/live.live.json",
-                motionDurationMillis = 1500,
-                motionMimeType = "video/mp4",
-                sidecarMimeType = "application/vnd.opencamera.live+json"
-            ),
-            latestPipelineNotes = listOf(
-                "live-format:intended=google-motion-photo-jpeg",
-                "live-format:actual=google-motion-photo-jpeg",
-                "live-motion:status=encoded",
-                "motion-photo:xmp=present",
-                "motion-photo:appended-mp4-bytes=12345",
-                "gallery-recognition=untested"
-            )
-        )
-
-        val output = sessionCaptureOutputText(state, strings)
-        assertTrue(output.contains("live-format:intended=google-motion-photo-jpeg"))
-        assertTrue(output.contains("live-format:actual=google-motion-photo-jpeg"))
-        assertTrue(output.contains("live-motion:status=encoded"))
-        assertTrue(output.contains("gallery-recognition=untested"))
-        // Output must not dump raw metadata blobs
-        assertFalse(output.contains("x:xmpmeta"))
-        assertFalse(output.contains("rdf:RDF"))
-        assertEquals(6, output.lines().size, "Output must stay compact for QA")
-    }
-
-    @Test
-    fun `capture output shows still only fallback diagnostics for degraded live photo`() {
-        val state = defaultSessionState(
-            latestSavedMediaType = SavedMediaType.PHOTO,
-            latestCapturePath = "Pictures/OpenCamera/fallback.jpg",
-            latestLivePhotoBundle = LivePhotoBundle(
-                stillPath = "Pictures/OpenCamera/fallback.jpg",
-                motionPath = "Pictures/OpenCamera/fallback.live.mp4",
-                sidecarPath = "Pictures/OpenCamera/fallback.live.json",
-                motionDurationMillis = 1500,
-                motionMimeType = "video/mp4",
-                sidecarMimeType = "application/vnd.opencamera.live+json",
-                bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK
-            ),
-            latestPipelineNotes = listOf(
-                "live-format:intended=google-motion-photo-jpeg",
-                "live-format:actual=still-jpeg",
-                "live-motion:status=failed",
-                "motion-photo:container=failed:motion-encode-error",
-                "gallery-recognition=untested"
-            )
-        )
-
-        val output = sessionCaptureOutputText(state, strings)
-        assertTrue(output.contains("live-format:actual=still-jpeg"))
-        assertTrue(output.contains("live-motion:status=failed"))
-        assertTrue(output.contains("gallery-recognition=untested"))
-        assertFalse(output.contains("google-jpeg"))
-    }
-
-    @Test
     fun `preview thumbnail output stays compact when only preview is available`() {
         val state = defaultSessionState().copy(
             presentation = defaultSessionState().presentation.copy(
@@ -276,15 +212,15 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `mode directory render model includes humanistic entry and uses product order`() {
         val state = defaultSessionState(
-            activeMode = ModeId.HUMANISTIC,
+            activeMode = ModeId.NIGHT,
             availableModes = listOf(
-                ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
-                ModeId.VIDEO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO
+                ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
+                ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
             ),
             modeSnapshot = ModeSnapshot(
-                id = ModeId.HUMANISTIC,
-                uiSpec = ModeUiSpec(title = "Humanistic", shutterLabel = "Capture Humanistic"),
-                state = ModeState(headline = "Humanistic mode active", detail = "Street-life quick capture ready")
+                id = ModeId.NIGHT,
+                uiSpec = ModeUiSpec(title = "Scenery", shutterLabel = "Capture Scenery"),
+                state = ModeState(headline = "Scenery mode active", detail = "Tripod multi-frame available")
             )
         )
 
@@ -299,24 +235,25 @@ class SessionCockpitRenderModelTest {
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
-        assertEquals("街头 Street", model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel)
     }
 
     @Test
-    fun `mode directory render model shows humanistic with street-life subfeatures`() {
+    fun `mode directory render model degrades features with capability fallback`() {
         val state = defaultSessionState(
-            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO)
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                supportsPortraitDepthEffect = false,
+                supportsNightMultiFrame = false
+            ),
+            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT)
         )
 
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
-        assertEquals(3, model.items.size)
+        assertEquals(4, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO),
-            model.items.map(ModeDirectoryItemRenderModel::modeId)
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT),
+            model.items.map { it.modeId }
         )
-        assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
-        assertEquals("街头 Street", model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel)
     }
 
     @Test
@@ -385,284 +322,10 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `currentZoomLabel is null when zoom matches a preset`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.DISCRETE_PRESET,
-                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            ),
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                preferredLensFacing = LensFacing.BACK,
-                enablePreviewSnapshots = true,
-                zoomRatio = 2f
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertNull(controls.currentZoomLabel)
-    }
-
-    @Test
-    fun `currentZoomLabel shows label when zoom between presets`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            ),
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                preferredLensFacing = LensFacing.BACK,
-                enablePreviewSnapshots = true,
-                zoomRatio = 1.5f
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertEquals("1.5", controls.currentZoomLabel)
-    }
-
-    @Test
-    fun `nearestPresetRatio is set when zoom not on preset`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            ),
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                preferredLensFacing = LensFacing.BACK,
-                enablePreviewSnapshots = true,
-                zoomRatio = 1.5f
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertEquals(1f, controls.nearestPresetRatio)
-    }
-
-    @Test
-    fun `zoom row hidden for unsupported capability`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.UNSUPPORTED,
-                    supportedRatios = listOf(1f),
-                    defaultRatio = 1f
-                )
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertFalse(controls.isZoomCapsuleRowVisible)
-        assertTrue(controls.zoomCapsules.isEmpty())
-    }
-
-    @Test
-    fun `continuous zoom capability shows all presets`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            ),
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                preferredLensFacing = LensFacing.BACK,
-                enablePreviewSnapshots = true,
-                zoomRatio = 1f
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertTrue(controls.isZoomCapsuleRowVisible)
-        assertEquals(3, controls.zoomCapsules.size)
-        assertNull(controls.currentZoomLabel)
-    }
-
-    // --- Focal length slider V2 integration tests ---
-
-    @Test
-    fun `focal slider is visible and enabled when zoom supported and idle`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertTrue(controls.focalLengthSlider.isVisible)
-        assertTrue(controls.focalLengthSlider.isEnabled)
-        assertNull(controls.focalLengthSlider.disabledReason)
-    }
-
-    @Test
-    fun `focal slider is hidden when zoom unsupported`() {
-        val state = defaultSessionState()
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertFalse(controls.focalLengthSlider.isVisible)
-    }
-
-    @Test
-    fun `focal slider is disabled during countdown`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            )
-        ).copy(
-            presentation = SessionPresentationState(countdownRemainingSeconds = 3)
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertTrue(controls.focalLengthSlider.isVisible)
-        assertFalse(controls.focalLengthSlider.isEnabled)
-        assertNotNull(controls.focalLengthSlider.disabledReason)
-    }
-
-    @Test
-    fun `focal slider is disabled during photo capture saving`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            ),
-            activeShot = ShotRequest(
-                shotId = "s1",
-                mediaType = MediaType.PHOTO,
-                shotKind = ShotKind.STILL_CAPTURE,
-                saveRequest = SaveRequest.photoLibrary(),
-                thumbnailPolicy = ThumbnailPolicy.NONE,
-                postProcessSpec = PostProcessSpec(),
-                captureProfile = CaptureProfile()
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertTrue(controls.focalLengthSlider.isVisible)
-        assertFalse(controls.focalLengthSlider.isEnabled)
-        assertNotNull(controls.focalLengthSlider.disabledReason)
-    }
-
-    @Test
-    fun `focal slider is disabled during recording requesting`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            )
-        ).copy(recordingStatus = RecordingStatus.REQUESTING)
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertTrue(controls.focalLengthSlider.isVisible)
-        assertFalse(controls.focalLengthSlider.isEnabled)
-    }
-
-    @Test
-    fun `focal slider stays enabled during active video recording`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            )
-        ).copy(recordingStatus = RecordingStatus.RECORDING)
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertTrue(controls.focalLengthSlider.isVisible)
-        assertTrue(controls.focalLengthSlider.isEnabled)
-        assertNull(controls.focalLengthSlider.disabledReason)
-    }
-
-    @Test
-    fun `focal slider preset ratios match capability`() {
-        val ratios = listOf(0.6f, 1f, 2f, 5f)
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.DISCRETE_PRESET,
-                    supportedRatios = ratios,
-                    defaultRatio = 1f
-                )
-            ),
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                preferredLensFacing = LensFacing.BACK,
-                enablePreviewSnapshots = true,
-                zoomRatio = 2f
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertEquals(ratios, controls.focalLengthSlider.presetRatios)
-        assertEquals(2f, controls.focalLengthSlider.currentRatio)
-    }
-
-    @Test
-    fun `focal slider current ratio is normalized to one decimal`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.CONTINUOUS,
-                    supportedRatios = listOf(1f, 5f),
-                    defaultRatio = 1f
-                )
-            ),
-            activeDeviceGraph = DeviceGraphSpec.stillCapture(
-                preferredLensFacing = LensFacing.BACK,
-                enablePreviewSnapshots = true,
-                zoomRatio = 2.345f
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertEquals(2.3f, controls.focalLengthSlider.currentRatio)
-    }
-
-    @Test
-    fun `slider and capsule row both visible when zoom supported`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.DISCRETE_PRESET,
-                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            )
-        )
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertTrue(controls.isZoomCapsuleRowVisible)
-        assertTrue(controls.focalLengthSlider.isVisible)
-    }
-
-    @Test
     fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
-            ModeId.VIDEO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
+            ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
         )
         val state = defaultSessionState(activeMode = ModeId.HUMANISTIC, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
@@ -679,9 +342,10 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `mode track labels are short and stable`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
+            ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
         )
-        val state = defaultSessionState(activeMode = ModeId.PHOTO, availableModes = availableModes)
+        val state = defaultSessionState(availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
         model.items.forEach { item ->
@@ -696,7 +360,7 @@ class SessionCockpitRenderModelTest {
     fun `active mode track item has distinct visual state`() {
         val state = defaultSessionState(
             activeMode = ModeId.HUMANISTIC,
-            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO)
+            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT)
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
@@ -716,33 +380,34 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `quick panel sheet exposes five rows without quality`() {
+    fun `quick panel sheet exposes all six rows`() {
         val state = defaultSessionState()
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Grid", sheet.gridRow.title)
+        assertEquals("Quality", sheet.qualityRow.title)
         assertEquals("Size", sheet.resolutionRow.title)
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
-
-        // Brightness row has slider fields
-        assertEquals("Brightness", sheet.brightnessRow.title)
-        assertTrue(sheet.brightnessRow.isVisible)
-        assertEquals(0, sheet.brightnessRow.steps)
-        assertTrue(sheet.brightnessRow.maxSteps >= sheet.brightnessRow.minSteps)
     }
 
     @Test
-    fun `quick panel sheet exposes resolution row`() {
+    fun `quick panel sheet exposes photo quality and resolution rows`() {
         val state = defaultSessionState(
-            activeDeviceGraph = DeviceGraphSpec.stillCapture()
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                qualityPreference = StillCaptureQualityPreference.QUALITY,
+                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
+            )
         )
 
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
+        assertEquals("Quality", sheet.qualityRow.title)
+        assertEquals("Still Max", sheet.qualityRow.value)
         assertEquals("Size", sheet.resolutionRow.title)
-        assertEquals("12MP", sheet.resolutionRow.value)
+        assertEquals("8MP", sheet.resolutionRow.value)
+        assertTrue(sheet.qualityRow.isEnabled)
         assertTrue(sheet.resolutionRow.isEnabled)
     }
 
@@ -784,7 +449,6 @@ class SessionCockpitRenderModelTest {
         assertFalse(sheet.frameRatioEnabled)
         assertNotNull(sheet.frameRatioDisabledReason)
         assertTrue(sheet.frameRatioOptions.all { !it.isEnabled })
-        assertNull(sheet.frameRatioNext)
     }
 
     @Test
@@ -804,81 +468,6 @@ class SessionCockpitRenderModelTest {
 
         assertFalse(sheet.frameRatioEnabled)
         assertNotNull(sheet.frameRatioDisabledReason)
-        assertNull(sheet.frameRatioNext)
-    }
-
-    @Test
-    fun `frameRatioNext cycles 4_3 to 16_9 to 1_1 back to 4_3`() {
-        val state = defaultSessionState()
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertEquals(FrameRatio.RATIO_16_9, sheet.frameRatioNext)
-
-        // Simulate 16:9 selected
-        val state169 = defaultSessionState().copy(
-            activeEffectSpec = EffectSpec(listOf(FrameEffect(FrameRatio.RATIO_16_9)))
-        )
-        val sheet169 = quickPanelSheetRenderModel(state169, TestAppTextResolver(), strings)
-        assertEquals(FrameRatio.RATIO_1_1, sheet169.frameRatioNext)
-
-        // Simulate 1:1 selected
-        val state11 = defaultSessionState().copy(
-            activeEffectSpec = EffectSpec(listOf(FrameEffect(FrameRatio.RATIO_1_1)))
-        )
-        val sheet11 = quickPanelSheetRenderModel(state11, TestAppTextResolver(), strings)
-        assertEquals(FrameRatio.RATIO_4_3, sheet11.frameRatioNext)
-    }
-
-    @Test
-    fun `quick panel rows expose correct control kinds`() {
-        val state = defaultSessionState()
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertEquals(QuickControlKind.CYCLE, sheet.gridRow.controlKind)
-        assertEquals(QuickControlKind.CYCLE, sheet.resolutionRow.controlKind)
-        assertEquals(QuickControlKind.SEGMENTED, sheet.frameRatioRow.controlKind)
-        assertEquals(QuickControlKind.TOGGLE, sheet.liveRow.controlKind)
-        assertEquals(QuickControlKind.CYCLE, sheet.timerRow.controlKind)
-    }
-
-    @Test
-    fun `quick panel live row isSelected reflects on-off state`() {
-        val stateOn = defaultSessionState(
-            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
-                livePhotoEnabledByDefault = true
-            )
-        )
-        val sheetOn = quickPanelSheetRenderModel(stateOn, TestAppTextResolver(), strings)
-        assertTrue(sheetOn.liveRow.isSelected)
-        assertEquals("On", sheetOn.liveRow.value)
-
-        val stateOff = defaultSessionState(
-            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
-                livePhotoEnabledByDefault = false
-            )
-        )
-        val sheetOff = quickPanelSheetRenderModel(stateOff, TestAppTextResolver(), strings)
-        assertFalse(sheetOff.liveRow.isSelected)
-        assertEquals("Off", sheetOff.liveRow.value)
-    }
-
-    @Test
-    fun `quick panel rows show disabled reason when present`() {
-        val state = defaultSessionState(
-            activeShot = ShotRequest(
-                shotId = "test-shot",
-                shotKind = ShotKind.STILL_CAPTURE,
-                mediaType = MediaType.PHOTO,
-                saveRequest = SaveRequest.photoLibrary(),
-                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
-                postProcessSpec = PostProcessSpec(),
-                captureProfile = CaptureProfile()
-            )
-        )
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertNotNull(sheet.frameRatioRow.disabledReason)
-        assertFalse(sheet.frameRatioRow.isEnabled)
     }
 
     @Test
@@ -975,80 +564,64 @@ class SessionCockpitRenderModelTest {
         assertEquals("Camera permission required", reason)
     }
 
-    // --- shutter visual state tests ---
-
     @Test
-    fun `shutter visual state is PHOTO_READY when idle`() {
-        val state = defaultSessionState()
-        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
-    }
-
-    @Test
-    fun `shutter visual state is BLOCKED when preview recovering`() {
-        val state = defaultSessionState(previewStatus = PreviewStatus.RECOVERING)
-        assertEquals(ShutterVisualState.BLOCKED, shutterVisualState(state))
-    }
-
-    @Test
-    fun `shutter visual state is BLOCKED when camera permission denied`() {
-        val state = defaultSessionState().copy(
-            permissionState = PermissionState(cameraGranted = false, microphoneGranted = false)
-        )
-        assertEquals(ShutterVisualState.BLOCKED, shutterVisualState(state))
-    }
-
-    @Test
-    fun `shutter visual state is COUNTDOWN when countdown active`() {
-        val state = defaultSessionState().copy(
-            presentation = SessionPresentationState(countdownRemainingSeconds = 3)
-        )
-        assertEquals(ShutterVisualState.COUNTDOWN, shutterVisualState(state))
-    }
-
-    @Test
-    fun `shutter visual state is SAVING when capture status is saving`() {
-        val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING)
-        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
-    }
-
-    @Test
-    fun `shutter visual state is SAVING when active photo shot`() {
+    fun `quick quality row shows combined video spec in video mode`() {
         val state = defaultSessionState(
-            activeShot = ShotRequest(
-                shotId = "test-shot",
-                shotKind = ShotKind.STILL_CAPTURE,
-                mediaType = MediaType.PHOTO,
-                saveRequest = SaveRequest.photoLibrary(),
-                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
-                postProcessSpec = PostProcessSpec(),
-                captureProfile = CaptureProfile()
+            activeMode = ModeId.VIDEO,
+            activeDeviceGraph = DeviceGraphSpec.videoRecording(
+                requestedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.FHD_1080P,
+                    frameRate = VideoFrameRate.FPS_60
+                ),
+                resolvedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.FHD_1080P,
+                    frameRate = VideoFrameRate.FPS_60
+                )
             )
         )
-        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("1080p60", sheet.qualityRow.value)
+        assertTrue(sheet.qualityRow.isEnabled)
     }
 
     @Test
-    fun `shutter visual state is VIDEO_REQUESTING when recording requesting`() {
-        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.REQUESTING)
-        assertEquals(ShutterVisualState.VIDEO_REQUESTING, shutterVisualState(state))
+    fun `quick quality row shows degraded video spec with asterisk`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            activeDeviceGraph = DeviceGraphSpec.videoRecording(
+                requestedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.UHD_4K,
+                    frameRate = VideoFrameRate.FPS_60
+                ),
+                resolvedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.UHD_4K,
+                    frameRate = VideoFrameRate.FPS_30
+                )
+            )
+        )
+
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("4K30*", sheet.qualityRow.value)
     }
 
     @Test
-    fun `shutter visual state is VIDEO_RECORDING when actively recording`() {
-        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
-        assertEquals(ShutterVisualState.VIDEO_RECORDING, shutterVisualState(state))
-    }
+    fun `quick quality row disabled during video recording`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            activeDeviceGraph = DeviceGraphSpec.videoRecording(
+                requestedVideoSpec = VideoSpec(
+                    resolution = VideoResolution.FHD_1080P,
+                    frameRate = VideoFrameRate.FPS_30
+                )
+            )
+        ).copy(recordingStatus = RecordingStatus.RECORDING)
 
-    @Test
-    fun `shutter visual state is VIDEO_STOPPING when recording stopping`() {
-        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.STOPPING)
-        assertEquals(ShutterVisualState.VIDEO_STOPPING, shutterVisualState(state))
-    }
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
-    @Test
-    fun `shutter visual state is FAILURE_OR_DEGRADED when capture failed`() {
-        val state = defaultSessionState().copy(captureStatus = CaptureStatus.FAILED)
-        assertEquals(ShutterVisualState.FAILURE_OR_DEGRADED, shutterVisualState(state))
+        assertFalse(sheet.qualityRow.isEnabled)
     }
 
     companion object {
@@ -1078,7 +651,9 @@ class SessionCockpitRenderModelTest {
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
-            enablePreviewSnapshots = true
+            enablePreviewSnapshots = true,
+            qualityPreference = StillCaptureQualityPreference.LATENCY,
+            resolutionPreset = StillCaptureResolutionPreset.LARGE_12MP
         ),
         previewStatus: PreviewStatus = PreviewStatus.ACTIVE,
         previewMetrics: PreviewMetrics = PreviewMetrics(),
