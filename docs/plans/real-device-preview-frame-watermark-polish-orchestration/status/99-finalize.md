@@ -12,7 +12,7 @@
 
 ## Changes
 
-- git status: main had unrelated concurrent changes during finalization; Codex staged and committed only this package's source/test/docs files.
+- git status: main had unrelated concurrent changes during finalization; functional source/test commits were scoped to this package, while the final ledger commit also contains concurrent zoom-orchestration document edits that were already staged/committed in the shared mainline flow.
 - git diff --stat:
   - `c7c5f06`: 2 files changed, 236 insertions.
   - `34b234c`: 3 files changed, 146 insertions, 2 deletions.
@@ -56,7 +56,7 @@
 
 - [x] Only touched allowed paths for this orchestration finalize plus the functional files required by the two package commits.
 - [x] Did not edit forbidden paths outside conflict resolution scope.
-- [x] Did not edit other packages' status files.
+- [x] Did not intentionally edit other packages' status files; note that the final shared ledger commit contains concurrent zoom-orchestration document edits from the shared mainline flow.
 
 ## Unresolved Risks
 
