@@ -95,6 +95,14 @@ internal class CockpitSurfaceRenderer(
             }
         }
 
+        slider.isInteractive = model.isEnabled
+        slider.alpha = if (model.isEnabled) 1f else 0.4f
+        slider.contentDescription = if (model.disabledReason != null) {
+            "Zoom slider: ${model.disabledReason}"
+        } else {
+            "Zoom slider: ${String.format(java.util.Locale.US, "%.1fx", model.currentRatio)}"
+        }
+
         slider.setPresetRatios(model.presetRatios)
         slider.setCurrentRatio(model.currentRatio)
     }

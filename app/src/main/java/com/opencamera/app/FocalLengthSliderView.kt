@@ -47,6 +47,8 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     var onRatioChanged: ((Float) -> Unit)? = null
     var onRatioSnapped: ((Float) -> Unit)? = null
 
+    var isInteractive: Boolean = true
+
     private var presetRatios: List<Float> = emptyList()
     private var currentRatio: Float = 1f
     private var minRatio: Float = 1f
@@ -196,6 +198,7 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!isInteractive) return false
         when (event.action) {
             MotionEvent.ACTION_DOWN -> {
                 val x = event.x

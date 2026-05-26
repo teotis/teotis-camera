@@ -32,7 +32,9 @@ internal data class ZoomCapsuleRenderModel(
 internal data class FocalLengthSliderRenderModel(
     val presetRatios: List<Float>,
     val currentRatio: Float,
-    val isVisible: Boolean
+    val isVisible: Boolean,
+    val isEnabled: Boolean = true,
+    val disabledReason: String? = null
 )
 
 internal data class SessionControlsRenderModel(
@@ -202,6 +204,11 @@ internal fun sessionControlsRenderModel(
     val currentRatio = normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
     val presets = capability.normalizedSupportedRatios
     val exactMatch = currentRatio in presets
+    val sliderEnabled = capability.isSwitchingSupported && !isZoomBlockedBySession(state)
+    val sliderDisabledReason = if (capability.isSwitchingSupported && !sliderEnabled) {
+        zoomDisabledReasonText(state)
+    } else null
+
     return SessionControlsRenderModel(
         lensFacingButtonLabel = lensFacingButtonLabel(state, strings),
         lensFacingEnabled = state.activeDeviceCapabilities.availableLensFacings.size > 1,
@@ -210,7 +217,9 @@ internal fun sessionControlsRenderModel(
         focalLengthSlider = FocalLengthSliderRenderModel(
             presetRatios = if (capability.isSwitchingSupported) presets else emptyList(),
             currentRatio = currentRatio,
-            isVisible = capability.isSwitchingSupported
+            isVisible = capability.isSwitchingSupported,
+            isEnabled = sliderEnabled,
+            disabledReason = sliderDisabledReason
         ),
         currentZoomLabel = if (capability.isSwitchingSupported && !exactMatch) compactZoomLabel(currentRatio) else null,
         isContinuousZoomActive = false,
@@ -650,6 +659,24 @@ private fun compactZoomLabel(ratio: Float): String {
     if (ratio == 1.0f) return "1x"
     val formatted = String.format(java.util.Locale.US, "%.1f", ratio)
     return if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
+}
+
+private fun isZoomBlockedBySession(state: SessionState): Boolean {
+    if (state.countdownRemainingSeconds != null) return true
+    val activeShot = state.activeShot
+    if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) return true
+    if (state.recordingStatus == RecordingStatus.REQUESTING) return true
+    if (state.recordingStatus == RecordingStatus.STOPPING) return true
+    return false
+}
+
+private fun zoomDisabledReasonText(state: SessionState): String {
+    if (state.countdownRemainingSeconds != null) return "Countdown in progress"
+    val activeShot = state.activeShot
+    if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) return "Saving previous photo"
+    if (state.recordingStatus == RecordingStatus.REQUESTING) return "Preparing to record"
+    if (state.recordingStatus == RecordingStatus.STOPPING) return "Stopping and saving"
+    return "Zoom unavailable"
 }
 
 private fun ZoomRatioCapability.zoomRatioSummary(): String {

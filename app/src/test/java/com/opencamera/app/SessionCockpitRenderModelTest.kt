@@ -487,6 +487,177 @@ class SessionCockpitRenderModelTest {
         assertNull(controls.currentZoomLabel)
     }
 
+    // --- Focal length slider V2 integration tests ---
+
+    @Test
+    fun `focal slider is visible and enabled when zoom supported and idle`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.focalLengthSlider.isVisible)
+        assertTrue(controls.focalLengthSlider.isEnabled)
+        assertNull(controls.focalLengthSlider.disabledReason)
+    }
+
+    @Test
+    fun `focal slider is hidden when zoom unsupported`() {
+        val state = defaultSessionState()
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertFalse(controls.focalLengthSlider.isVisible)
+    }
+
+    @Test
+    fun `focal slider is disabled during countdown`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        ).copy(
+            presentation = SessionPresentationState(countdownRemainingSeconds = 3)
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.focalLengthSlider.isVisible)
+        assertFalse(controls.focalLengthSlider.isEnabled)
+        assertNotNull(controls.focalLengthSlider.disabledReason)
+    }
+
+    @Test
+    fun `focal slider is disabled during photo capture saving`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeShot = ShotRequest(
+                shotId = "s1",
+                mediaType = MediaType.PHOTO,
+                shotKind = ShotKind.STILL_CAPTURE,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.NONE,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.focalLengthSlider.isVisible)
+        assertFalse(controls.focalLengthSlider.isEnabled)
+        assertNotNull(controls.focalLengthSlider.disabledReason)
+    }
+
+    @Test
+    fun `focal slider is disabled during recording requesting`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        ).copy(recordingStatus = RecordingStatus.REQUESTING)
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.focalLengthSlider.isVisible)
+        assertFalse(controls.focalLengthSlider.isEnabled)
+    }
+
+    @Test
+    fun `focal slider stays enabled during active video recording`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        ).copy(recordingStatus = RecordingStatus.RECORDING)
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.focalLengthSlider.isVisible)
+        assertTrue(controls.focalLengthSlider.isEnabled)
+        assertNull(controls.focalLengthSlider.disabledReason)
+    }
+
+    @Test
+    fun `focal slider preset ratios match capability`() {
+        val ratios = listOf(0.6f, 1f, 2f, 5f)
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = ratios,
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 2f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertEquals(ratios, controls.focalLengthSlider.presetRatios)
+        assertEquals(2f, controls.focalLengthSlider.currentRatio)
+    }
+
+    @Test
+    fun `focal slider current ratio is normalized to one decimal`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 2.345f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertEquals(2.3f, controls.focalLengthSlider.currentRatio)
+    }
+
+    @Test
+    fun `slider and capsule row both visible when zoom supported`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.isZoomCapsuleRowVisible)
+        assertTrue(controls.focalLengthSlider.isVisible)
+    }
+
     @Test
     fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
