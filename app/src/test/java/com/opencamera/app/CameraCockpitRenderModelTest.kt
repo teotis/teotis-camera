@@ -176,6 +176,22 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
+    fun `bottom cockpit shutter visual state defaults to PHOTO_READY`() {
+        val state = defaultSessionState()
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(ShutterVisualState.PHOTO_READY, model.bottomCockpit.shutterVisualState)
+    }
+
+    @Test
+    fun `bottom cockpit shutter visual state reflects recording`() {
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(ShutterVisualState.VIDEO_RECORDING, model.bottomCockpit.shutterVisualState)
+    }
+
+    @Test
     fun `cockpit render model carries active route through`() {
         val state = defaultSessionState()
         val route = CockpitPanelRoute.Settings(SettingsSubpage.ROOT)

@@ -27,6 +27,9 @@ internal class CockpitSurfaceRenderer(
 ) {
     var controlRotationDegrees: Float = 0f
 
+    private val shutterVisualDrawable = ShutterVisualDrawable()
+    private var shutterDrawableAttached = false
+
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
 
@@ -35,6 +38,10 @@ internal class CockpitSurfaceRenderer(
     }
 
     fun renderShutter(state: SessionState, controls: SessionControlsRenderModel, isShutterEnabled: Boolean = state.modeSnapshot.state.isShutterEnabled) {
+        if (!shutterDrawableAttached) {
+            shutterDrawableAttached = true
+            bottomCockpit.shutter.background = shutterVisualDrawable
+        }
         val shutterLabel = when (state.recordingStatus) {
             com.opencamera.core.session.RecordingStatus.IDLE -> context.getString(R.string.button_photo_capture)
             com.opencamera.core.session.RecordingStatus.REQUESTING -> context.getString(R.string.button_recording_starting)
@@ -43,11 +50,7 @@ internal class CockpitSurfaceRenderer(
         }
         bottomCockpit.shutter.contentDescription = shutterLabel
         bottomCockpit.shutter.text = ""
-        if (state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE) {
-            bottomCockpit.shutter.setBackgroundResource(R.drawable.bg_shutter_recording_selector)
-        } else {
-            bottomCockpit.shutter.setBackgroundResource(R.drawable.bg_shutter_selector)
-        }
+        shutterVisualDrawable.visualState = shutterVisualState(state)
         bottomCockpit.shutter.isEnabled = isShutterEnabled
         bottomCockpit.lensFacing.text = controls.lensFacingButtonLabel
         bottomCockpit.lensFacing.isEnabled = controls.lensFacingEnabled
