@@ -60,6 +60,12 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests 
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
+## Stop Gates And Risks
+
+- Stop before editing zoom slider, quick panel, or panel route code.
+- Stop if shutter semantics require session/capture state changes beyond visual rendering.
+- Risk: `CockpitSurfaceRenderer.kt` and `activity_main.xml` are shared files; preserve package 03 and 05 edits when merging.
+
 ## Expected Evidence Pack
 
 Write results to `status/02-shutter-state-animation-v2.md` using the status template.

@@ -61,6 +61,12 @@ rtk ./gradlew --no-daemon :app:assembleDebug
 rtk ./scripts/verify_stage_7_observability.sh
 ```
 
+## Stop Gates And Risks
+
+- Stop before hiding unsupported/degraded hardware capability behind enabled-looking controls.
+- Stop before overwriting package 02 shutter or package 03 zoom work in shared layout/renderer files.
+- Risk: semantic controls can regress accessibility or hit targets; preserve stable IDs and add focused tests for enabled/disabled/selected states.
+
 ## Expected Evidence Pack
 
 Write results to `status/05-quick-panel-semantic-controls-v2.md` using the status template.

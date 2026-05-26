@@ -62,6 +62,12 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests 
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
+## Stop Gates And Risks
+
+- Stop before adding direct CameraX/device behavior from UI.
+- Stop if EV feedback needs a new session/device contract rather than an existing intent.
+- Risk: `GesturePolicy.kt` may overlap with zoom pinch changes; coordinate with package 03 before editing the same branch.
+
 ## Expected Evidence Pack
 
 Write results to `status/01-focus-exposure-feedback-v2.md` using the status template.

@@ -51,3 +51,9 @@ rtk ./scripts/verify_stage_7_observability.sh
 - Stage 7 observability gate passes or any failure is documented as unrelated and accepted by the user.
 - No package introduced UI-local runtime camera ownership or direct CameraX calls from UI.
 - Codex/user visual QA confirms interaction timing is acceptable.
+
+## Stop Gates And Risks
+
+- Stop before destructive git operations or deleting agent worktrees.
+- Stop before accepting failed package verification as product-ready without user approval.
+- Risk: local test pass is not enough for animation feel; real-device visual QA remains required before a product GO.

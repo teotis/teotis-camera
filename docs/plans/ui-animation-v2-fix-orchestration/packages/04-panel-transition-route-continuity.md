@@ -59,6 +59,12 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --te
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
+## Stop Gates And Risks
+
+- Stop before adding new product panels or changing route names beyond transition continuity.
+- Stop if animation timing requires visual product approval not covered by tests.
+- Risk: transition helpers must remain interruptible and must not leave hidden panels touchable.
+
 ## Expected Evidence Pack
 
 Write results to `status/04-panel-transition-route-continuity.md` using the status template.

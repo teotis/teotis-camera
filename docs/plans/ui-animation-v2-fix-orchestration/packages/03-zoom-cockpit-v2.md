@@ -59,6 +59,12 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests 
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
+## Stop Gates And Risks
+
+- Stop before inventing unsupported focal-length or hardware capability claims.
+- Stop before editing shutter or quick panel portions of shared renderer/layout files.
+- Risk: continuous zoom dispatch can flood session intents; add or preserve throttling/debouncing evidence.
+
 ## Expected Evidence Pack
 
 Write results to `status/03-zoom-cockpit-v2.md` using the status template.

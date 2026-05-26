@@ -61,6 +61,12 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --te
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
+## Stop Gates And Risks
+
+- Stop before editing `core/mode/**` or changing the mode catalog contract.
+- Stop if restoring Humanistic requires broader product IA decisions beyond the tested main-track order.
+- Risk: this package is a prerequisite; do not start dependent packages from a failing focused UI baseline.
+
 ## Expected Evidence Pack
 
 Write results to `status/00-mode-order-regression.md` using the status template.
