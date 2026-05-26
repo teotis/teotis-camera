@@ -276,6 +276,7 @@ class DefaultCameraSession(
         mutations = previewSessionMutations,
         countdownInProgress = { captureRecordingProcessor.countdownInProgress() },
         cancelPendingCountdown = { reason -> captureRecordingProcessor.cancelPendingCountdown(reason) },
+        cancelRecordingElapsedTimer = { captureRecordingProcessor.cancelRecordingElapsedTimer() },
         scope = scope,
         dispatch = { intent -> dispatch(intent) }
     )

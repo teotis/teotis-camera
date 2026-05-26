@@ -115,7 +115,7 @@ internal class CaptureRecordingSessionProcessor(
         recordingWatchdogJob = null
     }
 
-    private fun cancelRecordingElapsedTimer() {
+    fun cancelRecordingElapsedTimer() {
         recordingElapsedJob?.cancel()
         recordingElapsedJob = null
         updateState.update { s ->
@@ -254,7 +254,7 @@ internal class CaptureRecordingSessionProcessor(
         }
         if (shot.mediaType == MediaType.VIDEO) {
             val shotId = shot.shotId
-            recordingElapsedJob = scope.launch {
+            recordingElapsedJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
                 while (state.value.activeShot?.shotId == shotId &&
                     state.value.recordingStatus == RecordingStatus.RECORDING
                 ) {

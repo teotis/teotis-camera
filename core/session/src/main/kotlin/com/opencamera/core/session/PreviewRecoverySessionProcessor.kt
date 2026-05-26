@@ -31,6 +31,7 @@ internal class PreviewRecoverySessionProcessor(
     private val mutations: PreviewSessionMutations,
     private val countdownInProgress: () -> Boolean,
     private val cancelPendingCountdown: (String) -> Unit,
+    private val cancelRecordingElapsedTimer: () -> Unit,
     private val scope: CoroutineScope,
     private val dispatch: suspend (SessionIntent) -> Unit
 ) {
@@ -227,6 +228,7 @@ internal class PreviewRecoverySessionProcessor(
             cancelPendingCountdown("Countdown cancelled because preview surface was lost")
         }
         if (state.value.recordingStatus == RecordingStatus.RECORDING) {
+            cancelRecordingElapsedTimer()
             handlePreviewError("Preview surface lost during recording: $reason")
             return
         }
@@ -238,6 +240,9 @@ internal class PreviewRecoverySessionProcessor(
     private suspend fun handlePreviewError(reason: String) {
         if (countdownInProgress()) {
             cancelPendingCountdown("Countdown cancelled because preview failed")
+        }
+        if (state.value.recordingStatus == RecordingStatus.RECORDING) {
+            cancelRecordingElapsedTimer()
         }
         val shouldAttemptRecovery = shouldAttemptPreviewErrorRecovery()
         mutations.updatePreviewError(
@@ -291,6 +296,9 @@ internal class PreviewRecoverySessionProcessor(
     private fun handlePreviewStopped(reason: String) {
         if (countdownInProgress()) {
             cancelPendingCountdown("Countdown cancelled because preview stopped")
+        }
+        if (state.value.recordingStatus == RecordingStatus.RECORDING) {
+            cancelRecordingElapsedTimer()
         }
         mutations.updatePreviewStopped(reason)
         trace.record("preview.stopped", reason)

@@ -81,6 +81,7 @@ class PreviewRecoverySessionProcessorTest {
                 mutations = mutations,
                 countdownInProgress = { countdownActive },
                 cancelPendingCountdown = { reason -> countdownCancellations.add(reason) },
+                cancelRecordingElapsedTimer = {},
                 scope = testScope,
                 dispatch = { intent -> processor.process(intent) }
             )
