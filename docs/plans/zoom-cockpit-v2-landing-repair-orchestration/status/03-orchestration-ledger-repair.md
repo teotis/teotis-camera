@@ -67,7 +67,7 @@
 
 ## Delivery
 
-- Commit hash: (recorded after commit)
+- Commit hash: `3487d65`
 
 ## Self-Certification
 
