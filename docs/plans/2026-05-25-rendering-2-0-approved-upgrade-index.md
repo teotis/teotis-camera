@@ -23,9 +23,9 @@
 
 | Document | Owner | Status | Purpose |
 | --- | --- | --- | --- |
-| [Rendering 2.0 Capture Save Reliability](./2026-05-25-rendering-2-0-capture-save-reliability.md) | Text/code agent + Codex/user real-device smoke | planned | Ensure optional rendering/postprocess failure never causes silent no-image behavior. |
-| [Rendering 2.0 Render Recipe Single Truth](./2026-05-25-rendering-2-0-render-recipe-single-truth.md) | Text/code agent | planned | Upgrade `RenderRecipe` and metadata flow so preview, saved output, capture feedback, and diagnostics share one recipe. |
-| [Rendering 2.0 Color Lab Perceptual Rendering](./2026-05-25-rendering-2-0-color-lab-perceptual-rendering.md) | Text/code agent + Codex/user visual QA | planned | Make Color Lab V2 visibly effective and natural through shared perceptual recipe, preview approximation, and saved JPEG rendering. |
+| [Rendering 2.0 Capture Save Reliability](./2026-05-25-rendering-2-0-capture-save-reliability.md) | Text/code agent + Codex/user real-device smoke | accepted locally | `guardedPostProcess(...)` outer guard landed; `PostprocessOuterGuardTest` passes; real-device smoke remains pending. |
+| [Rendering 2.0 Render Recipe Single Truth](./2026-05-25-rendering-2-0-render-recipe-single-truth.md) | Text/code agent | accepted locally | `RenderRecipe.from(ShotResult)` canonical fallback and recipe codec round-trip landed; real-device metadata verification remains pending. |
+| [Rendering 2.0 Color Lab Perceptual Rendering](./2026-05-25-rendering-2-0-color-lab-perceptual-rendering.md) | Text/code agent + Codex/user visual QA | accepted locally (approximate preview only) | `PreviewColorTransform`/`PreviewColorFidelity` model honest approximate/degraded states; NOT real PreviewView color pipeline parity; real-device visual QA remains pending. |
 
 ## Recommended Execution Order
 

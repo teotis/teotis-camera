@@ -85,11 +85,11 @@ After completing your assigned package:
 
 | Package | Agent | Status | Worktree | Commit/PR | Verification | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| 01-postprocess-outer-guard | - | pending | - | - | - | - |
-| 02-recipe-single-truth | - | pending | - | - | - | - |
-| 03-preview-fidelity-honesty | - | pending | - | - | - | - |
-| 04-ledger-and-gate-honesty | - | pending | - | - | - | - |
-| 99-integration-audit | Codex | pending | - | - | - | - |
+| 01-postprocess-outer-guard | external agent | accepted locally | mainline via `feat/rendering-2-0-upgrade` | `cc76237` | focused tests PASS | `guardedPostProcess(...)` in CameraXCaptureAdapter, PostprocessOuterGuardTest covers fallback |
+| 02-recipe-single-truth | external agent | accepted locally | mainline via `feat/rendering-2-0-upgrade` | `ce250f3` | focused tests PASS | `RenderRecipe.from(ShotResult)` canonical fallback, recipe codec round-trip |
+| 03-preview-fidelity-honesty | external agent | accepted locally (approximate only) | mainline via `feat/rendering-2-0-upgrade` | `3612c32` | focused tests PASS | `PreviewColorTransform`/`PreviewColorFidelity` model honest states; NOT real PreviewView parity |
+| 04-ledger-and-gate-honesty | - | superseded by post-merge follow-up package 02 | - | - | - | ledger reconciliation handled by `rendering-2-0-post-merge-followup-orchestration` |
+| 99-integration-audit | Codex | FAILED (pre-reconciliation) | mainline | - | static audit only | all packages failed pre-reconciliation; positive results accepted post-reconciliation |
 
 ## Merge Strategy
 

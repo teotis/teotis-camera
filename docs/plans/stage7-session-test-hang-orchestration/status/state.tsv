@@ -1,3 +1,3 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-01-session-test-hang-diagnosis-and-repair	ready			stage7-session-hang-01	agent/stage7-session-test-hang/01-session-test-hang-diagnosis-and-repair	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/stage7-session-test-hang-01-session-test-hang-diagnosis-and-repair							
+01-session-test-hang-diagnosis-and-repair	launched	2026-05-26T16:02:24Z		stage7-session-hang-01	agent/stage7-session-test-hang/01-session-test-hang-diagnosis-and-repair	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/stage7-session-test-hang-01-session-test-hang-diagnosis-and-repair							
 99-finalize	pending			stage7-session-hang-99-finalize	agent/stage7-session-test-hang/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/stage7-session-test-hang-99-finalize							

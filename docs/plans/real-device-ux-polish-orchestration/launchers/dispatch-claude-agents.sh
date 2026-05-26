@@ -17,7 +17,7 @@ cd "$REPO_ROOT"
 command -v claude >/dev/null 2>&1 || { echo "ERROR: claude CLI not found"; exit 1; }
 git rev-parse --git-dir >/dev/null 2>&1 || { echo "ERROR: not a git repository"; exit 1; }
 [ -f "$PLAN_DIR/INDEX.md" ] || { echo "ERROR: INDEX.md not found at $PLAN_DIR/INDEX.md"; exit 1; }
-[ -f "$PLAN_DIR/launchers/agent-view-prompts.md" ] || { echo "ERROR: Agent View prompts missing"; exit 1; }
+[ -f "$PLAN_DIR/launchers/agent-prompts.md" ] || { echo "ERROR: Agent prompts missing"; exit 1; }
 
 require_package() {
   local package_id="$1"
@@ -154,7 +154,7 @@ case "$PHASE" in
   audit|g5)
     launch_agent "99-integration-audit" "all implementation package status files completed"
     ;;
-  all)
+  start|all)
     echo "WARNING: launching all phases can create dependency-waiting agents. Prefer g0 -> g1 -> g2 -> g3 -> g4 -> audit."
     launch_agent "00-mode-entry-visibility" "none"
     launch_agent "03-quick-panel-outside-dismiss" "00-mode-entry-visibility completed or app tests known unblocked"

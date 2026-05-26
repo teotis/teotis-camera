@@ -57,7 +57,7 @@ preflight() {
 
   awk -F '\t' '
     NR == FNR { if (FNR > 1) pkg[$1] = 1; next }
-    NR == 1 { next }
+    FNR == 1 { next }
     {
       n = split($4, deps, ",")
       for (i = 1; i <= n; i++) {
