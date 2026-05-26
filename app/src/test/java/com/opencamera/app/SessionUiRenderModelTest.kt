@@ -1110,7 +1110,7 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `mode directory render model hides humanistic entry and uses product order`() {
+    fun `mode directory render model includes humanistic entry and uses product order`() {
         val state = defaultSessionState(
             activeMode = ModeId.VIDEO,
             availableModes = listOf(
@@ -1138,11 +1138,11 @@ class SessionUiRenderModelTest {
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Video", "Doc"),
+            listOf("Photo", "Humanistic", "Scenery", "Port", "Pro", "Video", "Doc"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
         )
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
     }
@@ -1349,7 +1349,7 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `mode track render model hides humanistic entry and uses product order`() {
+    fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
             ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
             ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
@@ -1360,17 +1360,13 @@ class SessionUiRenderModelTest {
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(3, model.items.size)
+        assertEquals(7, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
             model.items.map { it.modeId }
         )
-        assertTrue(model.items.none { it.modeId == ModeId.HUMANISTIC })
-        assertTrue(model.items.none { it.modeId == ModeId.NIGHT })
-        assertTrue(model.items.none { it.modeId == ModeId.PORTRAIT })
-        assertTrue(model.items.none { it.modeId == ModeId.PRO })
-        assertFalse(model.items.any { it.isActive })
-        assertFalse(model.items.first { it.modeId == ModeId.PHOTO }.isActive)
+        assertTrue(model.items.any { it.modeId == ModeId.HUMANISTIC })
+        assertTrue(model.items.first { it.modeId == ModeId.HUMANISTIC }.isActive)
         assertTrue(model.items.all { it.isAvailable })
     }
 
@@ -1812,17 +1808,21 @@ class SessionUiRenderModelTest {
 
     @Test
     fun `quick panel live toggle isSelected matches on-off state`() {
-        val stateOn = defaultSessionState(
+        val stateOn = defaultSessionState().copy(
             settings = defaultSessionState().settings.copy(
-                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = true)
+                persisted = defaultSessionState().settings.persisted.copy(
+                    photo = defaultSessionState().settings.persisted.photo.copy(livePhotoEnabledByDefault = true)
+                )
             )
         )
         val sheetOn = quickPanelSheetRenderModel(stateOn, TestAppTextResolver(), strings)
         assertTrue(sheetOn.liveRow.isSelected)
 
-        val stateOff = defaultSessionState(
+        val stateOff = defaultSessionState().copy(
             settings = defaultSessionState().settings.copy(
-                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = false)
+                persisted = defaultSessionState().settings.persisted.copy(
+                    photo = defaultSessionState().settings.persisted.photo.copy(livePhotoEnabledByDefault = false)
+                )
             )
         )
         val sheetOff = quickPanelSheetRenderModel(stateOff, TestAppTextResolver(), strings)

@@ -134,10 +134,19 @@ class GesturePolicyTest {
 
     @Test
     fun `pinchZoom accumulates within a single gesture`() {
-        policy.map(GestureEvent.PinchZoom(1.5f, 100f, 100f), ModeId.PHOTO, 1.0f)
+        policy.resetZoomAccumulation()
+        // First pinch: 1.0 * 1.5 = 1.5
+        val action1 = policy.map(GestureEvent.PinchZoom(1.5f, 100f, 100f), ModeId.PHOTO, 1.0f)
+        assertTrue(action1 is GestureAction.DispatchSession)
+        // Second pinch is throttled (within 16ms), but localZoomRatio still accumulates
         val action2 = policy.map(GestureEvent.PinchZoom(1.2f, 100f, 100f), ModeId.PHOTO, 1.0f)
-        assertTrue(action2 is GestureAction.DispatchSession)
-        val ratio = (action2 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
+        // Due to throttle, second event may return Ignore, but internal state accumulated
+        // After throttle window, next event should reflect accumulated ratio
+        Thread.sleep(20)
+        val action3 = policy.map(GestureEvent.PinchZoom(1.0f, 100f, 100f), ModeId.PHOTO, 1.0f)
+        assertTrue(action3 is GestureAction.DispatchSession)
+        val ratio = (action3 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
+        // 1.0 * 1.5 * 1.2 * 1.0 = 1.8
         assertEquals(1.8f, ratio.ratio, 0.01f)
     }
 

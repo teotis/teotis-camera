@@ -40,6 +40,7 @@ internal data class SessionControlsRenderModel(
     val lensFacingEnabled: Boolean,
     val zoomCapsules: List<ZoomCapsuleRenderModel>,
     val isZoomCapsuleRowVisible: Boolean,
+    val focalLengthSlider: FocalLengthSliderRenderModel,
     val currentZoomLabel: String? = null,
     val isContinuousZoomActive: Boolean = false,
     val nearestPresetRatio: Float? = null
@@ -206,6 +207,11 @@ internal fun sessionControlsRenderModel(
         lensFacingEnabled = state.activeDeviceCapabilities.availableLensFacings.size > 1,
         zoomCapsules = zoomCapsuleModels(state),
         isZoomCapsuleRowVisible = capability.isSwitchingSupported,
+        focalLengthSlider = FocalLengthSliderRenderModel(
+            presetRatios = if (capability.isSwitchingSupported) presets else emptyList(),
+            currentRatio = currentRatio,
+            isVisible = capability.isSwitchingSupported
+        ),
         currentZoomLabel = if (capability.isSwitchingSupported && !exactMatch) compactZoomLabel(currentRatio) else null,
         isContinuousZoomActive = false,
         nearestPresetRatio = if (!exactMatch && presets.isNotEmpty()) {

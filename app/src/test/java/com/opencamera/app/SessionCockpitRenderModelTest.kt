@@ -279,7 +279,7 @@ class SessionCockpitRenderModelTest {
             activeMode = ModeId.HUMANISTIC,
             availableModes = listOf(
                 ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
-                ModeId.VIDEO
+                ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
             ),
             modeSnapshot = ModeSnapshot(
                 id = ModeId.HUMANISTIC,
@@ -490,7 +490,8 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC, ModeId.VIDEO
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
+            ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
         )
         val state = defaultSessionState(activeMode = ModeId.HUMANISTIC, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
@@ -671,18 +672,22 @@ class SessionCockpitRenderModelTest {
 
     @Test
     fun `quick panel live row isSelected reflects on-off state`() {
-        val stateOn = defaultSessionState(
+        val stateOn = defaultSessionState().copy(
             settings = defaultSessionState().settings.copy(
-                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = true)
+                persisted = defaultSessionState().settings.persisted.copy(
+                    photo = defaultSessionState().settings.persisted.photo.copy(livePhotoEnabledByDefault = true)
+                )
             )
         )
         val sheetOn = quickPanelSheetRenderModel(stateOn, TestAppTextResolver(), strings)
         assertTrue(sheetOn.liveRow.isSelected)
         assertEquals("On", sheetOn.liveRow.value)
 
-        val stateOff = defaultSessionState(
+        val stateOff = defaultSessionState().copy(
             settings = defaultSessionState().settings.copy(
-                photo = defaultSessionState().settings.photo.copy(livePhotoEnabledByDefault = false)
+                persisted = defaultSessionState().settings.persisted.copy(
+                    photo = defaultSessionState().settings.persisted.photo.copy(livePhotoEnabledByDefault = false)
+                )
             )
         )
         val sheetOff = quickPanelSheetRenderModel(stateOff, TestAppTextResolver(), strings)
