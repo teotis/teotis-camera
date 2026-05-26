@@ -89,6 +89,8 @@ rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:testDebugUn
 ## Dependencies
 
 - Depends on: `03-shared-control-state-strategy`
+- Dependency type: status
+- Unlock condition: completed
 
 ## Parallel Safety
 

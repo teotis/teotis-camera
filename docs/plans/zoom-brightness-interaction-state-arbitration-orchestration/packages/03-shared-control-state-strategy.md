@@ -88,6 +88,8 @@ rtk rg -n "FocalLengthSlider|ApplyZoomRatio|ApplyPreviewBrightness|PreviewBright
 ## Dependencies
 
 - Depends on: `01-zoom-state-arbitration-audit`, `02-brightness-state-arbitration-audit`
+- Dependency type: status
+- Unlock condition: both packages completed
 
 ## Parallel Safety
 
