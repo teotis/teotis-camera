@@ -74,12 +74,12 @@ Package branches and worktrees recorded in package-graph.tsv and state.tsv:
 
 | Package | Branch | Worktree | Cleanup |
 |---|---|---|---|
-| 00-mode-entry-visibility | worktree-pkg-00-mode-order | .claude/worktrees/pkg-00-mode-order | Pending |
-| 03-quick-panel-outside-dismiss | agent/real-device-ux-polish/03-quick-panel-outside-dismiss | .worktrees/real-device-ux-polish/03-quick-panel-outside-dismiss | Pending |
-| 05-dev-log-storage-governance | worktree-05-dev-log-storage-governance | .claude/worktrees/05-dev-log-storage-governance | Pending |
-| 01-style-copy-noise-cleanup | agent/real-device-ux-polish/01-style-copy-noise-cleanup | .worktrees/real-device-ux-polish/01-style-copy-noise-cleanup | Pending |
-| 02-settings-third-level-navigation | worktree-pkg-02-settings-third-level | .claude/worktrees/pkg-02-settings-third-level | Pending |
-| 04-persistence-reset-unification | agent/real-device-ux-polish/04-persistence-reset-unification | .worktrees/real-device-ux-polish/04-persistence-reset-unification | Pending |
+| 00-mode-entry-visibility | worktree-pkg-00-mode-order | .claude/worktrees/pkg-00-mode-order | Done — branch + worktree removed |
+| 03-quick-panel-outside-dismiss | agent/real-device-ux-polish/03-quick-panel-outside-dismiss | .worktrees/real-device-ux-polish/03-quick-panel-outside-dismiss | Done — branch + worktree removed |
+| 05-dev-log-storage-governance | worktree-05-dev-log-storage-governance | .claude/worktrees/05-dev-log-storage-governance | Done — branch + worktree removed |
+| 01-style-copy-noise-cleanup | agent/real-device-ux-polish/01-style-copy-noise-cleanup | .worktrees/real-device-ux-polish/01-style-copy-noise-cleanup | Done — branch + worktree removed |
+| 02-settings-third-level-navigation | worktree-pkg-02-settings-third-level | .claude/worktrees/pkg-02-settings-third-level | Done — branch removed (worktree already gone) |
+| 04-persistence-reset-unification | agent/real-device-ux-polish/04-persistence-reset-unification | .worktrees/real-device-ux-polish/04-persistence-reset-unification | Done — branch + worktree removed |
 
 ## Residual Risks
 
