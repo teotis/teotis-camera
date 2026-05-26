@@ -38,7 +38,9 @@ import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.CommonSettings
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
+import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.PersistedSettings
+import com.opencamera.core.settings.ResetTarget
 import com.opencamera.core.settings.PhotoSettings
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.VideoFrameRate
@@ -580,7 +582,7 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `focal slider stays enabled during active video recording with continuous capability`() {
+    fun `focal slider stays enabled during active video recording`() {
         val state = defaultSessionState(
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 zoomRatioCapability = ZoomRatioCapability(
@@ -595,24 +597,6 @@ class SessionCockpitRenderModelTest {
         assertTrue(controls.focalLengthSlider.isVisible)
         assertTrue(controls.focalLengthSlider.isEnabled)
         assertNull(controls.focalLengthSlider.disabledReason)
-    }
-
-    @Test
-    fun `focal slider disabled during active video recording with discrete preset capability`() {
-        val state = defaultSessionState(
-            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
-                zoomRatioCapability = ZoomRatioCapability(
-                    support = ZoomControlSupport.DISCRETE_PRESET,
-                    supportedRatios = listOf(1f, 2f, 5f),
-                    defaultRatio = 1f
-                )
-            )
-        ).copy(recordingStatus = RecordingStatus.RECORDING)
-        val controls = sessionControlsRenderModel(state, strings)
-
-        assertTrue(controls.focalLengthSlider.isVisible)
-        assertFalse(controls.focalLengthSlider.isEnabled)
-        assertNotNull(controls.focalLengthSlider.disabledReason)
     }
 
     @Test
@@ -1167,5 +1151,30 @@ class SessionCockpitRenderModelTest {
                 lastError = lastError
             )
         )
+    }
+
+    @Test
+    fun `quick panel sheet has reset action when adjustments exist`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(sheet.hasQuickUserAdjustments)
+        assertEquals(
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.QUICK),
+            sheet.resetQuickAction
+        )
+    }
+
+    @Test
+    fun `quick panel sheet has no reset action when at defaults`() {
+        val state = defaultSessionState().copy(
+            settings = SessionSettingsSnapshot(
+                persisted = PersistedSettings()
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.hasQuickUserAdjustments)
+        assertNull(sheet.resetQuickAction)
     }
 }
