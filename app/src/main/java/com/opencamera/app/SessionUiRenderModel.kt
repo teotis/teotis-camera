@@ -1155,7 +1155,6 @@ internal fun watermarkLabSelectorRenderModel(
     val catalog = state.settings.catalog
     val editingEnabled = state.activeShot == null && state.countdownRemainingSeconds == null
     val supportsStillCapture = state.activeDeviceCapabilities.supportsStillCapture
-    val selectedTemplate = catalog.watermarkTemplateOrNull(settings.photo.defaultWatermarkTemplateId)
     return WatermarkLabSelectorRenderModel(
         headline = text.watermarkLab(),
         supportingText = text.watermarkSelectorSupporting(),
