@@ -36,7 +36,9 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Panel dismiss scrim: transparent overlay that dismisses panels on outside tap -->
+    <!-- Panel dismiss scrim: transparent overlay that dismisses panels on outside tap.
+         Elevation 4dp places scrim above bottom controls (0dp) so they cannot be
+         accidentally tapped while a panel overlay is open. -->
     <View
         android:id="@+id/panelDismissScrim"
         android:layout_width="0dp"
