@@ -1,30 +1,30 @@
-# Package: 08-architecture-boundary-violations
+# Package: [PACKAGE_ID]
 
 ## Status
-- State: pending
-- Launched at: -
-- Completed at: -
-- Agent: -
+- State: [pending|launched|in_progress|completed|blocked]
+- Launched at: [TIMESTAMP]
+- Completed at: [TIMESTAMP]
+- Agent: [AGENT_NAME]
 
 ## Evidence
-- Worktree: -
-- Branch: -
-- Base commit: -
-- Commit hash: -
-- Changed files: -
-- Verification commands: -
-- Verification results: -
-- Risks: -
+- Worktree: [WORKTREE_PATH]
+- Branch: [BRANCH_NAME]
+- Base commit: [COMMIT_HASH]
+- Commit hash: [COMMIT_HASH]
+- Changed files: [FILE_LIST]
+- Verification commands: [COMMANDS]
+- Verification results: [RESULTS]
+- Risks: [RISK_LIST]
 
 ## Analysis Results
-[PENDING]
+[ANALYSIS_CONTENT]
 
 ## Key Findings
-[PENDING]
+[FINDINGS_LIST]
 
 ## Recommendations
-[PENDING]
+[RECOMMENDATIONS_LIST]
 
 ## Notes
-- Created by orchestration setup
 - This is a pure analysis task - do NOT modify any source code
+- [ADDITIONAL_NOTES]
