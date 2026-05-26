@@ -3,6 +3,7 @@ package com.opencamera.app
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.StillCaptureOutputSize
+import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.effect.FrameEffect
@@ -17,6 +18,9 @@ import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.PreviewBrightnessFeedbackStatus
 import com.opencamera.core.settings.VideoSpec
+import com.opencamera.core.settings.PersistedSettingsAction
+import com.opencamera.core.settings.ResetTarget
+import com.opencamera.core.settings.hasUserAdjustments
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.PhotoLowLightPromptStatus
@@ -115,7 +119,9 @@ internal data class QuickPanelSheetRenderModel(
     val frameRatioEnabled: Boolean,
     val frameRatioDisabledReason: String?,
     val liveRow: QuickPanelRowRenderModel,
-    val timerRow: QuickPanelRowRenderModel
+    val timerRow: QuickPanelRowRenderModel,
+    val hasQuickUserAdjustments: Boolean = false,
+    val resetQuickAction: PersistedSettingsAction.ResetToDefaults? = null
 )
 
 internal data class ModeDirectoryItemRenderModel(
@@ -204,9 +210,9 @@ internal fun sessionControlsRenderModel(
     val currentRatio = normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
     val presets = capability.normalizedSupportedRatios
     val exactMatch = currentRatio in presets
-    val sliderEnabled = capability.isSwitchingSupported && !isZoomBlockedBySession(state)
+    val sliderEnabled = capability.isSwitchingSupported && !isZoomBlockedBySession(state, capability.support)
     val sliderDisabledReason = if (capability.isSwitchingSupported && !sliderEnabled) {
-        zoomDisabledReasonText(state)
+        zoomDisabledReasonText(state, capability.support)
     } else null
 
     return SessionControlsRenderModel(
@@ -399,7 +405,13 @@ internal fun quickPanelSheetRenderModel(
             value = timer.value,
             isEnabled = timer.isInteractive,
             controlKind = QuickControlKind.CYCLE
-        )
+        ),
+        hasQuickUserAdjustments = state.settings.persisted.hasUserAdjustments(ResetTarget.QUICK),
+        resetQuickAction = if (state.settings.persisted.hasUserAdjustments(ResetTarget.QUICK)) {
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.QUICK)
+        } else {
+            null
+        }
     )
 }
 
@@ -661,21 +673,23 @@ private fun compactZoomLabel(ratio: Float): String {
     return if (formatted.endsWith(".0")) formatted.dropLast(2) else formatted
 }
 
-private fun isZoomBlockedBySession(state: SessionState): Boolean {
+private fun isZoomBlockedBySession(state: SessionState, zoomSupport: ZoomControlSupport = ZoomControlSupport.UNSUPPORTED): Boolean {
     if (state.countdownRemainingSeconds != null) return true
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) return true
     if (state.recordingStatus == RecordingStatus.REQUESTING) return true
     if (state.recordingStatus == RecordingStatus.STOPPING) return true
+    if (state.recordingStatus == RecordingStatus.RECORDING && zoomSupport == ZoomControlSupport.DISCRETE_PRESET) return true
     return false
 }
 
-private fun zoomDisabledReasonText(state: SessionState): String {
+private fun zoomDisabledReasonText(state: SessionState, zoomSupport: ZoomControlSupport = ZoomControlSupport.UNSUPPORTED): String {
     if (state.countdownRemainingSeconds != null) return "Countdown in progress"
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) return "Saving previous photo"
     if (state.recordingStatus == RecordingStatus.REQUESTING) return "Preparing to record"
     if (state.recordingStatus == RecordingStatus.STOPPING) return "Stopping and saving"
+    if (state.recordingStatus == RecordingStatus.RECORDING && zoomSupport == ZoomControlSupport.DISCRETE_PRESET) return "Preset switching unavailable during recording"
     return "Zoom unavailable"
 }
 

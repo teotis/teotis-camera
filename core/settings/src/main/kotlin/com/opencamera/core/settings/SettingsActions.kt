@@ -47,6 +47,7 @@ sealed interface PersistedSettingsAction {
     data class UpdateColorLabSpec(val spec: ColorLabSpec) : PersistedSettingsAction
     data class UpdatePhotoStyleStrength(val strength: Float) : PersistedSettingsAction
     data class UpdatePhotoLowLightNightAssistEnabled(val enabled: Boolean) : PersistedSettingsAction
+    data class ResetToDefaults(val target: ResetTarget) : PersistedSettingsAction
 }
 
 fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings {
@@ -157,6 +158,33 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
         is PersistedSettingsAction.UpdatePhotoLowLightNightAssistEnabled -> copy(
             photo = photo.copy(lowLightNightAssistEnabled = action.enabled)
         )
+
+        is PersistedSettingsAction.ResetToDefaults -> {
+            val defaults = PersistedSettings()
+            when (action.target) {
+                ResetTarget.SETTINGS -> copy(common = defaults.common)
+                ResetTarget.STYLE -> copy(
+                    photo = photo.copy(
+                        defaultFilterProfileId = defaults.photo.defaultFilterProfileId,
+                        defaultHumanisticFilterProfileId = defaults.photo.defaultHumanisticFilterProfileId,
+                        defaultPortraitFilterProfileId = defaults.photo.defaultPortraitFilterProfileId,
+                        styleStrength = defaults.photo.styleStrength,
+                        colorLabSpec = defaults.photo.colorLabSpec
+                    )
+                )
+                ResetTarget.COLOR_LAB -> copy(
+                    photo = photo.copy(colorLabSpec = defaults.photo.colorLabSpec)
+                )
+                ResetTarget.QUICK -> copy(
+                    common = common.copy(gridMode = defaults.common.gridMode),
+                    photo = photo.copy(
+                        livePhotoEnabledByDefault = defaults.photo.livePhotoEnabledByDefault,
+                        countdownDuration = defaults.photo.countdownDuration
+                    ),
+                    video = video.copy(defaultVideoSpec = defaults.video.defaultVideoSpec)
+                )
+            }
+        }
     }
 }
 

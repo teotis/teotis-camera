@@ -16,6 +16,7 @@ import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.settings.PersistedSettingsAction
+import com.opencamera.core.settings.ResetTarget
 
 internal class MainActivityActionBinder(
     private val views: MainActivityViews,
@@ -115,7 +116,6 @@ internal class MainActivityActionBinder(
         }
         views.settingsPanel.back.setOnClickListener {
             callbacks.reducePanel(CockpitPanelCommand.SettingsBack)
-            callbacks.renderLatestSettingsSurfaces()
             callbacks.renderAfterPanelChange()
         }
 
@@ -147,6 +147,10 @@ internal class MainActivityActionBinder(
         }
         views.quickPanel.timer.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.countdown)
+        }
+        views.quickPanel.resetDefaults.setOnClickListener {
+            val action = snapshot().quickPanelSheet?.resetQuickAction ?: return@setOnClickListener
+            callbacks.applySettingsAction(action)
         }
 
         // Settings sub-page buttons
@@ -188,6 +192,11 @@ internal class MainActivityActionBinder(
         }
         views.settingsPanel.videoFilter.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.videoSection?.defaultFilter)
+        }
+
+        views.settingsPanel.resetDefaults.setOnClickListener {
+            val action = snapshot().settingsPage?.resetSettingsAction ?: return@setOnClickListener
+            callbacks.applySettingsAction(action)
         }
 
         // Portrait lab
@@ -252,6 +261,10 @@ internal class MainActivityActionBinder(
         views.filterLab.saveCustom.setOnClickListener {
             callbacks.saveCurrentFilterAsCustom(snapshot().filterLabPage?.saveCustomControl)
         }
+        views.filterLab.resetDefaults.setOnClickListener {
+            val action = snapshot().filterLabPage?.resetStyleAction ?: return@setOnClickListener
+            callbacks.applySettingsAction(action)
+        }
         views.filterLab.modeToggle.setOnClickListener {
             val current = snapshot().activePanelRoute
             if (current is CockpitPanelRoute.ColorLab) {
@@ -313,6 +326,10 @@ internal class MainActivityActionBinder(
         views.devConsole.export.setOnClickListener {
             callbacks.exportDevLog()
         }
+        views.devConsole.cleanupKey.setOnClickListener { callbacks.cleanupDevLogByType(DevLogTab.KEY) }
+        views.devConsole.cleanupCore.setOnClickListener { callbacks.cleanupDevLogByType(DevLogTab.CORE) }
+        views.devConsole.cleanupError.setOnClickListener { callbacks.cleanupDevLogByType(DevLogTab.ERROR) }
+        views.devConsole.cleanupAll.setOnClickListener { callbacks.cleanupAllDevLogs() }
         views.devConsole.close.setOnClickListener {
             callbacks.reducePanel(CockpitPanelCommand.CloseDevConsole)
             callbacks.renderAfterPanelChange()
@@ -400,7 +417,18 @@ internal class MainActivityActionBinder(
             }
         }
         previewView.setOnTouchListener { v, event ->
-            gestureRouter!!.onTouchEvent(v, event)
+            val snap = snapshot()
+            val guardState = GestureGuardState(
+                activePanel = snap.activePanelRoute,
+                isFilterAdjustmentActive = snap.isFilterAdjustmentVisible
+            )
+            if (!gestureGuard.isGestureAllowed(GestureZone.PREVIEW, guardState)) {
+                // Let the touch fall through to panelDismissScrim so that an
+                // outside tap dismisses the active panel instead of being lost.
+                false
+            } else {
+                gestureRouter!!.onTouchEvent(v, event)
+            }
         }
     }
 

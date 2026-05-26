@@ -614,7 +614,14 @@ class DefaultCameraSession(
             )
             return
         }
-        if (activeShot != null && _state.value.recordingStatus != RecordingStatus.RECORDING) {
+
+        val recordingStatus = _state.value.recordingStatus
+        if (recordingStatus == RecordingStatus.REQUESTING || recordingStatus == RecordingStatus.STOPPING) {
+            updateState(lastAction = "Wait for recording state to settle before adjusting zoom")
+            trace.record("zoom.switch.blocked", "recording=$recordingStatus")
+            return
+        }
+        if (activeShot != null && recordingStatus != RecordingStatus.RECORDING) {
             updateState(lastAction = "Wait for recording to start before switching zoom")
             trace.record(
                 "zoom.switch.blocked",
@@ -630,6 +637,12 @@ class DefaultCameraSession(
                 "zoom.switch.unavailable",
                 zoomCapability.support.tagValue
             )
+            return
+        }
+
+        if (recordingStatus == RecordingStatus.RECORDING && zoomCapability.support == ZoomControlSupport.DISCRETE_PRESET) {
+            updateState(lastAction = "Zoom preset stepping is blocked during recording")
+            trace.record("zoom.switch.blocked.recording", "discrete-preset")
             return
         }
 
@@ -672,10 +685,23 @@ class DefaultCameraSession(
             return
         }
 
+        val recordingStatus = _state.value.recordingStatus
+        if (recordingStatus == RecordingStatus.REQUESTING || recordingStatus == RecordingStatus.STOPPING) {
+            updateState(lastAction = "Wait for recording state to settle before adjusting zoom")
+            trace.record("zoom.apply.blocked", "recording=$recordingStatus")
+            return
+        }
+
         val zoomCapability = _state.value.activeDeviceCapabilities.zoomRatioCapability
         if (!zoomCapability.isSwitchingSupported) {
             updateState(lastAction = "Zoom switching is unavailable on this device")
             trace.record("zoom.apply.unavailable", zoomCapability.support.tagValue)
+            return
+        }
+
+        if (recordingStatus == RecordingStatus.RECORDING && zoomCapability.support == ZoomControlSupport.DISCRETE_PRESET) {
+            updateState(lastAction = "Zoom preset stepping is blocked during recording")
+            trace.record("zoom.apply.blocked.recording", "discrete-preset")
             return
         }
 

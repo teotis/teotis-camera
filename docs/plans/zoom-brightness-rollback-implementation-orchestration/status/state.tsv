@@ -1,6 +1,6 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-01-zoom-slider-render-latch	pending
-02-brightness-dispatch-and-latch	pending
-03-pinch-zoom-basis-repair	pending
+01-zoom-slider-render-latch	completed	2026-05-26T18:54:22Z	2026-05-27T12:00:00Z	zb-01-zoom-slider-render-latch	agent/zoom-brightness-rollback/01-zoom-slider-render-latch	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/01-zoom-slider-render-latch	92b76a7	3befe77	passed	pending	pending
+02-brightness-dispatch-and-latch	completed	2026-05-26T18:54:22Z	2026-05-27T12:00:00Z	zb-02-brightness-dispatch-and-latch	agent/zoom-brightness-rollback/02-brightness-dispatch-and-latch	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/02-brightness-dispatch-and-latch	65ddc81	511fe57	passed	pending	pending
+03-pinch-zoom-basis-repair	completed	2026-05-27T00:00:00Z	2026-05-27T00:00:00Z	zb-03-pinch-zoom-basis-repair	agent/zoom-brightness-rollback/03-pinch-zoom-basis-repair	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/03-pinch-zoom-basis-repair	3befe77	0ecc9ee	passed	pending	pending
 04-integration-verification-and-smoke	pending
 99-finalize	pending

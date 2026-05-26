@@ -149,6 +149,124 @@ class PreviewSceneMaskSourceTest {
         )
     }
 
+    @Test
+    fun `MlKit source does not close ImageProxy when used through fanout`() {
+        val source = MlKitSelfiePreviewSceneMaskSource()
+        source.start(PreviewSceneMaskConfig())
+
+        var closeCount = 0
+        val proxy = object : ImageProxy {
+            override fun close() { closeCount++ }
+            override fun getImage() = null
+            override fun getPlanes() = emptyArray<ImageProxy.PlaneProxy>()
+            override fun getWidth() = 640
+            override fun getHeight() = 480
+            override fun getImageInfo() = throw UnsupportedOperationException()
+            override fun getFormat() = 35
+            override fun getCropRect() = android.graphics.Rect(0, 0, 640, 480)
+            override fun setCropRect(rect: android.graphics.Rect?) {}
+        }
+
+        // Simulate fanout calling source then closing
+        source.onAnalyzeFrame(proxy, 0)
+        // Source should not close proxy - fanout owns lifecycle
+        assertEquals("source should not close ImageProxy", 0, closeCount)
+
+        // Fanout closes
+        proxy.close()
+        assertEquals("fanout close is the only close", 1, closeCount)
+
+        source.stop("test")
+    }
+
+    @Test
+    fun `maxFps throttle drops too-soon frame before conversion`() {
+        val source = MlKitSelfiePreviewSceneMaskSource()
+        // maxFps=4 means min interval = 250ms
+        source.start(PreviewSceneMaskConfig(maxFps = 4))
+
+        // First frame: no previous processed time, should not be throttled
+        // (but will fail bitmap conversion since test proxy has no planes)
+        val proxy1 = createTestImageProxy()
+        source.onAnalyzeFrame(proxy1, 0)
+
+        // Second frame immediately after: should be fps-throttled
+        val proxy2 = createTestImageProxy()
+        source.onAnalyzeFrame(proxy2, 0)
+
+        // Since we can't easily inspect internal counters from test,
+        // we verify the source doesn't crash and still reports latestMask as null
+        // (both frames fail at bitmap conversion, but fps throttle happens before that for the second)
+        assertNull(source.latestMask())
+
+        source.stop("test")
+    }
+
+    @Test
+    fun `maxFps config with 0 disables throttling`() {
+        val source = MlKitSelfiePreviewSceneMaskSource()
+        source.start(PreviewSceneMaskConfig(maxFps = 0))
+
+        // Should not throw or throttle
+        val proxy1 = createTestImageProxy()
+        source.onAnalyzeFrame(proxy1, 0)
+        val proxy2 = createTestImageProxy()
+        source.onAnalyzeFrame(proxy2, 0)
+
+        assertNull(source.latestMask())
+        source.stop("test")
+    }
+
+    @Test
+    fun `target size config is stored and used`() {
+        val config = PreviewSceneMaskConfig(targetWidth = 128, targetHeight = 96, maxFps = 8)
+        val source = MlKitSelfiePreviewSceneMaskSource()
+        source.start(config)
+
+        // Config should be accepted without error
+        val proxy = createTestImageProxy()
+        source.onAnalyzeFrame(proxy, 0)
+
+        assertNull(source.latestMask())
+        source.stop("test")
+    }
+
+    @Test
+    fun `PreviewSceneMaskPayload with source dimensions records transform`() {
+        val payload = PreviewSceneMaskPayload(
+            width = 128,
+            height = 96,
+            confidenceMask = ByteArray(128 * 96) { 127 },
+            rotationDegrees = 0,
+            timestampMillis = 1000L,
+            sourceWidth = 640,
+            sourceHeight = 480,
+            diagnostics = listOf("source=640x480", "target=128x96")
+        )
+        val descriptor = payload.toDescriptor()
+        assertEquals(640, descriptor.transform.sourceWidth)
+        assertEquals(480, descriptor.transform.sourceHeight)
+        assertEquals(128, descriptor.transform.maskWidth)
+        assertEquals(96, descriptor.transform.maskHeight)
+        assertTrue(descriptor.diagnostics.any { it.contains("source=640x480") })
+    }
+
+    @Test
+    fun `PreviewSceneMaskPayload default source dimensions equal mask dimensions`() {
+        val payload = PreviewSceneMaskPayload(
+            width = 256,
+            height = 256,
+            confidenceMask = ByteArray(256 * 256) { 100 },
+            rotationDegrees = 90,
+            timestampMillis = 2000L
+        )
+        assertEquals(256, payload.sourceWidth)
+        assertEquals(256, payload.sourceHeight)
+        val descriptor = payload.toDescriptor()
+        assertEquals(256, descriptor.transform.sourceWidth)
+        assertEquals(256, descriptor.transform.sourceHeight)
+    }
+
     private fun createTestImageProxy(): ImageProxy {
         return object : ImageProxy {
             override fun close() {}

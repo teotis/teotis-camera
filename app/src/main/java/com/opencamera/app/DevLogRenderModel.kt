@@ -8,5 +8,9 @@ internal data class DevLogRenderModel(
     val title: String,
     val summaryText: String,
     val content: String,
-    val exportContent: String
+    val exportContent: String,
+    val storageUsedDisplay: String = "",
+    val storageCapacityDisplay: String = "",
+    val storageUsageRatio: Float = 0f,
+    val canCleanup: Boolean = false
 )

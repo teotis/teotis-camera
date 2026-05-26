@@ -46,6 +46,7 @@ internal class SettingsPanelRenderer(
         renderControl(views.videoDynamicFps, model.videoSection.dynamicFps, model.editingEnabled)
         renderControl(views.videoAudio, model.videoSection.audioProfile, model.editingEnabled)
         renderControl(views.videoFilter, model.videoSection.defaultFilter, model.editingEnabled)
+        views.resetDefaults.isVisible = model.hasSettingsUserAdjustments
     }
 
     fun renderTabs(selectedSettingsTab: SettingsTab) {
