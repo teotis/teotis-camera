@@ -1,6 +1,6 @@
 # Package 02 - Brightness Dispatch And Latch - Status
 
-## Result: pass
+## Result: completed
 
 ## Evidence
 
