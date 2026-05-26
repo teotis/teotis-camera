@@ -1,5 +1,7 @@
 package com.opencamera.app.camera
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
@@ -8,11 +10,17 @@ import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ThumbnailSource
+import com.opencamera.core.settings.WatermarkFrameBackground
+import com.opencamera.core.settings.WatermarkTextPlacement
 import kotlinx.coroutines.test.runTest
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
+@RunWith(RobolectricTestRunner::class)
 class PhotoWatermarkPostProcessorTest {
     @Test
     fun `photo result with watermark and content uri is rendered`() = runTest {
@@ -194,6 +202,102 @@ class PhotoWatermarkPostProcessorTest {
         assertEquals(0, editor.invocations.size)
         assertEquals(input, result)
     }
+
+    @Test
+    fun `blur four border top and left border pixels are derived from source edge content`() {
+        val source = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.RED)
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_LIGHT_BLUR)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+        val minEdge = 100f
+        val sideBorder = maxOf(20f, minEdge * 0.045f).toInt()
+        val topBorder = maxOf(20f, minEdge * 0.045f).toInt()
+
+        val topPixel = bmp.getPixel(bmp.width / 2, topBorder / 2)
+        val leftPixel = bmp.getPixel(sideBorder / 2, bmp.height / 2)
+
+        assertTrue(Color.red(topPixel) > 150, "top border should be reddish from source edge")
+        assertTrue(Color.red(leftPixel) > 150, "left border should be reddish from source edge")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    fun `blur four border dark edge input does not produce pale washed-out border`() {
+        val darkColor = Color.argb(255, 20, 15, 10)
+        val source = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(darkColor)
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_LIGHT_BLUR)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+        val topBorder = maxOf(20f, 80f * 0.045f).toInt()
+
+        val topPixel = bmp.getPixel(bmp.width / 2, topBorder / 2)
+
+        assertFalse(Color.red(topPixel) > 150, "dark source should not produce white/pale border")
+        assertFalse(Color.green(topPixel) > 150, "dark source should not produce white/pale border")
+        assertFalse(Color.blue(topPixel) > 150, "dark source should not produce white/pale border")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    fun `blur four border top border is greenish when top edge is green`() {
+        val source = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        for (x in 0 until 200) {
+            for (y in 0 until 200) {
+                source.setPixel(x, y, if (y < 40) Color.GREEN else Color.GRAY)
+            }
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_BLUR)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+
+        val topPixel = bmp.getPixel(bmp.width / 2, 2)
+        assertTrue(
+            Color.green(topPixel) > Color.red(topPixel),
+            "top border should be greenish from green top edge, got R=${Color.red(topPixel)} G=${Color.green(topPixel)}"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    fun `blur four border bottom border is bluish when bottom edge is blue`() {
+        val source = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        for (x in 0 until 200) {
+            for (y in 0 until 200) {
+                source.setPixel(x, y, if (y >= 160) Color.BLUE else Color.GRAY)
+            }
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_BLUR)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+
+        val bottomPixel = bmp.getPixel(bmp.width / 2, bmp.height - 6)
+        assertTrue(
+            Color.blue(bottomPixel) > Color.red(bottomPixel),
+            "bottom border should be bluish from blue bottom edge, got R=${Color.red(bottomPixel)} B=${Color.blue(bottomPixel)}"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+    private fun blurFourBorderTemplate(
+        background: WatermarkFrameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR
+    ) = ResolvedPhotoWatermarkTemplate(
+        templateId = "blur-four-border",
+        title = "Test Title",
+        supportingLines = listOf("Line 1"),
+        frameBackground = background,
+        usesExpandedFrame = true,
+        placement = WatermarkTextPlacement.BOTTOM_LEFT,
+        textScale = 1f,
+        textOpacity = 1f
+    )
 
     private fun photoResult(
         mediaType: MediaType = MediaType.PHOTO,

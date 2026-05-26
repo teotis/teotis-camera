@@ -415,6 +415,7 @@ private const val MAX_TEXT_SCALE = 1.4f
 private const val MIN_PADDING_PX = 18f
 private const val MIN_CORNER_RADIUS_PX = 12f
 private const val BLUR_DOWNSAMPLE_DIVISOR = 18
+private const val EDGE_STRIP_DOWNSAMPLE_DIVISOR = 4
 
 internal fun renderPhotoWatermarkBitmap(
     bitmap: Bitmap,
@@ -732,8 +733,13 @@ private fun drawBlurFourBorderFrame(
     val framedHeight = (source.height + topBorder + bottomBorder).toInt()
     val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(framedBitmap)
-    val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
-    drawFrameBackground(canvas, source, fullRect, template.frameBackground)
+    val sideBorderInt = sideBorder.toInt()
+    val topBorderInt = topBorder.toInt()
+    val bottomBorderInt = bottomBorder.toInt()
+    drawContentAwareEdgeBorder(
+        canvas, source, framedWidth, framedHeight,
+        sideBorderInt, topBorderInt, bottomBorderInt
+    )
     canvas.drawBitmap(source, sideBorder, topBorder, null)
 
     val hairlineColor = when (template.frameBackground) {
@@ -918,6 +924,39 @@ private fun drawProfessionalBottomBar(
         bitmap = framedBitmap,
         warning = template.warning
     )
+}
+
+private fun drawContentAwareEdgeBorder(
+    canvas: Canvas,
+    source: Bitmap,
+    framedWidth: Int,
+    framedHeight: Int,
+    sideBorder: Int,
+    topBorder: Int,
+    bottomBorder: Int
+) {
+    val stripH = maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR)
+    val stripW = maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR)
+
+    val topSrc = Bitmap.createBitmap(source, 0, 0, source.width, stripH)
+    val topScaled = Bitmap.createScaledBitmap(topSrc, framedWidth, topBorder, true)
+    canvas.drawBitmap(topScaled, 0f, 0f, null)
+    topSrc.recycle(); topScaled.recycle()
+
+    val bottomSrc = Bitmap.createBitmap(source, 0, source.height - stripH, source.width, stripH)
+    val bottomScaled = Bitmap.createScaledBitmap(bottomSrc, framedWidth, bottomBorder, true)
+    canvas.drawBitmap(bottomScaled, 0f, (framedHeight - bottomBorder).toFloat(), null)
+    bottomSrc.recycle(); bottomScaled.recycle()
+
+    val leftSrc = Bitmap.createBitmap(source, 0, 0, stripW, source.height)
+    val leftScaled = Bitmap.createScaledBitmap(leftSrc, sideBorder, source.height, true)
+    canvas.drawBitmap(leftScaled, 0f, topBorder.toFloat(), null)
+    leftSrc.recycle(); leftScaled.recycle()
+
+    val rightSrc = Bitmap.createBitmap(source, source.width - stripW, 0, stripW, source.height)
+    val rightScaled = Bitmap.createScaledBitmap(rightSrc, sideBorder, source.height, true)
+    canvas.drawBitmap(rightScaled, (framedWidth - sideBorder).toFloat(), topBorder.toFloat(), null)
+    rightSrc.recycle(); rightScaled.recycle()
 }
 
 private fun drawFrameBackground(
