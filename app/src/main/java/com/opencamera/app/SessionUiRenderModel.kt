@@ -546,7 +546,8 @@ internal fun sessionSettingsPageRenderModel(
                 label = text.watermarkLabSettingLabel(),
                 value = watermarkTemplateLabel(
                     settings.photo.defaultWatermarkTemplateId,
-                    watermarkTemplates
+                    watermarkTemplates,
+                    text
                 ),
                 availability = if (supportsStillCapture && watermarkTemplates.isNotEmpty()) {
                     SettingsControlAvailability.DEGRADED
@@ -1168,32 +1169,29 @@ internal fun watermarkLabSelectorRenderModel(
         items = catalog.watermarkTemplates.map { template ->
             val style = settings.photo.watermarkStyleFor(template.id)
             val isSelected = template.id == settings.photo.defaultWatermarkTemplateId
+            val templateLabel = template.localizedLabel(text)
             WatermarkLabTemplateItemRenderModel(
                 templateId = template.id,
-                title = template.label,
+                title = templateLabel,
                 supportingText = buildString {
-                    append(when (template.id) {
-                        "pure-text" -> text.watermarkTemplatePureText()
-                        "blur-four-border" -> text.watermarkTemplateBlurFourBorder()
-                        else -> if (template.supportsFrameBorder) text.watermarkTemplateExpandedFrame() else text.watermarkTemplateClassicOverlay()
-                    })
+                    append(template.kindLabel(text))
                     append(" | ")
                     append(text.tokensLabel())
                     append(" ")
                     append(template.tokenKeys.prettyWatermarkTokens(text))
                     append(" | ")
                     append(text.watermarkAttrPlacementPrefix())
-                    append(style.textPlacement.label)
+                    append(text.watermarkPlacementLabel(style.textPlacement))
                     append(" | ")
                     append(text.watermarkAttrScalePrefix())
-                    append(style.textScale.label)
+                    append(text.watermarkTextScaleLabel(style.textScale))
                     append(" | ")
                     append(text.watermarkAttrOpacityPrefix())
-                    append(style.textOpacity.label)
+                    append(text.watermarkTextOpacityLabel(style.textOpacity))
                     if (template.supportsFrameBorder) {
                         append(" | ")
                         append(text.watermarkAttrBackgroundPrefix())
-                        append(style.frameBackground.label)
+                        append(text.watermarkFrameBackgroundLabel(style.frameBackground))
                     }
                     if (isSelected) {
                         append(text.watermarkSelectorCurrentDefault())
@@ -1206,7 +1204,7 @@ internal fun watermarkLabSelectorRenderModel(
                     null
                 },
                 editButtonLabel = if (supportsStillCapture) {
-                    text.openStylePage()
+                    text.watermarkStylePageShort()
                 } else {
                     null
                 }
@@ -1242,11 +1240,11 @@ internal fun watermarkLabDetailRenderModel(
         ?: WatermarkFrameBackground.entries.toSet()
     val controlAvailability = if (supportsStillCapture) {
         SettingsControlAvailability.SUPPORTED
-    } else {
-        SettingsControlAvailability.UNSUPPORTED
-    }
+        } else {
+            SettingsControlAvailability.UNSUPPORTED
+        }
     return WatermarkLabDetailRenderModel(
-        headline = template.label,
+        headline = template.localizedLabel(text),
         supportingText = if (template.id == settings.photo.defaultWatermarkTemplateId) {
             text.watermarkDetailSupportingSelected()
         } else {
@@ -1262,7 +1260,7 @@ internal fun watermarkLabDetailRenderModel(
         },
         placementControl = SettingsControlRenderModel(
             label = text.textPlacementLabel(),
-            value = style.textPlacement.label,
+            value = text.watermarkPlacementLabel(style.textPlacement),
             availability = controlAvailability,
             availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
@@ -1281,7 +1279,7 @@ internal fun watermarkLabDetailRenderModel(
         ),
         textScaleControl = SettingsControlRenderModel(
             label = text.textScaleLabel(),
-            value = style.textScale.label,
+            value = text.watermarkTextScaleLabel(style.textScale),
             availability = controlAvailability,
             availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
@@ -1300,7 +1298,7 @@ internal fun watermarkLabDetailRenderModel(
         ),
         textOpacityControl = SettingsControlRenderModel(
             label = text.textOpacityLabel(),
-            value = style.textOpacity.label,
+            value = text.watermarkTextOpacityLabel(style.textOpacity),
             availability = controlAvailability,
             availabilityLabel = text.availabilityLabel(controlAvailability),
             supportLabel = if (supportsStillCapture) {
@@ -1320,7 +1318,7 @@ internal fun watermarkLabDetailRenderModel(
         frameBackgroundControl = if (template.supportsFrameBorder) {
             SettingsControlRenderModel(
                 label = text.frameBackgroundLabel(),
-                value = style.frameBackground.label,
+                value = text.watermarkFrameBackgroundLabel(style.frameBackground),
                 availability = controlAvailability,
                 supportLabel = if (supportsStillCapture) {
                     text.moodsCount(allowedBackgrounds.size)
@@ -1376,7 +1374,7 @@ internal fun filterLabPageRenderModel(
     val colorLabModel = colorLabPanelRenderModel(state, text)
     val colorLabRenderSpec = FilterRenderSpec().applyColorLab(settings.photo.colorLabSpec)
     val currentProfile = family.filters.firstOrNull { profile -> profile.id == family.currentFilterId }
-    val currentFilterLabel = currentProfile?.label ?: family.currentFilterId
+    val currentFilterLabel = currentProfile.localizedLabel(family.currentFilterId, text)
     val currentRenderSpec = currentProfile?.renderSpec ?: FilterRenderSpec()
     val cycleAction = if (family.supported) {
         nextListValueOrNull(
@@ -1400,7 +1398,7 @@ internal fun filterLabPageRenderModel(
             family.filters.joinToString(separator = "\n") { profile ->
                 val marker = if (profile.id == family.currentFilterId) "•" else "·"
                 val customBadge = if (profile.builtIn) "" else text.statusCustomBadge()
-                "$marker ${profile.label}${customBadge}"
+                "$marker ${profile.localizedLabel(text)}${customBadge}"
             }
         },
         editingEnabled = editingEnabled,
@@ -1449,9 +1447,10 @@ internal fun filterLabPageRenderModel(
         } else {
             family.filters.map { profile ->
                 val isSelected = profile.id == family.currentFilterId
+                val profileLabel = profile.localizedLabel(text)
                 FilterLabFilterItemRenderModel(
                     filterProfileId = profile.id,
-                    title = profile.label,
+                    title = profileLabel,
                     supportingText = buildString {
                         append(family.label)
                         if (!profile.builtIn) {
@@ -1576,9 +1575,42 @@ private fun videoFilterLabel(
 
 private fun watermarkTemplateLabel(
     templateId: String,
-    templates: List<WatermarkTemplate>
+    templates: List<WatermarkTemplate>,
+    text: AppTextResolver
 ): String {
-    return templates.firstOrNull { it.id == templateId }?.label ?: templateId
+    return templates.firstOrNull { it.id == templateId }?.localizedLabel(text) ?: templateId
+}
+
+private fun WatermarkTemplate.localizedLabel(text: AppTextResolver): String {
+    return when (id) {
+        "classic-overlay" -> text.watermarkTemplateClassicOverlay()
+        "travel-polaroid" -> text.watermarkTemplateTravelPolaroid()
+        "retro-frame" -> text.watermarkTemplateRetroFrame()
+        "pure-text" -> text.watermarkTemplatePureText()
+        "blur-four-border" -> text.watermarkTemplateBlurFourBorder()
+        "professional-bottom-bar" -> text.watermarkTemplateProfessionalBottomBar()
+        else -> label
+    }
+}
+
+private fun WatermarkTemplate.kindLabel(text: AppTextResolver): String {
+    return when (id) {
+        "pure-text" -> text.watermarkTemplatePureText()
+        "blur-four-border" -> text.watermarkTemplateBlurFourBorder()
+        else -> if (supportsFrameBorder) {
+            text.watermarkTemplateExpandedFrame()
+        } else {
+            text.watermarkTemplateClassicOverlay()
+        }
+    }
+}
+
+private fun FilterProfile?.localizedLabel(fallback: String, text: AppTextResolver): String {
+    return this?.localizedLabel(text) ?: fallback
+}
+
+private fun FilterProfile.localizedLabel(text: AppTextResolver): String {
+    return text.filterProfileLabel(id, label)
 }
 
 private fun Set<String>.prettyWatermarkTokens(text: AppTextResolver): String {

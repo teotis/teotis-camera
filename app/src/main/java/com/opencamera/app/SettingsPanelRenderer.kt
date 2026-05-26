@@ -89,6 +89,7 @@ internal class SettingsPanelRenderer(
         val dp8 = 8.dp
         val dp6 = 6.dp
         val dp10 = 10.dp
+        val dp12 = 12.dp
         model.items.forEach { item ->
             val card = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
@@ -115,6 +116,11 @@ internal class SettingsPanelRenderer(
                 setPadding(0, dp6, 0, 0)
             }
             card.addView(supporting)
+            val actionRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp10, 0, 0)
+            }
+            var actionCount = 0
             item.useAction?.let { action ->
                 val useButton = Button(
                     context,
@@ -125,15 +131,19 @@ internal class SettingsPanelRenderer(
                     text = context.getString(R.string.button_use_this_template)
                     isAllCaps = false
                     isEnabled = model.editingEnabled
+                    isSingleLine = true
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
                     setOnClickListener { onApplySettingsAction(action) }
                 }
                 val useParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp10
+                    weight = 1f
                 }
-                card.addView(useButton, useParams)
+                actionRow.addView(useButton, useParams)
+                actionCount += 1
             }
             item.editButtonLabel?.let { label ->
                 val editButton = Button(
@@ -145,15 +155,31 @@ internal class SettingsPanelRenderer(
                     text = label
                     isAllCaps = false
                     isEnabled = model.editingEnabled
+                    isSingleLine = true
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
                     setOnClickListener { onOpenWatermarkDetail(item.templateId) }
                 }
                 val editParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    0,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp10
+                    weight = 1f
+                    if (actionCount > 0) {
+                        marginStart = dp12
+                    }
                 }
-                card.addView(editButton, editParams)
+                actionRow.addView(editButton, editParams)
+                actionCount += 1
+            }
+            if (actionCount > 0) {
+                card.addView(
+                    actionRow,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                )
             }
             views.watermarkSelectorList.addView(card, params)
         }

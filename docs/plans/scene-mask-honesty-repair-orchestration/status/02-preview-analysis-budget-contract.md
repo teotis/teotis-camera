@@ -1,14 +1,14 @@
 # Package Status: 02-preview-analysis-budget-contract
 
-- **Agent**: —
-- **Status**: pending
-- **Started**:
+- **Agent**: agent-02-preview-analysis-budget-contract
+- **Status**: launched
+- **Started**: 2026-05-26T18:58:36Z
 - **Completed**:
 
 ## Worktree
 
-- Path:
-- Branch:
+- Path: `/private/tmp/open_camera-orchestration/scene-mask-honesty-repair/02-preview-analysis-budget-contract`
+- Branch: `agent/scene-mask-honesty-repair/02-preview-analysis-budget-contract`
 - Base commit:
 - Commit hash:
 
@@ -44,4 +44,3 @@
 ## Unresolved Risks
 
 - Pending.
-
