@@ -1,7 +1,7 @@
 # Package Status: <package-id>
 
 - **Agent**: <agent name / Claude Code window>
-- **Status**: <pending | in_progress | completed | blocked>
+- **Status**: <pending | in_progress | completed | blocked | finalizing | finalized>
 - **Started**: <timestamp>
 - **Completed**: <timestamp>
 
@@ -10,28 +10,21 @@
 - Path:
 - Branch:
 
-## Changes
+## Evidence
 
-- git status:
+- base commit:
+- commit hash:
+- changed files:
 - git diff --stat:
-- Changed files:
 
 ## Verification
 
 - Commands run:
 - Test results:
-
-## Delivery
-
-- Commit hash:
-- PR link:
+- Risks:
 
 ## Self-Certification
 
 - [ ] Only touched allowed paths
 - [ ] Did not edit forbidden paths
 - [ ] Did not edit INDEX.md or other status files
-
-## Unresolved Risks
-
-- <none | list>

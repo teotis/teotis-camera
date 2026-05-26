@@ -1,4 +1,4 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
 01-preview-frame-contract	pending
-02-natural-blur-border-rendering	completed
+02-natural-blur-border-rendering	completed	2026-05-26	2026-05-26	agent-02-natural-blur-border		/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/natural-blur-border		a7370b6	pass
 99-finalize	pending
