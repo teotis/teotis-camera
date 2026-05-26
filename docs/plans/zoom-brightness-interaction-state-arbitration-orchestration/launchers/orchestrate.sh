@@ -59,13 +59,6 @@ write_state_field() {
   local val="$3"
   local tmp="$STATUS_DIR/state.tsv.tmp"
   awk -F'\t' -v p="$pkg" -v c="$col" -v v="$val" '
-    BEGIN { OFS="\t" }
-    FNR == 1 { for (i=1; i<=NF; i++) if ($i == c) ci=i; print; next }
-    $1 == p { if (ci > 0) $ci = v; print; next }
-    { print }
-  ' col="$col" "$GRAPH" "$STATUS_DIR/state.tsv" > "$tmp"
-  # The above uses $GRAPH only for header; re-do with just state.tsv
-  awk -F'\t' -v p="$pkg" -v c="$col" -v v="$val" '
     BEGIN { OFS="\t"; ci=0 }
     NR == 1 { for (i=1; i<=NF; i++) if ($i == c) ci=i; print; next }
     $1 == p { if (ci > 0) $ci = v; print; next }
@@ -79,17 +72,17 @@ get_graph_value() {
   local pkg="$1"
   local col="$2"
   awk -F'\t' -v p="$pkg" -v c="$col" '
-    FNR == 1 { for (i=1; i<=NF; i++) h[i]=$i; next }
+    NR == 1 { for (i=1; i<=NF; i++) h[i]=$i; next }
     $1 == p { for (i=1; i<=NF; i++) if (h[i]==c) { print $i; exit } }
-  ' "$GRAPH" "$GRAPH"
+  ' "$GRAPH"
 }
 
 get_all_functional_packages() {
-  awk -F'\t' 'FNR == 1 { next } $NF != "1" { print $1 }' "$GRAPH" "$GRAPH"
+  awk -F'\t' 'NR == 1 { next } $NF != "1" { print $1 }' "$GRAPH"
 }
 
 get_all_packages() {
-  awk -F'\t' 'FNR == 1 { next } { print $1 }' "$GRAPH" "$GRAPH"
+  awk -F'\t' 'NR == 1 { next } { print $1 }' "$GRAPH"
 }
 
 get_dependencies() {
@@ -98,7 +91,7 @@ get_dependencies() {
 }
 
 get_finalize_package() {
-  awk -F'\t' 'FNR == 1 { next } $NF == "1" { print $1; exit }' "$GRAPH" "$GRAPH"
+  awk -F'\t' 'NR == 1 { next } $NF == "1" { print $1; exit }' "$GRAPH"
 }
 
 # --- Readiness check ---
@@ -345,7 +338,10 @@ cmd_status() {
     state=$(read_state "$pkg")
     wave=$(get_graph_value "$pkg" "wave")
     branch=$(get_graph_value "$pkg" "branch")
-    error=$(awk -F'\t' -v p="$pkg" '$1 == p { print $NF }' "$STATUS_DIR/state.tsv")
+    error=$(awk -F'\t' -v p="$pkg" '
+      NR == 1 { for (i=1; i<=NF; i++) if ($i == "last_error") ci=i; next }
+      $1 == p { print (ci > 0 ? $ci : ""); exit }
+    ' "$STATUS_DIR/state.tsv")
     printf "%-45s %-12s %-10s %-40s %-20s\n" "$pkg" "$state" "$wave" "$branch" "${error:--}"
   done
   echo
@@ -375,7 +371,10 @@ cmd_retry() {
     blocked|stale|invalid)
       echo "Resetting $pkg from $state to pending"
       local error
-      error=$(awk -F'\t' -v p="$pkg" '$1 == p { print $NF }' "$STATUS_DIR/state.tsv")
+      error=$(awk -F'\t' -v p="$pkg" '
+      NR == 1 { for (i=1; i<=NF; i++) if ($i == "last_error") ci=i; next }
+      $1 == p { print (ci > 0 ? $ci : ""); exit }
+    ' "$STATUS_DIR/state.tsv")
       echo "Prior error: ${error:--}"
       write_state_field "$pkg" "state" "pending"
       write_state_field "$pkg" "last_error" ""

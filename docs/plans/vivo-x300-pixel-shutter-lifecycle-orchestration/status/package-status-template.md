@@ -30,6 +30,7 @@
 ## Delivery
 
 - Commit hash:
+- Base commit:
 - PR link:
 
 ## Self-Certification
