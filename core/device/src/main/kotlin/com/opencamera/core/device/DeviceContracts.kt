@@ -396,8 +396,13 @@ fun resolvedZoomRatioSelection(
         return 1f
     }
     val normalizedCurrent = current?.let(::normalizedZoomRatioValue)
-    if (normalizedCurrent != null && normalizedCurrent in availableRatios) {
-        return normalizedCurrent
+    if (normalizedCurrent != null) {
+        if (capability.support == ZoomControlSupport.CONTINUOUS) {
+            return normalizedCurrent.coerceIn(availableRatios.first(), availableRatios.last())
+        }
+        if (normalizedCurrent in availableRatios) {
+            return normalizedCurrent
+        }
     }
     return capability.resolvedDefaultRatio
 }

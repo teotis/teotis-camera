@@ -716,7 +716,7 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `zoom toggle remains available while recording and blocks only unsupported devices`() = runTest {
+    fun `zoom toggle blocks discrete preset during recording`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
             trace = trace,
@@ -738,12 +738,15 @@ class DefaultCameraSessionTest {
 
         val shot = assertNotNull(session.state.value.activeShot)
         session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+
         session.dispatch(SessionIntent.ZoomRatioToggled)
         advanceUntilIdle()
 
-        assertEquals(2f, session.state.value.activeDeviceGraph.preview.zoomRatio)
-        assertEquals("Zoom set to 2.0x", session.state.value.lastAction)
-        assertTrue(trace.snapshot().any { it.name == "zoom.updated" })
+        assertEquals(1f, session.state.value.activeDeviceGraph.preview.zoomRatio)
+        assertEquals("Zoom preset stepping is blocked during recording", session.state.value.lastAction)
+        assertTrue(trace.snapshot().any { it.name == "zoom.switch.blocked.recording" })
     }
 
     @Test
@@ -794,6 +797,75 @@ class DefaultCameraSessionTest {
         assertEquals(5f, session.state.value.activeDeviceGraph.preview.zoomRatio)
         assertEquals("Zoom set to 5.0x", session.state.value.lastAction)
         assertTrue(trace.snapshot().any { it.name == "zoom.updated" && it.detail == "5.0x" })
+    }
+
+    @Test
+    fun `apply zoom ratio blocks discrete preset during recording`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+
+        session.dispatch(SessionIntent.ApplyZoomRatio(5f))
+        advanceUntilIdle()
+
+        assertEquals(1f, session.state.value.activeDeviceGraph.preview.zoomRatio)
+        assertEquals("Zoom preset stepping is blocked during recording", session.state.value.lastAction)
+        assertTrue(trace.snapshot().any { it.name == "zoom.apply.blocked.recording" })
+        assertFalse(trace.snapshot().any { it.name == "zoom.updated" })
+    }
+
+    @Test
+    fun `apply zoom ratio allows continuous zoom during recording`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 10f),
+                    defaultRatio = 1f
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+
+        session.dispatch(SessionIntent.ApplyZoomRatio(3.5f))
+        advanceUntilIdle()
+
+        assertEquals(3.5f, session.state.value.activeDeviceGraph.preview.zoomRatio)
+        assertEquals("Zoom set to 3.5x", session.state.value.lastAction)
+        assertTrue(trace.snapshot().any { it.name == "zoom.updated" && it.detail == "3.5x" })
     }
 
     @Test
