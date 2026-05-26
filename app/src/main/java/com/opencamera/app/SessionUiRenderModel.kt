@@ -1423,19 +1423,7 @@ internal fun filterLabPageRenderModel(
             selectedFamily = family.family
         ),
         adjustControl = FilterLabAdjustRenderModel(
-            buttonLabel = buildString {
-                append(text.adjustSelected())
-                append('\n')
-                append(currentFilterLabel)
-                append('\n')
-                append(
-                    when {
-                        currentProfile == null -> text.unavailableMissingProfile()
-                        currentProfile.builtIn -> text.readyEditableCopy()
-                        else -> text.readyEditingCustom()
-                    }
-                )
-            },
+            buttonLabel = currentFilterLabel,
             family = family.family,
             sourceProfileId = currentProfile?.id,
             isEnabled = editingEnabled && family.supported && currentProfile != null,
@@ -1464,23 +1452,7 @@ internal fun filterLabPageRenderModel(
                     } else {
                         family.updateAction(profile.id)
                     },
-                    adjustButtonLabel = if (isSelected) {
-                        buildString {
-                            append(text.adjustSelected())
-                            append('\n')
-                            append(profile.label)
-                            append('\n')
-                            append(
-                                if (profile.builtIn) {
-                                    text.readyEditableCopy()
-                                } else {
-                                    text.readyEditingCustom()
-                                }
-                            )
-                        }
-                    } else {
-                        null
-                    }
+                    adjustButtonLabel = null
                 )
             }
         },

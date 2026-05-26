@@ -117,24 +117,26 @@ internal class FilterLabPanelRenderer(
             card.addView(supporting)
 
             if (item.isSelected) {
-                val adjustButton = Button(
-                    context,
-                    null,
-                    0,
-                    R.style.Widget_OpenCamera_CompactButton
-                ).apply {
-                    text = item.adjustButtonLabel
-                    isAllCaps = false
-                    isEnabled = model.editingEnabled && item.adjustButtonLabel != null
-                    setOnClickListener { onOpenAdjustment(model.adjustControl) }
+                if (item.adjustButtonLabel != null) {
+                    val adjustButton = Button(
+                        context,
+                        null,
+                        0,
+                        R.style.Widget_OpenCamera_CompactButton
+                    ).apply {
+                        text = item.adjustButtonLabel
+                        isAllCaps = false
+                        isEnabled = model.editingEnabled
+                        setOnClickListener { onOpenAdjustment(model.adjustControl) }
+                    }
+                    val adjustParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        topMargin = 10.dp
+                    }
+                    card.addView(adjustButton, adjustParams)
                 }
-                val adjustParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = 10.dp
-                }
-                card.addView(adjustButton, adjustParams)
             } else {
                 val selectButton = Button(
                     context,

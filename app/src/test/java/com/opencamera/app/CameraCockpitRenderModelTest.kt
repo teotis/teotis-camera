@@ -81,7 +81,7 @@ class CameraCockpitRenderModelTest {
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals(3, model.rightRail.entries.size)
-        assertEquals("Lens", model.rightRail.entries[0].label)
+        assertEquals("Style", model.rightRail.entries[0].label)
         assertEquals("Quick", model.rightRail.entries[1].label)
         assertEquals("DEV", model.rightRail.entries[2].label)
     }
@@ -269,7 +269,7 @@ class CameraCockpitRenderModelTest {
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         val styleEntry = model.rightRail.entries[0]
-        assertEquals("Lens", styleEntry.label)
+        assertEquals("Style", styleEntry.label)
         assertEquals(CockpitPanelRoute.StyleLab, styleEntry.route)
     }
 

@@ -1028,7 +1028,7 @@ class SessionUiRenderModelTest {
         val selectedItem = model.filterItems.first { it.filterProfileId == "custom-portrait-original-1" }
         assertTrue(selectedItem.isSelected)
         assertTrue(selectedItem.supportingText.contains("Selected default"))
-        assertTrue(selectedItem.adjustButtonLabel?.contains("Adjust Selected") == true)
+        assertNull(selectedItem.adjustButtonLabel)
     }
 
     @Test
@@ -1061,7 +1061,7 @@ class SessionUiRenderModelTest {
         )
         val selectedItem = model.filterItems.first { it.filterProfileId == "portrait-original" }
         val unselectedItem = model.filterItems.first { it.filterProfileId == "portrait-blue" }
-        assertTrue(selectedItem.adjustButtonLabel?.contains("editable custom copy") == true)
+        assertNull(selectedItem.adjustButtonLabel)
         assertEquals(null, unselectedItem.adjustButtonLabel)
     }
 
@@ -1490,7 +1490,7 @@ class SessionUiRenderModelTest {
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
         assertEquals(3, visibleEntries.size)
-        assertEquals("Lens", visibleEntries[0].label)
+        assertEquals("Style", visibleEntries[0].label)
         assertEquals("Quick", visibleEntries[1].label)
         assertEquals("DEV", visibleEntries[2].label)
 
@@ -1513,7 +1513,7 @@ class SessionUiRenderModelTest {
     @Test
     fun `style entry label is Chinese via text resolver`() {
         val chineseResolver = object : TestAppTextResolver() {
-            override fun styleEntry(): String = "镜头"
+            override fun styleEntry(): String = "风格"
             override fun quickLauncher(): String = "快捷"
             override fun colorLabEntry(): String = "色彩实验室"
             override fun settingsEntry(): String = "设置"
@@ -1522,7 +1522,7 @@ class SessionUiRenderModelTest {
         val cockpit = cameraCockpitRenderModel(state, chineseResolver, strings)
 
         val visibleEntries = cockpit.rightRail.entries.filter { it.isVisible }
-        assertEquals("镜头", visibleEntries[0].label)
+        assertEquals("风格", visibleEntries[0].label)
         assertEquals("快捷", visibleEntries[1].label)
         assertEquals("色彩实验室", cockpit.topStatus.labEntryLabel)
         assertEquals("设置", cockpit.topStatus.settingsEntryLabel)

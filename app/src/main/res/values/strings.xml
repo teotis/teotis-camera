@@ -91,7 +91,7 @@
     <string name="dev_export_log">导出日志</string>
     <string name="dev_close">关闭</string>
     <string name="dev_console_content_description">调试控制台</string>
-    <string name="button_palette_entry">镜头</string>
+    <string name="button_palette_entry">风格</string>
     <string name="button_quick_launcher">快捷</string>
     <string name="quick_bubble_panel_content_description">快捷相机控制</string>
     <string name="floating_utility_group_content_description">浮动相机工具</string>
@@ -144,7 +144,7 @@
     <string name="label_aperture">光圈</string>
     <string name="label_wb">白平衡</string>
     <string name="label_auto">自动</string>
-    <string name="button_adjust_selected">调整所选</string>
+
     <string name="button_save_as_custom">保存为自定义</string>
     <string name="button_use_this_template">使用此模板</string>
     <string name="button_use_this_look">使用此风格</string>
@@ -188,7 +188,7 @@
     <string name="status_renderer_pending">渲染器待定</string>
     <string name="status_custom">自定义</string>
     <string name="status_unavailable_missing_profile">不可用 • 缺少源配置</string>
-    <string name="status_ready_editable_copy">就绪 • 打开可编辑的自定义副本</string>
+
     <string name="status_ready_editing_custom">就绪 • 编辑当前自定义风格</string>
     <string name="status_unavailable_already_custom">不可用 • 当前默认已是自定义</string>
     <string name="status_ready_becomes_default">就绪 • 成为默认</string>
