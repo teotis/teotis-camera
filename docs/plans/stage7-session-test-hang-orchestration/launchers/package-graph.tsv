@@ -1,0 +1,3 @@
+package_id	depends_on	phase	agent_name	status_file
+01-session-test-hang-diagnosis-and-repair		g1	stage7-session-hang-01	status/01-session-test-hang-diagnosis-and-repair.md
+99-integration-audit	01-session-test-hang-diagnosis-and-repair	audit		status/99-integration-audit.md
