@@ -960,8 +960,8 @@ class DefaultCameraSessionTest {
 
         assertEquals(0L, session.state.value.recordingElapsedMillis)
 
-        advanceTimeBy(3_000)
-        advanceUntilIdle()
+        // recordingElapsedJob runs on Dispatchers.Default with real-time delay
+        Thread.sleep(3_100)
 
         val elapsed = session.state.value.recordingElapsedMillis!!
         assertTrue(elapsed >= 3_000L, "Expected elapsed >= 3000 but was $elapsed")
