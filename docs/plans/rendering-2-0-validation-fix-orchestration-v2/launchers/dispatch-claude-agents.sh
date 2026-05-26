@@ -25,6 +25,7 @@ if [ "$CLAUDE_PERMISSION_MODE" = "auto" ]; then
   echo "Using Claude Code auto mode."
   echo "If this has not been opted into interactively yet, run once first:"
   echo "  claude --permission-mode auto"
+  echo "A user-level Claude Code settings default can also enable auto mode before this script runs."
   echo
 fi
 
@@ -58,6 +59,7 @@ Read $PLAN_DIR/INDEX.md and $package_doc. Implement ONLY package $package_id. Cr
       echo "ERROR: Claude Code requires one interactive auto-mode opt-in before --bg can use --permission-mode auto." >&2
       echo "Run once interactively from this repo:" >&2
       echo "  claude --permission-mode auto" >&2
+      echo "Alternatively, configure auto mode in user-level Claude Code settings, then rerun with CLAUDE_PERMISSION_MODE=auto." >&2
       echo "Or rerun this script without auto mode:" >&2
       echo "  CLAUDE_PERMISSION_MODE=default bash docs/plans/rendering-2-0-validation-fix-orchestration-v2/launchers/dispatch-claude-agents.sh" >&2
     fi
