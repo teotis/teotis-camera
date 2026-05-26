@@ -35,14 +35,11 @@ import com.opencamera.core.mode.label
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.WatermarkTemplate
 import com.opencamera.core.settings.compactSummary
-<<<<<<< HEAD
-=======
 import com.opencamera.core.settings.toMetadataTags
 import com.opencamera.core.settings.watermarkStyleFor
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
->>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

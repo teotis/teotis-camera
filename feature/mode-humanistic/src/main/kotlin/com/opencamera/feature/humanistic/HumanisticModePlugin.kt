@@ -37,12 +37,7 @@ import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.WatermarkTemplate
-<<<<<<< HEAD
 import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
-import com.opencamera.core.settings.compactSummary
-import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
-import com.opencamera.core.settings.liveWatermarkMetadataTags
-=======
 import com.opencamera.core.settings.renderStyleColorSpec
 import com.opencamera.core.settings.watermarkStyleFor
 import com.opencamera.core.settings.compactSummary
@@ -52,7 +47,6 @@ import com.opencamera.core.settings.toMetadataTags
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
->>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -257,18 +251,14 @@ private class HumanisticModeController(
             colorLabSpec = photoSettings.colorLabSpec,
             styleStrength = photoSettings.styleStrength
         )
-<<<<<<< HEAD
         val adjustedRenderSpec = pipelineResult?.finalRenderSpec
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
-        return EffectSpec(listOf(
-            FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
-=======
         val selectedWatermarkTemplate = selectedWatermarkTemplate()
         val watermarkStyle = context.settingsSnapshot.persisted.photo
             .watermarkStyleFor(selectedWatermarkTemplate.id)
         return EffectSpec(listOf(
-            FilterEffect(style.id, adjustedRenderSpec),
+            FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
             WatermarkEffect(
                 templateId = selectedWatermarkTemplate.id,
                 tokens = mapOf(
@@ -278,7 +268,6 @@ private class HumanisticModeController(
                 ),
                 style = watermarkStyle
             ),
->>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
             FrameEffect(currentFrameRatio())
         ))
     }

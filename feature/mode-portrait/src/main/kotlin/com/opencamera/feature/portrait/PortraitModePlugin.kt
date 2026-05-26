@@ -38,13 +38,10 @@ import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PhotoSettings
-<<<<<<< HEAD
-import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
-=======
 import com.opencamera.core.settings.WatermarkTemplate
 import com.opencamera.core.settings.renderStyleColorSpec
+import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.watermarkStyleFor
->>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.filterProfilesFor
@@ -266,15 +263,12 @@ private class PortraitModeController(
             colorLabSpec = photoSettings.colorLabSpec,
             styleStrength = photoSettings.styleStrength
         )
-<<<<<<< HEAD
         val adjustedRenderSpec = pipelineResult?.finalRenderSpec
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
-=======
         val selectedWatermarkTemplate = selectedWatermarkTemplate()
         val watermarkStyle = context.settingsSnapshot.persisted.photo
             .watermarkStyleFor(selectedWatermarkTemplate.id)
->>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
         return EffectSpec(listOf(
             FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
             PortraitEffect(
@@ -510,11 +504,6 @@ private class PortraitModeController(
 
     private fun onOffLabel(enabled: Boolean): String = if (enabled) "On" else "Off"
 
-<<<<<<< HEAD
-    private fun com.opencamera.core.settings.LiveMediaBundle.toCaptureSpec(
-        saveFormat: com.opencamera.core.settings.LiveSaveFormat
-    ): LivePhotoCaptureSpec {
-=======
     private fun selectedWatermarkTemplate(): WatermarkTemplate {
         val persistedTemplateId = context.settingsSnapshot.persisted.photo.defaultWatermarkTemplateId
         return context.settingsSnapshot.catalog.watermarkTemplates.firstOrNull { template ->
@@ -539,8 +528,9 @@ private class PortraitModeController(
         }
     }
 
-    private fun com.opencamera.core.settings.LiveMediaBundle.toCaptureSpec(): LivePhotoCaptureSpec {
->>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
+    private fun com.opencamera.core.settings.LiveMediaBundle.toCaptureSpec(
+        saveFormat: com.opencamera.core.settings.LiveSaveFormat
+    ): LivePhotoCaptureSpec {
         return LivePhotoCaptureSpec(
             motionDurationMillis = motionDurationMillis,
             motionMimeType = motionContainer,
