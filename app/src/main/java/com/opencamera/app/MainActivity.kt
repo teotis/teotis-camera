@@ -329,7 +329,10 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             traceEvents = container.trace.snapshot(),
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
-            text = text
+            text = text,
+            storageSummary = if (activePanelRoute is CockpitPanelRoute.DevConsole) {
+                runCatching { devLogExporter.storageSummary() }.getOrNull()
+            } else null
         )
         latestDevLogRenderModel = devLogModel
         devConsoleRenderer.renderVisibility(activePanelRoute)
@@ -380,12 +383,14 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     override fun refreshDevLogModel() {
         val state = latestSessionState ?: return
+        val summary = runCatching { devLogExporter.storageSummary() }.getOrNull()
         val model = devLogRenderModel(
             state = state,
             traceEvents = container.trace.snapshot(),
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
-            text = AppTextResolver(this)
+            text = AppTextResolver(this),
+            storageSummary = summary
         )
         latestDevLogRenderModel = model
         devConsoleRenderer.render(model)
@@ -766,12 +771,32 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     override fun exportDevLog() {
         runCatching {
                 val model = latestDevLogRenderModel ?: return
-                val file = devLogExporter.export(model.exportContent)
+                val file = devLogExporter.export(model.exportContent, type = selectedDevLogTab)
                 views.preview.captureOutput.text = "Debug log exported: ${file.absolutePath}"
             }
             .onFailure {
                 Toast.makeText(this, "Export failed", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    override fun cleanupDevLogByType(type: DevLogTab) {
+        runCatching {
+            val count = devLogExporter.cleanupByType(type)
+            Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
+            refreshDevLogModel()
+        }.onFailure {
+            Toast.makeText(this, "Cleanup failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun cleanupAllDevLogs() {
+        runCatching {
+            val count = devLogExporter.cleanupAll()
+            Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
+            refreshDevLogModel()
+        }.onFailure {
+            Toast.makeText(this, "Cleanup failed", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun showDisabledReason(reason: String) {

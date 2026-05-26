@@ -27,6 +27,8 @@ internal interface MainActivityActionCallbacks {
     fun showDisabledReason(reason: String)
     fun openLatestGalleryMedia()
     fun exportDevLog()
+    fun cleanupDevLogByType(type: DevLogTab)
+    fun cleanupAllDevLogs()
     fun refreshDevLogModel()
     fun selectDevLogTab(tab: DevLogTab)
     fun neutralColorLabAction(): PersistedSettingsAction

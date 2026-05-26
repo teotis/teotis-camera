@@ -1506,6 +1506,74 @@
                     android:textColor="@color/oc_text_secondary"
                     android:textSize="@dimen/text_size_dev_log" />
 
+                <!-- Storage info -->
+                <TextView
+                    android:id="@+id/devConsoleStorageInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_status"
+                    android:visibility="gone" />
+
+                <!-- Cleanup row 1: Key | Core -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/buttonDevCleanupKey"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_cleanup_key"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/buttonDevCleanupCore"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_cleanup_core"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <!-- Cleanup row 2: Error | All -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/buttonDevCleanupError"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_cleanup_error"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/buttonDevCleanupAll"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_cleanup_all"
+                        android:visibility="gone" />
+                </LinearLayout>
+
                 <!-- Action row -->
                 <LinearLayout
                     android:layout_width="match_parent"

@@ -313,6 +313,10 @@ internal class MainActivityActionBinder(
         views.devConsole.export.setOnClickListener {
             callbacks.exportDevLog()
         }
+        views.devConsole.cleanupKey.setOnClickListener { callbacks.cleanupDevLogByType(DevLogTab.KEY) }
+        views.devConsole.cleanupCore.setOnClickListener { callbacks.cleanupDevLogByType(DevLogTab.CORE) }
+        views.devConsole.cleanupError.setOnClickListener { callbacks.cleanupDevLogByType(DevLogTab.ERROR) }
+        views.devConsole.cleanupAll.setOnClickListener { callbacks.cleanupAllDevLogs() }
         views.devConsole.close.setOnClickListener {
             callbacks.reducePanel(CockpitPanelCommand.CloseDevConsole)
             callbacks.renderAfterPanelChange()

@@ -89,6 +89,12 @@
     <string name="dev_tab_error">错误</string>
     <string name="dev_tab_all">全部</string>
     <string name="dev_export_log">导出日志</string>
+    <string name="dev_cleanup_key">清理摘要</string>
+    <string name="dev_cleanup_core">清理链路</string>
+    <string name="dev_cleanup_error">清理错误</string>
+    <string name="dev_cleanup_all">清理全部</string>
+    <string name="dev_storage_format">存储: %1$s / %2$s</string>
+    <string name="dev_cleanup_done">已清理 %d 个文件</string>
     <string name="dev_close">关闭</string>
     <string name="dev_console_content_description">调试控制台</string>
     <string name="button_palette_entry">镜头</string>

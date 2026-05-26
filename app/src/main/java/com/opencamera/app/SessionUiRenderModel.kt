@@ -1673,7 +1673,8 @@ internal fun devLogRenderModel(
     isDebugBuild: Boolean,
     selectedTab: DevLogTab,
     text: AppTextResolver,
-    resourceDiagnostics: ResourceDiagnosticsSnapshot? = null
+    resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
+    storageSummary: StorageSummary? = null
 ): DevLogRenderModel {
     if (!isDebugBuild) {
         return DevLogRenderModel(
@@ -1760,7 +1761,11 @@ internal fun devLogRenderModel(
         },
         summaryText = summaryText,
         content = tabContent,
-        exportContent = exportContent
+        exportContent = exportContent,
+        storageUsedDisplay = storageSummary?.usedDisplay ?: "",
+        storageCapacityDisplay = storageSummary?.capacityDisplay ?: "",
+        storageUsageRatio = storageSummary?.usageRatio ?: 0f,
+        canCleanup = (storageSummary?.usedBytes ?: 0L) > 0L
     )
 }
 
