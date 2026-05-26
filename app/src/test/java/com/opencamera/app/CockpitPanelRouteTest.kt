@@ -64,4 +64,30 @@ class CockpitPanelRouteTest {
         val b: CockpitPanelRoute = CockpitPanelRoute.QuickBubble
         assertFalse(a == b)
     }
+
+    @Test
+    fun `ColorLab route is a panel but not settings`() {
+        val route = CockpitPanelRoute.ColorLab
+        assertTrue(route.isAnyPanelOpen)
+        assertFalse(route.isSettingsOpen)
+    }
+
+    @Test
+    fun `isAnyPanelOpen is true for all panel routes`() {
+        val panels = listOf(
+            CockpitPanelRoute.QuickBubble,
+            CockpitPanelRoute.Settings(),
+            CockpitPanelRoute.StyleLab,
+            CockpitPanelRoute.ColorLab,
+            CockpitPanelRoute.DevConsole
+        )
+        for (panel in panels) {
+            assertTrue(panel.isAnyPanelOpen, "$panel should be isAnyPanelOpen")
+        }
+    }
+
+    @Test
+    fun `isAnyPanelOpen is false only for None`() {
+        assertFalse(CockpitPanelRoute.None.isAnyPanelOpen)
+    }
 }

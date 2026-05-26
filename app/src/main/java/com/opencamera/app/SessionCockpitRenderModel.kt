@@ -40,7 +40,10 @@ internal data class SessionControlsRenderModel(
     val lensFacingEnabled: Boolean,
     val zoomCapsules: List<ZoomCapsuleRenderModel>,
     val isZoomCapsuleRowVisible: Boolean,
-    val focalLengthSlider: FocalLengthSliderRenderModel
+    val focalLengthSlider: FocalLengthSliderRenderModel,
+    val currentZoomLabel: String? = null,
+    val isContinuousZoomActive: Boolean = false,
+    val nearestPresetRatio: Float? = null
 )
 
 internal data class FrameRatioOptionRenderModel(
@@ -196,21 +199,24 @@ internal fun sessionControlsRenderModel(
     strings: SessionUiStrings
 ): SessionControlsRenderModel {
     val capability = state.activeDeviceCapabilities.zoomRatioCapability
-    val isZoomSupported = capability.isSwitchingSupported
-    val currentRatio = if (isZoomSupported) {
-        normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
-    } else 1f
-
+    val currentRatio = normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
+    val presets = capability.normalizedSupportedRatios
+    val exactMatch = currentRatio in presets
     return SessionControlsRenderModel(
         lensFacingButtonLabel = lensFacingButtonLabel(state, strings),
         lensFacingEnabled = state.activeDeviceCapabilities.availableLensFacings.size > 1,
         zoomCapsules = zoomCapsuleModels(state),
-        isZoomCapsuleRowVisible = isZoomSupported,
+        isZoomCapsuleRowVisible = capability.isSwitchingSupported,
         focalLengthSlider = FocalLengthSliderRenderModel(
-            presetRatios = if (isZoomSupported) capability.normalizedSupportedRatios else emptyList(),
+            presetRatios = if (capability.isSwitchingSupported) presets else emptyList(),
             currentRatio = currentRatio,
-            isVisible = isZoomSupported
-        )
+            isVisible = capability.isSwitchingSupported
+        ),
+        currentZoomLabel = if (capability.isSwitchingSupported && !exactMatch) compactZoomLabel(currentRatio) else null,
+        isContinuousZoomActive = false,
+        nearestPresetRatio = if (!exactMatch && presets.isNotEmpty()) {
+            presets.minByOrNull { kotlin.math.abs(it - currentRatio) }
+        } else null
     )
 }
 

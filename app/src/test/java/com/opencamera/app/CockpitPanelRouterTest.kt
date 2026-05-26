@@ -202,4 +202,86 @@ class CockpitPanelRouterTest {
         assertEquals(initial.isFilterAdjustmentVisible, result.isFilterAdjustmentVisible)
         assertEquals(initial.filterAdjustmentMode, result.filterAdjustmentMode)
     }
+
+    // --- Transition continuity: one-active-route and route switching ---
+
+    @Test
+    fun `opening StyleLab while Settings is open replaces route`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.Settings(SettingsSubpage.ROOT),
+            selectedSettingsTab = SettingsTab.PHOTO
+        )
+        val result = nextState(initial, CockpitPanelCommand.ToggleStyleLab)
+
+        assertEquals(CockpitPanelRoute.StyleLab, result.route)
+        assertTrue(result.isFilterAdjustmentVisible)
+    }
+
+    @Test
+    fun `opening Settings while StyleLab is open replaces route`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.StyleLab,
+            selectedFilterLabFamilyOverride = FilterLabFamily.PHOTO,
+            isFilterAdjustmentVisible = true
+        )
+        val result = nextState(initial, CockpitPanelCommand.ToggleSettingsRoot)
+
+        assertEquals(CockpitPanelRoute.Settings(), result.route)
+    }
+
+    @Test
+    fun `opening ColorLab while StyleLab is open replaces route`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        val result = nextState(initial, CockpitPanelCommand.ToggleColorLab)
+
+        assertEquals(CockpitPanelRoute.ColorLab, result.route)
+    }
+
+    @Test
+    fun `AndroidBack from QuickBubble closes`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.QuickBubble)
+        val result = nextState(initial, CockpitPanelCommand.AndroidBack)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `AndroidBack from DevConsole closes`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.DevConsole)
+        val result = nextState(initial, CockpitPanelCommand.AndroidBack)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `quick repeated toggles maintain correct one-active-route`() {
+        var state = CockpitPanelUiState()
+
+        // Open Settings
+        state = nextState(state, CockpitPanelCommand.ToggleSettingsRoot)
+        assertEquals(CockpitPanelRoute.Settings(), state.route)
+
+        // Quick toggle StyleLab (should replace Settings)
+        state = nextState(state, CockpitPanelCommand.ToggleStyleLab)
+        assertEquals(CockpitPanelRoute.StyleLab, state.route)
+
+        // Quick toggle ColorLab (should replace StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleColorLab)
+        assertEquals(CockpitPanelRoute.ColorLab, state.route)
+
+        // DismissAll (should close everything)
+        state = nextState(state, CockpitPanelCommand.DismissAll)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
+
+    @Test
+    fun `repeated same toggle opens then closes`() {
+        var state = CockpitPanelUiState()
+
+        state = nextState(state, CockpitPanelCommand.ToggleQuickBubble)
+        assertEquals(CockpitPanelRoute.QuickBubble, state.route)
+
+        state = nextState(state, CockpitPanelCommand.ToggleQuickBubble)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
 }

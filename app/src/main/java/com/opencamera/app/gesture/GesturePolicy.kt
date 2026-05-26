@@ -1,5 +1,6 @@
 package com.opencamera.app.gesture
 
+import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.SessionIntent
 
@@ -16,6 +17,8 @@ class GesturePolicy(
 ) {
     private var localZoomRatio = 1.0f
     private var lastPinchTimestamp = 0L
+    private var isDraggingZoom = false
+    private var lastDragTimestamp = 0L
 
     fun resetZoomAccumulation() {
         localZoomRatio = 1.0f
@@ -24,6 +27,11 @@ class GesturePolicy(
 
     fun syncZoomRatio(ratio: Float) {
         localZoomRatio = ratio
+    }
+
+    fun cancelDrag() {
+        isDraggingZoom = false
+        lastDragTimestamp = 0L
     }
 
     fun map(event: GestureEvent, @Suppress("UNUSED_PARAMETER") activeMode: ModeId, currentZoomRatio: Float = 1.0f): GestureAction {
@@ -41,13 +49,51 @@ class GesturePolicy(
                 }
             }
             is GestureEvent.ScaleEnd -> {
-                lastPinchTimestamp = 0L
+                resetZoomAccumulation()
+                GestureAction.Ignore
+            }
+            is GestureEvent.DragStart -> {
+                isDraggingZoom = true
+                lastDragTimestamp = 0L
+                GestureAction.Ignore
+            }
+            is GestureEvent.DragMove -> {
+                if (!isDraggingZoom) return GestureAction.Ignore
+                val now = System.currentTimeMillis()
+                if (now - lastDragTimestamp > 50) {
+                    lastDragTimestamp = now
+                    GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(currentZoomRatio))
+                } else {
+                    GestureAction.Ignore
+                }
+            }
+            is GestureEvent.DragEnd -> {
+                isDraggingZoom = false
+                lastDragTimestamp = 0L
                 GestureAction.Ignore
             }
             is GestureEvent.VerticalScroll -> GestureAction.ShowExposureHint(event.deltaY)
             is GestureEvent.HorizontalScroll -> GestureAction.AssistModeSwitch(event.deltaX)
             is GestureEvent.LongPress -> GestureAction.Ignore
-            is GestureEvent.DragCancel -> GestureAction.Ignore
+            is GestureEvent.DragCancel -> {
+                cancelDrag()
+                GestureAction.Ignore
+            }
         }
+    }
+
+    fun mapDragToRatio(
+        x: Float,
+        mapper: ZoomScaleMapper,
+        @Suppress("UNUSED_PARAMETER") capability: ZoomRatioCapability
+    ): GestureAction {
+        if (!isDraggingZoom) return GestureAction.Ignore
+        val result = mapper.mapPositionToRatio(x)
+        val now = System.currentTimeMillis()
+        if (now - lastDragTimestamp > 50) {
+            lastDragTimestamp = now
+            return GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(result.targetRatio))
+        }
+        return GestureAction.Ignore
     }
 }

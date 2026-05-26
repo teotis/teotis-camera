@@ -387,7 +387,11 @@ internal class MainActivityActionBinder(
                     )
                 }
                 is GestureAction.ShowExposureHint -> {
-                    // TODO: exposure adjustment via vertical scroll
+                    // EV via vertical scroll intentionally deferred:
+                    // ApplyPreviewBrightness requires absolute step values and session-owned
+                    // brightness tracking. A delta-only gesture without current-step feedback
+                    // would produce incorrect exposure compensation. The quick panel slider
+                    // already dispatches ApplyPreviewBrightness with correct absolute steps.
                 }
                 is GestureAction.AssistModeSwitch -> {
                     // TODO: mode track assist switch via horizontal scroll

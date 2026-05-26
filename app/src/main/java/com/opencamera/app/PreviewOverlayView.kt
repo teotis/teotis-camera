@@ -101,6 +101,8 @@ class PreviewOverlayView @JvmOverloads constructor(
     private var lastVignetteKey: Float = -1f
 
     private var focusReticle: FocusReticleRenderModel? = null
+    private var reticleAnimStartMs: Long = 0L
+    private var animatingReticle: Boolean = false
 
     private var renderModel = PreviewOverlayRenderModel(
         gridMode = CompositionGridMode.OFF,
@@ -127,7 +129,15 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     internal fun updateFocusReticle(model: FocusReticleRenderModel?) {
+        val changed = focusReticle != model
         focusReticle = model
+        if (model != null && changed) {
+            reticleAnimStartMs = android.os.SystemClock.uptimeMillis()
+            animatingReticle = true
+            postInvalidateOnAnimation()
+        } else if (model == null) {
+            animatingReticle = false
+        }
         invalidate()
     }
 
@@ -371,38 +381,39 @@ class PreviewOverlayView @JvmOverloads constructor(
 
     private fun drawFocusReticle(canvas: Canvas) {
         val model = focusReticle ?: return
+        val elapsed = android.os.SystemClock.uptimeMillis() - reticleAnimStartMs
+        val visual = focusReticleVisualState(model.status, elapsed)
+
+        if (visual.expired) {
+            animatingReticle = false
+            return
+        }
+
         val rawCx = model.normalizedX.coerceIn(0f, 1f) * width
         val rawCy = model.normalizedY.coerceIn(0f, 1f) * height
-        val radius = 24f * density
+        val baseRadius = 24f * density
+        val radius = baseRadius * visual.scale
         val tickLength = 8f * density
         val bounds = activeFrameRectOrFullView()
         val clamped = clampReticleCenter(rawCx, rawCy, radius, tickLength, bounds.left, bounds.top, bounds.right, bounds.bottom)
         val cx = clamped.x
         val cy = clamped.y
 
-        when (model.status) {
-            FocusReticleStatus.REQUESTED -> {
-                reticleRingPaint.color = Color.rgb(255, 191, 0)
-                canvas.drawCircle(cx, cy, radius, reticleRingPaint)
-            }
-            FocusReticleStatus.SUCCEEDED -> {
-                reticleRingPaint.color = Color.WHITE
-                canvas.drawCircle(cx, cy, radius, reticleRingPaint)
-            }
-            FocusReticleStatus.DEGRADED -> {
-                reticleRingPaint.color = Color.rgb(255, 191, 0)
-                canvas.drawCircle(cx, cy, radius, reticleRingPaint)
-                reticleTickPaint.color = Color.rgb(255, 191, 0)
-                // Short tick marks at cardinal positions
-                canvas.drawLine(cx, cy - radius - tickLength, cx, cy - radius, reticleTickPaint)
-                canvas.drawLine(cx, cy + radius, cx, cy + radius + tickLength, reticleTickPaint)
-                canvas.drawLine(cx - radius - tickLength, cy, cx - radius, cy, reticleTickPaint)
-                canvas.drawLine(cx + radius, cy, cx + radius + tickLength, cy, reticleTickPaint)
-            }
-            FocusReticleStatus.FAILED, FocusReticleStatus.UNSUPPORTED -> {
-                reticleRingPaint.color = Color.argb(128, 128, 128, 128)
-                canvas.drawCircle(cx, cy, radius, reticleRingPaint)
-            }
+        reticleRingPaint.color = visual.ringColor
+        reticleRingPaint.alpha = (visual.alpha * 255).toInt().coerceIn(0, 255)
+        canvas.drawCircle(cx, cy, radius, reticleRingPaint)
+
+        if (visual.ticksVisible) {
+            reticleTickPaint.color = visual.ringColor
+            reticleTickPaint.alpha = (visual.alpha * 255).toInt().coerceIn(0, 255)
+            canvas.drawLine(cx, cy - radius - tickLength, cx, cy - radius, reticleTickPaint)
+            canvas.drawLine(cx, cy + radius, cx, cy + radius + tickLength, reticleTickPaint)
+            canvas.drawLine(cx - radius - tickLength, cy, cx - radius, cy, reticleTickPaint)
+            canvas.drawLine(cx + radius, cy, cx + radius + tickLength, cy, reticleTickPaint)
+        }
+
+        if (animatingReticle) {
+            postInvalidateOnAnimation()
         }
     }
 }
@@ -443,6 +454,68 @@ internal data class FocusReticleRenderModel(
     val normalizedY: Float,
     val status: FocusReticleStatus
 )
+
+internal data class FocusReticleVisualState(
+    val scale: Float,
+    val alpha: Float,
+    val ringColor: Int,
+    val ticksVisible: Boolean,
+    val expired: Boolean
+)
+
+internal fun focusReticleVisualState(
+    status: FocusReticleStatus,
+    elapsedMs: Long
+): FocusReticleVisualState {
+    val expired: Boolean
+    val scale: Float
+    val alpha: Float
+    val ringColor: Int
+    val ticksVisible: Boolean
+
+    when (status) {
+        FocusReticleStatus.REQUESTED -> {
+            expired = elapsedMs > 600L
+            scale = when {
+                elapsedMs < 100L -> 1.3f - 0.3f * (elapsedMs / 100f)
+                elapsedMs < 400L -> 1.0f
+                else -> 1.0f + 0.15f * ((elapsedMs - 400f) / 200f)
+            }
+            alpha = if (elapsedMs < 400L) 1f else 1f - ((elapsedMs - 400f) / 200f).coerceIn(0f, 1f)
+            ringColor = Color.rgb(255, 191, 0)
+            ticksVisible = false
+        }
+        FocusReticleStatus.SUCCEEDED -> {
+            expired = elapsedMs > 500L
+            scale = 1.0f
+            alpha = if (elapsedMs < 250L) 1f else 1f - ((elapsedMs - 250f) / 250f).coerceIn(0f, 1f)
+            ringColor = Color.WHITE
+            ticksVisible = false
+        }
+        FocusReticleStatus.DEGRADED -> {
+            expired = elapsedMs > 600L
+            scale = 1.0f
+            alpha = if (elapsedMs < 350L) 1f else 1f - ((elapsedMs - 350f) / 250f).coerceIn(0f, 1f)
+            ringColor = Color.rgb(255, 191, 0)
+            ticksVisible = true
+        }
+        FocusReticleStatus.FAILED, FocusReticleStatus.UNSUPPORTED -> {
+            expired = elapsedMs > 400L
+            scale = 1f - 0.15f * (elapsedMs / 200f).coerceIn(0f, 1f)
+            alpha = if (elapsedMs < 150L) 0.5f else 0.5f * (1f - ((elapsedMs - 150f) / 250f).coerceIn(0f, 1f))
+            ringColor = Color.rgb(128, 128, 128)
+            ticksVisible = false
+        }
+    }
+
+    return FocusReticleVisualState(
+        scale = scale.coerceAtLeast(0.5f),
+        alpha = alpha.coerceIn(0f, 1f),
+        ringColor = ringColor,
+        ticksVisible = ticksVisible,
+        expired = expired
+    )
+}
 
 internal data class ReticlePoint(val x: Float, val y: Float)
 

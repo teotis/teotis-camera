@@ -77,4 +77,23 @@ class GestureGuardTest {
             GestureGuardState(isFilterAdjustmentActive = true)
         ))
     }
+
+    @Test
+    fun previewGesture_blockedWhenColorLabOpen() {
+        val state = GestureGuardState(activePanel = CockpitPanelRoute.ColorLab)
+        assertFalse(guard.isGestureAllowed(GestureZone.PREVIEW, state))
+    }
+
+    @Test
+    fun secondaryPanelGesture_allowedWhenColorLabOpen() {
+        val state = GestureGuardState(activePanel = CockpitPanelRoute.ColorLab)
+        assertTrue(guard.isGestureAllowed(GestureZone.SECONDARY_PANEL, state))
+    }
+
+    @Test
+    fun horizontalScroll_blockedWhenColorLabOpen() {
+        assertFalse(guard.isHorizontalScrollAllowed(
+            GestureGuardState(activePanel = CockpitPanelRoute.ColorLab)
+        ))
+    }
 }

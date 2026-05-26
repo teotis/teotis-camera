@@ -385,6 +385,109 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `currentZoomLabel is null when zoom matches a preset`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 2f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertNull(controls.currentZoomLabel)
+    }
+
+    @Test
+    fun `currentZoomLabel shows label when zoom between presets`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 1.5f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertEquals("1.5", controls.currentZoomLabel)
+    }
+
+    @Test
+    fun `nearestPresetRatio is set when zoom not on preset`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 1.5f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertEquals(1f, controls.nearestPresetRatio)
+    }
+
+    @Test
+    fun `zoom row hidden for unsupported capability`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.UNSUPPORTED,
+                    supportedRatios = listOf(1f),
+                    defaultRatio = 1f
+                )
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertFalse(controls.isZoomCapsuleRowVisible)
+        assertTrue(controls.zoomCapsules.isEmpty())
+    }
+
+    @Test
+    fun `continuous zoom capability shows all presets`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                zoomRatio = 1f
+            )
+        )
+        val controls = sessionControlsRenderModel(state, strings)
+
+        assertTrue(controls.isZoomCapsuleRowVisible)
+        assertEquals(3, controls.zoomCapsules.size)
+        assertNull(controls.currentZoomLabel)
+    }
+
+    @Test
     fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
             ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
