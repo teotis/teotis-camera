@@ -140,8 +140,12 @@ class GesturePolicyTest {
 
     @Test
     fun `pinchZoom accumulates within a single gesture`() {
+        var now = 17L
+        val policy = GesturePolicy { now }
+
         // Two PinchZoom events in the same gesture (no ScaleEnd between)
         policy.map(GestureEvent.PinchZoom(1.5f, 100f, 100f), ModeId.PHOTO, 1.0f)
+        now += 17L
         val action2 = policy.map(GestureEvent.PinchZoom(1.2f, 100f, 100f), ModeId.PHOTO, 1.0f)
         assertTrue(action2 is GestureAction.DispatchSession)
         val ratio = (action2 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio

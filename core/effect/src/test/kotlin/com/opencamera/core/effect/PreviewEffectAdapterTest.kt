@@ -27,8 +27,7 @@ class PreviewEffectAdapterTest {
         assertNull(model.watermarkHint)
         assertNull(model.frameGuideline)
         assertNull(model.compositionGrid)
-        assertNull(model.colorTransform)
-        assertEquals(PreviewColorFidelity.NONE, model.colorFidelity)
+        assertEquals(PreviewColorTransform.NONE, model.colorTransform)
     }
 
     @Test
@@ -51,7 +50,7 @@ class PreviewEffectAdapterTest {
 
         assertNotNull(model.colorTransform)
         assertFalse(model.colorTransform!!.isIdentity)
-        assertEquals(PreviewColorFidelity.GOOD, model.colorFidelity)
+        assertEquals(PreviewColorFidelity.GOOD, model.colorTransform.fidelity)
     }
 
     @Test
@@ -61,7 +60,7 @@ class PreviewEffectAdapterTest {
 
         assertNotNull(model.colorTransform)
         assertTrue(model.colorTransform!!.isIdentity)
-        assertEquals(PreviewColorFidelity.NONE, model.colorFidelity)
+        assertEquals(PreviewColorFidelity.NONE, model.colorTransform.fidelity)
     }
 
     @Test
@@ -290,7 +289,7 @@ class PreviewEffectAdapterTest {
     fun `neutral recipe does not produce color transform`() {
         val effect = FilterEffect(
             profileId = "vivid",
-            renderSpec = FilterRenderSpec(contrast = 1.1f),
+            renderSpec = FilterRenderSpec(),
             recipe = PerceptualColorRecipe.NEUTRAL
         )
         val model = adapter.adapt(EffectSpec(listOf(effect)))

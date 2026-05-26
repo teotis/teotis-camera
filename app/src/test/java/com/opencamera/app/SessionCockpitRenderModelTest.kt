@@ -279,7 +279,7 @@ class SessionCockpitRenderModelTest {
             activeMode = ModeId.HUMANISTIC,
             availableModes = listOf(
                 ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
-                ModeId.VIDEO
+                ModeId.VIDEO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO
             ),
             modeSnapshot = ModeSnapshot(
                 id = ModeId.HUMANISTIC,
@@ -387,7 +387,8 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC, ModeId.VIDEO
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
+            ModeId.VIDEO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO
         )
         val state = defaultSessionState(activeMode = ModeId.HUMANISTIC, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())

@@ -45,7 +45,7 @@ class PreviewColorTransformTest {
         val transform = PreviewColorTransform.fromSpec(spec)
         assertFalse(transform.isIdentity)
         // Grayscale: R row should be [0.213, 0.715, 0.072, 0, 0]
-        val m = transform.colorMatrix
+        val m = transform.matrix!!
         assertEquals(0.213f, m[0], 0.001f)
         assertEquals(0.715f, m[1], 0.001f)
         assertEquals(0.072f, m[2], 0.001f)
@@ -55,7 +55,7 @@ class PreviewColorTransformTest {
     fun `warmth shift adds to red and subtracts from blue`() {
         val spec = FilterRenderSpec(warmthShift = 10)
         val transform = PreviewColorTransform.fromSpec(spec)
-        val m = transform.colorMatrix
+        val m = transform.matrix!!
         // Translation column: R should be positive, B should be negative
         assertTrue(m[4] > 0f, "R translation should be positive for warm shift")
         assertTrue(m[14] < 0f, "B translation should be negative for warm shift")
@@ -65,7 +65,7 @@ class PreviewColorTransformTest {
     fun `contrast scales around midpoint`() {
         val spec = FilterRenderSpec(contrast = 1.5f)
         val transform = PreviewColorTransform.fromSpec(spec)
-        val m = transform.colorMatrix
+        val m = transform.matrix!!
         // Diagonal should be 1.5
         assertEquals(1.5f, m[0], 0.001f)
         assertEquals(1.5f, m[6], 0.001f)
@@ -78,7 +78,7 @@ class PreviewColorTransformTest {
     fun `brightness shifts all channels equally`() {
         val spec = FilterRenderSpec(brightnessShift = 20)
         val transform = PreviewColorTransform.fromSpec(spec)
-        val m = transform.colorMatrix
+        val m = transform.matrix!!
         assertEquals(20f, m[4], 0.001f)
         assertEquals(20f, m[9], 0.001f)
         assertEquals(20f, m[14], 0.001f)
@@ -137,6 +137,6 @@ class PreviewColorTransformTest {
         )
         val transform = PreviewColorTransform.fromSpec(spec)
         assertFalse(transform.isIdentity)
-        assertEquals(20, transform.colorMatrix.size)
+        assertEquals(20, transform.matrix!!.size)
     }
 }

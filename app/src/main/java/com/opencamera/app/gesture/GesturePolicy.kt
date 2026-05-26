@@ -11,7 +11,9 @@ sealed interface GestureAction {
     data object Ignore : GestureAction
 }
 
-class GesturePolicy {
+class GesturePolicy(
+    private val nowMillis: () -> Long = System::currentTimeMillis
+) {
     private var localZoomRatio = 1.0f
     private var lastPinchTimestamp = 0L
 
@@ -30,7 +32,7 @@ class GesturePolicy {
             is GestureEvent.DoubleTap -> GestureAction.DispatchSession(SessionIntent.LensFacingToggled)
             is GestureEvent.PinchZoom -> {
                 localZoomRatio = (localZoomRatio * event.scaleFactor).coerceIn(0.5f, 10.0f)
-                val now = System.currentTimeMillis()
+                val now = nowMillis()
                 if (now - lastPinchTimestamp > 16) {
                     lastPinchTimestamp = now
                     GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(localZoomRatio))

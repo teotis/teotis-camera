@@ -3,6 +3,7 @@ package com.opencamera.core.effect
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.WatermarkStyleSettings
+import com.opencamera.core.settings.WatermarkTextPlacement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
