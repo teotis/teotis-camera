@@ -30,6 +30,12 @@ bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orc
 CLAUDE_PERMISSION_MODE=auto bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g0
 ```
 
+Optional one-off bypass override, if you do not want to rely on user-level settings:
+
+```bash
+CLAUDE_PERMISSION_MODE=bypassPermissions bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g0
+```
+
 ## Package: 00-mode-order-regression
 
 Copy the block below into Claude Code Agent View.

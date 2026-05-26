@@ -69,7 +69,7 @@ When done, write the full evidence pack to $status_file: worktree path, branch, 
       echo >&2
       echo "ERROR: Claude Code requires one interactive auto-mode opt-in before --bg can use --permission-mode auto." >&2
       echo "Run once interactively: claude --permission-mode auto" >&2
-      echo "Or rerun this script without auto mode: CLAUDE_PERMISSION_MODE=default bash launchers/dispatch-claude-agents.sh" >&2
+      echo "Or rerun this script without a permission override so user-level settings apply: unset CLAUDE_PERMISSION_MODE; bash launchers/dispatch-claude-agents.sh" >&2
     fi
     return "$status"
   fi
@@ -107,6 +107,7 @@ else
   echo "Permission mode: inherited from Claude Code settings"
 fi
 echo "Setting sources: $CLAUDE_SETTING_SOURCES"
+echo "Tip: leave CLAUDE_PERMISSION_MODE empty to inherit user settings, including user-enabled bypassPermissions."
 if [ "$CLAUDE_PERMISSION_MODE" = "auto" ]; then
   echo
   echo "Auto mode requested. Claude Code requires user opt-in before --bg can create auto-mode sessions."

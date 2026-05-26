@@ -23,3 +23,9 @@ To explicitly use auto mode, run the interactive opt-in once first:
 bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh opt-in-auto
 CLAUDE_PERMISSION_MODE=auto bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g0
 ```
+
+For a one-off bypass override:
+
+```bash
+CLAUDE_PERMISSION_MODE=bypassPermissions bash docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g0
+```

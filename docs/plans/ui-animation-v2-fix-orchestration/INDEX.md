@@ -162,7 +162,8 @@ Evidence pack must include:
 ## Launch Options
 
 - Option A: Background agent script — run `bash launchers/dispatch-claude-agents.sh g0`, then later `g1`, `g2`, `g3`, `g4`, and `audit`. The script creates `claude --bg --name` sessions for the requested phase and prints the `claude agents` command. It does not open Agents View by default; set `CLAUDE_OPEN_AGENT_VIEW=1` to open it after dispatch. Permission mode is inherited from Claude Code settings unless `CLAUDE_PERMISSION_MODE` is set.
-- Option B: Auto-mode opt-in, optional — if you want background sessions to use auto mode, first run `bash launchers/dispatch-claude-agents.sh opt-in-auto` and accept the interactive prompt. Then dispatch with `CLAUDE_PERMISSION_MODE=auto bash launchers/dispatch-claude-agents.sh g0`.
-- Option C: Agent View manual fallback — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --effort xhigh`, then copy prompts from `launchers/agent-view-prompts.md`.
-- Option D: `/batch` — not recommended; see `launchers/batch-instruction.md`.
-- Option E: Final integration audit — give `validation/final-audit-prompt.md` to Codex after all status files are complete.
+- Option B: Bypass permissions, optional — prefer enabling it as a user-level Claude Code setting, for example `permissions.defaultMode: bypassPermissions` in `~/.claude/settings.json`. The script will inherit it because it omits `--permission-mode` by default. Use `CLAUDE_PERMISSION_MODE=bypassPermissions` only as an explicit one-off override.
+- Option C: Auto-mode opt-in, optional — if you want background sessions to use auto mode, first run `bash launchers/dispatch-claude-agents.sh opt-in-auto` and accept the interactive prompt. Then dispatch with `CLAUDE_PERMISSION_MODE=auto bash launchers/dispatch-claude-agents.sh g0`.
+- Option D: Agent View manual fallback — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --effort xhigh`, then copy prompts from `launchers/agent-view-prompts.md`.
+- Option E: `/batch` — not recommended; see `launchers/batch-instruction.md`.
+- Option F: Final integration audit — give `validation/final-audit-prompt.md` to Codex after all status files are complete.
