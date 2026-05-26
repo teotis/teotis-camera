@@ -123,9 +123,7 @@ internal class MainActivityActionBinder(
         views.quickPanel.grid.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.commonSection?.gridMode)
         }
-        views.quickPanel.flash.setOnClickListener {
-            callbacks.dispatch(SessionIntent.SecondaryActionPressed)
-        }
+
         views.quickPanel.resolution.setOnClickListener {
             callbacks.dispatch(SessionIntent.StillCaptureResolutionToggled)
         }

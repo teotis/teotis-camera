@@ -442,12 +442,11 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `quick panel sheet exposes all six rows`() {
+    fun `quick panel sheet exposes five rows without quality`() {
         val state = defaultSessionState()
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Grid", sheet.gridRow.title)
-        assertEquals("Quality", sheet.qualityRow.title)
         assertEquals("Size", sheet.resolutionRow.title)
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Live", sheet.liveRow.title)
@@ -461,18 +460,17 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `quick panel sheet exposes photo quality and resolution rows`() {
+    fun `quick panel sheet exposes resolution row`() {
         val state = defaultSessionState(
-            activeDeviceGraph = DeviceGraphSpec.stillCapture()
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                resolutionPreset = StillCaptureResolutionPreset.MEDIUM_8MP
+            )
         )
 
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
-        assertEquals("Quality", sheet.qualityRow.title)
-        assertEquals("Still Max", sheet.qualityRow.value)
         assertEquals("Size", sheet.resolutionRow.title)
         assertEquals("8MP", sheet.resolutionRow.value)
-        assertTrue(sheet.qualityRow.isEnabled)
         assertTrue(sheet.resolutionRow.isEnabled)
     }
 
@@ -651,66 +649,6 @@ class SessionCockpitRenderModelTest {
         val reason = captureDisabledReason(state, TestAppTextResolver())
 
         assertEquals("Camera permission required", reason)
-    }
-
-    @Test
-    fun `quick quality row shows combined video spec in video mode`() {
-        val state = defaultSessionState(
-            activeMode = ModeId.VIDEO,
-            activeDeviceGraph = DeviceGraphSpec.videoRecording(
-                requestedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.FHD_1080P,
-                    frameRate = VideoFrameRate.FPS_60
-                ),
-                resolvedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.FHD_1080P,
-                    frameRate = VideoFrameRate.FPS_60
-                )
-            )
-        )
-
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertEquals("1080p60", sheet.qualityRow.value)
-        assertTrue(sheet.qualityRow.isEnabled)
-    }
-
-    @Test
-    fun `quick quality row shows degraded video spec with asterisk`() {
-        val state = defaultSessionState(
-            activeMode = ModeId.VIDEO,
-            activeDeviceGraph = DeviceGraphSpec.videoRecording(
-                requestedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.UHD_4K,
-                    frameRate = VideoFrameRate.FPS_60
-                ),
-                resolvedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.UHD_4K,
-                    frameRate = VideoFrameRate.FPS_30
-                )
-            )
-        )
-
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertEquals("4K30*", sheet.qualityRow.value)
-    }
-
-    @Test
-    fun `quick quality row disabled during video recording`() {
-        val state = defaultSessionState(
-            activeMode = ModeId.VIDEO,
-            activeDeviceGraph = DeviceGraphSpec.videoRecording(
-                requestedVideoSpec = VideoSpec(
-                    resolution = VideoResolution.FHD_1080P,
-                    frameRate = VideoFrameRate.FPS_30
-                )
-            )
-        ).copy(recordingStatus = RecordingStatus.RECORDING)
-
-        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
-
-        assertFalse(sheet.qualityRow.isEnabled)
     }
 
     companion object {

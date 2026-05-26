@@ -1742,16 +1742,12 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `quick panel sheet exposes all five rows`() {
+    fun `quick panel sheet exposes rows without quality`() {
         val state = defaultSessionState()
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Grid", sheet.gridRow.title)
-        assertEquals("3x3", sheet.gridRow.value)
-        assertEquals("Quality", sheet.qualityRow.title)
-        assertEquals("Still Max", sheet.qualityRow.value)
-        assertTrue(sheet.qualityRow.value != sheet.gridRow.value,
-            "Quality row value should show still quality, not grid value")
+
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)

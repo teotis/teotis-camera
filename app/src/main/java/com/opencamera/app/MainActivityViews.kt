@@ -29,7 +29,6 @@ internal data class TopBarViews(
 internal data class QuickPanelViews(
     val panel: NestedScrollView,
     val grid: Button,
-    val flash: Button,
     val resolution: Button,
     val brightnessSlider: SeekBar,
     val brightnessValueText: TextView,
@@ -225,7 +224,6 @@ internal data class MainActivityViews(
             val quickPanel = QuickPanelViews(
                 panel = activity.findViewById(R.id.quickBubblePanel),
                 grid = activity.findViewById(R.id.buttonQuickGrid),
-                flash = activity.findViewById(R.id.buttonQuickFlash),
                 resolution = activity.findViewById(R.id.buttonQuickResolution),
                 brightnessSlider = activity.findViewById(R.id.brightnessSlider),
                 brightnessValueText = activity.findViewById(R.id.brightnessValueText),
