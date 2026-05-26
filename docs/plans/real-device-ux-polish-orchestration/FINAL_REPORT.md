@@ -1,88 +1,77 @@
 # Real Device UX Polish — Final Report
 
-## Summary
+## 集成摘要
 
-All 6 functional packages completed, merged to integration branch, verified, and merged to `main`. The orchestration restored Humanistic/Portrait mode visibility, cleaned Style/Filter copy, enabled direct Settings third-level navigation, added Quick panel outside-tap dismiss, unified persistence reset controls, and added Dev log storage governance.
+6 个功能包全部合并至 main（commit `ba5717a`），通过集成验证。
 
-## Per-Package Acceptance Status
+## 包验收状态
 
-| Package | Status | Key Evidence |
+| 包 | 状态 | 说明 |
 |---|---|---|
-| 00-mode-entry-visibility | PASS | All 7 modes visible in product order; PRODUCT_MODE_ENTRY_ORDER complete; CockpitSurfaceRenderer uses buttonMap for all modes |
-| 03-quick-panel-outside-dismiss | PASS | Scrim at 4dp elevation intercepts outside taps; preview touch listener returns false when panel open; 8 new tests |
-| 05-dev-log-storage-governance | PASS | 20MB cap with oldest-first pruning; type-based cleanup (Key/Core/Error/All); 16 new tests |
-| 01-style-copy-noise-cleanup | PASS | 镜头→风格, removed 调整所选/打开可编辑的自定义副本; rg confirms clean |
-| 02-settings-third-level-navigation | PASS | Portrait/Watermark rows route directly to third-level pages; back navigation correct |
-| 04-persistence-reset-unification | PASS | Reset buttons on Settings/Style/Color Lab/Quick; hasUserAdjustments detection; 22 new tests |
+| 00-mode-entry-visibility | completed | 恢复人文/人像模式入口可见性，CockpitSurfaceRenderer 按钮映射和 modeTrack 渲染已更新 |
+| 01-style-copy-noise-cleanup | completed | Lens→Style 重命名，移除无意义的 selected-filter 文案 |
+| 02-settings-third-level-navigation | completed | 设置页 Portrait/Watermark 行直接路由到第三级页面 |
+| 03-quick-panel-outside-dismiss | completed | Quick 面板在外部点击时关闭，panelDismissScrim elevation 修复 |
+| 04-persistence-reset-unification | completed | 统一 Settings/Style/Color Lab/Quick 的持久化和重置功能 |
+| 05-dev-log-storage-governance | completed | Dev 日志 20MB 上限 + 分类清理功能 |
 
-## Merge Summary
+## 合并摘要
 
-Integration branch: agent/real-device-ux-polish/integration
+合并顺序（按依赖图）：
+1. `worktree-pkg-00-mode-order` → integration（冲突已解决：CockpitSurfaceRenderer.kt, SessionCockpitRenderModelTest.kt, 00-mode-order-regression.md）
+2. `agent/real-device-ux-polish/03-quick-panel-outside-dismiss` → integration（无冲突）
+3. `worktree-05-dev-log-storage-governance` → integration（无冲突）
+4. `agent/real-device-ux-polish/01-style-copy-noise-cleanup` → integration（state.tsv 冲突已解决）
+5. `worktree-pkg-02-settings-third-level` → integration（无冲突）
+6. `agent/real-device-ux-polish/04-persistence-reset-unification` → integration（CockpitSurfaceRenderer.kt 冲突已解决）
 
-Merge order (all merged, conflicts resolved):
-1. 00-mode-entry-visibility — clean merge
-2. 03-quick-panel-outside-dismiss — clean merge
-3. 05-dev-log-storage-governance — clean merge
-4. 01-style-copy-noise-cleanup — resolved state.tsv conflict
-5. 02-settings-third-level-navigation — clean merge
-6. 04-persistence-reset-unification — resolved conflict
+合并后修复：SessionCockpitRenderModelTest.kt 中过期的 qualityRow/qualityPreference 引用（来自 04 包合并时的自动合并遗留），SessionSettingsManagerTest.kt 中 humanistic-street slug 断言修正。
 
-Mainline merge: integration branch fully merged to main (no commits ahead of main).
+## 验证摘要
 
-## Integration Verification Summary
+- `:core:mode:test` (ModeCatalogContractsTest, ModeProductDeclarationTest) — PASS
+- `:core:settings:test` (PersistedSettingsSerializerTest) — PASS
+- `:app:testDebugUnitTest` (SessionCockpitRenderModelTest, CockpitPanelRouterTest, SessionUiRenderModelTest, SessionSettingsManagerTest, DevLogRenderModelTest) — PASS (233 tests)
+- `:app:assembleDebug` — PASS
+- `./scripts/verify_stage_7_observability.sh` — 19 DefaultCameraSessionTest failures（main 分支已有，非本次引入）
 
-| Command | Result |
-|---|---|
-| :core:mode:test ModeCatalogContractsTest ModeProductDeclarationTest | PASS |
-| :core:settings:test PersistedSettingsSerializerTest | PASS |
-| :app:testDebugUnitTest SessionCockpitRenderModelTest CockpitPanelRouterTest SessionUiRenderModelTest SessionSettingsManagerTest DevLogRenderModelTest | PASS (233/233) |
-| :app:assembleDebug | PASS |
-| verify_stage_7_observability.sh | PARTIAL — 19 pre-existing DefaultCameraSessionTest failures (unrelated to UX polish; no package touched session core files) |
+## Invalid-Copy Grep 结果
 
-## Invalid-Copy Grep
+```
+app/src/main/res/values/strings.xml:15: <string name="button_switch_lens">镜头</string>
+app/src/main/res/values/strings.xml:29: <string name="button_single_lens">单镜头</string>
+```
 
-rg -n "镜头|调整所选|打开可编辑的自定义副本" app/src/main app/src/test core/settings/src/main core/settings/src/test
+以上为合法的相机镜头切换文案（前/后镜头），非 Style/Lens 文案问题。
 
-Result: 2 hits, both legitimate camera lens references:
-- app/src/main/res/values/strings.xml:15 — button_switch_lens = 镜头 (physical lens switching)
-- app/src/main/res/values/strings.xml:29 — button_single_lens = 单镜头 (physical lens)
+## 跨包冲突报告
 
-No style/filter-related invalid copy found. PASS.
-
-## Cross-Package Conflict Report
-
-| Merge | Conflict | Resolution |
+| 冲突文件 | 涉及包 | 解决策略 |
 |---|---|---|
-| 01-style-copy-noise-cleanup into integration | status/state.tsv — both branches modified | Accepted integration version, applied 01 row update |
-| 04-persistence-reset-unification into integration | Source conflict | Resolved by integration agent |
+| CockpitSurfaceRenderer.kt | 00, 04 | 取功能分支版本（theirs） |
+| SessionCockpitRenderModelTest.kt | 00, 04, main | 取功能分支版本 + 合并后修复 |
+| 00-mode-order-regression.md | 00 | 取功能分支版本（theirs） |
+| state.tsv | 01 | 取 integration 版本（ours） |
 
 ## Real-Device Smoke Checklist
 
-| Item | Status | Notes |
-|---|---|---|
-| Humanistic and Portrait visible and tappable | Needs device smoke | Verified by unit tests; no device access |
-| Style entry reads Style/风格, not Lens/镜头 | Needs device smoke | String resources changed; rg confirms clean |
-| Selected filter does not show meaningless copy | Needs device smoke | adjustButtonLabel set to null; tests pass |
-| Settings Portrait/Watermark enters third-level pages | Needs device smoke | Routing logic changed; tests pass |
-| Quick dismisses on outside tap, no capture/focus/mode | Needs device smoke | Scrim + GestureGuard mechanism; tests pass |
-| Reset appears and restores defaults on Settings/Style/Color Lab/Quick | Needs device smoke | hasUserAdjustments + resetToDefaults; tests pass |
-| Dev logs cap at 20MB, cleanup by type works | Needs device smoke | DevLogExporter with pruneToCap; 16 tests pass |
+- [ ] Humanistic and Portrait are visible and tappable
+- [ ] Style entry reads Style/风格, not Lens/镜头
+- [ ] Selected filter does not show meaningless copy
+- [ ] Settings Portrait/Watermark enters third-level pages directly
+- [ ] Quick dismisses on outside tap and does not trigger capture/focus/mode
+- [ ] Reset appears and restores defaults on Settings/Style/Color Lab/Quick
+- [ ] Dev logs cap at 20MB and cleanup by type works
 
-## Cleanup Results
+> 以上需要真机验证，本地单元测试已覆盖逻辑正确性。
 
-Package branches and worktrees recorded in package-graph.tsv and state.tsv:
+## 清理结果
 
-| Package | Branch | Worktree | Cleanup |
-|---|---|---|---|
-| 00-mode-entry-visibility | worktree-pkg-00-mode-order | .claude/worktrees/pkg-00-mode-order | Done — branch + worktree removed |
-| 03-quick-panel-outside-dismiss | agent/real-device-ux-polish/03-quick-panel-outside-dismiss | .worktrees/real-device-ux-polish/03-quick-panel-outside-dismiss | Done — branch + worktree removed |
-| 05-dev-log-storage-governance | worktree-05-dev-log-storage-governance | .claude/worktrees/05-dev-log-storage-governance | Done — branch + worktree removed |
-| 01-style-copy-noise-cleanup | agent/real-device-ux-polish/01-style-copy-noise-cleanup | .worktrees/real-device-ux-polish/01-style-copy-noise-cleanup | Done — branch + worktree removed |
-| 02-settings-third-level-navigation | worktree-pkg-02-settings-third-level | .claude/worktrees/pkg-02-settings-third-level | Done — branch removed (worktree already gone) |
-| 04-persistence-reset-unification | agent/real-device-ux-polish/04-persistence-reset-unification | .worktrees/real-device-ux-polish/04-persistence-reset-unification | Done — branch + worktree removed |
-
-## Residual Risks
-
-1. Pre-existing DefaultCameraSessionTest failures (19): Unrelated to UX polish. No package branch touched :core:session files. These failures exist on main independently.
-2. Real-device smoke not run: All packages verified via unit tests and assembleDebug. Physical device tap/visual QA recommended before release.
-3. Unused lens string resources: button_switch_lens and button_single_lens may be dead code (no Kotlin references found). Not a UX polish concern.
+功能包分支和 worktree 待清理（集成验证和 main 合并已完成）：
+- `worktree-pkg-00-mode-order` + `.claude/worktrees/pkg-00-mode-order`
+- `agent/real-device-ux-polish/03-quick-panel-outside-dismiss` + `.worktrees/real-device-ux-polish/03-quick-panel-outside-dismiss`
+- `worktree-05-dev-log-storage-governance` + `.claude/worktrees/05-dev-log-storage-governance`
+- `agent/real-device-ux-polish/01-style-copy-noise-cleanup` + `.worktrees/real-device-ux-polish/01-style-copy-noise-cleanup`
+- `worktree-pkg-02-settings-third-level`
+- `agent/real-device-ux-polish/04-persistence-reset-unification` + `.worktrees/real-device-ux-polish/04-persistence-reset-unification`
+- `agent/real-device-ux-polish/integration`

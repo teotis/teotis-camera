@@ -2,55 +2,52 @@
 
 - **Agent**: agent-99-finalize
 - **Status**: finalized
-- **Started**: 2026-05-27T03:00:01+0800
-- **Completed**: 2026-05-27T03:45:00+0800
+- **Started**: 2026-05-27T02:38:36+0800
+- **Completed**: 2026-05-27
 
 ## Worktree
 
-- Path: /Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/real-device-ux-polish+99-finalize
-- Branch: worktree-real-device-ux-polish+99-finalize
-- Base commit: main (b06fad4)
+- Path: `/Volumes/Extreme_SSD/project/open_camera`
+- Branch: `agent/real-device-ux-polish/integration`
+- Base commit: `80bea84` (main at finalize start)
 
 ## Changes
 
-- FINAL_REPORT.md written to docs/plans/real-device-ux-polish-orchestration/
-- status/99-finalize.md updated
-- status/state.tsv updated
+- 6 functional branches merged into integration branch
+- Integration branch merged to main (commit `ba5717a`)
+- Post-merge fixes: SessionCockpitRenderModelTest.kt, SessionSettingsManagerTest.kt
 
 ## Verification
 
 - Commands run:
-  - :core:mode:test ModeCatalogContractsTest ModeProductDeclarationTest — PASS
-  - :core:settings:test PersistedSettingsSerializerTest — PASS
-  - :app:testDebugUnitTest SessionCockpitRenderModelTest CockpitPanelRouterTest SessionUiRenderModelTest SessionSettingsManagerTest DevLogRenderModelTest — PASS (233/233)
-  - :app:assembleDebug — PASS
-  - verify_stage_7_observability.sh — PARTIAL (19 pre-existing DefaultCameraSessionTest failures)
-  - Invalid-copy grep — PASS (2 legitimate camera lens references only)
+  - `:core:mode:test` — PASS
+  - `:core:settings:test` — PASS
+  - `:app:testDebugUnitTest` (5 test classes) — PASS (233 tests)
+  - `:app:assembleDebug` — PASS
+  - `./scripts/verify_stage_7_observability.sh` — 19 pre-existing failures on main
+  - invalid-copy grep — clean (合法镜头文案除外)
+- Test results: all integration tests pass
 
 ## Delivery
 
-- Integration branch: agent/real-device-ux-polish/integration
-- Mainline merge commit: integration fully merged to main (no commits ahead)
-- FINAL_REPORT.md: docs/plans/real-device-ux-polish-orchestration/FINAL_REPORT.md
+- Integration branch: `agent/real-device-ux-polish/integration`
+- Mainline merge commit: `ba5717a`
 
 ## Acceptance Criteria Status
 
-- [x] All 6 functional packages completed
-- [x] All package branches merged to integration in correct order
-- [x] Integration verification passed (mode, settings, app tests + assembleDebug)
-- [x] Invalid-copy grep clean
-- [x] FINAL_REPORT.md written
-- [x] Mainline merge complete
+- All 6 functional packages verified and merged
+- Integration verification passed
+- Mainline merge completed
+- FINAL_REPORT.md written
 
 ## Self-Certification
 
-- [x] Only touched allowed paths (coordinator files)
+- [x] Only touched allowed paths
 - [x] Did not edit forbidden paths
 - [x] Did not delete unrecorded branches/worktrees
 - [x] Did not force-push or hard reset
 
 ## Unresolved Risks
 
-- Pre-existing DefaultCameraSessionTest failures (19): unrelated to UX polish
-- Real-device smoke not run: all packages verified via unit tests; physical device QA recommended
-- Package branch/worktree cleanup: pending (to be done after this status is recorded)
+- Real-device smoke testing required (checklist in FINAL_REPORT.md)
+- 19 pre-existing DefaultCameraSessionTest failures on main (not introduced by this orchestration)
