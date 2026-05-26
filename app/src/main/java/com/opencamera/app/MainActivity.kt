@@ -507,7 +507,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             return
         }
         panelRouter.reduce(CockpitPanelCommand.OpenPortraitLab)
-        renderLatestSettingsSurfaces()
+        renderAfterPanelChange()
     }
 
     override fun openWatermarkLabSelector() {
@@ -518,7 +518,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             return
         }
         panelRouter.reduce(CockpitPanelCommand.OpenWatermarkSelector)
-        renderLatestSettingsSurfaces()
+        renderAfterPanelChange()
     }
 
     override fun openWatermarkLabDetail(templateId: String) {
@@ -527,7 +527,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             return
         }
         panelRouter.reduce(CockpitPanelCommand.OpenWatermarkDetail(templateId))
-        renderLatestSettingsSurfaces()
+        renderAfterPanelChange()
     }
 
     override fun selectFilterLabFamily(family: FilterLabFamily) {

@@ -99,7 +99,6 @@ internal class MainActivityActionBinder(
         }
         views.settingsPanel.back.setOnClickListener {
             callbacks.reducePanel(CockpitPanelCommand.SettingsBack)
-            callbacks.renderLatestSettingsSurfaces()
             callbacks.renderAfterPanelChange()
         }
 
