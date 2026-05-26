@@ -19,10 +19,6 @@ CLAUDE_EFFORT="${CLAUDE_EFFORT:-xhigh}"
 CLAUDE_PERMISSION_MODE="${CLAUDE_PERMISSION_MODE:-}"
 CLAUDE_SETTING_SOURCES="${CLAUDE_SETTING_SOURCES:-user,project,local}"
 CLAUDE_OPEN_AGENT_VIEW="${CLAUDE_OPEN_AGENT_VIEW:-0}"
-CLAUDE_PERMISSION_ARGS=()
-if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
-  CLAUDE_PERMISSION_ARGS=(--permission-mode "$CLAUDE_PERMISSION_MODE")
-fi
 
 echo "=== Claude Code ==="
 echo "$CLAUDE_VERSION"
@@ -52,14 +48,24 @@ launch_agent() {
   prompt="Read $PLAN_DIR/INDEX.md and $package_doc. Implement package $package_id. Write evidence to $status_file when done. Do NOT edit INDEX.md or other status files. Rebase on current main before final verification and merge/PR when complete."
   echo "Launching $name"
   set +e
-  output="$(claude \
-    --bg \
-    --name "$name" \
-    --model "$CLAUDE_MODEL" \
-    --effort "$CLAUDE_EFFORT" \
-    "${CLAUDE_PERMISSION_ARGS[@]}" \
-    --setting-sources "$CLAUDE_SETTING_SOURCES" \
-    "$prompt" 2>&1)"
+  if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+    output="$(claude \
+      --bg \
+      --name "$name" \
+      --model "$CLAUDE_MODEL" \
+      --effort "$CLAUDE_EFFORT" \
+      --permission-mode "$CLAUDE_PERMISSION_MODE" \
+      --setting-sources "$CLAUDE_SETTING_SOURCES" \
+      "$prompt" 2>&1)"
+  else
+    output="$(claude \
+      --bg \
+      --name "$name" \
+      --model "$CLAUDE_MODEL" \
+      --effort "$CLAUDE_EFFORT" \
+      --setting-sources "$CLAUDE_SETTING_SOURCES" \
+      "$prompt" 2>&1)"
+  fi
   status=$?
   set -e
   if [ "$status" -ne 0 ]; then
@@ -95,10 +101,18 @@ echo "After all agents complete, run the integration audit:"
 echo "  $PLAN_DIR/validation/final-audit-prompt.md"
 
 if [ "$CLAUDE_OPEN_AGENT_VIEW" = "1" ] && [ -t 1 ]; then
-  claude agents \
-    --cwd "$REPO_ROOT" \
-    --model "$CLAUDE_MODEL" \
-    --effort "$CLAUDE_EFFORT" \
-    "${CLAUDE_PERMISSION_ARGS[@]}" \
-    --setting-sources "$CLAUDE_SETTING_SOURCES"
+  if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
+    claude agents \
+      --cwd "$REPO_ROOT" \
+      --model "$CLAUDE_MODEL" \
+      --effort "$CLAUDE_EFFORT" \
+      --permission-mode "$CLAUDE_PERMISSION_MODE" \
+      --setting-sources "$CLAUDE_SETTING_SOURCES"
+  else
+    claude agents \
+      --cwd "$REPO_ROOT" \
+      --model "$CLAUDE_MODEL" \
+      --effort "$CLAUDE_EFFORT" \
+      --setting-sources "$CLAUDE_SETTING_SOURCES"
+  fi
 fi
