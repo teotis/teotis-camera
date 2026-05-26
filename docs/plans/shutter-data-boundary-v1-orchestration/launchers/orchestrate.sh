@@ -298,10 +298,11 @@ cmd_advance() {
 cmd_status() {
   preflight
   printf "%-32s %-12s %-42s %-80s %-12s %-16s %s\n" "PACKAGE" "STATE" "BRANCH" "WORKTREE" "VERIFY" "INTEGRATION" "LAST_ERROR"
-  while IFS=$'\t' read -r package_id state launched_at completed_at agent branch worktree base_commit commit_hash verification integration cleanup last_error; do
-    [ "$package_id" = "package_id" ] && continue
-    printf "%-32s %-12s %-42s %-80s %-12s %-16s %s\n" "$package_id" "$state" "$branch" "$worktree" "$verification" "$integration" "$last_error"
-  done < "$STATE"
+  awk -F '\t' '
+    FNR > 1 {
+      printf "%-32s %-12s %-42s %-80s %-12s %-16s %s\n", $1, $2, $6, $7, $10, $11, $13
+    }
+  ' "$STATE"
 }
 
 cmd_retry() {
