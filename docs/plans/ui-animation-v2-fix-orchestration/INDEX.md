@@ -161,7 +161,7 @@ Evidence pack must include:
 
 ## Launch Options
 
-- Option A: Background agent script — run `bash launchers/dispatch-claude-agents.sh g0`, then later `g1`, `g2`, `g3`, `g4`, and `audit`. The script creates `claude --bg --name` sessions for the requested phase and opens `claude agents` when interactive. Default permission mode is `default`.
+- Option A: Background agent script — run `bash launchers/dispatch-claude-agents.sh g0`, then later `g1`, `g2`, `g3`, `g4`, and `audit`. The script creates `claude --bg --name` sessions for the requested phase and prints the `claude agents` command. It does not open Agents View by default; set `CLAUDE_OPEN_AGENT_VIEW=1` to open it after dispatch. Default permission mode is `default`.
 - Option B: Auto-mode opt-in, optional — if you want background sessions to use auto mode, first run `bash launchers/dispatch-claude-agents.sh opt-in-auto` and accept the interactive prompt. Then dispatch with `CLAUDE_PERMISSION_MODE=auto bash launchers/dispatch-claude-agents.sh g0`.
 - Option C: Agent View manual fallback — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort xhigh`, then copy prompts from `launchers/agent-view-prompts.md`.
 - Option D: `/batch` — not recommended; see `launchers/batch-instruction.md`.

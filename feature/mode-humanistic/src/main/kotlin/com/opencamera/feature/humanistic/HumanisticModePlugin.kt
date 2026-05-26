@@ -7,6 +7,7 @@ import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
 import com.opencamera.core.effect.FrameEffect
+import com.opencamera.core.effect.WatermarkEffect
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FrameRatio
@@ -36,10 +37,22 @@ import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.WatermarkTemplate
+<<<<<<< HEAD
 import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.liveWatermarkMetadataTags
+=======
+import com.opencamera.core.settings.renderStyleColorSpec
+import com.opencamera.core.settings.watermarkStyleFor
+import com.opencamera.core.settings.compactSummary
+import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
+import com.opencamera.core.settings.liveWatermarkMetadataTags
+import com.opencamera.core.settings.toMetadataTags
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+>>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -244,11 +257,28 @@ private class HumanisticModeController(
             colorLabSpec = photoSettings.colorLabSpec,
             styleStrength = photoSettings.styleStrength
         )
+<<<<<<< HEAD
         val adjustedRenderSpec = pipelineResult?.finalRenderSpec
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
             FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
+=======
+        val selectedWatermarkTemplate = selectedWatermarkTemplate()
+        val watermarkStyle = context.settingsSnapshot.persisted.photo
+            .watermarkStyleFor(selectedWatermarkTemplate.id)
+        return EffectSpec(listOf(
+            FilterEffect(style.id, adjustedRenderSpec),
+            WatermarkEffect(
+                templateId = selectedWatermarkTemplate.id,
+                tokens = mapOf(
+                    "watermarkModel" to "OpenCamera",
+                    "watermarkDatetime" to watermarkDateTime(),
+                    "watermarkCameraParams" to watermarkCameraParams()
+                ),
+                style = watermarkStyle
+            ),
+>>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
             FrameEffect(currentFrameRatio())
         ))
     }
@@ -399,6 +429,20 @@ private class HumanisticModeController(
             id = persistedTemplateId,
             label = persistedTemplateId
         )
+    }
+
+    private fun watermarkDateTime(): String {
+        return LocalDateTime.now().format(
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
+        )
+    }
+
+    private fun watermarkCameraParams(): String {
+        return buildString {
+            append(runtimeState().stillCaptureResolutionPreset.label)
+            append(" • ")
+            append(currentFrameRatio().label)
+        }
     }
 
     private fun livePhotoEnabledByDefault(): Boolean =

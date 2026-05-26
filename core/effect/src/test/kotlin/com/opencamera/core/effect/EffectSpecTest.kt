@@ -99,4 +99,35 @@ class EffectSpecTest {
         assertNotNull(spec.find<FrameEffect>())
         assertNull(spec.find<DocumentEffect>())
     }
+
+    @Test
+    fun `document mode effect spec with watermark`() {
+        val document = DocumentEffect(autoCrop = true, contrastProfile = "high")
+        val watermark = WatermarkEffect(
+            templateId = "classic-overlay",
+            tokens = mapOf("watermarkModel" to "OpenCamera"),
+            style = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_LEFT
+            )
+        )
+        val spec = EffectSpec(listOf(document, watermark))
+
+        assertEquals(2, spec.entries.size)
+        assertNotNull(spec.find<DocumentEffect>())
+        assertNotNull(spec.find<WatermarkEffect>())
+        assertNull(spec.find<FilterEffect>())
+        assertNull(spec.find<FrameEffect>())
+        assertEquals("classic-overlay", spec.find<WatermarkEffect>()!!.templateId)
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, spec.find<WatermarkEffect>()!!.style.textPlacement)
+    }
+
+    @Test
+    fun `watermark effect target is BOTH by default`() {
+        val watermark = WatermarkEffect(
+            templateId = "classic",
+            tokens = mapOf("watermarkModel" to "Test"),
+            style = WatermarkStyleSettings()
+        )
+        assertEquals(EffectTarget.BOTH, watermark.target)
+    }
 }

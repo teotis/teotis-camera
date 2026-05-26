@@ -154,6 +154,7 @@ class EffectBridgeTest {
     }
 
     @Test
+<<<<<<< HEAD
     fun `toMetadataTags with non-neutral recipe emits recipe tags`() {
         val recipe = PerceptualColorRecipe(
             toneLift = 0.5f,
@@ -189,5 +190,89 @@ class EffectBridgeTest {
         assertEquals("vivid", tags["filterProfile"])
         assertNull(tags["recipe.toneLift"])
         assertNull(tags["recipe.chromaBoost"])
+=======
+    fun `toMetadataTags with DocumentEffect and WatermarkEffect`() {
+        val document = DocumentEffect(autoCrop = true, contrastProfile = "high")
+        val watermark = WatermarkEffect(
+            templateId = "classic-overlay",
+            tokens = mapOf(
+                "watermarkModel" to "OpenCamera",
+                "watermarkDatetime" to "2026-05-26 10:00",
+                "watermarkCameraParams" to "12MP"
+            ),
+            style = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+                textScale = WatermarkTextScale.NORMAL,
+                textOpacity = WatermarkTextOpacity.SOFT,
+                frameBackground = WatermarkFrameBackground.DARK
+            )
+        )
+        val spec = EffectSpec(listOf(document, watermark))
+
+        val tags = EffectBridge.toMetadataTags(spec)
+
+        assertEquals("document", tags["mode"])
+        assertEquals("true", tags["autoCrop"])
+        assertEquals("classic-overlay", tags["watermarkTemplate"])
+        assertEquals("OpenCamera", tags["watermarkModel"])
+        assertEquals("2026-05-26 10:00", tags["watermarkDatetime"])
+        assertEquals("12MP", tags["watermarkCameraParams"])
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT.storageKey, tags["watermarkPosition"])
+    }
+
+    @Test
+    fun `toPostProcessSpec with DocumentEffect and WatermarkEffect joins tokens`() {
+        val document = DocumentEffect(autoCrop = false, contrastProfile = null)
+        val watermark = WatermarkEffect(
+            templateId = "travel-polaroid",
+            tokens = mapOf(
+                "watermarkModel" to "OpenCamera",
+                "watermarkDatetime" to "2026-05-26 10:00",
+                "watermarkCameraParams" to "12MP"
+            ),
+            style = WatermarkStyleSettings()
+        )
+        val spec = EffectSpec(listOf(document, watermark))
+
+        val result = EffectBridge.toPostProcessSpec(spec)
+
+        assertEquals("OpenCamera | 2026-05-26 10:00 | 12MP", result.watermarkText)
+    }
+
+    @Test
+    fun `toMetadataTags with PortraitEffect and WatermarkEffect`() {
+        val portrait = PortraitEffect(
+            profileId = "luminous",
+            renderPath = "depth",
+            beautyPreset = "radiant",
+            beautyStrength = "elevated",
+            bokehEffect = "dreamy"
+        )
+        val watermark = WatermarkEffect(
+            templateId = "retro-frame",
+            tokens = mapOf(
+                "watermarkModel" to "OpenCamera",
+                "watermarkDatetime" to "2026-05-26 10:00",
+                "watermarkCameraParams" to "12MP • 4:3"
+            ),
+            style = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+                textScale = WatermarkTextScale.LARGE,
+                textOpacity = WatermarkTextOpacity.SOLID,
+                frameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR
+            )
+        )
+        val frame = FrameEffect(ratio = FrameRatio.RATIO_4_3)
+        val spec = EffectSpec(listOf(portrait, watermark, frame))
+
+        val tags = EffectBridge.toMetadataTags(spec)
+
+        assertEquals("portrait", tags["mode"])
+        assertEquals("luminous", tags["portraitProfile"])
+        assertEquals("retro-frame", tags["watermarkTemplate"])
+        assertEquals(WatermarkTextScale.LARGE.multiplier.toString(), tags["watermarkTextScale"])
+        assertEquals(WatermarkFrameBackground.SOURCE_VIVID_BLUR.storageKey, tags["watermarkFrameBackground"])
+        assertEquals("4:3", tags["frameRatio"])
+>>>>>>> e1dfefc (fix: 为 5 个非拍照模式添加 WatermarkEffect 水印效果接线)
     }
 }

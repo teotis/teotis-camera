@@ -6,6 +6,7 @@ import com.opencamera.core.device.LensFacing
 import com.opencamera.core.effect.DocumentEffect
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.WatermarkEffect
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.MediaMetadata
 
@@ -26,6 +27,11 @@ import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.captureAidMetadataTags
 import com.opencamera.core.mode.stillCaptureDeviceGraph
+import com.opencamera.core.settings.WatermarkTemplate
+import com.opencamera.core.settings.watermarkStyleFor
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -187,10 +193,22 @@ private class DocumentModeController(
 
     private fun buildEffectSpec(): EffectSpec {
         val profile = currentProfile()
+        val selectedWatermarkTemplate = selectedWatermarkTemplate()
+        val watermarkStyle = context.settingsSnapshot.persisted.photo
+            .watermarkStyleFor(selectedWatermarkTemplate.id)
         return EffectSpec(listOf(
             DocumentEffect(
                 autoCrop = profile.autoCrop,
                 contrastProfile = if (enhancementEnabled()) profile.contrastLabel else null
+            ),
+            WatermarkEffect(
+                templateId = selectedWatermarkTemplate.id,
+                tokens = mapOf(
+                    "watermarkModel" to "OpenCamera",
+                    "watermarkDatetime" to watermarkDateTime(),
+                    "watermarkCameraParams" to watermarkCameraParams()
+                ),
+                style = watermarkStyle
             )
         ))
     }
@@ -247,6 +265,26 @@ private class DocumentModeController(
         } else {
             "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only because document enhancement is unavailable on this device."
         }
+    }
+
+    private fun selectedWatermarkTemplate(): WatermarkTemplate {
+        val persistedTemplateId = context.settingsSnapshot.persisted.photo.defaultWatermarkTemplateId
+        return context.settingsSnapshot.catalog.watermarkTemplates.firstOrNull { template ->
+            template.id == persistedTemplateId
+        } ?: WatermarkTemplate(
+            id = persistedTemplateId,
+            label = persistedTemplateId
+        )
+    }
+
+    private fun watermarkDateTime(): String {
+        return LocalDateTime.now().format(
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
+        )
+    }
+
+    private fun watermarkCameraParams(): String {
+        return runtimeState().stillCaptureResolutionPreset.label
     }
 
     private data class DocumentProfile(

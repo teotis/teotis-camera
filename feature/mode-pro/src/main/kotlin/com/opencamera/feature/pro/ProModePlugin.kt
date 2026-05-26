@@ -6,6 +6,7 @@ import com.opencamera.core.device.LensFacing
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FrameEffect
+import com.opencamera.core.effect.WatermarkEffect
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
@@ -31,8 +32,13 @@ import com.opencamera.core.mode.FrameRatioDelegate
 import com.opencamera.core.mode.captureAidMetadataTags
 import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.mode.label
+import com.opencamera.core.settings.WatermarkTemplate
 import com.opencamera.core.settings.compactSummary
 import com.opencamera.core.settings.toMetadataTags
+import com.opencamera.core.settings.watermarkStyleFor
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -210,7 +216,19 @@ private class ProModeController(
     }
 
     private fun buildEffectSpec(): EffectSpec {
+        val selectedWatermarkTemplate = selectedWatermarkTemplate()
+        val watermarkStyle = context.settingsSnapshot.persisted.photo
+            .watermarkStyleFor(selectedWatermarkTemplate.id)
         return EffectSpec(listOf(
+            WatermarkEffect(
+                templateId = selectedWatermarkTemplate.id,
+                tokens = mapOf(
+                    "watermarkModel" to "OpenCamera",
+                    "watermarkDatetime" to watermarkDateTime(),
+                    "watermarkCameraParams" to watermarkCameraParams()
+                ),
+                style = watermarkStyle
+            ),
             FrameEffect(currentFrameRatio())
         ))
     }
@@ -305,6 +323,30 @@ private class ProModeController(
 
     private fun currentFrameRatio(): FrameRatio = frameRatioDelegate.currentFrameRatio()
     private fun runtimeState() = context.runtimeState()
+
+    private fun selectedWatermarkTemplate(): WatermarkTemplate {
+        val persistedTemplateId = context.settingsSnapshot.persisted.photo.defaultWatermarkTemplateId
+        return context.settingsSnapshot.catalog.watermarkTemplates.firstOrNull { template ->
+            template.id == persistedTemplateId
+        } ?: WatermarkTemplate(
+            id = persistedTemplateId,
+            label = persistedTemplateId
+        )
+    }
+
+    private fun watermarkDateTime(): String {
+        return LocalDateTime.now().format(
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
+        )
+    }
+
+    private fun watermarkCameraParams(): String {
+        return buildString {
+            append(runtimeState().stillCaptureResolutionPreset.label)
+            append(" • ")
+            append(currentFrameRatio().label)
+        }
+    }
 
     private data class ProPreset(
         val id: String,
