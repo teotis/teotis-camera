@@ -142,6 +142,7 @@ If Gradle shows transient Kotlin/build-directory errors in `~/.codex-build/OpenC
   - Recent effective loops
   - Historical archive
 - Update it after meaningful verified changes.
+- Agent handoff and orchestration documents must live under `docs/plans/`. Do not create or revive `codex/agent_plans/`; link new package indexes from `docs/plans/INDEX.md`.
 - Do not rewrite `codex/plan.md`, `codex/prompt.md`, or `codex/implement.md` core rules unless the user explicitly asks. Suggestions about those files should be recorded separately.
 - Some historical docs contain old absolute paths. Treat the current workspace `/Volumes/Extreme_SSD/project/codex_camera` as authoritative.
 

@@ -32,9 +32,9 @@ OpenCamera 2.0 turns the current screen from a set of feature panels into a cohe
 
 The 1.0 remediation plans should land first when they touch active bugs:
 
-- `codex/agent_plans/2026-05-21-interaction-routing-and-hit-targets.md`
-- `codex/agent_plans/2026-05-21-media-result-thumbnail-latency-devlog.md`
-- `codex/agent_plans/2026-05-21-panel-localization-and-visual-system.md`
+- `docs/plans/2026-05-21-interaction-routing-and-hit-targets.md`
+- `docs/plans/2026-05-21-media-result-thumbnail-latency-devlog.md`
+- `docs/plans/2026-05-21-panel-localization-and-visual-system.md`
 
 2.0 builds on those fixes and should not reintroduce the old behavior:
 

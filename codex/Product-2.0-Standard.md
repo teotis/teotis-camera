@@ -277,4 +277,4 @@ Then read the current status in `codex/documentation.md` and the latest relevant
 - `codex/V2-Readiness-Final-Local-Gate-Review.md`: latest local/text gate judgment.
 - `V2-Readiness-Release-Gate-Report.md`: release gate report at repo root.
 - `codex/Fifth-Recording-Hard10-Multimodal-QA-Report.md`: real-device visual/product QA baseline.
-- `codex/agent_plans/`: task packages and specialized audit plans.
+- `docs/plans/`: task packages and specialized audit plans.
