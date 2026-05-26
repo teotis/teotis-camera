@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import android.view.View
 import androidx.core.view.isVisible
 
 internal class MainActivityRenderer(
@@ -11,15 +12,52 @@ internal class MainActivityRenderer(
 ) {
     private var lastRenderedPanelRoute: CockpitPanelRoute = CockpitPanelRoute.None
 
+    private val transitionController = PanelTransitionController(
+        panelViews = {
+            listOfNotNull(activePanelView(lastRenderedPanelRoute))
+        },
+        scrimView = { views.panelDismissScrim }
+    )
+
     fun renderPanelVisibility(activePanelRoute: CockpitPanelRoute) {
         val route = activePanelRoute
         val routeChanged = route != lastRenderedPanelRoute
+
+        if (routeChanged) {
+            transitionController.cancel()
+        }
+
         lastRenderedPanelRoute = route
+
+        // Set final visibility deterministically for all panels.
         views.settingsPanel.panel.isVisible = route.isSettingsOpen
         views.filterLab.panel.isVisible = route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.ColorLab
         views.documentBatchOrganizer.panel.isVisible = route is CockpitPanelRoute.DocumentBatchOrganizer
+        views.quickPanel.panel.isVisible = route is CockpitPanelRoute.QuickBubble
         views.panelDismissScrim.isVisible = route.isAnyPanelOpen
+
+        // Reset panel transforms to final state so cancelled animations don't leak.
+        if (route.isAnyPanelOpen) {
+            for (panel in listOf(
+                views.settingsPanel.panel,
+                views.filterLab.panel,
+                views.documentBatchOrganizer.panel,
+                views.quickPanel.panel
+            )) {
+                if (panel.isVisible) {
+                    panel.alpha = 1f
+                    panel.translationY = 0f
+                }
+            }
+            views.panelDismissScrim.alpha = 1f
+        }
+
         if (routeChanged) {
+            // Run transition for the newly visible panel.
+            if (route.isAnyPanelOpen) {
+                transitionController.transition(opening = true)
+            }
+
             if (views.settingsPanel.panel.isVisible) views.settingsPanel.panel.scrollTo(0, 0)
             if (views.filterLab.panel.isVisible) views.filterLab.panel.scrollTo(0, 0)
             if (views.documentBatchOrganizer.panel.isVisible) views.documentBatchOrganizer.panel.scrollTo(0, 0)
@@ -35,11 +73,20 @@ internal class MainActivityRenderer(
         views.topBar.colorLabEntry.alpha = if (route is CockpitPanelRoute.ColorLab) 1f else 0.92f
         views.topBar.settingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
         views.topBar.filterEntry.alpha = if (route is CockpitPanelRoute.StyleLab) 1f else 0.92f
-        views.quickPanel.panel.isVisible = route is CockpitPanelRoute.QuickBubble
         views.quickPanel.launcher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
     }
 
     fun renderDevEntryVisibility(isDebug: Boolean) {
         views.devConsole.entry.isVisible = isDebug
+    }
+
+    private fun activePanelView(route: CockpitPanelRoute): View? = when (route) {
+        is CockpitPanelRoute.Settings -> views.settingsPanel.panel
+        is CockpitPanelRoute.StyleLab,
+        is CockpitPanelRoute.ColorLab -> views.filterLab.panel
+        is CockpitPanelRoute.DocumentBatchOrganizer -> views.documentBatchOrganizer.panel
+        is CockpitPanelRoute.QuickBubble -> views.quickPanel.panel
+        is CockpitPanelRoute.DevConsole -> views.devConsole.panel
+        is CockpitPanelRoute.None -> null
     }
 }
