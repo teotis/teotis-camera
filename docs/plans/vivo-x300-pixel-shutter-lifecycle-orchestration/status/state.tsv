@@ -1,6 +1,6 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
 01-pixel-capability-enumeration	completed	2026-05-26T16:39:23Z	2026-05-27T00:00:00Z	vivo-x300-01-pixel-capability-enumeration	worktree-vivo-x300-01-pixel-capability-enumeration	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/vivo-x300-01-pixel-capability-enumeration	bf87213b1f8cbbd8b435d29e5b9f893ce83979c0	bf87213b1f8cbbd8b435d29e5b9f893ce83979c0	pass	read-only
 03-shutter-lifecycle-contract	launched	2026-05-26T16:39:23Z		vivo-x300-03-shutter-lifecycle-contract
-02-quick-pixel-surface-design	launched	2026-05-26T16:49:56Z		vivo-x300-02-quick-pixel-surface-design
+02-quick-pixel-surface-design	completed	2026-05-26T16:49:56Z	2026-05-27	vivo-x300-02-quick-pixel-surface-design	main	.	04bce48	04bce48	pass	read-only
 04-real-device-verification-protocol	pending
 99-finalize	pending
