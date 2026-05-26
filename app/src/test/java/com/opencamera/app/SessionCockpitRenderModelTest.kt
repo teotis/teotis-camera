@@ -622,6 +622,82 @@ class SessionCockpitRenderModelTest {
         assertFalse(sheet.qualityRow.isEnabled)
     }
 
+    // --- shutter visual state tests ---
+
+    @Test
+    fun `shutter visual state is PHOTO_READY when idle`() {
+        val state = defaultSessionState()
+        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is BLOCKED when preview recovering`() {
+        val state = defaultSessionState(previewStatus = PreviewStatus.RECOVERING)
+        assertEquals(ShutterVisualState.BLOCKED, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is BLOCKED when camera permission denied`() {
+        val state = defaultSessionState().copy(
+            permissionState = PermissionState(cameraGranted = false, microphoneGranted = false)
+        )
+        assertEquals(ShutterVisualState.BLOCKED, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is COUNTDOWN when countdown active`() {
+        val state = defaultSessionState().copy(
+            presentation = SessionPresentationState(countdownRemainingSeconds = 3)
+        )
+        assertEquals(ShutterVisualState.COUNTDOWN, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is SAVING when capture status is saving`() {
+        val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING)
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is SAVING when active photo shot`() {
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "test-shot",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is VIDEO_REQUESTING when recording requesting`() {
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.REQUESTING)
+        assertEquals(ShutterVisualState.VIDEO_REQUESTING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is VIDEO_RECORDING when actively recording`() {
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
+        assertEquals(ShutterVisualState.VIDEO_RECORDING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is VIDEO_STOPPING when recording stopping`() {
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.STOPPING)
+        assertEquals(ShutterVisualState.VIDEO_STOPPING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is FAILURE_OR_DEGRADED when capture failed`() {
+        val state = defaultSessionState().copy(captureStatus = CaptureStatus.FAILED)
+        assertEquals(ShutterVisualState.FAILURE_OR_DEGRADED, shutterVisualState(state))
+    }
+
     companion object {
         private val strings = SessionUiStrings(
             buttonSwitchToFront = "Switch to Front",

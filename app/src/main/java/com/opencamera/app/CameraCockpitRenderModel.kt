@@ -61,6 +61,7 @@ internal data class BottomCockpitRenderModel(
     val lensButtonLabel: String,
     val lensButtonEnabled: Boolean,
     val recordingIndicator: RecordingIndicatorRenderModel,
+    val shutterVisualState: ShutterVisualState = ShutterVisualState.PHOTO_READY,
     val disabledReason: String? = null
 )
 
@@ -140,6 +141,7 @@ internal fun cameraCockpitRenderModel(
             lensButtonLabel = controls.lensFacingButtonLabel,
             lensButtonEnabled = controls.lensFacingEnabled,
             recordingIndicator = recordingIndicatorRenderModel(state, text),
+            shutterVisualState = shutterVisualState(state),
             disabledReason = captureDisabledReason(state, text)
         ),
         previewRatioChip = PreviewRatioChipRenderModel(

@@ -129,6 +129,25 @@ internal fun captureDisabledReason(state: SessionState, text: AppTextResolver): 
     return null
 }
 
+internal fun shutterVisualState(state: SessionState): ShutterVisualState {
+    if (state.previewStatus == PreviewStatus.RECOVERING) return ShutterVisualState.BLOCKED
+    if (!state.permissionState.cameraGranted) return ShutterVisualState.BLOCKED
+    if (state.countdownRemainingSeconds != null) return ShutterVisualState.COUNTDOWN
+    if (state.captureStatus == CaptureStatus.SAVING) return ShutterVisualState.SAVING
+    val activeShot = state.activeShot
+    if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
+        return ShutterVisualState.SAVING
+    }
+    when (state.recordingStatus) {
+        RecordingStatus.REQUESTING -> return ShutterVisualState.VIDEO_REQUESTING
+        RecordingStatus.RECORDING -> return ShutterVisualState.VIDEO_RECORDING
+        RecordingStatus.STOPPING -> return ShutterVisualState.VIDEO_STOPPING
+        RecordingStatus.IDLE -> Unit
+    }
+    if (state.captureStatus == CaptureStatus.FAILED) return ShutterVisualState.FAILURE_OR_DEGRADED
+    return ShutterVisualState.PHOTO_READY
+}
+
 internal fun sessionControlsRenderModel(
     state: SessionState,
     strings: SessionUiStrings
