@@ -1,8 +1,8 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-M01	pending
-M02	pending
-M03	pending
-M04	pending
+M01 launched
+M02 launched
+M03 launched
+M04 launched
 M05	pending
 M06	pending
 M07	pending
