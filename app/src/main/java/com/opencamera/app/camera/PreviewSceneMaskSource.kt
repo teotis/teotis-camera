@@ -33,6 +33,8 @@ data class PreviewSceneMaskPayload(
     val confidenceMask: ByteArray,
     val rotationDegrees: Int,
     val timestampMillis: Long,
+    val sourceWidth: Int = width,
+    val sourceHeight: Int = height,
     val diagnostics: List<String> = emptyList()
 ) {
     fun toDescriptor(): SceneMaskDescriptor = SceneMaskDescriptor(
@@ -42,8 +44,8 @@ data class PreviewSceneMaskPayload(
         backendId = "mlkit-selfie",
         confidence = 0.5f,
         transform = SceneMaskTransform(
-            sourceWidth = width,
-            sourceHeight = height,
+            sourceWidth = sourceWidth,
+            sourceHeight = sourceHeight,
             maskWidth = width,
             maskHeight = height,
             rotationDegrees = rotationDegrees
@@ -58,7 +60,9 @@ data class PreviewSceneMaskPayload(
             height == other.height &&
             confidenceMask.contentEquals(other.confidenceMask) &&
             rotationDegrees == other.rotationDegrees &&
-            timestampMillis == other.timestampMillis
+            timestampMillis == other.timestampMillis &&
+            sourceWidth == other.sourceWidth &&
+            sourceHeight == other.sourceHeight
     }
 
     override fun hashCode(): Int {
@@ -67,6 +71,8 @@ data class PreviewSceneMaskPayload(
         result = 31 * result + confidenceMask.contentHashCode()
         result = 31 * result + rotationDegrees
         result = 31 * result + timestampMillis.hashCode()
+        result = 31 * result + sourceWidth
+        result = 31 * result + sourceHeight
         return result
     }
 }

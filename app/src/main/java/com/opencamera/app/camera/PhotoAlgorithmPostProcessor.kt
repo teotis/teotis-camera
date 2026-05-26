@@ -165,7 +165,7 @@ internal class PhotoAlgorithmPostProcessor(
                         is MaskResolveResult.Available -> {
                             if (editor is MaskAwarePhotoAlgorithmEditor) {
                                 val (editorResult, maskNotes) = editor.applyWithMask(
-                                    resolvedMask.bitmap, payload.spec, resolvedMask.mask
+                                    payload.target, resolvedMask.bitmap, payload.spec, resolvedMask.mask
                                 )
                                 val baseResult = applyEditorResult(result, payload, editorResult)
                                 val descriptor = resolvedMask.mask.toDescriptor(
@@ -235,9 +235,7 @@ internal class PhotoAlgorithmPostProcessor(
                 is SceneMaskResult.Available -> MaskResolveResult.Available(
                     bitmap = decoded,
                     mask = maskResult.mask,
-                    extraNotes = listOf(
-                        SceneMaskPipelineNotes.saved(SceneMaskSupport.SUPPORTED)
-                    )
+                    extraNotes = emptyList()
                 )
                 is SceneMaskResult.Unavailable -> {
                     decoded.recycle()
@@ -355,12 +353,30 @@ internal class AndroidPhotoAlgorithmEditor(
     }
 
     override suspend fun applyWithMask(
+        target: ProcessorTarget,
         bitmap: Bitmap,
         spec: PhotoAlgorithmSpec,
         mask: SavedPhotoMaskPixels
     ): Pair<ProcessorEditorResult, List<String>> {
-        val notes = applyStyleWithMask(bitmap, spec, mask)
-        return Pair(PhotoAlgorithmApplied(), notes)
+        val sourceBytes = readSourceBytes(target)
+        val preservedExif: Map<String, String> = if (sourceBytes != null && sourceBytes.isNotEmpty()) {
+            readPreservedExif(sourceBytes)
+        } else {
+            emptyMap()
+        }
+        val styleNotes = applyStyleWithMask(bitmap, spec, mask)
+        val encodedBytes = encodeJpeg(bitmap)
+        if (!writeEncodedBytes(target, encodedBytes)) {
+            return Pair(
+                ProcessorEditorResult.Failed("output-unavailable"),
+                listOf(
+                    SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                    SceneMaskPipelineNotes.reason("output-unavailable")
+                )
+            )
+        }
+        val exifWarning = restorePreservedExif(target, preservedExif)
+        return Pair(PhotoAlgorithmApplied(exifWarning), styleNotes)
     }
 
     private fun applyStyle(

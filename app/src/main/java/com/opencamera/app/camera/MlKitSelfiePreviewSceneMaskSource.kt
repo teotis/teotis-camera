@@ -10,9 +10,11 @@ import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
+import android.graphics.Matrix
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
 
@@ -25,12 +27,15 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
     private var segmenter: com.google.mlkit.vision.segmentation.Segmenter? = null
     private val isRunning = AtomicBoolean(false)
     private val inferenceInFlight = AtomicBoolean(false)
-    private val latestMaskHolder = java.util.concurrent.atomic.AtomicReference<PreviewSceneMaskPayload?>()
+    private val latestMaskHolder = AtomicReference<PreviewSceneMaskPayload?>()
+    private val activeConfig = AtomicReference<PreviewSceneMaskConfig?>()
 
     private val framesReceived = AtomicLong()
     private val framesProcessed = AtomicLong()
     private val framesDropped = AtomicLong()
+    private val framesFpsThrottled = AtomicLong()
     private val inferenceErrors = AtomicLong()
+    private val lastProcessedTimeMs = AtomicLong(0L)
 
     override fun start(config: PreviewSceneMaskConfig) {
         if (isRunning.getAndSet(true)) {
@@ -43,7 +48,9 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
                 .enableRawSizeMask()
                 .build()
             segmenter = Segmentation.getClient(options)
-            Log.d(TAG, "Started: backend=${config.backendId}, target=${config.targetWidth}x${config.targetHeight}")
+            activeConfig.set(config)
+            lastProcessedTimeMs.set(0L)
+            Log.d(TAG, "Started: backend=${config.backendId}, target=${config.targetWidth}x${config.targetHeight}, maxFps=${config.maxFps}")
         } catch (e: Exception) {
             Log.w(TAG, "Failed to create segmenter, running degraded", e)
             isRunning.set(false)
@@ -55,8 +62,9 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
         segmenter?.close()
         segmenter = null
         latestMaskHolder.set(null)
+        activeConfig.set(null)
         inferenceInFlight.set(false)
-        Log.d(TAG, "Stopped: reason=$reason, received=$framesReceived, processed=$framesProcessed, dropped=$framesDropped, errors=$inferenceErrors")
+        Log.d(TAG, "Stopped: reason=$reason, received=$framesReceived, processed=$framesProcessed, dropped=$framesDropped, fpsThrottled=$framesFpsThrottled, errors=$inferenceErrors")
     }
 
     override fun latestMask(): PreviewSceneMaskPayload? = latestMaskHolder.get()
@@ -65,6 +73,18 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
         if (!isRunning.get()) return
 
         framesReceived.incrementAndGet()
+
+        // maxFps throttle: drop frame before expensive conversion
+        val config = activeConfig.get()
+        if (config != null && config.maxFps > 0) {
+            val minIntervalMs = 1000L / config.maxFps
+            val now = System.currentTimeMillis()
+            val lastProcessed = lastProcessedTimeMs.get()
+            if (lastProcessed > 0 && (now - lastProcessed) < minIntervalMs) {
+                framesFpsThrottled.incrementAndGet()
+                return
+            }
+        }
 
         if (inferenceInFlight.getAndSet(true)) {
             framesDropped.incrementAndGet()
@@ -77,15 +97,30 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
             return
         }
 
-        val bitmap = imageProxyToBitmap(image)
-        if (bitmap == null) {
+        val rawBitmap = imageProxyToBitmap(image)
+        if (rawBitmap == null) {
             inferenceInFlight.set(false)
             framesDropped.incrementAndGet()
             return
         }
 
-        val inputImage = InputImage.fromBitmap(bitmap, rotationDegrees)
+        val sourceWidth = rawBitmap.width
+        val sourceHeight = rawBitmap.height
+
+        // Downscale to target size before ML Kit processing
+        val targetW = config?.targetWidth ?: 256
+        val targetH = config?.targetHeight ?: 256
+        val scaledBitmap = if (sourceWidth != targetW || sourceHeight != targetH) {
+            Bitmap.createScaledBitmap(rawBitmap, targetW, targetH, true).also {
+                if (it !== rawBitmap) rawBitmap.recycle()
+            }
+        } else {
+            rawBitmap
+        }
+
+        val inputImage = InputImage.fromBitmap(scaledBitmap, rotationDegrees)
         val captureTimestamp = System.currentTimeMillis()
+        lastProcessedTimeMs.set(captureTimestamp)
 
         currentSegmenter.process(inputImage)
             .addOnSuccessListener { mask ->
@@ -110,22 +145,27 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
                         confidenceMask = byteMask,
                         rotationDegrees = rotationDegrees,
                         timestampMillis = captureTimestamp,
+                        sourceWidth = sourceWidth,
+                        sourceHeight = sourceHeight,
                         diagnostics = listOf(
                             "backend=mlkit-selfie",
                             "mode=stream",
+                            "source=${sourceWidth}x${sourceHeight}",
+                            "target=${targetW}x${targetH}",
                             "received=$framesReceived",
                             "processed=$framesProcessed",
-                            "dropped=$framesDropped"
+                            "dropped=$framesDropped",
+                            "fpsThrottled=$framesFpsThrottled"
                         )
                     )
                 )
-                bitmap.recycle()
+                scaledBitmap.recycle()
             }
             .addOnFailureListener { e ->
                 inferenceInFlight.set(false)
                 inferenceErrors.incrementAndGet()
                 Log.w(TAG, "Segmentation failed", e)
-                bitmap.recycle()
+                scaledBitmap.recycle()
             }
     }
 
