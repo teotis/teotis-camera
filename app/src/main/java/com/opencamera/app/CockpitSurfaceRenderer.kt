@@ -109,15 +109,11 @@ internal class CockpitSurfaceRenderer(
         quickPanel.grid.isEnabled = sheet.gridRow.isEnabled
         quickPanel.grid.alpha = if (sheet.gridRow.isEnabled) 1f else 0.4f
 
-<<<<<<< Updated upstream
-        quickPanel.resolution.text = "${sheet.resolutionRow.title} ${sheet.resolutionRow.value}"
-=======
         quickPanel.flash.text = quickRowLabel(sheet.qualityRow)
         quickPanel.flash.isEnabled = sheet.qualityRow.isEnabled
         quickPanel.flash.alpha = if (sheet.qualityRow.isEnabled) 1f else 0.4f
 
         quickPanel.resolution.text = quickRowLabel(sheet.resolutionRow)
->>>>>>> Stashed changes
         quickPanel.resolution.isEnabled = sheet.resolutionRow.isEnabled
         quickPanel.resolution.alpha = if (sheet.resolutionRow.isEnabled) 1f else 0.4f
 

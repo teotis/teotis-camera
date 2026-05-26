@@ -335,16 +335,12 @@ internal fun quickPanelSheetRenderModel(
             isEnabled = grid.isInteractive,
             controlKind = QuickControlKind.CYCLE
         ),
-<<<<<<< Updated upstream
-
-=======
         qualityRow = QuickPanelRowRenderModel(
             title = text.quickQuality(),
             value = qualityValue,
             isEnabled = qualityEnabled,
             controlKind = QuickControlKind.CYCLE
         ),
->>>>>>> Stashed changes
         resolutionRow = QuickPanelRowRenderModel(
             title = text.quickResolution(),
             value = stillResolutionQuickLabel(state, strings),
