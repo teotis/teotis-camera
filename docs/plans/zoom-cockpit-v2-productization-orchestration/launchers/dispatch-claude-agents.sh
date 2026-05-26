@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 PLAN_DIR="$REPO_ROOT/docs/plans/zoom-cockpit-v2-productization-orchestration"
 
 cd "$REPO_ROOT"
