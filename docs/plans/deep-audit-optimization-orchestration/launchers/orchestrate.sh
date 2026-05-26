@@ -115,7 +115,9 @@ is_package_ready() {
 
 # Count running agents
 count_running_agents() {
-    tail -n +2 "$STATE" | grep -c "launched\|in_progress" 2>/dev/null || echo "0"
+    local count
+    count=$(tail -n +2 "$STATE" | grep -c "launched\|in_progress" 2>/dev/null || echo "0")
+    echo "$count" | tr -d '\n'
 }
 
 # Launch a package agent
