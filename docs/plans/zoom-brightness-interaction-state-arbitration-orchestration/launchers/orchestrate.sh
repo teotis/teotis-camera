@@ -350,13 +350,13 @@ cmd_status() {
   for pkg in $(get_all_packages); do
     local state_md state_tsv
     state_tsv=$(read_state "$pkg")
-    state_md=$(grep -i '^\- \*\*Status\*\*:' "$PLAN_DIR/status/${pkg}.md" 2>/dev/null | head -1 | sed 's/.*: *//' | tr '[:upper:]' '[:lower:]' | xargs)
+    state_md=$(grep -i '^\- \*\*Status\*\*:' "$PLAN_DIR/status/${pkg}.md" 2>/dev/null | head -1 | sed 's/.*: *//' | tr '[:upper:]' '[:lower:]' | xargs || true)
     if [ -n "$state_md" ] && [ "$state_md" != "$state_tsv" ] && [ "$state_md" != "pending" ]; then
       echo "WARNING: $pkg state mismatch — markdown='$state_md' vs tsv='$state_tsv'"
       inconsistent=$((inconsistent + 1))
     fi
   done
-  [ "$inconsistent" -gt 0 ] && echo "WARN: $inconsistent state mismatches detected"
+  if [ "$inconsistent" -gt 0 ]; then echo "WARN: $inconsistent state mismatches detected"; fi
   release_lock
 }
 

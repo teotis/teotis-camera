@@ -1,6 +1,6 @@
-# Package Status: 99-integration-audit
+# Package Status: 99-finalize
 
-- **Agent**: Codex
+- **Agent**: —
 - **Status**: pending
 - **Started**: —
 - **Completed**: —
@@ -25,8 +25,10 @@
 
 - Source/doc references:
 - Acceptance criteria status:
-- Findings:
-- Recommended decision:
+- Per-package verification matrix:
+- Integration branch:
+- Mainline merge commit:
+- Cleanup results:
 
 ## Delivery
 
@@ -37,8 +39,7 @@
 
 - [ ] Only touched allowed paths
 - [ ] Did not edit forbidden paths
-- [ ] Did not edit package agents' status files
-- [ ] Did not claim vendor/system-camera parity
+- [ ] Did not edit functional package status files
 
 ## Unresolved Risks
 

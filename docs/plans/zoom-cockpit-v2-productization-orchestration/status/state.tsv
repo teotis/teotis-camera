@@ -1,6 +1,6 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
 01-product-contract-capability-boundary	completed	2026-05-26	2026-05-26	zoom-v2-01-product-contract	agent/zoom-cockpit-v2-productization/01-product-contract-capability-boundary	.agent-worktrees/zoom-cockpit-v2-productization/01-product-contract-capability-boundary		56dd679	passed	pending	pending
-02-slider-widget-productization	pending
-03-session-recording-zoom-policy	pending
+02-slider-widget-productization	launched	2026-05-26T16:37:44Z		zoom-v2-02-slider-widget-productization	agent/zoom-cockpit-v2-productization/02-slider-widget-productization	/Volumes/Extreme_SSD/project/open_camera/.agent-worktrees/zoom-cockpit-v2-productization/02-slider-widget-productization
+03-session-recording-zoom-policy	launched	2026-05-26T16:37:44Z		zoom-v2-03-session-recording-zoom-policy	agent/zoom-cockpit-v2-productization/03-session-recording-zoom-policy	/Volumes/Extreme_SSD/project/open_camera/.agent-worktrees/zoom-cockpit-v2-productization/03-session-recording-zoom-policy
 04-cockpit-wiring-and-ux-integration	completed	2026-05-26	2026-05-26	Claude Code	agent/zoom-cockpit-v2-productization/04-cockpit-wiring-and-ux-integration		8074961	passed	pending	pending
 99-finalize	pending
