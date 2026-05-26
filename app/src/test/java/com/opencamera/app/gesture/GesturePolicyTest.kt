@@ -105,7 +105,6 @@ class GesturePolicyTest {
         val endAction = policy.map(GestureEvent.ScaleEnd, ModeId.PHOTO)
         assertEquals(GestureAction.Ignore, endAction)
 
-        policy.syncZoomRatio(2.0f)
         val action2 = policy.map(GestureEvent.PinchZoom(1.1f, 200f, 300f), ModeId.PHOTO, 2.0f)
         assertTrue(action2 is GestureAction.DispatchSession)
         val ratio2 = (action2 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
@@ -116,7 +115,6 @@ class GesturePolicyTest {
     fun `consecutive pinches separated by ScaleEnd maintain zoom continuity`() {
         policy.map(GestureEvent.PinchZoom(3.0f, 100f, 100f), ModeId.PHOTO, 1.0f)
         policy.map(GestureEvent.ScaleEnd, ModeId.PHOTO)
-        policy.syncZoomRatio(3.0f)
 
         val action2 = policy.map(GestureEvent.PinchZoom(1.5f, 100f, 100f), ModeId.PHOTO, 3.0f)
         assertTrue(action2 is GestureAction.DispatchSession)
@@ -124,7 +122,6 @@ class GesturePolicyTest {
         assertEquals(4.5f, ratio2.ratio, 0.01f)
 
         policy.map(GestureEvent.ScaleEnd, ModeId.PHOTO)
-        policy.syncZoomRatio(4.5f)
 
         val action3 = policy.map(GestureEvent.PinchZoom(0.8f, 100f, 100f), ModeId.PHOTO, 4.5f)
         assertTrue(action3 is GestureAction.DispatchSession)
@@ -157,7 +154,7 @@ class GesturePolicyTest {
     }
 
     @Test
-    fun `scaleEnd resets zoom accumulation`() {
+    fun `scaleEnd preserves zoom accumulation for next pinch`() {
         policy.resetZoomAccumulation()
         policy.map(GestureEvent.PinchZoom(2f, 200f, 300f), ModeId.PHOTO)
         policy.map(GestureEvent.ScaleEnd, ModeId.PHOTO)
@@ -165,7 +162,7 @@ class GesturePolicyTest {
         assertTrue(action is GestureAction.DispatchSession)
         val dispatch = action as GestureAction.DispatchSession
         val ratio = (dispatch.intent as SessionIntent.ApplyZoomRatio).ratio
-        assertEquals(2.0f, ratio)
+        assertEquals(4.0f, ratio)
     }
 
     @Test
