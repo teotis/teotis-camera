@@ -49,7 +49,7 @@ class GesturePolicy(
                 }
             }
             is GestureEvent.ScaleEnd -> {
-                resetZoomAccumulation()
+                lastPinchTimestamp = 0L
                 GestureAction.Ignore
             }
             is GestureEvent.DragStart -> {

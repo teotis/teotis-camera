@@ -696,6 +696,14 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
+    override fun onBrightnessDragStart() {
+        cockpitRenderer.onBrightnessDragStart()
+    }
+
+    override fun onBrightnessDragEnd() {
+        cockpitRenderer.onBrightnessDragEnd()
+    }
+
     override fun handleFilterPaletteTouch(colorAxis: Float, toneAxis: Float) {
         if (activePanelRoute is CockpitPanelRoute.ColorLab) {
             val persisted = latestSessionState?.settings?.persisted ?: return

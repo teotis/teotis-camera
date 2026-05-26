@@ -26,6 +26,8 @@ internal class CockpitSurfaceRenderer(
     private val isModeTrackScrolling: () -> Boolean = { false }
 ) {
     var controlRotationDegrees: Float = 0f
+    var brightnessDragActive: Boolean = false
+        private set
 
     private val shutterVisualDrawable = ShutterVisualDrawable()
     private var shutterDrawableAttached = false
@@ -107,6 +109,14 @@ internal class CockpitSurfaceRenderer(
         slider.setCurrentRatio(model.currentRatio)
     }
 
+    fun onBrightnessDragStart() {
+        brightnessDragActive = true
+    }
+
+    fun onBrightnessDragEnd() {
+        brightnessDragActive = false
+    }
+
     private fun quickRowLabel(row: QuickPanelRowRenderModel): String {
         val base = "${row.title} ${row.value}"
         return if (row.disabledReason != null) "$base (${row.disabledReason})" else base
@@ -129,7 +139,9 @@ internal class CockpitSurfaceRenderer(
             quickPanel.brightnessSlider.visibility = View.VISIBLE
             quickPanel.brightnessValueText.visibility = View.VISIBLE
             quickPanel.brightnessSlider.max = brightness.maxSteps - brightness.minSteps
-            quickPanel.brightnessSlider.progress = brightness.steps - brightness.minSteps
+            if (!brightnessDragActive) {
+                quickPanel.brightnessSlider.progress = brightness.steps - brightness.minSteps
+            }
             quickPanel.brightnessSlider.isEnabled = brightness.isInteractive
             quickPanel.brightnessValueText.text = brightness.value
             quickPanel.brightnessValueText.alpha = if (brightness.disabledReason != null) 0.4f else 1f
