@@ -102,4 +102,40 @@ class FocalLengthSliderViewTest {
     fun `snap threshold fraction is 15 percent`() {
         assertEquals(0.15f, FocalLengthSliderView.SNAP_THRESHOLD_FRACTION)
     }
+
+    // -- formatCompactNodeLabel --
+
+    @Test
+    fun `formatCompactNodeLabel shows integer ratios without decimal`() {
+        assertEquals("1x", FocalLengthSliderView.formatCompactNodeLabel(1.0f))
+        assertEquals("2x", FocalLengthSliderView.formatCompactNodeLabel(2.0f))
+        assertEquals("5x", FocalLengthSliderView.formatCompactNodeLabel(5.0f))
+        assertEquals("10x", FocalLengthSliderView.formatCompactNodeLabel(10.0f))
+    }
+
+    @Test
+    fun `formatCompactNodeLabel shows fractional ratios with one decimal`() {
+        assertEquals("0.6", FocalLengthSliderView.formatCompactNodeLabel(0.6f))
+        assertEquals("1.5", FocalLengthSliderView.formatCompactNodeLabel(1.5f))
+        assertEquals("2.5", FocalLengthSliderView.formatCompactNodeLabel(2.5f))
+        assertEquals("3.3", FocalLengthSliderView.formatCompactNodeLabel(3.3f))
+    }
+
+    @Test
+    fun `formatCompactNodeLabel rounds to one decimal`() {
+        assertEquals("1.3", FocalLengthSliderView.formatCompactNodeLabel(1.25f))
+        assertEquals("2.8", FocalLengthSliderView.formatCompactNodeLabel(2.76f))
+    }
+
+    // -- shouldSuppressExternalUpdate (drag latch) --
+
+    @Test
+    fun `shouldSuppressExternalUpdate returns true during active drag`() {
+        assertTrue(FocalLengthSliderView.shouldSuppressExternalUpdate(true))
+    }
+
+    @Test
+    fun `shouldSuppressExternalUpdate returns false when not dragging`() {
+        assertFalse(FocalLengthSliderView.shouldSuppressExternalUpdate(false))
+    }
 }
