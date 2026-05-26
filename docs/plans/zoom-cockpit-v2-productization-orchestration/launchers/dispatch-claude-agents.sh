@@ -67,24 +67,25 @@ launch_agent() {
 }
 
 case "$phase" in
-  g1|all)
+  g1)
     launch_agent "01-product-contract-capability-boundary" "$PLAN_DIR/packages/01-product-contract-capability-boundary.md" "$PLAN_DIR/status/01-product-contract-capability-boundary.md"
     launch_agent "02-slider-widget-productization" "$PLAN_DIR/packages/02-slider-widget-productization.md" "$PLAN_DIR/status/02-slider-widget-productization.md"
-    if [ "$phase" != "all" ]; then
-      ;;
-    fi
-    ;&
+    ;;
   g2)
     launch_agent "03-session-recording-zoom-policy" "$PLAN_DIR/packages/03-session-recording-zoom-policy.md" "$PLAN_DIR/status/03-session-recording-zoom-policy.md"
     ;;
   g3)
     launch_agent "04-cockpit-wiring-and-ux-integration" "$PLAN_DIR/packages/04-cockpit-wiring-and-ux-integration.md" "$PLAN_DIR/status/04-cockpit-wiring-and-ux-integration.md"
     ;;
+  all)
+    launch_agent "01-product-contract-capability-boundary" "$PLAN_DIR/packages/01-product-contract-capability-boundary.md" "$PLAN_DIR/status/01-product-contract-capability-boundary.md"
+    launch_agent "02-slider-widget-productization" "$PLAN_DIR/packages/02-slider-widget-productization.md" "$PLAN_DIR/status/02-slider-widget-productization.md"
+    launch_agent "03-session-recording-zoom-policy" "$PLAN_DIR/packages/03-session-recording-zoom-policy.md" "$PLAN_DIR/status/03-session-recording-zoom-policy.md"
+    launch_agent "04-cockpit-wiring-and-ux-integration" "$PLAN_DIR/packages/04-cockpit-wiring-and-ux-integration.md" "$PLAN_DIR/status/04-cockpit-wiring-and-ux-integration.md"
+    ;;
   *)
-    if [ "$phase" != "all" ]; then
-      echo "Usage: bash launchers/dispatch-claude-agents.sh [g1|g2|g3|all]" >&2
-      exit 2
-    fi
+    echo "Usage: bash launchers/dispatch-claude-agents.sh [g1|g2|g3|all]" >&2
+    exit 2
     ;;
 esac
 

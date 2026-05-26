@@ -47,7 +47,7 @@ Make Session Kernel the single source of truth for Zoom Cockpit V2 runtime rules
 1. Re-read package 01 result before editing.
 2. Add or update `DefaultCameraSessionTest` zoom cases for recording states and capability support.
 3. Update `handleApplyZoomRatio()` and `handleZoomRatioToggled()` only as needed.
-4. Keep trace names stable or additive, for example `zoom.apply.blocked` with `recording=...`.
+4. Keep trace names stable or additive, for example `zoom.apply.blocked` with `recording=RECORDING`.
 5. Add/adjust `GesturePolicyTest` only if pinch behavior changes.
 6. Run focused session and app gesture tests.
 
