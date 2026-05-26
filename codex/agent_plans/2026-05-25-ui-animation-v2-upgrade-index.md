@@ -20,11 +20,11 @@ The user approved these UI/animation upgrade directions for OpenCamera 2.0:
 
 | Work Package | Owner | Status | Notes |
 | --- | --- | --- | --- |
-| [Focus And Exposure Feedback V2](./2026-05-25-focus-exposure-feedback-v2.md) | Text/code agent + Codex visual QA | planned | Builds on the tap-focus geometry/lifetime package; adds polished transient feedback and optional EV gesture UI. |
-| [Shutter State Animation V2](./2026-05-25-shutter-state-animation-v2.md) | Text/code agent + Codex visual QA | planned | Builds on shutter visual semantics repair; adds stateful Canvas/Drawable animation without changing capture ownership. |
-| [Zoom Cockpit V2](./2026-05-25-zoom-cockpit-v2.md) | Text/code agent + Codex real-device QA | planned | Uses existing zoom session/device owner; adds exact preset strip plus continuous drag/pinch feedback. |
-| [Panel Transition And Route Continuity](./2026-05-25-panel-transition-route-continuity.md) | Text/code agent | planned | Adds shared panel transition behavior around existing `CockpitPanelRoute`; no new session state. |
-| [Quick Panel Semantic Controls V2](./2026-05-25-quick-panel-semantic-controls-v2.md) | Text/code agent + Codex visual QA | planned | Builds on quick panel regression repair; replaces button-like rows with semantic controls and state badges. |
+| [Focus And Exposure Feedback V2](./2026-05-25-focus-exposure-feedback-v2.md) | Text/code agent + Codex visual QA | blocked | 2026-05-26 validation found the reticle still draws static circles/ticks and vertical EV remains TODO. |
+| [Shutter State Animation V2](./2026-05-25-shutter-state-animation-v2.md) | Text/code agent + Codex visual QA | blocked | 2026-05-26 validation found `ShutterVisualDrawable` exists but `renderShutter()` still swaps static background resources. |
+| [Zoom Cockpit V2](./2026-05-25-zoom-cockpit-v2.md) | Text/code agent + Codex real-device QA | in_progress | 2026-05-26 validation found a new `FocalLengthSliderView`, but no focused tests and package verification is blocked by mode-track regressions. |
+| [Panel Transition And Route Continuity](./2026-05-25-panel-transition-route-continuity.md) | Text/code agent | blocked | 2026-05-26 validation found panel visibility still toggles directly with no transition controller/animation. |
+| [Quick Panel Semantic Controls V2](./2026-05-25-quick-panel-semantic-controls-v2.md) | Text/code agent + Codex visual QA | blocked | 2026-05-26 validation found most quick rows remain generic `Button` rows; no `QuickControlKind`/semantic controls landed. |
 
 ## Related Recent Plans Used As References
 
@@ -87,5 +87,10 @@ rtk ./scripts/verify_stage_7_observability.sh
 ## Status Notes
 
 - Created: 2026-05-25.
-- Current status: planned.
+- Current status: blocked after 2026-05-26 validation.
 - Git status note: `rtk git status --short` failed in this workspace because the current `.git` metadata references a missing worktree path. This package only adds handoff documents and does not modify runtime code.
+- 2026-05-26 validation:
+  - `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionCockpitRenderModelTest --tests com.opencamera.app.CameraCockpitRenderModelTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.gesture.GesturePolicyTest` failed. Failures were in `SessionCockpitRenderModelTest`: mode directory / mode track no longer include `HUMANISTIC` in the expected product order.
+  - `rtk ./gradlew --no-daemon :app:assembleDebug` passed.
+  - Main blocking regression: `PRODUCT_MODE_ENTRY_ORDER` currently contains only `PHOTO, VIDEO, DOCUMENT`, which drops `HUMANISTIC` from directory/track render models when tests expect `PHOTO, HUMANISTIC, VIDEO, DOCUMENT`.
+  - Additional incomplete work: focus reticle lacks animation state, shutter visual drawable is unused, panel transitions are not implemented, and Quick Panel semantic controls did not land beyond slider/frame-row repair.
