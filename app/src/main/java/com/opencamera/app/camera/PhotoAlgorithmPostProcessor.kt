@@ -235,9 +235,7 @@ internal class PhotoAlgorithmPostProcessor(
                 is SceneMaskResult.Available -> MaskResolveResult.Available(
                     bitmap = decoded,
                     mask = maskResult.mask,
-                    extraNotes = listOf(
-                        SceneMaskPipelineNotes.saved(SceneMaskSupport.SUPPORTED)
-                    )
+                    extraNotes = emptyList()
                 )
                 is SceneMaskResult.Unavailable -> {
                     decoded.recycle()
@@ -366,13 +364,19 @@ internal class AndroidPhotoAlgorithmEditor(
         } else {
             emptyMap()
         }
-        val notes = applyStyleWithMask(bitmap, spec, mask)
+        val styleNotes = applyStyleWithMask(bitmap, spec, mask)
         val encodedBytes = encodeJpeg(bitmap)
         if (!writeEncodedBytes(target, encodedBytes)) {
-            return Pair(ProcessorEditorResult.Failed("output-unavailable"), notes)
+            return Pair(
+                ProcessorEditorResult.Failed("output-unavailable"),
+                listOf(
+                    SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                    SceneMaskPipelineNotes.reason("output-unavailable")
+                )
+            )
         }
         val exifWarning = restorePreservedExif(target, preservedExif)
-        return Pair(PhotoAlgorithmApplied(exifWarning), notes)
+        return Pair(PhotoAlgorithmApplied(exifWarning), styleNotes)
     }
 
     private fun applyStyle(

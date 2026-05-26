@@ -407,6 +407,85 @@ class PhotoAlgorithmPostProcessorTest {
         assertTrue(notes.any { it.contains("algorithm-render:applied:portrait-focus-balanced") })
     }
 
+    @Test
+    fun `mask aware write failure omits applied from pipeline notes`() = runTest {
+        val editor = FakeMaskAwarePhotoAlgorithmEditor(
+            result = ProcessorEditorResult.Failed("output-unavailable"),
+            maskNotes = listOf(
+                "scene-mask:saved=degraded",
+                "scene-mask:reason=output-unavailable"
+            )
+        )
+        val maskProvider = FakeSavedPhotoMaskProvider(
+            result = SceneMaskResult.Available(
+                SavedPhotoMaskPixels(
+                    maskPixels = IntArray(16) { 0x88000000.toInt() },
+                    maskWidth = 4,
+                    maskHeight = 4,
+                    confidence = 0.9f
+                )
+            )
+        )
+        val testBitmap = mockBitmap(8, 8)
+        val processor = PhotoAlgorithmPostProcessor(
+            editor,
+            maskProvider = maskProvider,
+            maskBitmapSource = { testBitmap }
+        )
+        val result = processor.process(
+            photoResult(algorithmProfile = "portrait-depth-natural")
+        )
+
+        val notes = result.pipelineNotes
+        assertFalse(notes.any { it.contains("scene-mask:saved=applied") })
+        assertTrue(notes.any { it.contains("scene-mask:saved=degraded") })
+        assertTrue(notes.any { it.contains("scene-mask:reason=output-unavailable") })
+        assertTrue(notes.any { it.contains("algorithm-render:failed:output-unavailable") })
+    }
+
+    @Test
+    fun `mask aware editor writes modified bytes to file target`() = runTest {
+        val tempFile = java.io.File.createTempFile("mask-writeback-test", ".dat")
+        try {
+            tempFile.writeBytes(byteArrayOf(0x01, 0x02, 0x03, 0x04))
+            val initialBytes = tempFile.readBytes()
+
+            val editor = WritingFakeMaskAwareEditor()
+            val maskProvider = FakeSavedPhotoMaskProvider(
+                result = SceneMaskResult.Available(
+                    SavedPhotoMaskPixels(
+                        maskPixels = IntArray(16) { 0x88000000.toInt() },
+                        maskWidth = 4,
+                        maskHeight = 4,
+                        confidence = 0.9f
+                    )
+                )
+            )
+            val testBitmap = mockBitmap(8, 8)
+            val processor = PhotoAlgorithmPostProcessor(
+                editor,
+                maskProvider = maskProvider,
+                maskBitmapSource = { testBitmap }
+            )
+            val result = processor.process(
+                photoResult(
+                    algorithmProfile = "portrait-depth-natural",
+                    outputHandle = MediaOutputHandle(
+                        displayPath = tempFile.absolutePath,
+                        filePath = tempFile.absolutePath
+                    )
+                )
+            )
+
+            assertEquals(1, editor.applyWithMaskInvocations.size)
+            assertTrue(result.pipelineNotes.any { it.contains("scene-mask:saved=applied") })
+            val outputBytes = tempFile.readBytes()
+            assertFalse(outputBytes.contentEquals(initialBytes), "Output bytes should differ after mask-aware write")
+        } finally {
+            tempFile.delete()
+        }
+    }
+
     private fun photoResult(
         algorithmProfile: String?,
         outputHandle: MediaOutputHandle = MediaOutputHandle(
@@ -459,8 +538,9 @@ class PhotoAlgorithmPostProcessorTest {
         }
     }
 
-    private class FakeMaskAwarePhotoAlgorithmEditor(
-        private val result: PhotoAlgorithmApplied
+    private open class FakeMaskAwarePhotoAlgorithmEditor(
+        private val result: ProcessorEditorResult,
+        private val maskNotes: List<String> = listOf("scene-mask:saved=applied", "color-render:subject-protected")
     ) : MaskAwarePhotoAlgorithmEditor {
         val applyInvocations = mutableListOf<Invocation>()
         val applyWithMaskInvocations = mutableListOf<MaskInvocation>()
@@ -480,7 +560,7 @@ class PhotoAlgorithmPostProcessorTest {
             mask: SavedPhotoMaskPixels
         ): Pair<ProcessorEditorResult, List<String>> {
             applyWithMaskInvocations += MaskInvocation(spec, mask)
-            return Pair(result, listOf("scene-mask:saved=applied", "color-render:subject-protected"))
+            return Pair(result, maskNotes)
         }
     }
 
@@ -491,6 +571,46 @@ class PhotoAlgorithmPostProcessorTest {
             bitmap: Bitmap,
             request: SavedPhotoSceneMaskRequest
         ): SceneMaskResult = result
+    }
+
+    private class WritingFakeMaskAwareEditor : MaskAwarePhotoAlgorithmEditor {
+        val applyWithMaskInvocations = mutableListOf<MaskInvocation>()
+
+        override suspend fun apply(
+            target: ProcessorTarget,
+            spec: PhotoAlgorithmSpec
+        ): ProcessorEditorResult = PhotoAlgorithmApplied()
+
+        override suspend fun applyWithMask(
+            target: ProcessorTarget,
+            bitmap: Bitmap,
+            spec: PhotoAlgorithmSpec,
+            mask: SavedPhotoMaskPixels
+        ): Pair<ProcessorEditorResult, List<String>> {
+            applyWithMaskInvocations += MaskInvocation(spec, mask)
+            val written = when (target) {
+                is ProcessorTarget.FilePath -> {
+                    java.io.File(target.path).outputStream().use {
+                        it.write(MASK_AWARE_WRITE_SENTINEL)
+                        true
+                    }
+                }
+                is ProcessorTarget.ContentUri -> false
+            }
+            val result: ProcessorEditorResult = if (written) {
+                PhotoAlgorithmApplied()
+            } else {
+                ProcessorEditorResult.Failed("output-unavailable")
+            }
+            return Pair(result, listOf("scene-mask:saved=applied", "color-render:subject-protected"))
+        }
+
+        companion object {
+            val MASK_AWARE_WRITE_SENTINEL = byteArrayOf(
+                0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte(),
+                0x4D, 0x41, 0x53, 0x4B
+            )
+        }
     }
 
     private data class Invocation(
