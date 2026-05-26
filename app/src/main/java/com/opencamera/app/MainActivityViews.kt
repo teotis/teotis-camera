@@ -35,7 +35,8 @@ internal data class QuickPanelViews(
     val frameRatio: Button,
     val livePhoto: Button,
     val timer: Button,
-    val launcher: Button
+    val launcher: Button,
+    val resetDefaults: Button
 )
 
 internal data class SettingsPanelViews(
@@ -99,7 +100,8 @@ internal data class SettingsPanelViews(
     val watermarkTextScale: Button,
     val watermarkTextOpacity: Button,
     val watermarkFrameBackground: Button,
-    val watermarkDetailFooter: TextView
+    val watermarkDetailFooter: TextView,
+    val resetDefaults: Button
 )
 
 internal data class FilterLabViews(
@@ -138,7 +140,8 @@ internal data class FilterLabViews(
     val advancedWarmBoost: Button,
     val advancedCoolBoost: Button,
     val advancedTemperatureShift: Button,
-    val advancedTintShift: Button
+    val advancedTintShift: Button,
+    val resetDefaults: Button
 )
 
 internal data class DevConsoleViews(
@@ -235,7 +238,8 @@ internal data class MainActivityViews(
                 frameRatio = activity.findViewById(R.id.buttonQuickFrameRatio),
                 livePhoto = activity.findViewById(R.id.buttonQuickLivePhoto),
                 timer = activity.findViewById(R.id.buttonQuickTimer),
-                launcher = activity.findViewById(R.id.buttonQuickLauncher)
+                launcher = activity.findViewById(R.id.buttonQuickLauncher),
+                resetDefaults = activity.findViewById(R.id.buttonQuickResetDefaults)
             )
             val floatingUtility = FloatingUtilityViews(
                 quickLauncher = activity.findViewById(R.id.buttonQuickLauncher),
@@ -302,7 +306,8 @@ internal data class MainActivityViews(
                 watermarkTextScale = activity.findViewById(R.id.buttonWatermarkTextScale),
                 watermarkTextOpacity = activity.findViewById(R.id.buttonWatermarkTextOpacity),
                 watermarkFrameBackground = activity.findViewById(R.id.buttonWatermarkFrameBackground),
-                watermarkDetailFooter = activity.findViewById(R.id.watermarkDetailFooter)
+                watermarkDetailFooter = activity.findViewById(R.id.watermarkDetailFooter),
+                resetDefaults = activity.findViewById(R.id.buttonSettingsResetDefaults)
             )
             val filterLab = FilterLabViews(
                 panel = activity.findViewById(R.id.filterPanel),
@@ -340,7 +345,8 @@ internal data class MainActivityViews(
                 advancedWarmBoost = activity.findViewById(R.id.buttonAdvancedWarmBoost),
                 advancedCoolBoost = activity.findViewById(R.id.buttonAdvancedCoolBoost),
                 advancedTemperatureShift = activity.findViewById(R.id.buttonAdvancedTemperatureShift),
-                advancedTintShift = activity.findViewById(R.id.buttonAdvancedTintShift)
+                advancedTintShift = activity.findViewById(R.id.buttonAdvancedTintShift),
+                resetDefaults = activity.findViewById(R.id.buttonFilterResetDefaults)
             )
             val devConsole = DevConsoleViews(
                 entry = activity.findViewById(R.id.buttonDevEntry),

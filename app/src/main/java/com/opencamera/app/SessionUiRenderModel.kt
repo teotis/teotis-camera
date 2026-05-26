@@ -25,6 +25,8 @@ import com.opencamera.core.settings.LiveSaveFormat
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.PhotoSettings
+import com.opencamera.core.settings.ResetTarget
+import com.opencamera.core.settings.hasUserAdjustments
 import com.opencamera.core.settings.PortraitBeautyPreset
 import com.opencamera.core.settings.PortraitBeautyStrength
 import com.opencamera.core.settings.PortraitBokehEffect
@@ -89,7 +91,9 @@ internal data class SessionSettingsPageRenderModel(
     val commonSection: CommonSettingsSectionRenderModel,
     val photoSection: PhotoSettingsSectionRenderModel,
     val videoSection: VideoSettingsSectionRenderModel,
-    val catalogFooter: String
+    val catalogFooter: String,
+    val hasSettingsUserAdjustments: Boolean = false,
+    val resetSettingsAction: PersistedSettingsAction.ResetToDefaults? = null
 )
 
 
@@ -243,21 +247,24 @@ internal data class ColorLabPanelRenderModel(
     val toneAxis: Float,
     val strength: Float,
     val summary: String,
-    val resetAction: PersistedSettingsAction.UpdateColorLabSpec
+    val resetAction: PersistedSettingsAction.UpdateColorLabSpec,
+    val hasUserAdjustments: Boolean = false
 )
 
 internal fun colorLabPanelRenderModel(
     state: SessionState,
     text: AppTextResolver
 ): ColorLabPanelRenderModel {
-    val spec = state.settings.persisted.photo.colorLabSpec
+    val settings = state.settings.persisted
+    val spec = settings.photo.colorLabSpec
     return ColorLabPanelRenderModel(
         title = text.colorLabEntry(),
         colorAxis = spec.colorAxis,
         toneAxis = spec.toneAxis,
         strength = spec.strength,
         summary = text.colorToneSummary(spec.colorAxis, spec.toneAxis),
-        resetAction = PersistedSettingsAction.UpdateColorLabSpec(ColorLabSpec())
+        resetAction = PersistedSettingsAction.UpdateColorLabSpec(ColorLabSpec()),
+        hasUserAdjustments = settings.hasUserAdjustments(ResetTarget.COLOR_LAB)
     )
 }
 
@@ -286,7 +293,9 @@ internal data class FilterLabPageRenderModel(
     val adjustmentPanel: FilterAdjustmentPanelRenderModel,
     val cycleControl: SettingsControlRenderModel,
     val saveCustomControl: FilterLabSaveCustomRenderModel,
-    val footer: String
+    val footer: String,
+    val hasStyleUserAdjustments: Boolean = false,
+    val resetStyleAction: PersistedSettingsAction.ResetToDefaults? = null
 )
 
 internal data class FilterLabSaveCustomRenderModel(
@@ -814,7 +823,13 @@ internal fun sessionSettingsPageRenderModel(
                 }
             )
         ),
-        catalogFooter = ""
+        catalogFooter = "",
+        hasSettingsUserAdjustments = settings.hasUserAdjustments(ResetTarget.SETTINGS),
+        resetSettingsAction = if (settings.hasUserAdjustments(ResetTarget.SETTINGS)) {
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.SETTINGS)
+        } else {
+            null
+        }
     )
 }
 
@@ -1533,7 +1548,13 @@ internal fun filterLabPageRenderModel(
         updateStyleStrengthAction = PersistedSettingsAction.UpdatePhotoStyleStrength(
             settings.photo.styleStrength.coerceIn(0f, 1f)
         ),
-        footer = if (isColorLab) "" else text.filterLabFooter()
+        footer = if (isColorLab) "" else text.filterLabFooter(),
+        hasStyleUserAdjustments = settings.hasUserAdjustments(ResetTarget.STYLE),
+        resetStyleAction = if (settings.hasUserAdjustments(ResetTarget.STYLE)) {
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.STYLE)
+        } else {
+            null
+        }
     )
 }
 
