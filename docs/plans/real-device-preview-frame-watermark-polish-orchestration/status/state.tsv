@@ -1,4 +1,4 @@
 package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
 01-preview-frame-contract	completed	2026-05-26T16:38:43Z	2026-05-27T00:00:00Z	agent-01-preview-frame-contract	worktree-01-preview-frame-contract	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/01-preview-frame-contract		b7c0815/c7c5f06	pass	merged-to-main	preserved	
 02-natural-blur-border-rendering	completed	2026-05-26	2026-05-27T00:00:00Z	agent-02-natural-blur-border	worktree-natural-blur-border	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/natural-blur-border		a7370b6/34b234c	pass	merged-to-main	missing-worktree	
-99-finalize	finalized	2026-05-27T00:00:00Z	2026-05-27T00:00:00Z	Codex	main	/Volumes/Extreme_SSD/project/open_camera		bd0b795	pass	pass	preserved	
+99-finalize	finalized	2026-05-27T00:00:00Z	2026-05-27T00:00:00Z	Codex	main	/Volumes/Extreme_SSD/project/open_camera		finalization-commit	pass	pass	preserved	

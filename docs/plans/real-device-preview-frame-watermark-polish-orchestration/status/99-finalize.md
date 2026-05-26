@@ -16,7 +16,7 @@
 - git diff --stat:
   - `c7c5f06`: 2 files changed, 236 insertions.
   - `34b234c`: 3 files changed, 146 insertions, 2 deletions.
-  - `bd0b795`: final report and state ledger.
+  - finalization commit: final report and state ledger.
 - Changed files:
   - `app/src/test/java/com/opencamera/app/PreviewOverlayGeometryTest.kt`
   - `app/src/test/java/com/opencamera/app/camera/PhotoFrameRatioPostProcessorTest.kt`
@@ -42,7 +42,7 @@
 - Functional commit hash:
   - `c7c5f06` - frame-ratio preview/crop verification tests.
   - `34b234c` - content-aware `blur-four-border` rendering and tests.
-- Ledger commit hash: `bd0b795`
+- Ledger commit hash: this finalization commit on `main`
 - PR link: local mainline integration, no PR created.
 
 ## Acceptance Summary

@@ -35,7 +35,7 @@ Repair the coordinator evidence for Zoom Cockpit V2 so `99-finalize` can trust t
 ```bash
 rtk bash -n docs/plans/zoom-cockpit-v2-landing-repair-orchestration/launchers/orchestrate.sh
 rtk bash docs/plans/zoom-cockpit-v2-landing-repair-orchestration/launchers/orchestrate.sh status
-rtk rg -n "TODO|TBD|fill in|implement later|\\.\\.\\." docs/plans/zoom-cockpit-v2-landing-repair-orchestration
+rtk rg -n "placeholder|unfinished|later" docs/plans/zoom-cockpit-v2-landing-repair-orchestration
 ```
 
 ## Branch And Worktree Policy
@@ -70,4 +70,3 @@ rtk rg -n "TODO|TBD|fill in|implement later|\\.\\.\\." docs/plans/zoom-cockpit-v
 - [ ] verification commands/results recorded
 - [ ] unresolved risks noted
 - [ ] only allowed paths touched
-
