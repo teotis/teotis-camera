@@ -400,7 +400,18 @@ internal class MainActivityActionBinder(
             }
         }
         previewView.setOnTouchListener { v, event ->
-            gestureRouter!!.onTouchEvent(v, event)
+            val snap = snapshot()
+            val guardState = GestureGuardState(
+                activePanel = snap.activePanelRoute,
+                isFilterAdjustmentActive = snap.isFilterAdjustmentVisible
+            )
+            if (!gestureGuard.isGestureAllowed(GestureZone.PREVIEW, guardState)) {
+                // Let the touch fall through to panelDismissScrim so that an
+                // outside tap dismisses the active panel instead of being lost.
+                false
+            } else {
+                gestureRouter!!.onTouchEvent(v, event)
+            }
         }
     }
 

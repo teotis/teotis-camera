@@ -284,4 +284,12 @@ class CockpitPanelRouterTest {
         state = nextState(state, CockpitPanelCommand.ToggleQuickBubble)
         assertEquals(CockpitPanelRoute.None, state.route)
     }
+
+    @Test
+    fun `DismissAll from QuickBubble closes to None`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.QuickBubble)
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
 }
