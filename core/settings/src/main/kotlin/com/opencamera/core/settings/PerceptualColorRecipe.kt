@@ -5,6 +5,8 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 
 enum class PreviewColorFidelity {
+    NONE,
+    GOOD,
     APPROXIMATE,
     MASK_AWARE,
     FALLBACK,

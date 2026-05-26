@@ -42,6 +42,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
+import com.opencamera.core.media.StillCaptureQualityPreference
 import kotlinx.coroutines.launch
 
 class DefaultCameraSession(

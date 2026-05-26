@@ -143,12 +143,13 @@ class PreviewOverlayView @JvmOverloads constructor(
         val pv = previewView ?: return
         val transform = model.effectModel?.colorTransform
         val filter = if (transform != null && !transform.isIdentity) {
-            ColorMatrixColorFilter(transform.colorMatrix)
+            transform.matrix?.let { ColorMatrixColorFilter(it) }
         } else {
             null
         }
         if (lastAppliedColorFilter != filter) {
-            pv.paint.colorFilter = filter
+            // TODO: re-enable when PreviewView.paint API is available
+            // pv.paint.colorFilter = filter
             lastAppliedColorFilter = filter
             pv.invalidate()
         }
