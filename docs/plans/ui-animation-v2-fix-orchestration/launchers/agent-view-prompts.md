@@ -1,6 +1,14 @@
 # Agent View Prompts
 
-Use these prompts in Claude Code Agent View. Start with package 00. Do not launch later dependency packages until their "Must wait for" packages are complete.
+Use these prompts in Claude Code Agent View. This package is updated for Claude Code `2.1.142`, where background sessions are managed with `claude agents`.
+
+Open Agent View from the repo root with:
+
+```bash
+claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high
+```
+
+Start with package 00. Do not launch later dependency packages until their "Must wait for" packages are complete.
 
 ## Package: 00-mode-order-regression
 

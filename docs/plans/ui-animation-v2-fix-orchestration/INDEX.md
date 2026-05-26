@@ -10,7 +10,7 @@ Repair the blocked UI Components And Animation V2 landing so OpenCamera has trut
 - Why: There are six scoped packages, but several share Android UI files. Agent View gives isolated worktrees and evidence packs while allowing limited safe parallelism.
 - Alternatives rejected:
   - `SINGLE_AGENT` — possible, but slower and less auditable for the five distinct UI surfaces.
-  - `CLAUDE_BG_SCRIPT` — generated as an option, but not the default because shared UI files make manual launch order safer.
+  - `CLAUDE_BG_SCRIPT` — not used for the current Claude Code `2.1.142` setup; background work is dispatched from Agent View via `claude agents`.
   - `BATCH` — not a mechanical repo-wide transform.
   - `AGENT_TEAM` — unnecessary for direct implementation and higher token cost.
 - Max parallel agents: 2
@@ -161,7 +161,7 @@ Evidence pack must include:
 
 ## Launch Options
 
-- Option A: Agent View manual dispatch — copy prompts from `launchers/agent-view-prompts.md`.
-- Option B: `claude --bg` script — run `bash launchers/dispatch-claude-agents.sh` from this repo. The script launches only the safe first wave by default.
+- Option A: Agent View manual dispatch — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high`, then copy prompts from `launchers/agent-view-prompts.md`.
+- Option B: Agent View helper script — run `bash launchers/dispatch-claude-agents.sh` from this repo. The script performs preflight checks and opens Agent View; it does not auto-dispatch every package.
 - Option C: `/batch` — not recommended for this non-mechanical UI work.
 - Option D: Final integration audit — give `validation/final-audit-prompt.md` to Codex after all status files are complete.

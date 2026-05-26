@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLAN_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$PLAN_DIR/../../.." && pwd)"
+PROMPT_FILE="$PLAN_DIR/launchers/agent-view-prompts.md"
 
 cd "$REPO_ROOT"
 
@@ -12,17 +13,34 @@ git rev-parse --git-dir >/dev/null 2>&1 || { echo "ERROR: not a git repository";
 [ -f "$PLAN_DIR/INDEX.md" ] || { echo "ERROR: INDEX.md not found at $PLAN_DIR/INDEX.md"; exit 1; }
 [ -f "$PLAN_DIR/packages/00-mode-order-regression.md" ] || { echo "ERROR: package 00 doc missing"; exit 1; }
 [ -f "$PLAN_DIR/status/00-mode-order-regression.md" ] || { echo "ERROR: package 00 status file missing"; exit 1; }
+[ -f "$PROMPT_FILE" ] || { echo "ERROR: Agent View prompts missing at $PROMPT_FILE"; exit 1; }
 
 echo "=== UI Animation V2 Fix Orchestration ==="
 echo "Plan: $PLAN_DIR"
 echo
-echo "Launching prerequisite package only: 00-mode-order-regression"
-echo "After it completes and is merged/rebased, launch the next safe Agent View wave from:"
-echo "$PLAN_DIR/launchers/agent-view-prompts.md"
+echo "Claude Code version:"
+claude --version
+echo
+echo "Claude Code 2.1 uses Agent View through 'claude agents'."
+echo "This helper does not dispatch all packages automatically."
+echo
+echo "Open Agent View, then paste package prompts from:"
+echo "$PROMPT_FILE"
+echo
+echo "Launch order:"
+echo "1. 00-mode-order-regression"
+echo "2. 01-focus-exposure-feedback-v2 and 04-panel-transition-route-continuity"
+echo "3. 03-zoom-cockpit-v2"
+echo "4. 02-shutter-state-animation-v2"
+echo "5. 05-quick-panel-semantic-controls-v2"
+echo "6. 99-integration-audit"
+echo
+echo "Tip: pass --print-only to stop here without opening Agent View."
 
-claude --bg --name "ui-v2-00-mode-order" "Read $PLAN_DIR/INDEX.md and $PLAN_DIR/packages/00-mode-order-regression.md. Implement package 00-mode-order-regression only. Use an isolated worktree. Run the listed rtk verification commands. Write evidence to $PLAN_DIR/status/00-mode-order-regression.md when done. Do NOT edit INDEX.md or other status files. Do NOT force-push, hard reset, delete worktrees, use network, or touch forbidden paths."
+if [[ "${1:-}" == "--print-only" ]]; then
+  exit 0
+fi
 
 echo
-echo "=== Agent launched ==="
-echo "Run 'claude agents' to check status."
-echo "Next: launch packages 01 and 04 manually after package 00 is complete."
+echo "=== Opening Claude Code Agent View ==="
+exec claude agents --cwd "$REPO_ROOT" --permission-mode default --effort high
