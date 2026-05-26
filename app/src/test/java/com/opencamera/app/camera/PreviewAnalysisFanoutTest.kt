@@ -199,6 +199,27 @@ class PreviewAnalysisFanoutTest {
         assertEquals("close should be attempted once", 1, closeAttempts)
     }
 
+    @Test
+    fun `fanout owns close with MlKit scene mask source`() {
+        var closeCount = 0
+        val proxy = createCountingProxy { closeCount++ }
+
+        val mlKitSource = MlKitSelfiePreviewSceneMaskSource()
+        mlKitSource.start(PreviewSceneMaskConfig())
+
+        val fanout = PreviewAnalysisFanout(
+            sceneMaskConsumer = { img, rot -> mlKitSource.onAnalyzeFrame(img, rot) },
+            livePreviewConsumer = { _, _ -> }
+        )
+
+        fanout.analyze(proxy, 0)
+
+        // Fanout is the sole close owner; MlKit source must not close
+        assertEquals("fanout should close exactly once", 1, closeCount)
+
+        mlKitSource.stop("test")
+    }
+
     private fun createCountingProxy(onClose: () -> Unit): ImageProxy {
         return object : ImageProxy {
             override fun close() { onClose() }
