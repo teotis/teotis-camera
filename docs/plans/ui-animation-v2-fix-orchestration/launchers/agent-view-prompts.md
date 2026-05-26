@@ -1,8 +1,8 @@
 # Agent View Prompts
 
-Use these prompts in Claude Code Agent View. This package is updated for Claude Code `2.1.142`, where background sessions are managed with `claude agents`.
+Use these prompts in Claude Code Agent View as a fallback or for manual inspection. The preferred launcher is now the background dispatch script, which creates `claude --bg --name` sessions by phase.
 
-Important: `claude agents` opens Agent View, but it does not create package task units by itself. Create each task unit inside Agent View by pasting the relevant package block below. The helper script opens the view and prints the launch order only.
+Compatibility note: the local `claude --help` for `2.1.142` may omit `--bg`, but the official Claude Code CLI reference says `--help` does not list every flag and documents `--bg` as the background-agent flag.
 
 Open Agent View from the repo root with:
 
@@ -11,6 +11,17 @@ claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode d
 ```
 
 Start with package 00. Do not launch later dependency packages until their "Must wait for" packages are complete.
+
+Background script launch order:
+
+```bash
+bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g0
+bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g1
+bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g2
+bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g3
+bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh g4
+bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/ui-animation-v2-fix-orchestration/launchers/dispatch-claude-agents.sh audit
+```
 
 ## Package: 00-mode-order-regression
 

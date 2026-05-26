@@ -6,11 +6,11 @@ Repair the blocked UI Components And Animation V2 landing so OpenCamera has trut
 
 ## Execution Mode Recommendation
 
-- Recommended mode: `AGENT_VIEW`
-- Why: There are six scoped packages, but several share Android UI files. Agent View gives isolated worktrees and evidence packs while allowing limited safe parallelism.
+- Recommended mode: `BACKGROUND_AGENT_SCRIPT`
+- Why: The user wants task units to be created automatically. Official Claude Code CLI reference documents `--bg` for background agents and notes that `claude --help` may omit supported flags, so the launcher now creates background sessions by phase and then opens Agent View.
 - Alternatives rejected:
   - `SINGLE_AGENT` — possible, but slower and less auditable for the five distinct UI surfaces.
-  - `CLAUDE_BG_SCRIPT` — not used for the current Claude Code `2.1.142` setup; background work is dispatched from Agent View via `claude agents`.
+  - `AGENT_VIEW` — still available as a fallback, but manual prompt pasting is no longer the preferred launch path.
   - `BATCH` — not a mechanical repo-wide transform.
   - `AGENT_TEAM` — unnecessary for direct implementation and higher token cost.
 - Max parallel agents: 2
@@ -93,12 +93,12 @@ After completing your assigned package:
 
 | Package | Mode | Agent Name | Prompt File | Status File |
 | --- | --- | --- | --- | --- |
-| 00-mode-order-regression | agent-view | agent-00-mode-order | `launchers/agent-view-prompts.md#package-00-mode-order-regression` | `status/00-mode-order-regression.md` |
-| 01-focus-exposure-feedback-v2 | agent-view | agent-01-focus-feedback | `launchers/agent-view-prompts.md#package-01-focus-exposure-feedback-v2` | `status/01-focus-exposure-feedback-v2.md` |
-| 02-shutter-state-animation-v2 | agent-view | agent-02-shutter-animation | `launchers/agent-view-prompts.md#package-02-shutter-state-animation-v2` | `status/02-shutter-state-animation-v2.md` |
-| 03-zoom-cockpit-v2 | agent-view | agent-03-zoom-cockpit | `launchers/agent-view-prompts.md#package-03-zoom-cockpit-v2` | `status/03-zoom-cockpit-v2.md` |
-| 04-panel-transition-route-continuity | agent-view | agent-04-panel-transition | `launchers/agent-view-prompts.md#package-04-panel-transition-route-continuity` | `status/04-panel-transition-route-continuity.md` |
-| 05-quick-panel-semantic-controls-v2 | agent-view | agent-05-quick-panel | `launchers/agent-view-prompts.md#package-05-quick-panel-semantic-controls-v2` | `status/05-quick-panel-semantic-controls-v2.md` |
+| 00-mode-order-regression | background-script | ui-v2-00-mode-order-regression | `launchers/dispatch-claude-agents.sh g0` | `status/00-mode-order-regression.md` |
+| 01-focus-exposure-feedback-v2 | background-script | ui-v2-01-focus-exposure-feedback-v2 | `launchers/dispatch-claude-agents.sh g1` | `status/01-focus-exposure-feedback-v2.md` |
+| 02-shutter-state-animation-v2 | background-script | ui-v2-02-shutter-state-animation-v2 | `launchers/dispatch-claude-agents.sh g3` | `status/02-shutter-state-animation-v2.md` |
+| 03-zoom-cockpit-v2 | background-script | ui-v2-03-zoom-cockpit-v2 | `launchers/dispatch-claude-agents.sh g2` | `status/03-zoom-cockpit-v2.md` |
+| 04-panel-transition-route-continuity | background-script | ui-v2-04-panel-transition-route-continuity | `launchers/dispatch-claude-agents.sh g1` | `status/04-panel-transition-route-continuity.md` |
+| 05-quick-panel-semantic-controls-v2 | background-script | ui-v2-05-quick-panel-semantic-controls-v2 | `launchers/dispatch-claude-agents.sh g4` | `status/05-quick-panel-semantic-controls-v2.md` |
 | 99-integration-audit | codex | — | `validation/final-audit-prompt.md` | `status/99-integration-audit.md` |
 
 ## Status Ledger
@@ -161,7 +161,7 @@ Evidence pack must include:
 
 ## Launch Options
 
-- Option A: Agent View manual dispatch — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode default --effort high`, then copy prompts from `launchers/agent-view-prompts.md`.
-- Option B: Agent View opener script — run `bash launchers/dispatch-claude-agents.sh` from this repo. The script performs preflight checks and opens Agent View; it creates no task units. Create each task in Agent View by pasting prompts from `launchers/agent-view-prompts.md`.
-- Option C: `/batch` — not recommended for this non-mechanical UI work.
+- Option A: Background agent script — run `bash launchers/dispatch-claude-agents.sh g0`, then later `g1`, `g2`, `g3`, `g4`, and `audit`. The script creates `claude --bg --name` sessions for the requested phase and opens `claude agents` when interactive.
+- Option B: Agent View manual fallback — open `claude agents --cwd /Volumes/Extreme_SSD/project/open_camera --permission-mode auto --effort xhigh`, then copy prompts from `launchers/agent-view-prompts.md`.
+- Option C: `/batch` — not recommended; see `launchers/batch-instruction.md`.
 - Option D: Final integration audit — give `validation/final-audit-prompt.md` to Codex after all status files are complete.
