@@ -6,6 +6,7 @@ Future handoff documents should be added here and linked from this index instead
 
 | Plan | Owner | Status | Date | Outcome / Next Action |
 | --- | --- | --- | --- | --- |
+| [Gradle Build Isolation Follow-Up Orchestration](./gradle-build-isolation-followup-orchestration/INDEX.md) | Multi-agent implementation + Codex final audit | planned | 2026-05-26 | Dispatch package for finishing old verification-script isolation and restoring the build-isolation planning ledger after external-agent repair. |
 | [Rendering 2.0 Validation Fixes Orchestration](./rendering-2-0-validation-fix-orchestration/INDEX.md) | Multi-agent implementation + Codex final audit | planned | 2026-05-26 | External landing is partly valid but not acceptance-ready; dispatch packages for postprocess outer guard, recipe single truth gap, preview fidelity honesty, and ledger/gate honesty. |
 | [Repo Health Triage Handoff Index](./2026-05-25-repo-health-triage-index.md) | Codex planning + implementation agents | planned | 2026-05-25 | Verified git/status, Stage 7 compile, and app focused test blockers after external-agent work; execute git hygiene first, then test repairs. |
 | [Git Worktree Hygiene And Status Repair](./2026-05-25-git-worktree-hygiene-and-status-repair.md) | Text/code agent with user approval for destructive cleanup | planned | 2026-05-25 | Repair stale nested worktree/submodule-like state so ordinary `git status` and `git submodule status` are reliable again. |
