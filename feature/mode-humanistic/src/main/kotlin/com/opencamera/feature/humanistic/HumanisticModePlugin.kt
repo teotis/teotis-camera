@@ -204,6 +204,7 @@ private class HumanisticModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     ),
                     livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft.toCaptureSpec(context.settingsSnapshot.persisted.photo.liveSaveFormat)
@@ -234,6 +235,7 @@ private class HumanisticModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )

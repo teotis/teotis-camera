@@ -185,6 +185,7 @@ private class DocumentModeController(
                 ),
                 postProcessSpec = postProcessSpec,
                 captureProfile = com.opencamera.core.media.CaptureProfile(
+                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
             )

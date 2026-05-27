@@ -108,6 +108,18 @@ private class ProModeController(
         )
     }
 
+    override suspend fun onStillCaptureQualityChanged(
+        stillCaptureQuality: com.opencamera.core.media.StillCaptureQualityPreference
+    ) {
+        mutableSnapshot.value = buildSnapshot(
+            headline = if (manualControlsEnabled()) {
+                "Pro quality updated"
+            } else {
+                "Assist quality updated"
+            }
+        )
+    }
+
     override suspend fun onEnter() {
         context.eventSink("pro.enter")
         mutableSnapshot.value = buildSnapshot(
@@ -209,6 +221,7 @@ private class ProModeController(
                 captureProfile = CaptureProfile(
                     flashMode = flashMode,
                     manualCaptureParams = context.settingsSnapshot.catalog.manualCaptureDraft,
+                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
             )
@@ -287,9 +300,9 @@ private class ProModeController(
             "Flash unavailable on this device"
         }
         return if (manualControlsEnabled()) {
-            "Preset ${preset.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | ISO ${preset.iso} | ${preset.exposureTime} | WB ${preset.whiteBalanceKelvin}K | Focus ${preset.focusMode} | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} | Frame ${currentFrameRatio().label} | $flashSummary"
+            "Preset ${preset.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | ISO ${preset.iso} | ${preset.exposureTime} | WB ${preset.whiteBalanceKelvin}K | Focus ${preset.focusMode} | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} | Frame ${currentFrameRatio().label} | $flashSummary"
         } else {
-            "Preset ${preset.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Guided tuning active because manual controls are unavailable on this device. | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} saved only. | Frame ${currentFrameRatio().label} | $flashSummary"
+            "Preset ${preset.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Guided tuning active because manual controls are unavailable on this device. | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} saved only. | Frame ${currentFrameRatio().label} | $flashSummary"
         }
     }
 

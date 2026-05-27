@@ -116,6 +116,18 @@ private class PortraitModeController(
         )
     }
 
+    override suspend fun onStillCaptureQualityChanged(
+        stillCaptureQuality: com.opencamera.core.media.StillCaptureQualityPreference
+    ) {
+        mutableSnapshot.value = buildSnapshot(
+            headline = if (depthEffectEnabled()) {
+                "Portrait quality updated"
+            } else {
+                "Focus quality updated"
+            }
+        )
+    }
+
     override suspend fun onEnter() {
         context.eventSink("portrait.enter")
         styleIndex = resolvedDefaultStyleIndex().coerceAtMost(currentStyles().lastIndex)
@@ -212,6 +224,7 @@ private class PortraitModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         manualCaptureParams = currentManualDraftOrNull(),
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     ),
                     livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft.toCaptureSpec(context.settingsSnapshot.persisted.photo.liveSaveFormat)
@@ -245,6 +258,7 @@ private class PortraitModeController(
                 postProcessSpec = postProcessSpec,
                 captureProfile = CaptureProfile(
                     manualCaptureParams = currentManualDraftOrNull(),
+                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
                 )
@@ -461,9 +475,9 @@ private class PortraitModeController(
             append(" | Bokeh ${portraitSettings.portraitBokehEffect.label}")
         }
         val standardSummary = if (depthEffectEnabled()) {
-            "Style ${style.label} | $commonSummary | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Depth strength ${style.bokehStrength} | Subject tracking ${style.subjectTracking} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Portrait depth rendering active."
+            "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Depth strength ${style.bokehStrength} | Subject tracking ${style.subjectTracking} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Portrait depth rendering active."
         } else {
-            "Style ${style.label} | $commonSummary | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Focus-priority portrait fallback because depth effect is unavailable on this device."
+            "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Focus-priority portrait fallback because depth effect is unavailable on this device."
         }
         if (!proVariantEnabled) {
             return standardSummary

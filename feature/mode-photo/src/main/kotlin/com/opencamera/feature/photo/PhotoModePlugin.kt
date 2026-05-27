@@ -102,6 +102,14 @@ private class PhotoModeController(
         )
     }
 
+    override suspend fun onStillCaptureQualityChanged(
+        stillCaptureQuality: com.opencamera.core.media.StillCaptureQualityPreference
+    ) {
+        mutableSnapshot.value = buildSnapshot(
+            headline = "Photo quality updated"
+        )
+    }
+
     override suspend fun onEnter() {
         context.eventSink("photo.enter")
         selectedFilter = resolvedDefaultFilter()
@@ -176,6 +184,7 @@ private class PhotoModeController(
                             postProcessSpec = postProcessSpec,
                             captureProfile = CaptureProfile(
                                 flashMode = flashMode,
+                                stillCaptureQuality = runtimeState().stillCaptureQuality,
                                 stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                             ),
                             livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft
@@ -203,6 +212,7 @@ private class PhotoModeController(
                             postProcessSpec = postProcessSpec,
                             captureProfile = CaptureProfile(
                                 flashMode = flashMode,
+                                stillCaptureQuality = runtimeState().stillCaptureQuality,
                                 stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                             )
                         )
@@ -278,9 +288,9 @@ private class PhotoModeController(
 
     private fun defaultDetail(): String {
         return if (currentFlashSupported()) {
-            "Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash ${currentFlashMode().label} | Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
+            "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash ${currentFlashMode().label} | Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
         } else {
-            "Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash control unavailable on this device. Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
+            "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash control unavailable on this device. Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
         }
     }
 
@@ -334,6 +344,7 @@ private class PhotoModeController(
                         longExposureMillis = 450L,
                         requiresTripod = false,
                         flashMode = flashMode,
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )
@@ -353,6 +364,7 @@ private class PhotoModeController(
                     ),
                     captureProfile = CaptureProfile(
                         flashMode = flashMode,
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )
@@ -369,6 +381,7 @@ private class PhotoModeController(
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         flashMode = flashMode,
+                        stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     )
                 )

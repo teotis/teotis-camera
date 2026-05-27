@@ -219,6 +219,7 @@ internal class CaptureRecordingSessionProcessor(
         } else {
             null
         }
+        val displayedStartedAt = if (shot.mediaType == MediaType.VIDEO) 0L else null
         updateState.update { s ->
             s.copy(
                 captureStatus = if (shot.mediaType == MediaType.PHOTO) {
@@ -239,7 +240,7 @@ internal class CaptureRecordingSessionProcessor(
                 presentation = s.presentation.copy(
                     countdownRemainingSeconds = null,
                     pendingCaptureFeedback = null,
-                    recordingStartedAtElapsedMillis = startedAt,
+                    recordingStartedAtElapsedMillis = displayedStartedAt,
                     recordingElapsedMillis = if (shot.mediaType == MediaType.VIDEO) 0L else null,
                     lastAction = if (shot.mediaType == MediaType.PHOTO) {
                         if (shot.livePhotoSpec != null) {

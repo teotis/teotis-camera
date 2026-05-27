@@ -11,7 +11,9 @@ import com.opencamera.core.device.recoveryReason
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.outputPathOrNull
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -366,7 +368,7 @@ internal class PreviewRecoverySessionProcessor(
     }
 
     private fun scheduleMeteringFeedbackExpiry(requestId: String, delayMs: Long) {
-        scope.launch {
+        CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
             delay(delayMs)
             dispatch(SessionIntent.PreviewMeteringFeedbackExpired(requestId))
         }
@@ -382,7 +384,9 @@ internal class PreviewRecoverySessionProcessor(
             )
         )
 
-        if (snapshot.activeMode != com.opencamera.core.mode.ModeId.PHOTO) {
+        if (snapshot.activeMode != com.opencamera.core.mode.ModeId.PHOTO &&
+            snapshot.activeDeviceCapabilities.supportsStillCapture
+        ) {
             trace.record("photo.low-light.ignored", "mode=${snapshot.activeMode}")
             return
         }
@@ -424,7 +428,7 @@ internal class PreviewRecoverySessionProcessor(
                 "untilElapsedMillis=$visibleUntil"
             )
             promptExpiryJob?.cancel()
-            promptExpiryJob = scope.launch {
+            promptExpiryJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
                 delay(3000L)
                 dispatch(SessionIntent.PhotoLowLightPromptExpired)
             }

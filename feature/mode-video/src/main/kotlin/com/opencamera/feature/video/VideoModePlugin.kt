@@ -277,14 +277,19 @@ private class VideoModeController(
         if (nextSpec == null) {
             return ModeSignal.ShowHint("Video quality is unavailable")
         }
-        requestedVideoSpec = nextSpec
-        context.eventSink("video.quality.selected.${nextSpec.resolution.storageKey}.${nextSpec.frameRate.storageKey}")
+        requestedVideoSpec = requestedVideoSpec.copy(resolution = nextSpec.resolution)
+        context.eventSink(
+            "video.quality.selected.${requestedVideoSpec.resolution.storageKey}.${requestedVideoSpec.frameRate.storageKey}"
+        )
         mutableSnapshot.value = buildSnapshot(
             headline = "Video quality updated"
         )
         val activeVideoSpec = resolvedVideoSpec()
-        val requestedLabel = nextSpec.quickLabel()
-        val suffix = if (activeVideoSpec.resolution != nextSpec.resolution || activeVideoSpec.frameRate != nextSpec.frameRate) {
+        val requestedLabel = requestedVideoSpec.quickLabel()
+        val suffix = if (
+            activeVideoSpec.resolution != requestedVideoSpec.resolution ||
+            activeVideoSpec.frameRate != requestedVideoSpec.frameRate
+        ) {
             " (active ${activeVideoSpec.quickLabel()})"
         } else {
             ""
@@ -409,5 +414,5 @@ private class VideoModeController(
         .resolveVideoSpec(requestedVideoSpec)
         .applied
 
-    private fun VideoSpec.quickLabel(): String = "${resolution.quickLabel}${frameRate.fps}"
+    private fun VideoSpec.quickLabel(): String = summaryLabel
 }

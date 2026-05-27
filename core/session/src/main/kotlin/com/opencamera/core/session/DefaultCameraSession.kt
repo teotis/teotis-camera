@@ -65,7 +65,7 @@ class DefaultCameraSession(
         ?: supportedModes.firstOrNull()
         ?: error("No supported camera modes for $baseDeviceCapabilities")
     private val initialLensFacing = defaultLensFacing(baseDeviceCapabilities.availableLensFacings)
-    private val initialStillCaptureQuality = StillCaptureQualityPreference.QUALITY
+    private val initialStillCaptureQuality = StillCaptureQualityPreference.LATENCY
     private val initialStillCaptureResolutionPreset = clampStillCaptureResolutionPreset(
         StillCaptureResolutionPreset.LARGE_12MP,
         baseDeviceCapabilities.availableStillCaptureResolutionPresets
@@ -77,7 +77,9 @@ class DefaultCameraSession(
     )
     private var sessionDeviceCapabilities = baseDeviceCapabilities
     private var sessionLensFacing = initialLensFacing
+    private var sessionStillCaptureQuality = initialStillCaptureQuality
     private var sessionStillCaptureResolutionPreset = initialStillCaptureResolutionPreset
+    private var sessionStillCaptureOutputSize = initialStillCaptureOutputSize
     private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
     private var sessionSettingsSnapshot = settingsSnapshot
     private var currentController: ModeController = createController(
@@ -849,8 +851,20 @@ class DefaultCameraSession(
             return
         }
 
-        // TODO: re-enable when StillCaptureQualityPreference is merged
-        trace.record("still-quality.skipped", "not-yet-implemented")
+        val nextQuality = when (sessionStillCaptureQuality) {
+            StillCaptureQualityPreference.LATENCY -> StillCaptureQualityPreference.QUALITY
+            StillCaptureQualityPreference.QUALITY -> StillCaptureQualityPreference.LATENCY
+        }
+        sessionStillCaptureQuality = nextQuality
+        currentController.onStillCaptureQualityChanged(nextQuality)
+        updateState(
+            modeSnapshot = currentController.snapshot.value,
+            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
+            activeDeviceGraph = resolvedActiveDeviceGraph(),
+            lastAction = "Still quality set to ${nextQuality.label}",
+            lastError = null
+        )
+        trace.record("still-quality.updated", nextQuality.tagValue)
     }
 
     private suspend fun handleStillCaptureResolutionToggled() {
@@ -883,8 +897,40 @@ class DefaultCameraSession(
             return
         }
 
-        // TODO: re-enable when StillCaptureResolutionPreset is merged
-        trace.record("still-resolution.skipped", "not-yet-implemented")
+        val nextOutputSize = sessionDeviceCapabilities.availableStillCaptureOutputSizes
+            .takeIf { it.isNotEmpty() }
+            ?.let { sizes ->
+                nextStillCaptureOutputSize(
+                    current = sessionStillCaptureOutputSize,
+                    available = sizes
+                )
+            }
+        val nextPreset = nextOutputSize?.let(::resolutionPresetForOutputSize)
+            ?: nextStillCaptureResolutionPreset(
+                current = sessionStillCaptureResolutionPreset,
+                available = sessionDeviceCapabilities.availableStillCaptureResolutionPresets
+            )
+        sessionStillCaptureResolutionPreset = nextPreset
+        sessionStillCaptureOutputSize = nextOutputSize
+        currentController.onStillCaptureResolutionChanged(nextPreset)
+        val activeGraph = resolveActiveDeviceGraph(
+            baseGraph = currentController.deviceGraph(),
+            deviceCapabilities = _state.value.activeDeviceCapabilities,
+            requestedOutputSize = nextOutputSize,
+            requestedZoomRatio = _state.value.activeDeviceGraph.preview.zoomRatio
+        )
+        updateState(
+            modeSnapshot = currentController.snapshot.value,
+            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
+            activeDeviceGraph = activeGraph,
+            lastAction = if (nextOutputSize != null) {
+                "Still resolution set to ${nextOutputSize.width}x${nextOutputSize.height}"
+            } else {
+                "Still resolution set to ${nextPreset.label}"
+            },
+            lastError = null
+        )
+        trace.record("still-resolution.updated", nextPreset.tagValue)
     }
 
     private suspend fun handlePreviewRatioToggled() {
@@ -1039,8 +1085,14 @@ class DefaultCameraSession(
             current = sessionStillCaptureResolutionPreset,
             available = deviceCapabilities.availableStillCaptureResolutionPresets
         )
-        if (clampedResolutionPreset != sessionStillCaptureResolutionPreset) {
+        val resolutionAdjusted = clampedResolutionPreset != sessionStillCaptureResolutionPreset
+        if (resolutionAdjusted) {
             sessionStillCaptureResolutionPreset = clampedResolutionPreset
+            sessionStillCaptureOutputSize = resolvedStillCaptureOutputSizeSelection(
+                current = null,
+                available = deviceCapabilities.availableStillCaptureOutputSizes,
+                fallbackPreset = clampedResolutionPreset
+            )
             currentController.onStillCaptureResolutionChanged(clampedResolutionPreset)
         }
         updateState(
@@ -1051,7 +1103,7 @@ class DefaultCameraSession(
                 deviceCapabilities = deviceCapabilities
             ),
             lastAction = if (
-                clampedResolutionPreset != sessionStillCaptureResolutionPreset
+                resolutionAdjusted
             ) {
                 "Still resolution adjusted to ${clampedResolutionPreset.label} for current lens"
             } else {
@@ -1311,13 +1363,13 @@ class DefaultCameraSession(
             updateState(lastAction = "Cannot move item: batch is not active")
             return
         }
-        if (currentBatch.items.size < 2) {
-            updateState(lastAction = "Cannot reorder: batch has fewer than 2 items")
-            return
-        }
         val currentIndex = currentBatch.items.indexOfFirst { it.itemId == itemId }
         if (currentIndex == -1) {
             updateState(lastAction = "Cannot move: $itemId not in batch")
+            return
+        }
+        if (currentBatch.items.size < 2) {
+            updateState(lastAction = "Cannot reorder: batch has fewer than 2 items")
             return
         }
         val targetIndex = when (direction) {
@@ -1515,7 +1567,9 @@ class DefaultCameraSession(
                     ModeRuntimeState(
                         deviceCapabilities = sessionDeviceCapabilities,
                         lensFacing = sessionLensFacing,
-                        stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset
+                        stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset,
+                        stillCaptureQuality = sessionStillCaptureQuality,
+                        stillCaptureOutputSize = sessionStillCaptureOutputSize
                     )
                 },
                 eventSink = { detail ->

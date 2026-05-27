@@ -166,7 +166,7 @@ data class DeviceCapabilities(
     val manualControlCapabilities: ManualControlCapabilityMatrix? = null,
     val supportsDocumentScanEnhancement: Boolean = true,
     val supportsPortraitDepthEffect: Boolean = true,
-    val supportsNightMultiFrame: Boolean = false,
+    val supportsNightMultiFrame: Boolean = true,
     val supportsFlashControl: Boolean = true,
     val availableLensFacings: Set<LensFacing> = setOf(LensFacing.BACK),
     val availableStillCaptureOutputSizes: List<StillCaptureOutputSize> = emptyList(),
@@ -497,14 +497,20 @@ data class DeviceGraphSpec(
             enablePreviewSnapshots: Boolean = true,
             zoomRatio: Float = 1f,
             resolutionOption: StillCaptureResolutionOption? = null,
-            outputSize: StillCaptureOutputSize? = null
+            outputSize: StillCaptureOutputSize? = null,
+            qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference =
+                com.opencamera.core.media.StillCaptureQualityPreference.LATENCY,
+            resolutionPreset: com.opencamera.core.media.StillCaptureResolutionPreset =
+                com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP
         ): DeviceGraphSpec {
             return DeviceGraphSpec(
                 template = CaptureTemplate.STILL_CAPTURE,
                 preferredLensFacing = preferredLensFacing,
                 stillCapture = StillCaptureConfig(
                     resolutionOption = resolutionOption,
-                    outputSize = outputSize
+                    outputSize = outputSize,
+                    qualityPreference = qualityPreference,
+                    resolutionPreset = resolutionPreset
                 ),
                 preview = PreviewConfig(
                     snapshotsEnabled = enablePreviewSnapshots,

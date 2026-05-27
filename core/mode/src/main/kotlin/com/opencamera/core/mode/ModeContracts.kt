@@ -6,6 +6,7 @@ import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.PhotoLowLightStrategySupport
 import com.opencamera.core.device.PhotoSceneSignal
 import com.opencamera.core.device.SceneLightState
+import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.photoLowLightStrategySupport
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.media.CaptureStrategy
@@ -100,22 +101,33 @@ fun ModeContext.captureAidMetadataTags(): Map<String, String> {
     val persisted = settingsSnapshot.persisted
     val lensFacing = runtimeState().lensFacing
     val selfieMirrorEnabled = persisted.common.selfieMirrorEnabled
-    return mapOf(
-        "captureLensFacing" to lensFacing.name.lowercase(),
-        "selfieMirrorEnabled" to if (selfieMirrorEnabled) "on" else "off",
-        "selfieMirrorApply" to (
-            lensFacing == LensFacing.FRONT &&
-                selfieMirrorEnabled
-            ).toString(),
-        "shutterSoundEnabled" to if (persisted.common.shutterSoundEnabled) "on" else "off"
-    )
+    return buildMap {
+        put(
+            "captureLensFacing",
+            lensFacing.name.lowercase()
+        )
+        put("selfieMirrorEnabled", if (selfieMirrorEnabled) "on" else "off")
+        put(
+            "selfieMirrorApply",
+            (
+                lensFacing == LensFacing.FRONT &&
+                    selfieMirrorEnabled
+                ).toString()
+        )
+        put("shutterSoundEnabled", if (persisted.common.shutterSoundEnabled) "on" else "off")
+        put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
+        runtimeState().stillCaptureOutputSize?.let { size ->
+            put("stillOutputSize", "${size.width}x${size.height}")
+        }
+    }
 }
 
 data class ModeRuntimeState(
     val deviceCapabilities: DeviceCapabilities,
     val lensFacing: LensFacing,
     val stillCaptureResolutionPreset: StillCaptureResolutionPreset,
-    val stillCaptureQuality: StillCaptureQualityPreference = StillCaptureQualityPreference.LATENCY
+    val stillCaptureQuality: StillCaptureQualityPreference = StillCaptureQualityPreference.LATENCY,
+    val stillCaptureOutputSize: StillCaptureOutputSize? = null
 )
 
 data class PhotoLowLightRuntimeState(
@@ -193,6 +205,10 @@ interface ModeController {
 
     suspend fun onStillCaptureResolutionChanged(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
+    ) = Unit
+
+    suspend fun onStillCaptureQualityChanged(
+        stillCaptureQuality: StillCaptureQualityPreference
     ) = Unit
 
     suspend fun onEnter()

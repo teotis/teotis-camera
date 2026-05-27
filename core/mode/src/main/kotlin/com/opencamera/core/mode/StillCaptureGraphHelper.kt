@@ -14,6 +14,8 @@ fun stillCaptureDeviceGraph(runtimeState: ModeRuntimeState): DeviceGraphSpec {
     return DeviceGraphSpec.stillCapture(
         preferredLensFacing = runtimeState.lensFacing,
         enablePreviewSnapshots = runtimeState.deviceCapabilities.supportsPreviewSnapshots,
-        resolutionOption = resolutionOption
+        resolutionOption = resolutionOption,
+        qualityPreference = runtimeState.stillCaptureQuality,
+        resolutionPreset = preset
     )
 }

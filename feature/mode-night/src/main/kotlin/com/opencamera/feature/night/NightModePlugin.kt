@@ -224,6 +224,7 @@ private class NightModeController(
                     requiresTripod = profile.requiresTripod,
                     flashMode = flashMode,
                     manualCaptureParams = currentManualDraftOrNull(),
+                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
             )
@@ -234,6 +235,7 @@ private class NightModeController(
                 captureProfile = CaptureProfile(
                     flashMode = flashMode,
                     manualCaptureParams = currentManualDraftOrNull(),
+                    stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
             )
