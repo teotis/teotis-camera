@@ -94,6 +94,7 @@
     <string name="dev_storage_format">Storage: %1$s / %2$s</string>
     <string name="dev_cleanup_done">Cleared %d files</string>
     <string name="dev_close">Close</string>
+    <string name="dev_cleanup_current">Clear</string>
     <string name="dev_console_content_description">Debug console overlay</string>
     <string name="button_palette_entry">Style</string>
     <string name="button_quick_launcher">Quick</string>
