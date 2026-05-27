@@ -1,12 +1,21 @@
 # 03-shutter-visual-state-and-qa Status
 
-- **Status**: pending
-- **Agent**:
+- **Status**: completed
+- **Agent**: shutter-feedback-watermark-03-shutter-visual-state-and-qa
 - **Branch**: `agent/shutter-feedback-watermark/03-shutter-visual-state-and-qa`
 - **Worktree**: `/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-feedback-watermark-03-shutter-visual-state-and-qa`
 - **Base commit**: `a8d621fb80e808254e9c301429571278309434ee`
-- **Commit hash**:
-- **Changed files**:
-- **Verification**:
+- **Commit hash**: `d475bd6364b854ce3b0d1c9378094e11300b167a`
+- **Changed files**: SessionCockpitRenderModel.kt, ShutterVisualDrawable.kt, CameraCockpitRenderModelTest.kt, SessionCockpitRenderModelTest.kt, CameraXCaptureAdapter.kt (tiny threading fix), CaptureRecordingSessionProcessor.kt, DefaultCameraSession.kt, SessionContracts.kt, CaptureRecordingSessionProcessorTest.kt, DefaultCameraSessionTest.kt
+- **Verification**: `app:testDebugUnitTest` — 207 tests passed, 0 failed
 - **Evidence**:
-- **Risks / follow-up**:
+  - Render states before: PHOTO_READY → SAVING → PHOTO_READY (binary, no intermediate feedback)
+  - Render states after: PHOTO_READY → PHOTO_PRESSED (immediate tap acknowledgment, 80ms shrink animation) → SAVING (activeShot + SAVING) → BACKGROUND_SAVING (SAVING without activeShot, subtle rotating arc) → PHOTO_READY
+  - BACKGROUND_SAVING:淡灰圆环 + 内部填充 + 慢速旋转弧线 (1800ms), 视觉上比前台 SAVING 更轻量
+  - PHOTO_PRESSED: 已有状态, 现在在 REQUESTED + activeShot 时正确触发, 提供即时按压确认
+  - Session rearm policy: DATA_RECEIVED + activeShot == null → PHOTO_READY (快门可点击)
+  - 保守拍摄: DATA_RECEIVED + activeShot 非空 → SAVING (快门仍禁用)
+  - 录像停止语义不变: VIDEO_RECORDING, VIDEO_STOPPING
+  - 特殊/高风险拍摄仍保持 BLOCKED
+- **Risks / follow-up**: BACKGROUND_SAVING 状态仅在 activeShot 已清除但 captureStatus 仍为 SAVING 的短暂窗口出现; 实际设备行为取决于内核时序。最终真机验证需由 05-real-device-acceptance 完成。
+- **Note**: This is NOT final real-device PASS. Package 05 must record device evidence.
