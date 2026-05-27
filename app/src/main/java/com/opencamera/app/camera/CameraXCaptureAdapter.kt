@@ -1797,7 +1797,9 @@ class CameraXCaptureAdapter(
                     // Ordinary still capture: postprocess and ShotCompleted delivery
                     // run off the critical path so the session can re-arm the shutter
                     // after DataReceived without waiting for postprocess.
-                    adapterScope.launch {
+                    // Move postprocess off Dispatchers.Main.immediate to avoid main-thread
+                    // contention during UI-heavy capture feedback (P6 latency phase).
+                    CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
                         runCatching {
                             emitShotCompleted(
                                 plan = shotCompletedParams.plan,

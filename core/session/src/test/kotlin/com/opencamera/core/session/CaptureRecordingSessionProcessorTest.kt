@@ -339,6 +339,19 @@ class CaptureRecordingSessionProcessorTest {
     }
 
     @Test
+    fun `handleShotStarted clears shutterPressedAtElapsedMillis`() = runTest {
+        val harness = Harness(runningState().copy(
+            shutterPressedAtElapsedMillis = 12345L,
+            captureStatus = CaptureStatus.REQUESTED
+        ))
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+
+        assertNull(harness.state.value.shutterPressedAtElapsedMillis)
+        assertEquals(CaptureStatus.SAVING, harness.state.value.captureStatus)
+    }
+
+    @Test
     fun `handleDataReceived for ordinary still releases activeShot`() = runTest {
         val shot = testShotRequest("shot-1", MediaType.PHOTO)
         val harness = Harness(runningState().copy(activeShot = shot))
