@@ -5,6 +5,7 @@ import com.opencamera.core.capability.CapabilityGraphReport
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
+import com.opencamera.core.device.LensNode
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.RenderRecipe
 import com.opencamera.core.media.CameraPerformanceClass
@@ -340,6 +341,7 @@ sealed interface SessionEffect {
     data class ExecuteShot(val plan: ShotPlan) : SessionEffect
     data class StopActiveShot(val shotId: String) : SessionEffect
     data class ApplyZoomRatio(val zoomRatio: Float) : SessionEffect
+    data class SwitchLensNode(val lensNode: LensNode, val reason: String) : SessionEffect
     data class BindPreview(
         val modeId: ModeId,
         val deviceGraph: DeviceGraphSpec,

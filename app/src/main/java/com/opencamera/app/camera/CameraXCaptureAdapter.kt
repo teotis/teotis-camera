@@ -57,6 +57,8 @@ import com.opencamera.core.device.DeviceShotRequest
 import com.opencamera.core.device.DeviceShotRequestTranslator
 import com.opencamera.core.device.DefaultDeviceShotRequestTranslator
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.LensNode
+import com.opencamera.core.device.LensNodeAvailability
 import com.opencamera.core.device.ManualControlCapabilityMatrix
 import com.opencamera.core.device.PreviewBrightnessRange
 import com.opencamera.core.device.PreviewBrightnessRequest
@@ -146,7 +148,9 @@ data class CameraLensProfile(
         StillCaptureResolutionPreset.entries.toSet(),
     val videoSpecConstraints: VideoSpecConstraints = DeviceCapabilities.DEFAULT.videoSpecConstraints,
     val manualControlCapabilities: ManualControlCapabilityMatrix? = null,
-    val previewBrightnessRange: PreviewBrightnessRange = PreviewBrightnessRange.CONSERVATIVE
+    val previewBrightnessRange: PreviewBrightnessRange = PreviewBrightnessRange.CONSERVATIVE,
+    /** Hardware camera ID, used for physical camera selection in multi-camera devices. */
+    val physicalCameraId: String? = null
 )
 
 internal data class StillCaptureTargetResolution(
@@ -839,10 +843,12 @@ internal fun mergeZoomRatioCapability(
         .distinct()
         .sorted()
     val mergedSupport = explicitCapabilities.maxValueOf { it.support }
+    val lensNodeMap = detectLensNodeMap(cameraProfiles)
     return ZoomRatioCapability(
         support = mergedSupport,
         supportedRatios = mergedRatios,
-        defaultRatio = mergedRatios.firstOrNull { it == 1f } ?: mergedRatios.first()
+        defaultRatio = mergedRatios.firstOrNull { it == 1f } ?: mergedRatios.first(),
+        lensNodeMap = lensNodeMap
     )
 }
 
@@ -1188,10 +1194,12 @@ private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> 
                 else -> null
             } ?: return@mapNotNull null
 
+            val zoomCap = detectZoomRatioCapability(characteristics)
+
             CameraLensProfile(
                 lensFacing = lensFacing,
                 hasFlashUnit = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
-                zoomRatioCapability = detectZoomRatioCapability(characteristics),
+                zoomRatioCapability = zoomCap,
                 previewBrightnessRange = detectPreviewBrightnessRange(characteristics),
                 availableStillCaptureOutputSizes = normalizeStillCaptureOutputSizes(
                     characteristics
@@ -1215,10 +1223,71 @@ private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> 
                 videoSpecConstraints = detectVideoSpecConstraints(
                     cameraId = cameraId,
                     characteristics = characteristics
-                )
+                ),
+                physicalCameraId = cameraId
             )
         }
     }.getOrDefault(emptyList())
+}
+
+/**
+ * Detects which physical cameras correspond to which [LensNode] by examining each back-facing
+ * camera's zoom ratio range. A camera with max zoom around 2x is TELEPHOTO; around 5x or higher
+ * is PERISCOPE. The camera with the lowest max zoom is WIDE.
+ */
+internal fun detectLensNodeMap(
+    profiles: List<CameraLensProfile>
+): Map<LensNode, LensNodeAvailability> {
+    val backProfiles = profiles.filter { it.lensFacing == LensFacing.BACK }
+    if (backProfiles.isEmpty()) return emptyMap()
+
+    // Find the max zoom ratio for each back camera profile
+    data class CameraZoomInfo(
+        val profile: CameraLensProfile,
+        val maxZoom: Float
+    )
+
+    val zoomInfos = backProfiles.map { profile ->
+        val ratios = profile.zoomRatioCapability.normalizedSupportedRatios
+        val maxZoom = ratios.maxOrNull() ?: 1f
+        CameraZoomInfo(profile, maxZoom)
+    }.sortedBy { it.maxZoom }
+
+    if (zoomInfos.isEmpty()) return emptyMap()
+
+    val result = mutableMapOf<LensNode, LensNodeAvailability>()
+
+    // The camera with the lowest max zoom is the primary WIDE camera
+    val wideInfo = zoomInfos.first()
+    result[LensNode.WIDE] = LensNodeAvailability(
+        node = LensNode.WIDE,
+        available = true,
+        thresholdRatio = 0f,
+        physicalCameraId = wideInfo.profile.physicalCameraId
+    )
+
+    // Classify other cameras by their max zoom range
+    for (info in zoomInfos.drop(1)) {
+        val maxZoom = info.maxZoom
+        val node = when {
+            maxZoom >= 4.0f -> LensNode.PERISCOPE
+            maxZoom >= 1.6f -> LensNode.TELEPHOTO
+            else -> continue
+        }
+        if (result.containsKey(node)) continue // Keep first (lowest max zoom) match per node
+        result[node] = LensNodeAvailability(
+            node = node,
+            available = true,
+            thresholdRatio = when (node) {
+                LensNode.TELEPHOTO -> 2.0f
+                LensNode.PERISCOPE -> 5.0f
+                else -> 0f
+            },
+            physicalCameraId = info.profile.physicalCameraId
+        )
+    }
+
+    return result
 }
 
 class CameraXCaptureAdapter(
@@ -1336,6 +1405,18 @@ class CameraXCaptureAdapter(
 
             is DeviceCommand.UpdateZoomRatio -> runCatching {
                 updateZoomRatio(command.zoomRatio)
+            }.onFailure { throwable ->
+                val issue = classifyPreviewBindingFailure(throwable)
+                invalidateCachedProviderState(issue)
+                _events.emit(
+                    DeviceEvent.RuntimeIssue(
+                        issue
+                    )
+                )
+            }
+
+            is DeviceCommand.SwitchLensNode -> runCatching {
+                switchLensNode(command.lensNode, command.reason)
             }.onFailure { throwable ->
                 val issue = classifyPreviewBindingFailure(throwable)
                 invalidateCachedProviderState(issue)
@@ -2670,6 +2751,121 @@ class CameraXCaptureAdapter(
         return when (lensFacing) {
             LensFacing.BACK -> CameraSelector.DEFAULT_BACK_CAMERA
             LensFacing.FRONT -> CameraSelector.DEFAULT_FRONT_CAMERA
+        }
+    }
+
+    private fun cameraSelectorForLensNode(
+        lensNode: LensNode,
+        physicalCameraId: String
+    ): CameraSelector {
+        return CameraSelector.Builder()
+            .addCameraFilter { cameras ->
+                cameras.filter { camera ->
+                    runCatching {
+                        val field = camera.javaClass.getDeclaredField("mCameraInfo")
+                        field.isAccessible = true
+                        val cameraInfo = field.get(camera) as? androidx.camera.core.CameraInfo
+                        val idField = cameraInfo?.javaClass?.getDeclaredField("mCameraId")
+                        idField?.isAccessible = true
+                        val id = idField?.get(cameraInfo) as? String
+                        id == physicalCameraId
+                    }.getOrDefault(false)
+                }
+            }
+            .build()
+    }
+
+    private suspend fun switchLensNode(lensNode: LensNode, reason: String) {
+        val activeGraph = currentGraph ?: return
+        val zoomCapability = capabilities.zoomRatioCapability
+        val availability = zoomCapability.lensNodeMap[lensNode]
+
+        if (availability == null || !availability.available || availability.physicalCameraId == null) {
+            _events.emit(
+                DeviceEvent.RuntimeIssue(
+                    DeviceRuntimeIssue(
+                        kind = DeviceRuntimeIssueKind.USER_ACTION_REQUIRED,
+                        reason = "Lens node ${lensNode.tagValue} is not available on this device: $reason",
+                        isRecoverable = true
+                    )
+                )
+            )
+            return
+        }
+
+        val physicalCameraId = availability.physicalCameraId ?: return
+        currentGraph = activeGraph.copy(
+            preview = activeGraph.preview.copy(requestedLensNode = lensNode)
+        )
+
+        // Rebind with a camera selector targeting the physical camera
+        val provider = cameraProvider ?: return
+        val lifecycleOwner = boundLifecycleOwner ?: return
+        val previewView = boundPreviewView ?: return
+
+        suppressPreviewStateEvents = true
+        removePreviewStreamObserver()
+        removeCameraStateObserver()
+        livePreviewFrameSource?.stop("lens-switch")
+        provider.unbindAll()
+
+        val selector = cameraSelectorForLensNode(lensNode, physicalCameraId)
+        val preview = Preview.Builder().build().also { useCase ->
+            useCase.setSurfaceProvider(previewView.surfaceProvider)
+        }
+
+        val boundUseCaseCamera = when (activeGraph.template) {
+            CaptureTemplate.STILL_CAPTURE -> {
+                val capture = imageCapture ?: createImageCapture(
+                    deviceGraph = activeGraph,
+                    stillCaptureQuality = currentStillCaptureQuality
+                        ?: StillCaptureQualityPreference.LATENCY,
+                    stillCaptureResolutionPreset = currentStillCaptureResolutionPreset
+                        ?: StillCaptureResolutionPreset.LARGE_12MP,
+                    manualCaptureConfig = currentManualCaptureConfig
+                )
+                val useCases = mutableListOf<androidx.camera.core.UseCase>(preview, capture)
+                if (livePreviewFrameSource != null) {
+                    val analysis = ImageAnalysis.Builder()
+                        .setTargetResolution(android.util.Size(720, 480))
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                    analysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
+                        (livePreviewFrameSource as? CameraXLivePreviewFrameSource)?.onAnalyzeFrame(
+                            imageProxy,
+                            imageProxy.imageInfo.rotationDegrees
+                        ) ?: imageProxy.close()
+                    }
+                    useCases.add(analysis)
+                }
+                provider.bindToLifecycle(lifecycleOwner, selector, *useCases.toTypedArray())
+            }
+            CaptureTemplate.VIDEO_RECORDING -> {
+                val videoSpec = currentVideoSpec ?: activeGraph.recording.videoSpec
+                val recorder = Recorder.Builder()
+                    .setQualitySelector(
+                        QualitySelector.fromOrderedList(
+                            orderedRecordingQualities(
+                                videoSpec.resolution.toRecordingQualityPreset()
+                            )
+                        )
+                    )
+                    .build()
+                val capture = VideoCapture.Builder(recorder)
+                    .setTargetFrameRate(targetFrameRateRange(videoSpec))
+                    .setTargetRotation(mapOutputRotationToSurface(currentOutputRotation))
+                    .build()
+                provider.bindToLifecycle(lifecycleOwner, selector, preview, capture)
+            }
+        }
+
+        boundCamera = boundUseCaseCamera
+        suppressPreviewStateEvents = false
+
+        // Apply current zoom ratio to the newly bound camera
+        val currentZoom = activeGraph.preview.zoomRatio
+        if (activeGraph.template != CaptureTemplate.STILL_CAPTURE) {
+            boundUseCaseCamera.cameraControl.setZoomRatio(currentZoom)
         }
     }
 

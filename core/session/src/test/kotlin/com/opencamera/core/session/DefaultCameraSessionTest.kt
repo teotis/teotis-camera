@@ -6,6 +6,8 @@ import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.asCapabilityGraphQuery
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.LensNode
+import com.opencamera.core.device.LensNodeAvailability
 import com.opencamera.core.device.PhotoLowLightStrategySupport
 import com.opencamera.core.device.PhotoSceneSignal
 import com.opencamera.core.device.RecordingQualityPreset
@@ -4901,5 +4903,134 @@ class DefaultCameraSessionTest {
         assertTrue(thumbnail is ThumbnailSource.SavedMedia)
         assertEquals("Pictures/OpenCamera/degraded-photo.jpg", thumbnail.outputPath)
         assertEquals("Photo saved (degraded)", session.state.value.lastAction)
+    }
+
+    // --- Lens node threshold and hysteresis ---
+
+    private val twoNodeMap = mapOf(
+        LensNode.WIDE to LensNodeAvailability(
+            node = LensNode.WIDE, available = true, thresholdRatio = 0f, physicalCameraId = "0"
+        ),
+        LensNode.TELEPHOTO to LensNodeAvailability(
+            node = LensNode.TELEPHOTO, available = true, thresholdRatio = 2.0f, physicalCameraId = "1"
+        )
+    )
+
+    private val threeNodeMap = twoNodeMap + (
+        LensNode.PERISCOPE to LensNodeAvailability(
+            node = LensNode.PERISCOPE, available = true, thresholdRatio = 5.0f, physicalCameraId = "2"
+        )
+    )
+
+    @Test
+    fun `evaluateLensNode returns WIDE when lens node map is empty`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val result = session.evaluateLensNode(3.0f, null, emptyMap())
+        assertEquals(LensNode.WIDE, result)
+    }
+
+    @Test
+    fun `evaluateLensNode returns WIDE for ratio below 2x threshold`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val result = session.evaluateLensNode(1.5f, null, twoNodeMap)
+        assertEquals(LensNode.WIDE, result)
+    }
+
+    @Test
+    fun `evaluateLensNode returns TELEPHOTO when ratio above threshold plus hysteresis`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // 2.1 > 2.0 + 0.1 → TELEPHOTO
+        val result = session.evaluateLensNode(2.1f, null, twoNodeMap)
+        assertEquals(LensNode.TELEPHOTO, result)
+    }
+
+    @Test
+    fun `evaluateLensNode blocks switch when ratio within hysteresis band going up`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // 2.05 is above 2.0 threshold but below 2.1 (threshold + hysteresis) → stays WIDE
+        val result = session.evaluateLensNode(2.05f, LensNode.WIDE, twoNodeMap)
+        assertEquals(LensNode.WIDE, result)
+    }
+
+    @Test
+    fun `evaluateLensNode switches to TELEPHOTO when crossing threshold with hysteresis`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // 2.1 > 2.0 + 0.1 → TELEPHOTO
+        val result = session.evaluateLensNode(2.1f, LensNode.WIDE, twoNodeMap)
+        assertEquals(LensNode.TELEPHOTO, result)
+    }
+
+    @Test
+    fun `evaluateLensNode switches back to WIDE when dropping below threshold minus hysteresis`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // 1.9 < 2.0 - 0.1 → WIDE
+        val result = session.evaluateLensNode(1.9f, LensNode.TELEPHOTO, twoNodeMap)
+        assertEquals(LensNode.WIDE, result)
+    }
+
+    @Test
+    fun `evaluateLensNode blocks switch back when ratio within hysteresis band going down`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // 1.95 is between 1.9 and 2.0 → stays TELEPHOTO
+        val result = session.evaluateLensNode(1.95f, LensNode.TELEPHOTO, twoNodeMap)
+        assertEquals(LensNode.TELEPHOTO, result)
+    }
+
+    @Test
+    fun `evaluateLensNode returns PERISCOPE for ratio above 5x threshold`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val result = session.evaluateLensNode(5.1f, null, threeNodeMap)
+        assertEquals(LensNode.PERISCOPE, result)
+    }
+
+    @Test
+    fun `evaluateLensNode drops to TELEPHOTO when leaving PERISCOPE range`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // 4.9 < 5.0 + 0.1 → TELEPHOTO (below periscope threshold + hysteresis)
+        val result = session.evaluateLensNode(4.9f, LensNode.PERISCOPE, threeNodeMap)
+        assertEquals(LensNode.TELEPHOTO, result)
+    }
+
+    @Test
+    fun `evaluateLensNode hysteresis prevents jitter at threshold boundary`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // Simulate jitter: ratio oscillates in the hysteresis band (below 2.1)
+        var current: LensNode? = null
+        current = session.evaluateLensNode(1.95f, current, twoNodeMap)
+        assertEquals(LensNode.WIDE, current)
+        current = session.evaluateLensNode(2.05f, current, twoNodeMap)
+        assertEquals(LensNode.WIDE, current)
+        current = session.evaluateLensNode(1.98f, current, twoNodeMap)
+        assertEquals(LensNode.WIDE, current)
+        // Only switch when clearly past the hysteresis band
+        current = session.evaluateLensNode(2.15f, current, twoNodeMap)
+        assertEquals(LensNode.TELEPHOTO, current)
+    }
+
+    @Test
+    fun `evaluateLensNode with unavailable node falls through to WIDE`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val mapWithUnavailable = mapOf(
+            LensNode.WIDE to LensNodeAvailability(
+                node = LensNode.WIDE, available = true, thresholdRatio = 0f, physicalCameraId = "0"
+            ),
+            LensNode.TELEPHOTO to LensNodeAvailability(
+                node = LensNode.TELEPHOTO, available = false, thresholdRatio = 2.0f
+            )
+        )
+        // Ratio is above 2x but TELEPHOTO is unavailable → WIDE
+        val result = session.evaluateLensNode(3.0f, null, mapWithUnavailable)
+        assertEquals(LensNode.WIDE, result)
     }
 }
