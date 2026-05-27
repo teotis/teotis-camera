@@ -1,27 +1,28 @@
 # 01-zoom-threshold-lens-switch Status
 
-**Status**: blocked
+**Status**: completed
 
 ## Worktree And Branch
 
 - Worktree: `/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-regression-20260527/01-zoom-threshold-lens-switch`
 - Branch: `agent/real-device-ux-regression-20260527/01-zoom-threshold-lens-switch`
 - Base commit: `36abefa`
-- Commit hash: `60b2f1c`
+- Original package commit: `60b2f1c`
+- Mainline repair commit: `2e6a94e`
 
 ## Verification
 
-- `rtk ./scripts/run_isolated_gradle.sh --no-parallel -Dorg.gradle.workers.max=1 -Pkotlin.incremental=false :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`: FAILED
-- First combined verification attempt hit transient Kotlin daemon / missing-file compilation failures across modules.
-- Serial rerun compiled successfully but failed `DefaultCameraSessionTest`: 151 tests completed, 19 failed.
+- `rtk ./gradlew --no-daemon --no-parallel -Dorg.gradle.workers.max=1 -Pkotlin.incremental=false --rerun-tasks :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest`: PASSED, `BUILD SUCCESSFUL in 22s`, 43 tasks executed.
+- `rtk ./gradlew --no-daemon --no-parallel -Dorg.gradle.workers.max=1 -Pkotlin.incremental=false --rerun-tasks :app:testDebugUnitTest --tests com.opencamera.app.FocalLengthSliderViewTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest :app:assembleDebug`: PASSED, `BUILD SUCCESSFUL in 39s`, 87 tasks executed.
 
 ## Evidence
 
-- Commit `60b2f1c` exists and modifies zoom/session/device behavior for 2x/5x lens node switching.
-- The original package worktree and branch references were missing from git refs/worktree state; local branch and worktree were restored from commit `60b2f1c` for verification.
-- The failures are broad session behavior regressions, not a single missing label/smoke issue, so this package must not unlock downstream integration yet.
+- The stale blocked status was valid for clean commit `60b2f1c`: it reproduced 19 `DefaultCameraSessionTest` failures.
+- Current `main` had already advanced past `60b2f1c`, but the same 19 failures still reproduced before the repair.
+- Commit `2e6a94e` restores the session still-capture contract required by the current tests: still quality/resolution state, output-size metadata propagation, low-light prompt availability, metering feedback lifetime, video elapsed display, and document-batch unknown-item ordering.
+- The original 2x/5x zoom package remains present in history as `60b2f1c`; downstream packages should base on current `main` so they include `2e6a94e`.
 
 ## Risks / Residual Device QA
 
-- Package 01 needs repair before `05-integration-visual-smoke-protocol` can run.
-- Real-device verification for 2x/5x switching remains pending after local test repair.
+- Real-device verification for physical 2x/5x lens switching remains pending and belongs to `05-integration-visual-smoke-protocol`.
+- Desktop verification proves the stale session blocker is resolved; it does not prove real-device visual lens switching behavior.
