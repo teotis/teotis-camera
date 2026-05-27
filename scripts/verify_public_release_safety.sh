@@ -62,32 +62,37 @@ elif printf '%s\n%s\n' "${effective_name}" "${effective_email}" | grep -E -i "${
     fail "public repo effective git identity is private: ${effective_name} <${effective_email}>"
 fi
 
-if git -C "${TARGET_DIR}" ls-files | grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|GEMINI\.md|local\.properties|V2-Readiness-Release-Gate-Report\.md)$|^(codex|scripts|specs)/' >/dev/null; then
+FORBIDDEN_TRACKED='(^|/)(AGENTS\.md|CLAUDE\.md|GEMINI\.md|local\.properties|V2-Readiness-Release-Gate-Report\.md|pragmatic_renewal_architect_report\.html|structural_abstraction_architect_report\.html)$|^(codex|scripts|specs)/'
+
+if git -C "${TARGET_DIR}" ls-files | grep -E "${FORBIDDEN_TRACKED}" >/dev/null; then
     fail "forbidden internal files are tracked"
-    git -C "${TARGET_DIR}" ls-files | grep -E '(^|/)(AGENTS\.md|CLAUDE\.md|GEMINI\.md|local\.properties|V2-Readiness-Release-Gate-Report\.md)$|^(codex|scripts|specs)/' >&2
+    git -C "${TARGET_DIR}" ls-files | grep -E "${FORBIDDEN_TRACKED}" >&2
 fi
 
-tracked_files="$(mktemp)"
-git -C "${TARGET_DIR}" ls-files -z > "${tracked_files}"
+if find "${TARGET_DIR}" \
+    -path "${TARGET_DIR}/.git" -prune -o \
+    -type d -name build -print | grep . >/tmp/public-safety-build-dirs.$$; then
+    fail "generated build directories exist in public repo"
+    sed -n '1,120p' /tmp/public-safety-build-dirs.$$ >&2
+fi
+rm -f /tmp/public-safety-build-dirs.$$
 
-if [[ -s "${tracked_files}" ]]; then
-    if xargs -0 grep -I -n -E -i "${DENY_IDENTITY}" < "${tracked_files}" >/tmp/public-safety-identity.$$ 2>/dev/null; then
-        fail "tracked files contain private identity or local paths"
-        sed -n '1,120p' /tmp/public-safety-identity.$$ >&2
-    fi
-
-    if xargs -0 grep -I -n -E -i "${DENY_BRAND}" < "${tracked_files}" >/tmp/public-safety-brand.$$ 2>/dev/null; then
-        fail "tracked files contain unreviewed competitor/reference terms"
-        sed -n '1,120p' /tmp/public-safety-brand.$$ >&2
-    fi
-
-    if xargs -0 grep -I -n -E "${DENY_SECRET}" < "${tracked_files}" >/tmp/public-safety-secrets.$$ 2>/dev/null; then
-        fail "tracked files contain high-confidence secret material"
-        sed -n '1,120p' /tmp/public-safety-secrets.$$ >&2
-    fi
+if git -C "${TARGET_DIR}" grep -I -n -E -i "${DENY_IDENTITY}" -- . >/tmp/public-safety-identity.$$ 2>/dev/null; then
+    fail "tracked files contain private identity or local paths"
+    sed -n '1,120p' /tmp/public-safety-identity.$$ >&2
 fi
 
-rm -f "${tracked_files}" /tmp/public-safety-identity.$$ /tmp/public-safety-brand.$$ /tmp/public-safety-secrets.$$
+if git -C "${TARGET_DIR}" grep -I -n -E -i "${DENY_BRAND}" -- . >/tmp/public-safety-brand.$$ 2>/dev/null; then
+    fail "tracked files contain unreviewed competitor/reference terms"
+    sed -n '1,120p' /tmp/public-safety-brand.$$ >&2
+fi
+
+if git -C "${TARGET_DIR}" grep -I -n -E "${DENY_SECRET}" -- . >/tmp/public-safety-secrets.$$ 2>/dev/null; then
+    fail "tracked files contain high-confidence secret material"
+    sed -n '1,120p' /tmp/public-safety-secrets.$$ >&2
+fi
+
+rm -f /tmp/public-safety-identity.$$ /tmp/public-safety-brand.$$ /tmp/public-safety-secrets.$$
 
 if find "${TARGET_DIR}" \( -name '*.env' -o -name '*.key' -o -name '*.pem' -o -name '*.keystore' \) -print | grep . >/tmp/public-safety-files.$$; then
     fail "sensitive-looking files exist in public repo"
@@ -107,7 +112,7 @@ else
     warn "no docs/assets directory found"
 fi
 
-if git -C "${TARGET_DIR}" status --short --ignored | grep -E '^\?\? |^!! ' | grep -E '(^|/)(\.env|.*\.key|.*\.pem|local\.properties|AGENTS\.md|CLAUDE\.md|GEMINI\.md)$' >/tmp/public-safety-untracked.$$; then
+if git -C "${TARGET_DIR}" status --short --ignored | grep -E '^\?\? |^!! ' | grep -E '(^|[[:space:]/])(\.env|.*\.key|.*\.pem|local\.properties|AGENTS\.md|CLAUDE\.md|GEMINI\.md|pragmatic_renewal_architect_report\.html|structural_abstraction_architect_report\.html)$' >/tmp/public-safety-untracked.$$; then
     fail "sensitive untracked/ignored files exist"
     sed -n '1,120p' /tmp/public-safety-untracked.$$ >&2
 fi

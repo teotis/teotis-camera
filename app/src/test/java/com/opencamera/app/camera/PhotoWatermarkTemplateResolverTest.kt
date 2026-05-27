@@ -22,11 +22,11 @@ class PhotoWatermarkTemplateResolverTest {
                 )
             ),
             preservedExif = mapOf(
-                ExifInterface.TAG_MODEL to "vivo X300 Ultra"
+                ExifInterface.TAG_MODEL to "Teotis Camera Pro"
             )
         )
 
-        assertEquals("vivo X300 Ultra · Scenery Handheld", resolved.title)
+        assertEquals("Teotis Camera Pro · Scenery Handheld", resolved.title)
     }
 
     @Test
@@ -75,7 +75,7 @@ class PhotoWatermarkTemplateResolverTest {
             watermarkText = "PHOTO Auto",
             metadata = MediaMetadata(),
             preservedExif = mapOf(
-                ExifInterface.TAG_MODEL to "vivo X300 Ultra",
+                ExifInterface.TAG_MODEL to "Teotis Camera Pro",
                 ExifInterface.TAG_DATETIME_ORIGINAL to "2026:04:11 20:16:00"
             )
         )

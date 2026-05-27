@@ -28,11 +28,22 @@ fi
 git -C "${TARGET_DIR}" config user.name "${PUBLIC_GIT_NAME}"
 git -C "${TARGET_DIR}" config user.email "${PUBLIC_GIT_EMAIL}"
 
+echo "Removing generated build outputs from public target..."
+find "${TARGET_DIR}" \
+    -path "${TARGET_DIR}/.git" -prune -o \
+    -type d -name build -prune -exec rm -rf {} +
+find "${TARGET_DIR}" -maxdepth 1 -type f \( \
+    -name 'pragmatic_renewal_architect_report.html' -o \
+    -name 'structural_abstraction_architect_report.html' \
+    \) -delete
+
 echo "Syncing source files..."
 rsync -a --delete \
     --exclude='.git/' \
     --exclude='.gradle/' \
     --exclude='.idea/' \
+    --exclude='build/' \
+    --exclude='*/build/' \
     --exclude='.codegraph/' \
     --exclude='.tmp/' \
     --exclude='._*' \
@@ -48,6 +59,8 @@ rsync -a --delete \
     --exclude='CLAUDE.md' \
     --exclude='GEMINI.md' \
     --exclude='V2-Readiness-Release-Gate-Report.md' \
+    --exclude='pragmatic_renewal_architect_report.html' \
+    --exclude='structural_abstraction_architect_report.html' \
     --exclude='local.properties' \
     --exclude='README.md' \
     --exclude='README_EN.md' \

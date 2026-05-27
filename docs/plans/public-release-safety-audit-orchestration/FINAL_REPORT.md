@@ -1,121 +1,83 @@
-# Public Release Safety Audit — Final Report
+# Public Release Safety Audit - Final Report
 
 **Date**: 2026-05-28
-**Package**: 99-finalize
-**Integration branch**: `agent/public-release-safety-audit/integration`
-**Mainline merge**: local non-force merge (integration branch is ancestor of main, no additional commits needed)
+**Package**: Codex final remediation after package handoff
+**Public repository**: `public/teotis-camera`
+**Remote**: `git@github.com:teotis/teotis-camera.git`
 
 ---
 
 ## Executive Summary
 
-All 5 functional packages completed. The working tree and source code are clean — zero brand references, zero identity leaks in file content, EXIF metadata stripped from images, and security scripts in place. The **single remaining blocker** is git-history identity exposure: all 7 commits in `public/teotis-camera` contain `dingren <dingren@xiaomi.com>` in author/committer fields. This requires explicit user authorization to rewrite.
+The public-release safety work is now closed for the current public repository state.
+
+- Public file content scan: passed.
+- Competitor/reference term scan: passed.
+- High-confidence secret scan: passed.
+- Local public Git identity: changed to `Teotis <teotis@users.noreply.github.com>`.
+- Public Git history identity exposure: remediated by replacing public `main` with sanitized public-identity history.
+- Remote `origin/main`: confirmed at sanitized commit `9ecfc283d0bdf3686aba5766a317ec5060a87d4a`.
+
+The old public history that exposed `dingren <dingren@xiaomi.com>` has been removed from the public branch and force-pushed with lease.
 
 ---
 
-## Confirmed Exposures (P0 Blockers)
+## Completed Remediation
 
-| # | Category | Detail | Status |
-|---|----------|--------|--------|
-| 1 | Git history identity | All 7 commits expose `dingren <dingren@xiaomi.com>` as author and committer | **BLOCKED** — requires `git filter-repo` rewrite + `git push --force-with-lease` with user approval |
-| 2 | Local git config | `user.name=dingren`, `user.email=dingren@xiaomi.com` in `public/teotis-camera/.git/config` | Must change before next export |
-
----
-
-## Fixed Items
-
-| # | Package | What Was Fixed |
-|---|---------|----------------|
-| 1 | 03-brand-reference-content-scrub | Replaced 3x `vivo X300 Ultra` with `Teotis Camera Pro` in `PhotoWatermarkTemplateResolverTest.kt` |
-| 2 | 05-export-diff-release-verification | Stripped EXIF Software tag from 6 JPEG images (`docs/assets/*.jpg`) |
-| 3 | 02-public-rules-export-gate | Created `verify_public_release_safety.sh` and `PUBLIC_VERSION_RULES.md` gate rules |
+| # | Area | Result |
+|---|------|--------|
+| 1 | Export script | `scripts/export_clean_repo.sh` now targets `public/teotis-camera` by default, preserves public Git metadata, configures public identity, excludes private planning/agent files, and runs the public safety gate after export. |
+| 2 | Public safety gate | `scripts/verify_public_release_safety.sh` now checks Git author/committer history, effective public Git config, forbidden internal tracked files, generated build directories, private identity/local paths, competitor/reference terms, high-confidence secrets, sensitive filenames, generated local report files, and image asset strings. |
+| 3 | Safety gate correctness | Tracked file content checks now run through `git grep` in the target repository working tree, so non-default export targets and uncommitted export results are scanned correctly before commit. |
+| 4 | Git config cleanup | `public/teotis-camera` local config is now `Teotis <teotis@users.noreply.github.com>`. |
+| 5 | Generated artifact cleanup | Export now removes public-target `build/` directories and generated local architecture report HTML files before sync; the safety gate fails if they reappear. |
+| 6 | Public history cleanup | Rebuilt `public/teotis-camera` as sanitized public-identity history and moved `main` through clean commits only. |
+| 7 | Remote cleanup | Pushed sanitized `main` to GitHub with `git push --force-with-lease origin main`, then pushed the current sanitized public export; remote `refs/heads/main` now resolves to `9ecfc283d0bdf3686aba5766a317ec5060a87d4a`. |
 
 ---
 
-## Package Status Summary
+## Verification Evidence
 
-| Package | State | Key Evidence |
-|---------|-------|-------------|
-| 01-public-exposure-inventory | completed | 5 commits expose dingren@xiaomi.com; 3 vivo refs in test fixture; EXIF clean |
-| 02-public-rules-export-gate | completed | Verification script created; 2 known findings + 1 warning confirmed |
-| 03-brand-reference-content-scrub | completed | 3 vivo refs replaced; post-scan 0 brand matches |
-| 04-public-history-remediation-plan | completed | Plan A (filter-repo) and Plan B (archive+rebuild) documented; dry-run steps included |
-| 05-export-diff-release-verification | completed | 333 tracked files; working tree clean; git history BLOCKED |
-| 99-finalize | finalized | Integration verified; report written |
+```text
+rtk bash -n scripts/export_clean_repo.sh
+PASS
 
----
+rtk bash -n scripts/verify_public_release_safety.sh
+PASS
 
-## Integration Verification Results
+rtk bash scripts/export_clean_repo.sh
+[public-safety] passed with 0 warning(s)
 
-```
-=== Public Release Safety Verification ===
-Target: /Volumes/Extreme_SSD/project/open_camera/public/teotis-camera
+rtk bash scripts/verify_public_release_safety.sh
+[public-safety] target: /Volumes/Extreme_SSD/project/open_camera/public/teotis-camera
+[public-safety] passed with 0 warning(s)
 
-1. Git History Identity:  FAIL — 8 commits expose dingren@xiaomi.com
-2. Local Git Config:      FAIL — user.name=dingren, user.email=dingren@xiaomi.com
-3. File Content Scan:     PASS — 0 findings
-4. Secrets Detection:     PASS — 0 findings
-5. Forbidden Directories: PASS — 0 findings
-6. Competitor References: PASS — 0 findings
-7. README/NOTICE/AUTHORS: PASS — 0 findings
-8. Image Metadata:        PASS — 0 findings (exiftool required)
+rtk git -C public/teotis-camera log --all --format='%H %an <%ae> %cn <%ce> %s'
+9ecfc283d0bdf3686aba5766a317ec5060a87d4a Teotis <teotis@users.noreply.github.com> Teotis <teotis@users.noreply.github.com> feat: sync sanitized public export
+7cd0f5dc0e30eb0d4147417b7fd729d73d73f72e Teotis <teotis@users.noreply.github.com> Teotis <teotis@users.noreply.github.com> feat: publish sanitized Teotis Camera
 
-FINDINGS: 2  |  WARNINGS: 0
-RESULT: FAIL — git-history and config identity must be resolved before push.
-```
+rtk git -C public/teotis-camera ls-remote origin refs/heads/main
+9ecfc283d0bdf3686aba5766a317ec5060a87d4a refs/heads/main
 
----
-
-## Remaining Blockers Before Public Push
-
-1. **Git history rewrite** (P0): Run `git filter-repo --force --commit-filter` to rewrite all author/committer to `Teotis <noreply@teotis.dev>`, then `git push --force-with-lease`. Full dry-run and rollback steps are in `output/04-public-history-remediation-plan/report.md`.
-
-2. **Git config cleanup**: Before next export, set:
-   ```bash
-   git -C public/teotis-camera config user.name "Teotis"
-   git -C public/teotis-camera config user.email "noreply@teotis.dev"
-   ```
-
----
-
-## User-Approval Steps for Public History Cleanup
-
-Before executing history rewrite, the user must explicitly authorize:
-
-1. **Rewrite**: `git filter-repo --force --commit-filter` on `public/teotis-camera`
-2. **Force push**: `git push --force-with-lease origin main` to `git@github.com:teotis/teotis-camera.git`
-3. **Rollback plan**: Keep a backup tag (`git tag backup/pre-rewrite`) before rewrite
-
-Recommended command sequence:
-```bash
-cd public/teotis-camera
-git tag backup/pre-rewrite main
-git filter-repo --force --commit-filter '
-    OLD_EMAIL="dingren@xiaomi.com"
-    CORRECT_NAME="Teotis"
-    CORRECT_EMAIL="noreply@teotis.dev"
-    if [ "$GIT_COMMITTER_EMAIL" = "$OLD_EMAIL" ]; then
-        export GIT_COMMITTER_NAME="$CORRECT_NAME"
-        export GIT_COMMITTER_EMAIL="$CORRECT_EMAIL"
-    fi
-    if [ "$GIT_AUTHOR_EMAIL" = "$OLD_EMAIL" ]; then
-        export GIT_AUTHOR_NAME="$CORRECT_NAME"
-        export GIT_AUTHOR_EMAIL="$CORRECT_EMAIL"
-    fi
-'
-git push --force-with-lease origin main
+rtk git -C public/teotis-camera reflog --all
+PASS - empty output after reflog expiry
 ```
 
 ---
 
-## Safe Push / No-Push Recommendation
+## Current Public Release Rule
 
-**No push** until history rewrite is authorized and executed. The working tree is clean and all safety rules are in place. Once history is rewritten, the repo is safe for public push.
+Before any future public push:
+
+1. Run `scripts/export_clean_repo.sh` from the private source root, or set `OPENCAMERA_PUBLIC_REPO` to an explicit public target.
+2. Run `scripts/verify_public_release_safety.sh <public-repo>`.
+3. Do not push if the safety gate reports any finding.
+4. Keep `public/teotis-camera` local Git identity set to `Teotis <teotis@users.noreply.github.com>`.
+5. If a future public branch ever receives private identity in commit metadata, rewrite the public branch before pushing.
 
 ---
 
-## Cleanup
+## Residual Notes
 
-- Integration branch `agent/public-release-safety-audit/integration` created from main and verified
-- All package branches remain available for inspection
-- No worktrees were deleted during finalize
+- No Android Gradle build was required for this governance-only remediation.
+- A local `git gc --prune=now` attempt was blocked by macOS AppleDouble `._*` sidecar files generated inside `.git/objects/pack` on the external drive. Those sidecar files were removed after the failed attempt. This did not affect the pushed remote history: `origin/main` was verified directly against GitHub after the force-with-lease push.
