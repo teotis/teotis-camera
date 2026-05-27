@@ -1209,6 +1209,31 @@ class CameraSessionCoordinatorTest {
         }
     }
 
+    @Test
+    fun `switch lens node effect is forwarded as device command`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        session.emitEffect(
+            SessionEffect.SwitchLensNode(
+                lensNode = com.opencamera.core.device.LensNode.TELEPHOTO,
+                reason = "Zoom 2.1x crosses threshold for Telephoto"
+            )
+        )
+        advanceUntilIdle()
+
+        val lensSwitch = adapter.recordedCommands.filterIsInstance<DeviceCommand.SwitchLensNode>()
+        assertEquals(1, lensSwitch.size)
+        assertEquals(com.opencamera.core.device.LensNode.TELEPHOTO, lensSwitch[0].lensNode)
+    }
+
     private class TestLifecycleOwner : LifecycleOwner {
         private val delegateLifecycle = object : Lifecycle() {
             override fun addObserver(observer: LifecycleObserver) = Unit
