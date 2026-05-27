@@ -179,9 +179,9 @@ internal fun shutterDisabledReason(state: SessionState, text: AppTextResolver): 
     }
     // Session rearm policy: ordinary still capture clears activeShot at DATA_RECEIVED,
     // so the shutter is safe to re-arm even though postprocess/save may still be finishing.
+    // BACKGROUND_SAVING visual state shows a subtle indicator while the shutter remains enabled.
     // Conservative capture kinds (multi-frame, live photo) keep activeShot until ShotCompleted.
-    if (state.captureStatus == CaptureStatus.DATA_RECEIVED && activeShot == null) return null
-    if (state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED) return text.disabledSavingPhoto()
+    if (activeShot == null && (state.captureStatus == CaptureStatus.DATA_RECEIVED || state.captureStatus == CaptureStatus.SAVING)) return null
     if (state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
     if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
     return null
@@ -191,19 +191,16 @@ internal fun shutterVisualState(state: SessionState): ShutterVisualState {
     if (state.previewStatus == PreviewStatus.RECOVERING) return ShutterVisualState.BLOCKED
     if (!state.permissionState.cameraGranted) return ShutterVisualState.BLOCKED
     if (state.countdownRemainingSeconds != null) return ShutterVisualState.COUNTDOWN
-    // P1 fast feedback: show press animation when capture was just requested
-    // but ShotStarted hasn't arrived yet (captureStatus == REQUESTED + activeShot set).
-    if (state.captureStatus == CaptureStatus.REQUESTED) {
-        val activeShot = state.activeShot
-        if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
-            return ShutterVisualState.PHOTO_PRESSED
-        }
-    }
-    if (state.captureStatus == CaptureStatus.SAVING) return ShutterVisualState.SAVING
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
-        return ShutterVisualState.SAVING
+        return when (state.captureStatus) {
+            CaptureStatus.REQUESTED -> ShutterVisualState.PHOTO_PRESSED
+            else -> ShutterVisualState.SAVING
+        }
     }
+    // Background save indicator: captureStatus is still SAVING but activeShot is already cleared
+    // (session rearm policy). Shutter is enabled; show subtle background work indicator.
+    if (state.captureStatus == CaptureStatus.SAVING) return ShutterVisualState.BACKGROUND_SAVING
     when (state.recordingStatus) {
         RecordingStatus.REQUESTING -> return ShutterVisualState.VIDEO_REQUESTING
         RecordingStatus.RECORDING -> return ShutterVisualState.VIDEO_RECORDING

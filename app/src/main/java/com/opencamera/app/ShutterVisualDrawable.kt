@@ -16,8 +16,10 @@ import kotlin.math.min
 internal enum class ShutterVisualState {
     PHOTO_READY,
     PHOTO_PRESSED,
+    CAPTURE_IN_PROGRESS,
     COUNTDOWN,
     SAVING,
+    BACKGROUND_SAVING,
     VIDEO_REQUESTING,
     VIDEO_RECORDING,
     VIDEO_STOPPING,
@@ -97,6 +99,14 @@ internal class ShutterVisualDrawable : Drawable() {
                 fillPaint.alpha = (fillAlpha * 0.6f).toInt()
                 drawPhotoReady(canvas, cx, cy, ringRadius, innerRadius * 0.85f)
             }
+            ShutterVisualState.CAPTURE_IN_PROGRESS -> {
+                // Brief acknowledgment flash: blue-tinted ring with slightly dimmed fill
+                ringPaint.color = Color.rgb(160, 200, 220)
+                ringPaint.alpha = ringAlpha
+                fillPaint.color = Color.rgb(200, 210, 215)
+                fillPaint.alpha = (fillAlpha * 0.7f).toInt()
+                drawPhotoReady(canvas, cx, cy, ringRadius, innerRadius * 0.9f)
+            }
             ShutterVisualState.COUNTDOWN -> {
                 ringPaint.color = SHUTTER_RING_GRAY
                 ringPaint.alpha = ringAlpha
@@ -109,6 +119,15 @@ internal class ShutterVisualDrawable : Drawable() {
             ShutterVisualState.SAVING -> {
                 ringPaint.color = Color.argb(133, 200, 200, 200)
                 ringPaint.alpha = ringAlpha
+                drawSaving(canvas, cx, cy, ringRadius, ringStroke)
+            }
+            ShutterVisualState.BACKGROUND_SAVING -> {
+                // Subtle indicator: same ring as SAVING but dimmer, with a slower rotating arc
+                ringPaint.color = Color.argb(100, 200, 200, 200)
+                ringPaint.alpha = ringAlpha
+                fillPaint.color = SHUTTER_FILL_GRAY
+                fillPaint.alpha = (fillAlpha * 0.6f).toInt()
+                drawPhotoReady(canvas, cx, cy, ringRadius, innerRadius)
                 drawSaving(canvas, cx, cy, ringRadius, ringStroke)
             }
             ShutterVisualState.VIDEO_REQUESTING -> {
@@ -219,9 +238,34 @@ internal class ShutterVisualDrawable : Drawable() {
                     start()
                 }
             }
+            ShutterVisualState.CAPTURE_IN_PROGRESS -> {
+                // Brief shrink animation (same as pressed) for immediate visual acknowledgment
+                pressAnimator = ValueAnimator.ofFloat(1f, 0.9f).apply {
+                    duration = 80L
+                    interpolator = DecelerateInterpolator()
+                    addUpdateListener {
+                        innerScale = it.animatedValue as Float
+                        invalidateSelf()
+                    }
+                    start()
+                }
+            }
             ShutterVisualState.SAVING -> {
                 val rotateAnim = ValueAnimator.ofFloat(0f, 360f).apply {
                     duration = 1200L
+                    repeatCount = ValueAnimator.INFINITE
+                    interpolator = null
+                    addUpdateListener {
+                        savingRotation = it.animatedValue as Float
+                    }
+                    start()
+                }
+                savingAnimator = rotateAnim
+            }
+            ShutterVisualState.BACKGROUND_SAVING -> {
+                // Slower rotation to visually distinguish from foreground SAVING
+                val rotateAnim = ValueAnimator.ofFloat(0f, 360f).apply {
+                    duration = 1800L
                     repeatCount = ValueAnimator.INFINITE
                     interpolator = null
                     addUpdateListener {
