@@ -444,4 +444,30 @@ class CockpitPanelRouterTest {
         assertEquals(CockpitPanelRoute.None, state.route)
         assertFalse(state.route.isAnyPanelOpen)
     }
+
+    // --- CloseDocumentBatchOrganizer: explicit dismiss from organizer ---
+
+    @Test
+    fun `CloseDocumentBatchOrganizer closes from DocumentBatchOrganizer`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.DocumentBatchOrganizer)
+        val result = nextState(initial, CockpitPanelCommand.CloseDocumentBatchOrganizer)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `CloseDocumentBatchOrganizer closes from None (no-op safe)`() {
+        val initial = CockpitPanelUiState()
+        val result = nextState(initial, CockpitPanelCommand.CloseDocumentBatchOrganizer)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `CloseDocumentBatchOrganizer from Settings stays Settings`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.Settings())
+        val result = nextState(initial, CockpitPanelCommand.CloseDocumentBatchOrganizer)
+
+        assertEquals(CockpitPanelRoute.Settings(), result.route)
+    }
 }

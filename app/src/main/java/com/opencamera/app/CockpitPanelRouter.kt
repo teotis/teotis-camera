@@ -27,6 +27,7 @@ internal sealed class CockpitPanelCommand {
     data class SelectFilterFamily(val family: FilterLabFamily) : CockpitPanelCommand()
     data object ToggleFilterAdjustmentMode : CockpitPanelCommand()
     data object ToggleDocumentBatchOrganizer : CockpitPanelCommand()
+    data object CloseDocumentBatchOrganizer : CockpitPanelCommand()
     data object AndroidBack : CockpitPanelCommand()
 }
 
@@ -190,6 +191,14 @@ internal fun nextState(
                 current.copy(route = CockpitPanelRoute.None)
             } else {
                 current.copy(route = CockpitPanelRoute.DocumentBatchOrganizer)
+            }
+        }
+
+        is CockpitPanelCommand.CloseDocumentBatchOrganizer -> {
+            if (current.route is CockpitPanelRoute.DocumentBatchOrganizer) {
+                current.copy(route = CockpitPanelRoute.None)
+            } else {
+                current
             }
         }
 
