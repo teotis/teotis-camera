@@ -295,8 +295,8 @@ class ProModePluginTest {
     fun `preset cycling wraps around`(): Unit = runBlocking {
         val controller = createController(supportsManualControls = true)
 
-        // Cycle through 3 manual presets + 1 more = back to first
-        for (i in 0 until 4) {
+        // 3 manual presets; cycle 3 times to return to first
+        for (i in 0 until 3) {
             controller.handle(ModeIntent.SecondaryActionPressed)
         }
 

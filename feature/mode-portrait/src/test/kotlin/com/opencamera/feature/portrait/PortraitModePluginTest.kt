@@ -283,8 +283,8 @@ class PortraitModePluginTest {
     fun `style cycling wraps around`(): Unit = runBlocking {
         val controller = createController()
 
-        // Cycle through all styles and back to first
-        for (i in 0 until 8) {
+        // 7 default styles; cycle 7 times to return to first
+        for (i in 0 until 7) {
             controller.handle(ModeIntent.SecondaryActionPressed)
         }
 

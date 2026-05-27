@@ -319,8 +319,8 @@ class HumanisticModePluginTest {
     fun `style cycling wraps around`(): Unit = runBlocking {
         val controller = createController()
 
-        // There are 5 default humanistic styles; cycle 6 times to return to first
-        for (i in 0 until 6) {
+        // 5 default humanistic styles; cycle 5 times to return to first
+        for (i in 0 until 5) {
             controller.handle(ModeIntent.SecondaryActionPressed)
         }
 
