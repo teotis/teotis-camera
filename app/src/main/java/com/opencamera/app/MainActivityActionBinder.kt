@@ -70,7 +70,7 @@ internal class MainActivityActionBinder(
             callbacks.renderAfterPanelChange()
         }
         views.documentBatchOrganizer.close.setOnClickListener {
-            callbacks.reducePanel(CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+            callbacks.reducePanel(CockpitPanelCommand.CloseDocumentBatchOrganizer)
             callbacks.renderAfterPanelChange()
         }
     }
