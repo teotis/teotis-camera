@@ -58,6 +58,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun quickResolution(): String = "Size"
     override fun quickLive(): String = "Live"
     override fun quickTimer(): String = "Timer"
+    override fun quickWatermark(): String = "Watermark"
     override fun moreControls(): String = "More"
     override fun stopSession(): String = "Stop Session"
     override fun restartSession(): String = "Restart Session"

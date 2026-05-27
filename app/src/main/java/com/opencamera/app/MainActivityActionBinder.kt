@@ -146,6 +146,10 @@ internal class MainActivityActionBinder(
             val nextRatio = snapshot().quickPanelSheet?.frameRatioNext ?: return@setOnClickListener
             callbacks.dispatch(SessionIntent.FrameRatioSelected(nextRatio))
         }
+        views.quickPanel.watermark.setOnClickListener {
+            val nextTemplateId = snapshot().quickPanelSheet?.watermarkNextTemplateId ?: return@setOnClickListener
+            callbacks.applySettingsAction(PersistedSettingsAction.UpdatePhotoWatermarkTemplate(nextTemplateId))
+        }
         views.quickPanel.livePhoto.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.livePhoto)
         }

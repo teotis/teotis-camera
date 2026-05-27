@@ -300,6 +300,14 @@
                     android:layout_height="40dp" />
             </LinearLayout>
 
+            <!-- Watermark row -->
+            <Button
+                android:id="@+id/buttonQuickWatermark"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp" />
+
             <!-- Live row -->
             <Button
                 android:id="@+id/buttonQuickLivePhoto"

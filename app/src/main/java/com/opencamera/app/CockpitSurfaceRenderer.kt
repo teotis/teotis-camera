@@ -153,6 +153,10 @@ internal class CockpitSurfaceRenderer(
         quickPanel.frameRatio.text = "${sheet.frameRatioRow.title} ${sheet.frameRatioRow.value}"
         quickPanel.frameRatio.isEnabled = sheet.frameRatioEnabled
 
+        quickPanel.watermark.text = quickRowLabel(sheet.watermarkRow)
+        quickPanel.watermark.isEnabled = sheet.watermarkRow.isEnabled
+        quickPanel.watermark.alpha = if (sheet.watermarkRow.isEnabled) 1f else 0.4f
+
         quickPanel.livePhoto.text = quickRowLabel(sheet.liveRow)
         quickPanel.livePhoto.isEnabled = sheet.liveRow.isEnabled
         if (sheet.liveRow.isSelected) {

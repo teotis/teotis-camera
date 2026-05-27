@@ -82,6 +82,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun quickBrightnessNa(): String = str(R.string.button_quick_brightness_na, "N/A")
     open fun quickLive(): String = str(R.string.button_quick_live, "Live")
     open fun quickTimer(): String = str(R.string.button_quick_timer, "Timer")
+    open fun quickWatermark(): String = str(R.string.button_quick_watermark, "Watermark")
     open fun moreControls(): String = str(R.string.button_more_controls, "More")
     open fun stopSession(): String = str(R.string.button_stop_session, "Stop Session")
     open fun restartSession(): String = str(R.string.button_restart_session, "Restart Session")

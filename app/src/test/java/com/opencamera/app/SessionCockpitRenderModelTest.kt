@@ -50,6 +50,7 @@ import com.opencamera.core.settings.VideoSpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -725,6 +726,9 @@ class SessionCockpitRenderModelTest {
         assertEquals("Grid", sheet.gridRow.title)
         assertEquals("Size", sheet.resolutionRow.title)
         assertEquals("Frame", sheet.frameRatioRow.title)
+        assertEquals("Watermark", sheet.watermarkRow.title)
+        assertEquals("Travel Polaroid", sheet.watermarkRow.value)
+        assertTrue(sheet.watermarkRow.isEnabled)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
 
@@ -839,6 +843,7 @@ class SessionCockpitRenderModelTest {
         assertEquals(QuickControlKind.CYCLE, sheet.gridRow.controlKind)
         assertEquals(QuickControlKind.CYCLE, sheet.resolutionRow.controlKind)
         assertEquals(QuickControlKind.SEGMENTED, sheet.frameRatioRow.controlKind)
+        assertEquals(QuickControlKind.CYCLE, sheet.watermarkRow.controlKind)
         assertEquals(QuickControlKind.TOGGLE, sheet.liveRow.controlKind)
         assertEquals(QuickControlKind.CYCLE, sheet.timerRow.controlKind)
     }
@@ -881,6 +886,76 @@ class SessionCockpitRenderModelTest {
 
         assertNotNull(sheet.frameRatioRow.disabledReason)
         assertFalse(sheet.frameRatioRow.isEnabled)
+    }
+
+    @Test
+    fun `quick panel watermark row shows current template label`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("Watermark", sheet.watermarkRow.title)
+        assertEquals("Travel Polaroid", sheet.watermarkRow.value)
+        assertTrue(sheet.watermarkRow.isEnabled)
+        assertNull(sheet.watermarkRow.disabledReason)
+    }
+
+    @Test
+    fun `quick panel watermark row cycles to next template`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertNotNull(sheet.watermarkNextTemplateId)
+        assertNotEquals(state.settings.persisted.photo.defaultWatermarkTemplateId, sheet.watermarkNextTemplateId)
+    }
+
+    @Test
+    fun `quick panel watermark row wraps around to first template`() {
+        // With only one template, there is no next
+        val state = defaultSessionState(
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                defaultWatermarkTemplateId = "classic-overlay"
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        // classic-overlay is first; next should be travel-polaroid (second)
+        assertEquals("travel-polaroid", sheet.watermarkNextTemplateId)
+    }
+
+    @Test
+    fun `quick panel watermark row disabled when no templates available`() {
+        val state = defaultSessionState().copy(
+            settings = defaultSessionState().settings.copy(
+                catalog = com.opencamera.core.settings.FeatureCatalog(
+                    watermarkTemplates = emptyList()
+                )
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.watermarkRow.isEnabled)
+        assertNotNull(sheet.watermarkRow.disabledReason)
+        assertNull(sheet.watermarkNextTemplateId)
+    }
+
+    @Test
+    fun `quick panel watermark row disabled during active shot`() {
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "test-shot",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.watermarkRow.isEnabled)
+        assertNotNull(sheet.watermarkRow.disabledReason)
+        assertNull(sheet.watermarkNextTemplateId)
     }
 
     @Test
