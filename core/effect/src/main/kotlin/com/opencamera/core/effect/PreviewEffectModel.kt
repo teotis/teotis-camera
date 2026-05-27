@@ -54,7 +54,8 @@ data class WatermarkHintSpec(
     val placement: WatermarkTextPlacement,
     val previewText: String,
     val opacity: Float,
-    val shape: WatermarkPreviewShape = WatermarkPreviewShape.BACKED_TEXT
+    val shape: WatermarkPreviewShape = WatermarkPreviewShape.BACKED_TEXT,
+    val textScale: Float = 1f
 )
 
 data class FrameGuidelineSpec(

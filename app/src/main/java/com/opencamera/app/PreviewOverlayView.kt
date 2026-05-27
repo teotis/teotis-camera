@@ -75,6 +75,8 @@ class PreviewOverlayView @JvmOverloads constructor(
         typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
     }
 
+    private val watermarkHintBaseTextSizeSp = 12f
+
     private val watermarkBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.STROKE
@@ -295,12 +297,21 @@ class PreviewOverlayView @JvmOverloads constructor(
         when (spec.shape) {
             WatermarkPreviewShape.FOUR_BORDER -> drawWatermarkFourBorderHint(canvas, spec)
             WatermarkPreviewShape.TEXT_ONLY,
-            WatermarkPreviewShape.BACKED_TEXT,
-            WatermarkPreviewShape.EXPANDED_FRAME -> drawWatermarkTextHint(canvas, spec)
+            WatermarkPreviewShape.BACKED_TEXT -> drawWatermarkTextHint(canvas, spec)
+            WatermarkPreviewShape.EXPANDED_FRAME -> drawWatermarkExpandedFrameHint(canvas, spec)
         }
     }
 
+    private fun applyWatermarkTextScale(textScale: Float) {
+        watermarkHintPaint.textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            watermarkHintBaseTextSizeSp * textScale,
+            resources.displayMetrics
+        )
+    }
+
     private fun drawWatermarkTextHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        applyWatermarkTextScale(spec.textScale)
         watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
         val padding = 16f * density
         val x: Float
@@ -334,7 +345,44 @@ class PreviewOverlayView @JvmOverloads constructor(
         canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
     }
 
+    private fun drawWatermarkExpandedFrameHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        applyWatermarkTextScale(spec.textScale)
+        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
+        val rect = activeFrameRectOrFullView()
+        val padding = 16f * density
+        val x: Float
+        val y: Float
+        watermarkHintPaint.textAlign = Paint.Align.LEFT
+        when (spec.placement) {
+            WatermarkTextPlacement.TOP_LEFT -> {
+                x = rect.left + padding
+                y = rect.top + padding + watermarkHintPaint.textSize
+            }
+            WatermarkTextPlacement.TOP_RIGHT -> {
+                x = rect.right - padding
+                y = rect.top + padding + watermarkHintPaint.textSize
+                watermarkHintPaint.textAlign = Paint.Align.RIGHT
+            }
+            WatermarkTextPlacement.BOTTOM_LEFT -> {
+                x = rect.left + padding
+                y = rect.bottom - padding
+            }
+            WatermarkTextPlacement.BOTTOM_RIGHT -> {
+                x = rect.right - padding
+                y = rect.bottom - padding
+                watermarkHintPaint.textAlign = Paint.Align.RIGHT
+            }
+            WatermarkTextPlacement.BOTTOM_CENTER -> {
+                x = rect.centerX()
+                y = rect.bottom - padding
+                watermarkHintPaint.textAlign = Paint.Align.CENTER
+            }
+        }
+        canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
+    }
+
     private fun drawWatermarkFourBorderHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        applyWatermarkTextScale(spec.textScale)
         val inset = 10f * density
         val rect = activeFrameRectOrFullView()
         val borderRect = RectF(
