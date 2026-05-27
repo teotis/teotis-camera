@@ -400,6 +400,14 @@ launch_ready_or_finalize() {
   ready="$(ready_packages || true)"
   if [ -z "$ready" ]; then
     echo "No ready packages to launch."
+    local active
+    active="$(awk -F '\t' 'NR > 1 && ($2 == "launched" || $2 == "in_progress" || $2 == "finalizing") { print $1 ":" $2 }' "$STATE")"
+    if [ -n "$active" ]; then
+      echo "Active packages are still recorded in the coordinator state:"
+      echo "$active"
+      echo "Run status for details:"
+      echo "  bash \"$PLAN_DIR/launchers/orchestrate.sh\" status"
+    fi
     return
   fi
   while IFS= read -r id; do
