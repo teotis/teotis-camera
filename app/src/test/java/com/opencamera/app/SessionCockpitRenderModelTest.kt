@@ -1108,6 +1108,43 @@ class SessionCockpitRenderModelTest {
         assertEquals(ShutterVisualState.FAILURE_OR_DEGRADED, shutterVisualState(state))
     }
 
+    @Test
+    fun `shutter visual state is PHOTO_PRESSED when capture requested with active photo shot`() {
+        // Between submitCaptureStrategy (sets activeShot + REQUESTED) and ShotStarted (sets SAVING),
+        // the shutter shows PHOTO_PRESSED for immediate tactile feedback (P1 latency phase).
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "press-1",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        ).copy(captureStatus = CaptureStatus.REQUESTED)
+        assertEquals(ShutterVisualState.PHOTO_PRESSED, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is PHOTO_PRESSED with shutterPressedAtElapsedMillis`() {
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "press-2",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        ).copy(
+            captureStatus = CaptureStatus.REQUESTED,
+            shutterPressedAtElapsedMillis = System.currentTimeMillis()
+        )
+        assertEquals(ShutterVisualState.PHOTO_PRESSED, shutterVisualState(state))
+    }
+
     // --- Session rearm policy: DATA_RECEIVED with null activeShot ---
 
     @Test

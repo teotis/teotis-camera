@@ -324,7 +324,14 @@ class DefaultCameraSession(
         when (intent) {
             is SessionIntent.SettingsUpdated -> handleSettingsUpdated(intent.snapshot)
             is SessionIntent.SwitchMode -> handleSwitchMode(intent.modeId)
-            SessionIntent.ShutterPressed -> handleModeIntent(ModeIntent.ShutterPressed)
+            SessionIntent.ShutterPressed -> {
+                val elapsedNanos = System.nanoTime()
+                _state.value = _state.value.copy(
+                    shutterPressedAtElapsedMillis = elapsedNanos / 1_000_000L
+                )
+                trace.record("capture.shutter.pressed", "elapsed=${elapsedNanos / 1_000_000L}ms")
+                handleModeIntent(ModeIntent.ShutterPressed)
+            }
             SessionIntent.SecondaryActionPressed -> handleModeIntent(ModeIntent.SecondaryActionPressed)
             SessionIntent.TertiaryActionPressed -> handleModeIntent(ModeIntent.TertiaryActionPressed)
             SessionIntent.ProActionPressed -> handleModeIntent(ModeIntent.ProActionPressed)
