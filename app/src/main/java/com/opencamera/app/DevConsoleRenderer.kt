@@ -41,9 +41,5 @@ internal class DevConsoleRenderer(
                 R.string.dev_storage_format, model.storageUsedDisplay, model.storageCapacityDisplay
             )
         }
-        views.cleanupKey.isVisible = model.canCleanup
-        views.cleanupCore.isVisible = model.canCleanup
-        views.cleanupError.isVisible = model.canCleanup
-        views.cleanupAll.isVisible = model.canCleanup
     }
 }
