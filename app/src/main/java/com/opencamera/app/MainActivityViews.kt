@@ -106,7 +106,6 @@ internal data class SettingsPanelViews(
 
 internal data class FilterLabViews(
     val panel: NestedScrollView,
-    val close: Button,
     val headline: TextView,
     val supportingText: TextView,
     val heroSummary: TextView,
@@ -155,10 +154,6 @@ internal data class DevConsoleViews(
     val summary: TextView,
     val content: TextView,
     val storageInfo: TextView,
-    val cleanupKey: Button,
-    val cleanupCore: Button,
-    val cleanupError: Button,
-    val cleanupAll: Button,
     val export: Button,
     val close: Button
 )
@@ -311,7 +306,6 @@ internal data class MainActivityViews(
             )
             val filterLab = FilterLabViews(
                 panel = activity.findViewById(R.id.filterPanel),
-                close = activity.findViewById(R.id.buttonCloseFilter),
                 headline = activity.findViewById(R.id.filterHeadline),
                 supportingText = activity.findViewById(R.id.filterSupportingText),
                 heroSummary = activity.findViewById(R.id.filterHeroSummary),
@@ -359,10 +353,6 @@ internal data class MainActivityViews(
                 summary = activity.findViewById(R.id.devConsoleSummary),
                 content = activity.findViewById(R.id.devConsoleContent),
                 storageInfo = activity.findViewById(R.id.devConsoleStorageInfo),
-                cleanupKey = activity.findViewById(R.id.buttonDevCleanupKey),
-                cleanupCore = activity.findViewById(R.id.buttonDevCleanupCore),
-                cleanupError = activity.findViewById(R.id.buttonDevCleanupError),
-                cleanupAll = activity.findViewById(R.id.buttonDevCleanupAll),
                 export = activity.findViewById(R.id.buttonDevExport),
                 close = activity.findViewById(R.id.buttonDevClose)
             )

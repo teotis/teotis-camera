@@ -96,6 +96,7 @@
     <string name="dev_storage_format">存储: %1$s / %2$s</string>
     <string name="dev_cleanup_done">已清理 %d 个文件</string>
     <string name="dev_close">关闭</string>
+    <string name="dev_cleanup_current">清理</string>
     <string name="dev_console_content_description">调试控制台</string>
     <string name="button_palette_entry">风格</string>
     <string name="button_quick_launcher">快捷</string>

@@ -171,7 +171,7 @@
 
         <Button
             android:id="@+id/buttonDevEntry"
-            style="@style/Widget.OpenCamera.RightRailDevButton"
+            style="@style/Widget.OpenCamera.RightRailButton"
             android:layout_width="@dimen/touch_target_min"
             android:layout_height="@dimen/touch_target_min"
             android:layout_marginTop="@dimen/right_rail_gap"
@@ -318,10 +318,10 @@
 
             <Button
                 android:id="@+id/buttonQuickResetDefaults"
-                style="@style/Widget.OpenCamera.PillButton"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
                 android:text="@string/button_reset_defaults"
                 android:visibility="gone" />
         </LinearLayout>
@@ -1363,14 +1363,6 @@
                 android:layout_marginTop="12dp"
                 android:text="@string/button_reset_defaults"
                 android:visibility="gone" />
-
-            <Button
-                android:id="@+id/buttonCloseFilter"
-                style="@style/Widget.OpenCamera.PillButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/button_filter_close" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
@@ -1543,64 +1535,6 @@
                     android:textSize="@dimen/text_size_status"
                     android:visibility="gone" />
 
-                <!-- Cleanup row 1: Key | Core -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/buttonDevCleanupKey"
-                        style="@style/Widget.OpenCamera.CompactButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_cleanup_key"
-                        android:visibility="gone" />
-
-                    <Button
-                        android:id="@+id/buttonDevCleanupCore"
-                        style="@style/Widget.OpenCamera.CompactButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_cleanup_core"
-                        android:visibility="gone" />
-                </LinearLayout>
-
-                <!-- Cleanup row 2: Error | All -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/buttonDevCleanupError"
-                        style="@style/Widget.OpenCamera.CompactButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_cleanup_error"
-                        android:visibility="gone" />
-
-                    <Button
-                        android:id="@+id/buttonDevCleanupAll"
-                        style="@style/Widget.OpenCamera.CompactButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_cleanup_all"
-                        android:visibility="gone" />
-                </LinearLayout>
-
                 <!-- Action row -->
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -1624,7 +1558,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="@string/dev_close" />
+                        android:text="@string/dev_cleanup_current" />
                 </LinearLayout>
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
