@@ -3,23 +3,33 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SOURCE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-TARGET_DIR="/Volumes/Extreme_SSD/project/opencamera-clean"
+TARGET_DIR="${OPENCAMERA_PUBLIC_REPO:-${SOURCE_DIR}/public/teotis-camera}"
+PUBLIC_GIT_NAME="${OPENCAMERA_PUBLIC_GIT_NAME:-Teotis}"
+PUBLIC_GIT_EMAIL="${OPENCAMERA_PUBLIC_GIT_EMAIL:-teotis@users.noreply.github.com}"
 
-echo "=== OpenCamera 纯净版仓库导出 ==="
-echo "源目录: ${SOURCE_DIR}"
-echo "目标目录: ${TARGET_DIR}"
+echo "=== Teotis Camera public export ==="
+echo "source: ${SOURCE_DIR}"
+echo "target: ${TARGET_DIR}"
 echo ""
 
-# 1. 创建目标目录
-if [[ -d "${TARGET_DIR}" ]]; then
-    echo "目标目录已存在，将清空后重新创建..."
-    rm -rf "${TARGET_DIR}"
+if [[ "${TARGET_DIR}" == "${SOURCE_DIR}" || "${TARGET_DIR}" == "${SOURCE_DIR}/"*"/.." ]]; then
+    echo "Refusing unsafe target: ${TARGET_DIR}" >&2
+    exit 1
 fi
+
 mkdir -p "${TARGET_DIR}"
 
-# 2. rsync 复制源码，排除非源码内容
-echo "正在复制源码..."
-rsync -a \
+if [[ ! -d "${TARGET_DIR}/.git" ]]; then
+    echo "Initializing public repository metadata..."
+    git -C "${TARGET_DIR}" init
+    git -C "${TARGET_DIR}" remote add origin git@github.com:teotis/teotis-camera.git || true
+fi
+
+git -C "${TARGET_DIR}" config user.name "${PUBLIC_GIT_NAME}"
+git -C "${TARGET_DIR}" config user.email "${PUBLIC_GIT_EMAIL}"
+
+echo "Syncing source files..."
+rsync -a --delete \
     --exclude='.git/' \
     --exclude='.gradle/' \
     --exclude='.idea/' \
@@ -27,17 +37,26 @@ rsync -a \
     --exclude='.tmp/' \
     --exclude='._*' \
     --exclude='.DS_Store' \
+    --exclude='.claude/' \
+    --exclude='.worktrees/' \
+    --exclude='public/' \
     --exclude='codex/' \
     --exclude='docs/' \
     --exclude='specs/' \
     --exclude='scripts/' \
     --exclude='AGENTS.md' \
+    --exclude='CLAUDE.md' \
+    --exclude='GEMINI.md' \
     --exclude='V2-Readiness-Release-Gate-Report.md' \
     --exclude='local.properties' \
+    --exclude='README.md' \
+    --exclude='README_EN.md' \
+    --exclude='LICENSE' \
+    --exclude='NOTICE' \
+    --exclude='AUTHORS' \
     "${SOURCE_DIR}/" "${TARGET_DIR}/"
 
-# 3. 修改 build.gradle.kts，移除 sharedBuildRoot
-echo "正在修改 build.gradle.kts..."
+echo "Writing public root Gradle config..."
 cat > "${TARGET_DIR}/build.gradle.kts" << 'GRADLE'
 plugins {
     id("com.android.application") version "8.5.2" apply false
@@ -46,14 +65,32 @@ plugins {
 }
 GRADLE
 
-# 4. 初始化 git 仓库
-echo "正在初始化 git 仓库..."
-cd "${TARGET_DIR}"
-git init
-git add -A
-git commit -m "feat: OpenCamera 初始纯净版"
+if [[ -f "${TARGET_DIR}/settings.gradle.kts" ]]; then
+    perl -0pi -e 's/rootProject\.name\s*=\s*"OpenCamera"/rootProject.name = "TeotisCamera"/g' "${TARGET_DIR}/settings.gradle.kts"
+fi
+
+cat > "${TARGET_DIR}/.gitignore" << 'GITIGNORE'
+.gradle/
+build/
+*/build/
+local.properties
+._*
+.DS_Store
+__pycache__/
+*.pyc
+*.iml
+.idea/
+
+# Git worktrees
+.worktrees/
+.claude/worktrees/
+GITIGNORE
+
+echo "Running public release safety check..."
+"${SCRIPT_DIR}/verify_public_release_safety.sh" "${TARGET_DIR}"
 
 echo ""
-echo "=== 导出完成 ==="
-echo "纯净版仓库位于: ${TARGET_DIR}"
-echo "共 $(find . -type f | wc -l | tr -d ' ') 个文件"
+echo "=== export complete ==="
+echo "public repository: ${TARGET_DIR}"
+echo "effective git identity: $(git -C "${TARGET_DIR}" config user.name) <$(git -C "${TARGET_DIR}" config user.email)>"
+echo "tracked/public files: $(git -C "${TARGET_DIR}" ls-files | wc -l | tr -d ' ')"

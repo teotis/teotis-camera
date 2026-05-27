@@ -1,0 +1,5 @@
+backgrounded · 3f60743c
+  claude agents             list sessions
+  claude attach 3f60743c    open in this terminal
+  claude logs 3f60743c      show recent output
+  claude stop 3f60743c      stop this session

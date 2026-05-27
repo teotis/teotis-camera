@@ -1,0 +1,5 @@
+backgrounded · [36me132c760[39m
+[2m  claude agents             list sessions[22m
+[2m  claude attach e132c760    open in this terminal[22m
+[2m  claude logs e132c760      show recent output[22m
+[2m  claude stop e132c760      stop this session[22m
