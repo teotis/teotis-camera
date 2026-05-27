@@ -5,6 +5,8 @@ import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.LensNode
+import com.opencamera.core.device.LensNodeAvailability
 import com.opencamera.core.device.PreviewBrightnessRequest
 import com.opencamera.core.device.PreviewBrightnessResult
 import com.opencamera.core.device.PreviewBrightnessResultStatus
@@ -722,18 +724,92 @@ class DefaultCameraSession(
             return
         }
 
-        updateState(
-            activeDeviceGraph = resolveActiveDeviceGraph(
-                baseGraph = currentController.deviceGraph(),
-                deviceCapabilities = _state.value.activeDeviceCapabilities,
-                requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
-                requestedZoomRatio = clampedRatio
-            ),
-            lastAction = "Zoom set to ${zoomLabel(clampedRatio)}",
-            lastError = null
-        )
+        // Lens node hysteresis: determine target node from zoom ratio thresholds
+        val lensNodeMap = zoomCapability.lensNodeMap
+        val currentLensNode = _state.value.activeDeviceGraph.preview.requestedLensNode
+        if (lensNodeMap.isNotEmpty()) {
+            val targetLensNode = evaluateLensNode(clampedRatio, currentLensNode, lensNodeMap)
+            if (targetLensNode != currentLensNode) {
+                _effects.emit(
+                    SessionEffect.SwitchLensNode(
+                        lensNode = targetLensNode,
+                        reason = "Zoom ${zoomLabel(clampedRatio)} crosses threshold for ${targetLensNode.label}"
+                    )
+                )
+            }
+            updateState(
+                activeDeviceGraph = resolveActiveDeviceGraph(
+                    baseGraph = currentController.deviceGraph(),
+                    deviceCapabilities = _state.value.activeDeviceCapabilities,
+                    requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
+                    requestedZoomRatio = clampedRatio
+                ).let { graph ->
+                    graph.copy(preview = graph.preview.copy(requestedLensNode = targetLensNode))
+                },
+                lastAction = "Zoom set to ${zoomLabel(clampedRatio)}, lens=${targetLensNode.tagValue}",
+                lastError = null
+            )
+        } else {
+            updateState(
+                activeDeviceGraph = resolveActiveDeviceGraph(
+                    baseGraph = currentController.deviceGraph(),
+                    deviceCapabilities = _state.value.activeDeviceCapabilities,
+                    requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
+                    requestedZoomRatio = clampedRatio
+                ),
+                lastAction = "Zoom set to ${zoomLabel(clampedRatio)}",
+                lastError = null
+            )
+        }
         trace.record("zoom.updated", zoomLabel(clampedRatio))
         requestZoomApply(clampedRatio)
+    }
+
+    /**
+     * Determines the target [LensNode] for the given [ratio] using hysteresis around
+     * node thresholds. When [currentNode] is non-null, switching requires crossing
+     * the threshold by [LENS_NODE_HYSTERESIS_DELTA] to prevent jitter.
+     *
+     * Returns [LensNode.WIDE] as the fallback when no multi-camera is available.
+     */
+    internal fun evaluateLensNode(
+        ratio: Float,
+        currentNode: LensNode?,
+        lensNodeMap: Map<LensNode, LensNodeAvailability>
+    ): LensNode {
+        if (lensNodeMap.isEmpty()) return LensNode.WIDE
+        val sorted = lensNodeMap.values
+            .filter { it.available }
+            .sortedByDescending { it.thresholdRatio }
+        if (sorted.isEmpty()) return LensNode.WIDE
+
+        // Find which node range the ratio falls into (from highest threshold down)
+        var target = LensNode.WIDE
+        for (avail in sorted) {
+            if (ratio >= avail.thresholdRatio) {
+                target = avail.node
+                break
+            }
+        }
+
+        // Apply hysteresis when switching between nodes
+        if (currentNode != null && currentNode != target) {
+            val currentThreshold = lensNodeMap[currentNode]?.thresholdRatio ?: return target
+            val targetThreshold = lensNodeMap[target]?.thresholdRatio ?: return target
+            return if (currentThreshold > targetThreshold) {
+                // Switching to lower-zoom node: only if at or below current threshold minus hysteresis
+                if (ratio <= currentThreshold - LENS_NODE_HYSTERESIS_DELTA) target else currentNode
+            } else {
+                // Switching to higher-zoom node: only if above or at target threshold plus hysteresis
+                if (ratio >= targetThreshold + LENS_NODE_HYSTERESIS_DELTA) target else currentNode
+            }
+        }
+        return target
+    }
+
+    companion object {
+        /** Hysteresis delta for lens node switching (zoom ratio units). */
+        internal const val LENS_NODE_HYSTERESIS_DELTA = 0.1f
     }
 
     private suspend fun handleStillCaptureQualityToggled() {

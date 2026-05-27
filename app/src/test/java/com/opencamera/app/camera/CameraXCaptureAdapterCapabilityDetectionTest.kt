@@ -268,4 +268,121 @@ class CameraXCaptureAdapterCapabilityDetectionTest {
         )
         assertEquals(ZoomControlSupport.UNSUPPORTED, capabilities.zoomRatioCapability.support)
     }
+
+    // --- detectLensNodeMap ---
+
+    @Test
+    fun `detectLensNodeMap returns empty when no back cameras`() {
+        val profiles = listOf(
+            CameraLensProfile(lensFacing = LensFacing.FRONT, hasFlashUnit = false)
+        )
+        val result = detectLensNodeMap(profiles)
+        assertTrue(result.isEmpty())
+    }
+
+    @Test
+    fun `detectLensNodeMap returns only WIDE for single back camera`() {
+        val profiles = listOf(
+            CameraLensProfile(
+                lensFacing = LensFacing.BACK,
+                hasFlashUnit = true,
+                physicalCameraId = "0",
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f, 10f)
+                )
+            )
+        )
+        val result = detectLensNodeMap(profiles)
+        assertEquals(1, result.size)
+        assertTrue(result.containsKey(com.opencamera.core.device.LensNode.WIDE))
+        assertEquals("0", result[com.opencamera.core.device.LensNode.WIDE]?.physicalCameraId)
+    }
+
+    @Test
+    fun `detectLensNodeMap detects telephoto from 2x max zoom camera`() {
+        val profiles = listOf(
+            CameraLensProfile(
+                lensFacing = LensFacing.BACK,
+                hasFlashUnit = true,
+                physicalCameraId = "0",
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f)
+                )
+            ),
+            CameraLensProfile(
+                lensFacing = LensFacing.BACK,
+                hasFlashUnit = false,
+                physicalCameraId = "1",
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 3f)
+                )
+            )
+        )
+        val result = detectLensNodeMap(profiles)
+        assertEquals(2, result.size)
+        assertTrue(result.containsKey(com.opencamera.core.device.LensNode.WIDE))
+        assertTrue(result.containsKey(com.opencamera.core.device.LensNode.TELEPHOTO))
+        assertEquals("1", result[com.opencamera.core.device.LensNode.TELEPHOTO]?.physicalCameraId)
+        assertEquals(2.0f, result[com.opencamera.core.device.LensNode.TELEPHOTO]?.thresholdRatio)
+    }
+
+    @Test
+    fun `detectLensNodeMap detects periscope from 5x max zoom camera`() {
+        val profiles = listOf(
+            CameraLensProfile(
+                lensFacing = LensFacing.BACK,
+                hasFlashUnit = true,
+                physicalCameraId = "0",
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f)
+                )
+            ),
+            CameraLensProfile(
+                lensFacing = LensFacing.BACK,
+                hasFlashUnit = false,
+                physicalCameraId = "2",
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 5f, 10f)
+                )
+            )
+        )
+        val result = detectLensNodeMap(profiles)
+        assertEquals(2, result.size)
+        assertTrue(result.containsKey(com.opencamera.core.device.LensNode.WIDE))
+        assertTrue(result.containsKey(com.opencamera.core.device.LensNode.PERISCOPE))
+        assertEquals("2", result[com.opencamera.core.device.LensNode.PERISCOPE]?.physicalCameraId)
+        assertEquals(5.0f, result[com.opencamera.core.device.LensNode.PERISCOPE]?.thresholdRatio)
+    }
+
+    @Test
+    fun `detectLensNodeMap ignores front cameras`() {
+        val profiles = listOf(
+            CameraLensProfile(
+                lensFacing = LensFacing.FRONT,
+                hasFlashUnit = false,
+                physicalCameraId = "2",
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 5f, 10f)
+                )
+            ),
+            CameraLensProfile(
+                lensFacing = LensFacing.BACK,
+                hasFlashUnit = true,
+                physicalCameraId = "0",
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f)
+                )
+            )
+        )
+        val result = detectLensNodeMap(profiles)
+        assertEquals(1, result.size)
+        assertTrue(result.containsKey(com.opencamera.core.device.LensNode.WIDE))
+    }
 }

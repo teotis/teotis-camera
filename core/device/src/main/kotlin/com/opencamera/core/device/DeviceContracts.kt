@@ -47,6 +47,30 @@ enum class LensFacing {
     FRONT
 }
 
+/**
+ * Represents a physical camera lens node on a multi-camera device.
+ * [WIDE] is the primary 1x lens, [TELEPHOTO] is typically 2x,
+ * [PERISCOPE] is typically 5x or higher.
+ */
+enum class LensNode(val tagValue: String, val label: String) {
+    WIDE("wide", "Wide"),
+    TELEPHOTO("telephoto", "Telephoto"),
+    PERISCOPE("periscope", "Periscope")
+}
+
+/**
+ * Describes whether a [LensNode] is available on the current device and
+ * what zoom ratio range triggers it.
+ */
+data class LensNodeAvailability(
+    val node: LensNode,
+    val available: Boolean,
+    /** Minimum zoom ratio that activates this node (inclusive after hysteresis). */
+    val thresholdRatio: Float,
+    /** Physical camera ID on the device, or null if unavailable. */
+    val physicalCameraId: String? = null
+)
+
 enum class CaptureTemplate {
     STILL_CAPTURE,
     VIDEO_RECORDING
@@ -337,7 +361,9 @@ data class PreviewMeteringResult(
 
 data class PreviewConfig(
     val snapshotsEnabled: Boolean = true,
-    val zoomRatio: Float = 1f
+    val zoomRatio: Float = 1f,
+    /** The physical lens node requested for the current zoom level. null = not tracked / wide default. */
+    val requestedLensNode: LensNode? = null
 )
 
 enum class ZoomControlSupport(
@@ -361,7 +387,9 @@ enum class ZoomControlSupport(
 data class ZoomRatioCapability(
     val support: ZoomControlSupport = ZoomControlSupport.UNSUPPORTED,
     val supportedRatios: List<Float> = listOf(1f),
-    val defaultRatio: Float = 1f
+    val defaultRatio: Float = 1f,
+    /** Maps lens nodes to their availability and threshold ratios. Empty when device has no multi-camera. */
+    val lensNodeMap: Map<LensNode, LensNodeAvailability> = emptyMap()
 ) {
     val normalizedSupportedRatios: List<Float>
         get() = supportedRatios
@@ -524,6 +552,7 @@ sealed interface DeviceCommand {
     data class ExecuteShot(val plan: ShotPlan) : DeviceCommand
     data class StopActiveShot(val shotId: String) : DeviceCommand
     data class UpdateZoomRatio(val zoomRatio: Float) : DeviceCommand
+    data class SwitchLensNode(val lensNode: LensNode, val reason: String) : DeviceCommand
     data class ApplyPreviewMetering(val request: PreviewMeteringRequest) : DeviceCommand
     data class UpdateOutputRotation(val rotation: CameraOutputRotation) : DeviceCommand
     data class ApplyPreviewBrightness(val request: PreviewBrightnessRequest) : DeviceCommand

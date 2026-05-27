@@ -80,6 +80,9 @@ class CameraSessionCoordinator(
             is SessionEffect.ApplyZoomRatio -> cameraAdapter.dispatch(
                 DeviceCommand.UpdateZoomRatio(effect.zoomRatio)
             )
+            is SessionEffect.SwitchLensNode -> cameraAdapter.dispatch(
+                DeviceCommand.SwitchLensNode(effect.lensNode, effect.reason)
+            )
             is SessionEffect.BindPreview -> bindPreview(
                 modeId = effect.modeId,
                 deviceGraph = effect.deviceGraph,
