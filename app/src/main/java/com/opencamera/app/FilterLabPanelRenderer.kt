@@ -65,7 +65,7 @@ internal class FilterLabPanelRenderer(
             views.adjustmentPanel.isVisible = false
         }
 
-        views.resetDefaults.isVisible = model.hasStyleUserAdjustments
+        views.resetDefaults.isVisible = model.resetStyleAction != null
     }
 
     fun renderTab(button: Button, model: FilterLabTabRenderModel) {

@@ -826,11 +826,7 @@ internal fun sessionSettingsPageRenderModel(
         ),
         catalogFooter = "",
         hasSettingsUserAdjustments = settings.hasUserAdjustments(ResetTarget.SETTINGS),
-        resetSettingsAction = if (settings.hasUserAdjustments(ResetTarget.SETTINGS)) {
-            PersistedSettingsAction.ResetToDefaults(ResetTarget.SETTINGS)
-        } else {
-            null
-        }
+        resetSettingsAction = PersistedSettingsAction.ResetToDefaults(ResetTarget.SETTINGS)
     )
 }
 
@@ -1547,8 +1543,8 @@ internal fun filterLabPageRenderModel(
             settings.photo.styleStrength.coerceIn(0f, 1f)
         ),
         footer = if (isColorLab) "" else text.filterLabFooter(),
-        hasStyleUserAdjustments = settings.hasUserAdjustments(ResetTarget.STYLE),
-        resetStyleAction = if (settings.hasUserAdjustments(ResetTarget.STYLE)) {
+        hasStyleUserAdjustments = !isColorLab && settings.hasUserAdjustments(ResetTarget.STYLE),
+        resetStyleAction = if (!isColorLab && settings.hasUserAdjustments(ResetTarget.STYLE)) {
             PersistedSettingsAction.ResetToDefaults(ResetTarget.STYLE)
         } else {
             null

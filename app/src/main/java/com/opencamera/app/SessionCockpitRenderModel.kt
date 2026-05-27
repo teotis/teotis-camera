@@ -19,7 +19,6 @@ import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.PreviewBrightnessFeedbackStatus
 import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.PersistedSettingsAction
-import com.opencamera.core.settings.ResetTarget
 import com.opencamera.core.settings.hasUserAdjustments
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
@@ -415,12 +414,8 @@ internal fun quickPanelSheetRenderModel(
             isEnabled = timer.isInteractive,
             controlKind = QuickControlKind.CYCLE
         ),
-        hasQuickUserAdjustments = state.settings.persisted.hasUserAdjustments(ResetTarget.QUICK),
-        resetQuickAction = if (state.settings.persisted.hasUserAdjustments(ResetTarget.QUICK)) {
-            PersistedSettingsAction.ResetToDefaults(ResetTarget.QUICK)
-        } else {
-            null
-        }
+        hasQuickUserAdjustments = false,
+        resetQuickAction = null
     )
 }
 

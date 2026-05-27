@@ -1346,15 +1346,12 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `quick panel sheet has reset action when adjustments exist`() {
+    fun `quick panel sheet does not expose reset action when adjustments exist`() {
         val state = defaultSessionState()
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
-        assertTrue(sheet.hasQuickUserAdjustments)
-        assertEquals(
-            PersistedSettingsAction.ResetToDefaults(ResetTarget.QUICK),
-            sheet.resetQuickAction
-        )
+        assertFalse(sheet.hasQuickUserAdjustments)
+        assertNull(sheet.resetQuickAction)
     }
 
     @Test

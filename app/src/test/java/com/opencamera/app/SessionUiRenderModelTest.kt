@@ -2120,7 +2120,7 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `settings page has no reset action when at defaults`() {
+    fun `settings page keeps reset action when at defaults`() {
         val state = defaultSessionState(
             persistedPhotoSettings = com.opencamera.core.settings.PhotoSettings()
         ).copy(
@@ -2131,7 +2131,10 @@ class SessionUiRenderModelTest {
         val model = sessionSettingsPageRenderModel(state, TestAppTextResolver())
 
         assertFalse(model.hasSettingsUserAdjustments)
-        assertEquals(null, model.resetSettingsAction)
+        assertEquals(
+            PersistedSettingsAction.ResetToDefaults(ResetTarget.SETTINGS),
+            model.resetSettingsAction
+        )
     }
 
     @Test
@@ -2184,6 +2187,19 @@ class SessionUiRenderModelTest {
             )
         )
         val model = filterLabPageRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.hasStyleUserAdjustments)
+        assertEquals(null, model.resetStyleAction)
+    }
+
+    @Test
+    fun `color lab page does not expose style reset action`() {
+        val state = defaultSessionState()
+        val model = filterLabPageRenderModel(
+            state = state,
+            text = TestAppTextResolver(),
+            panelRole = StyleAndColorLabRole.COLOR_LAB
+        )
 
         assertFalse(model.hasStyleUserAdjustments)
         assertEquals(null, model.resetStyleAction)
