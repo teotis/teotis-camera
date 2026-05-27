@@ -1,0 +1,5 @@
+package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
+01-photo-night-still	pending			agent-feature-tests-01-photo-night-still	agent/feature-module-direct-tests/01-photo-night-still	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/feature-module-direct-tests-01-photo-night-still						
+02-document-video-specialized	pending			agent-feature-tests-02-document-video-specialized	agent/feature-module-direct-tests/02-document-video-specialized	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/feature-module-direct-tests-02-document-video-specialized						
+03-portrait-pro-humanistic	pending			agent-feature-tests-03-portrait-pro-humanistic	agent/feature-module-direct-tests/03-portrait-pro-humanistic	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/feature-module-direct-tests-03-portrait-pro-humanistic						
+99-finalize	pending			agent-feature-tests-99-finalize	agent/feature-module-direct-tests/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/feature-module-direct-tests-99-finalize						
