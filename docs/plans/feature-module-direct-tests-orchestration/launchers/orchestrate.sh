@@ -328,7 +328,27 @@ cmd_advance() {
 cmd_status() {
   preflight_graph
   printf "%-34s %-12s %-52s %-12s %s\n" "package" "state" "branch" "verification" "last_error"
-  awk -F '\t' 'FNR > 1 { printf "%-34s %-12s %-52s %-12s %s\n", $1, $2, $6, $10, $13 }' "$STATE"
+  local pkg state branch verification error status_file md display_state display_error
+  while IFS= read -r pkg; do
+    [ -z "$pkg" ] && continue
+    state="$(field_from_state "$pkg" state)"
+    branch="$(field_from_state "$pkg" branch)"
+    verification="$(field_from_state "$pkg" verification)"
+    error="$(field_from_state "$pkg" last_error)"
+    status_file="$PLAN_DIR/$(field_from_graph "$pkg" status_file)"
+    md="$(markdown_status "$status_file")"
+    display_state="$state"
+    display_error="$error"
+    case "$md" in
+      completed|blocked|stale|invalid|finalizing|finalized)
+        if [ "$md" != "$state" ]; then
+          display_state="invalid"
+          display_error="markdown status $md disagrees with state $state"
+        fi
+        ;;
+    esac
+    printf "%-34s %-12s %-52s %-12s %s\n" "$pkg" "$display_state" "$branch" "$verification" "$display_error"
+  done < <(all_packages)
 }
 
 cmd_retry() {
