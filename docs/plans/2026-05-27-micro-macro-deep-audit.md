@@ -240,7 +240,51 @@ CI 环境中极易 flaky。应使用 `advanceTimeBy` 或注入虚拟时钟。
 
 ---
 
-## 七、代码健康问题
+## 七、Android 生命周期问题
+
+### 7.1 [High] 无 ViewModel — 进程死亡丢失全部状态
+
+项目不使用 ViewModel。所有状态保存在 Activity 字段和 AppContainer 单例中。进程死亡后:
+- `panelRouter` (面板路由) 丢失
+- `selectedDevLogTab` 丢失
+- `latestSessionState` 丢失
+- 用户回到 app 看到的是默认状态而非之前的面板/模式
+
+### 7.2 [High] 无 onSaveInstanceState/onRestoreInstanceState
+
+Activity 没有实现状态保存/恢复。配合 `configChanges="orientation|screenSize|keyboardHidden"` 和 `screenOrientation="portrait"`，配置变更被手动处理，但进程死亡恢复完全缺失。
+
+### 7.3 [High] render() 中调用 applyLocale() 可触发 Activity 重建
+
+`MainActivity.render()` 第 254 行调用 `applyLocale()`，其中 `AppCompatDelegate.setApplicationLocales()` 会触发 Activity 重建。但重建时无状态保存，用户当前面板/设置页面丢失。
+
+### 7.4 [Medium] SessionIntent.Shutdown 从未被 dispatch
+
+`onStop()` dispatch `PreviewHostDetached` 但不 dispatch `Shutdown`。`handleShutdown()` 方法存在但从未被 Activity 生命周期调用。
+
+### 7.5 [Medium] requestCameraPermissionIfNeeded() 首次安装逻辑缺陷
+
+`shouldShowRequestPermissionRationale` 在首次安装时返回 false + 权限未授予 → 进入"永久拒绝"分支，而非请求权限。
+
+### 7.6 [Medium] onBackPressed() 已弃用
+
+`onBackPressed()` 在 API 33 已弃用，应使用 `OnBackPressedCallback`。
+
+### 7.7 [Medium] VideoFrameExtractor.extract() 在主线程同步执行
+
+`render()` 中调用 `VideoFrameExtractor.extract()`，该方法执行文件 I/O 和 Bitmap 操作，在主线程同步运行。
+
+### 7.8 [Medium] configChanges 缺少 uiMode
+
+Manifest 的 `configChanges` 不包含 `uiMode`，暗色模式切换时行为未定义。
+
+### 7.9 [Low] 无多窗口模式处理
+
+未声明 `resizeableActivity`，无 `onMultiWindowModeChanged` 覆写。分屏模式下相机预览行为未定义。
+
+---
+
+## 八、代码健康问题
 
 ### 7.1 被禁用的功能 (TODO)
 
@@ -278,36 +322,46 @@ CI 环境中极易 flaky。应使用 `advanceTimeBy` 或注入虚拟时钟。
 2. **孤儿 CoroutineScope** — CaptureRecordingSessionProcessor.kt:92,258 — Session 关闭后协程泄漏
 3. **FrameRingBuffer 无锁** — FrameRingBuffer.kt — 并发访问崩溃
 4. **ImageProxy 未关闭** — CameraXLivePreviewFrameSource.kt:74 — 预览冻结
+5. **无进程死亡恢复** — MainActivity — 无 ViewModel、无 onSaveInstanceState，进程死亡丢失全部状态
 
 ### P1 — High 风险 (本周修复)
 
-5. **Float 精确比较** — DeviceContracts.kt:387 — Zoom 操作脆弱
-6. **buffer 竞态** — CameraXLivePreviewFrameSource.kt — NPE 风险
-7. **adapter 多字段无锁** — CameraXCaptureAdapter.kt — 状态不一致
-8. **StateFlow 非原子更新** — DefaultCameraSession.kt — 状态覆盖
-9. **Bitmap 未 recycle** — MlKitSelfiePreviewSceneMaskSource.kt — OOM 风险
-10. **PreviewAnalysisFanout 不捕获 Error** — PreviewAnalysisFanout.kt — ImageProxy 泄漏
-11. **adapterScope 未 cancel** — CameraXCaptureAdapter.kt — 资源泄漏
-12. **Thread.sleep(3100)** — DefaultCameraSessionTest.kt — CI 不稳定
+5. **无 ViewModel / 无状态保存** — MainActivity — 进程死亡丢失全部 UI 状态
+6. **render() 中 applyLocale 触发重建** — MainActivity:254 — Activity 重建无状态保存
+7. **Float 精确比较** — DeviceContracts.kt:387 — Zoom 操作脆弱
+8. **buffer 竞态** — CameraXLivePreviewFrameSource.kt — NPE 风险
+9. **adapter 多字段无锁** — CameraXCaptureAdapter.kt — 状态不一致
+10. **StateFlow 非原子更新** — DefaultCameraSession.kt — 状态覆盖
+11. **Bitmap 未 recycle** — MlKitSelfiePreviewSceneMaskSource.kt — OOM 风险
+12. **PreviewAnalysisFanout 不捕获 Error** — PreviewAnalysisFanout.kt — ImageProxy 泄漏
+13. **adapterScope 未 cancel** — CameraXCaptureAdapter.kt — 资源泄漏
+14. **Thread.sleep(3100)** — DefaultCameraSessionTest.kt — CI 不稳定
 
 ### P2 — Medium 风险 (本月修复)
 
-13. **Preview Surface Lost 卡死** — PreviewRecoverySessionProcessor.kt
-14. **onEnter() 重复调用** — DefaultCameraSession.kt
-15. **submitCaptureStrategy 无 lifecycle 检查** — CaptureRecordingSessionProcessor.kt
-16. **权限撤销未取消看门狗** — DefaultCameraSession.kt
-17. **emit/tryEmit 混用** — CameraXCaptureAdapter.kt
-18. **OCWM 溢出** — OcwmJpegContainer.kt
-19. **依赖版本升级** — AGP, Kotlin, CameraX
-20. **Git 仓库清理** — 2.9GB teotis-camera, 31MB APK
+15. **Preview Surface Lost 卡死** — PreviewRecoverySessionProcessor.kt
+16. **onEnter() 重复调用** — DefaultCameraSession.kt
+17. **submitCaptureStrategy 无 lifecycle 检查** — CaptureRecordingSessionProcessor.kt
+18. **权限撤销未取消看门狗** — DefaultCameraSession.kt
+19. **emit/tryEmit 混用** — CameraXCaptureAdapter.kt
+20. **OCWM 溢出** — OcwmJpegContainer.kt
+21. **请求权限首次安装逻辑缺陷** — MainActivity
+22. **onBackPressed() 弃用** — MainActivity
+23. **VideoFrameExtractor 主线程同步** — MainActivity
+24. **Shutdown 从未 dispatch** — MainActivity
+25. **configChanges 缺少 uiMode** — AndroidManifest
+26. **依赖版本升级** — AGP, Kotlin, CameraX
+27. **Git 仓库清理** — 2.9GB teotis-camera, 31MB APK
 
 ### P3 — Low 风险 / 改进项 (排期)
 
-21. Worktree 批量清理
-22. 测试断言消息补充
-23. 重复测试代码提取
-24. 提交信息规范化
-25. .idea/.tmp 从 git 移除
+28. Worktree 批量清理
+29. 测试断言消息补充
+30. 重复测试代码提取
+31. 提交信息规范化
+32. .idea/.tmp 从 git 移除
+33. onBackPressed 弃用迁移
+34. MediaActionSound 按需创建
 
 ---
 
@@ -324,6 +378,7 @@ CI 环境中极易 flaky。应使用 `advanceTimeBy` 或注入虚拟时钟。
 | **资源泄漏** | 未覆盖 | **1 Critical + 3 High** |
 | **逻辑 bug** | 未覆盖 | **1 确定性 bug + 1 High** |
 | **状态机正确性** | 未覆盖 | **1 High + 4 Medium** |
+| **Android 生命周期** | 未覆盖 | **3 High + 5 Medium** |
 | **测试质量细节** | 覆盖率百分比 | **具体问题清单** |
 | **Git 仓库健康** | 未覆盖 | **6.74GB 膨胀** |
 | **依赖版本** | 提及可升级 | **具体版本对比** |
