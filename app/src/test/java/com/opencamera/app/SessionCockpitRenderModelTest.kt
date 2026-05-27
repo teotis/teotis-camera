@@ -1008,9 +1008,11 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `shutter visual state is SAVING when capture status is saving`() {
+    fun `shutter visual state is BACKGROUND_SAVING when capture status is saving without activeShot`() {
+        // After session rearm: captureStatus may still be SAVING but activeShot is already null.
+        // Shutter is enabled; show subtle background work indicator.
         val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING)
-        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+        assertEquals(ShutterVisualState.BACKGROUND_SAVING, shutterVisualState(state))
     }
 
     @Test
@@ -1027,6 +1029,59 @@ class SessionCockpitRenderModelTest {
             )
         )
         assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state is CAPTURE_IN_PROGRESS when active photo shot with REQUESTED status`() {
+        // Between ShutterPressed and ShotStarted: activeShot exists, captureStatus is REQUESTED.
+        // Show brief acknowledgment instead of full SAVING spinner.
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "req-1",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        ).copy(captureStatus = CaptureStatus.REQUESTED)
+        assertEquals(ShutterVisualState.CAPTURE_IN_PROGRESS, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter visual state transitions from CAPTURE_IN_PROGRESS to SAVING`() {
+        val shot = ShotRequest(
+            shotId = "trans-1",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        // REQUESTED → CAPTURE_IN_PROGRESS
+        val requestedState = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.REQUESTED)
+        assertEquals(ShutterVisualState.CAPTURE_IN_PROGRESS, shutterVisualState(requestedState))
+
+        // SAVING → SAVING
+        val savingState = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.SAVING)
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(savingState))
+
+        // DATA_RECEIVED with activeShot cleared (conservative keeps activeShot) → SAVING or ready
+        val dataReceivedState = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(dataReceivedState))
+    }
+
+    @Test
+    fun `shutter visual state is BACKGROUND_SAVING after rearm while captureStatus is SAVING`() {
+        // Edge case: activeShot cleared by rearm while captureStatus still SAVING.
+        // Visual shows BACKGROUND_SAVING; shutter remains disabled (captureStatus still SAVING).
+        val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING, activeShot = null)
+        assertEquals(ShutterVisualState.BACKGROUND_SAVING, shutterVisualState(state))
     }
 
     @Test

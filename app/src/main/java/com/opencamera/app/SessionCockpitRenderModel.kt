@@ -191,11 +191,16 @@ internal fun shutterVisualState(state: SessionState): ShutterVisualState {
     if (state.previewStatus == PreviewStatus.RECOVERING) return ShutterVisualState.BLOCKED
     if (!state.permissionState.cameraGranted) return ShutterVisualState.BLOCKED
     if (state.countdownRemainingSeconds != null) return ShutterVisualState.COUNTDOWN
-    if (state.captureStatus == CaptureStatus.SAVING) return ShutterVisualState.SAVING
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
-        return ShutterVisualState.SAVING
+        return when (state.captureStatus) {
+            CaptureStatus.REQUESTED -> ShutterVisualState.CAPTURE_IN_PROGRESS
+            else -> ShutterVisualState.SAVING
+        }
     }
+    // Background save indicator: captureStatus is still SAVING but activeShot is already cleared
+    // (session rearm policy). Shutter is enabled; show subtle background work indicator.
+    if (state.captureStatus == CaptureStatus.SAVING) return ShutterVisualState.BACKGROUND_SAVING
     when (state.recordingStatus) {
         RecordingStatus.REQUESTING -> return ShutterVisualState.VIDEO_REQUESTING
         RecordingStatus.RECORDING -> return ShutterVisualState.VIDEO_RECORDING

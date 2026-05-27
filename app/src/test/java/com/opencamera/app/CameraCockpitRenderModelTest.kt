@@ -5,8 +5,15 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
+import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.PostProcessSpec
+import com.opencamera.core.media.ShotKind
+import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.media.SaveRequest
+import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
@@ -189,6 +196,38 @@ class CameraCockpitRenderModelTest {
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals(ShutterVisualState.VIDEO_RECORDING, model.bottomCockpit.shutterVisualState)
+    }
+
+    @Test
+    fun `bottom cockpit shutter visual state is CAPTURE_IN_PROGRESS when shot requested`() {
+        val shot = ShotRequest(
+            shotId = "cockpit-1",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState().copy(
+            activeShot = shot,
+            captureStatus = CaptureStatus.REQUESTED
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(ShutterVisualState.CAPTURE_IN_PROGRESS, model.bottomCockpit.shutterVisualState)
+        assertFalse(model.bottomCockpit.isShutterEnabled)
+    }
+
+    @Test
+    fun `bottom cockpit shutter visual state is BACKGROUND_SAVING when saving without activeShot`() {
+        // captureStatus == SAVING with activeShot == null: visual shows BACKGROUND_SAVING,
+        // but shutter remains disabled because captureStatus is still SAVING.
+        val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(ShutterVisualState.BACKGROUND_SAVING, model.bottomCockpit.shutterVisualState)
+        assertFalse(model.bottomCockpit.isShutterEnabled)
     }
 
     @Test
