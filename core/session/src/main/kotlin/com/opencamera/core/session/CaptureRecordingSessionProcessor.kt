@@ -232,6 +232,7 @@ internal class CaptureRecordingSessionProcessor(
                     RecordingStatus.IDLE
                 },
                 activeShot = shot,
+                shutterPressedAtElapsedMillis = null,
                 modeSnapshot = currentController().snapshot.value,
                 activeDeviceCapabilities = s.activeDeviceCapabilities,
                 activeDeviceGraph = resolvedActiveDeviceGraph(),

@@ -214,6 +214,7 @@ data class SessionState(
     val activeCapabilityReport: CapabilityGraphReport? = null,
     val previewRatio: PreviewRatio = PreviewRatio.FULL,
     val outputRotation: CameraOutputRotation = CameraOutputRotation.ROTATION_0,
+    val shutterPressedAtElapsedMillis: Long? = null,
     val presentation: SessionPresentationState = SessionPresentationState()
 ) {
     val countdownRemainingSeconds: Int?

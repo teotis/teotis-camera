@@ -191,6 +191,14 @@ internal fun shutterVisualState(state: SessionState): ShutterVisualState {
     if (state.previewStatus == PreviewStatus.RECOVERING) return ShutterVisualState.BLOCKED
     if (!state.permissionState.cameraGranted) return ShutterVisualState.BLOCKED
     if (state.countdownRemainingSeconds != null) return ShutterVisualState.COUNTDOWN
+    // P1 fast feedback: show press animation when capture was just requested
+    // but ShotStarted hasn't arrived yet (captureStatus == REQUESTED + activeShot set).
+    if (state.captureStatus == CaptureStatus.REQUESTED) {
+        val activeShot = state.activeShot
+        if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
+            return ShutterVisualState.PHOTO_PRESSED
+        }
+    }
     if (state.captureStatus == CaptureStatus.SAVING) return ShutterVisualState.SAVING
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
