@@ -179,9 +179,9 @@ internal fun shutterDisabledReason(state: SessionState, text: AppTextResolver): 
     }
     // Session rearm policy: ordinary still capture clears activeShot at DATA_RECEIVED,
     // so the shutter is safe to re-arm even though postprocess/save may still be finishing.
+    // BACKGROUND_SAVING visual state shows a subtle indicator while the shutter remains enabled.
     // Conservative capture kinds (multi-frame, live photo) keep activeShot until ShotCompleted.
-    if (state.captureStatus == CaptureStatus.DATA_RECEIVED && activeShot == null) return null
-    if (state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED) return text.disabledSavingPhoto()
+    if (activeShot == null && (state.captureStatus == CaptureStatus.DATA_RECEIVED || state.captureStatus == CaptureStatus.SAVING)) return null
     if (state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
     if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
     return null

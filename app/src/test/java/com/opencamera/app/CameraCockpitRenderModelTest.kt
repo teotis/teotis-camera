@@ -222,12 +222,12 @@ class CameraCockpitRenderModelTest {
     @Test
     fun `bottom cockpit shutter visual state is BACKGROUND_SAVING when saving without activeShot`() {
         // captureStatus == SAVING with activeShot == null: visual shows BACKGROUND_SAVING,
-        // but shutter remains disabled because captureStatus is still SAVING.
+        // and shutter is enabled (session rearmed) so user can take next photo immediately.
         val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING)
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals(ShutterVisualState.BACKGROUND_SAVING, model.bottomCockpit.shutterVisualState)
-        assertFalse(model.bottomCockpit.isShutterEnabled)
+        assertTrue(model.bottomCockpit.isShutterEnabled)
     }
 
     @Test

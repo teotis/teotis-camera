@@ -960,6 +960,14 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `shutter disabled reason returns null during background save after rearm`() {
+        // After session rearm: captureStatus == SAVING but activeShot is null.
+        // Shutter should be enabled so user can immediately take next photo.
+        val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING, activeShot = null)
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
     fun `capture disabled reason returns recording`() {
         val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
         val reason = captureDisabledReason(state, TestAppTextResolver())
@@ -1177,6 +1185,64 @@ class SessionCockpitRenderModelTest {
 
         assertTrue(cockpit.bottomCockpit.isShutterEnabled)
         assertNull(cockpit.bottomCockpit.disabledReason)
+    }
+
+    @Test
+    fun `shutter visual state recovers to PHOTO_READY after preview recovery`() {
+        val recovering = defaultSessionState(previewStatus = PreviewStatus.RECOVERING)
+        assertEquals(ShutterVisualState.BLOCKED, shutterVisualState(recovering))
+
+        val recovered = defaultSessionState(previewStatus = PreviewStatus.ACTIVE)
+        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(recovered))
+    }
+
+    @Test
+    fun `shutter disabled reason blocks multi-frame capture with activeShot at DATA_RECEIVED`() {
+        // Conservative capture (multi-frame) keeps activeShot until ShotCompleted.
+        // Shutter must stay blocked even at DATA_RECEIVED.
+        val shot = ShotRequest(
+            shotId = "mf-block-1",
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter remains disabled with activePhotoShot during SAVING`() {
+        // Active photo shot with SAVING status: shutter must stay disabled.
+        val shot = ShotRequest(
+            shotId = "save-block-1",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.SAVING)
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter enabled with BACKGROUND_SAVING via cockpit render model`() {
+        // After rearm: captureStatus == SAVING, activeShot == null.
+        // Visual shows BACKGROUND_SAVING; shutter is enabled for immediate next shot.
+        val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING, activeShot = null)
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(cockpit.bottomCockpit.isShutterEnabled)
+        assertNull(cockpit.bottomCockpit.disabledReason)
+        assertEquals(ShutterVisualState.BACKGROUND_SAVING, cockpit.bottomCockpit.shutterVisualState)
     }
 
     companion object {
