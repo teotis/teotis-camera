@@ -629,10 +629,10 @@ internal fun previewContentGeometry(
             ratioWidth, ratioHeight
         )
         RectF(
-            contentRect.left + fr.left,
-            contentRect.top + fr.top,
-            contentRect.left + fr.right,
-            contentRect.top + fr.bottom
+            (contentRect.left + fr.left).coerceIn(contentRect.left, contentRect.right),
+            (contentRect.top + fr.top).coerceIn(contentRect.top, contentRect.bottom),
+            (contentRect.left + fr.right).coerceIn(contentRect.left, contentRect.right),
+            (contentRect.top + fr.bottom).coerceIn(contentRect.top, contentRect.bottom)
         )
     } else {
         RectF(contentRect)
