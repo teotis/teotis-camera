@@ -2645,6 +2645,80 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `second ordinary still tap is accepted after DATA_RECEIVED rearm`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        // First capture: ShutterPressed → ShotStarted → DataReceived
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot1 = assertNotNull(session.state.value.activeShot)
+        assertEquals(CaptureStatus.REQUESTED, session.state.value.captureStatus)
+
+        session.dispatch(SessionIntent.ShotStarted(shot1))
+        runCurrent()
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+
+        session.dispatch(SessionIntent.DataReceived(shot1.shotId, MediaType.PHOTO))
+        runCurrent()
+        assertEquals(CaptureStatus.DATA_RECEIVED, session.state.value.captureStatus)
+        assertNull(session.state.value.activeShot)
+
+        // Second capture: ShutterPressed must be accepted (activeShot is null at DATA_RECEIVED)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot2 = assertNotNull(session.state.value.activeShot)
+        assertEquals(CaptureStatus.REQUESTED, session.state.value.captureStatus)
+        assertTrue(shot2.shotId != shot1.shotId)
+
+        // Verify second shot goes through full lifecycle
+        session.dispatch(SessionIntent.ShotStarted(shot2))
+        runCurrent()
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+        assertEquals(shot2.shotId, session.state.value.activeShot?.shotId)
+
+        session.dispatch(SessionIntent.ShotCompleted(
+            ShotResult(
+                shotId = shot2.shotId,
+                mediaType = MediaType.PHOTO,
+                outputPath = "Pictures/OpenCamera/second.jpg",
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/second.jpg"),
+                metadata = SaveRequest.photoLibrary().metadata
+            )
+        ))
+        runCurrent()
+        assertEquals(CaptureStatus.COMPLETED, session.state.value.captureStatus)
+        assertNull(session.state.value.activeShot)
+
+        assertTrue(trace.snapshot().any { it.name == "capture.data.received" })
+    }
+
+    @Test
+    fun `shutter tap is blocked while ordinary photo activeShot is non-null`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot1 = assertNotNull(session.state.value.activeShot)
+
+        // Second ShutterPressed while activeShot is still set — must be blocked
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+
+        assertEquals(shot1.shotId, session.state.value.activeShot?.shotId)
+        assertEquals("Wait for current capture to finish before sending another command", session.state.value.lastAction)
+        assertTrue(trace.snapshot().any { it.name == "mode.intent.blocked" })
+    }
+
+    @Test
     fun `session state exposes independent active device graph for active mode`() = runTest {
         val session = createSession(InMemorySessionTrace(), this)
 
