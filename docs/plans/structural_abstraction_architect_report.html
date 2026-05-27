@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenCamera Structural Abstraction Review</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #0f141b;
+      --panel: #161d27;
+      --panel2: #1d2633;
+      --text: #e6edf3;
+      --muted: #9fb0c4;
+      --line: #344154;
+      --accent: #7dd3fc;
+      --good: #86efac;
+      --warn: #facc15;
+      --bad: #fca5a5;
+      --topo-bg: #151922;
+      --topo-current-label-bg: rgba(248,81,73,0.14);
+      --topo-current-label-color: #ff7b72;
+      --topo-current-border: rgba(248,81,73,0.32);
+      --topo-proposed-label-bg: rgba(88,166,255,0.15);
+      --topo-proposed-label-color: #79c0ff;
+      --topo-proposed-border: rgba(88,166,255,0.32);
+      --lb-backdrop: rgba(0,0,0,0.88);
+      --lb-content-bg: #151922;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f7f9fc;
+        --panel: #ffffff;
+        --panel2: #eef3f8;
+        --text: #172033;
+        --muted: #5e6c80;
+        --line: #d5dee9;
+        --accent: #0369a1;
+        --good: #166534;
+        --warn: #854d0e;
+        --bad: #991b1b;
+        --topo-bg: #f4f6f8;
+        --lb-backdrop: rgba(255,255,255,0.94);
+        --lb-content-bg: #ffffff;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    header {
+      padding: 48px min(7vw, 72px) 28px;
+      border-bottom: 1px solid var(--line);
+    }
+    main {
+      display: grid;
+      grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+      gap: 28px;
+      padding: 28px min(7vw, 72px) 80px;
+    }
+    nav {
+      position: sticky;
+      top: 20px;
+      align-self: start;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    nav a {
+      display: block;
+      padding: 8px 10px;
+      color: var(--muted);
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    nav a.active, nav a:hover {
+      color: var(--text);
+      background: var(--panel2);
+    }
+    section, article.card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 22px;
+      margin-bottom: 20px;
+    }
+    h1, h2, h3 { line-height: 1.18; margin: 0 0 12px; }
+    h1 { font-size: clamp(30px, 4vw, 48px); }
+    h2 { font-size: 24px; }
+    h3 { font-size: 20px; }
+    p { margin: 8px 0 12px; }
+    ul { margin: 8px 0 0 20px; padding: 0; }
+    li { margin: 6px 0; }
+    code {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 0.92em;
+    }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid var(--line); padding: 10px; vertical-align: top; }
+    th { text-align: left; background: var(--panel2); }
+    .lede { max-width: 980px; color: var(--muted); font-size: 17px; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 9px;
+      background: var(--panel2);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .good { color: var(--good); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .matrix .cell { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: var(--panel2); }
+    .review {
+      margin-top: 18px;
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    textarea, select {
+      width: 100%;
+      min-height: 72px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--text);
+      padding: 10px;
+      font: inherit;
+    }
+    select { min-height: auto; }
+    .stars button {
+      border: 1px solid var(--line);
+      background: var(--panel2);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    .stars button.selected { border-color: var(--accent); color: var(--accent); }
+    #exportReview {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #06111f;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.28);
+    }
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 78px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: none;
+    }
+    .topology-compare { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; }
+    .topology-diagram { flex: 1; min-width: 340px; cursor: pointer; }
+    .topology-diagram .mermaid { min-height: 380px; width: 100%; background: var(--topo-bg); }
+    .topology-diagram .label { font-size: 14px; font-weight: 600; margin-bottom: 8px; padding: 4px 12px; border-radius: 4px; display: inline-block; }
+    .topology-diagram.current .label { background: var(--topo-current-label-bg); color: var(--topo-current-label-color); }
+    .topology-diagram.current .mermaid { border: 2px solid var(--topo-current-border); border-radius: 8px; padding: 16px; }
+    .topology-diagram.proposed .label { background: var(--topo-proposed-label-bg); color: var(--topo-proposed-label-color); }
+    .topology-diagram.proposed .mermaid { border: 2px solid var(--topo-proposed-border); border-radius: 8px; padding: 16px; }
+    .lightbox { display: none; position: fixed; inset: 0; z-index: 9999; background: var(--lb-backdrop); cursor: pointer; }
+    .lightbox.active { display: flex; align-items: center; justify-content: center; }
+    .lightbox .diagram-wrapper { min-width: 700px; min-height: 500px; max-width: 92vw; max-height: 92vh; overflow: auto; background: var(--lb-content-bg); border-radius: 8px; padding: 24px; }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; padding-inline: 18px; }
+      nav { position: static; }
+      .matrix { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OpenCamera Structural Abstraction Review</h1>
+    <p class="lede">针对大型类、Effect/Capture 表述重复、app 层后处理、feature 测试缺口、以及 Document-batch 泄入 Session Kernel 的证据审查。结论是：有可落地修复方案，但应按小试点推进，不应启动大一统重构。</p>
+    <div class="badge-row">
+      <span class="badge">Date: 2026-05-27</span>
+      <span class="badge">Mode: analysis only</span>
+      <span class="badge">Production code modified: no</span>
+    </div>
+  </header>
+  <main>
+    <nav>
+      <a href="#summary">Executive Summary</a>
+      <a href="#evidence">Evidence Ledger</a>
+      <a href="#matrix">Leverage Matrix</a>
+      <a href="#pressure">Pressure Map</a>
+      <a href="#proposal-feature-tests">Feature Tests</a>
+      <a href="#proposal-effect-payload">Effect Payload</a>
+      <a href="#proposal-session-extension">Mode Extension</a>
+      <a href="#proposal-large-files">Large Files</a>
+      <a href="#deferred">Deferred</a>
+      <a href="#handoff">Transition Handoff</a>
+    </nav>
+    <div>
+      <section id="summary">
+        <h2>Executive Summary</h2>
+        <p>这五类问题都“有”，但成熟度不同。最有用户价值和研发价值的第一步是补 feature module 的直接单元测试，因为它能立刻把模式插件输出的 <code>EffectSpec</code>、<code>PostProcessSpec</code>、metadata tags 和 session events 固定下来，为后续拆大类和收敛 metadata 桥提供安全网。</p>
+        <p>最高杠杆的结构机会是把 Effect/Capture 中的渲染意图变成更完整的 typed payload，从而逐步删除 post-processor 里反复读取 <code>customTags</code> 的逻辑。Document-batch 则是一个真实但不应急着整体迁移的试验田：先抽出 session 内部 reducer/extension seam，再决定是否允许 mode-owned command handler。</p>
+        <p>大型文件拆解有效，但优先级应低于测试安全网和表示收敛。它适合按已存在的自然职责拆，不适合按行数机械切文件。</p>
+      </section>
+
+      <section id="evidence">
+        <h2>Evidence Ledger</h2>
+        <table>
+          <thead><tr><th>Observed fact</th><th>Evidence</th><th>Inference</th></tr></thead>
+          <tbody>
+            <tr><td>大型文件真实存在</td><td><code>CameraXCaptureAdapter.kt</code> 3134 lines; <code>SessionUiRenderModel.kt</code> 2289; <code>DefaultCameraSession.kt</code> 1604; <code>MainActivity.kt</code> 851.</td><td>可拆，但需要按职责 seam 和现有测试保护拆。</td></tr>
+            <tr><td>Effect/Capture 表述重复</td><td><code>EffectSpec</code> 是 typed entries; <code>EffectBridge.toMetadataTags()</code> flatten 到 string map; <code>PostProcessSpec</code> 只有 watermark/exif/algorithm 三个字段; <code>ShotExecutor.mergeWith()</code> 再合并 metadata。</td><td>当前 canonical intent 不完整，导致 post-processors 继续读 <code>customTags</code>。</td></tr>
+            <tr><td>App 层后处理很重</td><td><code>PhotoAlgorithmPostProcessor.kt</code> 1120 lines; <code>PortraitRenderPostProcessor.kt</code> 993; <code>PhotoWatermarkPostProcessor.kt</code> 1295; 另外 <code>DocumentAutoCropPostProcessor.kt</code> 364。</td><td>可以分离纯 render decision 和 Android bitmap/EXIF/file IO，但不可直接搬到 core。</td></tr>
+            <tr><td>Feature module 直接测试为空</td><td><code>find feature -path "*/src/test*" -type f</code> 无输出；既有审计记录 <code>feature=0</code> tests。</td><td>这是最便宜且可靠的第一试点。</td></tr>
+            <tr><td>Document-batch 是 session mode-specific 积累案例</td><td><code>SessionIntent</code> 包含 <code>DocumentBatchClear</code>, <code>RemoveItem</code>, <code>MoveItem</code>, <code>Reorder</code>, <code>Finish</code>; <code>DefaultCameraSession</code> 直接 handle 这些 intent。</td><td>适合作为 mode extension / reducer seam 的试验对象。</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="matrix">
+        <h2>Structural Leverage Matrix</h2>
+        <div class="matrix">
+          <div class="cell"><h3>High leverage, low burden</h3><p><strong>Feature plugin direct tests.</strong> 先锁定已有行为，无生产行为变更，收益是给后续拆分提供护栏。</p></div>
+          <div class="cell"><h3>High leverage, medium burden</h3><p><strong>Effect payload through capture.</strong> 从少数 tags 开始迁移，删除 postprocessor re-parse 分支。</p></div>
+          <div class="cell"><h3>Medium leverage, medium burden</h3><p><strong>Document-batch session extension seam.</strong> 先内部 reducer 化，再考虑从 core session API 中隐藏 mode-specific intent。</p></div>
+          <div class="cell"><h3>Medium leverage, variable burden</h3><p><strong>Large file decomposition.</strong> 价值取决于每次是否删除 coordination burden；纯切文件收益有限。</p></div>
+        </div>
+      </section>
+
+      <section id="pressure">
+        <h2>Structural Pressure Map</h2>
+        <ul>
+          <li><strong>Representation duplication:</strong> <code>EffectSpec</code>, <code>RenderRecipe</code>, <code>PostProcessSpec</code>, <code>MediaMetadata.customTags</code> 同时表达一部分渲染意图。</li>
+          <li><strong>Conversion glue:</strong> mode plugins 调 <code>EffectBridge</code>，然后自行补 custom tags；post-processors 再反向解释 tags。</li>
+          <li><strong>Orchestration hotspot:</strong> <code>CameraXCaptureAdapter</code> 同时承担 CameraX runtime、capture、video、preview bitmap、live/photo feedback、postprocess guard 等职责。</li>
+          <li><strong>Boundary friction:</strong> app 层有 Android-bound render IO 是合理的，但领域 render decisions 混在其中，增加迁移难度。</li>
+          <li><strong>Mode-specific accumulation:</strong> Document-batch 当前为了避免 UI hidden state 放入 session，这是合理的局部选择，但也证明 session 需要可控 extension seam。</li>
+        </ul>
+      </section>
+
+      <article class="card recommendation" id="proposal-feature-tests" data-title="Feature plugin direct tests" data-classification="Validated structural opportunity">
+        <h2>Feature Plugin Direct Tests</h2>
+        <div class="badge-row">
+          <span class="badge good">Classification: Validated structural opportunity</span>
+          <span class="badge">Structural Leverage: High</span>
+          <span class="badge">Transition Burden: Low</span>
+          <span class="badge">Risk: Low</span>
+          <span class="badge">Confidence: High</span>
+        </div>
+        <p><strong>Current symptom:</strong> feature modules encode mode behavior but have no direct tests. Behavior is partly covered indirectly by app/session tests, which makes refactoring and metadata migration harder than necessary.</p>
+        <p><strong>Hidden invariant:</strong> A mode plugin should be testable as a pure contract emitter: selected runtime settings in, capture strategy/effect spec/session events out.</p>
+        <p><strong>Complexity deleted:</strong> Reduces reliance on app/session integration tests for mode plugin regressions and creates a safe base for later Effect/Capture migration.</p>
+        <p><strong>Disproof signal:</strong> If plugins require Android runtime or real camera dependencies to instantiate, first extract test harness seams instead of writing brittle tests.</p>
+        <div class="topology-compare">
+          <div class="topology-diagram current">
+            <div class="label">Current Topology</div>
+            <div class="mermaid">
+flowchart TB
+  subgraph f["Feature Modules"]
+    P["Mode plugin behavior"]
+  end
+  subgraph s["Session And App Tests"]
+    T["Indirect coverage"]
+  end
+  P --> T
+            </div>
+          </div>
+          <div class="topology-diagram proposed">
+            <div class="label">Proposed Structural Topology</div>
+            <div class="mermaid">
+flowchart TB
+  subgraph f["Feature Modules"]
+    P["Mode plugin behavior"]
+    U["Direct unit tests"]
+  end
+  subgraph s["Integration Tests"]
+    T["Session and app coverage"]
+  end
+  U --> P
+  P --> T
+            </div>
+          </div>
+        </div>
+        <div class="review"></div>
+      </article>
+
+      <article class="card recommendation" id="proposal-effect-payload" data-title="Typed effect payload through capture" data-classification="Promising but needs narrow pilot">
+        <h2>Typed Effect Payload Through Capture</h2>
+        <div class="badge-row">
+          <span class="badge warn">Classification: Promising but needs narrow pilot</span>
+          <span class="badge">Structural Leverage: High</span>
+          <span class="badge">Transition Burden: Medium</span>
+          <span class="badge">Risk: Medium</span>
+          <span class="badge">Confidence: Medium High</span>
+        </div>
+        <p><strong>Current symptom:</strong> <code>EffectBridge</code> writes both typed-derived tags and a reduced <code>PostProcessSpec</code>. Post-processors still parse <code>customTags</code> for frame ratio, watermark style, portrait/document markers, and perceptual recipes.</p>
+        <p><strong>Hidden invariant:</strong> Preview, capture, saved render, thumbnail, and diagnostics should consume one render intent where possible; string metadata should be persistence/compatibility, not the main intra-process API.</p>
+        <p><strong>Meaningful differences preserved:</strong> EXIF/persisted tags remain string metadata; Android-bound rendering remains in app; core/effect does not learn CameraX or Bitmap.</p>
+        <p><strong>Pilot:</strong> Pick one small tag family, preferably frame ratio or selfie mirror, carry it as typed payload into <code>ShotRequest</code>/<code>ShotResult</code>, and delete exactly one customTags reparse path.</p>
+        <p><strong>Disproof signal:</strong> If migration adds another representation without deleting reparse logic, stop and revert to documentation plus tests only.</p>
+        <div class="topology-compare">
+          <div class="topology-diagram current">
+            <div class="label">Current Topology</div>
+            <div class="mermaid">
+flowchart TB
+  M["Mode Plugin"] --> E["EffectSpec"]
+  E --> B["EffectBridge"]
+  B --> P["PostProcessSpec"]
+  B --> C["customTags"]
+  P --> S["ShotRequest"]
+  C --> S
+  S --> R["PostProcessors parse tags"]
+            </div>
+          </div>
+          <div class="topology-diagram proposed">
+            <div class="label">Proposed Structural Topology</div>
+            <div class="mermaid">
+flowchart TB
+  M["Mode Plugin"] --> E["EffectSpec"]
+  E --> I["Typed render intent"]
+  I --> S["ShotRequest"]
+  S --> R["PostProcessors consume typed fields"]
+  I --> C["Metadata tags for persistence"]
+            </div>
+          </div>
+        </div>
+        <div class="review"></div>
+      </article>
+
+      <article class="card recommendation" id="proposal-session-extension" data-title="Mode-specific session extension seam" data-classification="Promising but unproven hypothesis">
+        <h2>Mode-Specific Session Extension Seam</h2>
+        <div class="badge-row">
+          <span class="badge warn">Classification: Promising but unproven hypothesis</span>
+          <span class="badge">Structural Leverage: Medium</span>
+          <span class="badge">Transition Burden: Medium</span>
+          <span class="badge">Risk: Medium</span>
+          <span class="badge">Confidence: Medium</span>
+        </div>
+        <p><strong>Current symptom:</strong> Document-batch state and intents are in core session, and <code>DefaultCameraSession</code> handles them directly.</p>
+        <p><strong>Why this is not simply wrong:</strong> The original choice avoided hidden UI ownership and made saved-media state testable. That is valuable. The risk is future repetition for every mode-specific workflow.</p>
+        <p><strong>Pilot:</strong> Extract document-batch operations into an internal reducer or session extension object first. Keep public session state behavior unchanged. Only after tests pass should the team evaluate a mode-owned command extension.</p>
+        <p><strong>Disproof signal:</strong> If only document mode needs this for the foreseeable future, a local reducer is enough; a generic extension framework would be premature.</p>
+        <div class="review"></div>
+      </article>
+
+      <article class="card recommendation" id="proposal-large-files" data-title="Responsibility-based large file decomposition" data-classification="Pragmatic sequencing problem">
+        <h2>Responsibility-Based Large File Decomposition</h2>
+        <div class="badge-row">
+          <span class="badge">Classification: Pragmatic sequencing problem</span>
+          <span class="badge">Structural Leverage: Medium</span>
+          <span class="badge">Transition Burden: Medium High</span>
+          <span class="badge">Risk: Medium</span>
+          <span class="badge">Confidence: High that problem exists</span>
+        </div>
+        <p><strong>Current symptom:</strong> Four central files are large enough to impair review and increase merge conflict risk.</p>
+        <p><strong>Recommended sequence:</strong> Do not split by line ranges. Split along already visible responsibilities: CameraX provider/preview lifecycle, still capture, video recording, metering/brightness, live/thumbnail helpers; render-model composers by cockpit/preview/settings/diagnostics/document batch; session reducers by preview/recovery, capture/recording, mode/device control.</p>
+        <p><strong>Proof of value:</strong> Each split should move tests with the extracted unit or add focused tests. A split that only creates wrappers without reducing caller knowledge should be rejected.</p>
+        <div class="review"></div>
+      </article>
+
+      <section id="deferred">
+        <h2>Rejected Or Deferred Abstractions</h2>
+        <ul>
+          <li><strong>Generic event bus:</strong> no deletion proof; risks hiding session ownership.</li>
+          <li><strong><code>:core:shared</code> bucket module:</strong> likely worsens boundaries unless a concrete shared invariant is identified.</li>
+          <li><strong>State machine framework:</strong> session already has tested transitions; framework migration burden is not justified by the inspected evidence.</li>
+          <li><strong>Move all post-processing to core:</strong> false abstraction risk because bitmap, EXIF, URI, and file IO are Android-bound.</li>
+          <li><strong>Parallel post-processing for performance:</strong> needs measured bottleneck data first.</li>
+        </ul>
+      </section>
+
+      <section id="handoff">
+        <h2>Transition Handoff Brief</h2>
+        <p><strong>Preferred first breakthrough:</strong> Add direct feature-mode plugin unit tests. This is low-risk, directly valuable, and creates the validation floor for all other work.</p>
+        <p><strong>Second step:</strong> Design a narrow typed render intent pilot that removes one customTags reparse path. Do not introduce a generic abstraction unless it deletes existing branches.</p>
+        <p><strong>Third step:</strong> Extract document-batch operations into an internal reducer as a reversible step. Keep public behavior and existing tests stable.</p>
+        <p><strong>Authorization boundary:</strong> This report is analysis only. Production code changes require a separate approved implementation plan.</p>
+      </section>
+    </div>
+  </main>
+  <button id="exportReview">Export Review</button>
+  <div class="toast" id="toast">Copied review Markdown to clipboard.</div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        fontSize: '16px',
+        primaryColor: '#243447',
+        primaryTextColor: '#e6edf3',
+        primaryBorderColor: '#6e7681',
+        lineColor: '#8b949e',
+        secondaryColor: '#161b22',
+        tertiaryColor: '#21262d',
+        clusterBkg: '#161b22',
+        clusterBorder: '#30363d',
+        edgeLabelBackground: '#161b22'
+      }
+    });
+  </script>
+  <script>
+    const statuses = [
+      'Structurally Sound',
+      'Needs More Evidence',
+      'Too Abstract',
+      'Send to Transition Planning',
+      'Reject'
+    ];
+    document.querySelectorAll('.recommendation').forEach(card => {
+      const key = 'oc-struct-review-' + card.id;
+      const saved = JSON.parse(localStorage.getItem(key) || '{}');
+      const review = card.querySelector('.review');
+      review.innerHTML = `
+        <label>Review note<textarea placeholder="Add review notes..."></textarea></label>
+        <div class="stars" aria-label="Acceptance rating"></div>
+        <label>Status<select>${statuses.map(status => `<option>${status}</option>`).join('')}</select></label>
+        <label>Counterexample or operational constraint<textarea placeholder="Missing counterexample, rollout risk, or device constraint..."></textarea></label>
+      `;
+      const note = review.querySelectorAll('textarea')[0];
+      const constraint = review.querySelectorAll('textarea')[1];
+      const select = review.querySelector('select');
+      const stars = review.querySelector('.stars');
+      let rating = saved.rating || 0;
+      for (let i = 1; i <= 5; i += 1) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = String(i);
+        button.addEventListener('click', () => {
+          rating = i;
+          persist();
+          renderStars();
+        });
+        stars.appendChild(button);
+      }
+      note.value = saved.note || '';
+      constraint.value = saved.constraint || '';
+      select.value = saved.status || statuses[1];
+      [note, constraint, select].forEach(input => input.addEventListener('input', persist));
+      renderStars();
+      function renderStars() {
+        stars.querySelectorAll('button').forEach((button, index) => {
+          button.classList.toggle('selected', index < rating);
+        });
+      }
+      function persist() {
+        localStorage.setItem(key, JSON.stringify({
+          note: note.value,
+          constraint: constraint.value,
+          status: select.value,
+          rating
+        }));
+      }
+    });
+
+    document.querySelectorAll('.topology-diagram').forEach(diagram => {
+      diagram.addEventListener('click', () => {
+        const rendered = diagram.querySelector('.mermaid svg');
+        if (!rendered) return;
+        const lb = document.createElement('div');
+        lb.className = 'lightbox active';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'diagram-wrapper';
+        wrapper.addEventListener('click', event => event.stopPropagation());
+        wrapper.appendChild(rendered.cloneNode(true));
+        lb.appendChild(wrapper);
+        document.body.appendChild(lb);
+        const close = () => lb.remove();
+        lb.addEventListener('click', close);
+        document.addEventListener('keydown', function onEsc(event) {
+          if (event.key === 'Escape') {
+            close();
+            document.removeEventListener('keydown', onEsc);
+          }
+        });
+      });
+    });
+
+    document.getElementById('exportReview').addEventListener('click', async () => {
+      let markdown = '# OpenCamera Structural Review Feedback\n\n';
+      document.querySelectorAll('.recommendation').forEach(card => {
+        const key = 'oc-struct-review-' + card.id;
+        const saved = JSON.parse(localStorage.getItem(key) || '{}');
+        if (!saved.note && !saved.constraint && !saved.rating && !saved.status) return;
+        markdown += `## ${card.dataset.title}\n`;
+        markdown += `Classification: ${card.dataset.classification}\n`;
+        markdown += `Rating: ${saved.rating || 'unrated'}\n`;
+        markdown += `Status: ${saved.status || 'unset'}\n`;
+        markdown += `Review: ${saved.note || ''}\n`;
+        markdown += `Constraint: ${saved.constraint || ''}\n\n`;
+      });
+      markdown += '[Next Action Directive] Treat the structural recommendations above as hypotheses that must be translated into safe engineering work. For items marked "Send to Transition Planning", evaluate transition burden, business relevance, compatibility boundaries, rollout controls, rollback strategy, ownership, and short, medium, and long-term ROI using the Pragmatic Renewal Architect approach. Do not modify code unless I explicitly authorize implementation after reviewing the proposed transition plan.';
+      await navigator.clipboard.writeText(markdown);
+      const toast = document.getElementById('toast');
+      toast.style.display = 'block';
+      setTimeout(() => { toast.style.display = 'none'; }, 2200);
+    });
+
+    const sections = [...document.querySelectorAll('section[id], article[id]')];
+    const links = [...document.querySelectorAll('nav a')];
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        links.forEach(link => link.classList.toggle('active', link.getAttribute('href') === '#' + entry.target.id));
+      });
+    }, { rootMargin: '-35% 0px -55% 0px', threshold: 0 });
+    sections.forEach(section => observer.observe(section));
+    links.forEach(link => {
+      link.addEventListener('click', event => {
+        event.preventDefault();
+        document.querySelector(link.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>
