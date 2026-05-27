@@ -434,5 +434,6 @@
     <string name="document_batch_crop_skipped">未裁边</string>
     <string name="document_batch_crop_failed">裁边失败</string>
     <string name="document_batch_rail_page_description">第 %d 页</string>
+    <string name="button_document_batch_organizer_close">关闭</string>
     <string name="button_reset_defaults">重置为默认</string>
 </resources>

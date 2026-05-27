@@ -46,10 +46,10 @@ internal class DocumentBatchOrganizerRenderer(
         item: DocumentBatchOrganizerItemRenderModel,
         appText: AppTextResolver
     ): View {
-        val rowPadding = 8.dp(context)
-        val itemMargin = 6.dp(context)
-        val thumbnailSize = 48.dp(context)
-        val buttonHeight = 32.dp(context)
+        val rowPadding = 6.dp(context)
+        val itemMargin = 4.dp(context)
+        val thumbnailSize = 36.dp(context)
+        val buttonHeight = 28.dp(context)
 
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -67,13 +67,13 @@ internal class DocumentBatchOrganizerRenderer(
         // Page number
         val pageLabel = TextView(context).apply {
             text = context.getString(R.string.document_batch_rail_page_description, item.pageNumber)
-            textSize = 13f
+            textSize = 12f
             setTextColor(0xCCFFFFFF.toInt())
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                marginEnd = 8.dp(context)
+                marginEnd = 6.dp(context)
             }
         }
         row.addView(pageLabel)
@@ -94,14 +94,14 @@ internal class DocumentBatchOrganizerRenderer(
         if (item.cropStatusLabel != null) {
             val statusLabel = TextView(context).apply {
                 text = item.cropStatusLabel
-                textSize = 10f
+                textSize = 9f
                 setTextColor(0x99FFFFFF.toInt())
                 layoutParams = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     1f
                 ).apply {
-                    marginStart = 8.dp(context)
+                    marginStart = 6.dp(context)
                 }
             }
             row.addView(statusLabel)
@@ -153,16 +153,16 @@ internal class DocumentBatchOrganizerRenderer(
     private fun createActionButton(context: Context, label: String, heightPx: Int): Button {
         return Button(context).apply {
             text = label
-            textSize = 11f
+            textSize = 10f
             setTextColor(0xFFFFFFFF.toInt())
             minimumWidth = 0
             minimumHeight = 0
-            setPadding(8.dp(context), 0, 8.dp(context), 0)
+            setPadding(6.dp(context), 0, 6.dp(context), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 heightPx
             ).apply {
-                marginStart = 4.dp(context)
+                marginStart = 3.dp(context)
             }
             background = context.getDrawable(R.drawable.bg_panel_row)
         }
