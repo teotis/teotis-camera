@@ -1,12 +1,29 @@
 # 04-watermark-template-preview Status
 
-- **Status**: ready
-- **Agent**:
+- **Status**: completed
+- **Agent**: shutter-feedback-watermark-04-watermark-template-preview
 - **Branch**: `agent/shutter-feedback-watermark/04-watermark-template-preview`
 - **Worktree**: `/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-feedback-watermark-04-watermark-template-preview`
 - **Base commit**: `a8d621fb80e808254e9c301429571278309434ee`
-- **Commit hash**:
+- **Commit hash**: `ac404655c0f1cbfcfcd5024614b3e1a03dd92f6d`
 - **Changed files**:
+  - `core/effect/src/main/kotlin/com/opencamera/core/effect/PreviewEffectModel.kt` - WatermarkHintSpec 新增 textScale 字段
+  - `core/effect/src/main/kotlin/com/opencamera/core/effect/PreviewEffectAdapter.kt` - 修正 professional-bottom-bar 形状映射，填充 textScale
+  - `app/src/main/java/com/opencamera/app/PreviewOverlayView.kt` - 区分 EXPANDED_FRAME 渲染，应用 textScale
+  - `core/effect/src/test/kotlin/com/opencamera/core/effect/PreviewEffectAdapterTest.kt` - 新增 6 个测试用例
 - **Verification**:
+  - `:core:effect:test` — PASS (PreviewEffectAdapterTest, 6 new tests included)
+  - `:app:testDebugUnitTest` — PASS (SessionPreviewRenderModelTest + SessionUiRenderModelTest)
 - **Evidence**:
+  - Preview model mapping table:
+    - `pure-text` → TEXT_ONLY
+    - `classic-overlay` → BACKED_TEXT
+    - `travel-polaroid` → EXPANDED_FRAME
+    - `retro-frame` → EXPANDED_FRAME
+    - `blur-four-border` → FOUR_BORDER
+    - `professional-bottom-bar` → EXPANDED_FRAME (was BACKED_TEXT, now fixed)
+  - textScale propagated from WatermarkStyleSettings to WatermarkHintSpec
+  - EXPANDED_FRAME uses active frame rect for placement (not full view)
 - **Risks / follow-up**:
+  - Preview rendering is approximate and does not promise exact saved-photo fidelity (by design)
+  - Visual differentiation between BACKED_TEXT and EXPANDED_FRAME is text positioning only; no frame border is drawn for EXPANDED_FRAME
