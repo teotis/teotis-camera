@@ -116,7 +116,8 @@ class PreviewEffectAdapter {
             placement = effect.style.textPlacement,
             previewText = effect.tokens["watermarkModel"] ?: "Watermark",
             opacity = effect.style.textOpacity.alphaFraction * 0.6f,
-            shape = resolveWatermarkShape(effect.templateId)
+            shape = resolveWatermarkShape(effect.templateId),
+            textScale = effect.style.textScale.multiplier
         )
     }
 
@@ -124,7 +125,8 @@ class PreviewEffectAdapter {
         return when (templateId) {
             "pure-text" -> WatermarkPreviewShape.TEXT_ONLY
             "blur-four-border" -> WatermarkPreviewShape.FOUR_BORDER
-            "travel-polaroid", "retro-frame" -> WatermarkPreviewShape.EXPANDED_FRAME
+            "travel-polaroid", "retro-frame", "professional-bottom-bar" ->
+                WatermarkPreviewShape.EXPANDED_FRAME
             else -> WatermarkPreviewShape.BACKED_TEXT
         }
     }

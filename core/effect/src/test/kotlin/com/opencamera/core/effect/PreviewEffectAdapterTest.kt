@@ -243,6 +243,74 @@ class PreviewEffectAdapterTest {
     }
 
     @Test
+    fun `professional bottom bar watermark hint is expanded frame`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "professional-bottom-bar",
+                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    style = WatermarkStyleSettings(
+                        textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+                        textOpacity = WatermarkTextOpacity.SOLID,
+                        frameBackground = WatermarkFrameBackground.DARK
+                    )
+                )
+            ))
+        )
+
+        assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+    }
+
+    @Test
+    fun `retro frame watermark hint is expanded frame`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "retro-frame",
+                    tokens = mapOf("watermarkModel" to "Camera"),
+                    style = WatermarkStyleSettings()
+                )
+            ))
+        )
+
+        assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+    }
+
+    @Test
+    fun `watermark hint propagates text scale from style`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "classic",
+                    tokens = mapOf("watermarkModel" to "Test"),
+                    style = WatermarkStyleSettings(
+                        textScale = com.opencamera.core.settings.WatermarkTextScale.LARGE
+                    )
+                )
+            ))
+        )
+
+        assertNotNull(model.watermarkHint)
+        assertEquals(1.2f, model.watermarkHint!!.textScale)
+    }
+
+    @Test
+    fun `watermark hint defaults to normal text scale`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "classic",
+                    tokens = mapOf("watermarkModel" to "Test"),
+                    style = WatermarkStyleSettings()
+                )
+            ))
+        )
+
+        assertNotNull(model.watermarkHint)
+        assertEquals(1f, model.watermarkHint!!.textScale)
+    }
+
+    @Test
     fun `strong warm deep recipe produces non-neutral color transform`() {
         val recipe = PerceptualColorRecipe(
             toneDepth = 0.5f,
