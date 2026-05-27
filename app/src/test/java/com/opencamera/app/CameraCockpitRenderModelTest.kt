@@ -199,7 +199,7 @@ class CameraCockpitRenderModelTest {
     }
 
     @Test
-    fun `bottom cockpit shutter visual state is CAPTURE_IN_PROGRESS when shot requested`() {
+    fun `bottom cockpit shutter visual state is PHOTO_PRESSED when shot requested`() {
         val shot = ShotRequest(
             shotId = "cockpit-1",
             shotKind = ShotKind.STILL_CAPTURE,
@@ -215,7 +215,7 @@ class CameraCockpitRenderModelTest {
         )
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertEquals(ShutterVisualState.CAPTURE_IN_PROGRESS, model.bottomCockpit.shutterVisualState)
+        assertEquals(ShutterVisualState.PHOTO_PRESSED, model.bottomCockpit.shutterVisualState)
         assertFalse(model.bottomCockpit.isShutterEnabled)
     }
 

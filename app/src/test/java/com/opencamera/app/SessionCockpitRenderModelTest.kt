@@ -1032,25 +1032,7 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `shutter visual state is CAPTURE_IN_PROGRESS when active photo shot with REQUESTED status`() {
-        // Between ShutterPressed and ShotStarted: activeShot exists, captureStatus is REQUESTED.
-        // Show brief acknowledgment instead of full SAVING spinner.
-        val state = defaultSessionState(
-            activeShot = ShotRequest(
-                shotId = "req-1",
-                shotKind = ShotKind.STILL_CAPTURE,
-                mediaType = MediaType.PHOTO,
-                saveRequest = SaveRequest.photoLibrary(),
-                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
-                postProcessSpec = PostProcessSpec(),
-                captureProfile = CaptureProfile()
-            )
-        ).copy(captureStatus = CaptureStatus.REQUESTED)
-        assertEquals(ShutterVisualState.CAPTURE_IN_PROGRESS, shutterVisualState(state))
-    }
-
-    @Test
-    fun `shutter visual state transitions from CAPTURE_IN_PROGRESS to SAVING`() {
+    fun `shutter visual state transitions from PHOTO_PRESSED to SAVING`() {
         val shot = ShotRequest(
             shotId = "trans-1",
             shotKind = ShotKind.STILL_CAPTURE,
@@ -1060,17 +1042,17 @@ class SessionCockpitRenderModelTest {
             postProcessSpec = PostProcessSpec(),
             captureProfile = CaptureProfile()
         )
-        // REQUESTED → CAPTURE_IN_PROGRESS
+        // REQUESTED → PHOTO_PRESSED (immediate tap acknowledgment)
         val requestedState = defaultSessionState(activeShot = shot)
             .copy(captureStatus = CaptureStatus.REQUESTED)
-        assertEquals(ShutterVisualState.CAPTURE_IN_PROGRESS, shutterVisualState(requestedState))
+        assertEquals(ShutterVisualState.PHOTO_PRESSED, shutterVisualState(requestedState))
 
         // SAVING → SAVING
         val savingState = defaultSessionState(activeShot = shot)
             .copy(captureStatus = CaptureStatus.SAVING)
         assertEquals(ShutterVisualState.SAVING, shutterVisualState(savingState))
 
-        // DATA_RECEIVED with activeShot cleared (conservative keeps activeShot) → SAVING or ready
+        // DATA_RECEIVED with activeShot still set (conservative) → SAVING
         val dataReceivedState = defaultSessionState(activeShot = shot)
             .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
         assertEquals(ShutterVisualState.SAVING, shutterVisualState(dataReceivedState))
