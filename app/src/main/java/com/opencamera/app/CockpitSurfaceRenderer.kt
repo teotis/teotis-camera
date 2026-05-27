@@ -176,11 +176,11 @@ internal class CockpitSurfaceRenderer(
         val buttonMap = mapOf(
             com.opencamera.core.mode.ModeId.PHOTO to modeTrack.photo,
             com.opencamera.core.mode.ModeId.HUMANISTIC to modeTrack.humanistic,
+            com.opencamera.core.mode.ModeId.PORTRAIT to modeTrack.portrait,
             com.opencamera.core.mode.ModeId.VIDEO to modeTrack.video,
             com.opencamera.core.mode.ModeId.DOCUMENT to modeTrack.document
         )
         modeTrack.night.visibility = View.GONE
-        modeTrack.portrait.visibility = View.GONE
         modeTrack.pro.visibility = View.GONE
         buttonMap.values.forEach { it.visibility = View.GONE }
         model.items.forEach { item ->

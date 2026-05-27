@@ -3,6 +3,6 @@
     <corners
         android:topLeftRadius="@dimen/radius_bottom_cockpit"
         android:topRightRadius="@dimen/radius_bottom_cockpit" />
-    <solid android:color="@color/oc_surface_scrim" />
+    <solid android:color="#CC000000" />
 </shape>
 
