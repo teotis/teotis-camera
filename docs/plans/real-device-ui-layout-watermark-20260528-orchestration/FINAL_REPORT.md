@@ -2,7 +2,7 @@
 
 ## Result
 
-Ready for mainline merge after user-approved real-device QA waiver.
+Merged to mainline after user-approved real-device QA waiver.
 
 ## Merged Packages
 
@@ -27,3 +27,4 @@ The real-device acceptance package was skipped by explicit user approval on 2026
 - Final visual feel for frame containment, bottom density, and Quick Watermark cycling still needs later device screenshot review if symptoms persist.
 - Existing git noise remains: repeated `non-monotonic index .git/objects/pack/._pack-...idx` messages from macOS resource-fork files. It did not block branch lookup, merge, or Gradle verification in this run.
 - Package branches/worktrees are preserved for inspection; cleanup is deferred.
+- Mainline merge completed on 2026-05-28.

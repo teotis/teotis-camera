@@ -20,7 +20,7 @@
 
 - User approved skipping package `04-real-device-acceptance` real-device smoke on 2026-05-28.
 - Integration branch merged packages `01`, `02`, `03`, and the `04` waiver branch without conflicts.
-- Mainline merge is pending at the time this status file is written.
+- Mainline merge completed on 2026-05-28 after resolving the coordinator `state.tsv` conflict in favor of the finalized ledger state.
 
 ## Blocker Context
 
