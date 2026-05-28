@@ -11,6 +11,7 @@ import com.opencamera.core.media.SceneMaskQuality
  * Pure-JVM ARGB color constants (matching android.graphics.Color values).
  */
 private const val COLOR_WHITE: Int = -1 // 0xFFFFFFFF
+private val COLOR_BAR_DARK: Int = 0xFE000000.toInt() // 0xFE000000
 
 class PreviewEffectAdapter {
 
@@ -117,7 +118,9 @@ class PreviewEffectAdapter {
             previewText = effect.tokens["watermarkModel"] ?: "Watermark",
             opacity = effect.style.textOpacity.alphaFraction * 0.6f,
             shape = resolveWatermarkShape(effect.templateId),
-            textScale = effect.style.textScale.multiplier
+            textScale = effect.style.textScale.multiplier,
+            previewLabels = buildPreviewLabels(effect),
+            barBackground = resolveBarBackground(effect)
         )
     }
 
@@ -125,9 +128,29 @@ class PreviewEffectAdapter {
         return when (templateId) {
             "pure-text" -> WatermarkPreviewShape.TEXT_ONLY
             "blur-four-border" -> WatermarkPreviewShape.FOUR_BORDER
-            "travel-polaroid", "retro-frame", "professional-bottom-bar" ->
-                WatermarkPreviewShape.EXPANDED_FRAME
+            "professional-bottom-bar" -> WatermarkPreviewShape.BOTTOM_BAR
+            "travel-polaroid", "retro-frame" -> WatermarkPreviewShape.EXPANDED_FRAME
             else -> WatermarkPreviewShape.BACKED_TEXT
+        }
+    }
+
+    private fun buildPreviewLabels(effect: WatermarkEffect): List<String> {
+        if (effect.templateId != "professional-bottom-bar") return emptyList()
+        val labels = mutableListOf<String>()
+        effect.tokens["watermarkModel"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }
+        effect.tokens["datetime"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }
+        effect.tokens["camera-params"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }
+        return labels.ifEmpty { listOf("Watermark") }
+    }
+
+    private fun resolveBarBackground(effect: WatermarkEffect): Int {
+        if (effect.templateId != "professional-bottom-bar") return 0
+        return when (effect.style.frameBackground) {
+            com.opencamera.core.settings.WatermarkFrameBackground.DARK -> COLOR_BAR_DARK
+            com.opencamera.core.settings.WatermarkFrameBackground.WHITE -> COLOR_WHITE
+            com.opencamera.core.settings.WatermarkFrameBackground.SOURCE_BLUR -> COLOR_BAR_DARK
+            com.opencamera.core.settings.WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> COLOR_BAR_DARK
+            com.opencamera.core.settings.WatermarkFrameBackground.SOURCE_VIVID_BLUR -> COLOR_BAR_DARK
         }
     }
 

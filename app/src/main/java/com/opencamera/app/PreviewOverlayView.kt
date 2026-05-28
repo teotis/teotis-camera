@@ -299,6 +299,7 @@ class PreviewOverlayView @JvmOverloads constructor(
             WatermarkPreviewShape.TEXT_ONLY,
             WatermarkPreviewShape.BACKED_TEXT -> drawWatermarkTextHint(canvas, spec)
             WatermarkPreviewShape.EXPANDED_FRAME -> drawWatermarkExpandedFrameHint(canvas, spec)
+            WatermarkPreviewShape.BOTTOM_BAR -> drawWatermarkBottomBarHint(canvas, spec)
         }
     }
 
@@ -412,6 +413,53 @@ class PreviewOverlayView @JvmOverloads constructor(
             WatermarkTextPlacement.BOTTOM_CENTER -> borderRect.centerX()
         }
         canvas.drawText(spec.previewText, textX, textY, watermarkHintPaint)
+    }
+
+    private val bottomBarBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val bottomBarTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            10f,
+            resources.displayMetrics
+        )
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+    }
+
+    private fun drawWatermarkBottomBarHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        val rect = activeFrameRectOrFullView()
+        val barHeight = 36f * density
+        val barRect = RectF(
+            rect.left,
+            rect.bottom - barHeight,
+            rect.right,
+            rect.bottom
+        )
+        val bgColor = spec.barBackground
+        if (bgColor != 0) {
+            bottomBarBackgroundPaint.color = bgColor
+            bottomBarBackgroundPaint.alpha = (spec.opacity * 200).toInt().coerceIn(0, 200)
+            canvas.drawRect(barRect, bottomBarBackgroundPaint)
+        }
+        bottomBarTextPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
+        val padding = 10f * density
+        val textY = barRect.centerY() - (bottomBarTextPaint.ascent() + bottomBarTextPaint.descent()) / 2f
+        if (spec.previewLabels.isNotEmpty()) {
+            bottomBarTextPaint.textAlign = Paint.Align.LEFT
+            val leftX = barRect.left + padding
+            canvas.drawText(spec.previewLabels.first(), leftX, textY, bottomBarTextPaint)
+            if (spec.previewLabels.size > 1) {
+                bottomBarTextPaint.textAlign = Paint.Align.RIGHT
+                val rightX = barRect.right - padding
+                canvas.drawText(spec.previewLabels.last(), rightX, textY, bottomBarTextPaint)
+            }
+        } else {
+            bottomBarTextPaint.textAlign = Paint.Align.CENTER
+            canvas.drawText(spec.previewText, barRect.centerX(), textY, bottomBarTextPaint)
+        }
     }
 
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
