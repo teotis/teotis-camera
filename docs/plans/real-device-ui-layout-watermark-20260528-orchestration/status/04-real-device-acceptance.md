@@ -2,7 +2,7 @@
 
 ## State
 
-`manual_required`
+`completed`
 
 ## Evidence
 
