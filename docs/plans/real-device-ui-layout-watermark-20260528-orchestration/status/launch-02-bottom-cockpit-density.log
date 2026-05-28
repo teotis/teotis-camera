@@ -1,0 +1,5 @@
+backgrounded · [36mcd4a81ca[39m
+[2m  claude agents             list sessions[22m
+[2m  claude attach cd4a81ca    open in this terminal[22m
+[2m  claude logs cd4a81ca      show recent output[22m
+[2m  claude stop cd4a81ca      stop this session[22m

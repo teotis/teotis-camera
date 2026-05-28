@@ -2,7 +2,7 @@
 
 ## State
 
-`pending`
+`manual_required`
 
 ## Evidence
 
