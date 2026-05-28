@@ -213,6 +213,8 @@ open class AppTextResolver(private val context: Context?) {
         String.format(str(R.string.dev_log_title_error, "Error Log (%d)"), count)
     open fun devLogTitleAll(count: Int): String =
         String.format(str(R.string.dev_log_title_all, "All Events (%d)"), count)
+    open fun devLogTitleLink(count: Int): String =
+        String.format(str(R.string.dev_log_title_link, "Link Flow (%d)"), count)
 
     // Filter advanced control labels
     open fun filterCtrlExposure(): String = str(R.string.filter_ctrl_exposure, "Exposure")

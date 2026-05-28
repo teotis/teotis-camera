@@ -87,6 +87,7 @@
     <string name="dev_tab_core">Pipeline</string>
     <string name="dev_tab_error">Error</string>
     <string name="dev_tab_all">All</string>
+    <string name="dev_tab_link">Link</string>
     <string name="dev_export_log">Export Log</string>
     <string name="dev_cleanup_key">Clear Summary</string>
     <string name="dev_cleanup_core">Clear Pipeline</string>
@@ -318,6 +319,7 @@
     <string name="dev_log_title_core">Pipeline Log (%d)</string>
     <string name="dev_log_title_error">Error Log (%d)</string>
     <string name="dev_log_title_all">All Events (%d)</string>
+    <string name="dev_log_title_link">Link Flow (%d)</string>
 
     <!-- Missing quick bubble strings -->
     <string name="button_quick_grid">Grid</string>

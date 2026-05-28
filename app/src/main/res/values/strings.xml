@@ -89,6 +89,7 @@
     <string name="dev_tab_core">链路</string>
     <string name="dev_tab_error">错误</string>
     <string name="dev_tab_all">全部</string>
+    <string name="dev_tab_link">耗时</string>
     <string name="dev_export_log">导出日志</string>
     <string name="dev_cleanup_key">清理摘要</string>
     <string name="dev_cleanup_core">清理链路</string>
@@ -322,6 +323,7 @@
     <string name="dev_log_title_core">链路日志 (%d)</string>
     <string name="dev_log_title_error">错误日志 (%d)</string>
     <string name="dev_log_title_all">全部事件 (%d)</string>
+    <string name="dev_log_title_link">流程耗时 (%d)</string>
 
     <!-- Settings joiners for sessionSettingsRenderModel -->
     <string name="settings_joiner_grid">网格</string>

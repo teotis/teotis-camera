@@ -41,6 +41,14 @@ class DevLogExporterTest {
     }
 
     @Test
+    fun `export creates file with LINK type header`() {
+        val file = exporter.export("link flow content", type = DevLogTab.LINK, nowMillis = 3000L)
+        assertTrue(file.exists())
+        val header = file.readLines().first()
+        assertEquals("# type: LINK", header)
+    }
+
+    @Test
     fun `storageSummary returns zero when no directory`() {
         val emptyExporter = TestableDevLogExporter(File(tempDir, "nonexistent"))
         val summary = emptyExporter.storageSummary()

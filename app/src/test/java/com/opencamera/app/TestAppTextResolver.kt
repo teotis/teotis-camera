@@ -138,6 +138,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun devLogTitleCore(count: Int): String = "Pipeline Log ($count)"
     override fun devLogTitleError(count: Int): String = "Error Log ($count)"
     override fun devLogTitleAll(count: Int): String = "All Events ($count)"
+    override fun devLogTitleLink(count: Int): String = "Link Flow ($count)"
     override fun filterCtrlExposure(): String = "Exposure"
     override fun filterCtrlSoftGlow(): String = "Soft Glow"
     override fun filterCtrlHalo(): String = "Halo"
