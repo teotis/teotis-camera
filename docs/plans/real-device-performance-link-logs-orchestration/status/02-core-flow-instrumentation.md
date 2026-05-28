@@ -2,7 +2,7 @@
 
 ## State
 
-`invalid`
+`completed`
 
 ## Worktree
 
