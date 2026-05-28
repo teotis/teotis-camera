@@ -2,7 +2,7 @@
 
 ## State
 
-`ready`
+`launched`
 
 ## Worktree
 
