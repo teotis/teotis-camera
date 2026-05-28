@@ -117,6 +117,8 @@ internal data class QuickPanelSheetRenderModel(
     val frameRatioOptions: List<FrameRatioOptionRenderModel>,
     val frameRatioEnabled: Boolean,
     val frameRatioDisabledReason: String?,
+    val watermarkRow: QuickPanelRowRenderModel,
+    val watermarkNextTemplateId: String?,
     val liveRow: QuickPanelRowRenderModel,
     val timerRow: QuickPanelRowRenderModel,
     val hasQuickUserAdjustments: Boolean = false,
@@ -367,6 +369,27 @@ internal fun quickPanelSheetRenderModel(
 
     val resolutionEnabled = stillQualityEnabled && isStillResolutionToggleEnabled(state)
 
+    val catalog = state.settings.catalog
+    val watermarkTemplates = catalog.watermarkTemplates
+    val currentTemplateId = state.settings.persisted.photo.defaultWatermarkTemplateId
+    val currentTemplate = watermarkTemplates.firstOrNull { it.id == currentTemplateId }
+    val watermarkEnabled = stillTemplate && !stillBusy && state.activeDeviceCapabilities.supportsStillCapture && watermarkTemplates.isNotEmpty()
+    val watermarkDisabledReason = when {
+        !state.activeDeviceCapabilities.supportsStillCapture -> null
+        !stillTemplate -> null
+        stillBusy -> text.disabledSavingPhoto()
+        watermarkTemplates.isEmpty() -> text.noWatermarkTemplates()
+        else -> null
+    }
+    val nextTemplateId = if (watermarkEnabled && watermarkTemplates.size > 1) {
+        val currentIndex = watermarkTemplates.indexOfFirst { it.id == currentTemplateId }
+        val nextIndex = if (currentIndex >= 0) (currentIndex + 1) % watermarkTemplates.size else 0
+        watermarkTemplates[nextIndex].id
+    } else {
+        null
+    }
+    val watermarkLabel = currentTemplate?.label ?: currentTemplateId
+
     val currentRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio ?: FrameRatio.RATIO_4_3
     val entries = FrameRatio.entries
     val nextRatio = if (frameControl.isEnabled) {
@@ -401,6 +424,14 @@ internal fun quickPanelSheetRenderModel(
         frameRatioOptions = frameControl.options,
         frameRatioEnabled = frameControl.isEnabled,
         frameRatioDisabledReason = frameControl.disabledReason,
+        watermarkRow = QuickPanelRowRenderModel(
+            title = text.quickWatermark(),
+            value = watermarkLabel,
+            isEnabled = watermarkEnabled,
+            disabledReason = watermarkDisabledReason,
+            controlKind = QuickControlKind.CYCLE
+        ),
+        watermarkNextTemplateId = nextTemplateId,
         liveRow = QuickPanelRowRenderModel(
             title = text.quickLive(),
             value = live.value,
