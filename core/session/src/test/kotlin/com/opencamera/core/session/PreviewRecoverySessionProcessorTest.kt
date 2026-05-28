@@ -78,6 +78,7 @@ class PreviewRecoverySessionProcessorTest {
                 state = state,
                 effects = effects,
                 trace = trace,
+                linkRecorder = InMemoryPerformanceLinkRecorder(),
                 mutations = mutations,
                 countdownInProgress = { countdownActive },
                 cancelPendingCountdown = { reason -> countdownCancellations.add(reason) },
