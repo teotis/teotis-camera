@@ -326,6 +326,7 @@ internal class MainActivityActionBinder(
         views.devConsole.tabKey.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.KEY) }
         views.devConsole.tabCore.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.CORE) }
         views.devConsole.tabError.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.ERROR) }
+        views.devConsole.tabLink.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.LINK) }
         views.devConsole.tabAll.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.ALL) }
         views.devConsole.export.setOnClickListener {
             callbacks.exportDevLog()

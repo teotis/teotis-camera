@@ -12,6 +12,8 @@ import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
+import com.opencamera.core.session.PerformanceLinkEvent
+import com.opencamera.core.session.toLinkLogLine
 import com.opencamera.core.session.buildSessionDebugDump
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.ColorLabSpec
@@ -1694,7 +1696,8 @@ internal fun devLogRenderModel(
     selectedTab: DevLogTab,
     text: AppTextResolver,
     resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
-    storageSummary: StorageSummary? = null
+    storageSummary: StorageSummary? = null,
+    linkEvents: List<PerformanceLinkEvent> = emptyList()
 ): DevLogRenderModel {
     if (!isDebugBuild) {
         return DevLogRenderModel(
@@ -1731,10 +1734,13 @@ internal fun devLogRenderModel(
         }
     }
 
+    val linkContent = linkEvents.joinToString("\n") { it.toLinkLogLine() }
+
     val tabContent = when (selectedTab) {
         DevLogTab.KEY -> formatEvents(keyEvents)
         DevLogTab.CORE -> formatEvents(coreEvents)
         DevLogTab.ERROR -> formatEvents(errorEvents)
+        DevLogTab.LINK -> linkContent
         DevLogTab.ALL -> formatEvents(allEvents)
     }
 
@@ -1745,6 +1751,8 @@ internal fun devLogRenderModel(
         appendLine(formatEvents(coreEvents))
         appendLine("=== ERROR EVENTS ===")
         appendLine(formatEvents(errorEvents))
+        appendLine("=== LINK FLOW EVENTS ===")
+        appendLine(linkContent)
         appendLine("=== ALL EVENTS ===")
         appendLine(formatEvents(allEvents))
         debugDump.resourceDiagnostics?.let { res ->
@@ -1757,6 +1765,7 @@ internal fun devLogRenderModel(
 
     val lastTiming = traceEvents.lastOrNull { it.name.endsWith(".timing") }
     val lastIssue = errorEvents.lastOrNull()
+    val lastLink = linkEvents.lastOrNull()
     val summaryText = buildString {
         append("状态: ${debugDump.previewStatus} | ")
         append("模式: ${debugDump.activeMode.name} | ")
@@ -1764,6 +1773,12 @@ internal fun devLogRenderModel(
         append("录制: ${debugDump.recordingStatus}")
         if (lastTiming != null) {
             append(" | 最后耗时: ${lastTiming.detail}")
+        }
+        if (lastLink != null) {
+            append(" | Link: ${lastLink.flow}/${lastLink.stage}=${lastLink.status.label}")
+            if (lastLink.durationMillis != null) {
+                append(" ${lastLink.durationMillis}ms")
+            }
         }
         if (lastIssue != null) {
             append(" | 最近问题: ${lastIssue.name}")
@@ -1777,6 +1792,7 @@ internal fun devLogRenderModel(
             DevLogTab.KEY -> text.devLogTitleKey(keyEvents.size)
             DevLogTab.CORE -> text.devLogTitleCore(coreEvents.size)
             DevLogTab.ERROR -> text.devLogTitleError(errorEvents.size)
+            DevLogTab.LINK -> text.devLogTitleLink(linkEvents.size)
             DevLogTab.ALL -> text.devLogTitleAll(allEvents.size)
         },
         summaryText = summaryText,

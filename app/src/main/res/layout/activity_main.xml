@@ -1495,6 +1495,15 @@
                         android:text="@string/dev_tab_error" />
 
                     <Button
+                        android:id="@+id/buttonDevTabLink"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_link" />
+
+                    <Button
                         android:id="@+id/buttonDevTabAll"
                         style="@style/Widget.OpenCamera.CompactButton"
                         android:layout_width="0dp"
