@@ -1,0 +1,418 @@
+package com.opencamera.app
+
+import com.opencamera.app.i18n.AppTextResolver
+import com.opencamera.core.mode.ModeId
+import com.opencamera.core.settings.CompositionGridMode
+import com.opencamera.core.settings.CountdownDuration
+import com.opencamera.core.settings.PersistedSettings
+
+open class TestAppTextResolver : AppTextResolver(null) {
+    override fun modeDisplayName(modeId: ModeId): String = when (modeId) {
+        ModeId.PHOTO -> "Photo"
+        ModeId.DOCUMENT -> "Doc"
+        ModeId.NIGHT -> "Scenery"
+        ModeId.HUMANISTIC -> "Humanistic"
+        ModeId.PORTRAIT -> "Port"
+        ModeId.PRO -> "Pro"
+        ModeId.VIDEO -> "Video"
+    }
+
+    override fun modeTrackLabel(modeId: ModeId): String = modeDisplayName(modeId)
+
+    override fun gridModeLabel(value: CompositionGridMode): String = when (value) {
+        CompositionGridMode.OFF -> "Off"
+        CompositionGridMode.RULE_OF_THIRDS -> "3x3"
+        CompositionGridMode.GOLDEN_RATIO -> "Golden"
+    }
+
+    override fun countdownLabel(value: CountdownDuration): String = when (value) {
+        CountdownDuration.OFF -> "Off"
+        CountdownDuration.SECONDS_3 -> "3s"
+        CountdownDuration.SECONDS_5 -> "5s"
+        CountdownDuration.SECONDS_10 -> "10s"
+    }
+
+    override fun onOff(enabled: Boolean): String = if (enabled) "On" else "Off"
+    override fun shutterShort(): String = "Shutter"
+    override fun ratio(): String = "Ratio"
+    override fun filter(): String = "Filter"
+    override fun portrait(): String = "Portrait"
+    override fun watermark(): String = "Watermark"
+    override fun livePhoto(): String = "Live"
+    override fun timer(): String = "Timer"
+    override fun flash(): String = "Flash"
+    override fun filterLab(): String = "Tone Lab"
+    override fun portraitLab(): String = "Portrait Lab"
+    override fun watermarkLab(): String = "Watermark Lab"
+    override fun devEntry(): String = "DEV"
+    override fun devRestart(): String = "Restart Session"
+    override fun devClose(): String = "Close"
+    override fun devExportLog(): String = "Export Log"
+    override fun devTabKey(): String = "Summary"
+    override fun devTabCore(): String = "Pipeline"
+    override fun devTabError(): String = "Error"
+    override fun devTabAll(): String = "All"
+    override fun quickLauncher(): String = "Quick"
+    override fun quickGrid(): String = "Grid"
+    override fun quickQuality(): String = "Quality"
+    override fun quickResolution(): String = "Size"
+    override fun quickLive(): String = "Live"
+    override fun quickTimer(): String = "Timer"
+    override fun moreControls(): String = "More"
+    override fun stopSession(): String = "Stop Session"
+    override fun restartSession(): String = "Restart Session"
+    override fun closeSettings(): String = "Close Settings"
+    override fun closeFilter(): String = "Close Filter Lab"
+    override fun permissionPending(): String = "Camera permission is required before preview can start."
+    override fun permissionGranted(): String = "Camera permission granted. Preview is ready."
+    override fun permissionCameraOnly(): String = "Camera granted. Video recording will be silent until microphone permission is granted."
+    override fun permissionDenied(): String = "Camera permission denied. Tap shutter to request it again."
+    override fun permissionPermanentlyDenied(): String = "Camera permission permanently denied. Please enable it in system settings."
+    override fun permissionOpenSettings(): String = "Open Settings"
+    override fun outputWaiting(): String = "No photo captured yet."
+    override fun outputSavedPrefix(): String = "Last photo:"
+    override fun outputVideoPrefix(): String = "Last video:"
+    override fun outputLivePrefix(): String = "Last Live photo:"
+    override fun outputErrorPrefix(): String = "Camera issue:"
+    override fun outputPreviewPrefix(): String = "Preview thumbnail:"
+    override fun settingsSectionCommon(): String = "General"
+    override fun settingsSectionPhoto(): String = "Photo"
+    override fun settingsSectionVideo(): String = "Video"
+    override fun switchLens(): String = "Switch Lens"
+    override fun zoomPrefix(): String = "Zoom"
+    override fun zoomUnavailable(): String = "Zoom N/A"
+    override fun stillQuality(): String = "Still Quality"
+    override fun stillFast(): String = "Still Fast"
+    override fun stillMax(): String = "Still Max"
+    override fun stillQualityUnavailable(): String = "Still N/A"
+    override fun stillResolution(): String = "Still Size"
+    override fun still12Mp(): String = "Still 12MP"
+    override fun still8Mp(): String = "Still 8MP"
+    override fun still2Mp(): String = "Still 2MP"
+    override fun stillResolutionUnavailable(): String = "Size N/A"
+    override fun switchToFront(): String = "Switch to Front"
+    override fun switchToBack(): String = "Switch to Back"
+    override fun singleLens(): String = "Single Lens"
+    override fun tone(): String = "Tone"
+    override fun styleEntry(): String = "Style"
+    override fun stylePanelTitle(): String = "Style"
+    override fun colorLabPanelTitle(): String = "Color Lab"
+    override fun useThisStyle(): String = "Use Style"
+    override fun paletteSectionTitle(): String = "Palette"
+    override fun lensLabEditingEnabled(): String = "Changes save instantly and refresh the active mode defaults."
+    override fun lensLabEditingDisabled(): String = "Finish the current capture before changing saved defaults."
+    override fun portraitLabEditingEnabled(): String = "Portrait defaults save instantly and apply to the next portrait capture metadata and lightweight render pass."
+    override fun portraitLabEditingDisabled(): String = "Finish the current capture before changing portrait product defaults."
+    override fun watermarkSelectorEditingEnabled(): String = "Default template changes save instantly. Each template keeps its own placement, scale, opacity, and frame background preset."
+    override fun watermarkSelectorEditingDisabled(): String = "Finish the current capture before changing watermark defaults."
+    override fun watermarkDetailEditingEnabled(): String = "Template-specific styles save instantly and stay attached to this watermark preset."
+    override fun watermarkDetailEditingDisabled(): String = "Finish the current capture before changing watermark styles."
+    override fun filterLabEditingEnabled(): String = "Selected family defaults save instantly and refresh the active mode when relevant."
+    override fun filterLabEditingDisabled(): String = "Finish the current capture before changing filter defaults."
+    override fun statusCustomBadge(): String = " | Custom"
+    override fun filterLabSupportingText(): String = "Independent filter panel for mode defaults. Import and export stay deferred in this closure; selected looks can be adjusted or saved as custom."
+    override fun filterLabHeroSummary(familyLabel: String, filterLabel: String, count: Int): String = "$familyLabel default $filterLabel • $count looks staged"
+    override fun filterLabCurrentDefault(filterLabel: String): String = "Current default $filterLabel"
+    override fun filterLabSelectedDefault(): String = " | Selected default"
+    override fun filterLabLightPaletteHint(): String = "Horizontal swipe for color, vertical swipe for tone."
+    override fun filterLabDragToCreateCustom(): String = "Drag palette to save as custom"
+    override fun filterLabNextLook(familyLabel: String): String = "Next $familyLabel look"
+    override fun filterLabLooksDeferred(count: Int): String = "$count looks | import/export deferred"
+    override fun filterLabFooter(): String = "Independent Tone Lab prioritized. Panel adjustments and custom saves ongoing; import/export deferred."
+    override fun filterLabSaveCustomUnavailableProfile(): String = "Unavailable • Missing source profile"
+    override fun filterLabSaveCustomAlreadyCustom(): String = "Unavailable • Current default already custom"
+    override fun filterLabSaveCustomReady(familyLabel: String): String = "Ready • Becomes the $familyLabel default"
+    override fun filterLightPaletteColor(): String = "Color"
+    override fun filterLightPaletteTone(): String = "Tone"
+    override fun filterSignedOff(): String = "Off"
+    override fun filterSignedWarm(): String = "Warm"
+    override fun filterSignedWarmPlus(): String = "Warm+"
+    override fun filterSignedCool(): String = "Cool"
+    override fun filterSignedCoolPlus(): String = "Cool+"
+    override fun filterSignedMagenta(): String = "Magenta"
+    override fun filterSignedMagentaPlus(): String = "Magenta+"
+    override fun filterSignedGreen(): String = "Green"
+    override fun filterSignedGreenPlus(): String = "Green+"
+    override fun devLogTitleKey(count: Int): String = "Summary Log ($count)"
+    override fun devLogTitleCore(count: Int): String = "Pipeline Log ($count)"
+    override fun devLogTitleError(count: Int): String = "Error Log ($count)"
+    override fun devLogTitleAll(count: Int): String = "All Events ($count)"
+    override fun filterCtrlExposure(): String = "Exposure"
+    override fun filterCtrlSoftGlow(): String = "Soft Glow"
+    override fun filterCtrlHalo(): String = "Halo"
+    override fun filterCtrlGrain(): String = "Grain"
+    override fun filterCtrlSharpness(): String = "Sharpness"
+    override fun filterCtrlVignette(): String = "Vignette"
+    override fun filterCtrlHighlights(): String = "Highlights"
+    override fun filterCtrlShadows(): String = "Shadows"
+    override fun filterCtrlWarmBoost(): String = "Warm Boost"
+    override fun filterCtrlCoolBoost(): String = "Cool Boost"
+    override fun filterCtrlTempShift(): String = "Temp Shift"
+    override fun filterCtrlTintShift(): String = "Tint Shift"
+    override fun filterFamilyPhoto(): String = "Photo"
+    override fun filterFamilyHumanistic(): String = "Humanistic"
+    override fun filterFamilyPortrait(): String = "Portrait"
+    override fun filterFamilyVideo(): String = "Video"
+    override fun proControlsScenery(): String = "Scenery Pro Controls"
+    override fun proControlsPortrait(): String = "Portrait Pro Controls"
+    override fun proControlsHumanistic(): String = "Humanistic Pro Controls"
+    override fun proControlsDefault(): String = "Pro Controls"
+    override fun compositionGridLabel(): String = "Composition grid"
+    override fun shutterToneLabel(): String = "Shutter tone"
+    override fun selfieMirrorLabel(): String = "Selfie mirror"
+    override fun defaultPhotoFilterLabel(): String = "Default photo filter"
+    override fun portraitLabSettingLabel(): String = "Portrait Lab"
+    override fun watermarkLabSettingLabel(): String = "Watermark Lab"
+    override fun livePhotoDefaultLabel(): String = "Live photo default"
+    override fun liveSaveFormatLabel(): String = "Live save format"
+    override fun liveSaveFormatSupportLabel(count: Int): String = "$count formats: Motion Photo, MP4 Sidecar, JPEG Only"
+    override fun countdownLabel(): String = "Countdown"
+    override fun resolutionLabel(): String = "Resolution"
+    override fun frameRateLabel(): String = "Frame rate"
+    override fun dynamicFpsLabel(): String = "Dynamic fps"
+    override fun audioSceneLabel(): String = "Audio scene"
+    override fun videoFilterSeedLabel(): String = "Video filter seed"
+    override fun portraitProfileLabel(): String = "Portrait profile"
+    override fun beautyPresetLabel(): String = "Beauty preset"
+    override fun beautyStrengthLabel(): String = "Beauty strength"
+    override fun bokehEffectLabel(): String = "Bokeh effect"
+    override fun textPlacementLabel(): String = "Text placement"
+    override fun textScaleLabel(): String = "Text scale"
+    override fun textOpacityLabel(): String = "Text opacity"
+    override fun frameBackgroundLabel(): String = "Frame background"
+    override fun tokensLabel(): String = "Tokens"
+    override fun rawLabel(): String = "RAW"
+    override fun isoLabel(): String = "ISO"
+    override fun shutterLabel(): String = "Shutter"
+    override fun evLabel(): String = "EV"
+    override fun focusLabel(): String = "Focus"
+    override fun apertureLabel(): String = "Aperture"
+    override fun wbLabel(): String = "WB"
+    override fun autoLabel(): String = "Auto"
+    override fun saveAsCustom(): String = "Save as Custom"
+    override fun useThisTemplate(): String = "Use This Template"
+    override fun useThisLook(): String = "Use This Look"
+    override fun openStylePage(): String = "Open Style Page"
+    override fun switchToAdvanced(): String = "Switch to Advanced"
+    override fun switchToLight(): String = "Switch to Light"
+    override fun tapToCycleLabel(): String = "Tap to cycle"
+    override fun levelWarm(): String = "Warm"
+    override fun levelWarmPlus(): String = "Warm+"
+    override fun levelCool(): String = "Cool"
+    override fun levelCoolPlus(): String = "Cool+"
+    override fun levelMagenta(): String = "Magenta"
+    override fun levelMagentaPlus(): String = "Magenta+"
+    override fun levelGreen(): String = "Green"
+    override fun levelGreenPlus(): String = "Green+"
+    override fun toneSoftLift(): String = "Soft Lift"
+    override fun toneDeepContrast(): String = "Deep Contrast"
+    override fun toneBalanced(): String = "Balanced"
+    override fun colorMagentaWarm(): String = "Magenta/Warm"
+    override fun colorGreenCool(): String = "Green/Cool"
+    override fun colorCoolMuted(): String = "Cool/Muted"
+    override fun colorNeutral(): String = "Neutral"
+    override fun currentDefault(): String = "Current default"
+    override fun selectedDefault(): String = "Selected default"
+    override fun rendererPending(): String = "Renderer pending"
+    override fun statusCustom(): String = "Custom"
+    override fun unavailableMissingProfile(): String = "Unavailable • Missing source profile"
+    override fun readyEditingCustom(): String = "Ready • Editing current custom look"
+    override fun unavailableAlreadyCustom(): String = "Unavailable • Current default already custom"
+    override fun readyBecomesDefault(): String = "Ready • Becomes the default"
+    override fun noCompatibleLooks(): String = "No compatible looks"
+    override fun stillCaptureUnavailable(): String = "Still capture unavailable on this device"
+    override fun videoRecordingUnavailable(): String = "Video recording unavailable on this device"
+    override fun microphoneUnavailable(): String = "Microphone capture unavailable on this device"
+    override fun noCompatibleFilters(): String = "No compatible filters"
+    override fun noWatermarkTemplates(): String = "No watermark templates available"
+    override fun camera2Interop(): String = "Camera2 interop"
+    override fun savedOnly(): String = "Saved only"
+    override fun temporarilyUnsupported(): String = "Temporarily unsupported"
+    override fun manualControlsUnavailable(): String = "Manual controls currently unavailable"
+    override fun manualAdapterApplies(): String = "Adapter applies"
+    override fun manualStaySavedOnly(): String = "stay saved-only"
+    override fun manualTempUnsupportedSuffix(): String = "temporarily unsupported"
+    override fun zoomRatioLabel(ratio: Float): String = "${ratio}x"
+    override fun countdownSeconds(seconds: Int): String = "${seconds}s"
+    override fun outputSizeLabel(width: Int, height: Int): String = "${width}x${height}"
+    override fun kelvinLabel(k: Int): String = "${k}K"
+    override fun shutterSpeedMs(ms: Int): String = "${ms}ms"
+    override fun focusDistanceDiopters(d: Float): String = java.lang.String.format("%.1fD", d)
+    override fun apertureFNumber(f: Float): String = java.lang.String.format("f/%s", f)
+    override fun supportCount(count: Int): String = "$count options"
+    override fun looksCount(count: Int): String = "$count curated looks"
+    override fun templatesCount(count: Int): String = "$count templates"
+    override fun presetsCount(count: Int): String = "$count presets"
+    override fun placementsCount(count: Int): String = "$count placements"
+    override fun stepsCount(count: Int): String = "$count steps"
+    override fun levelsCount(count: Int): String = "$count levels"
+    override fun moodsCount(count: Int): String = "$count moods"
+    override fun productProfilesCount(count: Int): String = "$count product profiles"
+    override fun plansCount(count: Int): String = "$count plans"
+    override fun renderingFeelsCount(count: Int): String = "$count rendering feels"
+    override fun nextLookLabel(label: String): String = "Next $label look"
+    override fun watermarkTokenCameraParams(): String = "Camera Params"
+    override fun watermarkTokenDateTime(): String = "Date/Time"
+    override fun watermarkTokenLocation(): String = "Location"
+    override fun watermarkTokenModel(): String = "Model"
+    override fun backLens(): String = "Back"
+    override fun frontLens(): String = "Front"
+    override fun placementLabel(): String = "Placement"
+    override fun scaleLabel(): String = "Scale"
+    override fun opacityLabel(): String = "Opacity"
+    override fun backgroundLabel(): String = "Background"
+    override fun colorLabel(): String = "Color"
+    override fun toneLabel(): String = "Tone"
+    override fun lowLightAuto24fps(): String = "Low-light auto 24fps"
+    override fun lockedFps(): String = "Locked fps"
+    override fun settingsSummaryGrid(): String = "Grid"
+    override fun settingsSummaryShutterSound(): String = "Shutter sound"
+    override fun settingsSummarySelfieMirror(): String = "Selfie mirror"
+    override fun settingsSummaryFilter(): String = "Filter"
+    override fun settingsSummaryPortrait(): String = "Portrait"
+    override fun settingsSummaryWatermark(): String = "Watermark"
+    override fun settingsSummaryLive(): String = "Live"
+    override fun settingsSummaryTimer(): String = "Timer"
+    override fun settingsSummaryMic(): String = "Mic"
+    override fun settingsSummaryFilters(): String = "filters"
+    override fun settingsSummaryWatermarkTemplates(): String = "watermark templates"
+    override fun settingsSummaryMsBundle(): String = "ms bundle"
+    override fun settingsSummaryProManualDraft(): String = "Pro manual draft"
+
+    // Settings joiners
+    override fun settingsJoinerGrid(): String = "Grid "
+    override fun settingsJoinerShutterSound(): String = " | Shutter sound "
+    override fun settingsJoinerSelfieMirror(): String = " | Selfie mirror "
+    override fun settingsJoinerFilter(): String = "Filter "
+    override fun settingsJoinerPortrait(): String = " | Portrait "
+    override fun settingsJoinerWatermark(): String = " | Watermark "
+    override fun settingsJoinerLive(): String = " | Live "
+    override fun settingsJoinerTimer(): String = " | Timer "
+    override fun settingsJoinerMic(): String = " | Mic "
+
+    // Settings page
+    override fun settingsPageSupporting(): String = "Quick defaults with explicit supported, degraded, and staged capability hints."
+    override fun gridSupportLabel(count: Int): String = "Cycle $count layouts"
+    override fun portraitTuningLabel(): String = "Open profile + beauty + bokeh tuning"
+    override fun watermarkTuningLabel(count: Int): String = "Open selector + per-template tuning; $count templates"
+    override fun liveSupportLabel(durationMs: Int, watermarkBehavior: String): String = "Saved default only; $durationMs ms bundle | dynamic watermark $watermarkBehavior"
+    override fun degradedResolutionLabel(saved: String, active: String): String = "Saved as $saved, active graph uses $active"
+    override fun degradedFramerateLabel(saved: String, active: String): String = "Saved as $saved, active graph uses $active"
+    override fun degradedDynamicFpsLabel(saved: String, active: String): String = "Saved as $saved, active graph uses $active"
+    override fun degradedAudioLabel(saved: String, active: String): String = "Saved as $saved, active graph uses $active"
+    override fun videoFilterSeedCountLabel(count: Int): String = "Saved filter seed; $count looks staged"
+    override fun catalogFooterStillWatermark(): String = "Still watermark templates now flow into metadata and photo rendering."
+    override fun catalogFooterManualStaged(): String = "Manual drafts and Live/video defaults remain staged in the same settings spine."
+    override fun catalogFooterProManualPrefix(): String = " | Pro manual draft "
+
+    // Watermark selector
+    override fun watermarkSelectorSupporting(): String = "Watermark selection sits one level below Settings. Pick the active template here, then enter the template-specific style page to edit."
+    override fun watermarkSelectorDefaultPrefix(): String = "Default "
+    override fun watermarkSelectorTemplatesStaged(count: Int): String = " templates staged"
+    override fun watermarkSelectorCurrentDefault(): String = " | Current default"
+    override fun watermarkEditAttrsFrame(): String = "Placement, scale, opacity, background"
+    override fun watermarkEditAttrsClassic(): String = "Placement, scale, opacity"
+    override fun watermarkSelectorFooterSupported(): String = "Pure Text shows no frame; Classic Overlay keeps its border fixed; Travel Polaroid and Retro Frame expose frame variants; Blur Four Border uses blur-only backgrounds."
+    override fun watermarkSelectorFooterUnsupported(): String = "Still capture is unavailable on this device, so Watermark Lab stays read-only."
+
+    // Watermark detail
+    override fun watermarkDetailSupportingSelected(): String = "This is the active default watermark. Changes here will affect the next static photo rendered with this template."
+    override fun watermarkDetailSupportingNotSelected(): String = "This template is not yet the current default. Adjust here first, then switch from the selector page when ready."
+    override fun watermarkDetailFooterFrame(): String = "Frame border rendering is live for static-photo export."
+    override fun watermarkDetailFooterOverlay(): String = "Classic overlay stays inside the source image without an expanded border."
+    override fun watermarkDetailFooterPureText(): String = "Clean text sits directly on the source image with no border or background container."
+    override fun watermarkDetailTokensPrefix(): String = "Tokens: "
+
+    // Watermark attribute prefixes
+    override fun watermarkAttrPlacementPrefix(): String = "Placement "
+    override fun watermarkAttrScalePrefix(): String = "Scale "
+    override fun watermarkAttrOpacityPrefix(): String = "Opacity "
+    override fun watermarkAttrBackgroundPrefix(): String = "Background "
+    override fun watermarkTemplateExpandedFrame(): String = "Expanded frame"
+    override fun watermarkTemplateClassicOverlay(): String = "Classic overlay"
+    override fun watermarkTemplatePureText(): String = "Pure text"
+    override fun watermarkTemplateBlurFourBorder(): String = "Blur four border"
+
+    // Portrait lab
+    override fun portraitLabSupporting(): String = "Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster."
+    override fun portraitLabJoinerBeauty(): String = "Beauty "
+    override fun portraitLabJoinerBokeh(): String = "Bokeh "
+    override fun portraitLabFooter(): String = "Tone Lab still owns portrait color style selection. Portrait Lab only governs the product profile, beauty plan/strength, and lightweight bokeh rendering metadata introduced in 6B-5."
+
+    // Pro controls
+    override fun proControlsSupportingEditable(): String = "Upper-layer manual draft is currently editable; each control indicates its status: Applied, Saved-only, or Temporarily unsupported."
+    override fun proControlsSupportingReadonly(): String = "Draft changes allowed, but this device currently holds all controls in saved-only or temporarily-unsupported state."
+    override fun proControlsFinishCaptureHint(): String = "Finish the current capture before editing."
+
+    // Disabled reasons
+    override fun disabledCountdown(): String = "Countdown in progress"
+    override fun disabledSavingPhoto(): String = "Saving previous photo"
+    override fun disabledPreparingRecording(): String = "Preparing to record"
+    override fun disabledRecording(): String = "Unavailable during recording"
+    override fun disabledStoppingRecording(): String = "Stopping and saving"
+    override fun disabledPreviewRecovering(): String = "Camera recovering"
+    override fun disabledPermission(): String = "Camera permission required"
+
+    // Frame ratio control
+    override fun frameRatioTitle(): String = "Frame"
+    override fun disabledFrameRatioUnsupportedMode(): String = "Frame ratio not supported in current mode"
+    override fun disabledFrameRatioActiveShot(): String = "Wait for current capture to finish"
+    override fun disabledFrameRatioCountdown(): String = "Wait for countdown to finish"
+
+    // Recording status
+    override fun statusRecordingStarting(): String = "Starting…"
+    override fun statusRecordingActive(): String = "Recording"
+    override fun statusRecordingSaving(): String = "Saving…"
+
+    // Settings blocked
+    override fun settingsBlockedByCapture(): String = "Capture in progress, settings locked"
+    override fun settingsNotLoaded(): String = "Settings not loaded yet"
+    override fun settingsActionUnsupported(): String = "Action not supported in current mode"
+
+    // Color lab summary
+    override fun colorToneSummary(colorAxis: Float, toneAxis: Float): String {
+        val colorLabel = when {
+            colorAxis > 0.6f -> levelWarmPlus()
+            colorAxis > 0.08f -> levelWarm()
+            colorAxis < -0.6f -> levelCoolPlus()
+            colorAxis < -0.08f -> levelCool()
+            else -> colorNeutral()
+        }
+        val toneLabel = when {
+            toneAxis > 0.08f -> toneSoftLift()
+            toneAxis < -0.08f -> toneDeepContrast()
+            else -> toneBalanced()
+        }
+        return "$colorLabel / $toneLabel"
+    }
+
+    override fun availabilityLabel(value: SettingsControlAvailability): String = when (value) {
+        SettingsControlAvailability.SUPPORTED -> "可用"
+        SettingsControlAvailability.DEGRADED -> "部分支持"
+        SettingsControlAvailability.UNSUPPORTED -> "不支持"
+    }
+    override fun languageDisplayName(settings: PersistedSettings): String = "English"
+
+    override fun sessionUiStrings(): SessionUiStrings {
+        return SessionUiStrings(
+            buttonSwitchToFront = "Switch to Front",
+            buttonSwitchToBack = "Switch to Back",
+            buttonSingleLens = "Single Lens",
+            buttonZoomPrefix = "Zoom",
+            buttonZoomUnavailable = "Zoom N/A",
+            buttonStillFast = "Still Fast",
+            buttonStillMax = "Still Max",
+            buttonStillQualityUnavailable = "Still N/A",
+            buttonStill12Mp = "Still 12MP",
+            buttonStill8Mp = "Still 8MP",
+            buttonStill2Mp = "Still 2MP",
+            buttonStillResolutionUnavailable = "Size N/A",
+            outputErrorPrefix = "Camera issue:",
+            outputVideoPrefix = "Last video:",
+            outputLivePrefix = "Last Live photo:",
+            outputSavedPrefix = "Last photo:",
+            outputPreviewPrefix = "Preview thumbnail:",
+            outputWaiting = "No photo captured yet."
+        )
+    }
+}

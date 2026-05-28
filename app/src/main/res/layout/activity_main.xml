@@ -1,0 +1,1681 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/oc_root_background">
+
+    <!-- Layer 1: Full-screen camera preview -->
+    <!-- Layer 2: Lightweight top status -->
+    <!-- Layer 3: Floating Focus utilities -->
+    <!-- Layer 4: Bottom capture deck -->
+    <!-- Overlay: Quick Bubble tools -->
+    <!-- Overlay: Palette panel -->
+    <!-- Overlay: Dev console -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreview"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="-20dp"
+        app:implementationMode="performance"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:scaleType="fitCenter" />
+
+    <com.opencamera.app.PreviewOverlayView
+        android:id="@+id/previewOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="-20dp"
+        android:clickable="false"
+        android:focusable="false"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Panel dismiss scrim: transparent overlay that dismisses panels on outside tap.
+         Elevation 4dp places scrim above bottom controls (0dp) so they cannot be
+         accidentally tapped while a panel overlay is open. -->
+    <View
+        android:id="@+id/panelDismissScrim"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#26000000"
+        android:clickable="true"
+        android:elevation="4dp"
+        android:focusable="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Secondary panel bottom boundary: from top 7/10, equivalent to 3/10 above bottom -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/secondaryPanelBottomGuide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.7" />
+
+    <!-- Layer 2: Top lightweight status area -->
+    <View
+        android:id="@+id/topScrim"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/top_scrim_height"
+        android:background="@drawable/bg_top_scrim"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <LinearLayout
+        android:id="@+id/topPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/space_12"
+        android:layout_marginTop="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/titleText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:breakStrategy="simple"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="@string/app_name"
+            android:textColor="@color/oc_text_primary"
+            android:textSize="@dimen/text_size_title"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/buttonColorLabEntry"
+            style="@style/Widget.OpenCamera.TopActionChip"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginStart="@dimen/space_4"
+            android:text="@string/button_color_lab_entry" />
+
+        <Button
+            android:id="@+id/buttonSettingsEntry"
+            style="@style/Widget.OpenCamera.TopActionChip"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:layout_marginStart="@dimen/space_2"
+            android:text="@string/button_settings_entry" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/permissionStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/space_12"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:text="@string/permission_pending"
+        android:textColor="@color/oc_text_secondary"
+        android:textSize="@dimen/text_size_status"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel" />
+
+    <!-- Floating Focus utilities -->
+    <LinearLayout
+        android:id="@+id/floatingUtilityGroup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="@dimen/space_16"
+        android:gravity="center"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <Button
+            android:id="@+id/buttonFilterEntry"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:text="@string/button_palette_entry" />
+
+        <Button
+            android:id="@+id/buttonQuickLauncher"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:layout_marginTop="@dimen/right_rail_gap"
+            android:text="@string/button_quick_launcher" />
+
+        <Button
+            android:id="@+id/buttonLowLightNightPrompt"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:layout_marginTop="@dimen/right_rail_gap"
+            android:contentDescription="@string/low_light_night_assist_content_description"
+            android:text="@string/button_low_light_night_prompt"
+            android:visibility="gone" />
+
+        <!-- buttonLensLabEntry removed: legacy right-rail settings entry superseded by buttonColorLabEntry in top bar -->
+
+        <Button
+            android:id="@+id/buttonDevEntry"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:layout_marginTop="@dimen/right_rail_gap"
+            android:text="@string/button_dev_entry" />
+    </LinearLayout>
+
+    <!-- Document batch side rail (visible only in document mode with active batch) -->
+    <LinearLayout
+        android:id="@+id/documentBatchRail"
+        android:layout_width="56dp"
+        android:layout_height="0dp"
+        android:layout_marginEnd="@dimen/space_8"
+        android:background="#40000000"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingVertical="@dimen/space_4"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintEnd_toStartOf="@id/floatingUtilityGroup"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <Button
+            android:id="@+id/documentBatchRailHeader"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="32dp"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:id="@+id/documentBatchRailList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="@dimen/space_4"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:orientation="vertical"
+            android:gravity="center_horizontal" />
+    </LinearLayout>
+
+    <!-- Overlay: Quick Panel Sheet -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/quickBubblePanel"
+        android:layout_width="260dp"
+        android:layout_height="0dp"
+        android:layout_marginEnd="74dp"
+        android:clipToPadding="false"
+        android:elevation="8dp"
+        android:fadeScrollbars="false"
+        android:scrollbars="none"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp">
+
+            <!-- Grid row -->
+            <Button
+                android:id="@+id/buttonQuickGrid"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp" />
+
+            <!-- Resolution row -->
+            <Button
+                android:id="@+id/buttonQuickResolution"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp" />
+
+            <!-- Brightness row: label + SeekBar + value -->
+            <LinearLayout
+                android:id="@+id/brightnessRow"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="6dp"
+                android:background="@drawable/bg_panel_row">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/button_quick_brightness"
+                    android:textColor="#FFFFFF"
+                    android:textSize="11sp"
+                    android:gravity="start|center_vertical" />
+
+                <SeekBar
+                    android:id="@+id/brightnessSlider"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:paddingHorizontal="6dp" />
+
+                <TextView
+                    android:id="@+id/brightnessValueText"
+                    android:layout_width="44dp"
+                    android:layout_height="32dp"
+                    android:textSize="12sp"
+                    android:textColor="#FFFFFF"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Frame ratio row: single cycle button -->
+            <LinearLayout
+                android:id="@+id/frameRatioRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:background="@drawable/bg_panel_row">
+
+                <Button
+                    android:id="@+id/buttonQuickFrameRatio"
+                    style="@style/Widget.OpenCamera.QuickBubbleButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp" />
+            </LinearLayout>
+
+            <!-- Live row -->
+            <Button
+                android:id="@+id/buttonQuickLivePhoto"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp" />
+
+            <!-- Timer row -->
+            <Button
+                android:id="@+id/buttonQuickTimer"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp" />
+
+            <Button
+                android:id="@+id/buttonQuickResetDefaults"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp"
+                android:text="@string/button_reset_defaults"
+                android:visibility="gone" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Mode track: horizontal scrolling strip (positioned above zoom chips) -->
+    <HorizontalScrollView
+        android:id="@+id/modeTrackScroll"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="0dp"
+        android:scrollbars="none"
+        android:fadeScrollbars="false"
+        android:clipToPadding="false"
+        android:paddingHorizontal="@dimen/space_12"
+        android:paddingVertical="@dimen/space_2"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:id="@+id/modeTrack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/buttonPhotoMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/button_photo_mode" />
+
+            <Button
+                android:id="@+id/buttonNightMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_night_mode" />
+
+            <Button
+                android:id="@+id/buttonPortraitMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_portrait_mode" />
+
+            <Button
+                android:id="@+id/buttonProMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_pro_mode" />
+
+            <Button
+                android:id="@+id/buttonVideoMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_video_mode" />
+
+            <Button
+                android:id="@+id/buttonDocumentMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_document_mode" />
+
+            <Button
+                android:id="@+id/buttonHumanisticMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_humanistic_mode"
+                android:visibility="gone" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- Settings panel (unchanged, adjusts constraints) -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/settingsPanel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_settings_panel"
+        android:contentDescription="@string/settings_panel_content_description"
+        android:elevation="8dp"
+        android:fillViewport="true"
+        android:padding="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/panel_padding">
+
+            <Button
+                android:id="@+id/buttonSettingsBack"
+                style="@style/Widget.OpenCamera.PillButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/button_back"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/settingsRootContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="visible">
+
+                <TextView
+                    android:id="@+id/settingsHeadline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/oc_text_primary"
+                    android:textSize="@dimen/text_size_panel_title"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/settingsSupportingText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_support" />
+
+                <TextView
+                    android:id="@+id/settingsHeroSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/buttonSettingsTabCommon"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_common" />
+
+                    <Button
+                        android:id="@+id/buttonSettingsTabPhoto"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_photo" />
+
+                    <Button
+                        android:id="@+id/buttonSettingsTabVideo"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/settings_section_video" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/settingsCommonSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:background="@drawable/bg_settings_card"
+                    android:orientation="vertical"
+                    android:padding="@dimen/space_16">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_section_common"
+                        android:textColor="@color/oc_text_primary"
+                        android:textSize="@dimen/text_size_section_title"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/settingsCommonSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="@color/oc_text_secondary"
+                        android:textSize="@dimen/text_size_control_value" />
+
+                    <Button
+                        android:id="@+id/buttonGridMode"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonShutterSound"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonSelfieMirror"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/settingsPhotoSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_settings_card"
+                    android:orientation="vertical"
+                    android:padding="@dimen/space_16">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_section_photo"
+                        android:textColor="@color/oc_text_primary"
+                        android:textSize="@dimen/text_size_section_title"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/settingsPhotoSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="@color/oc_text_secondary"
+                        android:textSize="@dimen/text_size_control_value" />
+
+                    <Button
+                        android:id="@+id/buttonPhotoFilter"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonPhotoPortraitLab"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonPhotoWatermark"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonPhotoLive"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonPhotoLiveSaveFormat"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonPhotoTimer"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/settingsVideoSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_settings_card"
+                    android:orientation="vertical"
+                    android:padding="@dimen/space_16">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/settings_section_video"
+                        android:textColor="@color/oc_text_primary"
+                        android:textSize="@dimen/text_size_section_title"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/settingsVideoSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textColor="@color/oc_text_secondary"
+                        android:textSize="@dimen/text_size_control_value" />
+
+                    <Button
+                        android:id="@+id/buttonVideoResolution"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonVideoFrameRate"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonVideoDynamicFps"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonVideoAudio"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonVideoFilter"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/settingsCatalogFooter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:textColor="@color/oc_text_muted"
+                    android:textSize="@dimen/text_size_status" />
+
+                <TextView
+                    android:id="@+id/settingsEditingHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settingsPortraitLabContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/portraitLabHeadline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textColor="@color/oc_text_primary"
+                    android:textSize="@dimen/text_size_panel_title"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/portraitLabSupportingText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_support" />
+
+                <TextView
+                    android:id="@+id/portraitLabHeroSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+
+                <TextView
+                    android:id="@+id/portraitLabEditingHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+
+                <Button
+                    android:id="@+id/buttonPortraitProfile"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart" />
+
+                <Button
+                    android:id="@+id/buttonPortraitBeautyPreset"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart" />
+
+                <Button
+                    android:id="@+id/buttonPortraitBeautyStrength"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart" />
+
+                <Button
+                    android:id="@+id/buttonPortraitBokehEffect"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Depth"
+                        android:textColor="@color/oc_text_secondary"
+                        android:textSize="@dimen/text_size_status" />
+
+                    <SeekBar
+                        android:id="@+id/portraitDepthStrengthSeekBar"
+                        android:layout_width="0dp"
+                        android:layout_height="32dp"
+                        android:layout_weight="1"
+                        android:max="100"
+                        android:paddingHorizontal="6dp" />
+
+                    <TextView
+                        android:id="@+id/portraitDepthStrengthValue"
+                        android:layout_width="44dp"
+                        android:layout_height="32dp"
+                        android:textSize="@dimen/text_size_status"
+                        android:textColor="@color/oc_text_secondary"
+                        android:gravity="center" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/portraitLabFooter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:textColor="@color/oc_text_muted"
+                    android:textSize="@dimen/text_size_status" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settingsWatermarkSelectorContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/watermarkSelectorHeadline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textColor="@color/oc_text_primary"
+                    android:textSize="@dimen/text_size_panel_title"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/watermarkSelectorSupportingText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_support" />
+
+                <TextView
+                    android:id="@+id/watermarkSelectorHeroSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+
+                <LinearLayout
+                    android:id="@+id/watermarkSelectorList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/watermarkSelectorEditingHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+
+                <TextView
+                    android:id="@+id/watermarkSelectorFooter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/oc_text_muted"
+                    android:textSize="@dimen/text_size_status" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/settingsWatermarkDetailContent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/watermarkDetailHeadline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textColor="@color/oc_text_primary"
+                    android:textSize="@dimen/text_size_panel_title"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/watermarkDetailSupportingText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_support" />
+
+                <TextView
+                    android:id="@+id/watermarkDetailHeroSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+
+                <TextView
+                    android:id="@+id/watermarkDetailEditingHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+
+                <Button
+                    android:id="@+id/buttonWatermarkPlacement"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart" />
+
+                <Button
+                    android:id="@+id/buttonWatermarkTextScale"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart" />
+
+                <Button
+                    android:id="@+id/buttonWatermarkTextOpacity"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart" />
+
+                <Button
+                    android:id="@+id/buttonWatermarkFrameBackground"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/watermarkDetailFooter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:textColor="@color/oc_text_muted"
+                    android:textSize="@dimen/text_size_status" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/buttonSettingsResetDefaults"
+                style="@style/Widget.OpenCamera.PillButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/button_reset_defaults"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/buttonCloseSettings"
+                style="@style/Widget.OpenCamera.PillButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/button_settings_close" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Filter panel (compact palette style) -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/filterPanel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/bg_settings_panel"
+        android:contentDescription="@string/filter_panel_content_description"
+        android:elevation="8dp"
+        android:fillViewport="true"
+        android:padding="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/panel_padding">
+
+            <TextView
+                android:id="@+id/filterHeadline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/oc_text_primary"
+                android:textSize="@dimen/text_size_panel_title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/filterSupportingText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/oc_text_secondary"
+                android:textSize="@dimen/text_size_support" />
+
+            <TextView
+                android:id="@+id/filterHeroSummary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:fontFamily="monospace"
+                android:textColor="@color/oc_accent"
+                android:textSize="@dimen/text_size_status" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/buttonFilterPhotoTab"
+                    style="@style/Widget.OpenCamera.CompactButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true" />
+
+                <Button
+                    android:id="@+id/buttonFilterHumanisticTab"
+                    style="@style/Widget.OpenCamera.CompactButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true" />
+
+                <Button
+                    android:id="@+id/buttonFilterPortraitTab"
+                    style="@style/Widget.OpenCamera.CompactButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginHorizontal="4dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true" />
+
+                <Button
+                    android:id="@+id/buttonFilterVideoTab"
+                    style="@style/Widget.OpenCamera.CompactButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:singleLine="true" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/filterSectionFiltersTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/filter_section_filters"
+                android:textColor="@color/oc_text_secondary"
+                android:textSize="@dimen/text_size_section_title"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/filterSelectionCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_settings_card"
+                android:orientation="vertical"
+                android:padding="@dimen/space_16">
+
+                <TextView
+                    android:id="@+id/filterCurrentSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/oc_text_primary"
+                    android:textSize="@dimen/text_size_section_title"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/filterSelectionList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical" />
+
+                <Button
+                    android:id="@+id/buttonFilterSaveCustom"
+                    style="@style/Widget.OpenCamera.SettingsButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp"
+                    android:textAlignment="viewStart" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/filterSectionPaletteTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/filter_section_palette"
+                android:textColor="@color/oc_text_secondary"
+                android:textSize="@dimen/text_size_section_title"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/filterAdjustmentPanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_settings_card"
+                android:orientation="vertical"
+                android:padding="@dimen/space_16"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/buttonFilterModeToggle"
+                    style="@style/Widget.OpenCamera.PillButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/filterPaletteSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_control_value" />
+
+                <com.opencamera.app.FilterPaletteView
+                    android:id="@+id/filterPaletteSurface"
+                    android:layout_width="match_parent"
+                    android:layout_height="180dp"
+                    android:layout_marginTop="6dp" />
+
+                <TextView
+                    android:id="@+id/filterPaletteHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_status" />
+
+                <TextView
+                    android:id="@+id/filterAdvancedTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="@string/filter_section_advanced"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_section_title"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:id="@+id/filterAdvancedControls"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/buttonAdvancedExposure"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedSoftGlow"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedHalo"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedGrain"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedSharpness"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedVignette"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedHighlights"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedShadows"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedWarmBoost"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedCoolBoost"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedTemperatureShift"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAdvancedTintShift"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textAlignment="viewStart" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/filterEditingHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:textColor="@color/oc_accent"
+                android:textSize="@dimen/text_size_status" />
+
+            <TextView
+                android:id="@+id/filterFooter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/oc_text_muted"
+                android:textSize="@dimen/text_size_status" />
+
+            <Button
+                android:id="@+id/buttonFilterResetDefaults"
+                style="@style/Widget.OpenCamera.PillButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/button_reset_defaults"
+                android:visibility="gone" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Document batch organizer panel (compact bottom sheet) -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/documentBatchOrganizerPanel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
+        android:layout_marginBottom="@dimen/space_8"
+        android:background="@drawable/bg_settings_panel"
+        android:contentDescription="@string/document_batch_organizer_title"
+        android:elevation="8dp"
+        android:fillViewport="true"
+        android:maxHeight="240dp"
+        android:padding="0dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/secondaryPanelBottomGuide">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/panel_padding">
+
+            <TextView
+                android:id="@+id/documentBatchOrganizerTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/oc_text_primary"
+                android:textSize="@dimen/text_size_section_title"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/documentBatchOrganizerCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/oc_text_secondary"
+                android:textSize="@dimen/text_size_status" />
+
+            <LinearLayout
+                android:id="@+id/documentBatchOrganizerItemList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/buttonCloseDocumentBatchOrganizer"
+                style="@style/Widget.OpenCamera.PillButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/button_document_batch_organizer_close" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Dev console overlay -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/devConsolePanel"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
+        android:layout_marginTop="14dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="@color/oc_surface_panel"
+        app:cardCornerRadius="@dimen/radius_panel_shell"
+        app:cardElevation="10dp"
+        app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topPanel">
+
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:padding="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="@dimen/panel_padding">
+
+                <!-- Tab row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/buttonDevTabKey"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_key" />
+
+                    <Button
+                        android:id="@+id/buttonDevTabCore"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_core" />
+
+                    <Button
+                        android:id="@+id/buttonDevTabError"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_error" />
+
+                    <Button
+                        android:id="@+id/buttonDevTabAll"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_all" />
+                </LinearLayout>
+
+                <!-- Title -->
+                <TextView
+                    android:id="@+id/devConsoleTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textColor="@color/oc_text_primary"
+                    android:textSize="@dimen/text_size_section_title"
+                    android:textStyle="bold" />
+
+                <!-- Summary row -->
+                <TextView
+                    android:id="@+id/devConsoleSummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/oc_accent"
+                    android:textSize="@dimen/text_size_status" />
+
+                <!-- Content area -->
+                <TextView
+                    android:id="@+id/devConsoleContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:fontFamily="monospace"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_dev_log" />
+
+                <!-- Storage info -->
+                <TextView
+                    android:id="@+id/devConsoleStorageInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_status"
+                    android:visibility="gone" />
+
+                <!-- Action row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/buttonDevExport"
+                        style="@style/Widget.OpenCamera.PillButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_export_log" />
+
+                    <Button
+                        android:id="@+id/buttonDevClose"
+                        style="@style/Widget.OpenCamera.PillButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/dev_cleanup_current" />
+                </LinearLayout>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </com.google.android.material.card.MaterialCardView>
+
+
+    <!-- Layer 3: Bottom control strip (three-segment cockpit) -->
+    <LinearLayout
+        android:id="@+id/bottomSheet"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_bottom_panel"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/bottom_cockpit_padding_horizontal"
+        android:paddingTop="@dimen/space_2"
+        android:paddingEnd="@dimen/bottom_cockpit_padding_horizontal"
+        android:paddingBottom="@dimen/space_8"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!-- Capture output status (compact, single line) -->
+        <TextView
+            android:id="@+id/captureOutput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/output_waiting"
+            android:textColor="@color/oc_text_secondary"
+            android:textSize="@dimen/text_size_status"
+            android:visibility="gone" />
+
+        <!-- Focal length slider -->
+        <com.opencamera.app.FocalLengthSliderView
+            android:id="@+id/focalLengthSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:layout_marginHorizontal="@dimen/space_16"
+            android:visibility="gone" />
+
+        <!-- Recording elapsed indicator -->
+        <TextView
+            android:id="@+id/recordingIndicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_4"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:textColor="@color/oc_accent"
+            android:textSize="@dimen/text_size_status"
+            android:visibility="gone" />
+
+        <!-- Main control row: Thumbnail | Shutter | Lens/Zoom -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_2"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- Left: Thumbnail -->
+            <ImageView
+                android:id="@+id/previewThumbnail"
+                android:layout_width="@dimen/thumbnail_size"
+                android:layout_height="@dimen/thumbnail_size"
+                android:background="@drawable/bg_thumbnail"
+                android:contentDescription="@string/preview_thumbnail_content_description"
+                android:padding="2dp"
+                android:scaleType="centerCrop" />
+
+            <!-- Center: Shutter (round) -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/buttonShutter"
+                    android:layout_width="@dimen/touch_target_shutter"
+                    android:layout_height="@dimen/touch_target_shutter"
+                    android:background="@drawable/bg_shutter_selector"
+                    app:backgroundTint="@null"
+                    android:includeFontPadding="false"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:minWidth="@dimen/touch_target_shutter"
+                    android:minHeight="@dimen/touch_target_shutter"
+                    android:text=""
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/transparent"
+                    android:textSize="@dimen/text_size_control_value" />
+            </LinearLayout>
+
+            <!-- Right: Lens -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/buttonLensFacing"
+                    style="@style/Widget.OpenCamera.QuickSettingButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/button_switch_lens" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

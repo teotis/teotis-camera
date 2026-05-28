@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Spacing scale -->
+    <dimen name="space_2">2dp</dimen>
+    <dimen name="space_4">4dp</dimen>
+    <dimen name="space_8">8dp</dimen>
+    <dimen name="space_12">12dp</dimen>
+    <dimen name="space_16">16dp</dimen>
+    <dimen name="space_24">24dp</dimen>
+
+    <!-- Touch targets -->
+    <dimen name="touch_target_min">44dp</dimen>
+    <dimen name="touch_target_shutter">72dp</dimen>
+    <dimen name="mode_chip_min_width">64dp</dimen>
+    <dimen name="mode_chip_min_height">32dp</dimen>
+    <dimen name="zoom_chip_min_width">36dp</dimen>
+    <dimen name="zoom_chip_min_height">26dp</dimen>
+
+    <!-- Zoom strip layout -->
+    <dimen name="zoom_strip_container_height">32dp</dimen>
+    <dimen name="zoom_chip_padding_h">8dp</dimen>
+    <dimen name="zoom_chip_padding_v">2dp</dimen>
+
+    <!-- Shape radii -->
+    <dimen name="radius_top_status">12dp</dimen>
+    <dimen name="radius_bottom_cockpit">24dp</dimen>
+    <dimen name="radius_panel_shell">16dp</dimen>
+    <dimen name="radius_panel_row">8dp</dimen>
+    <dimen name="radius_chip">20dp</dimen>
+    <dimen name="radius_thumbnail">8dp</dimen>
+    <dimen name="radius_small_button">12dp</dimen>
+    <dimen name="radius_shutter">36dp</dimen>
+
+    <!-- Typography sizes -->
+    <dimen name="text_size_title">17sp</dimen>
+    <dimen name="text_size_status">12sp</dimen>
+    <dimen name="text_size_mode_chip">15sp</dimen>
+    <dimen name="text_size_zoom_chip">12sp</dimen>
+    <dimen name="text_size_right_rail">12sp</dimen>
+    <dimen name="text_size_panel_title">18sp</dimen>
+    <dimen name="text_size_section_title">15sp</dimen>
+    <dimen name="text_size_control_label">14sp</dimen>
+    <dimen name="text_size_control_value">13sp</dimen>
+    <dimen name="text_size_support">12sp</dimen>
+    <dimen name="text_size_dev_log">11sp</dimen>
+
+    <!-- Component sizing -->
+    <dimen name="right_rail_body">36dp</dimen>
+    <dimen name="right_rail_gap">8dp</dimen>
+    <dimen name="control_row_min_height">48dp</dimen>
+    <dimen name="thumbnail_size">56dp</dimen>
+    <dimen name="shutter_size">72dp</dimen>
+    <dimen name="top_scrim_height">72dp</dimen>
+    <dimen name="panel_margin_horizontal">16dp</dimen>
+    <dimen name="panel_padding">18dp</dimen>
+    <dimen name="panel_max_height">480dp</dimen>
+    <dimen name="bottom_cockpit_padding_horizontal">16dp</dimen>
+</resources>
