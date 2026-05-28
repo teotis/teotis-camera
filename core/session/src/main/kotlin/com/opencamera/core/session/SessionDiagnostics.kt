@@ -62,7 +62,8 @@ data class SessionDebugDump(
     val perfSnapshot: PerfSnapshot,
     val recoveryTrace: RecoveryTraceSnapshot,
     val recentEvents: List<SessionTraceEvent>,
-    val resourceDiagnostics: ResourceDiagnosticsSnapshot? = null
+    val resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
+    val recentLinkEvents: List<PerformanceLinkEvent> = emptyList()
 )
 
 fun SessionState.toPerfSnapshot(): PerfSnapshot {
@@ -115,7 +116,8 @@ fun buildSessionDebugDump(
     traceEvents: List<SessionTraceEvent>,
     recentEventLimit: Int = 12,
     recoveryEventLimit: Int = 8,
-    resourceDiagnostics: ResourceDiagnosticsSnapshot? = null
+    resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
+    linkEvents: List<PerformanceLinkEvent> = emptyList()
 ): SessionDebugDump {
     return SessionDebugDump(
         lifecycle = state.lifecycle,
@@ -133,7 +135,8 @@ fun buildSessionDebugDump(
             maxEvents = recoveryEventLimit
         ),
         recentEvents = traceEvents.takeLast(recentEventLimit),
-        resourceDiagnostics = resourceDiagnostics
+        resourceDiagnostics = resourceDiagnostics,
+        recentLinkEvents = linkEvents.takeLast(recentEventLimit)
     )
 }
 
