@@ -68,6 +68,7 @@
     <string name="button_quick_live">实况</string>
     <string name="button_quick_resolution">像素</string>
     <string name="button_quick_timer">定时</string>
+    <string name="button_quick_watermark">水印</string>
     <string name="button_quick_brightness">亮度</string>
     <string name="button_quick_brightness_minus">−</string>
     <string name="button_quick_brightness_plus">+</string>
