@@ -2,7 +2,7 @@
 
 ## State
 
-`pending`
+`finalized`
 
 ## Worktree
 
@@ -12,16 +12,23 @@
 
 ## Verification
 
-- pending
+- All 6 integration verification commands: BUILD SUCCESSFUL
+- Stage 7 observability: BUILD SUCCESSFUL
+- 01-watermark: commit `dad5284` verified
+- 02-zoom: commit `18e1334` verified
+- 03-integration: verification-only, all checks passed
 
 ## Integration
 
-- pending
+- Integration branch: `agent/watermark-zoom-preview-fix/integration`
+- Mainline merge: `733f584` (fast-forward to main)
+- Merge order: 01 → 02 → 03, no conflicts
 
 ## Cleanup
 
-- pending
+- Package worktrees: pending deletion after confirmation
+- Package branches: pending deletion after confirmation
 
 ## Risks / Blockers
 
-- Finalize must not run until all functional packages are completed.
+- None. All packages completed, verification passed, integration merged to main.
