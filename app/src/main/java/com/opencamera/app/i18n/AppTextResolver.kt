@@ -554,6 +554,9 @@ open class AppTextResolver(private val context: Context?) {
     open fun buttonLowLightNightPromptDegraded(): String = str(R.string.button_low_light_night_prompt_degraded, "Night assist (single-frame)")
     open fun lowLightNightAssistContentDescription(): String = str(R.string.low_light_night_assist_content_description, "Low-light night assist prompt")
 
+    // Processing status
+    open fun statusProcessingPhotoKeepOpen(): String = str(R.string.status_processing_photo_keep_open, "Processing photo. Please keep OpenCamera open.")
+
     // Recording status
     open fun statusRecordingStarting(): String = str(R.string.status_recording_starting, "Starting…")
     open fun statusRecordingActive(): String = str(R.string.status_recording_active, "Recording")

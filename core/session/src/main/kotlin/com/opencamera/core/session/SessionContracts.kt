@@ -171,6 +171,13 @@ data class PreviewMetrics(
     val lastStartReason: String? = null
 )
 
+data class PendingPostprocessUiState(
+    val shotId: String,
+    val mediaType: MediaType,
+    val message: String,
+    val warnBeforeExit: Boolean = true
+)
+
 data class SessionPresentationState(
     val countdownRemainingSeconds: Int? = null,
     val previewThumbnailPath: String? = null,
@@ -191,7 +198,8 @@ data class SessionPresentationState(
     val photoLowLightPrompt: PhotoLowLightPrompt? = null,
     val recordingStartedAtElapsedMillis: Long? = null,
     val recordingElapsedMillis: Long? = null,
-    val documentBatch: DocumentBatchState = DocumentBatchState.inactive()
+    val documentBatch: DocumentBatchState = DocumentBatchState.inactive(),
+    val pendingPostprocess: PendingPostprocessUiState? = null
 )
 
 data class SessionState(

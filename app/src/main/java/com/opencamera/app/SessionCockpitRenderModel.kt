@@ -576,17 +576,22 @@ internal fun primaryStatusRenderModel(
     text: AppTextResolver
 ): PrimaryStatusRenderModel {
     val modeLabel = text.modeDisplayName(state.activeMode)
-    val statusText = buildString {
-        append(state.previewStatus.name.lowercase().replaceFirstChar(Char::titlecase))
-        if (state.captureStatus != CaptureStatus.IDLE) {
-            append(" · ${state.captureStatus.name.lowercase().replaceFirstChar(Char::titlecase)}")
-        }
-        state.countdownRemainingSeconds?.let { append(" · ${it}s") }
-        when (state.recordingStatus) {
-            RecordingStatus.REQUESTING -> append(" · ${text.statusRecordingStarting()}")
-            RecordingStatus.RECORDING -> append(" · ${text.statusRecordingActive()}")
-            RecordingStatus.STOPPING -> append(" · ${text.statusRecordingSaving()}")
-            RecordingStatus.IDLE -> Unit
+    val pendingPp = state.presentation.pendingPostprocess
+    val statusText = if (pendingPp != null) {
+        text.statusProcessingPhotoKeepOpen()
+    } else {
+        buildString {
+            append(state.previewStatus.name.lowercase().replaceFirstChar(Char::titlecase))
+            if (state.captureStatus != CaptureStatus.IDLE) {
+                append(" · ${state.captureStatus.name.lowercase().replaceFirstChar(Char::titlecase)}")
+            }
+            state.countdownRemainingSeconds?.let { append(" · ${it}s") }
+            when (state.recordingStatus) {
+                RecordingStatus.REQUESTING -> append(" · ${text.statusRecordingStarting()}")
+                RecordingStatus.RECORDING -> append(" · ${text.statusRecordingActive()}")
+                RecordingStatus.STOPPING -> append(" · ${text.statusRecordingSaving()}")
+                RecordingStatus.IDLE -> Unit
+            }
         }
     }
     return PrimaryStatusRenderModel(

@@ -619,6 +619,112 @@ class CaptureRecordingSessionProcessorTest {
         assertTrue(batch.lastMessage?.contains("auto-cropped") == true)
     }
 
+    // ── Pending Postprocess UI State Tests ────────────────────────────
+
+    @Test
+    fun `handleDataReceived for ordinary still sets pendingPostprocess`() = runTest {
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+        val harness = Harness(runningState().copy(activeShot = shot))
+        harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
+
+        val pending = harness.state.value.presentation.pendingPostprocess
+        assertNotNull(pending)
+        assertEquals("shot-1", pending.shotId)
+        assertEquals(MediaType.PHOTO, pending.mediaType)
+        assertTrue(pending.warnBeforeExit)
+        assertNull(harness.state.value.activeShot)
+    }
+
+    @Test
+    fun `pendingPostprocess cleared after ShotCompleted`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
+        assertNotNull(harness.state.value.presentation.pendingPostprocess)
+
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+    }
+
+    @Test
+    fun `pendingPostprocess cleared after ShotFailed with matching activeShot`() = runTest {
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+        val harness = Harness(runningState().copy(activeShot = shot))
+        harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
+        assertNotNull(harness.state.value.presentation.pendingPostprocess)
+
+        harness.process(SessionIntent.ShotFailed("shot-1", MediaType.PHOTO, "camera error"))
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+    }
+
+    @Test
+    fun `pendingPostprocess cleared after ShotFailed for orphaned rearmed shot`() = runTest {
+        // Simulate: ordinary still rearmed (activeShot = null, pendingPostprocess set),
+        // then a late ShotFailed arrives.
+        val initialState = runningState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val harness = Harness(initialState)
+        assertNotNull(harness.state.value.presentation.pendingPostprocess)
+
+        harness.process(SessionIntent.ShotFailed("shot-1", MediaType.PHOTO, "postprocess error"))
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+        assertTrue(harness.trace.snapshot().any { it.name == "shot.failed.orphaned" })
+    }
+
+    @Test
+    fun `multi-frame DataReceived does not set pendingPostprocess`() = runTest {
+        val shot = multiFrameShotRequest("shot-mf-1")
+        val harness = Harness(runningState().copy(activeShot = shot))
+        harness.process(SessionIntent.DataReceived("shot-mf-1", MediaType.PHOTO))
+
+        assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
+        assertEquals(shot, harness.state.value.activeShot)
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+    }
+
+    @Test
+    fun `live photo DataReceived does not set pendingPostprocess`() = runTest {
+        val shot = livePhotoShotRequest("shot-live-1")
+        val harness = Harness(runningState().copy(activeShot = shot))
+        harness.process(SessionIntent.DataReceived("shot-live-1", MediaType.PHOTO))
+
+        assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
+        assertEquals(shot, harness.state.value.activeShot)
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+    }
+
+    @Test
+    fun `second ordinary still DataReceived overwrites pendingPostprocess`() = runTest {
+        val harness = Harness()
+        // First shot
+        val shot1 = testShotRequest("shot-1", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot1))
+        harness.process(SessionIntent.DataReceived("shot-1", MediaType.PHOTO))
+        assertEquals("shot-1", harness.state.value.presentation.pendingPostprocess?.shotId)
+
+        // Second shot - should overwrite
+        harness.state.value = harness.state.value.copy(
+            captureStatus = CaptureStatus.IDLE,
+            activeShot = testShotRequest("shot-2", MediaType.PHOTO)
+        )
+        harness.process(SessionIntent.DataReceived("shot-2", MediaType.PHOTO))
+        val pending = harness.state.value.presentation.pendingPostprocess
+        assertNotNull(pending)
+        assertEquals("shot-2", pending.shotId)
+    }
+
     @Test
     fun `video ShotCompleted does not append to document batch`() = runTest {
         val documentState = runningState().copy(

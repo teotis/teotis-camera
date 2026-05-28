@@ -360,6 +360,9 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun disabledFrameRatioActiveShot(): String = "Wait for current capture to finish"
     override fun disabledFrameRatioCountdown(): String = "Wait for countdown to finish"
 
+    // Processing status
+    override fun statusProcessingPhotoKeepOpen(): String = "Processing photo. Please keep OpenCamera open."
+
     // Recording status
     override fun statusRecordingStarting(): String = "Starting…"
     override fun statusRecordingActive(): String = "Recording"

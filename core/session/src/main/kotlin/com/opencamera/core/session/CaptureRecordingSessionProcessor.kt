@@ -299,7 +299,15 @@ internal class CaptureRecordingSessionProcessor(
             if (canRearmOnDataReceived(activeShot)) {
                 s.copy(
                     captureStatus = CaptureStatus.DATA_RECEIVED,
-                    activeShot = null
+                    activeShot = null,
+                    presentation = s.presentation.copy(
+                        pendingPostprocess = PendingPostprocessUiState(
+                            shotId = shotId,
+                            mediaType = mediaType,
+                            message = "",
+                            warnBeforeExit = true
+                        )
+                    )
                 )
             } else {
                 s.copy(captureStatus = CaptureStatus.DATA_RECEIVED)
@@ -328,6 +336,7 @@ internal class CaptureRecordingSessionProcessor(
                     countdownRemainingSeconds = null,
                     recordingStartedAtElapsedMillis = null,
                     recordingElapsedMillis = null,
+                    pendingPostprocess = null,
                     previewThumbnailPath = result.thumbnailSource.outputPathOrNull()
                         ?: s.presentation.previewThumbnailPath,
                     latestThumbnailSource = when (result.thumbnailSource) {
@@ -450,6 +459,7 @@ internal class CaptureRecordingSessionProcessor(
     ) {
         val currentActiveShot = state.value.activeShot
         if (currentActiveShot == null) {
+            clearPendingPostprocessIfMatches(shotId)
             trace.record("shot.failed.orphaned", "shotId=$shotId,reason=$reason")
             return
         }
@@ -482,6 +492,7 @@ internal class CaptureRecordingSessionProcessor(
                     countdownRemainingSeconds = null,
                     recordingStartedAtElapsedMillis = null,
                     recordingElapsedMillis = null,
+                    pendingPostprocess = null,
                     lastAction = if (mediaType == MediaType.PHOTO) {
                         "Photo capture failed"
                     } else {
@@ -497,6 +508,17 @@ internal class CaptureRecordingSessionProcessor(
             if (mediaType == MediaType.PHOTO) "capture.failed" else "recording.failed",
             "$shotId:$reason"
         )
+    }
+
+    private fun clearPendingPostprocessIfMatches(shotId: String) {
+        val pending = state.value.presentation.pendingPostprocess
+        if (pending != null && pending.shotId == shotId) {
+            updateState.update { s ->
+                s.copy(
+                    presentation = s.presentation.copy(pendingPostprocess = null)
+                )
+            }
+        }
     }
 
     suspend fun handleInterruptedShotFailure(

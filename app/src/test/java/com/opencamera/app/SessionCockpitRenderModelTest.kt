@@ -26,6 +26,7 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.session.CaptureStatus
+import com.opencamera.core.session.PendingPostprocessUiState
 import com.opencamera.core.session.PermissionState
 import com.opencamera.core.session.PreviewMetrics
 import com.opencamera.core.session.PreviewStatus
@@ -1418,6 +1419,118 @@ class SessionCockpitRenderModelTest {
                 lastError = lastError
             )
         )
+    }
+
+    // ── Pending Postprocess UI State Tests ────────────────────────────
+
+    @Test
+    fun `primary status shows processing warning when pendingPostprocess is set`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertEquals("Processing photo. Please keep OpenCamera open.", model.statusText)
+    }
+
+    @Test
+    fun `primary status does not show processing warning when pendingPostprocess is null`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(pendingPostprocess = null)
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("Data received") || model.statusText.contains("Active"))
+        assertFalse(model.statusText.contains("keep OpenCamera open"))
+    }
+
+    @Test
+    fun `primary status processing warning contains explicit do not exit language`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("keep OpenCamera open"))
+    }
+
+    @Test
+    fun `shutter remains enabled during processing warning after session rearm`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(cockpit.bottomCockpit.isShutterEnabled)
+        assertNull(cockpit.bottomCockpit.disabledReason)
+    }
+
+    @Test
+    fun `capture disabled reason blocks config while pending postprocess is active`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val reason = captureDisabledReason(state, TestAppTextResolver())
+
+        assertNotNull(reason)
+        assertEquals("Saving previous photo", reason)
+    }
+
+    @Test
+    fun `conservative capture keeps shutter blocked even with pending postprocess`() {
+        // Multi-frame: activeShot still set, shutter stays blocked
+        val shot = ShotRequest(
+            shotId = "mf-block-1",
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot).copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED
+        )
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
     }
 
     @Test

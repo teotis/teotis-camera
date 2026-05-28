@@ -437,4 +437,5 @@
     <string name="document_batch_rail_page_description">第 %d 页</string>
     <string name="button_document_batch_organizer_close">关闭</string>
     <string name="button_reset_defaults">重置为默认</string>
+    <string name="status_processing_photo_keep_open">照片处理中，请勿退出 OpenCamera。</string>
 </resources>
