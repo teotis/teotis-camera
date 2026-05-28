@@ -23,9 +23,13 @@ import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
+import com.opencamera.core.effect.WatermarkHintSpec
+import com.opencamera.core.effect.WatermarkPreviewShape
 import com.opencamera.core.settings.PersistedSettings
 import com.opencamera.core.settings.PhotoSettings
 import com.opencamera.core.settings.SessionSettingsSnapshot
+import com.opencamera.core.settings.WatermarkTextOpacity
+import com.opencamera.core.settings.WatermarkTextPlacement
 import com.opencamera.core.settings.VideoFrameRate
 import com.opencamera.core.settings.VideoResolution
 import com.opencamera.core.settings.VideoSettings
@@ -33,6 +37,8 @@ import com.opencamera.core.settings.VideoSpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SessionPreviewRenderModelTest {
@@ -180,5 +186,45 @@ class SessionPreviewRenderModelTest {
                 lastAction = "Ready"
             )
         )
+    }
+
+    // --- stagedWatermarkHint override ---
+
+    @Test
+    fun `staged watermark hint overrides effect model watermark hint`() {
+        val baseline = defaultSessionState()
+        val stagedHint = WatermarkHintSpec(
+            templateId = "professional-bottom-bar",
+            placement = WatermarkTextPlacement.BOTTOM_CENTER,
+            previewText = "professional-bottom-bar",
+            opacity = 0.6f,
+            shape = WatermarkPreviewShape.BOTTOM_BAR,
+            textScale = 1f,
+            previewLabels = listOf("OpenCamera", "2026-05-28"),
+            barBackground = 0xFE000000.toInt()
+        )
+
+        val model = previewOverlayRenderModel(
+            baseline,
+            stagedWatermarkHint = stagedHint
+        )
+
+        assertNotNull(model.effectModel?.watermarkHint)
+        assertEquals("professional-bottom-bar", model.effectModel!!.watermarkHint!!.templateId)
+        assertEquals(WatermarkPreviewShape.BOTTOM_BAR, model.effectModel!!.watermarkHint!!.shape)
+        assertEquals(2, model.effectModel!!.watermarkHint!!.previewLabels.size)
+        assertEquals("OpenCamera", model.effectModel!!.watermarkHint!!.previewLabels[0])
+    }
+
+    @Test
+    fun `null staged hint preserves existing watermark hint`() {
+        val baseline = defaultSessionState()
+        val model = previewOverlayRenderModel(
+            baseline,
+            stagedWatermarkHint = null
+        )
+
+        // Without an effectAdapter, watermarkHint is null; staged override is also null
+        assertNull(model.effectModel?.watermarkHint)
     }
 }

@@ -12,7 +12,8 @@ enum class WatermarkPreviewShape {
     TEXT_ONLY,
     BACKED_TEXT,
     EXPANDED_FRAME,
-    FOUR_BORDER
+    FOUR_BORDER,
+    BOTTOM_BAR
 }
 
 data class PreviewEffectRenderModel(
@@ -55,7 +56,9 @@ data class WatermarkHintSpec(
     val previewText: String,
     val opacity: Float,
     val shape: WatermarkPreviewShape = WatermarkPreviewShape.BACKED_TEXT,
-    val textScale: Float = 1f
+    val textScale: Float = 1f,
+    val previewLabels: List<String> = emptyList(),
+    val barBackground: Int = 0
 )
 
 data class FrameGuidelineSpec(
