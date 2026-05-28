@@ -1692,11 +1692,6 @@ class CameraXCaptureAdapter(
                 zoomRatio = normalizedZoomRatio
             )
         )
-        // Still preview path: CameraX stays at 1x (full lens) so the user sees
-        // the complete sensor image. The overlay frame rect scales by 1/zoom to
-        // indicate the capture window, and the zoom crop is applied in post-processing.
-        // Video path: CameraX zoom is applied normally.
-        if (activeGraph.template == CaptureTemplate.STILL_CAPTURE) return
         val camera = boundCamera ?: return
         camera.cameraControl.setZoomRatio(normalizedZoomRatio).await()
     }
@@ -2866,9 +2861,7 @@ class CameraXCaptureAdapter(
 
         // Apply current zoom ratio to the newly bound camera
         val currentZoom = activeGraph.preview.zoomRatio
-        if (activeGraph.template != CaptureTemplate.STILL_CAPTURE) {
-            boundUseCaseCamera.cameraControl.setZoomRatio(currentZoom)
-        }
+        boundUseCaseCamera.cameraControl.setZoomRatio(currentZoom)
     }
 
     private suspend fun ensureStillCaptureRequest(deviceRequest: DeviceShotRequest) {
@@ -3056,11 +3049,7 @@ class CameraXCaptureAdapter(
         cameraProvider = provider
         boundCamera = boundUseCaseCamera
         observeCameraState(boundUseCaseCamera)
-        // Still preview: keep CameraX at 1x for full-lens preview; zoom crop is
-        // applied in post-processing. Video: apply CameraX zoom normally.
-        if (deviceGraph.template != CaptureTemplate.STILL_CAPTURE) {
-            boundUseCaseCamera.cameraControl.setZoomRatio(deviceGraph.preview.zoomRatio)
-        }
+        boundUseCaseCamera.cameraControl.setZoomRatio(deviceGraph.preview.zoomRatio)
         currentTorchEnabled = false
         currentGraph = deviceGraph
         boundLifecycleOwner = lifecycleOwner
