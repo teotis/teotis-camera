@@ -89,6 +89,7 @@ class CaptureRecordingSessionProcessorTest {
             state = state,
             effects = effects,
             trace = trace,
+            linkRecorder = InMemoryPerformanceLinkRecorder(),
             shotExecutor = shotExecutor,
             currentController = { modeController },
             resolvedActiveDeviceGraph = { initialState.activeDeviceGraph },

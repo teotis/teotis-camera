@@ -30,6 +30,7 @@ internal class PreviewRecoverySessionProcessor(
     private val state: MutableStateFlow<SessionState>,
     private val effects: MutableSharedFlow<SessionEffect>,
     private val trace: SessionTrace,
+    private val linkRecorder: PerformanceLinkRecorder,
     private val mutations: PreviewSessionMutations,
     private val countdownInProgress: () -> Boolean,
     private val cancelPendingCountdown: (String) -> Unit,
@@ -40,6 +41,8 @@ internal class PreviewRecoverySessionProcessor(
     private var pendingPreviewHostRecoveryReason: String? = null
     private var meteringCounter: Int = 0
     private var promptExpiryJob: Job? = null
+    private var activePreviewSpan: PerformanceSpanSnapshot? = null
+    private var activeMeteringSpan: PerformanceSpanSnapshot? = null
 
     companion object {
         private const val METERING_FEEDBACK_DISPLAY_MS = 1_500L
@@ -144,6 +147,16 @@ internal class PreviewRecoverySessionProcessor(
             if (isRecovery) "preview.recovery.started" else "preview.binding.started",
             reason
         )
+        // Start preview link span
+        val flow = if (isRecovery) "recovery" else "preview"
+        val correlationId = "prev-${metrics.bindCount + 1}"
+        activePreviewSpan = linkRecorder.startSpan(
+            flow = flow,
+            stage = "binding",
+            correlationId = correlationId,
+            detail = reason,
+            source = "PreviewRecoverySessionProcessor"
+        )
     }
 
     private fun handlePreviewFirstFrameAvailable(firstFrameLatencyMillis: Long) {
@@ -165,6 +178,15 @@ internal class PreviewRecoverySessionProcessor(
             )
         )
         trace.record("preview.first.frame", "${firstFrameLatencyMillis}ms")
+        // Complete preview link span
+        activePreviewSpan?.let { span ->
+            linkRecorder.completeSpan(
+                span,
+                status = LinkEventStatus.COMPLETED,
+                detail = "firstFrameLatency=${firstFrameLatencyMillis}ms"
+            )
+            activePreviewSpan = null
+        }
     }
 
     // -- Snapshot and capture feedback --
@@ -226,6 +248,11 @@ internal class PreviewRecoverySessionProcessor(
     // -- Preview surface / error / runtime issue --
 
     private suspend fun handlePreviewSurfaceLost(reason: String) {
+        // Complete any active preview span as failed
+        activePreviewSpan?.let { span ->
+            linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = reason)
+            activePreviewSpan = null
+        }
         if (countdownInProgress()) {
             cancelPendingCountdown("Countdown cancelled because preview surface was lost")
         }
@@ -240,6 +267,11 @@ internal class PreviewRecoverySessionProcessor(
     }
 
     private suspend fun handlePreviewError(reason: String) {
+        // Complete any active preview span as failed
+        activePreviewSpan?.let { span ->
+            linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = reason)
+            activePreviewSpan = null
+        }
         if (countdownInProgress()) {
             cancelPendingCountdown("Countdown cancelled because preview failed")
         }
@@ -264,6 +296,12 @@ internal class PreviewRecoverySessionProcessor(
     }
 
     private suspend fun handlePreviewRuntimeIssue(issue: DeviceRuntimeIssue) {
+        // Complete any active preview span as degraded or failed
+        activePreviewSpan?.let { span ->
+            val status = if (issue.isRecoverable) LinkEventStatus.DEGRADED else LinkEventStatus.FAILED
+            linkRecorder.completeSpan(span, status = status, detail = issue.displayReason())
+            activePreviewSpan = null
+        }
         if (countdownInProgress()) {
             cancelPendingCountdown("Countdown cancelled because preview failed")
         }
@@ -338,6 +376,14 @@ internal class PreviewRecoverySessionProcessor(
             "preview.metering.requested",
             "requestId=$requestId,x=${"%.2f".format(point.normalizedX)},y=${"%.2f".format(point.normalizedY)},mode=focus+ae"
         )
+        // Start metering link span
+        activeMeteringSpan = linkRecorder.startSpan(
+            flow = "metering",
+            stage = "focus_ae",
+            correlationId = requestId,
+            detail = "x=${"%.2f".format(point.normalizedX)},y=${"%.2f".format(point.normalizedY)}",
+            source = "PreviewRecoverySessionProcessor"
+        )
     }
 
     private fun handlePreviewMeteringCompleted(result: PreviewMeteringResult) {
@@ -355,6 +401,19 @@ internal class PreviewRecoverySessionProcessor(
             PreviewMeteringResultStatus.UNSUPPORTED -> "preview.metering.unsupported"
         }
         trace.record(traceLabel, "requestId=${result.requestId}")
+        // Complete metering link span
+        activeMeteringSpan?.let { span ->
+            if (span.correlationId == result.requestId) {
+                val linkStatus = when (result.status) {
+                    PreviewMeteringResultStatus.SUCCEEDED -> LinkEventStatus.COMPLETED
+                    PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> LinkEventStatus.DEGRADED
+                    PreviewMeteringResultStatus.FAILED -> LinkEventStatus.FAILED
+                    PreviewMeteringResultStatus.UNSUPPORTED -> LinkEventStatus.UNAVAILABLE
+                }
+                linkRecorder.completeSpan(span, status = linkStatus, detail = result.reason)
+                activeMeteringSpan = null
+            }
+        }
     }
 
     private fun handlePreviewMeteringFeedbackExpired(requestId: String) {

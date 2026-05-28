@@ -288,4 +288,76 @@ class SessionDiagnosticsTest {
             presentation = presentation
         )
     }
+
+    // ── Link event diagnostics tests ────────────────────────────────
+
+    @Test
+    fun `session debug dump includes link events when provided`() {
+        val linkEvents = listOf(
+            PerformanceLinkEvent(
+                flow = "preview",
+                stage = "binding",
+                status = LinkEventStatus.COMPLETED,
+                correlationId = "prev-1",
+                startElapsedMillis = 100L,
+                endElapsedMillis = 250L,
+                durationMillis = 150L,
+                detail = "firstFrameLatency=150ms",
+                source = "PreviewRecoverySessionProcessor"
+            ),
+            PerformanceLinkEvent(
+                flow = "capture",
+                stage = "requested",
+                status = LinkEventStatus.COMPLETED,
+                correlationId = "shot-1",
+                startElapsedMillis = 500L,
+                endElapsedMillis = 800L,
+                durationMillis = 300L,
+                detail = null,
+                source = "CaptureRecordingSessionProcessor"
+            )
+        )
+        val state = defaultSessionState()
+        val dump = buildSessionDebugDump(
+            state = state,
+            traceEvents = emptyList(),
+            linkEvents = linkEvents
+        )
+        assertEquals(2, dump.recentLinkEvents.size)
+        assertEquals("preview", dump.recentLinkEvents[0].flow)
+        assertEquals("capture", dump.recentLinkEvents[1].flow)
+    }
+
+    @Test
+    fun `session debug dump limits link events to recent limit`() {
+        val linkEvents = (1..15).map { index ->
+            PerformanceLinkEvent(
+                flow = "preview",
+                stage = "binding",
+                status = LinkEventStatus.COMPLETED,
+                correlationId = "prev-$index",
+                startElapsedMillis = index * 100L,
+                endElapsedMillis = index * 100L + 80,
+                durationMillis = 80L,
+                detail = null,
+                source = "test"
+            )
+        }
+        val state = defaultSessionState()
+        val dump = buildSessionDebugDump(
+            state = state,
+            traceEvents = emptyList(),
+            recentEventLimit = 5,
+            linkEvents = linkEvents
+        )
+        assertEquals(5, dump.recentLinkEvents.size)
+        assertEquals("prev-15", dump.recentLinkEvents.last().correlationId)
+    }
+
+    @Test
+    fun `link events default to empty when not provided`() {
+        val state = defaultSessionState()
+        val dump = buildSessionDebugDump(state = state, traceEvents = emptyList())
+        assertTrue(dump.recentLinkEvents.isEmpty())
+    }
 }
