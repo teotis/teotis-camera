@@ -1,0 +1,38 @@
+build:
+  maxIssues: 0
+
+complexity:
+  LongMethod:
+    threshold: 60
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 7
+  ComplexMethod:
+    threshold: 15
+  TooManyFunctions:
+    thresholdInFiles: 25
+    thresholdInClasses: 25
+
+style:
+  MaxLineLength:
+    maxLineLength: 120
+  MagicNumber:
+    active: false
+  ReturnCount:
+    max: 3
+  NestedBlockDepth:
+    max: 4
+
+empty-blocks:
+  EmptyFunctionBlock:
+    active: true
+  EmptyWhenBlock:
+    active: true
+  EmptyCatchBlock:
+    active: true
+
+potential-bugs:
+  UnsafeCallOnNullableType:
+    active: true
+  UnsafeCast:
+    active: true

@@ -7,20 +7,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
-/**
- * 覆盖行为:
- * - SavedMedia + content:// renderUri → CONTENT_URI 类型
- * - SavedMedia + file:// renderUri → ABSOLUTE_FILE 类型
- * - SavedMedia + 绝对路径 outputPath → ABSOLUTE_FILE 类型
- * - SavedMedia + VIDEO → mimeType "video/*"
- * - SavedMedia + PHOTO → mimeType "image/*"
- * - PreviewSnapshot → mimeType "image/*"，kind ABSOLUTE_FILE
- * - null source → null
- * - 空 renderUri 回退到 outputPath
- * - 非 content:// 且非 file:// 且非绝对路径 → null
- *
- * 不适合单测的行为: 无
- */
+// 覆盖行为:
+// - SavedMedia + content:// renderUri -> CONTENT_URI 类型
+// - SavedMedia + file:// renderUri -> ABSOLUTE_FILE 类型
+// - SavedMedia + 绝对路径 outputPath -> ABSOLUTE_FILE 类型
+// - SavedMedia + VIDEO -> mimeType video/*
+// - SavedMedia + PHOTO -> mimeType image/*
+// - PreviewSnapshot -> mimeType image/*, kind ABSOLUTE_FILE
+// - null source -> null
+// - 空 renderUri 回退到 outputPath
+// - 非 content:// 且非 file:// 且非绝对路径 -> null
+//
+// 不适合单测的行为: 无
 class GalleryOpenTargetLogicTest {
 
     @Test

@@ -10,3 +10,6 @@
 {"ts":"2026-05-29T19:44:38Z","event":"state_changed","package_id":"03-test-coverage","old_state":"pending","new_state":"launched"}
 {"ts":"2026-05-29T19:44:38Z","event":"launch_succeeded","package_id":"03-test-coverage","session_id":"446c2087","new_state":"launched","branch":"agent/quality-scan/03-test-coverage","worktree":"docs/plans/code-quality-scan-orchestration/scratch/03-test-coverage/worktree"}
 {"ts":"2026-05-29T19:44:50Z","event":"scratch_path_requested","package_id":"03-test-coverage","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/code-quality-scan-orchestration/scratch/03-test-coverage"}
+{"ts":"2026-05-29T19:46:10Z","event":"scratch_path_requested","package_id":"02-arch-compliance","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/code-quality-scan-orchestration/scratch/02-arch-compliance"}
+{"ts":"2026-05-29T19:49:27Z","event":"state_changed","package_id":"02-arch-compliance","old_state":"launched","new_state":"completed"}
+{"ts":"2026-05-29T19:52:08Z","event":"state_changed","package_id":"03-test-coverage","old_state":"launched","new_state":"completed"}
