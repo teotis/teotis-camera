@@ -126,6 +126,8 @@
     <string name="label_portrait_lab">Portrait</string>
     <string name="label_watermark_lab">Watermark</string>
     <string name="label_live_photo_default">Live photo default</string>
+    <string name="label_live_save_format">Live save format</string>
+    <string name="format_live_save_format_support">%d formats: Motion Photo, MP4 copy, JPEG only</string>
     <string name="label_countdown">Countdown</string>
     <string name="label_resolution">Resolution</string>
     <string name="label_frame_rate">Frame rate</string>
@@ -427,4 +429,48 @@
     <string name="pro_controls_supporting_editable">Upper-layer manual draft is currently editable; each control indicates its status: Applied, Saved-only, or Temporarily unsupported.</string>
     <string name="pro_controls_supporting_readonly">Draft changes allowed, but this device currently holds all controls in saved-only or temporarily-unsupported state.</string>
     <string name="pro_controls_finish_capture_hint">Finish the current capture before editing.</string>
+
+    <!-- Document batch organizer -->
+    <string name="document_batch_organizer_title">Organize Batch</string>
+    <string name="document_batch_page_count">%d pages</string>
+    <string name="document_batch_remove">Remove from batch</string>
+    <string name="document_batch_move_up">Move up</string>
+    <string name="document_batch_move_down">Move down</string>
+    <string name="document_batch_crop_applied">Cropped</string>
+    <string name="document_batch_crop_skipped">Not cropped</string>
+    <string name="document_batch_crop_failed">Crop failed</string>
+    <string name="document_batch_rail_page_description">Page %d</string>
+    <string name="button_document_batch_organizer_close">Close</string>
+    <string name="button_reset_defaults">Reset to defaults</string>
+    <string name="status_processing_photo_keep_open">Processing photo, do not exit OpenCamera.</string>
+
+    <!-- Zoom labels -->
+    <string name="label_zoom_preset_steps">Preset steps</string>
+    <string name="label_zoom_continuous">Continuous</string>
+    <string name="label_zoom_unsupported">Unsupported</string>
+
+    <!-- Live photo / watermark labels -->
+    <string name="live_photo_still_only">Still Only</string>
+    <string name="live_photo_motion_metadata_only">Motion Metadata Only</string>
+    <string name="live_photo_motion_burned_in">Motion Burned In</string>
+    <string name="live_photo_unsupported">Unsupported</string>
+    <string name="watermark_still_only">Watermark: Still Only</string>
+    <string name="watermark_metadata_only">Watermark: Metadata Only</string>
+    <string name="watermark_burned_in">Watermark: Burned In</string>
+    <string name="watermark_unsupported">Watermark: Unsupported</string>
+
+    <!-- Toast/debug messages -->
+    <string name="toast_debug_log_exported">Debug log exported: %s</string>
+    <string name="toast_export_failed">Export failed</string>
+    <string name="toast_cleanup_failed">Cleanup failed</string>
+
+    <!-- Runtime issue labels -->
+    <string name="issue_bind_failure">Bind failure</string>
+    <string name="issue_preview_stall">Preview stalled</string>
+    <string name="issue_provider_failure">Provider failure</string>
+    <string name="issue_camera_recoverable">Camera recoverable error</string>
+    <string name="issue_camera_fatal">Camera fatal error</string>
+    <string name="issue_camera_unavailable">Camera unavailable</string>
+    <string name="issue_thermal_critical">Thermal critical</string>
+    <string name="issue_runtime_error">Runtime error</string>
 </resources>

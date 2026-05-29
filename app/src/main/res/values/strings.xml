@@ -441,4 +441,32 @@
     <string name="button_document_batch_organizer_close">关闭</string>
     <string name="button_reset_defaults">重置为默认</string>
     <string name="status_processing_photo_keep_open">照片处理中，请勿退出 OpenCamera。</string>
+
+    <!-- Live photo save format -->
+    <string name="label_zoom_preset_steps">预设步进</string>
+    <string name="label_zoom_continuous">连续</string>
+    <string name="label_zoom_unsupported">不支持</string>
+    <string name="live_photo_still_only">仅静态</string>
+    <string name="live_photo_motion_metadata_only">仅动态元数据</string>
+    <string name="live_photo_motion_burned_in">动态嵌入</string>
+    <string name="live_photo_unsupported">不支持</string>
+    <string name="watermark_still_only">水印: 仅静态</string>
+    <string name="watermark_metadata_only">水印: 仅元数据</string>
+    <string name="watermark_burned_in">水印: 动态嵌入</string>
+    <string name="watermark_unsupported">水印: 不支持</string>
+
+    <!-- Toast/debug messages -->
+    <string name="toast_debug_log_exported">调试日志已导出: %s</string>
+    <string name="toast_export_failed">导出失败</string>
+    <string name="toast_cleanup_failed">清理失败</string>
+
+    <!-- Runtime issue labels -->
+    <string name="issue_bind_failure">绑定失败</string>
+    <string name="issue_preview_stall">预览停滞</string>
+    <string name="issue_provider_failure">提供者故障</string>
+    <string name="issue_camera_recoverable">相机可恢复错误</string>
+    <string name="issue_camera_fatal">相机致命错误</string>
+    <string name="issue_camera_unavailable">相机不可用</string>
+    <string name="issue_thermal_critical">严重过热</string>
+    <string name="issue_runtime_error">运行时错误</string>
 </resources>
