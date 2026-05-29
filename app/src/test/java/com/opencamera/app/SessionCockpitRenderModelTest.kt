@@ -1310,6 +1310,45 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `shutter disabled reason blocks LIVE_PHOTO with activeShot at DATA_RECEIVED`() {
+        // Live photo is a conservative capture kind: activeShot stays set until ShotCompleted.
+        // Shutter must stay blocked even at DATA_RECEIVED — same policy as multi-frame.
+        val shot = ShotRequest(
+            shotId = "live-block-1",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter disabled reason returns null during active recording`() {
+        // During active recording, shutter functions as stop-recording control.
+        // Unlike captureDisabledReason (which blocks during recording),
+        // shutterDisabledReason keeps the shutter enabled.
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
+    fun `capture disabled reason blocks during recording but shutter stays enabled`() {
+        // captureDisabledReason is the generic capture gating function used by
+        // non-shutter controls. It blocks during recording.
+        // shutterDisabledReason is the shutter-specific gating that keeps the
+        // shutter enabled as stop-recording control.
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
+        assertNotNull(captureDisabledReason(state, TestAppTextResolver()))
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
     fun `shutter enabled with BACKGROUND_SAVING via cockpit render model`() {
         // After rearm: captureStatus == SAVING, activeShot == null.
         // Visual shows BACKGROUND_SAVING; shutter is enabled for immediate next shot.

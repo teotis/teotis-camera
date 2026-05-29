@@ -15,6 +15,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
         ModeId.PORTRAIT -> "Port"
         ModeId.PRO -> "Pro"
         ModeId.VIDEO -> "Video"
+        ModeId.FULL_CLEAR -> "Full Clear"
     }
 
     override fun modeTrackLabel(modeId: ModeId): String = modeDisplayName(modeId)
