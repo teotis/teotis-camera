@@ -876,6 +876,128 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `apply zoom ratio with lens node map sets discrete previewZoomRatio`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        // captureZoom = 3.0 → previewZoom = 2.0 (largest threshold ≤ 3.0)
+        session.dispatch(SessionIntent.ApplyZoomRatio(3.0f))
+        advanceUntilIdle()
+
+        assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.zoomRatio)
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+    }
+
+    @Test
+    fun `previewZoomRatio stays discrete when captureZoom changes within same lens range`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        // captureZoom = 2.5 → previewZoom = 2.0
+        session.dispatch(SessionIntent.ApplyZoomRatio(2.5f))
+        advanceUntilIdle()
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+
+        // captureZoom = 3.5 → still previewZoom = 2.0 (same lens range)
+        session.dispatch(SessionIntent.ApplyZoomRatio(3.5f))
+        advanceUntilIdle()
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+    }
+
+    @Test
+    fun `previewZoomRatio jumps when captureZoom crosses lens threshold`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        // captureZoom = 4.5 → previewZoom = 2.0 (TELEPHOTO range)
+        session.dispatch(SessionIntent.ApplyZoomRatio(4.5f))
+        advanceUntilIdle()
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+
+        // captureZoom = 6.0 → previewZoom = 5.0 (PERISCOPE range)
+        session.dispatch(SessionIntent.ApplyZoomRatio(6.0f))
+        advanceUntilIdle()
+        assertEquals(5.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+    }
+
+    @Test
+    fun `previewZoomRatio is always less than or equal to captureZoomRatio`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        val testRatios = listOf(0.6f, 1.0f, 1.5f, 2.0f, 3.0f, 5.0f, 7.0f, 10.0f)
+        for (captureZoom in testRatios) {
+            session.dispatch(SessionIntent.ApplyZoomRatio(captureZoom))
+            advanceUntilIdle()
+            val previewZoom = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+            assertTrue(
+                previewZoom <= session.state.value.activeDeviceGraph.preview.zoomRatio,
+                "previewZoomRatio ($previewZoom) should be <= captureZoomRatio (${session.state.value.activeDeviceGraph.preview.zoomRatio}) at captureZoom=$captureZoom"
+            )
+        }
+    }
+
+    @Test
     fun `preview host detach cancels active photo countdown`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
@@ -5219,6 +5341,100 @@ class DefaultCameraSessionTest {
         // Ratio is above 2x but TELEPHOTO is unavailable → WIDE
         val result = session.evaluateLensNode(3.0f, null, mapWithUnavailable)
         assertEquals(LensNode.WIDE, result)
+    }
+
+    // ── computePreviewZoomRatio tests ──────────────────────────────────
+
+    @Test
+    fun `computePreviewZoomRatio returns captureZoom when lens node map is empty`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val result = session.computePreviewZoomRatio(3.0f, emptyMap())
+        assertEquals(3.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns 1f when captureZoom below 1 and empty map`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val result = session.computePreviewZoomRatio(0.5f, emptyMap())
+        assertEquals(1.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns threshold for two-node map`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // captureZoom = 1.5 → largest threshold <= 1.5 is 0 (WIDE)
+        val result = session.computePreviewZoomRatio(1.5f, twoNodeMap)
+        assertEquals(0.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns 2 for two-node map at threshold`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // captureZoom = 2.0 → largest threshold <= 2.0 is 2.0 (TELEPHOTO)
+        val result = session.computePreviewZoomRatio(2.0f, twoNodeMap)
+        assertEquals(2.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns 5 for three-node map at periscope threshold`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // captureZoom = 5.0 → largest threshold <= 5.0 is 5.0 (PERISCOPE)
+        val result = session.computePreviewZoomRatio(5.0f, threeNodeMap)
+        assertEquals(5.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns max threshold for captureZoom above all thresholds`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // captureZoom = 10.0 → max threshold is 5.0 (PERISCOPE)
+        val result = session.computePreviewZoomRatio(10.0f, threeNodeMap)
+        assertEquals(5.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio previewZoomRatio always less than or equal to captureZoom`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val testRatios = listOf(0.6f, 1.0f, 1.5f, 2.0f, 3.0f, 5.0f, 8.0f, 10.0f)
+        for (captureZoom in testRatios) {
+            val previewZoom = session.computePreviewZoomRatio(captureZoom, threeNodeMap)
+            assertTrue(
+                previewZoom <= captureZoom,
+                "previewZoomRatio ($previewZoom) should be <= captureZoom ($captureZoom)"
+            )
+        }
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns smallest threshold when captureZoom below all thresholds`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // All thresholds: 0, 2, 5. captureZoom = 0.3 → largest <= 0.3 is 0
+        val result = session.computePreviewZoomRatio(0.3f, threeNodeMap)
+        assertEquals(0.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio with unavailable node ignores it`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val mapWithUnavailable = mapOf(
+            LensNode.WIDE to LensNodeAvailability(
+                node = LensNode.WIDE, available = true, thresholdRatio = 0f, physicalCameraId = "0"
+            ),
+            LensNode.TELEPHOTO to LensNodeAvailability(
+                node = LensNode.TELEPHOTO, available = false, thresholdRatio = 2.0f
+            )
+        )
+        // captureZoom = 3.0 → only WIDE (0) is available → returns 0
+        val result = session.computePreviewZoomRatio(3.0f, mapWithUnavailable)
+        assertEquals(0.0f, result)
     }
 
     // ── CaptureReadiness contract tests ───────────────────────────────

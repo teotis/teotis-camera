@@ -744,6 +744,7 @@ class DefaultCameraSession(
         // Lens node hysteresis: determine target node from zoom ratio thresholds
         val lensNodeMap = zoomCapability.lensNodeMap
         val currentLensNode = _state.value.activeDeviceGraph.preview.requestedLensNode
+        val previewZoomRatio = computePreviewZoomRatio(clampedRatio, lensNodeMap)
         if (lensNodeMap.isNotEmpty()) {
             val targetLensNode = evaluateLensNode(clampedRatio, currentLensNode, lensNodeMap)
             if (targetLensNode != currentLensNode) {
@@ -771,7 +772,10 @@ class DefaultCameraSession(
                     requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
                     requestedZoomRatio = clampedRatio
                 ).let { graph ->
-                    graph.copy(preview = graph.preview.copy(requestedLensNode = targetLensNode))
+                    graph.copy(preview = graph.preview.copy(
+                        requestedLensNode = targetLensNode,
+                        previewZoomRatio = previewZoomRatio
+                    ))
                 },
                 lastAction = "Zoom set to ${zoomLabel(clampedRatio)}, lens=${targetLensNode.tagValue}",
                 lastError = null
@@ -783,7 +787,9 @@ class DefaultCameraSession(
                     deviceCapabilities = _state.value.activeDeviceCapabilities,
                     requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
                     requestedZoomRatio = clampedRatio
-                ),
+                ).let { graph ->
+                    graph.copy(preview = graph.preview.copy(previewZoomRatio = previewZoomRatio))
+                },
                 lastAction = "Zoom set to ${zoomLabel(clampedRatio)}",
                 lastError = null
             )
@@ -832,6 +838,27 @@ class DefaultCameraSession(
             }
         }
         return target
+    }
+
+    /**
+     * Computes the discrete preview zoom ratio for a given capture zoom ratio.
+     * Returns the largest available thresholdRatio ≤ [captureZoom], or the smallest
+     * threshold if captureZoom is below all thresholds. The result is always ≤ captureZoom.
+     */
+    internal fun computePreviewZoomRatio(
+        captureZoom: Float,
+        lensNodeMap: Map<LensNode, LensNodeAvailability>
+    ): Float {
+        if (lensNodeMap.isEmpty()) return captureZoom.coerceAtLeast(1f)
+        val availableThresholds = lensNodeMap.values
+            .filter { it.available }
+            .map { it.thresholdRatio }
+            .sorted()
+        if (availableThresholds.isEmpty()) return captureZoom.coerceAtLeast(1f)
+        val maxThreshold = availableThresholds.last()
+        if (captureZoom >= maxThreshold) return maxThreshold
+        val match = availableThresholds.lastOrNull { it <= captureZoom }
+        return match ?: availableThresholds.first()
     }
 
     companion object {
@@ -1580,9 +1607,14 @@ class DefaultCameraSession(
             current = requestedZoomRatio,
             capability = deviceCapabilities.zoomRatioCapability
         )
+        val resolvedPreviewZoomRatio = computePreviewZoomRatio(
+            resolvedZoomRatio,
+            deviceCapabilities.zoomRatioCapability.lensNodeMap
+        )
         return baseGraph.copy(
             preview = baseGraph.preview.copy(
-                zoomRatio = resolvedZoomRatio
+                zoomRatio = resolvedZoomRatio,
+                previewZoomRatio = resolvedPreviewZoomRatio
             ),
             stillCapture = baseGraph.stillCapture.copy(
                 outputSize = resolvedOutputSize

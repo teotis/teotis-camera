@@ -369,6 +369,8 @@ data class PreviewMeteringResult(
 data class PreviewConfig(
     val snapshotsEnabled: Boolean = true,
     val zoomRatio: Float = 1f,
+    /** Discrete preview base zoom ratio, always ≤ zoomRatio, jumps at physical lens switch points. */
+    val previewZoomRatio: Float = 1f,
     /** The physical lens node requested for the current zoom level. null = not tracked / wide default. */
     val requestedLensNode: LensNode? = null
 )
