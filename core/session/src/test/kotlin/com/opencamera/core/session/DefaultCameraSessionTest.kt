@@ -22,12 +22,17 @@ import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.LiveTemporalWindow
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.LivePhotoCaptureSpec
+import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
+import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.feature.document.DocumentModePlugin
 import com.opencamera.core.mode.ModeId
@@ -5214,5 +5219,315 @@ class DefaultCameraSessionTest {
         // Ratio is above 2x but TELEPHOTO is unavailable → WIDE
         val result = session.evaluateLensNode(3.0f, null, mapWithUnavailable)
         assertEquals(LensNode.WIDE, result)
+    }
+
+    // ── CaptureReadiness contract tests ───────────────────────────────
+
+    @Test
+    fun `CaptureCommitted sets readiness for ordinary still capture`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(CaptureStatus.REQUESTED, session.state.value.captureStatus)
+
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+
+        val readiness = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(shot.shotId, readiness.shotId)
+        assertEquals(MediaType.PHOTO, readiness.mediaType)
+        assertEquals("camera2:onCaptureCompleted", readiness.source)
+        assertEquals(450L, readiness.elapsedTimestampMs)
+        assertTrue(trace.snapshot().any { it.name == "capture.committed" })
+    }
+
+    @Test
+    fun `CaptureCommitted does not set readiness for multi-frame capture`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        // Simulate a night/multi-frame shot
+        val multiFrameShot = ShotRequest(
+            shotId = "shot-mf-1",
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = com.opencamera.core.media.PostProcessSpec(
+                algorithmProfile = "night-multiframe-tripod"
+            ),
+            captureProfile = com.opencamera.core.media.CaptureProfile(frameCount = 12)
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(multiFrameShot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = multiFrameShot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 800L
+            )
+        )
+        runCurrent()
+
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Multi-frame capture must NOT set readiness (conservative)"
+        )
+    }
+
+    @Test
+    fun `CaptureCommitted does not set readiness for live photo`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        val livePhotoShot = ShotRequest(
+            shotId = "shot-live-1",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+            captureProfile = com.opencamera.core.media.CaptureProfile(),
+            livePhotoSpec = com.opencamera.core.media.LivePhotoCaptureSpec()
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(livePhotoShot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = livePhotoShot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 600L
+            )
+        )
+        runCurrent()
+
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Live photo must NOT set readiness (conservative)"
+        )
+    }
+
+    @Test
+    fun `capture readiness is cleared on next ShotStarted`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        // First capture: set readiness
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot1 = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot1))
+        runCurrent()
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot1.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+        assertNotNull(session.state.value.presentation.captureReadiness)
+
+        // Complete first shot via DataReceived + ShotCompleted
+        session.dispatch(SessionIntent.DataReceived(shot1.shotId, MediaType.PHOTO))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot1.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/first.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/first.jpg"),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        runCurrent()
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        // Second capture: readiness should start null, then be set again
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot2 = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot2))
+        runCurrent()
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Readiness must be cleared when new shot starts"
+        )
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot2.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 500L
+            )
+        )
+        runCurrent()
+        val readiness2 = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(shot2.shotId, readiness2.shotId)
+    }
+
+    @Test
+    fun `CaptureCommitted does not set readiness when activeShot mismatched`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+
+        // Dispatch CaptureCommitted with wrong shotId
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = "wrong-shot-id",
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 300L
+            )
+        )
+        runCurrent()
+
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Readiness must NOT be set for mismatched shotId"
+        )
+    }
+
+    @Test
+    fun `CaptureCommitted is idempotent and handled once per shot`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+        val readiness1 = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(450L, readiness1.elapsedTimestampMs)
+
+        // Second CaptureCommitted for same shot: readiness value is idempotently overwritten
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 500L
+            )
+        )
+        runCurrent()
+        assertEquals(
+            500L,
+            session.state.value.presentation.captureReadiness?.elapsedTimestampMs,
+            "Readiness is idempotently updated to latest value"
+        )
+    }
+
+    @Test
+    fun `CaptureCommitted does not break recording stop semantics`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val videoShot = assertNotNull(session.state.value.activeShot)
+        assertEquals(MediaType.VIDEO, videoShot.mediaType)
+
+        session.dispatch(SessionIntent.ShotStarted(videoShot))
+        runCurrent()
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+
+        // CaptureCommitted for a video shot: readiness must NOT be set
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = videoShot.shotId,
+                mediaType = MediaType.VIDEO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 200L
+            )
+        )
+        runCurrent()
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        // Recording still active after CaptureCommitted
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+        assertEquals(videoShot.shotId, session.state.value.activeShot?.shotId)
+
+        // Stop recording (via ShotCompleted) works normally
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = videoShot.shotId,
+                    mediaType = MediaType.VIDEO,
+                    outputPath = "Movies/OpenCamera/test.mp4",
+                    saveRequest = videoShot.saveRequest,
+                    thumbnailSource = ThumbnailSource.SavedMedia("Movies/OpenCamera/test.mp4"),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        runCurrent()
+
+        assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+        assertNull(session.state.value.activeShot)
     }
 }
