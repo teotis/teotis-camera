@@ -2,7 +2,7 @@
 
 ## State
 
-`pending`
+`completed`
 
 ## Evidence
 
