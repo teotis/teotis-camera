@@ -593,12 +593,13 @@ prompt_for_package() {
 
 ensure_worktree() {
   local package_id="$1"
-  local branch worktree parent
+  local branch worktree parent abs_worktree
   branch="$(graph_field "$package_id" branch)"
   worktree="$(graph_field "$package_id" worktree)"
-  parent="$(dirname "$worktree")"
+  abs_worktree="$REPO_ROOT/$worktree"
+  parent="$(dirname "$abs_worktree")"
   mkdir -p "$parent"
-  if git -C "$worktree" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if git -C "$abs_worktree" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     return 0
   fi
   git -C "$REPO_ROOT" worktree add -B "$branch" "$worktree" HEAD >/dev/null
@@ -672,14 +673,14 @@ launch_package() {
   set +e
   if [ -n "$CLAUDE_PERMISSION_MODE" ]; then
     launch_output="$(
-      cd "$worktree" &&
+      cd "$REPO_ROOT/$worktree" &&
         claude --bg --name "$name" --model "$CLAUDE_MODEL" --effort "$CLAUDE_EFFORT" \
           --permission-mode "$CLAUDE_PERMISSION_MODE" --setting-sources "$CLAUDE_SETTING_SOURCES" \
           "$(cat "$prompt_file")" 2>&1
     )"
   else
     launch_output="$(
-      cd "$worktree" &&
+      cd "$REPO_ROOT/$worktree" &&
         claude --bg --name "$name" --model "$CLAUDE_MODEL" --effort "$CLAUDE_EFFORT" \
           --setting-sources "$CLAUDE_SETTING_SOURCES" "$(cat "$prompt_file")" 2>&1
     )"
@@ -966,8 +967,8 @@ verify_package_evidence() {
     bad=1
   fi
   if [ -n "$worktree" ] && [ "$worktree" != "pending" ] &&
-    git -C "$worktree" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    if [ -n "$(git -C "$worktree" status --porcelain)" ]; then
+    git -C "$REPO_ROOT/$worktree" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    if [ -n "$(git -C "$REPO_ROOT/$worktree" status --porcelain)" ]; then
       printf '%s worktree is dirty: %s\n' "$package_id" "$worktree" >&2
       bad=1
     fi
