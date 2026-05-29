@@ -1,7 +1,7 @@
 # Package Status: 06-platform-configuration-branches
 
 ## State
-- **Status**: pending
+**Status**: launched
 - **Launched**: pending
 - **Completed**: pending
 

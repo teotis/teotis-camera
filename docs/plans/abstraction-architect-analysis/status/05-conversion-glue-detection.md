@@ -1,7 +1,7 @@
 # Package Status: 05-conversion-glue-detection
 
 ## State
-- **Status**: pending
+**Status**: launched
 - **Launched**: pending
 - **Completed**: pending
 

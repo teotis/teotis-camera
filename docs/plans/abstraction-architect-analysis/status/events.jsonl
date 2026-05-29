@@ -18,3 +18,9 @@
 {"ts":"2026-05-29T09:59:35Z","event":"state_changed","package_id":"04-cross-cutting-concerns","old_state":"launched","new_state":"completed"}
 {"ts":"2026-05-29T10:00:11Z","event":"state_changed","package_id":"01-architecture-boundary-integrity","old_state":"launched","new_state":"completed"}
 {"ts":"2026-05-29T10:01:38Z","event":"state_changed","package_id":"03-session-kernel-invariants","old_state":"launched","new_state":"completed"}
+{"ts":"2026-05-29T12:10:36Z","event":"launch_requested","package_id":"05-conversion-glue-detection","branch":"agent/abstraction-analysis/05-conversion-glue-detection","worktree":"","finalize":"0"}
+{"ts":"2026-05-29T12:10:37Z","event":"state_changed","package_id":"05-conversion-glue-detection","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T12:10:37Z","event":"launch_succeeded","package_id":"05-conversion-glue-detection","session_id":"70a4bdc7","new_state":"launched","branch":"agent/abstraction-analysis/05-conversion-glue-detection","worktree":""}
+{"ts":"2026-05-29T12:10:43Z","event":"launch_requested","package_id":"06-platform-configuration-branches","branch":"agent/abstraction-analysis/06-platform-configuration-branches","worktree":"","finalize":"0"}
+{"ts":"2026-05-29T12:10:44Z","event":"state_changed","package_id":"06-platform-configuration-branches","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T12:10:44Z","event":"launch_succeeded","package_id":"06-platform-configuration-branches","session_id":"2e26ce54","new_state":"launched","branch":"agent/abstraction-analysis/06-platform-configuration-branches","worktree":""}
