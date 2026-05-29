@@ -1,1 +1,2 @@
 {"event":"created","package_id":"coordinator","state":"pending","detail":"capture readiness sound timing orchestration initialized"}
+{"ts":"2026-05-29T06:32:03Z","event":"state_changed","package_id":"99-finalize","old_state":"pending","new_state":"finalized"}
