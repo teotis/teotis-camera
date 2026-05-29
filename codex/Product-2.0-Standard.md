@@ -15,7 +15,7 @@ OpenCamera 2.0 should be judged as:
 - A verifiable product baseline: preview, controls, capture, saved media, thumbnail, diagnostics, and recovery must agree with each other.
 - A foundation for future high-end algorithms, not a demo that hides placeholder behavior behind polished UI.
 
-The project should reference Apple, OPPO, vivo, Google, Xiaomi, Huawei, and other mature camera products at the level of product semantics: predictable cockpit, clear hierarchy, smooth feedback, trustworthy output, and graceful degradation. It should not copy brand-specific UI or claim private hardware-level capabilities.
+The project should reference 行业领先厂商, 参考厂商, vivo, Google, 厂商, Huawei, and other mature camera products at the level of product semantics: predictable cockpit, clear hierarchy, smooth feedback, trustworthy output, and graceful degradation. It should not copy brand-specific UI or claim private hardware-level capabilities.
 
 ## 2. Core 2.0 Promise
 

@@ -21,7 +21,7 @@
   - `app/src/test/java/com/opencamera/app/camera/PortraitRenderPostProcessorTest.kt`
 - Non-goals:
   - Do not build a GPU real-time light-spot preview.
-  - Do not add named ZEISS/Hasselblad/Apple styles unless licensing and product copy are explicitly approved.
+  - Do not add named ZEISS/品牌联名/Apple styles unless licensing and product copy are explicitly approved.
   - Do not modify subject skin smoothing in this package except to protect subject edges from background bloom spill.
   - Do not run segmentation independently from the mask-aware portrait path.
 

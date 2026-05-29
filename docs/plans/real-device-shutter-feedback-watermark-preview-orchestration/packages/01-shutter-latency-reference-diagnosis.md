@@ -20,8 +20,8 @@ Explain why the shutter button still feels slow after the V1 data boundary lande
 - Read-only: `app/src/main/java/com/opencamera/app/**`
 - Read-only: `app/src/main/java/com/opencamera/app/camera/**`
 - Read-only: `core/effect/**`
-- Read-only: `/Users/dingren/Applications/MiuiCamera/codex/intro_capture_data_flow.md`
-- Read-only: `/Users/dingren/Applications/MiuiCamera/codex/intro_watermark.md`
+- Read-only: `<HOME>/Applications/参考相机应用/codex/intro_capture_data_flow.md`
+- Read-only: `<HOME>/Applications/参考相机应用/codex/intro_watermark.md`
 - Coordinator status file: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/status/01-shutter-latency-reference-diagnosis.md`
 - Coordinator state file row for `01-shutter-latency-reference-diagnosis`
 
@@ -51,7 +51,7 @@ Explain why the shutter button still feels slow after the V1 data boundary lande
 3. Synthesize a design target:
    - Apple-like immediate press confirmation,
    - vivo-like cadence/readiness,
-   - MiuiCamera staged data task flow from local docs,
+   - 参考相机应用 staged data task flow from local docs,
    - OpenCamera's Session Kernel ownership rules.
 4. Decide what package 02 and 03 should implement, including what they must not touch.
 

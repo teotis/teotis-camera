@@ -284,7 +284,7 @@ English labels should feel like natural camera UI, not engineering debug output.
 
 Based on package 01 research:
 
-| Dimension | Apple (Macro Control) | vivo X-series | OPPO Find X-series | Full Clear V2 |
+| Dimension | Apple (Macro Control) | vivo X 系列 | OPPO Find X 系列 | Full Clear V2 |
 |---|---|---|---|---|
 | Approach | Automatic close-up lens switch with manual override | Hardware + ZEISS ISP multi-frame | Hardware + Hasselblad color + multi-camera | App-layer path selection + optional fusion |
 | User sees | Macro toggle | Scene optimization labels | Master mode / Hasselblad styling | Confidence-based result labels |

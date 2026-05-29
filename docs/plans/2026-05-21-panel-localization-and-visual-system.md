@@ -188,4 +188,4 @@ Manual smoke:
 - Do not migrate the app to Compose in this pass.
 - Do not add new camera features.
 - Do not alter Session Kernel ownership to manage panel visibility.
-- Do not chase pixel-perfect parity with vivo/iPhone; use them only as product references while preserving current architecture.
+- Do not chase pixel-perfect parity with vivo/参考设备; use them only as product references while preserving current architecture.

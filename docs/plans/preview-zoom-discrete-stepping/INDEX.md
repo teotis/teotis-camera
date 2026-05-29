@@ -4,7 +4,7 @@
 
 修复真机实测发现的三个变焦预览问题：
 
-1. **预览窗离散变焦**：预览窗不应连续变焦，而是到达对应焦段（物理镜头切换点）时直接跳跃变焦。在 vivo X300 等三摄手机上，应在超广角/广角/长焦的本机焦距处保持预览窗放大倍率不变。
+1. **预览窗离散变焦**：预览窗不应连续变焦，而是到达对应焦段（物理镜头切换点）时直接跳跃变焦。在 参考设备 等三摄手机上，应在超广角/广角/长焦的本机焦距处保持预览窗放大倍率不变。
 2. **画幅框面积约束**：保持画幅框占预览窗约 1/3 面积以上，让用户可以确认整体画面构图；同时避免高性能连续 SAT（平滑自动过渡）的实现难度。
 3. **16:9 画幅框溢出修复**：16:9 时画幅框大于预览窗的 bug——预览窗使用的是更低倍率设定下的传感器全部面积，不应小于 16:9 拍照流。
 
@@ -99,7 +99,7 @@ Package 03 depends on 02's code changes (needs the `previewZoomRatio` field adde
 | 01-analyze-preview-zoom-strategy | autonomous | Claude Code | n/a | analysis doc, zoom mapping table | none | normal graph |
 | 02-implement-discrete-preview-zoom | autonomous | Claude Code | n/a | unit tests, compile check | none | normal graph |
 | 03-fix-overlay-frame-geometry | autonomous | Claude Code | n/a | geometry unit tests, compile check | none | normal graph |
-| real-device-zoom-preview-qa | external-assist | user/Codex/vivo X300 | requires physical device to verify frame size and zoom stepping feel | APK path, install command, focused test checklist | screenshot/video of zoom stepping on device | release only |
+| real-device-zoom-preview-qa | external-assist | user/Codex/参考设备 | requires physical device to verify frame size and zoom stepping feel | APK path, install command, focused test checklist | screenshot/video of zoom stepping on device | release only |
 
 ## Key Design Decisions (Pre-Analysis)
 
@@ -123,7 +123,7 @@ Overlay rendering:
 
 `zoomRatio` 在 capture 和 preview 之间是同一个值，导致 preview 连续变焦时 frame 平滑缩放。实际上应当引入 `previewZoomRatio` 概念——它是用户看到的预览窗基准倍率，总是 ≤ `captureZoomRatio`，且在物理镜头切换点离散跳跃。
 
-### vivo X300 三摄影像映射（待 01 实测验证）
+### 参考设备 三摄影像映射（待 01 实测验证）
 
 | 镜头 | 物理焦距当量 | 建议预览基准倍率 | 覆盖焦段 |
 |---|---|---|---|

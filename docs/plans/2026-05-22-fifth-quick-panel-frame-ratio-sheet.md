@@ -76,4 +76,4 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --te
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
-Manual/multimodal follow-up: open `快捷` on vivo X300 and verify `4:3 / 16:9 / 1:1` remain visible.
+Manual/multimodal follow-up: open `快捷` on 参考设备 and verify `4:3 / 16:9 / 1:1` remain visible.

@@ -35,7 +35,7 @@ Cover these product mappings:
   - light spot / highlight shape if backed by mask.
 - Humanistic:
   - subtle subject/background tonal separation;
-  - 35mm/50mm/85mm profile mapping without overclaiming ZEISS/Hasselblad-style internals.
+  - 35mm/50mm/85mm profile mapping without overclaiming ZEISS/品牌联名-style internals.
 - Color Lab:
   - subject protection;
   - stronger background color/tone changes;

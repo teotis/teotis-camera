@@ -170,4 +170,4 @@ Use this structure:
 
 - Do not implement code changes in this QA pass unless the user explicitly asks.
 - Do not judge color science quality beyond confirming that the selected effect is applied.
-- Do not require vivo/iPhone pixel-perfect matching.
+- Do not require vivo/参考设备 pixel-perfect matching.

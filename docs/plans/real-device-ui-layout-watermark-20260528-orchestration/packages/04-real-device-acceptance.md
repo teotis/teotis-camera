@@ -54,7 +54,7 @@ rtk ./scripts/run_isolated_gradle.sh :app:assembleDebug
 If installing on the connected device is available:
 
 ```bash
-adb install -r -d /Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
+adb install -r -d <HOME>/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
 ```
 
 If the APK path differs because the worktree uses isolated build output, record the actual path.

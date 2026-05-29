@@ -75,4 +75,4 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --te
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
-Manual/multimodal follow-up: open settings/style panels on vivo X300 and confirm they read like product UI.
+Manual/multimodal follow-up: open settings/style panels on 参考设备 and confirm they read like product UI.

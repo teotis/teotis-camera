@@ -103,11 +103,11 @@ Acceptance:
 
 ## Work Package D: Real-Device QA Script
 
-Create a markdown checklist for vivo X300 validation.
+Create a markdown checklist for 参考设备 validation.
 
 Suggested file:
 
-- `docs/plans/2026-05-22-vivo-x300-output-consistency-qa.md`
+- `docs/plans/2026-05-22-参考厂商-x300-output-consistency-qa.md`
 
 Checklist must ask the tester to collect:
 

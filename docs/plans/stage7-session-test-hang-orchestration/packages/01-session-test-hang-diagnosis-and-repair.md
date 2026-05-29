@@ -48,7 +48,7 @@ bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/stage7-session-test-han
 
 ## Required Investigation
 
-1. Read `AGENTS.md`, `/Users/dingren/.codex/RTK.md`, this package, and the orchestration index.
+1. Read `AGENTS.md`, `<HOME>/.codex/RTK.md`, this package, and the orchestration index.
 2. Create or reuse an isolated worktree.
 3. In the worktree, run Gradle through `rtk ./scripts/run_isolated_gradle.sh`.
 4. Reproduce the hang with the smallest command first:

@@ -15,5 +15,5 @@
 - Verification: `verify_public_release_safety.sh`: 2 findings (git history identity + git config), 0 warnings; file content clean
 - Integration: vivo brand refs fixed; EXIF stripped; gate scripts in place
 - Cleanup: no worktrees deleted; branches preserved
-- Remaining blockers: git history rewrite required (dingren@xiaomi.com in 7 commits); git config cleanup needed
+- Remaining blockers: git history rewrite required (<REDACTED_EMAIL> in 7 commits); git config cleanup needed
 - Final report: `FINAL_REPORT.md` written

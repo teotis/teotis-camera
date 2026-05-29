@@ -1,4 +1,4 @@
-# vivo X300 UI 面板与底部 cockpit 修复方案
+# 参考设备 UI 面板与底部 cockpit 修复方案
 
 日期：2026-05-24
 
@@ -57,7 +57,7 @@
 
 验收：
 
-- vivo X300 竖屏中，打开设置/色彩实验室/快捷后，下边界在屏幕高度约 60% 处。
+- 参考设备 竖屏中，打开设置/色彩实验室/快捷后，下边界在屏幕高度约 60% 处。
 - 面板不会压到底部快门区，也不会短到只能显示两三行。
 
 ### 2. 快捷画幅区域视觉与命中
@@ -79,7 +79,7 @@
 验收：
 
 - 画幅区域肉眼看起来是一个和“网格/画质/实况/定时”同体系的半透明块。
-- 4:3 / 16:9 / 1:1 任意一个按钮在 vivo X300 上单手可稳定点中。
+- 4:3 / 16:9 / 1:1 任意一个按钮在 参考设备 上单手可稳定点中。
 - 选中项背景明显，未选中项仍有可点击控件边界。
 
 ### 3. 底栏透明与成片区域提示
@@ -162,7 +162,7 @@ rtk ./gradlew --no-daemon :app:assembleDebug
 真机验收：
 
 ```bash
-rtk adb install -r -d /Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
+rtk adb install -r -d <HOME>/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
 ```
 
 手动路径：

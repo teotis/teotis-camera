@@ -169,7 +169,7 @@ Confirmed: the codebase has zero awareness of Camera2's `getMaximumResolution()`
 
 4. **Does CameraX internally query `getMaximumResolution()` in the version used by this project?** — Need to check CameraX library version and its internal `StreamConfigurationMap` handling.
 
-5. **Does vivo X300 require a vendor-specific session mode for 50MP capture?** — Some OEMs (Samsung, Xiaomi, vivo) require `CaptureRequest` vendor tags or specific session configurations that standard CameraX cannot set. This would make the device `DEGRADED` even with correct size enumeration.
+5. **Does vivo X300 require a vendor-specific session mode for 50MP capture?** — Some OEMs (Samsung, 厂商, vivo) require `CaptureRequest` vendor tags or specific session configurations that standard CameraX cannot set. This would make the device `DEGRADED` even with correct size enumeration.
 
 6. **What is the actual pixel count of vivo X300's "50MP" output?** — Marketing "50MP" may be 8160×6120 (49.9MP) or a different resolution. Need real-device verification.
 

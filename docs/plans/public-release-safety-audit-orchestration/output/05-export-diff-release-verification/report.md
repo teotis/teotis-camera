@@ -10,7 +10,7 @@
 
 **Judgment: BLOCKED — safe only after history cleanup (requires explicit user approval)**
 
-The public repo working tree is clean of brand/identity leaks in tracked files, but the Git history exposes `dingren <dingren@xiaomi.com>` across all 6 commits. This is a hard blocker that must be resolved before pushing. The local git config for the public repo also uses the real identity, meaning any new commits would also leak.
+The public repo working tree is clean of brand/identity leaks in tracked files, but the Git history exposes `<REDACTED_USER> <<REDACTED_EMAIL>>` across all 6 commits. This is a hard blocker that must be resolved before pushing. The local git config for the public repo also uses the real identity, meaning any new commits would also leak.
 
 ---
 
@@ -48,14 +48,14 @@ The public repo working tree is clean of brand/identity leaks in tracked files, 
   - `vivo X300 Ultra` → `Teotis Camera Pro` in test fixtures
 
 ### Git history (all 6 commits)
-All commits expose `dingren <dingren@xiaomi.com>` as both author and committer:
+All commits expose `<REDACTED_USER> <<REDACTED_EMAIL>>` as both author and committer:
 ```
-b203091 dingren <dingren@xiaomi.com> | dingren <dingren@xiaomi.com> | chore: 替换测试 fixture 中 vivo X300 Ultra 为中性设备名
-a8e440d dingren <dingren@xiaomi.com> | dingren <dingren@xiaomi.com> | docs: switch public license to GPLv3
-0acb879 dingren <dingren@xiaomi.com> | dingren <dingren@xiaomi.com> | docs: 更新 README 展示实现亮点
-7939324 dingren <dingren@xiaomi.com> | dingren <dingren@xiaomi.com> | feat: 同步当前公开版更新
-bb56b95 dingren <dingren@xiaomi.com> | dingren <dingren@xiaomi.com> | fix: 修复导出脚本保留 Git 元数据，更新项目品牌名称
-c8adf1e dingren <dingren@xiaomi.com> | dingren <dingren@xiaomi.com> | feat: teotis-camera 初始公开版
+b203091 <REDACTED_USER> <<REDACTED_EMAIL>> | <REDACTED_USER> <<REDACTED_EMAIL>> | chore: 替换测试 fixture 中 vivo X300 Ultra 为中性设备名
+a8e440d <REDACTED_USER> <<REDACTED_EMAIL>> | <REDACTED_USER> <<REDACTED_EMAIL>> | docs: switch public license to GPLv3
+0acb879 <REDACTED_USER> <<REDACTED_EMAIL>> | <REDACTED_USER> <<REDACTED_EMAIL>> | docs: 更新 README 展示实现亮点
+7939324 <REDACTED_USER> <<REDACTED_EMAIL>> | <REDACTED_USER> <<REDACTED_EMAIL>> | feat: 同步当前公开版更新
+bb56b95 <REDACTED_USER> <<REDACTED_EMAIL>> | <REDACTED_USER> <<REDACTED_EMAIL>> | fix: 修复导出脚本保留 Git 元数据，更新项目品牌名称
+c8adf1e <REDACTED_USER> <<REDACTED_EMAIL>> | <REDACTED_USER> <<REDACTED_EMAIL>> | feat: teotis-camera 初始公开版
 ```
 
 ### Reflog
@@ -69,9 +69,9 @@ Reflog entries also expose the real identity in branch creation and commit recor
 
 | Location | Status | Detail |
 |----------|--------|--------|
-| Git commit author/committer | **BLOCKER** | All 6 commits: `dingren <dingren@xiaomi.com>` |
+| Git commit author/committer | **BLOCKER** | All 6 commits: `<REDACTED_USER> <<REDACTED_EMAIL>>` |
 | Git reflog | **BLOCKER** | All reflog entries expose real identity |
-| Local git config | **BLOCKER** | `user.name=dingren`, `user.email=dingren@xiaomi.com` |
+| Local git config | **BLOCKER** | `user.name=<REDACTED_USER>`, `user.email=<REDACTED_EMAIL>` |
 | Working tree tracked files | PASS | No identity leaks in source code, README, or config |
 | Working tree untracked files | PASS | No identity leaks (build artifacts gitignored) |
 
@@ -79,7 +79,7 @@ Reflog entries also expose the real identity in branch creation and commit recor
 
 | Check | Status | Detail |
 |-------|--------|--------|
-| Source code grep | PASS | No matches for Apple/vivo/Xiaomi/MIUI/Leica/Hasselblad/竞品/参考/学习/复刻/对标 |
+| Source code grep | PASS | No matches for Apple/vivo/厂商/厂商系统/品牌联名/品牌联名/竞品/参考/学习/复刻/对标 |
 | Test fixtures | PASS | `vivo X300 Ultra` replaced with `Teotis Camera Pro` on scrub branch |
 | Commit messages | INFO | Scrub branch commit mentions "vivo X300 Ultra" (historical, won't be visible after history cleanup) |
 
@@ -111,7 +111,7 @@ Reflog entries also expose the real identity in branch creation and commit recor
 
 ### Attempted commands
 ```bash
-ANDROID_HOME=/Users/dingren/Library/Android/sdk ./gradlew --no-daemon clean :app:assembleDebug
+ANDROID_HOME=<HOME>/Library/Android/sdk ./gradlew --no-daemon clean :app:assembleDebug
 ```
 
 ### Result: BLOCKED (environment-specific)
@@ -143,13 +143,13 @@ Build fails at `:app:parseDebugLocalResources` due to macOS AppleDouble `._` fil
 ### Verdict: **BLOCKED — safe only after history cleanup**
 
 **Cannot push now** because:
-1. **Git history exposes personal identity**: All 6 commits have `dingren <dingren@xiaomi.com>` as author and committer. GitHub will display these publicly.
+1. **Git history exposes personal identity**: All 6 commits have `<REDACTED_USER> <<REDACTED_EMAIL>>` as author and committer. GitHub will display these publicly.
 2. **Reflog exposes personal identity**: Reflog entries contain the same identity information.
 3. **Local git config uses real identity**: Any new commits would also leak identity.
 4. **History cleanup requires explicit user approval**: Per `PUBLIC_VERSION_RULES.md`, history rewriting and force pushing must get explicit user approval — agents cannot auto-execute.
 
 ### What must be done before pushing
-1. **Rewrite Git history**: Use `git filter-repo` or equivalent to replace `dingren <dingren@xiaomi.com>` with a public-safe identity (e.g., `Teotis <noreply@teotis.dev>`) in all commits.
+1. **Rewrite Git history**: Use `git filter-repo` or equivalent to replace `<REDACTED_USER> <<REDACTED_EMAIL>>` with a public-safe identity (e.g., `Teotis <noreply@teotis.dev>`) in all commits.
 2. **Update local git config**: Set `user.name` and `user.email` to public-safe values in `public/teotis-camera/.git/config`.
 3. **Squash or merge the scrub branch**: The `scrub/brand-reference-content-scrub` branch should be merged into `main` before or after history cleanup.
 4. **Commit the EXIF-stripped images**: The modified image files (EXIF Software tag removed) need to be committed.

@@ -10,7 +10,7 @@
 - **Verification**: `./scripts/run_isolated_gradle.sh :app:assembleDebug` BUILD SUCCESSFUL; `:app:testDebugUnitTest` 838 passed, 2 pre-existing failures (MaskAwarePortraitRenderMathTest mask alpha precision, PhotoAlgorithmPostProcessorTest unsupported profile handling)
 - **Evidence**:
   - **Device**: none connected (`adb devices` empty)
-  - **APK**: `/Users/dingren/.codex-build/OpenCamera-d73f9ae3/app/outputs/apk/debug/app-debug.apk` (30.4 MB)
+  - **APK**: `<HOME>/.codex-build/OpenCamera-d73f9ae3/app/outputs/apk/debug/app-debug.apk` (30.4 MB)
   - **Build command**: `rtk ./scripts/run_isolated_gradle.sh :app:assembleDebug`
   - **Final decision**: `NOT_RUN_DEVICE_UNAVAILABLE`
   - **QA protocol**: see below

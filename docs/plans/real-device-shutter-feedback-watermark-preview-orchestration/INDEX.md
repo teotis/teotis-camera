@@ -4,7 +4,7 @@
 
 Turn the latest real-device findings into a verified implementation loop:
 
-1. Shutter issue 2: the capture button still feels slow to recover after taking a photo. Current mainline already has the V1 data boundary, so this package must diagnose the remaining latency and design a faster perceived feedback model inspired by Apple-style immediate press feedback, vivo-style continuous shooting readiness, and the local MiuiCamera capture data flow notes.
+1. Shutter issue 2: the capture button still feels slow to recover after taking a photo. Current mainline already has the V1 data boundary, so this package must diagnose the remaining latency and design a faster perceived feedback model inspired by 行业标准 immediate press feedback, vivo-style continuous shooting readiness, and the local 参考相机应用 capture data flow notes.
 2. Watermark issue 10: when the user chooses a watermark template, the live preview should show the template at the corresponding position so the user can see the expected result before shooting.
 
 The outcome should be mergeable code branches plus a final device-oriented QA protocol. Do not declare real-device PASS unless a real-device run is recorded.
@@ -42,8 +42,8 @@ The outcome should be mergeable code branches plus a final device-oriented QA pr
   - data-received-to-clickable,
   - clickable-to-actual-second-shot acceptance,
   - and postprocess/save overlap behavior.
-- Local MiuiCamera notes in `/Users/dingren/Applications/MiuiCamera/codex/intro_capture_data_flow.md` emphasize separating fast user feedback from longer algorithm/save work.
-- Local MiuiCamera notes in `/Users/dingren/Applications/MiuiCamera/codex/intro_watermark.md` emphasize that watermark templates should be previewed before shooting and that final capture should consume a snapshot of the chosen template configuration.
+- Local 参考相机应用 notes in `<HOME>/Applications/参考相机应用/codex/intro_capture_data_flow.md` emphasize separating fast user feedback from longer algorithm/save work.
+- Local 参考相机应用 notes in `<HOME>/Applications/参考相机应用/codex/intro_watermark.md` emphasize that watermark templates should be previewed before shooting and that final capture should consume a snapshot of the chosen template configuration.
 - Current OpenCamera preview already has `WatermarkHintSpec`, `WatermarkPreviewShape`, `PreviewEffectAdapter`, and `PreviewOverlayView`, but the selected watermark template in settings is not guaranteed to appear as an accurate preview template at the corresponding position when the user is choosing it.
 
 ## Product Direction
@@ -60,9 +60,9 @@ Target experience:
 
 Reference synthesis:
 
-- Apple-like direction: immediate tactile/visual press confirmation, then quietly manage processing without making the main capture control look stuck.
+- 行业领先厂商-like direction: immediate tactile/visual press confirmation, then quietly manage processing without making the main capture control look stuck.
 - vivo-like direction: keep capture cadence and clear readiness as the dominant experience, while slower computational work is backgrounded or represented elsewhere.
-- MiuiCamera direction from local docs: use staged capture data flow and task objects so quick feedback and final save quality are both protected.
+- 参考相机应用 direction from local docs: use staged capture data flow and task objects so quick feedback and final save quality are both protected.
 
 ### Watermark Preview
 
@@ -104,7 +104,7 @@ Forbidden without explicit user approval:
 - add secrets or credentials
 - edit outside allowed paths
 - cross Stage boundaries or declare Stage 7 complete
-- claim Apple/vivo parity or real-device PASS without evidence
+- claim 行业领先厂商/vivo parity or real-device PASS without evidence
 
 ## Dependency Graph
 
@@ -142,7 +142,7 @@ Forbidden without explicit user approval:
 
 | Work Package | Target Agent | Dependency | Parallel Safety | Purpose |
 |---|---|---|---|---|
-| [01-shutter-latency-reference-diagnosis.md](packages/01-shutter-latency-reference-diagnosis.md) | research/design agent | none | safe with 04 | Measure current remaining shutter latency and synthesize Apple/vivo/Miui-inspired design targets |
+| [01-shutter-latency-reference-diagnosis.md](packages/01-shutter-latency-reference-diagnosis.md) | research/design agent | none | safe with 04 | Measure current remaining shutter latency and synthesize 行业领先厂商/vivo/Miui-inspired design targets |
 | [02-shutter-fast-feedback-runtime.md](packages/02-shutter-fast-feedback-runtime.md) | implementation agent | 01 | no | Repair runtime/capture acceptance semantics only where diagnosis proves a remaining blocker |
 | [03-shutter-visual-state-and-qa.md](packages/03-shutter-visual-state-and-qa.md) | UI implementation agent | 01, 02 | no | Make the button feel responsive without lying about capture safety |
 | [04-watermark-template-preview.md](packages/04-watermark-template-preview.md) | implementation agent | none | safe with 01 | Show selected watermark template on preview at the corresponding position |

@@ -1,8 +1,8 @@
 # Fifth Recording Hard10 Multimodal QA Report
 
 > Date: 2026-05-22  
-> Source recording: `/Users/dingren/Downloads/飞书20260522-162635.mp4`  
-> Device: vivo X300 real-device recording  
+> Source recording: `<HOME>/Downloads/飞书20260522-162635.mp4`  
+> Device: 参考设备 real-device recording  
 > Recording facts: `540x1176`, about `157.93s`, portrait  
 > Scope: high-difficulty 10% and multimodal-only review. This is not an implementation patch.
 
@@ -59,7 +59,7 @@ Why this blocks 2.0:
 Required owner:
 
 - Implement: `2026-05-22-fifth-color-lab-palette-persistence.md`
-- Multimodal recheck: drag palette on vivo X300; reticle must stay where released.
+- Multimodal recheck: drag palette on 参考设备; reticle must stay where released.
 
 ### P0-2 Capture cockpit is visually fragmented
 
@@ -112,7 +112,7 @@ Design judgment:
 Required owner:
 
 - Implement: `2026-05-22-fifth-top-bar-and-rail-ia-polish.md`
-- Multimodal recheck: top bar fits under vivo status/recording overlay; no clipping.
+- Multimodal recheck: top bar fits under 参考厂商 status/recording overlay; no clipping.
 
 ### P1-2 Right rail label is semantically wrong
 
@@ -123,7 +123,7 @@ Evidence:
 
 Design judgment:
 
-- Use `镜头` for the right-rail product entry, while Color Lab remains top action. This better matches vivo/OPPO camera ergonomics and user expectation.
+- Use `镜头` for the right-rail product entry, while Color Lab remains top action. This better matches 参考厂商/OPPO camera ergonomics and user expectation.
 
 Required owner:
 
@@ -180,9 +180,9 @@ Required owner:
 
 ### Recommended visual direction
 
-Reference vivo, Apple, and OPPO for ergonomics, not for copying surface details.
+Reference 参考厂商, Apple, and OPPO for ergonomics, not for copying surface details.
 
-- vivo/OPPO lesson: quick camera controls should be compact, panelized, and readable with one thumb.
+- 参考厂商/OPPO lesson: quick camera controls should be compact, panelized, and readable with one thumb.
 - Apple lesson: the bottom capture cockpit should feel anchored and calm; photographic adjustments should be direct and reversible.
 - OpenCamera philosophy: never fake capability. Degraded/unsupported states must remain explicit, but in product language rather than engineering dumps.
 
@@ -207,10 +207,10 @@ After text-only implementation packages land:
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
-2. Install on vivo X300:
+2. Install on 参考设备:
 
 ```bash
-adb install -r -d "/Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk"
+adb install -r -d "<HOME>/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk"
 ```
 
 3. Record a new 2-minute portrait pass covering:
@@ -248,7 +248,7 @@ rtk ffmpeg -y -i "<new-recording.mp4>" -vf fps=1/5,scale=540:-1 /private/tmp/ope
 Codex/multimodal owner:
 
 - This report.
-- Final visual pass on new vivo X300 recording.
+- Final visual pass on new 参考设备 recording.
 - Frame geometry visual arbitration.
 - Color Lab live feel judgment.
 - Capture feedback trust judgment.
@@ -267,4 +267,4 @@ Do not declare 2.0 visual/product GO from the current APK. The correct current s
 
 **NO GO for visual/product 2.0 acceptance, with clear implementation packages ready.**
 
-If the five text-only implementation packages land cleanly and the next vivo X300 recording satisfies the recheck protocol, the project can be reclassified to `CONDITIONAL GO pending saved-media output verification`.
+If the five text-only implementation packages land cleanly and the next 参考设备 recording satisfies the recheck protocol, the project can be reclassified to `CONDITIONAL GO pending saved-media output verification`.

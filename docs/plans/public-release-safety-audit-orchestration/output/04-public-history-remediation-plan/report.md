@@ -9,7 +9,7 @@
 | 远端 URL | `git@github.com:teotis/teotis-camera.git` |
 | 当前分支 | `scrub/brand-reference-content-scrub` |
 | 总 commit 数 | 6（含最新 test fixture 清理） |
-| 暴露身份 | `dingren <dingren@xiaomi.com>` |
+| 暴露身份 | `<REDACTED_USER> <<REDACTED_EMAIL>>` |
 
 ### 1.2 暴露详情
 
@@ -17,16 +17,16 @@
 
 | Commit | Subject | Author | Date |
 |--------|---------|--------|------|
-| `b203091` | chore: 替换测试 fixture 中 vivo X300 Ultra 为中性设备名 | dingren | dingren@xiaomi.com |
-| `a8e440d` | docs: switch public license to GPLv3 | dingren | dingren@xiaomi.com |
-| `0acb879` | docs: 更新 README 展示实现亮点 | dingren | dingren@xiaomi.com |
-| `7939324` | feat: 同步当前公开版更新 | dingren | dingren@xiaomi.com |
-| `bb56b95` | fix: 修复导出脚本保留 Git 元数据 | dingren | dingren@xiaomi.com |
-| `c8adf1e` | feat: teotis-camera 初始公开版 | dingren | dingren@xiaomi.com |
+| `b203091` | chore: 替换测试 fixture 中 vivo X300 Ultra 为中性设备名 | <REDACTED_USER> | <REDACTED_EMAIL> |
+| `a8e440d` | docs: switch public license to GPLv3 | <REDACTED_USER> | <REDACTED_EMAIL> |
+| `0acb879` | docs: 更新 README 展示实现亮点 | <REDACTED_USER> | <REDACTED_EMAIL> |
+| `7939324` | feat: 同步当前公开版更新 | <REDACTED_USER> | <REDACTED_EMAIL> |
+| `bb56b95` | fix: 修复导出脚本保留 Git 元数据 | <REDACTED_USER> | <REDACTED_EMAIL> |
+| `c8adf1e` | feat: teotis-camera 初始公开版 | <REDACTED_USER> | <REDACTED_EMAIL> |
 
 **泄露内容**：
-- 个人姓名 `dingren`
-- 公司邮箱 `dingren@xiaomi.com`（暴露雇主 Xiaomi 身份）
+- 个人姓名 `<REDACTED_USER>`
+- 公司邮箱 `<REDACTED_EMAIL>`（暴露雇主 厂商 身份）
 - GitHub 用户页面可关联到真实自然人
 
 ---
@@ -96,7 +96,7 @@ cd "$DRYRUN_DIR/repo"
 
 # 执行 filter-repo 改写
 git filter-repo --force \
-  --replace-text <(echo "dingren@xiaomi.com==>noreply@teotis.dev") \
+  --replace-text <(echo "<REDACTED_EMAIL>==>noreply@teotis.dev") \
   --commit-callback '
     import subprocess
     subprocess.run(["git", "commit", "--amend",
@@ -119,7 +119,7 @@ cd /Volumes/Extreme_SSD/project/open_camera/public/teotis-camera
 
 # 1. 执行改写
 git filter-repo --force \
-  --replace-text <(echo "dingren@xiaomi.com==>noreply@teotis.dev") \
+  --replace-text <(echo "<REDACTED_EMAIL>==>noreply@teotis.dev") \
   --commit-callback '
     import subprocess
     subprocess.run(["git", "commit", "--amend",
@@ -219,7 +219,7 @@ git log --all --format='%H %an <%ae> %cn <%ce> | %s'
 # 预期：全部显示 Teotis <noreply@teotis.dev>
 
 # 3. 搜索残留
-git log --all --format='%H %ae %ce %s' | grep -i 'xiaomi\|dingren'
+git log --all --format='%H %ae %ce %s' | grep -i 'xiaomi\|<REDACTED_USER>'
 # 预期：无输出
 
 # 4. GitHub Web 验证

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-This file captures the hardest 10% and all visual/multimodal work from the vivo X300 recording review. Text-only agents can implement the linked packages, but final acceptance requires this review loop.
+This file captures the hardest 10% and all visual/multimodal work from the 参考设备 recording review. Text-only agents can implement the linked packages, but final acceptance requires this review loop.
 
 The current baseline review has been completed and written to:
 
@@ -30,7 +30,7 @@ These require screenshots/recordings and visual comparison, not just unit tests.
 
 ### 1. Multimodal baseline extraction
 
-- Extract contact sheets and key frames from `/Users/dingren/Downloads/飞书20260522-162635.mp4`.
+- Extract contact sheets and key frames from `<HOME>/Downloads/飞书20260522-162635.mp4`.
 - Mark issue timestamps:
   - top clipping,
   - Color Lab palette snap-back,
@@ -42,9 +42,9 @@ These require screenshots/recordings and visual comparison, not just unit tests.
 
 ### 2. Design arbitration
 
-After text-only implementation packages land, compare a new vivo X300 recording against:
+After text-only implementation packages land, compare a new 参考设备 recording against:
 
-- vivo-like quick panel ergonomics,
+- 参考厂商-like quick panel ergonomics,
 - Apple-like bottom cockpit restraint and photographic style direct manipulation,
 - OPPO-like readable mode/zoom controls,
 - OpenCamera-specific explicit capability/degraded semantics.
@@ -83,7 +83,7 @@ Validate:
 ## Required Evidence For Final Pass
 
 - New APK build path and commit/worktree state.
-- vivo X300 portrait recording covering:
+- 参考设备 portrait recording covering:
   - first screen,
   - top bar,
   - Color Lab drag,

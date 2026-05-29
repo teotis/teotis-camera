@@ -10,9 +10,9 @@ Verify the fourth-round real-device fixes after text-only agents implement their
 
 Use the user's screenshots as baseline evidence:
 
-- `/Users/dingren/Downloads/20260522-061623.jpg`
-- `/Users/dingren/Downloads/20260522-061617.jpg`
-- `/Users/dingren/Downloads/20260522-061620.jpg`
+- `<HOME>/Downloads/20260522-061623.jpg`
+- `<HOME>/Downloads/20260522-061617.jpg`
+- `<HOME>/Downloads/20260522-061620.jpg`
 
 Also collect fresh screenshots/recordings from the new APK after implementation.
 

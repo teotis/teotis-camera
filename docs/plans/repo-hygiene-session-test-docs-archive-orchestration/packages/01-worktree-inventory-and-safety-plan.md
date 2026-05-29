@@ -37,7 +37,7 @@ Produce an evidence-backed cleanup inventory for `.claude/worktrees`, `.worktree
 
 ## Steps
 
-1. Read `AGENTS.md`, `/Users/dingren/.codex/RTK.md`, this package, and `INDEX.md`.
+1. Read `AGENTS.md`, `<HOME>/.codex/RTK.md`, this package, and `INDEX.md`.
 2. From the main checkout, run:
    ```bash
    rtk git worktree list

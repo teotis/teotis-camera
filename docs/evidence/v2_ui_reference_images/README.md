@@ -17,5 +17,5 @@ They are not a replacement for the Markdown specs in `codex/v2_ui/`. If an image
 To regenerate:
 
 ```bash
-rtk /Users/dingren/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 docs/evidence/v2_ui_reference_images/generate_reference_images.py
+rtk <HOME>/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 docs/evidence/v2_ui_reference_images/generate_reference_images.py
 ```

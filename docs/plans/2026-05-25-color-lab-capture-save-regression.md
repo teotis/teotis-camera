@@ -98,7 +98,7 @@ Optional real-device diagnostics:
 
 ```bash
 rtk adb logcat -c
-rtk adb install -r -d /Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
+rtk adb install -r -d <HOME>/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
 rtk adb logcat -d | rg "OpenCamera|capture|Shot|algorithm-render|postprocess|ImageCapture"
 ```
 

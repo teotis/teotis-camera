@@ -2,7 +2,7 @@
 
 ## 概述
 
-对 `public/teotis-camera` 公开仓进行竞品/品牌引用内容扫描，移除或中和所有不必要的竞品学习痕迹、品牌/厂商名称引用。
+对 `public/teotis-camera` 公开仓进行行业/品牌引用内容扫描，移除或中和所有不必要的行业研究痕迹、品牌/厂商名称引用。
 
 **审查时间**：2026-05-28
 **公开仓路径**：`public/teotis-camera`
@@ -15,16 +15,16 @@
 ### 扫描命令
 
 ```bash
-rg -n --fixed-strings -e 'Apple' -e 'iPhone' -e 'vivo' -e 'Xiaomi' -e 'MIUI' -e 'MiuiCamera' -e 'Leica' -e 'Hasselblad' -e '竞品' -e '参考' -e '学习' --glob '!.git/**'
+rg -n --fixed-strings -e 'Apple' -e 'iPhone' -e 'vivo' -e '厂商' -e '厂商系统' -e '参考相机应用' -e '品牌联名' -e '品牌联名' -e '行业' -e '参考' -e '学习' --glob '!.git/**'
 ```
 
 ### Before 清理（3 处命中）
 
 | # | 文件 | 行号 | 内容 | 严重性 |
 |---|------|------|------|--------|
-| 1 | `app/src/test/.../PhotoWatermarkTemplateResolverTest.kt` | 25 | `ExifInterface.TAG_MODEL to "vivo X300 Ultra"` | P1 竞品引用 |
-| 2 | `app/src/test/.../PhotoWatermarkTemplateResolverTest.kt` | 29 | `assertEquals("vivo X300 Ultra · Scenery Handheld", resolved.title)` | P1 竞品引用 |
-| 3 | `app/src/test/.../PhotoWatermarkTemplateResolverTest.kt` | 78 | `ExifInterface.TAG_MODEL to "vivo X300 Ultra",` | P1 竞品引用 |
+| 1 | `app/src/test/.../PhotoWatermarkTemplateResolverTest.kt` | 25 | `ExifInterface.TAG_MODEL to "vivo X300 Ultra"` | P1 行业引用 |
+| 2 | `app/src/test/.../PhotoWatermarkTemplateResolverTest.kt` | 29 | `assertEquals("vivo X300 Ultra · Scenery Handheld", resolved.title)` | P1 行业引用 |
+| 3 | `app/src/test/.../PhotoWatermarkTemplateResolverTest.kt` | 78 | `ExifInterface.TAG_MODEL to "vivo X300 Ultra",` | P1 行业引用 |
 
 ### After 清理（0 处命中）
 
@@ -42,7 +42,7 @@ rg -n --fixed-strings -e 'Apple' -e 'iPhone' -e 'vivo' -e 'Xiaomi' -e 'MIUI' -e 
 | `AUTHORS` | 无品牌引用 | 仅列出 "Teotis" |
 | `docs/assets/*.jpg` | 无品牌引用 | EXIF 仅含 software 字段（PD2509），无可读品牌名 |
 | `app/src/test/**` | 已修复 | vivo X300 Ultra → Teotis Camera Pro |
-| 源码注释 | 无品牌引用 | 无竞品比较或"学习参考"措辞 |
+| 源码注释 | 无品牌引用 | 无行业比较或"学习参考"措辞 |
 
 ---
 
@@ -76,8 +76,8 @@ rg -n --fixed-strings -e 'Apple' -e 'iPhone' -e 'vivo' -e 'Xiaomi' -e 'MIUI' -e 
 ## 五、验证结果
 
 ```
-$ rg -n --fixed-strings -e 'Apple' -e 'iPhone' -e 'vivo' -e 'Xiaomi' -e 'MIUI' -e 'MiuiCamera' -e 'Leica' -e 'Hasselblad' -e '竞品' -e '参考' -e '学习' --glob '!.git/**'
+$ rg -n --fixed-strings -e 'Apple' -e 'iPhone' -e 'vivo' -e '厂商' -e '厂商系统' -e '参考相机应用' -e '品牌联名' -e '品牌联名' -e '行业' -e '参考' -e '学习' --glob '!.git/**'
 (no output — 0 matches)
 ```
 
-**结论**：公开仓中所有竞品品牌引用已清除，剩余型号标识符（如 `X300U`、`X300 Ultra`）为中性测试数据，无品牌风险。
+**结论**：公开仓中所有行业品牌引用已清除，剩余型号标识符（如 `X300U`、`X300 Ultra`）为中性测试数据，无品牌风险。

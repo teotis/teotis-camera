@@ -4,7 +4,7 @@
 
 ## Context
 
-User report, screenshots, and `/Users/dingren/Downloads/opencamera-debug-1779350306073.log` show a cluster of product regressions in the current Android/Kotlin OpenCamera app. The project is currently in Stage 7: stability governance and automation hardening. Do not start a new stage. Keep fixes within the existing architecture: UI renders state and dispatches session/settings intents; Session Kernel owns runtime state; Device Adapter owns CameraX execution; Media Pipeline owns saved-media results.
+User report, screenshots, and `<HOME>/Downloads/opencamera-debug-1779350306073.log` show a cluster of product regressions in the current Android/Kotlin OpenCamera app. The project is currently in Stage 7: stability governance and automation hardening. Do not start a new stage. Keep fixes within the existing architecture: UI renders state and dispatches session/settings intents; Session Kernel owns runtime state; Device Adapter owns CameraX execution; Media Pipeline owns saved-media results.
 
 The strongest log evidence:
 

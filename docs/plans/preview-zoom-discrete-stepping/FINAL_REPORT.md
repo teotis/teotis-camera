@@ -53,7 +53,7 @@ Note: 42 pre-existing test failures in `DefaultCameraSessionTest` (unrelated to 
 ## External QA Gate
 
 `real-device-zoom-preview-qa` remains open — requires physical device verification:
-- Install APK on vivo X300
+- Install APK on 参考设备
 - Test zoom stepping (should snap at lens switch points)
 - Test 16:9 frame no longer overflows preview
 - Verify frame size at each zoom level

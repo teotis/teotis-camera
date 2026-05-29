@@ -31,7 +31,7 @@ Read-only targets:
 2. Scan tracked, untracked, and hidden metadata for identity/path/company leakage:
    - personal names/usernames, company email/domain, local paths, disk names, generated temp paths.
 3. Scan public-facing docs, README files, NOTICE/AUTHORS, commit messages, source comments, test fixtures, and asset names for competitor/reference traces:
-   - Apple, iPhone, vivo, Xiaomi, MIUI, MiuiCamera, Leica, Hasselblad, X-series device names, competitor/reference/learning wording.
+   - Apple, 参考设备, vivo, 厂商, 厂商系统, 参考相机应用, 品牌联名, 品牌联名, X 系列 device names, competitor/reference/learning wording.
 4. Inspect screenshot/assets metadata as far as local tools allow. If a metadata tool is missing, record that gap and use `file`, `strings`, and image dimensions as the minimum fallback.
 5. Classify every finding:
    - `P0`: already public identity/company/secrets/history exposure
@@ -47,7 +47,7 @@ Run and record:
 rtk git -C public/teotis-camera status --short --branch
 rtk git -C public/teotis-camera log --all --format='%H %an <%ae> %cn <%ce> %s'
 rtk rg -n --hidden --fixed-strings -e 'dingren' -e 'dingren@' -e '/Users/' -e '丁仁' public/teotis-camera --glob '!public/teotis-camera/.git/objects/**'
-rtk rg -n --fixed-strings -e 'Apple' -e 'iPhone' -e 'vivo' -e 'Xiaomi' -e 'MIUI' -e 'MiuiCamera' -e 'Leica' -e 'Hasselblad' -e '竞品' -e '参考' -e '学习' public/teotis-camera --glob '!public/teotis-camera/.git/objects/**'
+rtk rg -n --fixed-strings -e 'Apple' -e '参考设备' -e 'vivo' -e '厂商' -e '厂商系统' -e '参考相机应用' -e '品牌联名' -e '品牌联名' -e '行业' -e '参考' -e '学习' public/teotis-camera --glob '!public/teotis-camera/.git/objects/**'
 ```
 
 ## Evidence Required

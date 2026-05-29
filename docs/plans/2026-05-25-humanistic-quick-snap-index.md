@@ -31,7 +31,7 @@
 - `CameraXCaptureAdapter.createImageCapture` 已根据 `StillCaptureQualityPreference.LATENCY / QUALITY` 映射到 `ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY / CAPTURE_MODE_MAXIMIZE_QUALITY`，这是快速抓拍第一闭环可复用的入口。
 - `CameraXCaptureAdapter.captureStillImage` 已在 `ShotStarted` 后调用 `captureCaptureFeedbackSnapshot`，具备“按下后立即用预览帧反馈”的基础。
 - `LivePreviewFrameSource` / motion photo 相关能力已经存在，但人文快速抓拍第一闭环不应默认变成 Live 或多帧；Live 保留为用户设置或二级能力。
-- `codex-camera-reference/01-architecture/algo-shot-instance.md` 提到 MiuiCamera 的 `doAnchorFrameAsThumbnail()`、`enableZSL`、`zslPolicy` 和 single/burst shot 参数；适合被吸收到 OpenCamera 的 `CaptureStrategy / CaptureProfile / DeviceShotRequest`，而不是搬回旧式 shot instance 继承树。
+- `codex-camera-reference/01-architecture/algo-shot-instance.md` 提到 参考相机应用 的 `doAnchorFrameAsThumbnail()`、`enableZSL`、`zslPolicy` 和 single/burst shot 参数；适合被吸收到 OpenCamera 的 `CaptureStrategy / CaptureProfile / DeviceShotRequest`，而不是搬回旧式 shot instance 继承树。
 
 ## References
 

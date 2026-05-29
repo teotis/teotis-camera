@@ -13,7 +13,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 **Coordinator state**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/status/state.tsv`
 **Orchestrator**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/launchers/orchestrate.sh`
 
-Read `AGENTS.md` and `/Users/dingren/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
+Read `AGENTS.md` and `<HOME>/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
 
 Before calling `advance`, set coordinator status to `completed` or `blocked`, fill evidence, and update the machine-readable state row consistently.
 
@@ -44,7 +44,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 **Coordinator state**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/status/state.tsv`
 **Orchestrator**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/launchers/orchestrate.sh`
 
-Read `AGENTS.md` and `/Users/dingren/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
+Read `AGENTS.md` and `<HOME>/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
 
 Before calling `advance`, set coordinator status to `completed` or `blocked`, fill evidence, and update the machine-readable state row consistently.
 
@@ -75,7 +75,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 **Coordinator state**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/status/state.tsv`
 **Orchestrator**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/launchers/orchestrate.sh`
 
-Read `AGENTS.md` and `/Users/dingren/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
+Read `AGENTS.md` and `<HOME>/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
 
 Before calling `advance`, set coordinator status to `completed` or `blocked`, fill evidence, and update the machine-readable state row consistently.
 
@@ -106,7 +106,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 **Coordinator state**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/status/state.tsv`
 **Orchestrator**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/launchers/orchestrate.sh`
 
-Read `AGENTS.md` and `/Users/dingren/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
+Read `AGENTS.md` and `<HOME>/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
 
 Before calling `advance`, set coordinator status to `completed` or `blocked`, fill evidence, and update the machine-readable state row consistently.
 
@@ -137,7 +137,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 **Coordinator state**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/status/state.tsv`
 **Orchestrator**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/real-device-shutter-feedback-watermark-preview-orchestration/launchers/orchestrate.sh`
 
-Read `AGENTS.md` and `/Users/dingren/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
+Read `AGENTS.md` and `<HOME>/.codex/RTK.md`. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. Do not edit `INDEX.md` or another package status file. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
 
 Before calling `advance`, set coordinator status to `completed` or `blocked`, fill evidence, and update the machine-readable state row consistently.
 

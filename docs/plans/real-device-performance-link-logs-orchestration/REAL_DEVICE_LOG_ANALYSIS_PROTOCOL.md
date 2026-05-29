@@ -18,7 +18,7 @@ rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:assembleDeb
 ### APK 输出路径
 
 ```
-/Users/dingren/.codex-build/OpenCamera-b8ca60d4/app/outputs/apk/debug/app-debug.apk
+<HOME>/.codex-build/OpenCamera-b8ca60d4/app/outputs/apk/debug/app-debug.apk
 ```
 
 构建后复制到 `public/` 目录：
@@ -29,13 +29,13 @@ rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:assembleDeb
 ### 安装到设备
 
 ```bash
-adb install -r /Users/dingren/.codex-build/OpenCamera-b8ca60d4/app/outputs/apk/debug/app-debug.apk
+adb install -r <HOME>/.codex-build/OpenCamera-b8ca60d4/app/outputs/apk/debug/app-debug.apk
 ```
 
 若已有旧版本签名冲突：
 ```bash
 adb uninstall com.opencamera.app
-adb install /Users/dingren/.codex-build/OpenCamera-b8ca60d4/app/outputs/apk/debug/app-debug.apk
+adb install <HOME>/.codex-build/OpenCamera-b8ca60d4/app/outputs/apk/debug/app-debug.apk
 ```
 
 ---
@@ -147,7 +147,7 @@ link flow=<flow> stage=<stage> status=<status> id=<correlation_id> startElapsed=
 每次真机测试必须记录以下信息（填入表格）：
 
 ```
-设备型号:  [例如: Xiaomi 14 / Pixel 8 Pro]
+设备型号:  [例如: 厂商 14 / Pixel 8 Pro]
 Android 版本: [例如: Android 14, API 34]
 App 构建 commit:  [例如: dee6bf7]
 App 构建时间戳:  [例如: 2026-05-29T10:00:00Z]
@@ -237,7 +237,7 @@ App 构建时间戳:  [例如: 2026-05-29T10:00:00Z]
 DevLogRenderModelTest: 21 passed (含 6 个 LINK tab 测试)
 DevLogExporterTest: 16 passed (含 LINK type header 测试)
 :app:assembleDebug: BUILD SUCCESSFUL
-APK 路径: /Users/dingren/.codex-build/OpenCamera-b8ca60d4/app/outputs/apk/debug/app-debug.apk
+APK 路径: <HOME>/.codex-build/OpenCamera-b8ca60d4/app/outputs/apk/debug/app-debug.apk
 ```
 
 验证命令：

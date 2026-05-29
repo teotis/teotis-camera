@@ -1,4 +1,4 @@
-# vivo X300 Color Lab 效果强度修复方案
+# 参考设备 Color Lab 效果强度修复方案
 
 日期：2026-05-24
 
@@ -129,7 +129,7 @@ rtk ./gradlew --no-daemon :app:assembleDebug
 安装新 APK 后：
 
 ```bash
-rtk adb install -r -d /Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
+rtk adb install -r -d <HOME>/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
 ```
 
 手动路径：

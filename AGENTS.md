@@ -4,7 +4,7 @@ This repository is an Android/Kotlin camera project named `OpenCamera`. Treat it
 
 ## Local Command Rule
 
-- Always run shell commands through `rtk`, per `/Users/dingren/.codex/RTK.md`.
+- Always run shell commands through `rtk`, per `~/.codex/RTK.md`.
 - Examples:
   - `rtk rg --files`
   - `rtk ./gradlew --no-daemon :app:assembleDebug`

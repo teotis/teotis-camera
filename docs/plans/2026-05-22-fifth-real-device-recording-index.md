@@ -1,11 +1,11 @@
 # 2026-05-22 Fifth Real-Device Recording Review Index
 
-> **For agentic workers:** This is the master handoff for the vivo X300 recording `/Users/dingren/Downloads/飞书20260522-162635.mp4`. Pick one linked plan, keep edits scoped, and run the listed verification. Use `rtk` for every shell command.
+> **For agentic workers:** This is the master handoff for the 参考设备 recording `<HOME>/Downloads/飞书20260522-162635.mp4`. Pick one linked plan, keep edits scoped, and run the listed verification. Use `rtk` for every shell command.
 
 ## Source Evidence
 
-- Device/video: vivo X300 real-device screen recording.
-- File: `/Users/dingren/Downloads/飞书20260522-162635.mp4`
+- Device/video: 参考设备 real-device screen recording.
+- File: `<HOME>/Downloads/飞书20260522-162635.mp4`
 - Video facts: `540x1176`, about `157.93s`, portrait.
 - Multimodal review frames: settings, color lab, style panel, quick panel, dev panel, photo capture thumbnail, mode switching, 1:1 / 16:9 / 4:3 frame overlays.
 
@@ -49,9 +49,9 @@
 
 ## Reference Direction
 
-Use vivo, Apple, and OPPO as ergonomic references, but preserve OpenCamera's lower-layer philosophy:
+Use 参考厂商, Apple, and OPPO as ergonomic references, but preserve OpenCamera's lower-layer philosophy:
 
-- Like vivo/OPPO: camera-first visual density, concise mode rail, quick camera controls in one panel.
+- Like 参考厂商/OPPO: camera-first visual density, concise mode rail, quick camera controls in one panel.
 - Like Apple: restrained top actions, stable bottom capture cockpit, direct manipulation for photographic style controls.
 - Preserve OpenCamera: explicit supported/degraded/unsupported semantics, no fake capability, no hidden second session kernel, diagnostics available but not front-stage product UI.
 
@@ -73,7 +73,7 @@ Use vivo, Apple, and OPPO as ergonomic references, but preserve OpenCamera's low
    - Remove `Supported` and raw render parameter strings from user-facing panels; keep dev detail in Dev only.
 
 6. [Multimodal QA And High-Difficulty Owner Tasks](./2026-05-22-fifth-multimodal-hard10-qa.md)
-   - Covers the hardest 10% and all visual judgment work: frame geometry, top-bar safe area, palette live feel, capture thumbnail trust, final vivo X300 visual pass.
+   - Covers the hardest 10% and all visual judgment work: frame geometry, top-bar safe area, palette live feel, capture thumbnail trust, final 参考设备 visual pass.
 
 ## Recommended Dependency Order
 
@@ -103,4 +103,4 @@ After integration:
 rtk ./scripts/verify_stage_7_observability.sh
 ```
 
-Final acceptance still requires a new vivo X300 recording.
+Final acceptance still requires a new 参考设备 recording.

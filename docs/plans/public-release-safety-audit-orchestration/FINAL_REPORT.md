@@ -18,7 +18,7 @@ The public-release safety work is now closed for the current public repository s
 - Public Git history identity exposure: remediated by replacing public `main` with sanitized public-identity history.
 - Remote `origin/main`: confirmed at sanitized commit `9ecfc283d0bdf3686aba5766a317ec5060a87d4a`.
 
-The old public history that exposed `dingren <dingren@xiaomi.com>` has been removed from the public branch and force-pushed with lease.
+The old public history that exposed `<REDACTED_USER> <<REDACTED_EMAIL>>` has been removed from the public branch and force-pushed with lease.
 
 ---
 

@@ -12,8 +12,8 @@
 - Commit hash: none (read-only audit, no code changes)
 - Changed files: `output/01-public-exposure-inventory/report.md` (new)
 - Verification:
-  - `git -C public/teotis-camera log --all --format='%H %an <%ae> %cn <%ce> %s'` → 5 commit 全部暴露 dingren@xiaomi.com
-  - `grep -rn 'vivo\|Xiaomi\|xiaomi' public/teotis-camera/ --exclude-dir=.git` → 3 处 test fixture
+  - `git -C public/teotis-camera log --all --format='%H %an <%ae> %cn <%ce> %s'` → 5 commit 全部暴露 <REDACTED_EMAIL>
+  - `grep -rn 'vivo\|厂商\|xiaomi' public/teotis-camera/ --exclude-dir=.git` → 3 处 test fixture
   - `file public/teotis-camera/docs/assets/*.jpg` → EXIF software 字段含 PD2509 (Vivo)
   - `git -C public/teotis-camera config --list --show-origin` → 无泄露（仅 remote origin）
   - `find public/teotis-camera -name '*.env' -o -name '*.key' -o -name '*.pem'` → 无

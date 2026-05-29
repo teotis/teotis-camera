@@ -15,7 +15,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 You are implementing direct unit tests for `PhotoModePlugin` and `NightModePlugin`.
 
-Before any command, read `AGENTS.md`, `/Users/dingren/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
+Before any command, read `AGENTS.md`, `<HOME>/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
 
 You may edit only the allowed paths in the package doc. Do not edit INDEX.md or another package status file. Do not change production code to make tests pass. If a production seam is needed, mark this package `blocked`.
 
@@ -54,7 +54,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 You are implementing direct unit tests for `DocumentModePlugin` and `VideoModePlugin`.
 
-Before any command, read `AGENTS.md`, `/Users/dingren/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
+Before any command, read `AGENTS.md`, `<HOME>/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
 
 You may edit only the allowed paths in the package doc. Do not edit INDEX.md or another package status file. Do not change production code to make tests pass. If a production seam is needed, mark this package `blocked`.
 
@@ -93,7 +93,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 You are implementing direct unit tests for `PortraitModePlugin`, `ProModePlugin`, and `HumanisticModePlugin`.
 
-Before any command, read `AGENTS.md`, `/Users/dingren/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
+Before any command, read `AGENTS.md`, `<HOME>/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands. If you create/use an implementation worktree, do not rely on status files inside that worktree; write the coordinator status path above.
 
 You may edit only the allowed paths in the package doc. Do not edit INDEX.md or another package status file. Do not change production code to make tests pass. If a production seam is needed, mark this package `blocked`.
 

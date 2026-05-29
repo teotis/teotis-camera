@@ -211,4 +211,4 @@ This supports real-device validation: testers can see not just the result but th
 
 7. **No China-market-specific sources accessed**: vivo and OPPO China-market product pages (vivo.com.cn, oppo.cn) may contain more detailed specifications than international pages. These were not directly accessed.
 
-8. **Research scope is bounded**: This research covers the sources listed in the source table above. It does not include Samsung, Xiaomi, Huawei, or other Android OEMs whose macro/close-up implementations may offer additional patterns. It also does not include academic literature beyond the MFF survey papers cited.
+8. **Research scope is bounded**: This research covers the sources listed in the source table above. It does not include Samsung, 厂商, Huawei, or other Android OEMs whose macro/close-up implementations may offer additional patterns. It also does not include academic literature beyond the MFF survey papers cited.

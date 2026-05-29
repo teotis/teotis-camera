@@ -77,4 +77,4 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --te
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
-Manual/multimodal follow-up: compare before/after vivo X300 portrait recording for bottom cockpit coherence.
+Manual/multimodal follow-up: compare before/after 参考设备 portrait recording for bottom cockpit coherence.

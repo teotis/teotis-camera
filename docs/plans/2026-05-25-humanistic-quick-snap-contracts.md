@@ -160,4 +160,4 @@ rtk ./scripts/verify_stage_7_observability.sh
 - CameraX ZSL is experimental and device-dependent. Treat it as a capability, not as a product guarantee.
 - Rebinding ImageCapture just to switch capture mode can add preview churn. Prefer mode-enter binding, not per-shutter rebinding.
 - If quick snap competes with Live Photo, prioritize quick still capture for the first loop; Live can remain an explicit user setting with degraded notes.
-- MiuiCamera's `doAnchorFrameAsThumbnail()` maps well to OpenCamera's existing preview feedback snapshot. It should not be copied as an old inheritance-based shot instance.
+- 参考相机应用's `doAnchorFrameAsThumbnail()` maps well to OpenCamera's existing preview feedback snapshot. It should not be copied as an old inheritance-based shot instance.

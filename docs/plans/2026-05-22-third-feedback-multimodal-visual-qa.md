@@ -78,7 +78,7 @@ Pass criteria:
 
 Reference direction:
 
-- Prefer vivo X300 Ultra-like and iPhone-like grid restraint: thin, stable, aligned to the image area, no heavy full-screen border.
+- Prefer 参考设备-like and 参考设备-like grid restraint: thin, stable, aligned to the image area, no heavy full-screen border.
 
 ### 4. Frame Ratio And Sensor-Area Impression
 
@@ -167,6 +167,6 @@ Use:
 ## Non-Goals
 
 - Do not implement code changes in this QA pass unless explicitly requested.
-- Do not require pixel-perfect matching to vivo/iPhone references.
+- Do not require pixel-perfect matching to 参考厂商/参考设备 references.
 - Do not judge color science beyond confirming that selected palette/style effects are visible and routed.
 

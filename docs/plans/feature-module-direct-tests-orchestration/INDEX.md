@@ -22,7 +22,7 @@ Add direct unit-test coverage for the seven feature mode plugins so each plugin 
 - Implementation isolation: one worktree per functional package.
 - Worktree root pattern: `/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/feature-module-direct-tests-<package-id>`
 - Coordinator status/state files are not implementation artifacts and must not be committed on package branches unless explicitly requested.
-- All shell commands must run through `rtk`, per `/Users/dingren/.codex/RTK.md`.
+- All shell commands must run through `rtk`, per `<HOME>/.codex/RTK.md`.
 - Gradle in worktrees must use `rtk ./scripts/run_isolated_gradle.sh <gradle-args>`.
 
 ## Authorization

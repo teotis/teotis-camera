@@ -15,7 +15,7 @@ The product treatment may reference Apple and vivo, but implementation must obey
 
 - Apple Camera exposes video resolution and frame-rate controls directly in the camera UI, while keeping broader defaults in Settings: https://support.apple.com/guide/iphone/change-video-recording-settings-iphc1827d32f/ios
 - vivo support material frames video recording quality as a user-facing resolution/fps choice in the Camera path: https://www.vivo.com.cn/service/questions/all?categoryId=192&questionId=2072
-- vivo X-series product positioning advertises high video combinations such as all-focal 4K 120fps on X300 Ultra, which reinforces that OpenCamera must capability-gate combinations instead of assuming every option exists: https://www.vivo.com.cn/vivo/x300ultra
+- vivo X 系列 product positioning advertises high video combinations such as all-focal 4K 120fps on X300 Ultra, which reinforces that OpenCamera must capability-gate combinations instead of assuming every option exists: https://www.vivo.com.cn/vivo/x300ultra
 
 ## Current-Code Evidence
 

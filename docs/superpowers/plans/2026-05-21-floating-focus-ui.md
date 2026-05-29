@@ -593,7 +593,7 @@ Expected: script completes successfully and includes `:app:assembleDebug`.
 Run:
 
 ```bash
-rtk ls -lh /Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
+rtk ls -lh <HOME>/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
 ```
 
 Expected: APK exists.
@@ -644,7 +644,7 @@ Reason: the existing `zoomCapsuleRow` is already generated dynamically from sess
 
 Do not add vague notes.
 
-## Task 10: Install Command For vivo X300 Validation
+## Task 10: Install Command For 参考设备 Validation
 
 **Files:**
 - No source edits expected.
@@ -654,12 +654,12 @@ Do not add vague notes.
 Use:
 
 ```bash
-adb install -r /Users/dingren/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
+adb install -r <HOME>/.codex-build/OpenCamera/app/outputs/apk/debug/app-debug.apk
 ```
 
 - [ ] **Step 2: Provide crash log command**
 
-If the app crashes on vivo X300, immediately run:
+If the app crashes on 参考设备, immediately run:
 
 ```bash
 adb logcat -d -t 500 | grep -iE "FATAL EXCEPTION|AndroidRuntime|ClassCastException|InflateException|Resources\\$NotFoundException|com.opencamera"

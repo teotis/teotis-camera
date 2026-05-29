@@ -12,7 +12,7 @@
 - Commit hash: none (report-only package, no source code changes)
 - Changed files: `output/05-export-diff-release-verification/report.md`
 - Verification:
-  - `git log --all` identity leak: 6 commits expose `dingren <dingren@xiaomi.com>` — BLOCKER
+  - `git log --all` identity leak: 6 commits expose `<REDACTED_USER> <<REDACTED_EMAIL>>` — BLOCKER
   - `grep -rn` brand/identity in working tree: 0 matches in tracked files — PASS
   - Sensitive files check: none found — PASS
   - Image EXIF: `Software: Android PD2509_A_16.0.22.21.W10` stripped from 6 images — PASS (modified in public repo working tree)

@@ -13,9 +13,9 @@ Merged to mainline after user-approved real-device QA waiver.
 
 ## Integration Verification
 
-- `rtk env ANDROID_HOME=/Users/dingren/Library/Android/sdk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.SessionPreviewRenderModelTest --tests com.opencamera.app.SessionCockpitRenderModelTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.SessionSettingsManagerTest`
+- `rtk env ANDROID_HOME=<HOME>/Library/Android/sdk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.PreviewContentGeometryTest --tests com.opencamera.app.SessionPreviewRenderModelTest --tests com.opencamera.app.SessionCockpitRenderModelTest --tests com.opencamera.app.SessionUiRenderModelTest --tests com.opencamera.app.SessionSettingsManagerTest`
   - Result: BUILD SUCCESSFUL
-- `rtk env ANDROID_HOME=/Users/dingren/Library/Android/sdk ./scripts/run_isolated_gradle.sh :app:assembleDebug`
+- `rtk env ANDROID_HOME=<HOME>/Library/Android/sdk ./scripts/run_isolated_gradle.sh :app:assembleDebug`
   - Result: BUILD SUCCESSFUL
 
 ## Waiver

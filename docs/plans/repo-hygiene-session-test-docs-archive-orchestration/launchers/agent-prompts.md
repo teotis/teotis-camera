@@ -14,7 +14,7 @@ Use these prompts manually, or let `launchers/orchestrate.sh start/advance` laun
 **Scratch path**: run `bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/repo-hygiene-session-test-docs-archive-orchestration/launchers/orchestrate.sh scratch-path 01-worktree-inventory-and-safety-plan`  
 **Orchestrator**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/repo-hygiene-session-test-docs-archive-orchestration/launchers/orchestrate.sh`
 
-Read `AGENTS.md`, `/Users/dingren/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. This package is read-only with respect to existing worktrees: do not delete, move, prune, or repair any worktree.
+Read `AGENTS.md`, `<HOME>/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands. You may edit only the allowed paths in the package doc. This package is read-only with respect to existing worktrees: do not delete, move, prune, or repair any worktree.
 
 Before calling `advance`, set coordinator status to `completed` or `blocked`, fill evidence, then update the machine ledger only through:
 
@@ -48,7 +48,7 @@ bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/repo-hygiene-session-te
 **Scratch path**: run `bash /Volumes/Extreme_SSD/project/open_camera/docs/plans/repo-hygiene-session-test-docs-archive-orchestration/launchers/orchestrate.sh scratch-path 02-session-test-fixture-recovery-split`  
 **Orchestrator**: `/Volumes/Extreme_SSD/project/open_camera/docs/plans/repo-hygiene-session-test-docs-archive-orchestration/launchers/orchestrate.sh`
 
-Read `AGENTS.md`, `/Users/dingren/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands and `rtk ./scripts/run_isolated_gradle.sh` for Gradle in a package worktree. Edit only allowed paths. Do not change production session code to make a test split pass.
+Read `AGENTS.md`, `<HOME>/.codex/RTK.md`, the INDEX, and your package doc. Use `rtk` for all shell commands and `rtk ./scripts/run_isolated_gradle.sh` for Gradle in a package worktree. Edit only allowed paths. Do not change production session code to make a test split pass.
 
 Before calling `advance`, fill evidence: worktree, branch, base commit, commit hash, changed files, verification commands/results, baseline failures if any, and risks.
 

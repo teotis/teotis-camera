@@ -24,7 +24,7 @@ Add a still-photo watermark template that renders a calm professional bottom bar
   - `app/src/test/java/com/opencamera/app/camera/PhotoWatermarkTemplateResolverTest.kt`
   - `app/src/test/java/com/opencamera/app/camera/PhotoWatermarkPostProcessorTest.kt`
 - Non-goals:
-  - Do not copy Hasselblad, OPPO, vivo, or Apple branding.
+  - Do not copy 品牌联名, OPPO, vivo, or Apple branding.
   - Do not add video frame watermark burn-in.
   - Do not add freeform layout editing.
 

@@ -8,7 +8,7 @@ Make the top bar and right rail feel like a camera cockpit instead of a row of e
 
 ## Problems To Fix
 
-- Top-bar Chinese text is partially obstructed on vivo X300.
+- Top-bar Chinese text is partially obstructed on 参考设备.
 - `设置` and `色彩实验室` have the same visual length/weight, flattening hierarchy.
 - Top bar should move slightly upward while respecting status/cutout safe area.
 - Top buttons use outlined borders that conflict with the rest of the style.
@@ -77,4 +77,4 @@ rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --te
 rtk ./gradlew --no-daemon :app:assembleDebug
 ```
 
-Manual/multimodal follow-up: vivo X300 screenshot to verify no clipping under the recording/status bar.
+Manual/multimodal follow-up: 参考设备 screenshot to verify no clipping under the recording/status bar.

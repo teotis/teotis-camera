@@ -17,7 +17,7 @@ User issues covered:
 - `1`: 色彩/滤镜效果依然没有应用到成片上。
 - `6`: 缩略图更新会出现回退现象。
 
-Current log evidence from `/Users/dingren/Downloads/opencamera-debug-1779388460166.log`:
+Current log evidence from `<HOME>/Downloads/opencamera-debug-1779388460166.log`:
 
 - Shot requests contain the selected filter data:
   - `filterProfile=custom-vivid-1`

@@ -11,7 +11,7 @@
 - Base commit: pending
 - Commit hash: none
 - Changed files: `output/04-public-history-remediation-plan/report.md`
-- Verification: `git -C public/teotis-camera log --all --format='%H %an <%ae> %cn <%ce> %s'` → 6 commits all expose `dingren <dingren@xiaomi.com>`; `git -C public/teotis-camera remote -v` → `git@github.com:teotis/teotis-camera.git`
+- Verification: `git -C public/teotis-camera log --all --format='%H %an <%ae> %cn <%ce> %s'` → 6 commits all expose `<REDACTED_USER> <<REDACTED_EMAIL>>`; `git -C public/teotis-camera remote -v` → `git@github.com:teotis/teotis-camera.git`
 - Dry-run path if used: none (filter-repo not available locally; dry-run steps documented in report for user execution)
 - Risks: filter-repo not installed on current system; force-push requires team coordination; old forks may retain original identity
 

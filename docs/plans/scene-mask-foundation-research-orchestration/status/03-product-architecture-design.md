@@ -120,7 +120,7 @@
 | Claim | Status | Rule |
 |---|---|---|
 | "深度虚化" (depth bokeh) | **HIDDEN** | 2D mask is not depth; use "背景虚化" (background blur) instead |
-| "ZEISS/Hasselblad 式虚化" | **HIDDEN** | Cannot claim vendor pipeline equivalence |
+| "ZEISS/品牌联名 式虚化" | **HIDDEN** | Cannot claim vendor pipeline equivalence |
 | "实时景深预览" | **HIDDEN** | Preview shows no bokeh effect; only saved output has blur |
 | "多主体识别" | **HIDDEN** | ML Kit Selfie is person-only |
 | "语义分割" | **HIDDEN** | No semantic class support in Phase-1 |
@@ -217,7 +217,7 @@ Diagnostics flow through three layers:
 | # | Item | Reason |
 |---|---|---|
 | D1 | **True depth slider** | 2D mask is not depth; requires hardware depth sensor or ML-based depth estimation (MiDaS, etc.) |
-| D2 | **ZEISS/Hasselblad-style portrait** | Requires vendor ISP access; OpenCamera uses app-side processing only |
+| D2 | **ZEISS/品牌联名-style portrait** | Requires vendor ISP access; OpenCamera uses app-side processing only |
 | D3 | **Real-time bokeh preview** | Performance too expensive for preview frames on most devices |
 | D4 | **Multi-class semantic segmentation** | ML Kit Selfie is person-only; MediaPipe integration is Phase-2+ |
 | D5 | **Video mask tracking** | ML Kit Selfie stream mode is for preview only; video mask requires temporal consistency |

@@ -40,7 +40,7 @@ Public repo content, if edits are needed:
    - replace concrete brand/model fixture with neutral sample data
    - keep only if it is a neutral compatibility/API/platform term with written justification
 3. Scrub README/README_EN and public-facing docs so they describe Teotis features directly, not who/what inspired them.
-4. Replace test fixture values such as concrete vivo/X-series model names with neutral examples unless they are explicitly part of a public compatibility claim.
+4. Replace test fixture values such as concrete vivo/X 系列 model names with neutral examples unless they are explicitly part of a public compatibility claim.
 5. Check asset filenames, alt text, and metadata fallbacks.
 
 ## Verification
@@ -48,7 +48,7 @@ Public repo content, if edits are needed:
 Run and record:
 
 ```bash
-rtk rg -n --fixed-strings -e 'Apple' -e 'iPhone' -e 'vivo' -e 'Xiaomi' -e 'MIUI' -e 'MiuiCamera' -e 'Leica' -e 'Hasselblad' -e '竞品' -e '参考' -e '学习' public/teotis-camera --glob '!public/teotis-camera/.git/objects/**'
+rtk rg -n --fixed-strings -e 'Apple' -e '参考设备' -e 'vivo' -e '厂商' -e '厂商系统' -e '参考相机应用' -e '品牌联名' -e '品牌联名' -e '行业' -e '参考' -e '学习' public/teotis-camera --glob '!public/teotis-camera/.git/objects/**'
 rtk git -C public/teotis-camera status --short --branch
 ```
 
