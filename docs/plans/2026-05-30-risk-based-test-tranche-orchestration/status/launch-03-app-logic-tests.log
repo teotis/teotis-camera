@@ -1,0 +1,5 @@
+backgrounded · c97f2537
+  claude agents             list sessions
+  claude attach c97f2537    open in this terminal
+  claude logs c97f2537      show recent output
+  claude stop c97f2537      stop this session

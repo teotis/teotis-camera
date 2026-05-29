@@ -1,0 +1,16 @@
+{"ts":"2026-05-29T19:28:51Z","event":"launch_requested","package_id":"01-settings-codecs-tests","branch":"agent/test-tranche/01-settings-codecs-tests","worktree":".claude/worktrees/test-tranche/01-settings-codecs-tests","finalize":"0"}
+{"ts":"2026-05-29T19:28:52Z","event":"state_changed","package_id":"01-settings-codecs-tests","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T19:28:52Z","event":"launch_succeeded","package_id":"01-settings-codecs-tests","session_id":"4ea41839","new_state":"launched","branch":"agent/test-tranche/01-settings-codecs-tests","worktree":".claude/worktrees/test-tranche/01-settings-codecs-tests"}
+{"ts":"2026-05-29T19:29:03Z","event":"launch_requested","package_id":"02-device-media-pure-tests","branch":"agent/test-tranche/02-device-media-pure-tests","worktree":".claude/worktrees/test-tranche/02-device-media-pure-tests","finalize":"0"}
+{"ts":"2026-05-29T19:29:04Z","event":"state_changed","package_id":"02-device-media-pure-tests","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T19:29:04Z","event":"launch_succeeded","package_id":"02-device-media-pure-tests","session_id":"65c29504","new_state":"launched","branch":"agent/test-tranche/02-device-media-pure-tests","worktree":".claude/worktrees/test-tranche/02-device-media-pure-tests"}
+{"ts":"2026-05-29T19:29:10Z","event":"launch_requested","package_id":"03-app-logic-tests","branch":"agent/test-tranche/03-app-logic-tests","worktree":".claude/worktrees/test-tranche/03-app-logic-tests","finalize":"0"}
+{"ts":"2026-05-29T19:29:11Z","event":"state_changed","package_id":"03-app-logic-tests","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T19:29:11Z","event":"launch_succeeded","package_id":"03-app-logic-tests","session_id":"c97f2537","new_state":"launched","branch":"agent/test-tranche/03-app-logic-tests","worktree":".claude/worktrees/test-tranche/03-app-logic-tests"}
+{"ts":"2026-05-29T19:29:17Z","event":"launch_requested","package_id":"04-app-mixed-tests","branch":"agent/test-tranche/04-app-mixed-tests","worktree":".claude/worktrees/test-tranche/04-app-mixed-tests","finalize":"0"}
+{"ts":"2026-05-29T19:29:18Z","event":"state_changed","package_id":"04-app-mixed-tests","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T19:29:18Z","event":"launch_succeeded","package_id":"04-app-mixed-tests","session_id":"01328863","new_state":"launched","branch":"agent/test-tranche/04-app-mixed-tests","worktree":".claude/worktrees/test-tranche/04-app-mixed-tests"}
+{"ts":"2026-05-29T19:30:01Z","event":"launch_requested","package_id":"05-testability-audit","branch":"agent/test-tranche/05-testability-audit","worktree":".claude/worktrees/test-tranche/05-testability-audit","finalize":"0"}
+{"ts":"2026-05-29T19:30:03Z","event":"state_changed","package_id":"05-testability-audit","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T19:30:03Z","event":"launch_succeeded","package_id":"05-testability-audit","session_id":"fe655272","new_state":"launched","branch":"agent/test-tranche/05-testability-audit","worktree":".claude/worktrees/test-tranche/05-testability-audit"}
+{"ts":"2026-05-29T19:30:09Z","event":"scratch_path_requested","package_id":"05-testability-audit","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/2026-05-30-risk-based-test-tranche-orchestration/scratch/05-testability-audit"}

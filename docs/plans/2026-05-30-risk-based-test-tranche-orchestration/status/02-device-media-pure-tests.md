@@ -1,7 +1,7 @@
 # Package Status: 02-device-media-pure-tests
 
 ## State
-`pending`
+`launched`
 
 ## Summary
 为 core/device 和 core/media 模块中纯逻辑类补全测试：MultiFrameCaptureExecutionPlanner, ReversibleWatermarkArchiveManifest, sha256Hex, MediaProcessorAvailability

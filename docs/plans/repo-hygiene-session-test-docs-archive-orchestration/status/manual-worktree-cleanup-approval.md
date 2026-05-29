@@ -1,6 +1,6 @@
 # Manual Gate Status - Worktree Cleanup Approval
 
-- **Status**: pending
+**Status**: manual_required
 - **Package ID**: `manual-worktree-cleanup-approval`
 - **Owner**: user/Codex
 - **Branch**: `agent/repo-hygiene-session-test-docs-archive/manual-worktree-cleanup-approval`

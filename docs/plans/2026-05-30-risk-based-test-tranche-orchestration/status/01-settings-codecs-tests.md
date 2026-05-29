@@ -1,7 +1,7 @@
 # Package Status: 01-settings-codecs-tests
 
 ## State
-`pending`
+`launched`
 
 ## Summary
 为 core/settings 模块中 5 个纯逻辑类补全测试：FilterProfileShareCodec, ImportedFilterProfilesSerializer, ManualCaptureDraftSerializer, SettingsMetadataCodecs, SettingsDefaults

@@ -1,7 +1,7 @@
 # Package Status: 03-app-logic-tests
 
 ## State
-`pending`
+`launched`
 
 ## Summary
 为 app 模块中 3 个可纯逻辑测试的类补全测试：ResolutionFilterUtils, GalleryOpenTarget, DeviceCapabilitiesEffectQuery

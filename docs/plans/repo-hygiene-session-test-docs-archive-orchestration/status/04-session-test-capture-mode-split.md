@@ -1,6 +1,6 @@
 # Package 04 Status - Session Test Capture And Mode Split
 
-- **Status**: pending
+**Status**: invalid
 - **Package ID**: `04-session-test-capture-mode-split`
 - **Agent**: pending
 - **Branch**: `agent/repo-hygiene-session-test-docs-archive/04-session-test-capture-mode-split`
