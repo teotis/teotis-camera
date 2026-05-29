@@ -1,6 +1,6 @@
 # Package 05 Status - Docs Archive Pilot
 
-- **Status**: pending
+**Status**: invalid
 - **Package ID**: `05-docs-archive-pilot`
 - **Agent**: pending
 - **Branch**: `agent/repo-hygiene-session-test-docs-archive/05-docs-archive-pilot`

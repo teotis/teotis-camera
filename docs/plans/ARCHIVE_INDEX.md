@@ -89,19 +89,14 @@ These plans are nearing completion. They may become archive-eligible after all d
 
 | Plan | Status | Date | Notes |
 |---|---|---|---|
-| Gradle Build Isolation — Handoff Package | validated | 2026-05-26 | Build-root override landed; full gates should be rerun |
-| Document V2 Capture Metadata And Crop Status Repair | validated | 2026-05-25 | CaptureRecordingSessionProcessorTest passes |
-| Stage 7 Device Still Quality Test Repair | validated | 2026-05-25 | DefaultDeviceShotRequestTranslatorTest passes |
 | Watermark 2.0 Minimalist Text Polish | validated | 2026-05-26 | Typography-only; visual QA remains |
 | Watermark 2.0 Reversible Productization | validated | 2026-05-26 | OCWM reversible archive verification passed |
 | Document Batch Capture Integration | validated | 2026-05-25 | Batch append parses profile, scan mode, crop status |
 | Color Lab Validation Blocker Follow-Up Index | validated | 2026-05-25 | Repaired preview transform, mask-source fail-soft |
-| Color Lab Recipe Metadata Bridge Repair | validated | 2026-05-25 | PerceptualColorRecipe reaches capture metadata |
 | Color Lab Postprocess Fail-Soft And Test Repair | validated | 2026-05-25 | App focused tests pass, throwing mask source covered |
 | Color Lab Capture Save Regression | validated | 2026-05-25 | Local regressions pass; real-device smoke pending |
 | Document V2 Side Rail Completion | implemented | 2026-05-25 | Side rail render model present; visual QA remains |
 | Watermark 2.0 Professional Parameter Bottom Bar | implemented | 2026-05-26 | Bottom parameter bar wired; visual QA remains |
-| Document Batch Session Contracts | implemented | 2026-05-25 | Session-owned document batch state landed |
 | Document Batch Side Rail UI | implemented | 2026-05-25 | Side rail render model and tests present |
 | Color Lab Real-Device Follow-Up Index | implemented | 2026-05-25 | Deterministic blockers repaired; real-device QA pending |
 | Color Lab Preview Recipe Transform Repair | implemented | 2026-05-25 | Preview adapter consumes recipe transform |
@@ -115,6 +110,18 @@ These plans are nearing completion. They may become archive-eligible after all d
 
 No plans currently in this category. This section will be populated as plans complete all QA gates and merge to mainline.
 
+## Archived (Pilot)
+
+These plans were moved to `docs/plans/archive/2026-05/` on 2026-05-30 by `05-docs-archive-pilot`. Reference checks confirmed no active links in `codex/documentation.md`, `AGENTS.md`, or active orchestration packages.
+
+| Plan | Original Path | Archive Path | Status | Reason |
+|---|---|---|---|---|
+| Gradle Build Isolation — Handoff Package | `docs/plans/2026-05-26-agent-handoff-gradle-isolation-index.md` | `docs/plans/archive/2026-05/2026-05-26-agent-handoff-gradle-isolation-index.md` | validated | Build-root override landed; full gates should be rerun |
+| Document V2 Capture Metadata And Crop Status Repair | `docs/plans/2026-05-25-document-v2-capture-metadata-status-repair.md` | `docs/plans/archive/2026-05/2026-05-25-document-v2-capture-metadata-status-repair.md` | validated | CaptureRecordingSessionProcessorTest passes |
+| Stage 7 Device Still Quality Test Repair | `docs/plans/2026-05-25-stage7-device-still-quality-test-repair.md` | `docs/plans/archive/2026-05/2026-05-25-stage7-device-still-quality-test-repair.md` | validated | DefaultDeviceShotRequestTranslatorTest passes |
+| Document Batch Session Contracts | `docs/plans/2026-05-25-document-batch-session-contracts.md` | `docs/plans/archive/2026-05/2026-05-25-document-batch-session-contracts.md` | implemented | Session-owned document batch state landed |
+| Color Lab Recipe Metadata Bridge Repair | `docs/plans/2026-05-25-color-lab-recipe-metadata-bridge-repair.md` | `docs/plans/archive/2026-05/2026-05-25-color-lab-recipe-metadata-bridge-repair.md` | validated | PerceptualColorRecipe reaches capture metadata |
+
 ## Superseded
 
 No plans currently in this category. This section will be populated when newer plans replace existing ones.
@@ -125,12 +132,6 @@ No plans currently in this category. This section will be populated with past au
 
 ## Archive Candidates (Pilot)
 
-The following plans are the closest to archive eligibility. They will be evaluated by `05-docs-archive-pilot`:
+**Pilot executed on 2026-05-30.** Five low-risk plans were moved to `docs/plans/archive/2026-05/`. See "Archived (Pilot)" section above for details.
 
-1. **Gradle Build Isolation — Handoff Package** — validated, infrastructure work landed
-2. **Document V2 Capture Metadata And Crop Status Repair** — validated, focused tests pass
-3. **Stage 7 Device Still Quality Test Repair** — validated, focused tests pass
-4. **Document Batch Session Contracts** — implemented, session tests pass
-5. **Color Lab Recipe Metadata Bridge Repair** — validated, codec round-trip landed
-
-These candidates require downstream reference checks before archival. See `output/03-docs-plan-taxonomy-and-retention/archive-candidates.tsv` for the full candidate inventory.
+Remaining candidates from `output/03-docs-plan-taxonomy-and-retention/archive-candidates.tsv` are listed in the Conditional section above and will be evaluated in a future archive pass.

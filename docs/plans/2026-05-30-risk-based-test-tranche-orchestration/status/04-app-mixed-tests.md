@@ -1,7 +1,7 @@
 # Package Status: 04-app-mixed-tests
 
 ## State
-`launched`
+`completed`
 
 ## Summary
 为 app 模块中有计算属性的数据类补全测试：SessionUiRenderContracts, SettingsTab

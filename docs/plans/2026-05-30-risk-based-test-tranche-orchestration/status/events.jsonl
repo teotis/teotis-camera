@@ -14,3 +14,8 @@
 {"ts":"2026-05-29T19:30:03Z","event":"state_changed","package_id":"05-testability-audit","old_state":"pending","new_state":"launched"}
 {"ts":"2026-05-29T19:30:03Z","event":"launch_succeeded","package_id":"05-testability-audit","session_id":"fe655272","new_state":"launched","branch":"agent/test-tranche/05-testability-audit","worktree":".claude/worktrees/test-tranche/05-testability-audit"}
 {"ts":"2026-05-29T19:30:09Z","event":"scratch_path_requested","package_id":"05-testability-audit","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/2026-05-30-risk-based-test-tranche-orchestration/scratch/05-testability-audit"}
+{"ts":"2026-05-29T19:34:08Z","event":"state_changed","package_id":"02-device-media-pure-tests","old_state":"launched","new_state":"completed"}
+{"ts":"2026-05-29T19:36:34Z","event":"scratch_path_requested","package_id":"05-testability-audit","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/2026-05-30-risk-based-test-tranche-orchestration/scratch/05-testability-audit"}
+{"ts":"2026-05-29T19:36:38Z","event":"state_changed","package_id":"05-testability-audit","old_state":"launched","new_state":"completed"}
+{"ts":"2026-05-29T19:37:15Z","event":"state_changed","package_id":"01-settings-codecs-tests","old_state":"launched","new_state":"completed"}
+{"ts":"2026-05-29T19:41:06Z","event":"state_changed","package_id":"04-app-mixed-tests","old_state":"launched","new_state":"completed"}
