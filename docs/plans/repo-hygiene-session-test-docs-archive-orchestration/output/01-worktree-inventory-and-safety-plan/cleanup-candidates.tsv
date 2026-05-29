@@ -1,0 +1,65 @@
+path	classification	reason	branch	commit	dirty	confidence
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/01-app-unit-test-gate-cleanup	candidate-merged	branch merged to main, clean	worktree-01-app-unit-test-gate-cleanup	d895f784	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/01-effect-test-contract	candidate-merged	branch merged to main, clean	fix/01-effect-test-contract	a4a2586c	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/02-shutter-state-animation-v2	candidate-merged	branch merged to main, clean	worktree-02-shutter-state-animation-v2	98ab517a	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/02-slider-widget-productization	candidate-merged	branch merged to main, clean	agent/zoom-cockpit-v2-productization/02-slider-widget-productization	67488a4a	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/02-translation-audit	candidate-merged	branch merged to main, clean	worktree-02-translation-audit	4c728e1c	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/03-shared-control-state-strategy	candidate-merged	branch merged to main, clean	worktree-03-shared-control-state-strategy	7eecada1	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/04-verification-real-device-protocol	candidate-merged	branch merged to main, clean	worktree-04-verification-real-device-protocol	155ef872	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/07-synthesis-html-report	candidate-merged	branch merged to main, clean	worktree-07-synthesis-html-report	5f5f0b11	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/99-finalize	candidate-merged	branch merged to main, clean	agent/ui-i18n-cleanup/99-finalize	499a5d9e	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/agent-01-iq-gap-audit	candidate-merged	branch merged to main, clean	worktree-agent-01-iq-gap-audit	2cff9aa9	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/brightness-audit-02	candidate-merged	branch merged to main, clean	worktree-brightness-audit-02	7e4efe33	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/effect-preview-color-transform-fix	candidate-merged	branch merged to main, clean	worktree-effect-preview-color-transform-fix	8e9c3e3a	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/feat+color-lab-perceptual-strength	candidate-merged	branch merged to main, clean	worktree-feat+color-lab-perceptual-strength	fcb70068	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/feat+preview-analysis-fanout-stability	candidate-merged	branch merged to main, clean	worktree-feat+preview-analysis-fanout-stability	17c1c161	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/focal-slider-05	candidate-merged	branch merged to main, clean	worktree-focal-slider-05	08b0054e	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-01-preview-frame	candidate-merged	branch merged to main, clean	worktree-pkg-01-preview-frame	868b0cf5	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-01-watermark-recovery	candidate-merged	branch merged to main, clean	worktree-pkg-01-watermark-recovery	74a07e6e	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-02-ledger-rules	candidate-merged	branch merged to main, clean	worktree-pkg-02-ledger-rules	283d9e85	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-02-mask-audit	candidate-merged	branch merged to main, clean	worktree-pkg-02-mask-audit	80f73720	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-02-style-scorecard	candidate-merged	branch merged to main, clean	worktree-pkg-02-style-scorecard	f966f7a8	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-02-zoom-scaleend-recovery	candidate-merged	branch merged to main, clean	worktree-pkg-02-zoom-scaleend-recovery	ed8f6a43	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-03-rendering-pipeline	candidate-merged	branch merged to main, clean	worktree-pkg-03-rendering-pipeline	e15e40c4	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-04-ledger-v2	candidate-merged	branch merged to main, clean	worktree-pkg-04-ledger-v2	42c91ef2	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-04-zoom-semantics	candidate-merged	branch merged to main, clean	worktree-pkg-04-zoom-semantics	1b254769	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/postprocess-outer-guard	candidate-merged	branch merged to main, clean	fix/postprocess-outer-guard	48c21ee9	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/preview-fidelity-03	candidate-merged	branch merged to main, clean	worktree-preview-fidelity-03	6f56fbaf	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/preview-saved-mask-consistency	candidate-merged	branch merged to main, clean	worktree-preview-saved-mask-consistency	6d410918	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/real-device-ui-layout-watermark-20260528-01-preview-frame-containment	candidate-merged	branch merged to main, clean	agent/real-device-ui-layout-watermark-20260528/01-preview-frame-containment	b131f810	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/real-device-ui-layout-watermark-20260528-02-bottom-cockpit-density	candidate-merged	branch merged to main, clean	agent/real-device-ui-layout-watermark-20260528/02-bottom-cockpit-density	4b76ed23	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/real-device-ui-layout-watermark-20260528-03-quick-watermark-cycle	candidate-merged	branch merged to main, clean	agent/real-device-ui-layout-watermark-20260528/03-quick-watermark-cycle	f966c5b2	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/real-device-ui-layout-watermark-20260528-04-real-device-acceptance	candidate-merged	branch merged to main, clean	agent/real-device-ui-layout-watermark-20260528/04-real-device-acceptance	46f44867	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/real-device-ui-layout-watermark-20260528-integration	candidate-merged	branch merged to main, clean	agent/real-device-ui-layout-watermark-20260528/integration	3798fd5b	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/recipe-single-truth	candidate-merged	branch merged to main, clean	recipe-single-truth	93b4c2a9	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/replicated-tickling-bonbon	candidate-merged	branch merged to main, clean	worktree-replicated-tickling-bonbon	38e04c1c	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/scene-mask-research-01	candidate-merged	branch merged to main, clean	worktree-scene-mask-research-01	a7348232	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-data-boundary-v1	candidate-merged	branch merged to main, clean	fix/shutter-data-boundary-v1	1275f006	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/shutter-state-animation-v2	candidate-merged	branch merged to main, clean	worktree-shutter-state-animation-v2	2d9d6244	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/ui-v2-00-mode-order	candidate-merged	branch merged to main, clean	worktree-ui-v2-00-mode-order	a53aac41	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/ui-v2-01-focus-feedback	candidate-merged	branch merged to main, clean	ui-v2-01-focus-feedback	f94b7550	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/ui-v2-integration-audit	candidate-merged	branch merged to main, clean	worktree-ui-v2-integration-audit	cf80340d	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/wobbly-pondering-bear	candidate-merged	branch merged to main, clean	worktree-wobbly-pondering-bear	aee60d9d	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/zoom-arbitration-audit-01	candidate-merged	branch merged to main, clean	worktree-zoom-arbitration-audit-01	20bdc355	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/zoom-cockpit-v2	candidate-merged	branch merged to main, clean	worktree-zoom-cockpit-v2	1c8aec36	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/dev-log-tag-system/01-dev-log-tag-system	candidate-merged	branch merged to main, clean	agent/dev-log-tag-system/01-dev-log-tag-system	5065d0d6	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/full-clear-mode-v1/01-full-clear-product-definition	candidate-merged	branch merged to main, clean	agent/full-clear-mode-v1/01-full-clear-product-definition	222c647a	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/preview-fitcenter-geometry	candidate-merged	branch merged to main, clean	feature/preview-fitcenter-geometry	e9eb472a	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/public-release-safety-audit/01-public-exposure-inventory	candidate-merged	branch merged to main, clean	agent/public-release-safety-audit/01-public-exposure-inventory	7b10569b	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/public-release-safety-audit/02-public-rules-export-gate	candidate-merged	branch merged to main, clean	agent/public-release-safety-audit/02-public-rules-export-gate	fe337e6e	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/public-release-safety-audit/03-brand-reference-content-scrub	candidate-merged	branch merged to main, clean	agent/public-release-safety-audit/03-brand-reference-content-scrub	fe337e6e	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/public-release-safety-audit/04-public-history-remediation-plan	candidate-merged	branch merged to main, clean	agent/public-release-safety-audit/04-public-history-remediation-plan	fe337e6e	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/public-release-safety-audit/05-export-diff-release-verification	candidate-merged	branch merged to main, clean	agent/public-release-safety-audit/05-export-diff-release-verification	fe337e6e	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/public-release-safety-audit/99-finalize	candidate-merged	branch merged to main, clean	agent/public-release-safety-audit/integration	fe337e6e	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-regression-20260527/05-integration-visual-smoke-protocol	candidate-merged	branch merged to main, clean	agent/real-device-ux-regression-20260527/05-integration-visual-smoke-protocol	f6651e4b	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-regression-20260527/99-finalize	candidate-merged	branch merged to main, clean	agent/real-device-ux-regression-20260527/99-finalize	c633a4be	clean	high
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/research-01-backend-capability-matrix	candidate-stale	branch not merged, clean, appears abandoned	worktree-research-01-backend-capability-matrix	a096b05c	clean	medium
+/private/tmp/open_camera-real-device-ux-finalize-verify	candidate-stale	detached HEAD in /private/tmp, clean	detached	d10609a3	clean	medium
+/private/tmp/open_camera_01_zoom_verify_20260527_01	candidate-stale	detached HEAD in /private/tmp, clean	detached	60b2f1c2	clean	medium
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/03-session-kernel-invariants	unknown	dirty working tree, branch not merged	worktree-03-session-kernel-invariants	5f5f0b11	dirty	N/A
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/05-conversion-glue-detection	unknown	dirty working tree, branch merged but uncommitted changes	worktree-05-conversion-glue-detection	5f5f0b11	dirty	N/A
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/color-lab-capture-save-regression	unknown	dirty working tree, branch merged but uncommitted changes	worktree-color-lab-capture-save-regression	bf87213b	dirty	N/A
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/effect-preview-api-drift	unknown	dirty working tree, branch not merged	worktree-effect-preview-api-drift	bb42921f	dirty	N/A
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/pkg-04-ledger-fix	unknown	dirty working tree, branch merged but uncommitted changes	worktree-pkg-04-ledger-fix	ea27ba24	dirty	N/A
+/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/zoom-v2-03-session-recording-zoom-policy	unknown	dirty working tree, branch merged but uncommitted changes	worktree-zoom-v2-03-session-recording-zoom-policy	ab6b0103	dirty	N/A
+/Volumes/Extreme_SSD/project/open_camera/.worktrees/real-device-ux-regression-20260527/01-zoom-threshold-lens-switch	unknown	dirty working tree, branch merged but uncommitted changes	agent/real-device-ux-regression-20260527/01-zoom-threshold-lens-switch	60b2f1c2	dirty	N/A
