@@ -13,6 +13,7 @@ import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
+import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,6 +74,9 @@ private class FullClearModeController(
         context.eventSink("fullclear.exit")
     }
 
-    override suspend fun handle(intent: ModeIntent): ModeSignal = ModeSignal.None
+    override suspend fun handle(intent: ModeIntent): ModeSignal = when (intent) {
+        ModeIntent.ShutterPressed -> ModeSignal.SubmitCapture(CaptureStrategy.SingleFrame())
+        else -> ModeSignal.None
+    }
     override suspend fun onSessionEvent(event: ModeSessionEvent) = Unit
 }
