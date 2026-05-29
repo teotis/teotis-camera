@@ -7,3 +7,4 @@
 {"ts":"2026-05-29T06:34:01Z","event":"state_changed","package_id":"05-shutter-sound-and-visible-rearm","old_state":"pending","new_state":"completed"}
 {"ts":"2026-05-29T06:34:02Z","event":"state_changed","package_id":"06-real-device-timing-protocol","old_state":"pending","new_state":"completed"}
 {"ts":"2026-05-29T06:34:07Z","event":"state_changed","package_id":"99-finalize","old_state":"finalized","new_state":"finalized"}
+{"ts":"2026-05-29T06:36:23Z","event":"state_changed","package_id":"01-camerax-camera2-signal-feasibility","old_state":"completed","new_state":"completed"}
