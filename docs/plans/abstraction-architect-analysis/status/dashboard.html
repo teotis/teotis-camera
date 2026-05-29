@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Abstraction Architect Analysis - 编排控制台</title>
+<style>
+:root{color-scheme:light dark;--bg:#0f141b;--panel:#161d27;--panel2:#1d2633;--text:#e6edf3;--muted:#9fb0c4;--line:#344154;--accent:#7dd3fc;--good:#86efac;--warn:#facc15;--bad:#fca5a5;--purple:#c4b5fd;--orange:#fdba74}
+@media(prefers-color-scheme:light){:root{--bg:#f7f9fc;--panel:#fff;--panel2:#eef3f8;--text:#172033;--muted:#5e6c80;--line:#d5dee9;--accent:#0369a1;--good:#166534;--warn:#854d0e;--bad:#991b1b;--purple:#6d28d9;--orange:#c2410c}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);line-height:1.55;min-height:100vh}
+header{padding:32px min(5vw,48px) 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:clamp(24px,3.5vw,36px);line-height:1.2}
+header p{color:var(--muted);margin-top:6px;font-size:15px}
+.badge{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--panel2);font-size:12px;color:var(--muted);margin:2px}
+.badge.launched{border-color:var(--accent);color:var(--accent)}
+.badge.pending{border-color:var(--muted);color:var(--muted)}
+.badge.completed{border-color:var(--good);color:var(--good)}
+.badge.wave1{border-color:var(--accent);background:rgba(125,211,252,0.08)}
+.badge.wave2{border-color:var(--purple);background:rgba(196,181,253,0.08)}
+.badge.wave3{border-color:var(--orange);background:rgba(253,186,116,0.08)}
+.badge.final{border-color:var(--warn);background:rgba(250,204,21,0.08)}
+main{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;padding:20px min(5vw,48px) 60px;max-width:1200px;margin:0 auto}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px}
+h2{font-size:18px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+h3{font-size:15px;margin:14px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:16px;transition:border-color 0.15s}
+.card:hover{border-color:var(--accent)}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.card-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:var(--accent);font-weight:600}
+.card-title{font-size:15px;font-weight:600;margin-bottom:6px}
+.card-desc{font-size:13px;color:var(--muted);line-height:1.5}
+.card-meta{display:flex;flex-wrap:wrap;gap:4px;margin-top:10px}
+.session-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:2px 6px;color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left}
+th{background:var(--panel2);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.3px;color:var(--muted)}
+td:first-child{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.cmd{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px 14px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;margin:6px 0;overflow-x:auto;white-space:pre;line-height:1.6}
+.cmd-label{font-size:12px;color:var(--muted);margin-bottom:2px;font-family:inherit}
+.dim-section{margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.dim-title{font-size:14px;font-weight:600;margin-bottom:6px}
+.dim-list{list-style:none;padding:0}
+.dim-list li{padding:4px 0;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dim-list li::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.wave-indicator{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.wave-indicator span{font-size:12px;color:var(--muted)}
+.flow{display:flex;align-items:center;gap:6px;margin:10px 0;font-size:13px;color:var(--muted)}
+.flow-arrow{color:var(--accent);font-weight:bold}
+@media(max-width:600px){.grid2{grid-template-columns:1fr}main{padding:12px}header{padding:20px 12px}}
+@media print{body{background:#fff;color:#000}header,section{border-color:#ccc}.badge{border-color:#999}}
+</style>
+</header>
+<header>
+  <h1>Abstraction Architect Analysis</h1>
+  <p>OpenCamera 结构抽象深度分析 · 纯研究任务 · 不修改代码</p>
+  <div style="margin-top:10px">
+    <span class="badge wave1">Wave 1 · 4 agents</span>
+    <span class="badge wave2">Wave 2 · 2 agents</span>
+    <span class="badge wave3">Wave 3 · 1 agent</span>
+    <span class="badge final">Finalize</span>
+  </div>
+</header>
+<main>
+
+<section>
+<h2>当前状态</h2>
+<div class="wave-indicator">
+  <span class="badge launched">Wave 1: 已启动</span>
+  <span>→</span>
+  <span class="badge pending">Wave 2: 等待 Wave 1</span>
+  <span>→</span>
+  <span class="badge pending">Wave 3: 等待 Wave 2</span>
+  <span>→</span>
+  <span class="badge pending">Finalize: 等待全部</span>
+</div>
+
+<table>
+<thead><tr><th>Package</th><th>分析维度</th><th>Wave</th><th>State</th><th>Session</th></tr></thead>
+<tbody>
+<tr><td>01-architecture-boundary-integrity</td><td>层间依赖方向违规</td><td>1</td><td><span class="badge launched">launched</span></td><td><span class="session-id">8cf70cfb</span></td></tr>
+<tr><td>02-domain-model-unification</td><td>重复领域表示</td><td>1</td><td><span class="badge launched">launched</span></td><td><span class="session-id">3eb95c68</span></td></tr>
+<tr><td>03-session-kernel-invariants</td><td>状态机完整性</td><td>1</td><td><span class="badge launched">launched</span></td><td><span class="session-id">50142c0b</span></td></tr>
+<tr><td>04-cross-cutting-concerns</td><td>横切关注点耦合</td><td>1</td><td><span class="badge launched">launched</span></td><td><span class="session-id">b34b524b</span></td></tr>
+<tr><td>05-conversion-glue-detection</td><td>接口映射开销</td><td>2</td><td><span class="badge pending">pending</span></td><td>—</td></tr>
+<tr><td>06-platform-configuration-branches</td><td>设备分支模式</td><td>2</td><td><span class="badge pending">pending</span></td><td>—</td></tr>
+<tr><td>07-synthesis-html-report</td><td>综合 HTML 报告</td><td>3</td><td><span class="badge pending">pending</span></td><td>—</td></tr>
+<tr><td>99-finalize</td><td>验证与交付</td><td>final</td><td><span class="badge pending">pending</span></td><td>—</td></tr>
+</tbody>
+</table>
+</section>
+
+<section>
+<h2>分析维度详情</h2>
+<div class="grid2">
+
+<div class="card">
+  <div class="card-header"><span class="card-id">01</span><span class="badge wave1">Wave 1</span></div>
+  <div class="card-title">架构边界完整性</div>
+  <div class="card-desc">检测四层架构（Mode Plugin → Session Kernel → Device Adapter → Media Pipeline）的边界违规。检查 import 语句中的跨层依赖、类实例化中的边界违规、方法调用链中的隐式耦合。</div>
+  <div class="card-meta"><span class="badge launched">launched</span><span class="session-id">8cf70cfb</span></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-id">02</span><span class="badge wave1">Wave 1</span></div>
+  <div class="card-title">领域模型统一</div>
+  <div class="card-desc">检测重复的领域表示、可合并的类型、缺失的不变量约束。比较跨模块的 zoom/capture/preview/state 相关类型定义。</div>
+  <div class="card-meta"><span class="badge launched">launched</span><span class="session-id">3eb95c68</span></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-id">03</span><span class="badge wave1">Wave 1</span></div>
+  <div class="card-title">Session Kernel 不变量</div>
+  <div class="card-desc">深度分析 :core:session 的状态机完整性、恢复缺口和隐式状态。识别所有状态枚举/密封类及其转换路径。</div>
+  <div class="card-meta"><span class="badge launched">launched</span><span class="session-id">50142c0b</span></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-id">04</span><span class="badge wave1">Wave 1</span></div>
+  <div class="card-title">横切关注点</div>
+  <div class="card-desc">检测日志、配置、可观测性、诊断、恢复的散落耦合模式。识别集中化治理机会。</div>
+  <div class="card-meta"><span class="badge launched">launched</span><span class="session-id">b34b524b</span></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-id">05</span><span class="badge wave2">Wave 2</span></div>
+  <div class="card-title">转换胶水检测</div>
+  <div class="card-desc">检测不必要的映射层、接口转换开销和胶水代码。分析 Adapter/Wrapper 过度使用和数据转换链长度。</div>
+  <div class="card-meta"><span class="badge pending">pending</span><span style="font-size:12px;color:var(--muted)">依赖 01-04</span></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-id">06</span><span class="badge wave2">Wave 2</span></div>
+  <div class="card-title">平台配置分支</div>
+  <div class="card-desc">检测设备特定代码路径、平台分支模式和配置驱动的行为差异。评估能力图覆盖范围。</div>
+  <div class="card-meta"><span class="badge pending">pending</span><span style="font-size:12px;color:var(--muted)">依赖 01-04</span></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-id">07</span><span class="badge wave3">Wave 3</span></div>
+  <div class="card-title">综合 HTML 报告</div>
+  <div class="card-desc">整合所有分析包的发现，生成交互式 HTML 报告。包含架构健康度评分、问题优先级矩阵和优化路线图。</div>
+  <div class="card-meta"><span class="badge pending">pending</span><span style="font-size:12px;color:var(--muted)">依赖 01-06</span></div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-id">99</span><span class="badge final">Final</span></div>
+  <div class="card-title">验证与交付</div>
+  <div class="card-desc">验证所有包完成，将 HTML 报告复制到计划根目录，写 FINAL_REPORT.md。</div>
+  <div class="card-meta"><span class="badge pending">pending</span><span style="font-size:12px;color:var(--muted)">依赖全部</span></div>
+</div>
+
+</div>
+</section>
+
+<section>
+<h2>执行流程</h2>
+<div class="dim-section">
+  <div class="dim-title">依赖关系图</div>
+  <div class="flow">
+    <span class="badge wave1">01</span>
+    <span class="badge wave1">02</span>
+    <span class="badge wave1">03</span>
+    <span class="badge wave1">04</span>
+    <span class="flow-arrow">→</span>
+    <span class="badge wave2">05</span>
+    <span class="badge wave2">06</span>
+    <span class="flow-arrow">→</span>
+    <span class="badge wave3">07</span>
+    <span class="flow-arrow">→</span>
+    <span class="badge final">99</span>
+  </div>
+  <p style="font-size:13px;color:var(--muted);margin-top:8px">Wave 1 四个包并行执行，完成后自动触发 Wave 2，依此类推。每个 agent 完成后调用 <code>advance</code> 推进。</p>
+</div>
+
+<div class="dim-section">
+  <div class="dim-title">项目模块覆盖</div>
+  <ul class="dim-list">
+    <li>core/session — Session Kernel（状态机、恢复、诊断）</li>
+    <li>core/device — 设备适配器契约</li>
+    <li>core/media — 媒体管线契约</li>
+    <li>core/mode — 模式目录和插件契约</li>
+    <li>core/settings — 持久化设置</li>
+    <li>core/capability — 能力图</li>
+    <li>core/effect — 效果管线</li>
+    <li>feature/mode-* — 7 个模式插件</li>
+    <li>app — Android/CameraX 集成</li>
+  </ul>
+</div>
+</section>
+
+<section>
+<h2>操作命令</h2>
+
+<div class="cmd-label">查看状态</div>
+<div class="cmd">bash docs/plans/abstraction-architect-analysis/launchers/orchestrate.sh status</div>
+
+<div class="cmd-label">手动推进（agent 无法运行 shell 时）</div>
+<div class="cmd">bash docs/plans/abstraction-architect-analysis/launchers/orchestrate.sh advance</div>
+
+<div class="cmd-label">重试失败的包</div>
+<div class="cmd">bash docs/plans/abstraction-architect-analysis/launchers/orchestrate.sh retry &lt;package-id&gt;</div>
+
+<div class="cmd-label">查看 agent 日志</div>
+<div class="cmd">claude logs &lt;session-id&gt;
+# 例如: claude logs 8cf70cfb</div>
+
+<div class="cmd-label">停止 agent</div>
+<div class="cmd">claude stop &lt;session-id&gt;</div>
+
+<div class="cmd-label">环境检查</div>
+<div class="cmd">bash docs/plans/abstraction-architect-analysis/launchers/orchestrate.sh doctor --environment</div>
+
+<div class="cmd-label">最终报告位置</div>
+<div class="cmd">docs/plans/abstraction-architect-analysis/report.html</div>
+</section>
+
+<section>
+<h2>计划文件结构</h2>
+<div class="cmd">docs/plans/abstraction-architect-analysis/
+├── INDEX.md                          # 执行契约
+├── FINAL_REPORT.md                   # 最终报告（99-finalize 生成）
+├── report.html                       # 交互式 HTML 报告（07 生成）
+├── packages/
+│   ├── 01-architecture-boundary-integrity.md
+│   ├── 02-domain-model-unification.md
+│   ├── 03-session-kernel-invariants.md
+│   ├── 04-cross-cutting-concerns.md
+│   ├── 05-conversion-glue-detection.md
+│   ├── 06-platform-configuration-branches.md
+│   ├── 07-synthesis-html-report.md
+│   └── 99-finalize.md
+├── launchers/
+│   ├── agent-prompts.md              # Agent 提示词
+│   ├── package-graph.tsv             # 依赖图
+│   └── orchestrate.sh                # 编排脚本
+├── status/
+│   ├── state.tsv                     # 状态账本
+│   ├── events.jsonl                  # 审计日志
+│   ├── &lt;package-id&gt;.md              # 各包状态
+│   ├── report.html                   # 生成的报告
+│   └── dashboard.html                # 本控制台
+└── scratch/                          # 临时工作区</div>
+</section>
+
+</main>
+</body>
+</html>
