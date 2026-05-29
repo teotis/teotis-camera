@@ -1,7 +1,7 @@
 # Package Status: 03-session-kernel-invariants
 
 ## State
-**Status**: launched
+**Status**: completed
 - **Launched**: pending
 - **Completed**: pending
 
