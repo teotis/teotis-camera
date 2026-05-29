@@ -1,0 +1,3 @@
+package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error	failed_command	conflict_files	log_summary	recovery_hint
+01-dev-log-tag-system	pending	pending	pending	pending	agent/dev-log-tag-system/01-dev-log-tag-system	/Volumes/Extreme_SSD/project/open_camera/.worktrees/dev-log-tag-system/01-dev-log-tag-system	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+99-finalize	pending	pending	pending	pending	agent/dev-log-tag-system/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.worktrees/dev-log-tag-system/99-finalize	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending

@@ -71,6 +71,7 @@ class AppContainer(
     )
 
     val trace = InMemorySessionTrace()
+    val linkRecorder: com.opencamera.core.session.PerformanceLinkRecorder = com.opencamera.core.session.createPerformanceLinkRecorder()
     private val shotExecutor = ShotExecutor()
     private val savedMaskProvider: SavedPhotoSceneMaskProvider = try {
         MlKitSavedPhotoSceneMaskProvider()
@@ -168,6 +169,7 @@ class AppContainer(
     val cameraSession: CameraSession = DefaultCameraSession(
         registry = modeRegistry,
         trace = trace,
+        linkRecorder = linkRecorder,
         baseDeviceCapabilities = cameraAdapter.capabilities,
         scope = applicationScope,
         settingsSnapshot = initialSettingsSnapshot,

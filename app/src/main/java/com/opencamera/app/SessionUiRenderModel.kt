@@ -12,6 +12,8 @@ import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
+import com.opencamera.core.session.DevLogTag
+import com.opencamera.core.session.LinkEventStatus
 import com.opencamera.core.session.PerformanceLinkEvent
 import com.opencamera.core.session.toLinkLogLine
 import com.opencamera.core.session.buildSessionDebugDump
@@ -1653,41 +1655,37 @@ private fun <T> nextListValueOrNull(current: T, values: List<T>): T? {
 
 // -- Dev Log --
 
-private val KEY_EVENT_NAMES = setOf(
-    "session.created", "session.booted", "session.stopped",
-    "mode.switched", "lens.switched", "zoom.updated",
-    "preview.first.frame", "preview.host.attached", "preview.host.detached",
-    "capture.photo", "capture.saved", "capture.timing",
-    "recording.started", "recording.saved", "recording.timing",
-    "permissions.updated", "device.capabilities.updated", "settings.updated"
-)
+private fun SessionTraceEvent.hasTag(tag: DevLogTag): Boolean {
+    if (tags.contains(tag)) return true
+    // Name-based fallback for events without explicit tags (backward compatibility)
+    return inferredTags().contains(tag)
+}
 
-private val CORE_EVENT_NAMES = setOf(
-    "preview.binding.started", "preview.recovery.started", "preview.recovery.requested",
-    "preview.stopped", "preview.snapshot.updated", "preview.snapshot.ignored",
-    "capture.countdown.started", "capture.countdown.tick", "capture.countdown.completed",
-    "capture.saving",
-    "capture.feedback.snapshot.requested", "capture.feedback.snapshot.updated",
-    "capture.feedback.snapshot.skipped",
-    "recording.requested",
-    "shot.plan.failed",
-    "mode.signal", "mode.event", "mode.hint",
-    "intent.received"
-)
-
-private val ERROR_EVENT_NAMES = setOf(
-    "preview.error", "preview.surface.lost", "preview.runtime.issue",
-    "preview.recovery.failed", "preview.blocked",
-    "capture.failed", "recording.failed", "recording.stop.blocked",
-    "mode.switch.blocked", "mode.intent.blocked",
-    "lens.switch.blocked", "zoom.switch.blocked",
-    "still-quality.blocked", "still-resolution.blocked", "settings.update.blocked"
-)
-
-private val ERROR_SUFFIXES = listOf(".unavailable", ".skipped")
-
-private fun isErrorEvent(name: String): Boolean {
-    return name in ERROR_EVENT_NAMES || ERROR_SUFFIXES.any { name.endsWith(it) }
+private fun SessionTraceEvent.inferredTags(): Set<DevLogTag> {
+    val result = mutableSetOf<DevLogTag>()
+    val n = name
+    if (".blocked" in n || ".unavailable" in n || ".skipped" in n || ".failed" in n || ".error" in n || ".issue" in n) {
+        result += DevLogTag.ERROR
+    }
+    if (n.startsWith("session.")) result += DevLogTag.LIFECYCLE
+    if (n.startsWith("mode.") && n != "mode.event" && n != "mode.signal" && n != "mode.hint") result += DevLogTag.MODE
+    if (n.startsWith("mode.event") || n.startsWith("mode.signal") || n.startsWith("mode.hint")) result += DevLogTag.INTENT
+    if (n.startsWith("capture.") && !n.startsWith("capture.feedback")) result += DevLogTag.CAPTURE
+    if (n.startsWith("capture.feedback")) result += DevLogTag.PREVIEW
+    if (n.endsWith(".timing")) result += DevLogTag.TIMING
+    if (n.startsWith("recording.")) result += DevLogTag.RECORDING
+    if (n.startsWith("preview.")) result += DevLogTag.PREVIEW
+    if (n.startsWith("lens.")) result += DevLogTag.LENS
+    if (n.startsWith("zoom.")) result += DevLogTag.ZOOM
+    if (n.startsWith("permissions.")) result += DevLogTag.PERMISSION
+    if (n.startsWith("settings.") || n.startsWith("device.")) result += DevLogTag.SETTINGS
+    if (n.startsWith("intent.")) result += DevLogTag.INTENT
+    if ("recovery" in n) result += DevLogTag.RECOVERY
+    if (n.startsWith("preview.first.frame") || n.startsWith("preview.binding") || n.startsWith("shot.plan")) {
+        result += DevLogTag.PERFORMANCE
+    }
+    if (n.startsWith("resource") || n.startsWith("thermal") || n.startsWith("class.")) result += DevLogTag.RESOURCE
+    return result
 }
 
 internal fun devLogRenderModel(
@@ -1711,18 +1709,21 @@ internal fun devLogRenderModel(
         )
     }
 
-    val keyEvents = traceEvents.filter { it.name in KEY_EVENT_NAMES }
-    val coreEvents = traceEvents.filter { it.name in CORE_EVENT_NAMES }
-    val errorEvents = traceEvents.filter { isErrorEvent(it.name) }
+    val keyEvents = traceEvents.filter { it.hasTag(DevLogTag.LIFECYCLE) || it.hasTag(DevLogTag.MODE) || it.hasTag(DevLogTag.CAPTURE) || it.hasTag(DevLogTag.RECORDING) || it.hasTag(DevLogTag.PERFORMANCE) || it.hasTag(DevLogTag.TIMING) }
+    val coreEvents = traceEvents.filter { it.hasTag(DevLogTag.PREVIEW) || it.hasTag(DevLogTag.RECOVERY) || it.hasTag(DevLogTag.SETTINGS) || it.hasTag(DevLogTag.PERMISSION) || it.hasTag(DevLogTag.LENS) || it.hasTag(DevLogTag.INTENT) || it.hasTag(DevLogTag.ZOOM) || it.hasTag(DevLogTag.RESOURCE) }
+    val errorEvents = traceEvents.filter { it.hasTag(DevLogTag.ERROR) }
     val allEvents = traceEvents
 
     fun formatEvents(events: List<SessionTraceEvent>): String {
         return events.joinToString("\n") { event ->
-            "${event.sequence}. ${event.name} -> ${event.detail}"
+            val tagLabels = if (event.tags.isNotEmpty()) {
+                " [${event.tags.joinToString(",") { it.displayName }}]"
+            } else ""
+            "${event.sequence}. ${event.name} -> ${event.detail}$tagLabels"
         }
     }
 
-    val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics)
+    val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics, linkEvents = linkEvents)
     val perf = debugDump.perfSnapshot
     val recovery = debugDump.recoveryTrace
 
@@ -1733,15 +1734,41 @@ internal fun devLogRenderModel(
         debugDump.resourceDiagnostics?.let { res ->
             appendLine("Resource: thermal=${res.thermalState.tagValue} | class=${res.performanceClass.tagValue} | jobs=${res.activeAlgorithmJobs}/${res.maxConcurrentAlgorithmJobs}")
         }
+        if (linkEvents.isNotEmpty()) {
+            appendLine("Link Flow (${linkEvents.size} events):")
+            linkEvents.takeLast(8).forEach { event ->
+                val timing = event.durationMillis?.let { " ${it}ms" } ?: ""
+                appendLine("  ${event.flow}/${event.stage} -> ${event.status.label}$timing")
+            }
+        }
     }
 
-    val linkContent = linkEvents.joinToString("\n") { it.toLinkLogLine() }
+    val linkContent = buildString {
+        if (linkEvents.isNotEmpty()) {
+            appendLine("=== LINK FLOW SUMMARY ===")
+            val byFlow = linkEvents.groupBy { it.flow }
+            byFlow.forEach { (flow, events) ->
+                val completed = events.count { it.status == LinkEventStatus.COMPLETED }
+                val failed = events.count { it.status == LinkEventStatus.FAILED }
+                val degraded = events.count { it.status == LinkEventStatus.DEGRADED }
+                val totalMs = events.mapNotNull { it.durationMillis }.sum()
+                appendLine("$flow: ${events.size} events ($completed completed, $degraded degraded, $failed failed), total=${totalMs}ms")
+                events.forEach { event ->
+                    val timing = event.durationMillis?.let { " ${it}ms" } ?: " --ms"
+                    appendLine("  [${event.status.label}] ${event.stage}$timing ${event.detail ?: ""}")
+                }
+            }
+            appendLine()
+            appendLine("=== LINK FLOW EVENTS (MACHINE) ===")
+            linkEvents.forEach { event -> appendLine(event.toLinkLogLine()) }
+        }
+    }
 
     val tabContent = when (selectedTab) {
         DevLogTab.KEY -> formatEvents(keyEvents)
         DevLogTab.CORE -> formatEvents(coreEvents)
         DevLogTab.ERROR -> formatEvents(errorEvents)
-        DevLogTab.LINK -> linkContent
+        DevLogTab.LINK -> linkContent.ifEmpty { "No link flow events recorded yet" }
         DevLogTab.ALL -> formatEvents(allEvents)
     }
 
@@ -1764,17 +1791,13 @@ internal fun devLogRenderModel(
         append(coreSummary)
     }
 
-    val lastTiming = traceEvents.lastOrNull { it.name.endsWith(".timing") }
-    val lastIssue = errorEvents.lastOrNull()
     val lastLink = linkEvents.lastOrNull()
+    val lastIssue = errorEvents.lastOrNull()
     val summaryText = buildString {
         append("状态: ${debugDump.previewStatus} | ")
         append("模式: ${debugDump.activeMode.name} | ")
         append("拍摄: ${debugDump.captureStatus} | ")
         append("录制: ${debugDump.recordingStatus}")
-        if (lastTiming != null) {
-            append(" | 最后耗时: ${lastTiming.detail}")
-        }
         if (lastLink != null) {
             append(" | Link: ${lastLink.flow}/${lastLink.stage}=${lastLink.status.label}")
             if (lastLink.durationMillis != null) {

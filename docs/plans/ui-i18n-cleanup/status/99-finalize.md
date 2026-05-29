@@ -1,7 +1,7 @@
 # 99-finalize Status
 
 ## State
-`pending`
+`invalid`
 
 ## Evidence
 - **Worktree**: `.claude/worktrees/99-finalize`

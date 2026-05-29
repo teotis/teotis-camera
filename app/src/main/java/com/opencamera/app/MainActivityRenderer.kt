@@ -32,6 +32,13 @@ internal class MainActivityRenderer(
         // Set final visibility deterministically for all panels.
         views.settingsPanel.panel.isVisible = route.isSettingsOpen
         views.filterLab.panel.isVisible = route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.ColorLab
+        if (route is CockpitPanelRoute.ColorLab) {
+            views.filterLab.panel.isNestedScrollingEnabled = false
+            views.filterLab.panel.overScrollMode = android.view.View.OVER_SCROLL_NEVER
+        } else {
+            views.filterLab.panel.isNestedScrollingEnabled = true
+            views.filterLab.panel.overScrollMode = android.view.View.OVER_SCROLL_ALWAYS
+        }
         views.documentBatchOrganizer.panel.isVisible = route is CockpitPanelRoute.DocumentBatchOrganizer
         views.quickPanel.panel.isVisible = route is CockpitPanelRoute.QuickBubble
         views.panelDismissScrim.isVisible = route.isAnyPanelOpen

@@ -1,0 +1,5 @@
+backgrounded · [36medc737c8[39m
+[2m  claude agents             list sessions[22m
+[2m  claude attach edc737c8    open in this terminal[22m
+[2m  claude logs edc737c8      show recent output[22m
+[2m  claude stop edc737c8      stop this session[22m

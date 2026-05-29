@@ -1,7 +1,7 @@
 # 03-kotlin-hardcoded Status
 
 ## State
-`pending`
+`completed`
 
 ## Evidence
 - **Worktree**: `.claude/worktrees/03-app-core-i18n`

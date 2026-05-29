@@ -1,7 +1,7 @@
 # 02-layout-xml Status
 
 ## State
-`invalid`
+`completed`
 
 ## Evidence
 - **Worktree**: `.claude/worktrees/02-feature-mode-i18n`

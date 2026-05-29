@@ -51,6 +51,9 @@ data class PerformanceSpanSnapshot(
     )
 }
 
+fun createPerformanceLinkRecorder(maxEvents: Int = 100): PerformanceLinkRecorder =
+    InMemoryPerformanceLinkRecorder(maxEvents = maxEvents)
+
 interface PerformanceLinkRecorder {
     fun startSpan(
         flow: String,
