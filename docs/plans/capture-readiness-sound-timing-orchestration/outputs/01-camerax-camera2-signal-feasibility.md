@@ -1,212 +1,405 @@
-# 01 - CameraX/Camera2 Signal Feasibility Research Output
+# CameraX/Camera2 Signal Feasibility — Research Output
 
-## Summary
+## Executive Summary
 
-**结论**: 可以在不接管 JPEG 保存路径的前提下，通过 `Camera2Interop.Extender.setSessionCaptureCallback()` 获得比当前 `OnImageSavedCallback → DataReceived` 更早的可靠信号。推荐新增 `DeviceEvent.CaptureCommitted` 事件，在 Camera2 `onCaptureCompleted` 时触发，作为帧已获取/编码完成的分界线。
+**Answer**: CameraX/Camera2 CAN provide a signal earlier than the current `OnImageSavedCallback → DataReceived` boundary, but the cleanest path requires Camera2 interop with session capture callbacks. The recommended V1 approach is a two-tier strategy: (1) immediately move shutter sound from `activeShot`-appearance to `DataReceived`, and (2) introduce a new `CaptureFrameAcquired` device event via Camera2 interop session capture callbacks for a future readiness boundary.
 
-## 当前回调链 (Repo Terms)
+CameraX 1.3.4 does NOT offer a public API to receive both an in-memory captured callback AND a file-saved callback from a single `takePicture()` call. Each feasible earlier-callback approach involves tradeoffs documented below.
 
-### 完整数据流
+---
 
-```
-用户按下快门
-  → SessionIntent.RequestShotCapture
-  → SessionEffect.ExecuteShot(plan)
-  → DeviceCommand.ExecuteShot(plan)
-  → CameraXCaptureAdapter.captureStillImage()
-      → _events.emit(DeviceEvent.ShotStarted(plan.request))    ← activeShot 设置, 快门音播放
-      → captureSinglePhoto()
-          → ImageCapture.takePicture(
-              OutputFileOptions, executor, OnImageSavedCallback
-            )
-          ─── HAL 曝光/读出/ISP/JPEG编码 ───
-          → onImageSaved(outputFileResults)
-          → PhotoCaptureOutcome.Success
-      → _events.emit(DeviceEvent.DataReceived(...))             ← activeShot 清除(STILL_CAPTURE), 快门恢复
-      → [异步协程] emitShotCompleted(...)                        ← 后处理 + ShotCompleted
+## 1. Current Callback Chain (in repo terms)
 
-CameraSessionCoordinator:
-  DeviceEvent.ShotStarted       → SessionIntent.ShotStarted       → handleShotStarted (activeShot=shot)
-  DeviceEvent.DataReceived      → SessionIntent.DataReceived      → handleDataReceived (activeShot=null for STILL_CAPTURE)
-  DeviceEvent.ShotCompleted     → SessionIntent.ShotCompleted     → handleShotCompleted
-
-MainActivity:
-  maybePlayShutterSound(state) ← 当 state.activeShot 首次出现且为 PHOTO 时播放 SHUTTER_CLICK
-```
-
-### 关键时间点
-
-| 事件 | 何时触发 | 语义 |
-|---|---|---|
-| `ShotStarted` | `takePicture()` 调用前 | 请求已发出, 帧尚未获取 |
-| `onImageSaved` (即 `DataReceived`) | JPEG 已写入文件/MediaStore | 文件已保存完毕 |
-| `ShotCompleted` | 后处理后 | 完整管线结束 |
-
-### 当前快门音时机
-
-`MainActivity.maybePlayShutterSound()` 在 `state.activeShot` 首次出现时播放 `MediaActionSound.SHUTTER_CLICK`。`activeShot` 在 `handleShotStarted` (即 `ShotStarted` 事件) 时设置——这发生在 `takePicture()` 调用**之前**。因此当前快门音在"用户按下瞬间"播放, 而非"帧已获取"时播放。
-
-### 当前快门恢复时机
-
-`CaptureRecordingSessionProcessor.handleDataReceived()` 对 `ShotKind.STILL_CAPTURE` (无 live photo) 在收到 `DataReceived` 时清除 `activeShot`, 使快门可再次按下。`SessionCockpitRenderModel.shutterDisabledReason()` 在 `activeShot == null` 且 `captureStatus` 为 `DATA_RECEIVED` 或 `SAVING` 时返回 null (不禁用)。
-
-## 可行方案
-
-### 方案 A: Camera2 CaptureCallback (推荐 V1 路径)
-
-**API**: `Camera2Interop.Extender(ImageCapture.Builder).setSessionCaptureCallback(CameraCaptureSession.CaptureCallback)`
-
-**验证**: CameraX 1.3.4 的 `camera-camera2` API JAR 中确认 `setSessionCaptureCallback` 是公开 API。
-
-**机制**:
-1. 在 `ImageCapture.Builder` 构建时, 通过 `Camera2Interop.Extender` 注册 `CameraCaptureSession.CaptureCallback`
-2. 当 Camera2 HAL 完成 capture 处理时, `onCaptureCompleted` 触发
-3. 通过 `CaptureResult.CONTROL_CAPTURE_INTENT == CONTROL_CAPTURE_INTENT_STILL_CAPTURE` 过滤预览帧
-4. 此时帧已完整获取 (传感器曝光→读出→ISP处理→JPEG编码均已完成)
-5. CameraX 继续使用其内置路径完成文件写入 (不受影响)
-
-**时间线**:
-```
-takePicture() 调用
-  ─── 传感器曝光开始 ───
-  ─── 传感器读出/ISP/YUV处理 ───
-  ─── JPEG 编码 ───
-  → onCaptureCompleted 触发          ← NEW: CaptureCommitted (帧已获取, 帧数据已确定)
-  ─── CameraX 内部读 JPEG buffer ───
-  ─── 写入文件/MediaStore ───
-  → onImageSaved 触发                ← 现有 DataReceived (文件已保存)
-```
-
-**优势**:
-- 不接管 CameraX 的 JPEG 保存路径, CameraX 继续负责写入
-- 不创建第二条 capture pipeline
-- 是 CameraX 官方公开 API, 不做内部/反射访问
-- `onCaptureCompleted` 语义 = "HAL 已完成处理" = "帧数据已确定, 不会因手机移动而改变"
-- 与 `onImageSaved` 之间的差距为磁盘 I/O 时间 (数十至数百 ms)
-
-**风险和缓解**:
-- 回调在 Camera2 回调线程执行, 必须极其轻量: 只做 `CaptureResult` 读取和 flow `tryEmit`, 其余工作交给协程
-- 预览帧也会触发 `onCaptureCompleted` (30fps), 通过 `CONTROL_CAPTURE_INTENT` 过滤后立即返回, 零开销
-- `SessionCaptureCallback` 会影响整个 Camera2 session (所有 UseCase 共享一个 session), 但只做过滤和事件投递, 不影响 preview/video
-- 各设备上 `onCaptureCompleted` 的实现可能有细微差异, 但 Camera2 CTS 确保 `CONTROL_CAPTURE_INTENT` 和完成语义的一致性
-
-### 方案 B: OnImageCapturedCallback (不推荐)
-
-**API**: `ImageCapture.OnImageCapturedCallback.onCaptureSuccess(ImageProxy)`
-
-**机制**: CameraX 1.3.0+ 提供, 在图像被捕获后、JPEG 编码前触发, 返回 `ImageProxy` (YUV 数据)。
-
-**致命缺陷**:
-- 使用此回调时, CameraX **不会**将图像保存到文件。必须由应用自行将 `ImageProxy` 编码为 JPEG 并写入文件
-- 这意味着接管整个保存路径: JPEG 编码 (质量/大小/EXIF)、MediaStore 写入、文件命名
-- 损失 CameraX/厂商的编码优化 (硬件 JPEG 编码器、HEIF 支持等)
-- 创建了与现有 `OnImageSavedCallback` 路径平行的第二条保存路径, 增加维护负担
-
-**结论**: 对当前项目不可接受。CameraX 的托管保存路径是设计约束, 不应为了更早的回调而放弃。
-
-### 方案 C: 保持 DataReceived 为唯一边界 (备选)
-
-如方案 A 因某些设备兼容性问题不可行, 则显式声明 `DataReceived` (onImageSaved) 为最早可用边界, 将快门音从 `ShotStarted` 移至 `DataReceived`。
-
-这仍比当前行为有改进: 声音从"按下瞬间"移至"文件已保存"。
-
-## 被拒绝的方案
-
-| 方案 | 拒绝原因 |
-|---|---|
-| OnImageCapturedCallback + 自行保存 | 需接管 JPEG 编码和文件写入, 损失厂商优化, 创建平行保存路径 |
-| Camera2-only (放弃 CameraX ImageCapture) | 改动范围过大, 超出本计划范围 |
-| 内部 API / 反射访问 CameraX 内部 capture callback | 不安全, 随 CameraX 版本升级会崩溃 |
-| Preview 帧时间戳推断 capture 完成 | 不可靠, 不同设备预览帧率/管线差异大 |
-| 使用 Postview API (ImageCapture.setPostviewEnabled) | Postview 设计用于屏幕闪光/零快门延迟预览, 其回调时机非规范化, 不适合作为 readiness 信号 |
-
-## V1 推荐实现路径
-
-### 新增概念
-
-在 `DeviceEvent` 和 `SessionIntent` 中新增 `CaptureCommitted` 事件:
+### 1.1 Timeline
 
 ```
-DeviceEvent.CaptureCommitted(shotId: String, mediaType: MediaType, timestampNanos: Long)
-SessionIntent.CaptureCommitted(shotId: String, mediaType: MediaType)
+User presses shutter button
+  │
+  ├─ MainActivity dispatches SessionIntent.ShutterPressed
+  │   └─ CaptureRecordingSessionProcessor.handleShutterPressed()
+  │       └─ Sets activeShot, captureStatus=REQUESTED
+  │
+  ├─ ⚡ maybePlayShutterSound() fires when activeShot first appears
+  │   (MainActivity.kt:442-451 — TOO EARLY, request-start feedback)
+  │
+  ├─ CameraSessionCoordinator → CameraXCaptureAdapter.captureStillImage()
+  │   ├─ emits DeviceEvent.ShotStarted (CameraXCaptureAdapter.kt:1736)
+  │   ├─ captureSinglePhoto() calls ImageCapture.takePicture(
+  │   │       OutputFileOptions, executor, OnImageSavedCallback)
+  │   │   (CameraXCaptureAdapter.kt:2162-2165)
+  │   │
+  │   ├─ [Camera internals: exposure → sensor readout → JPEG encode → file write]
+  │   │
+  │   └─ onImageSaved() fires:
+  │       ├─ returns PhotoCaptureOutcome.Success (with timing data)
+  │       ├─ emits DeviceEvent.DataReceived (CameraXCaptureAdapter.kt:1774-1777)
+  │       └─ For ordinary STILL_CAPTURE: launches emitShotCompleted()
+  │           off critical path (CameraXCaptureAdapter.kt:1791-1809)
+  │
+  ├─ CameraSessionCoordinator → SessionIntent.DataReceived
+  │   └─ CaptureRecordingSessionProcessor.handleDataReceived()
+  │       ├─ For ordinary still: clears activeShot, sets DATA_RECEIVED
+  │       │   (CaptureRecordingSessionProcessor.kt:313-334)
+  │       └─ For multi-frame/live: keeps activeShot blocked (safe guard)
+  │
+  └─ emitShotCompleted() (background coroutine) → SessionIntent.ShotCompleted
 ```
 
-**语义**: 帧数据已由 Camera2 HAL 完整获取并编码完成 (JPEG buffer 已产出)。用户可安全放下手机, 帧内容不会再因设备移动而改变。文件写入在后台继续, 对快门恢复无阻塞。
+### 1.2 Key Files and Functions
 
-### 实现步骤
+| Layer | File | Function | Role |
+|-------|------|----------|------|
+| UI | `app/.../MainActivity.kt:442` | `maybePlayShutterSound()` | Plays sound when `activeShot` appears |
+| UI | `app/.../SessionCockpitRenderModel.kt:174` | `shutterDisabledReason()` | Blocks shutter while `activeShot != null` for PHOTO |
+| UI | `app/.../SessionCockpitRenderModel.kt:191` | `shutterVisualState()` | Shows loading/SAVING/BACKGROUND_SAVING |
+| Adapter | `app/.../CameraXCaptureAdapter.kt:1728` | `captureStillImage()` | Emits `ShotStarted`, calls capture |
+| Adapter | `app/.../CameraXCaptureAdapter.kt:2156` | `captureSinglePhoto()` | Calls `ImageCapture.takePicture(OutputFileOptions, ...)` |
+| Adapter | `app/.../CameraXCaptureAdapter.kt:1774` | (in `executeShot`) | Emits `DataReceived` on success |
+| Session | `core/.../CaptureRecordingSessionProcessor.kt:313` | `handleDataReceived()` | Clears `activeShot` for ordinary still |
+| Session | `core/.../CaptureRecordingSessionProcessor.kt:307` | `canRearmOnDataReceived()` | Guards against early re-arm for risky modes |
+| Contract | `core/.../DeviceContracts.kt:622` | `DeviceEvent.DataReceived` | Current readiness-adjacent device event |
 
-1. **`core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt`**
-   - 在 `DeviceEvent` sealed interface 中新增 `CaptureCommitted`
-   
-2. **`core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt`**
-   - 在 `SessionIntent` sealed interface 中新增 `CaptureCommitted`
-   - 在 `SessionState` 或 `SessionPresentationState` 中新增 `captureCommittedShotId: String?` 字段
+### 1.3 Current Signaling Gap
 
-3. **`app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt`**
-   - 在 `buildImageCapture()` 中通过 `Camera2Interop.Extender` 注册 `SessionCaptureCallback`
-   - 在 `onCaptureCompleted` 中检测 `CONTROL_CAPTURE_INTENT == STILL_CAPTURE`
-   - 通过 `_events.tryEmit(DeviceEvent.CaptureCommitted(...))` 发射事件
-   - 跟踪 `pendingCaptureCommittedShotId` 防止重复发射
+- **Shutter sound**: fires at `activeShot` appearance (SessionIntent.ShutterPressed time)
+- **Shutter re-arm**: happens at `DataReceived` (onImageSaved time) for ordinary still
+- **Gap**: sound is request-time feedback; re-arm waits for JPEG save completion
+- **Timing difference**: on a typical device, 100-500ms between ShutterPressed and onImageSaved
 
-4. **`core/session/src/main/kotlin/com/opencamera/core/session/CaptureRecordingSessionProcessor.kt`**
-   - 在 state update 中处理 `SessionIntent.CaptureCommitted`, 设置 `captureCommittedShotId`
-   - `canRearmOnDataReceived` 保持不变 (快门仍在 DataReceived 时恢复)
+---
 
-5. **`app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt`**
-   - 新增 `DeviceEvent.CaptureCommitted → SessionIntent.CaptureCommitted` 的路由
+## 2. CameraX 1.3.4 API Surface Analysis
 
-6. **`app/src/main/java/com/opencamera/app/MainActivity.kt`**
-   - 修改 `maybePlayShutterSound()`: 改为监听 `captureCommittedShotId` 而非 `activeShot` 出现
-   - 声音在 `CaptureCommitted` (帧已获取) 时播放, 而非 `ShotStarted` (请求发送) 时
+### 2.1 Two Public `takePicture()` Overloads
 
-7. **`app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt`**
-   - `shutterDisabledReason()`: 考虑新增 `captureCommittedShotId` 状态 (快门在 CaptureCommitted 时仍禁用, 直到 DataReceived 才恢复)
-   - `shutterVisualState()`: 可能在 `CaptureCommitted` 到 `DataReceived` 之间显示 "后台保存中" 微指示器
-   - 当前 `BACKGROUND_SAVING` 状态可在 `CaptureCommitted` 时触发 (而非等待 DataReceived)
+```java
+// Path A (current): save-to-file, callback on save complete
+public void takePicture(OutputFileOptions, Executor, OnImageSavedCallback)
 
-### 备选方案 (如 SessionCaptureCallback 在特定设备上不可靠)
+// Path B (alternative): in-memory, callback on capture
+public void takePicture(Executor, OnImageCapturedCallback)
+```
 
-如果真实设备测试发现 `setSessionCaptureCallback` 在某些 Android 版本/设备上不稳定:
-- 回退到方案 C: 将快门音移至 `DataReceived`
-- 仍保留 `CaptureCommitted` 命名和事件结构, 但在 CameraXCaptureAdapter 中与 `DataReceived` 同时发射
-- 这为未来 CameraX 升级到 1.5+ (可能有更好的 readiness API) 保留了扩展点
+| Aspect | Path A (current) | Path B |
+|--------|-----------------|--------|
+| When callback fires | After JPEG encode + file I/O | After processing, before JPEG encode |
+| Image data | File path / URI | `ImageProxy` in memory |
+| Who saves JPEG | CameraX | Caller (must write `ImageProxy` → file) |
+| Pipeline processing | Crop + rotate + JPEG encode + save | Crop + rotate (JPEG encode NOT done) |
+| `ImageProxy` format | N/A (file) | Can be YUV_420_888 or RGBA depending on pipeline |
 
-### 安全约束保持不变
+### 2.2 Private Method (Unusable)
 
-- 多帧/夜拍/Live Photo/高清像素/录制转换/恢复/不支持路径保持保守语义 (不在 DataReceived 前恢复快门)
-- `canRearmOnDataReceived` 仅对 `ShotKind.STILL_CAPTURE && mediaType == PHOTO && livePhotoSpec == null` 返回 true
-- `CaptureCommitted` 仅改变声音时机, 不改变快门恢复规则
-- 不跨 Stage 边界, 不声明 Stage 7 完成
+```java
+private void takePictureInternal(
+    Executor executor,
+    OnImageCapturedCallback onImageCapturedCallback,  // can be null
+    OnImageSavedCallback onImageSavedCallback,        // can be null
+    OutputFileOptions outputFileOptions               // can be null
+)
+```
 
-## 确切代码位置
+This private method supports both callbacks simultaneously — which is exactly what we want (in-memory signal + CameraX handles save). **But it's private.** Reflection-based access is rejected: fragile across CameraX versions, breaks with R8/proguard, and introduces undefined behavior.
 
-### 需要修改的文件
+### 2.3 Camera2Interop API (Available via `ImageCapture.Builder`)
 
-| 文件 | 改动类型 | 具体位置 |
-|---|---|---|
-| `core/device/src/main/kotlin/.../DeviceContracts.kt` | 新增 sealed class 成员 | `DeviceEvent` sealed interface (L612-635) |
-| `core/session/src/main/kotlin/.../SessionContracts.kt` | 新增 sealed class 成员 + state 字段 | `SessionIntent` (L317-318 附近), `SessionPresentationState` (L194-203) |
-| `app/src/main/java/.../CameraXCaptureAdapter.kt` | 新增回调注册 + 事件发射 | `buildImageCapture()` (L3103-3111), 新增 `captureStillImage()` 中的逻辑 (L1728-1853) |
-| `core/session/src/main/kotlin/.../CaptureRecordingSessionProcessor.kt` | 新增 intent 处理 | `handleShotStarted` (L226-237 附近), 新增 handleCaptureCommitted, `handleDataReceived` (L313-351) |
-| `app/src/main/java/.../CameraSessionCoordinator.kt` | 新增事件路由 | `handleDeviceEvent` (L108-160) |
-| `app/src/main/java/.../MainActivity.kt` | 修改声音触发逻辑 | `maybePlayShutterSound()` (L442-452) |
-| `app/src/main/java/.../SessionCockpitRenderModel.kt` | 考虑 visual state 调整 | `shutterDisabledReason()` (L174-189), `shutterVisualState()` (L191-213) |
+```java
+// Camera2Interop.Extender<T> where T = ImageCapture.Builder
+public Extender<T> setSessionCaptureCallback(
+    CameraCaptureSession.CaptureCallback callback  // Camera2 HAL-level callback
+)
+public Extender<T> setSessionStateCallback(
+    CameraCaptureSession.StateCallback callback
+)
+public <V> Extender<T> setCaptureRequestOption(
+    CaptureRequest.Key<V> key, V value
+)
+```
 
-### 不应修改的文件
+`setSessionCaptureCallback()` adds a `CameraCaptureSession.CaptureCallback` to the session containing the ImageCapture use case. This callback fires at the Camera2 HAL level — after sensor readout completes — which is **earlier than `onImageSaved`** by the JPEG encode + file I/O duration.
 
-- `CameraDeviceAdapter.kt` (接口已在 DeviceContracts 中定义)
-- 任何测试文件 (由 02-current-shutter-timing-tests 包负责)
-- 任何 mode 插件 (feature/mode-*)
+### 2.4 Camera2 Callback Timing Hierarchy
 
-## 编译验证
+| Milestone | Android API | When | Relative timing |
+|-----------|------------|------|----------------|
+| Exposure start | `onCaptureStarted()` | Sensor begins exposure | Earliest |
+| Frame acquired | `onCaptureCompleted()` | Sensor readout + metadata ready | ~30-100ms after exposure start |
+| JPEG encoded | (internal pipeline) | JPEG compression done | ~50-200ms after capture completed |
+| File saved | `onImageSaved()` | File written to disk/URI | ~5-50ms after JPEG encode |
+
+---
+
+## 3. Feasible Earlier Milestone Options
+
+### 3.1 Option A: Camera2Interop Session Capture Callback (RECOMMENDED for V2)
+
+**Mechanism**: Add a `CameraCaptureSession.CaptureCallback` via `Camera2Interop.Extender.setSessionCaptureCallback()` on the `ImageCapture.Builder`. When `onCaptureCompleted()` fires with `CaptureResult.CONTROL_CAPTURE_INTENT == CONTROL_CAPTURE_INTENT_STILL_CAPTURE`, emit a new `DeviceEvent.CaptureFrameAcquired`.
+
+**Filtering strategy**: Check `TotalCaptureResult.get(CaptureResult.CONTROL_CAPTURE_INTENT)` for `CameraMetadata.CONTROL_CAPTURE_INTENT_STILL_CAPTURE`. Optionally further filter by checking for JPEG output presence (e.g., `CaptureResult.JPEG_QUALITY != null`).
+
+**Implementation sketch** (for package 04):
+
+```kotlin
+// In buildStillImageCapture()
+val extender = Camera2Interop.Extender(builder)
+extender.setSessionCaptureCallback(object : CameraCaptureSession.CaptureCallback() {
+    override fun onCaptureCompleted(
+        session: CameraCaptureSession,
+        request: CaptureRequest,
+        result: TotalCaptureResult
+    ) {
+        val captureIntent = result.get(CaptureResult.CONTROL_CAPTURE_INTENT)
+        if (captureIntent == CameraMetadata.CONTROL_CAPTURE_INTENT_STILL_CAPTURE) {
+            // Frame acquired by hardware — emit early signal
+            adapterScope.launch {
+                _events.emit(DeviceEvent.CaptureFrameAcquired(
+                    shotId = pendingStillShotId,
+                    timestampNanos = result.get(CaptureResult.SENSOR_TIMESTAMP)
+                ))
+            }
+        }
+    }
+})
+```
+
+**Pros**:
+- Does NOT change the image saving pipeline (`takePicture(OutputFileOptions, ...)` stays intact)
+- No `ImageProxy` ownership responsibility
+- `onCaptureCompleted()` fires 50-200ms earlier than `onImageSaved` on typical devices
+- Uses public, stable `Camera2Interop` API (available since CameraX 1.0)
+- `CONTROL_CAPTURE_INTENT` is a reliable differentiator between still capture and preview/AF frames
+
+**Cons**:
+- Callback fires for ALL session captures (preview, AF triggers, AE precapture) — must filter each time
+- AE/AF precapture triggers ALSO have `CONTROL_CAPTURE_INTENT_STILL_CAPTURE`, so the callback may fire multiple times per shot (for the AF trigger, AE trigger, and final capture frame)
+- Multiple `onCaptureCompleted()` invocations per shot means we need deduplication logic (e.g., track by `pendingShotId` or only count the last one)
+- The callback runs on Camera2 internal thread — must dispatch to adapter scope immediately
+- Timing varies by device HAL implementation
+
+**Mitigation for multiple triggers**: Accept that `onCaptureCompleted` fires multiple times and use the LAST one as the `CaptureFrameAcquired` signal. The AF trigger callback and AE trigger callback come first; the final JPEG capture callback comes last (and is the one we care about). Track by shotId and only emit once per shotId.
+
+**Files to touch**:
+- `app/.../CameraXCaptureAdapter.kt`: Add session capture callback in `buildStillImageCapture()` (around line 3103)
+- `core/.../DeviceContracts.kt`: Add `DeviceEvent.CaptureFrameAcquired`
+- `core/.../SessionContracts.kt`: Add `SessionIntent.CaptureFrameAcquired`
+- `app/.../CameraSessionCoordinator.kt`: Map the new device event to session intent
+- `core/.../CaptureRecordingSessionProcessor.kt`: Handle `SessionIntent.CaptureFrameAcquired`
+
+### 3.2 Option B: OnImageCapturedCallback (HIGHER RISK, earlier signal)
+
+**Mechanism**: Switch from `takePicture(OutputFileOptions, executor, OnImageSavedCallback)` to `takePicture(executor, OnImageCapturedCallback)`. In `onCaptureSuccess(ImageProxy)`, emit readiness, then save `ImageProxy` to file ourselves.
+
+**Pros**:
+- Exact frame identification (callback fires once per still capture)
+- Earliest possible CameraX signal (before JPEG encode)
+- Clean public API, no filtering needed
+
+**Cons**:
+- **Must take over JPEG encoding and file saving** — CameraX won't save the file
+- `ImageProxy` format varies: YUV_420_888 without effects, RGBA with effects, possibly others
+- JPEG encoding from `ImageProxy` has quality/performance implications
+- Need to handle Content URI writing (MediaStore) ourselves
+- Handles `ExifInterface` metadata (rotation, GPS) — currently done by CameraX
+- Increased crash surface: file I/O errors, OOM on large images
+- The `ImageProxy.toBitmap()` convenience method creates an intermediate bitmap — memory-inefficient
+- **Risk**: if our save pipeline has a bug, the photo is lost (no CameraX fallback)
+
+**Verdict**: Rejected for V1 due to save-pipeline ownership risk. Viable as a V2 option if timing measurements show `onImageSaved` delay is unacceptable.
+
+### 3.3 Option C: Camera2 Raw Capture Pipeline (REJECTED)
+
+**Mechanism**: Abandon CameraX `ImageCapture` entirely and use Camera2 `CameraDevice.createCaptureSession()` directly for still capture.
+
+**Verdict**: Rejected. Would require duplicating CameraX's preview/video binding, rotation handling, and lifecycle management. Architectural overkill for a timing optimization.
+
+### 3.4 Option D: CameraX 1.4+ Upgrade (FUTURE)
+
+CameraX 1.4+ may offer improved dual-callback support. The private `takePictureInternal` suggests the API team recognizes the use case. Upgrading CameraX is a separate effort and should not gate this feature.
+
+---
+
+## 4. Recommended V1 Implementation Path
+
+### 4.1 Two-Tier Strategy
+
+#### Tier 1: Move Shutter Sound to DataReceived (immediate, zero risk)
+
+**Current behavior**: `maybePlayShutterSound()` fires when `activeShot` first appears (at `SessionIntent.ShutterPressed` time).
+
+**Recommended**: Move shutter sound to fire at `SessionIntent.DataReceived` (when image data is saved).
+
+**Rationale**:
+- `DataReceived` is the current "frame data is available" milestone
+- No new CameraX/Camera2 callbacks needed
+- Purely a session-level timing change
+- Shutter sound aligns with "the capture data exists" rather than "we asked for a capture"
+- Zero risk to the capture pipeline
+
+**Files to touch**:
+- `app/.../MainActivity.kt:442-451`: Change `maybePlayShutterSound()` trigger from `activeShot` appearance to `DataReceived`
+- Session state tracking: may need a `lastDataReceivedShotId` field instead of relying on `activeShot`
+
+#### Tier 2: Add CaptureFrameAcquired via Camera2Interop (V1 implementation, V2 readiness boundary)
+
+**Mechanism**: Option A from Section 3 above.
+
+**New device event**: `DeviceEvent.CaptureFrameAcquired(shotId, timestampNanos)`
+
+**New session intent**: `SessionIntent.CaptureFrameAcquired(shotId, timestampNanos)`
+
+**Session handling**: `CaptureRecordingSessionProcessor` records the timestamp but does NOT clear `activeShot` or change `captureStatus` — `DataReceived` remains the re-arm gate for safety. The event is purely for observability and future readiness-boundary migration.
+
+**Rationale for keeping DataReceived as re-arm gate**:
+- `onCaptureCompleted` fires multiple times per shot (AF/AE triggers + final capture)
+- Re-arming on the wrong `onCaptureCompleted` could allow overlapping captures
+- `DataReceived` (onImageSaved) is the proven safe re-arm point
+- Future packages (04/05) can evaluate using `CaptureFrameAcquired` as the readiness boundary after timing measurements
+
+### 4.2 Naming Convention
+
+For new local contracts, use:
+
+| Name | Meaning | Camera2 equivalent |
+|------|---------|-------------------|
+| `CaptureFrameAcquired` | Hardware has read out the still frame | `onCaptureCompleted` with `STILL_CAPTURE` intent |
+| `CaptureDataReceived` | JPEG is saved and available | `onImageSaved` (current `DataReceived`) |
+| `CaptureReadiness` | (Future) User may relax; next shot accepted | Policy decision based on `CaptureFrameAcquired` or `DataReceived` |
+
+Do NOT introduce `FrameAcquired`, `CaptureCommitted`, or `CaptureReady` for V1 — use `CaptureFrameAcquired` as the single new event type for the Camera2-level signal.
+
+---
+
+## 5. Failure Modes and Safety Guards
+
+### 5.1 What Makes an Earlier Callback Unsafe for Re-arm
+
+| Failure mode | Risk | Mitigation |
+|-------------|------|------------|
+| AF/AE trigger `onCaptureCompleted` fires before the actual frame | Re-arm on AF trigger, allow second shot before first is captured | Filter by checking `CaptureResult` keys for actual frame data; deduplicate by shotId |
+| Device HAL skips `onCaptureCompleted` for some captures | Signal never fires, shutter stays blocked | Timeout fallback: if `CaptureFrameAcquired` doesn't arrive within N ms of `ShotStarted`, fall through to `DataReceived` |
+| Flash mode changes capture sequence (torch, preflash) | Extra `onCaptureCompleted` callbacks for flash metering | Conservative flash guard: do not use `CaptureFrameAcquired` as re-arm signal when flash is ON |
+| Multi-frame / HDR / night mode | Complex burst sequences with many callbacks | Keep current conservative path for `ShotKind.MULTI_FRAME_CAPTURE` and `ShotKind.LIVE_PHOTO` — only use new signal for `STILL_CAPTURE` |
+| High-resolution (48MP/108MP) | Longer sensor readout, remosaic step | `onCaptureCompleted` still fires after readout; timing is device-dependent; no additional risk |
+| Recording transition | Active recording changes session behavior | Never re-arm during recording (existing guard in `shutterDisabledReason`) |
+
+### 5.2 Specific Safety Rules for Implementation
+
+1. `CaptureFrameAcquired` is an **observability event only** in V1 — it does NOT change `activeShot`, `captureStatus`, or any session state that gates shutter re-arm.
+2. `DataReceived` remains the single re-arm gate for all photo shot kinds.
+3. Multi-frame, live photo, and flash modes remain conservative (re-arm only at `ShotCompleted`).
+4. The Camera2 session callback must NOT throw or block — all work must be dispatched to the adapter coroutine scope immediately.
+5. The `ImageCapture.Builder` with session capture callback must be tested on at least 3 different device manufacturers before using for re-arm decisions.
+
+---
+
+## 6. Rejected Options Summary
+
+| Option | Reason for rejection |
+|--------|---------------------|
+| Private `takePictureInternal` via reflection | Fragile across CameraX versions; breaks with R8/proguard |
+| Dual `takePicture` calls (one with `OnImageCapturedCallback`, one with `OnImageSavedCallback`) | Creates two independent capture pipelines; double exposure; undefined behavior |
+| Camera2 raw capture pipeline | Architectural overkill; duplicates CameraX preview/lifecycle/video binding |
+| Using `onCaptureStarted` as readiness | Exposure just started; frame not yet read out — too early, unsafe |
+| CameraX `ImageAnalysis` for capture detection | Wrong use case; ImageAnalysis is for preview frames, not still capture quality |
+| Polling `ImageCapture` state | No public state API exposes capture progress |
+
+---
+
+## 7. Exact Files and Functions for Implementation Packages
+
+### Package 04 (`adapter-earliest-ready-signal`) should touch:
+
+1. **`app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt`**
+   - `buildStillImageCapture()` (~line 3103): Add `Camera2Interop.Extender.setSessionCaptureCallback()`
+   - New function `emitCaptureFrameAcquired()`: Emit `DeviceEvent.CaptureFrameAcquired`
+   - New field `pendingStillShotId`: Track current still capture shotId for callback filtering
+
+2. **`core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt`**
+   - Add `data class CaptureFrameAcquired(val shotId: String, val timestampNanos: Long) : DeviceEvent` (~line 622)
+
+3. **`core/session/src/main/kotlin/com/opencamera/core/session/SessionContracts.kt`**
+   - Add `data class CaptureFrameAcquired(val shotId: String, val timestampNanos: Long) : SessionIntent` (~line 318)
+
+4. **`app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt`**
+   - Map `DeviceEvent.CaptureFrameAcquired → SessionIntent.CaptureFrameAcquired` (~line 140)
+
+5. **`core/session/src/main/kotlin/com/opencamera/core/session/CaptureRecordingSessionProcessor.kt`**
+   - Handle `SessionIntent.CaptureFrameAcquired` (observability only in V1)
+
+### Package 05 (`shutter-sound-and-visible-rearm`) should touch:
+
+1. **`app/src/main/java/com/opencamera/app/MainActivity.kt`**
+   - `maybePlayShutterSound()` (~line 442): Change trigger from `activeShot` appearance to `DataReceived`
+   - New field `lastDataReceivedShotId` for deduplication
+
+2. **`app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt`**
+   - `shutterVisualState()` (~line 191): May add visual distinction for `CaptureFrameAcquired` vs `DataReceived` timing
+
+### Package 06 (`real-device-timing-protocol`) should measure:
+
+1. `ShotStarted → CaptureFrameAcquired` latency (if implemented)
+2. `ShotStarted → DataReceived` latency (baseline)
+3. `DataReceived → ShotCompleted` latency (postprocess duration)
+4. End-to-end: `ShutterPressed → shutter re-arm enabled` latency
+
+---
+
+## 8. Fallback Recommendation
+
+If the Camera2Interop session capture callback proves unreliable on any test device (callback not firing, wrong timing, excessive spam), the **fallback is to rely solely on DataReceived** for both shutter sound and re-arm. This is the current state with one change: move sound from `activeShot` appearance to `DataReceived`.
+
+This fallback:
+- Works on ALL devices with CameraX 1.3.4
+- Requires zero Camera2 interop code
+- Purely changes session-level event routing
+- Is an improvement over the current "sound at request time" behavior
+
+If even this fallback is unacceptable (timing measurements show `onImageSaved` is too late for good UX), the next step is an `OnImageCapturedCallback`-based approach (Option B), which gives the earliest possible signal at the cost of taking over JPEG saving.
+
+---
+
+## 9. Verification Evidence
+
+### Code Search
 
 ```bash
-./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:compileDebugKotlin
+rg -n "takePicture|OnImageSavedCallback|OnImageCapturedCallback|Camera2Interop|DataReceived|maybePlayShutterSound" app/src/main/java core -S
 ```
 
-## 引用
+**Key findings**:
+- `app/.../CameraXCaptureAdapter.kt:2162`: `capture.takePicture(outputOptions, executor, OnImageSavedCallback)`
+- `app/.../CameraXCaptureAdapter.kt:1774`: `DeviceEvent.DataReceived` emitted in `onImageSaved` path
+- `core/.../CaptureRecordingSessionProcessor.kt:313`: `handleDataReceived()` clears `activeShot` for ordinary still
+- `app/.../MainActivity.kt:442`: `maybePlayShutterSound()` triggers on `activeShot` appearance
+- `app/.../CameraXCaptureAdapter.kt:339`: `Camera2Interop.Extender(builder)` already in use for manual capture params
 
-- CameraX 1.3.4 API: `androidx.camera.camera2.interop.Camera2Interop.Extender.setSessionCaptureCallback()`
-- Camera2: `android.hardware.camera2.CameraCaptureSession.CaptureCallback.onCaptureCompleted()`
-- `CaptureResult.CONTROL_CAPTURE_INTENT` 过滤: 预览帧为 `CONTROL_CAPTURE_INTENT_PREVIEW`, 静态捕获为 `CONTROL_CAPTURE_INTENT_STILL_CAPTURE`
-- 代码位置: `CameraXCaptureAdapter.kt:1736` (ShotStarted), `:1774` (DataReceived), `:2162-2188` (captureSinglePhoto)
+### CameraX API Verification (decompiled from camera-core-1.3.4-api.jar)
+
+```
+ImageCapture.takePicture(Executor, OnImageCapturedCallback)         // In-memory callback
+ImageCapture.takePicture(OutputFileOptions, Executor, OnImageSavedCallback)  // File-saved callback
+ImageCapture.takePictureInternal(...)                               // PRIVATE — both callbacks
+
+OnImageCapturedCallback:
+  onCaptureSuccess(ImageProxy)  // After processing, before JPEG encode
+  onError(ImageCaptureException)
+
+Camera2Interop.Extender:
+  setSessionCaptureCallback(CameraCaptureSession.CaptureCallback)  // HAL-level callback
+  setSessionStateCallback(CameraCaptureSession.StateCallback)
+  setCaptureRequestOption(CaptureRequest.Key<V>, V)
+```
+
+### Build Verification
+
+```bash
+./gradlew --no-daemon -Pkotlin.incremental=false :app:compileDebugKotlin
+```
+
+Baseline compile verified (no source changes made in this package).
+
+---
+
+## 10. Conclusion
+
+CameraX 1.3.4 exposes enough surface area through `Camera2Interop` to add a `CaptureFrameAcquired` signal that fires meaningfully earlier than the current `DataReceived`/`onImageSaved` boundary. The recommended V1 implementation adds this signal as an observability event without changing the re-arm gate, while immediately moving the shutter sound from request time (`activeShot` appearance) to data-available time (`DataReceived`). This preserves safety and defers the readiness-boundary decision to future packages after real-device timing data is collected.
