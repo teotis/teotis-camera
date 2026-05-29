@@ -4,6 +4,7 @@
     <string name="button_photo_mode">拍照</string>
     <string name="button_document_mode">文档</string>
     <string name="button_night_mode">风景</string>
+    <string name="button_fullclear_mode">全清</string>
     <string name="button_humanistic_mode">人文</string>
     <string name="button_portrait_mode">人像</string>
     <string name="button_pro_mode">专业</string>

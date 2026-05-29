@@ -52,6 +52,7 @@ import com.opencamera.feature.night.NightModePlugin
 import com.opencamera.feature.photo.PhotoModePlugin
 import com.opencamera.feature.portrait.PortraitModePlugin
 import com.opencamera.feature.pro.ProModePlugin
+import com.opencamera.feature.fullclear.FullClearModePlugin
 import com.opencamera.feature.video.VideoModePlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -127,6 +128,7 @@ class AppContainer(
     private val modeRegistry = ModeRegistry(
         listOf(
             DocumentModePlugin(),
+            FullClearModePlugin(),
             HumanisticModePlugin(),
             NightModePlugin(),
             PhotoModePlugin(),

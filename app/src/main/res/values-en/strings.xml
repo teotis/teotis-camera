@@ -4,6 +4,7 @@
     <string name="button_photo_mode">Photo</string>
     <string name="button_document_mode">Doc</string>
     <string name="button_night_mode">Scenery</string>
+    <string name="button_fullclear_mode">Full Clear</string>
     <string name="button_humanistic_mode">Human</string>
     <string name="button_portrait_mode">Port</string>
     <string name="button_pro_mode">Pro</string>

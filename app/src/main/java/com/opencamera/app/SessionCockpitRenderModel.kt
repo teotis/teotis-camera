@@ -560,6 +560,7 @@ private val PRODUCT_MODE_ENTRY_ORDER = listOf(
     ModeId.PHOTO,
     ModeId.HUMANISTIC,
     ModeId.NIGHT,
+    ModeId.FULL_CLEAR,
     ModeId.PORTRAIT,
     ModeId.PRO,
     ModeId.VIDEO,

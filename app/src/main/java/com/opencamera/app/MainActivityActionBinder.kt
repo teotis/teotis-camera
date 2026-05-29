@@ -346,6 +346,7 @@ internal class MainActivityActionBinder(
             views.modeTrack.photo to ModeId.PHOTO,
             views.modeTrack.humanistic to ModeId.HUMANISTIC,
             views.modeTrack.night to ModeId.NIGHT,
+            views.modeTrack.fullClear to ModeId.FULL_CLEAR,
             views.modeTrack.portrait to ModeId.PORTRAIT,
             views.modeTrack.pro to ModeId.PRO,
             views.modeTrack.video to ModeId.VIDEO,

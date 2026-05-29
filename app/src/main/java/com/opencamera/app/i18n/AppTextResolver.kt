@@ -24,6 +24,7 @@ open class AppTextResolver(private val context: Context?) {
         ModeId.HUMANISTIC -> str(R.string.button_humanistic_mode, "Human")
         ModeId.PORTRAIT -> str(R.string.button_portrait_mode, "Port")
         ModeId.PRO -> str(R.string.button_pro_mode, "Pro")
+        ModeId.FULL_CLEAR -> str(R.string.button_fullclear_mode, "全清")
         ModeId.VIDEO -> str(R.string.button_video_mode, "Video")
     }
 

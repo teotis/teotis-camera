@@ -62,6 +62,7 @@ dependencies {
     implementation(project(":feature:mode-photo"))
     implementation(project(":feature:mode-portrait"))
     implementation(project(":feature:mode-pro"))
+    implementation(project(":feature:mode-fullclear"))
     implementation(project(":feature:mode-video"))
 
     implementation("androidx.core:core-ktx:1.13.1")
