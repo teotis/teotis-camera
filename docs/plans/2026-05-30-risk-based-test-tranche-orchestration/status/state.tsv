@@ -1,0 +1,7 @@
+package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error	failed_command	conflict_files	log_summary	recovery_hint
+01-settings-codecs-tests	pending	pending	pending	pending	agent/test-tranche/01-settings-codecs-tests	.claude/worktrees/test-tranche/01-settings-codecs-tests	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+02-device-media-pure-tests	pending	pending	pending	pending	agent/test-tranche/02-device-media-pure-tests	.claude/worktrees/test-tranche/02-device-media-pure-tests	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+03-app-logic-tests	pending	pending	pending	pending	agent/test-tranche/03-app-logic-tests	.claude/worktrees/test-tranche/03-app-logic-tests	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+04-app-mixed-tests	pending	pending	pending	pending	agent/test-tranche/04-app-mixed-tests	.claude/worktrees/test-tranche/04-app-mixed-tests	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+05-testability-audit	pending	pending	pending	pending	agent/test-tranche/05-testability-audit	.claude/worktrees/test-tranche/05-testability-audit	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+99-finalize	pending	pending	pending	pending	agent/test-tranche/99-finalize	.claude/worktrees/test-tranche/99-finalize	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
