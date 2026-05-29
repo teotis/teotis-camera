@@ -1,7 +1,7 @@
 # Package Status: 04-cross-cutting-concerns
 
 ## State
-**Status**: launched
+**Status**: completed
 - **Launched**: pending
 - **Completed**: pending
 

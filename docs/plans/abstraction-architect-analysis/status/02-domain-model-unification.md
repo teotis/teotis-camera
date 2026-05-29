@@ -1,7 +1,7 @@
 # Package Status: 02-domain-model-unification
 
 ## State
-**Status**: launched
+**Status**: completed
 - **Launched**: pending
 - **Completed**: pending
 

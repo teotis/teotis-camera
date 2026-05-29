@@ -11,3 +11,8 @@
 {"ts":"2026-05-29T09:52:05Z","event":"state_changed","package_id":"04-cross-cutting-concerns","old_state":"pending","new_state":"launched"}
 {"ts":"2026-05-29T09:52:05Z","event":"launch_succeeded","package_id":"04-cross-cutting-concerns","session_id":"b34b524b","new_state":"launched","branch":"agent/abstraction-analysis/04-cross-cutting-concerns","worktree":""}
 {"ts":"2026-05-29T09:52:48Z","event":"scratch_path_requested","package_id":"04-cross-cutting-concerns","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/abstraction-architect-analysis/scratch/04-cross-cutting-concerns"}
+{"ts":"2026-05-29T09:53:20Z","event":"scratch_path_requested","package_id":"02-domain-model-unification","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/abstraction-architect-analysis/scratch/02-domain-model-unification"}
+{"ts":"2026-05-29T09:54:32Z","event":"scratch_path_requested","package_id":"03-session-kernel-invariants","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/abstraction-architect-analysis/scratch/03-session-kernel-invariants"}
+{"ts":"2026-05-29T09:58:05Z","event":"scratch_path_requested","package_id":"01-architecture-boundary-integrity","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/abstraction-architect-analysis/scratch/01-architecture-boundary-integrity"}
+{"ts":"2026-05-29T09:59:12Z","event":"state_changed","package_id":"02-domain-model-unification","old_state":"launched","new_state":"completed"}
+{"ts":"2026-05-29T09:59:35Z","event":"state_changed","package_id":"04-cross-cutting-concerns","old_state":"launched","new_state":"completed"}
