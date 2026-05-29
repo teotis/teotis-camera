@@ -1,0 +1,31 @@
+plan_path	status	archive_eligible	reason	risk
+./2026-05-26-agent-handoff-gradle-isolation-index.md	validated	conditional	Build-root override landed; full gates should be rerun	low
+./2026-05-25-document-v2-capture-metadata-status-repair.md	validated	conditional	CaptureRecordingSessionProcessorTest passes with profile, scan mode, crop status	low
+./2026-05-25-stage7-device-still-quality-test-repair.md	validated	conditional	DefaultDeviceShotRequestTranslatorTest passes; still-quality blocker no longer reproducible	low
+./2026-05-25-watermark-2-minimalist-text-polish.md	validated	conditional	pure-text is typography-only and hides frame-background controls	low
+./2026-05-25-watermark-2-reversible-productization.md	validated	conditional	OCWM reversible archive verification passed with byte-identical Python extraction	low
+./2026-05-25-document-batch-capture-integration.md	validated	conditional	Batch append parses profile, scan mode, document crop status	low
+./2026-05-25-color-lab-validation-blocker-followup-index.md	validated	conditional	Preview transform rendering, mask-source fail-soft, Humanistic UI regressions repaired	low
+./2026-05-25-color-lab-recipe-metadata-bridge-repair.md	validated	conditional	PerceptualColorRecipe reaches capture metadata via shared codec	low
+./2026-05-25-color-lab-postprocess-failsoft-test-repair.md	validated	conditional	App focused tests pass and throwing mask source covered by fail-soft regression	low
+./2026-05-25-color-lab-capture-save-regression.md	validated	conditional	Local postprocess/capture-feedback regressions pass; real-device smoke pending	medium
+./2026-05-25-document-v2-side-rail-completion.md	implemented	conditional	Side rail render model, layout, renderer, tests present; visual QA remains	medium
+./2026-05-25-watermark-2-professional-parameter-bottom-bar.md	implemented	conditional	Bottom parameter bar wired through settings, serializer, resolver, renderer; visual QA remains	medium
+./2026-05-25-document-batch-session-contracts.md	implemented	conditional	Session-owned document batch state and remove/reorder intents landed	low
+./2026-05-25-document-batch-side-rail-ui.md	implemented	conditional	Side rail render model, layout, renderer, tests present; visual QA remains	medium
+./2026-05-25-color-lab-real-device-followup-index.md	implemented	conditional	Local deterministic blockers repaired; final real-device save/visual QA pending	medium
+./2026-05-25-color-lab-preview-recipe-transform-repair.md	implemented	conditional	Preview adapter and app overlay consume recipe transform; real-device QA pending	medium
+./2026-05-25-color-lab-perceptual-strength-and-consistency.md	implemented	conditional	Recipe metadata and preview render path wired; real-device visual acceptance pending	medium
+./2026-05-25-rendering-2-0-approved-upgrade-index.md	accepted locally	conditional	Three sub-plans landed; real-device visual QA and product completion pending	medium
+./2026-05-25-rendering-2-0-capture-save-reliability.md	accepted locally	conditional	guardedPostProcess outer guard landed; real-device smoke pending	medium
+./2026-05-25-rendering-2-0-render-recipe-single-truth.md	accepted locally	conditional	RenderRecipe canonical fallback landed; real-device metadata verification pending	medium
+./2026-05-25-rendering-2-0-color-lab-perceptual-rendering.md	accepted locally	conditional	Approximate preview only; real-device visual QA pending	medium
+./2026-05-25-document-v2-repair-index.md	blocked	no	No visible organizer panel/renderer/view binding	n/a
+./2026-05-25-document-v2-organizer-ui-wiring.md	blocked	no	No visible organizer panel/renderer/view binding or move/remove UI dispatch	n/a
+./2026-05-25-ui-animation-v2-upgrade-index.md	blocked	no	Focused UI tests fail on mode directory/track humanistic order	n/a
+./2026-05-25-portrait-2-0-approved-upgrade-index.md	blocked	no	Blocking app-layer failures in mask-aware saved rendering	n/a
+./2026-05-25-portrait-2-0-landing-validation-blockers.md	blocked	no	Fix mask-aware output writeback, scene mask edge softness	n/a
+./2026-05-25-watermark-2-product-upgrade-index.md	blocked	no	core:effect test compilation and blur-four-border issues	n/a
+./2026-05-25-watermark-2-blur-four-border-polish.md	blocked	no	Direct persisted background actions still accept solid backgrounds	n/a
+./2026-05-25-document-mode-v2-continuous-capture-index.md	blocked	no	Organizer panel/action wiring not delivered	n/a
+./2026-05-25-document-batch-organize-acceptance.md	blocked	no	Visible organizer UI and action wiring not complete	n/a
