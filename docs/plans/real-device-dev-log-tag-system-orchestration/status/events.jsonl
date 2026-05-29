@@ -1,0 +1,3 @@
+{"ts":"2026-05-29T09:36:28Z","event":"launch_requested","package_id":"01-dev-log-tag-system","branch":"agent/dev-log-tag-system/01-dev-log-tag-system","worktree":"/Volumes/Extreme_SSD/project/open_camera/.worktrees/dev-log-tag-system/01-dev-log-tag-system","finalize":"0"}
+{"ts":"2026-05-29T09:36:29Z","event":"state_changed","package_id":"01-dev-log-tag-system","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T09:36:29Z","event":"launch_succeeded","package_id":"01-dev-log-tag-system","session_id":"424d9ccf","new_state":"launched","branch":"agent/dev-log-tag-system/01-dev-log-tag-system","worktree":"/Volumes/Extreme_SSD/project/open_camera/.worktrees/dev-log-tag-system/01-dev-log-tag-system"}

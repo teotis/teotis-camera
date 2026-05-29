@@ -2,9 +2,9 @@
 
 ## State
 
-`ready`
+`launched`
 
-**Status**: ready
+**Status**: launched
 
 ## Evidence
 
