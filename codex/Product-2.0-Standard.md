@@ -274,7 +274,7 @@ Then read the current status in `codex/documentation.md` and the latest relevant
 - `codex/documentation.md`: living project status and latest verified loops.
 - `codex/v2_ui/`: UI/interaction 2.0 design material.
 - `codex/capability_kernel_v2/`: capability kernel 2.0 architecture material.
-- `codex/V2-Readiness-Final-Local-Gate-Review.md`: latest local/text gate judgment.
+- `codex/archive/readiness/V2-Readiness-Final-Local-Gate-Review.md`: latest local/text gate judgment.
 - `V2-Readiness-Release-Gate-Report.md`: release gate report at repo root.
-- `codex/Fifth-Recording-Hard10-Multimodal-QA-Report.md`: real-device visual/product QA baseline.
+- `codex/archive/readiness/Fifth-Recording-Hard10-Multimodal-QA-Report.md`: real-device visual/product QA baseline.
 - `docs/plans/`: task packages and specialized audit plans.

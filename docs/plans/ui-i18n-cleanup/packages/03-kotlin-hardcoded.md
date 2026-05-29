@@ -1,86 +1,189 @@
-# Package 03-kotlin-hardcoded - Kotlin 源码硬编码英文清理
+# Package 03: App + Core 模块 i18n 清理
 
 ## Objective
-清理 Kotlin 源码中硬编码的英文用户可见字符串，改为使用字符串资源引用。
+清理 `app/` 和 `core/` 模块中所有硬编码的英文 UI 字符串，改为使用 `R.string.xxx` 资源引用或中文文本。
+
+## Prerequisites
+- Package 01-strings-xml 已完成（新增 string ID 可用）
+- Wave 2 启动条件: 01 状态为 `completed`
 
 ## Allowed Paths
-- `app/src/main/java/com/opencamera/app/MainActivity.kt`
+**App 模块**:
 - `app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt`
-- `app/src/main/java/com/opencamera/app/SessionCockpitRenderModel.kt`
-- `app/src/main/java/com/opencamera/app/i18n/AppTextResolver.kt` (如需添加新方法)
-- `app/src/main/res/values/strings.xml` (如需添加新字符串资源)
-- `app/src/main/res/values-en/strings.xml` (如需同步)
+- `app/src/main/java/com/opencamera/app/MainActivity.kt`
+- `app/src/main/java/com/opencamera/app/CockpitSurfaceRenderer.kt`
+
+**Core 模块**:
+- `core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt`
+- `core/media/src/main/kotlin/com/opencamera/core/media/MediaTypes.kt`
+- `core/media/src/main/kotlin/com/opencamera/core/media/LivePhotoContracts.kt`
 
 ## Forbidden Paths
-- 所有其他文件
+- `app/src/main/res/values/strings.xml`（只能读，不能改）
+- `feature/` 下的所有文件（Package 02 负责）
+- 所有 `*Test.kt` 文件
 
-## Tasks
+## Acceptance Criteria
+1. 所有枚举的显示标签不再使用英文硬编码
+2. MainActivity 中 3 类 Toast 消息使用 `R.string.toast_xxx` 引用
+3. CockpitSurfaceRenderer 中的 `contentDescription` 使用中文
+4. core 模块中的用户可见标签使用 `R.string.xxx` 引用或中文
+5. 功能行为不变——仅改变字符串，不改变逻辑
 
-### 1. 修复 MainActivity.kt 中的硬编码 Toast/text
-| Line | Current | Proposed Fix |
+## 具体修改清单
+
+### Part A: SessionUiRenderModel.kt
+文件: `app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt`
+
+#### A1. ModeLabel 枚举（行 168-171）
+当前使用英文 `.name` 或硬编码字符串作为 UI 标签。修改 `displayName()` 或等效方法，映射到 string 资源。
+
+| 枚举值 | 当前 | 目标 |
 |---|---|---|
-| 788 | `"Debug log exported: ${file.absolutePath}"` | 使用 `getString(R.string.dev_log_exported, file.absolutePath)` 并添加 `<string name="dev_log_exported">调试日志已导出: %s</string>` |
-| 791 | `"Export failed"` | 使用 `getString(R.string.dev_export_failed)` 并添加 `<string name="dev_export_failed">导出失败</string>` |
-| 801 | `"Cleanup failed"` | 使用 `getString(R.string.dev_cleanup_failed)` 并添加 `<string name="dev_cleanup_failed">清理失败</string>` |
-| 811 | `"Cleanup failed"` | 同上，复用 `R.string.dev_cleanup_failed` |
+| PHOTO | "Photo" | `R.string.mode_label_photo` |
+| HUMANISTIC | "Humanistic" | `R.string.mode_label_humanistic` |
+| PORTRAIT | "Portrait" | `R.string.mode_label_portrait` |
+| VIDEO | "Video" | `R.string.mode_label_video` |
 
-### 2. 修复 SessionUiRenderModel.kt 中的 FilterControl 枚举
-| Line | Enum Value | Current Display Name | Proposed Fix |
-|---|---|---|---|
-| 189 | SOFT_GLOW | `"Soft Glow"` | 通过 AppTextResolver 引用 `R.string.filter_ctrl_soft_glow` (已有中文"柔光") |
-| 196 | WARM_BOOST | `"Warm Boost"` | 引用 `R.string.filter_ctrl_warm_boost` (已有"暖色增强") |
-| 197 | COOL_BOOST | `"Cool Boost"` | 引用 `R.string.filter_ctrl_cool_boost` (已有"冷色增强") |
-| 198 | TEMPERATURE_SHIFT | `"Temp Shift"` | 引用 `R.string.filter_ctrl_temp_shift` (已有"色温偏移") |
-| 199 | TINT_SHIFT | `"Tint Shift"` | 引用 `R.string.filter_ctrl_tint_shift` (已有"色调偏移") |
+注意：还有其他 mode（如 DOCUMENT, SCENERY, FULL_CLEAR, PRO）——如果此枚举包含它们，也需一并处理。
 
-**注意**: 枚举构造函数中无法直接访问 Context，需要：
-- 方案 A: 在枚举中添加 `resId` 字段，显示时通过 Context 获取
-- 方案 B: 在 AppTextResolver 中添加 `filterControlDisplayName()` 方法
-- 方案 C: 将显示名称从枚举移出，在渲染时通过 AppTextResolver 获取
+#### A2. FilterControlKind 枚举（行 188-199）
+当前 `.name` 属性直接作为 UI 标签使用。这些与 `strings.xml` 中的 `filter_ctrl_*` 资源一一对应。
 
-### 3. 修复 SessionCockpitRenderModel.kt
-| Line | Current | Proposed Fix |
+| 枚举值 | 当前硬编码 | strings.xml Key |
 |---|---|---|
-| 743 | `"Zoom unavailable"` | 使用 AppTextResolver 的 `zoomUnavailable()` 方法 (已有中文"变焦不可用") |
+| EXPOSURE | "Exposure" | filter_ctrl_exposure |
+| SOFT_GLOW | "Soft Glow" | filter_ctrl_soft_glow |
+| HALO | "Halo" | filter_ctrl_halo |
+| GRAIN | "Grain" | filter_ctrl_grain |
+| SHARPNESS | "Sharpness" | filter_ctrl_sharpness |
+| VIGNETTE | "Vignette" | filter_ctrl_vignette |
+| HIGHLIGHTS | "Highlights" | filter_ctrl_highlights |
+| SHADOWS | "Shadows" | filter_ctrl_shadows |
+| WARM_BOOST | "Warm Boost" | filter_ctrl_warm_boost |
+| COOL_BOOST | "Cool Boost" | filter_ctrl_cool_boost |
+| TEMPERATURE_SHIFT | "Temp Shift" | filter_ctrl_temp_shift |
+| TINT_SHIFT | "Tint Shift" | filter_ctrl_tint_shift |
 
-### 4. 全面扫描
-```bash
-# 扫描所有 Kotlin 文件中的硬编码英文 UI 字符串
-grep -rn 'setText("' app/src/main/java/ --include="*.kt"
-grep -rn '\.text = "[A-Z]' app/src/main/java/ --include="*.kt"
-grep -rn 'Toast\.makeText.*"[A-Za-z]' app/src/main/java/ --include="*.kt"
-grep -rn '("[A-Z][a-z][a-z]* [A-Za-z]*")' app/src/main/java/ --include="*.kt" | grep -v 'import\|package\|Log\.\|TAG\|Exception\|class \|object '
-```
+#### A3. FilterAdvancedControl.Level 枚举（行 2046-2049）
+| 枚举值 | 当前 | 目标 |
+|---|---|---|
+| OFF | "Off" | `R.string.level_off` |
+| LOW | "Low" | `R.string.level_low` |
+| MEDIUM | "Medium" | `R.string.level_medium` |
+| HIGH | "High" | `R.string.level_high` |
+
+#### A4. 硬编码字符串 "Focus"（行 1000）
+`collect("Focus", capabilities.focusDistance)` — 将 "Focus" 改为 `R.string.label_focus`（已存在于 strings.xml）。
+
+#### 实现方式
+- 如果 SessionUiRenderModel 的函数可接受 Android Context 参数，使用 `context.getString(R.string.xxx)`
+- 如果无法传入 Context，在枚举上定义 `val labelResId: Int`，由 UI 渲染层负责 `getString()`
+- 参照现有的 `AppTextResolver` 模式（如果存在类似机制）
+- 如果以上都不可行，使用中文硬编码字符串作为最小可行修复
+
+### Part B: MainActivity.kt
+文件: `app/src/main/java/com/opencamera/app/MainActivity.kt`
+
+| 行号 | 当前 | 修改为 |
+|---|---|---|
+| 788 | `"Debug log exported: ${file.absolutePath}"` | `getString(R.string.toast_debug_log_exported, file.absolutePath)` |
+| 791 | `"Export failed"` | `getString(R.string.toast_export_failed)` |
+| 801 | `"Cleanup failed"` | `getString(R.string.toast_cleanup_failed)` |
+| 811 | `"Cleanup failed"` | `getString(R.string.toast_cleanup_failed)` |
+
+### Part C: CockpitSurfaceRenderer.kt
+文件: `app/src/main/java/com/opencamera/app/CockpitSurfaceRenderer.kt`
+
+| 行号 | 当前 | 修改为 |
+|---|---|---|
+| 103 | `"Zoom slider: ${model.disabledReason}"` | `"变焦滑块: ${model.disabledReason}"` 或新 string resource |
+| 105 | `"Zoom slider: ${String.format(java.util.Locale.US, "%.1fx", model.currentRatio)}"` | `"变焦滑块: ${String.format(java.util.Locale.US, "%.1fx", model.currentRatio)}"` |
+
+这些是 accessibility `contentDescription` 文本。如果在 Renderer 中无法访问 Android Context，直接用中文硬编码替换英文。
+
+### Part D: DeviceContracts.kt
+文件: `core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt`
+
+#### D1. LensType 标签（行 63-65）
+| 枚举值 | 当前 label | 目标 |
+|---|---|---|
+| WIDE | "Wide" | `R.string.lens_wide` 或 `"广角"` |
+| TELEPHOTO | "Telephoto" | `R.string.lens_telephoto` 或 `"长焦"` |
+| PERISCOPE | "Periscope" | `R.string.lens_periscope` 或 `"潜望"` |
+
+#### D2. ZoomControlKind 标签（行 382-390）
+| 值 | 当前 | 目标 |
+|---|---|---|
+| UNSUPPORTED | "Unsupported" | `R.string.label_zoom_unsupported` 或 `"不支持"` |
+| PRESET_STEPS | "Preset steps" | `R.string.label_zoom_preset_steps` 或 `"预设步进"` |
+| CONTINUOUS | "Continuous" | `R.string.label_zoom_continuous` 或 `"连续"` |
+
+#### D3. DeviceRuntimeIssueKind 的 label 属性（行 593-600）
+| 当前 | 目标 |
+|---|---|
+| "Bind failure" | `R.string.issue_bind_failure` |
+| "Preview stalled" | `R.string.issue_preview_stall` |
+| "Provider failure" | `R.string.issue_provider_failure` |
+| "Camera recoverable error" | `R.string.issue_camera_recoverable` |
+| "Camera fatal error" | `R.string.issue_camera_fatal` |
+| "Camera unavailable" | `R.string.issue_camera_unavailable` |
+| "Thermal critical" | `R.string.issue_thermal_critical` |
+| "Runtime error" | `R.string.issue_runtime_error` |
+
+### Part E: MediaTypes.kt
+文件: `core/media/src/main/kotlin/com/opencamera/core/media/MediaTypes.kt`
+
+| 行号 | 当前 label | 目标 |
+|---|---|---|
+| 36 | "Fast" | `R.string.button_still_fast`（已存在）或 `"快速"` |
+| 40 | "Max" | `R.string.button_still_max`（已存在）或 `"最高"` |
+
+### Part F: LivePhotoContracts.kt
+文件: `core/media/src/main/kotlin/com/opencamera/core/media/LivePhotoContracts.kt`
+
+| 行号 | 当前 label | 目标 |
+|---|---|---|
+| 16 | "Still Only" | `R.string.live_photo_still_only` 或 `"仅静态"` |
+| 17 | "Motion Metadata Only" | `R.string.live_photo_motion_metadata_only` 或 `"仅动态元数据"` |
+| 18 | "Motion Burned In" | `R.string.live_photo_motion_burned_in` 或 `"动态嵌入"` |
+| 19 | "Unsupported" | `R.string.live_photo_unsupported` 或 `"不支持"` |
+| 69 | "Watermark: Still Only" | `R.string.watermark_still_only` 或 `"水印: 仅静态"` |
+| 70 | "Watermark: Metadata Only" | `R.string.watermark_metadata_only` 或 `"水印: 仅元数据"` |
+| 71 | "Watermark: Burned In" | `R.string.watermark_burned_in` 或 `"水印: 动态嵌入"` |
+| 72 | "Watermark: Unsupported" | `R.string.watermark_unsupported` 或 `"水印: 不支持"` |
 
 ## Verification Commands
 ```bash
-# 确认无硬编码英文 Toast
-grep -rn 'Toast\.makeText.*"[A-Za-z]' app/src/main/java/ --include="*.kt"
-# 应无输出
+# 1. app 模块中不再有硬编码英文 UI 字符串
+grep -rn '"[A-Z][a-z].*[a-z]{2,}' app/src/main/java --include="*.kt" \
+  | grep -v '//' | grep -v 'TAG =' | grep -v 'import' | grep -v 'package' \
+  | grep -v 'Log\.' | grep -v 'require\|check\|error\|assert\|TODO' \
+  | grep -v 'BuildConfig' | grep -v '\.put(' | grep -v '\.add(' \
+  | grep -v '/test/' \
+  || echo "PASS: no hardcoded English in app module"
 
-# 确认无硬编码英文 text 赋值
-grep -rn '\.text = "[A-Z][a-z]' app/src/main/java/ --include="*.kt"
-# 应无输出
+# 2. core 模块中不再有硬编码英文显示标签
+grep -rn 'label = "[A-Z]' core/device/src --include="*.kt" core/media/src --include="*.kt" \
+  | grep -v test \
+  || echo "PASS: no hardcoded English labels in core modules"
 
-# 构建验证
-./gradlew assembleDebug
+# 3. 检查特定枚举的显示名称
+grep -rn '"[A-Z][a-z].*[a-z]{2,}"' core/device/src/main/kotlin --include="*.kt" \
+  | grep -v '//' | grep -v 'TAG =' | grep -v 'import' | grep -v 'package' \
+  | grep -v 'Log\.' | grep -v 'require\|check\|error\|assert' \
+  | grep -v '/test/' \
+  || echo "PASS: no hardcoded English strings in core device module"
 ```
 
-## Acceptance Criteria
-- MainActivity.kt 中无硬编码英文 Toast 或 text 赋值
-- SessionUiRenderModel.kt 中 FilterControl 枚举的显示名称通过字符串资源获取
-- SessionCockpitRenderModel.kt 中无硬编码英文
-- 应用编译通过
-- 如添加新字符串资源，values/ 和 values-en/ 同步更新
+## Core 模块特殊说明
+Core 模块是纯 Kotlin 库，可能不直接依赖 Android `R` 类。处理方式的优先级：
+1. 如果 core 模块有 `label` 属性用于 UI 显示，确保它最终通过 Context.getString() 解析
+2. 如果 core 模块不能依赖 Android 资源，在 data class 中使用 `@StringRes Int` 类型存储资源 ID
+3. 如果以上都不可行，将中文文本作为 display label 直接硬编码（比英文更合适当前中文语境）
+4. 检查 core 模块的 `build.gradle.kts` 是否已经有 Android resource 依赖
 
-## Expected Evidence
-- git diff 显示所有文件修改
-- 构建日志确认编译成功
-- grep 扫描确认无残留
-
-## Branch/Worktree Policy
-- Branch: `agent/ui-i18n-cleanup/03-kotlin-hardcoded`
-- Worktree: `.claude/worktrees/03-kotlin-hardcoded`
-
-## Unlock Condition
-- None (wave 1, no dependencies)
+## Notes
+- `SessionUiRenderModel.kt` 的 `debugDump` 字符串（行 320-352）是开发者控制台文本，非最终用户 UI，可以保留英文或改为中文——根据现有 panel 中其他字符串的语言一致性决定
+- `SessionCockpitRenderModel.kt` 的 `debugDump` 同样处理
+- "Focus" 字符串在 `collect("Focus", ...)` 调用中——检查此处的 API 使用模式后替换

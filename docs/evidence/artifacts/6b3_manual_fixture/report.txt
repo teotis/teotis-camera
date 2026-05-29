@@ -1,6 +1,6 @@
 source=/Volumes/Extreme SSD/好图/Gj7c0RnXwAEBSS3.jpg
 source_size=1229x2048
-classic_overlay=/Volumes/Extreme_SSD/project/open_camera/codex/artifacts/6b3_manual_fixture/classic_overlay_preview.jpg
+classic_overlay=/Volumes/Extreme_SSD/project/open_camera/docs/evidence/artifacts/6b3_manual_fixture/classic_overlay_preview.jpg
 classic_overlay_size=1229x2048
 travel_polaroid=/Volumes/Extreme_SSD/project/open_camera/codex/artifacts/6b3_manual_fixture/travel_polaroid_preview.jpg
 travel_polaroid_size=1297x2404

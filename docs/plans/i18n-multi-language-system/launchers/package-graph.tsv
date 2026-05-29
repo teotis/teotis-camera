@@ -1,0 +1,5 @@
+package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
+01-i18n-core-infrastructure	packages/01-i18n-core-infrastructure.md	status/01-i18n-core-infrastructure.md		status	1	agent/i18n/01-i18n-core-infrastructure		0	0
+02-translation-audit-completeness	packages/02-translation-audit-completeness.md	status/02-translation-audit-completeness.md		status	1	agent/i18n/02-translation-audit-completeness		0	0
+03-i18n-developer-workflow	packages/03-i18n-developer-workflow.md	status/03-i18n-developer-workflow.md	01-i18n-core-infrastructure,02-translation-audit-completeness	status	2	agent/i18n/03-i18n-developer-workflow		0	0
+99-finalize	packages/99-finalize.md	status/99-finalize.md	01-i18n-core-infrastructure,02-translation-audit-completeness,03-i18n-developer-workflow	status+code	final	agent/i18n/99-finalize		0	1

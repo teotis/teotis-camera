@@ -2,7 +2,7 @@
 
 Reusable high-quality source images for visual checks, prototype scripts, effect tuning, and manual QA comparisons.
 
-These files are not Android runtime resources. Keep them under `codex/visual_checks/` so tests and local review scripts can reference stable repo paths without shipping them in the app.
+These files are not Android runtime resources. Keep them under `docs/evidence/visual_checks/` so tests and local review scripts can reference stable repo paths without shipping them in the app.
 
 ## Files
 
