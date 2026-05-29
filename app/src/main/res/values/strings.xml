@@ -194,6 +194,10 @@
     <string name="level_magenta_plus">洋红+</string>
     <string name="level_green">绿</string>
     <string name="level_green_plus">绿+</string>
+    <string name="level_off">关</string>
+    <string name="level_low">低</string>
+    <string name="level_medium">中</string>
+    <string name="level_high">高</string>
     <string name="status_current_default">当前默认</string>
     <string name="status_selected_default">已选默认</string>
     <string name="status_renderer_pending">渲染器待定</string>
@@ -237,6 +241,9 @@
     <string name="format_next_look">下一个%s风格</string>
     <string name="lens_back">后置</string>
     <string name="lens_front">前置</string>
+    <string name="lens_wide">广角</string>
+    <string name="lens_telephoto">长焦</string>
+    <string name="lens_periscope">潜望</string>
     <string name="label_placement">位置</string>
     <string name="label_scale">大小</string>
     <string name="label_opacity">透明度</string>
@@ -282,7 +289,67 @@
     <string name="settings_blocked_by_capture">拍摄进行中，无法更改设置</string>
     <string name="settings_not_loaded">设置尚未加载</string>
     <string name="settings_action_unsupported">当前模式不支持此操作</string>
-    <string name="format_color_tone">Color: %.2f, Tone: %.2f</string>
+    <string name="format_color_tone">颜色: %.2f, 色调: %.2f</string>
+    <string name="status_document_pipeline_ready">文档管线就绪</string>
+    <string name="status_document_mode_inactive">文档模式未激活</string>
+    <string name="status_document_capture_requested">文档拍摄已请求</string>
+    <string name="status_document_scan_in_progress">文档扫描进行中</string>
+    <string name="status_document_saved">文档已保存</string>
+    <string name="status_document_capture_failed">文档拍摄失败</string>
+    <string name="status_humanistic_pipeline_ready">人文管线就绪</string>
+    <string name="status_humanistic_mode_active">人文模式已激活</string>
+    <string name="status_humanistic_mode_inactive">人文模式未激活</string>
+    <string name="status_humanistic_resolution_updated">人文分辨率已更新</string>
+    <string name="status_humanistic_style_updated">人文风格已更新</string>
+    <string name="status_humanistic_capture_in_progress">人文拍摄进行中</string>
+    <string name="status_humanistic_photo_saved">人文照片已保存</string>
+    <string name="status_scenery_pipeline_ready">风景管线就绪</string>
+    <string name="status_scenery_mode_inactive">风景模式未激活</string>
+    <string name="status_photo_pipeline_ready">拍照管线就绪</string>
+    <string name="status_photo_mode_active">拍照模式已激活</string>
+    <string name="status_photo_mode_inactive">拍照模式未激活</string>
+    <string name="status_photo_resolution_updated">拍照分辨率已更新</string>
+    <string name="status_photo_quality_updated">拍照画质已更新</string>
+    <string name="status_flash_mode_updated">闪光灯模式已更新</string>
+    <string name="status_portrait_pipeline_ready">人像管线就绪</string>
+    <string name="status_portrait_mode_inactive">人像模式未激活</string>
+    <string name="status_pro_pipeline_ready">专业管线就绪</string>
+    <string name="status_pro_mode_inactive">专业模式未激活</string>
+    <string name="status_pro_capture_requested">专业拍摄已请求</string>
+    <string name="status_video_pipeline_ready">视频管线就绪</string>
+    <string name="status_video_mode_active">视频模式已激活</string>
+    <string name="status_video_mode_inactive">视频模式未激活</string>
+    <string name="status_recording_in_progress">录制进行中</string>
+    <string name="status_recording_requested">录制已请求</string>
+    <string name="status_recording_failed">录制失败</string>
+    <string name="status_fullclear_mode_active">全清模式已激活</string>
+    <string name="mode_label_document">文档</string>
+    <string name="mode_label_humanistic">人文</string>
+    <string name="mode_label_scenery">风景</string>
+    <string name="mode_label_photo">拍照</string>
+    <string name="mode_label_portrait">人像</string>
+    <string name="mode_label_pro">专业</string>
+    <string name="mode_label_fullclear">全清</string>
+    <string name="mode_label_video">视频</string>
+    <string name="shutter_label_scan_document">扫描文档</string>
+    <string name="shutter_label_capture_humanistic">拍摄人文</string>
+    <string name="shutter_label_capture_scenery">拍摄风景</string>
+    <string name="shutter_label_capture_still">拍摄静态</string>
+    <string name="shutter_label_capture_portrait">拍摄人像</string>
+    <string name="shutter_label_capture_pro">专业拍摄</string>
+    <string name="shutter_label_capture_fullclear">拍摄</string>
+    <string name="secondary_action_cycle_scan_style">切换扫描风格</string>
+    <string name="secondary_action_cycle_humanistic_style">切换人文风格</string>
+    <string name="secondary_action_cycle_scenery_style">切换风景风格</string>
+    <string name="secondary_action_cycle_portrait_style">切换人像风格</string>
+    <string name="secondary_action_cycle_preset">切换预设</string>
+    <string name="detail_humanistic_inactive">切换回人文模式以继续街拍生活摄影。</string>
+    <string name="detail_photo_inactive">切换回拍照以继续静态拍摄。</string>
+    <string name="detail_video_inactive">将录制决策交由 Session Kernel 处理。</string>
+    <string name="detail_fullclear_pipeline_ready">全清拍摄管线就绪。</string>
+    <string name="detail_humanistic_capture_progress">街拍静态请求已被统一拍摄管线接受。</string>
+    <string name="detail_recording_requested">等待 Session Kernel 启动 %s 录制任务。</string>
+    <string name="detail_video_saved">视频已保存</string>
     <string name="watermark_detail_editing_enabled">模板专属样式即时保存，并保持与此水印预设关联。</string>
     <string name="watermark_detail_editing_disabled">完成当前拍摄后才可以更改水印样式。</string>
     <string name="lens_lab_editing_enabled">更改即时保存并刷新当前模式默认值。</string>
@@ -416,6 +483,22 @@
     <string name="filter_profile_portrait_original">原色人像</string>
     <string name="filter_profile_portrait_chasing_light">追光人像</string>
     <string name="filter_profile_portrait_rich">浓郁人像</string>
+    <string name="filter_profile_receipt">收据</string>
+    <string name="filter_profile_whiteboard">白板</string>
+    <string name="filter_profile_contract">合同</string>
+    <string name="filter_profile_archive">归档</string>
+    <string name="filter_profile_color_copy">彩色复印</string>
+    <string name="filter_profile_handheld">手持</string>
+    <string name="filter_profile_tripod">三脚架</string>
+    <string name="filter_profile_balanced">平衡</string>
+    <string name="filter_profile_warm">暖色</string>
+    <string name="filter_profile_neutral">中性</string>
+    <string name="filter_profile_night">夜景</string>
+    <string name="filter_profile_contrast">对比</string>
+    <string name="filter_profile_low_light">弱光</string>
+    <string name="contrast_label_high">高</string>
+    <string name="contrast_label_balanced">平衡</string>
+    <string name="contrast_label_natural">自然</string>
 
     <!-- Portrait lab -->
     <string name="portrait_lab_supporting">人像产品调节位于设置下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。</string>
@@ -441,4 +524,32 @@
     <string name="button_document_batch_organizer_close">关闭</string>
     <string name="button_reset_defaults">重置为默认</string>
     <string name="status_processing_photo_keep_open">照片处理中，请勿退出 OpenCamera。</string>
+
+    <!-- Live photo save format -->
+    <string name="label_zoom_preset_steps">预设步进</string>
+    <string name="label_zoom_continuous">连续</string>
+    <string name="label_zoom_unsupported">不支持</string>
+    <string name="live_photo_still_only">仅静态</string>
+    <string name="live_photo_motion_metadata_only">仅动态元数据</string>
+    <string name="live_photo_motion_burned_in">动态嵌入</string>
+    <string name="live_photo_unsupported">不支持</string>
+    <string name="watermark_still_only">水印: 仅静态</string>
+    <string name="watermark_metadata_only">水印: 仅元数据</string>
+    <string name="watermark_burned_in">水印: 动态嵌入</string>
+    <string name="watermark_unsupported">水印: 不支持</string>
+
+    <!-- Toast/debug messages -->
+    <string name="toast_debug_log_exported">调试日志已导出: %s</string>
+    <string name="toast_export_failed">导出失败</string>
+    <string name="toast_cleanup_failed">清理失败</string>
+
+    <!-- Runtime issue labels -->
+    <string name="issue_bind_failure">绑定失败</string>
+    <string name="issue_preview_stall">预览停滞</string>
+    <string name="issue_provider_failure">提供者故障</string>
+    <string name="issue_camera_recoverable">相机可恢复错误</string>
+    <string name="issue_camera_fatal">相机致命错误</string>
+    <string name="issue_camera_unavailable">相机不可用</string>
+    <string name="issue_thermal_critical">严重过热</string>
+    <string name="issue_runtime_error">运行时错误</string>
 </resources>

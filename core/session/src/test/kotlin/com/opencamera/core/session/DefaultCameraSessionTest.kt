@@ -5260,6 +5260,67 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `CaptureCommitted re-arms ordinary still capture for next shutter press`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot1 = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot1))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot1.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+
+        assertNull(
+            session.state.value.activeShot,
+            "ordinary still capture should be truly re-armed at CaptureCommitted"
+        )
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+
+        val shot2 = assertNotNull(session.state.value.activeShot)
+        assertTrue(shot2.shotId != shot1.shotId)
+        assertEquals(CaptureStatus.REQUESTED, session.state.value.captureStatus)
+    }
+
+    @Test
+    fun `DataReceived sets capture readiness fallback when Camera2 committed callback is absent`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
+        runCurrent()
+
+        val readiness = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(shot.shotId, readiness.shotId)
+        assertEquals("DeviceEvent.DataReceived", readiness.source)
+        assertNull(session.state.value.activeShot)
+    }
+
+    @Test
     fun `CaptureCommitted does not set readiness for multi-frame capture`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace, this)
@@ -5460,7 +5521,7 @@ class DefaultCameraSessionTest {
         val readiness1 = assertNotNull(session.state.value.presentation.captureReadiness)
         assertEquals(450L, readiness1.elapsedTimestampMs)
 
-        // Second CaptureCommitted for same shot: readiness value is idempotently overwritten
+        // Second CaptureCommitted for same shot: readiness remains the first handled value.
         session.dispatch(
             SessionIntent.CaptureCommitted(
                 shotId = shot.shotId,
@@ -5471,9 +5532,9 @@ class DefaultCameraSessionTest {
         )
         runCurrent()
         assertEquals(
-            500L,
+            450L,
             session.state.value.presentation.captureReadiness?.elapsedTimestampMs,
-            "Readiness is idempotently updated to latest value"
+            "Readiness should be handled once for the committed shot"
         )
     }
 

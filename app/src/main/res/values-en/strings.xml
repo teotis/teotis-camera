@@ -126,6 +126,8 @@
     <string name="label_portrait_lab">Portrait</string>
     <string name="label_watermark_lab">Watermark</string>
     <string name="label_live_photo_default">Live photo default</string>
+    <string name="label_live_save_format">Live save format</string>
+    <string name="format_live_save_format_support">%d formats: Motion Photo, MP4 copy, JPEG only</string>
     <string name="label_countdown">Countdown</string>
     <string name="label_resolution">Resolution</string>
     <string name="label_frame_rate">Frame rate</string>
@@ -190,6 +192,10 @@
     <string name="level_magenta_plus">Magenta+</string>
     <string name="level_green">Green</string>
     <string name="level_green_plus">Green+</string>
+    <string name="level_off">Off</string>
+    <string name="level_low">Low</string>
+    <string name="level_medium">Medium</string>
+    <string name="level_high">High</string>
     <string name="status_current_default">Current default</string>
     <string name="status_selected_default">Selected default</string>
     <string name="status_renderer_pending">Renderer pending</string>
@@ -233,6 +239,9 @@
     <string name="format_next_look">Next %s look</string>
     <string name="lens_back">Back</string>
     <string name="lens_front">Front</string>
+    <string name="lens_wide">Wide</string>
+    <string name="lens_telephoto">Telephoto</string>
+    <string name="lens_periscope">Periscope</string>
     <string name="label_placement">Placement</string>
     <string name="label_scale">Scale</string>
     <string name="label_opacity">Opacity</string>
@@ -279,6 +288,66 @@
     <string name="settings_not_loaded">Settings not loaded yet</string>
     <string name="settings_action_unsupported">Action not supported in current mode</string>
     <string name="format_color_tone">Color: %.2f, Tone: %.2f</string>
+    <string name="status_document_pipeline_ready">Document pipeline ready</string>
+    <string name="status_document_mode_inactive">Document mode inactive</string>
+    <string name="status_document_capture_requested">Document capture requested</string>
+    <string name="status_document_scan_in_progress">Document scan in progress</string>
+    <string name="status_document_saved">Document saved</string>
+    <string name="status_document_capture_failed">Document capture failed</string>
+    <string name="status_humanistic_pipeline_ready">Humanistic pipeline ready</string>
+    <string name="status_humanistic_mode_active">Humanistic mode active</string>
+    <string name="status_humanistic_mode_inactive">Humanistic mode inactive</string>
+    <string name="status_humanistic_resolution_updated">Humanistic resolution updated</string>
+    <string name="status_humanistic_style_updated">Humanistic style updated</string>
+    <string name="status_humanistic_capture_in_progress">Humanistic capture in progress</string>
+    <string name="status_humanistic_photo_saved">Humanistic photo saved</string>
+    <string name="status_scenery_pipeline_ready">Scenery pipeline ready</string>
+    <string name="status_scenery_mode_inactive">Scenery mode inactive</string>
+    <string name="status_photo_pipeline_ready">Photo pipeline ready</string>
+    <string name="status_photo_mode_active">Photo mode active</string>
+    <string name="status_photo_mode_inactive">Photo mode inactive</string>
+    <string name="status_photo_resolution_updated">Photo resolution updated</string>
+    <string name="status_photo_quality_updated">Photo quality updated</string>
+    <string name="status_flash_mode_updated">Flash mode updated</string>
+    <string name="status_portrait_pipeline_ready">Portrait pipeline ready</string>
+    <string name="status_portrait_mode_inactive">Portrait mode inactive</string>
+    <string name="status_pro_pipeline_ready">Pro pipeline ready</string>
+    <string name="status_pro_mode_inactive">Pro mode inactive</string>
+    <string name="status_pro_capture_requested">Pro capture requested</string>
+    <string name="status_video_pipeline_ready">Video pipeline ready</string>
+    <string name="status_video_mode_active">Video mode active</string>
+    <string name="status_video_mode_inactive">Video mode inactive</string>
+    <string name="status_recording_in_progress">Recording in progress</string>
+    <string name="status_recording_requested">Recording requested</string>
+    <string name="status_recording_failed">Recording failed</string>
+    <string name="status_fullclear_mode_active">Full Clear mode active</string>
+    <string name="mode_label_document">Document</string>
+    <string name="mode_label_humanistic">Humanistic</string>
+    <string name="mode_label_scenery">Scenery</string>
+    <string name="mode_label_photo">Photo</string>
+    <string name="mode_label_portrait">Portrait</string>
+    <string name="mode_label_pro">Pro</string>
+    <string name="mode_label_fullclear">Full Clear</string>
+    <string name="mode_label_video">Video</string>
+    <string name="shutter_label_scan_document">Scan Document</string>
+    <string name="shutter_label_capture_humanistic">Capture Humanistic</string>
+    <string name="shutter_label_capture_scenery">Capture Scenery</string>
+    <string name="shutter_label_capture_still">Capture Still</string>
+    <string name="shutter_label_capture_portrait">Capture Portrait</string>
+    <string name="shutter_label_capture_pro">Capture Pro Still</string>
+    <string name="shutter_label_capture_fullclear">Capture</string>
+    <string name="secondary_action_cycle_scan_style">Cycle Scan Style</string>
+    <string name="secondary_action_cycle_humanistic_style">Cycle Humanistic Style</string>
+    <string name="secondary_action_cycle_scenery_style">Cycle Scenery Style</string>
+    <string name="secondary_action_cycle_portrait_style">Cycle Portrait Style</string>
+    <string name="secondary_action_cycle_preset">Cycle Preset</string>
+    <string name="detail_humanistic_inactive">Switch back to Humanistic to resume street-life capture.</string>
+    <string name="detail_photo_inactive">Switch back to photo to resume still capture.</string>
+    <string name="detail_video_inactive">Leave recording decisions to the Session Kernel.</string>
+    <string name="detail_fullclear_pipeline_ready">Full clear capture pipeline ready.</string>
+    <string name="detail_humanistic_capture_progress">Street-life still request accepted by the unified shot pipeline.</string>
+    <string name="detail_recording_requested">Waiting for Session Kernel to start the %s recording task.</string>
+    <string name="detail_video_saved">Video saved</string>
     <string name="watermark_detail_editing_enabled">Template-specific styles save instantly and stay attached to this watermark preset.</string>
     <string name="watermark_detail_editing_disabled">Finish the current capture before changing watermark styles.</string>
     <string name="lens_lab_editing_enabled">Changes save instantly and refresh the active mode defaults.</string>
@@ -416,6 +485,22 @@
     <string name="filter_profile_portrait_original">Portrait Original</string>
     <string name="filter_profile_portrait_chasing_light">Portrait Chasing Light</string>
     <string name="filter_profile_portrait_rich">Portrait Rich</string>
+    <string name="filter_profile_receipt">Receipt</string>
+    <string name="filter_profile_whiteboard">Whiteboard</string>
+    <string name="filter_profile_contract">Contract</string>
+    <string name="filter_profile_archive">Archive</string>
+    <string name="filter_profile_color_copy">Color Copy</string>
+    <string name="filter_profile_handheld">Handheld</string>
+    <string name="filter_profile_tripod">Tripod</string>
+    <string name="filter_profile_balanced">Balanced</string>
+    <string name="filter_profile_warm">Warm</string>
+    <string name="filter_profile_neutral">Neutral</string>
+    <string name="filter_profile_night">Night</string>
+    <string name="filter_profile_contrast">Contrast</string>
+    <string name="filter_profile_low_light">Low Light</string>
+    <string name="contrast_label_high">High</string>
+    <string name="contrast_label_balanced">Balanced</string>
+    <string name="contrast_label_natural">Natural</string>
 
     <!-- Portrait lab -->
     <string name="portrait_lab_supporting">Portrait product controls sit one level below Settings. Use this page to adjust the saved portrait profile, beauty behavior, and bokeh effect without changing the active portrait filter roster.</string>
@@ -427,4 +512,48 @@
     <string name="pro_controls_supporting_editable">Upper-layer manual draft is currently editable; each control indicates its status: Applied, Saved-only, or Temporarily unsupported.</string>
     <string name="pro_controls_supporting_readonly">Draft changes allowed, but this device currently holds all controls in saved-only or temporarily-unsupported state.</string>
     <string name="pro_controls_finish_capture_hint">Finish the current capture before editing.</string>
+
+    <!-- Document batch organizer -->
+    <string name="document_batch_organizer_title">Organize Batch</string>
+    <string name="document_batch_page_count">%d pages</string>
+    <string name="document_batch_remove">Remove from batch</string>
+    <string name="document_batch_move_up">Move up</string>
+    <string name="document_batch_move_down">Move down</string>
+    <string name="document_batch_crop_applied">Cropped</string>
+    <string name="document_batch_crop_skipped">Not cropped</string>
+    <string name="document_batch_crop_failed">Crop failed</string>
+    <string name="document_batch_rail_page_description">Page %d</string>
+    <string name="button_document_batch_organizer_close">Close</string>
+    <string name="button_reset_defaults">Reset to defaults</string>
+    <string name="status_processing_photo_keep_open">Processing photo, do not exit OpenCamera.</string>
+
+    <!-- Zoom labels -->
+    <string name="label_zoom_preset_steps">Preset steps</string>
+    <string name="label_zoom_continuous">Continuous</string>
+    <string name="label_zoom_unsupported">Unsupported</string>
+
+    <!-- Live photo / watermark labels -->
+    <string name="live_photo_still_only">Still Only</string>
+    <string name="live_photo_motion_metadata_only">Motion Metadata Only</string>
+    <string name="live_photo_motion_burned_in">Motion Burned In</string>
+    <string name="live_photo_unsupported">Unsupported</string>
+    <string name="watermark_still_only">Watermark: Still Only</string>
+    <string name="watermark_metadata_only">Watermark: Metadata Only</string>
+    <string name="watermark_burned_in">Watermark: Burned In</string>
+    <string name="watermark_unsupported">Watermark: Unsupported</string>
+
+    <!-- Toast/debug messages -->
+    <string name="toast_debug_log_exported">Debug log exported: %s</string>
+    <string name="toast_export_failed">Export failed</string>
+    <string name="toast_cleanup_failed">Cleanup failed</string>
+
+    <!-- Runtime issue labels -->
+    <string name="issue_bind_failure">Bind failure</string>
+    <string name="issue_preview_stall">Preview stalled</string>
+    <string name="issue_provider_failure">Provider failure</string>
+    <string name="issue_camera_recoverable">Camera recoverable error</string>
+    <string name="issue_camera_fatal">Camera fatal error</string>
+    <string name="issue_camera_unavailable">Camera unavailable</string>
+    <string name="issue_thermal_critical">Thermal critical</string>
+    <string name="issue_runtime_error">Runtime error</string>
 </resources>

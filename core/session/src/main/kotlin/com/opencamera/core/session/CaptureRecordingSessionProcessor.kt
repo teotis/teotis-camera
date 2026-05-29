@@ -326,6 +326,13 @@ internal class CaptureRecordingSessionProcessor(
                     captureStatus = CaptureStatus.DATA_RECEIVED,
                     activeShot = null,
                     presentation = s.presentation.copy(
+                        captureReadiness = s.presentation.captureReadiness
+                            ?: com.opencamera.core.device.CaptureReadiness(
+                                shotId = shotId,
+                                mediaType = mediaType,
+                                source = "DeviceEvent.DataReceived",
+                                elapsedTimestampMs = null
+                            ),
                         pendingPostprocess = PendingPostprocessUiState(
                             shotId = shotId,
                             mediaType = mediaType,
@@ -374,12 +381,19 @@ internal class CaptureRecordingSessionProcessor(
             if (activeShot.shotId != shotId || mediaType != MediaType.PHOTO) return@update s
             if (canSignalReadinessOnCaptureCommitted(activeShot)) {
                 s.copy(
+                    activeShot = null,
                     presentation = s.presentation.copy(
                         captureReadiness = com.opencamera.core.device.CaptureReadiness(
                             shotId = shotId,
                             mediaType = mediaType,
                             source = source,
                             elapsedTimestampMs = elapsedTimestampMs
+                        ),
+                        pendingPostprocess = PendingPostprocessUiState(
+                            shotId = shotId,
+                            mediaType = mediaType,
+                            message = "",
+                            warnBeforeExit = true
                         )
                     )
                 )

@@ -1,7 +1,7 @@
 # 01-strings-xml Status
 
 ## State
-`invalid`
+`launched`
 
 ## Evidence
 - **Worktree**: `.claude/worktrees/01-strings-xml`
