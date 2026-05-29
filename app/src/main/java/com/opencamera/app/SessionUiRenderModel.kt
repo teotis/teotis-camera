@@ -167,10 +167,10 @@ internal data class PortraitLabPageRenderModel(
 internal enum class FilterLabFamily(
     val label: String
 ) {
-    PHOTO("Photo"),
-    HUMANISTIC("Humanistic"),
-    PORTRAIT("Portrait"),
-    VIDEO("Video")
+    PHOTO("照片"),
+    HUMANISTIC("人文"),
+    PORTRAIT("人像"),
+    VIDEO("视频")
 }
 
 internal data class FilterLabTabRenderModel(
@@ -187,18 +187,18 @@ internal enum class FilterAdjustmentMode {
 internal enum class FilterAdvancedControl(
     val label: String
 ) {
-    EXPOSURE("Exposure"),
-    SOFT_GLOW("Soft Glow"),
-    HALO("Halo"),
-    GRAIN("Grain"),
-    SHARPNESS("Sharpness"),
-    VIGNETTE("Vignette"),
-    HIGHLIGHTS("Highlights"),
-    SHADOWS("Shadows"),
-    WARM_BOOST("Warm Boost"),
-    COOL_BOOST("Cool Boost"),
-    TEMPERATURE_SHIFT("Temp Shift"),
-    TINT_SHIFT("Tint Shift")
+    EXPOSURE("曝光"),
+    SOFT_GLOW("柔光"),
+    HALO("光晕"),
+    GRAIN("颗粒"),
+    SHARPNESS("锐度"),
+    VIGNETTE("暗角"),
+    HIGHLIGHTS("高光"),
+    SHADOWS("阴影"),
+    WARM_BOOST("暖色增强"),
+    COOL_BOOST("冷色增强"),
+    TEMPERATURE_SHIFT("色温偏移"),
+    TINT_SHIFT("色调偏移")
 }
 
 internal data class FilterLabFilterItemRenderModel(
@@ -999,7 +999,7 @@ private fun manualSupportSummary(
     collect("ISO", capabilities.iso)
     collect("S", capabilities.shutter)
     collect("EV", capabilities.exposureCompensation)
-    collect("Focus", capabilities.focusDistance)
+    collect(text.focusLabel(), capabilities.focusDistance)
     collect("A", capabilities.aperture)
     collect("WB", capabilities.whiteBalance)
 
@@ -2066,10 +2066,10 @@ private enum class FilterAdjustmentLevel(
     val floatValue: Float,
     val brightnessValue: Int
 ) {
-    OFF("Off", 0f, 0),
-    LOW("Low", 0.10f, 6),
-    MEDIUM("Medium", 0.20f, 12),
-    HIGH("High", 0.30f, 18)
+    OFF("关", 0f, 0),
+    LOW("低", 0.10f, 6),
+    MEDIUM("中", 0.20f, 12),
+    HIGH("高", 0.30f, 18)
 }
 
 private fun FilterRenderSpec.currentLevel(

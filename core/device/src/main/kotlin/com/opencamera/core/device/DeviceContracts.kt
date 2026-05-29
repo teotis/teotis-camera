@@ -60,9 +60,9 @@ enum class LensFacing {
  * [PERISCOPE] is typically 5x or higher.
  */
 enum class LensNode(val tagValue: String, val label: String) {
-    WIDE("wide", "Wide"),
-    TELEPHOTO("telephoto", "Telephoto"),
-    PERISCOPE("periscope", "Periscope")
+    WIDE("wide", "广角"),
+    TELEPHOTO("telephoto", "长焦"),
+    PERISCOPE("periscope", "潜望")
 }
 
 /**
@@ -379,15 +379,15 @@ enum class ZoomControlSupport(
 ) {
     UNSUPPORTED(
         tagValue = "unsupported",
-        label = "Unsupported"
+        label = "不支持"
     ),
     DISCRETE_PRESET(
         tagValue = "discrete-preset",
-        label = "Preset steps"
+        label = "预设步进"
     ),
     CONTINUOUS(
         tagValue = "continuous",
-        label = "Continuous"
+        label = "连续"
     )
 }
 
@@ -590,30 +590,30 @@ data class DeviceRuntimeIssue(
 
 fun DeviceRuntimeIssue.displayReason(): String {
     val prefix = when (kind) {
-        DeviceRuntimeIssueKind.BIND_FAILURE -> "Bind failure"
-        DeviceRuntimeIssueKind.PREVIEW_STALL -> "Preview stalled"
-        DeviceRuntimeIssueKind.PROVIDER_FAILURE -> "Provider failure"
-        DeviceRuntimeIssueKind.CAMERA_RECOVERABLE -> "Camera recoverable error"
-        DeviceRuntimeIssueKind.CAMERA_FATAL -> "Camera fatal error"
-        DeviceRuntimeIssueKind.USER_ACTION_REQUIRED -> "Camera unavailable"
-        DeviceRuntimeIssueKind.THERMAL_CRITICAL -> "Thermal critical"
-        DeviceRuntimeIssueKind.UNKNOWN -> "Runtime error"
+        DeviceRuntimeIssueKind.BIND_FAILURE -> "绑定失败"
+        DeviceRuntimeIssueKind.PREVIEW_STALL -> "预览停滞"
+        DeviceRuntimeIssueKind.PROVIDER_FAILURE -> "提供者故障"
+        DeviceRuntimeIssueKind.CAMERA_RECOVERABLE -> "相机可恢复错误"
+        DeviceRuntimeIssueKind.CAMERA_FATAL -> "相机致命错误"
+        DeviceRuntimeIssueKind.USER_ACTION_REQUIRED -> "相机不可用"
+        DeviceRuntimeIssueKind.THERMAL_CRITICAL -> "严重过热"
+        DeviceRuntimeIssueKind.UNKNOWN -> "运行时错误"
     }
     return "$prefix: $reason"
 }
 
 fun DeviceRuntimeIssue.recoveryReason(): String {
     val suffix = when (kind) {
-        DeviceRuntimeIssueKind.BIND_FAILURE -> "bind failure"
-        DeviceRuntimeIssueKind.PREVIEW_STALL -> "preview stall"
-        DeviceRuntimeIssueKind.PROVIDER_FAILURE -> "provider failure"
-        DeviceRuntimeIssueKind.CAMERA_RECOVERABLE -> "camera recoverable error"
-        DeviceRuntimeIssueKind.CAMERA_FATAL -> "camera fatal error"
-        DeviceRuntimeIssueKind.USER_ACTION_REQUIRED -> "camera unavailable"
-        DeviceRuntimeIssueKind.THERMAL_CRITICAL -> "thermal critical"
-        DeviceRuntimeIssueKind.UNKNOWN -> "runtime error"
+        DeviceRuntimeIssueKind.BIND_FAILURE -> "绑定失败"
+        DeviceRuntimeIssueKind.PREVIEW_STALL -> "预览停滞"
+        DeviceRuntimeIssueKind.PROVIDER_FAILURE -> "提供者故障"
+        DeviceRuntimeIssueKind.CAMERA_RECOVERABLE -> "相机可恢复错误"
+        DeviceRuntimeIssueKind.CAMERA_FATAL -> "相机致命错误"
+        DeviceRuntimeIssueKind.USER_ACTION_REQUIRED -> "相机不可用"
+        DeviceRuntimeIssueKind.THERMAL_CRITICAL -> "严重过热"
+        DeviceRuntimeIssueKind.UNKNOWN -> "运行时错误"
     }
-    return "recover after $suffix: $reason"
+    return "恢复后($suffix): $reason"
 }
 
 sealed interface DeviceEvent {
