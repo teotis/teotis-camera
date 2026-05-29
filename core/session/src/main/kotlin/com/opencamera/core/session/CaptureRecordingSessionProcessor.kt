@@ -219,6 +219,15 @@ internal class CaptureRecordingSessionProcessor(
         } else {
             null
         }
+        if (shot.mediaType == MediaType.VIDEO && startedAt != null) {
+            val shutterPressedAt = state.value.shutterPressedAtElapsedMillis
+            if (shutterPressedAt != null && shutterPressedAt > 0) {
+                val startupLatencyMs = startedAt - shutterPressedAt
+                if (startupLatencyMs >= 0) {
+                    trace.record("recording.startup.latency", "${startupLatencyMs}ms")
+                }
+            }
+        }
         val displayedStartedAt = if (shot.mediaType == MediaType.VIDEO) 0L else null
         updateState.update { s ->
             s.copy(
@@ -432,6 +441,15 @@ internal class CaptureRecordingSessionProcessor(
                 if (result.mediaType == MediaType.PHOTO) "capture.timing" else "recording.timing",
                 "shot=${result.shotId},device=${deviceMs}ms,postprocess=${postprocessMs}ms,total=${postCompleted - requested}ms"
             )
+            if (deviceStarted != null && deviceStarted > 0) {
+                val intentDelayMs = deviceStarted - requested
+                if (intentDelayMs > 0) {
+                    trace.record(
+                        "capture.shutter.to.device",
+                        "shot=${result.shotId},${intentDelayMs}ms"
+                    )
+                }
+            }
         }
     }
 

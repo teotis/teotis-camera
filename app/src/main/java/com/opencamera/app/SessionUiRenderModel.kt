@@ -1655,7 +1655,10 @@ private val KEY_EVENT_NAMES = setOf(
     "mode.switched", "lens.switched", "zoom.updated",
     "preview.first.frame", "preview.host.attached", "preview.host.detached",
     "capture.photo", "capture.saved", "capture.timing",
+    "capture.shutter.to.device",
     "recording.started", "recording.saved", "recording.timing",
+    "recording.startup.latency",
+    "mode.switch.completed", "lens.switch.completed",
     "permissions.updated", "device.capabilities.updated", "settings.updated"
 )
 
@@ -1668,6 +1671,7 @@ private val CORE_EVENT_NAMES = setOf(
     "capture.feedback.snapshot.skipped",
     "recording.requested",
     "shot.plan.failed",
+    "mode.switch.started", "lens.switch.started",
     "mode.signal", "mode.event", "mode.hint",
     "intent.received"
 )
