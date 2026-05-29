@@ -176,6 +176,9 @@ internal fun shutterDisabledReason(state: SessionState, text: AppTextResolver): 
     if (state.countdownRemainingSeconds != null) return text.disabledCountdown()
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
+        // CaptureReadiness marks the explicit user-facing readiness boundary:
+        // the frame is acquired and the shutter is safe to re-arm.
+        if (state.presentation.captureReadiness != null) return null
         return text.disabledSavingPhoto()
     }
     // Session rearm policy: ordinary still capture clears activeShot at DATA_RECEIVED,
@@ -194,6 +197,12 @@ internal fun shutterVisualState(state: SessionState): ShutterVisualState {
     if (state.countdownRemainingSeconds != null) return ShutterVisualState.COUNTDOWN
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
+        // CaptureReadiness is the explicit user-facing readiness boundary.
+        // Once readiness is signaled, the button shows "ready" even while
+        // post-processing continues in the background.
+        if (state.presentation.captureReadiness != null) {
+            return ShutterVisualState.PHOTO_READY
+        }
         return when (state.captureStatus) {
             CaptureStatus.REQUESTED -> ShutterVisualState.PHOTO_PRESSED
             else -> ShutterVisualState.SAVING

@@ -440,15 +440,15 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 
     private fun maybePlayShutterSound(state: SessionState) {
-        val activeShot = state.activeShot
+        val readiness = state.presentation.captureReadiness ?: return
         val shouldPlay = state.settings.persisted.common.shutterSoundEnabled &&
-            activeShot?.mediaType == com.opencamera.core.media.MediaType.PHOTO &&
-            activeShot.shotId != lastPlayedShutterSoundShotId
+            readiness.mediaType == com.opencamera.core.media.MediaType.PHOTO &&
+            readiness.shotId != lastPlayedShutterSoundShotId
         if (!shouldPlay) {
             return
         }
         shutterClickSound.play(MediaActionSound.SHUTTER_CLICK)
-        lastPlayedShutterSoundShotId = activeShot?.shotId
+        lastPlayedShutterSoundShotId = readiness.shotId
     }
 
     private fun buildUiSnapshot(): MainActivityUiSnapshot {

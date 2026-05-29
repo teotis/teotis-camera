@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import com.opencamera.core.device.CaptureReadiness
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.effect.EffectSpec
@@ -1310,12 +1311,110 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `shutter disabled reason blocks LIVE_PHOTO with activeShot at DATA_RECEIVED`() {
-        // Live photo is a conservative capture kind: activeShot stays set until ShotCompleted.
-        // Shutter must stay blocked even at DATA_RECEIVED — same policy as multi-frame.
+    fun `shutter visual state is PHOTO_READY when captureReadiness set with active photo shot`() {
+        // CaptureReadiness signals the frame is acquired; visual shows ready
+        // even though activeShot is still present (post-processing continues).
         val shot = ShotRequest(
-            shotId = "live-block-1",
-            shotKind = ShotKind.LIVE_PHOTO,
+            shotId = "ready-1",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.REQUESTED)
+            .copy(
+                presentation = SessionPresentationState(
+                    captureReadiness = CaptureReadiness(
+                        shotId = "ready-1",
+                        mediaType = MediaType.PHOTO,
+                        source = "test"
+                    )
+                )
+            )
+        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter disabled reason returns null when captureReadiness set with active photo shot`() {
+        // Readiness re-arms the shutter even while activeShot is still present.
+        val shot = ShotRequest(
+            shotId = "ready-2",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.REQUESTED)
+            .copy(
+                presentation = SessionPresentationState(
+                    captureReadiness = CaptureReadiness(
+                        shotId = "ready-2",
+                        mediaType = MediaType.PHOTO,
+                        source = "test"
+                    )
+                )
+            )
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
+    fun `shutter enabled with captureReadiness via cockpit render model`() {
+        val shot = ShotRequest(
+            shotId = "ready-3",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.REQUESTED)
+            .copy(
+                presentation = SessionPresentationState(
+                    captureReadiness = CaptureReadiness(
+                        shotId = "ready-3",
+                        mediaType = MediaType.PHOTO,
+                        source = "test"
+                    )
+                )
+            )
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+        assertTrue(cockpit.bottomCockpit.isShutterEnabled)
+        assertNull(cockpit.bottomCockpit.disabledReason)
+        assertEquals(ShutterVisualState.PHOTO_READY, cockpit.bottomCockpit.shutterVisualState)
+    }
+
+    @Test
+    fun `shutter visual state shows SAVING when captureReadiness not set for active photo shot`() {
+        // Without captureReadiness, active photo shot stays in SAVING visual.
+        val shot = ShotRequest(
+            shotId = "no-readiness",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        // No captureReadiness set
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter disabled reason blocks when captureReadiness not set for active photo shot`() {
+        // Without captureReadiness, shutter stays blocked during active photo shot.
+        val shot = ShotRequest(
+            shotId = "no-readiness-2",
+            shotKind = ShotKind.STILL_CAPTURE,
             mediaType = MediaType.PHOTO,
             saveRequest = SaveRequest.photoLibrary(),
             thumbnailPolicy = ThumbnailPolicy.NONE,
@@ -1325,27 +1424,6 @@ class SessionCockpitRenderModelTest {
         val state = defaultSessionState(activeShot = shot)
             .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
         assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
-        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
-    }
-
-    @Test
-    fun `shutter disabled reason returns null during active recording`() {
-        // During active recording, shutter functions as stop-recording control.
-        // Unlike captureDisabledReason (which blocks during recording),
-        // shutterDisabledReason keeps the shutter enabled.
-        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
-        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
-    }
-
-    @Test
-    fun `capture disabled reason blocks during recording but shutter stays enabled`() {
-        // captureDisabledReason is the generic capture gating function used by
-        // non-shutter controls. It blocks during recording.
-        // shutterDisabledReason is the shutter-specific gating that keeps the
-        // shutter enabled as stop-recording control.
-        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
-        assertNotNull(captureDisabledReason(state, TestAppTextResolver()))
-        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
     }
 
     @Test
