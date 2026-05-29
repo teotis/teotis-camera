@@ -1,7 +1,7 @@
 # Package Status: 07-synthesis-html-report
 
 ## State
-- **Status**: pending
+**Status**: launched
 - **Launched**: pending
 - **Completed**: pending
 
