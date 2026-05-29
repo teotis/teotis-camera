@@ -53,6 +53,14 @@ Important boundaries:
 - Do not create a second hidden session kernel in coordinators, managers, bridges, UI, or adapters.
 - Any hardware-dependent capability must have explicit `supported`, `unsupported`, or `degraded` semantics that can be tested.
 
+## Current Stage
+
+- Current execution is demand-driven: the user's latest request is the primary driver, and stage labels are status context rather than the default roadmap.
+- `codex/documentation.md` is the authoritative current-status source for milestone, progress, verification baseline, residual risks, and recent verified loops.
+- `docs/plans/**` contains active handoff, orchestration, feature-plan, and research packages when a request names or depends on them.
+- `codex/plan.md` is reserved for pre-research, user research, new feature planning, or explicit planning maintenance. Do not use it as the default stage source.
+- Do not enter a broader stage, milestone, or scope without explicit user approval. One approval only applies to one transition.
+
 ## Required Working Loop
 
 When the user asks to continue or advance work without naming a narrow target:
