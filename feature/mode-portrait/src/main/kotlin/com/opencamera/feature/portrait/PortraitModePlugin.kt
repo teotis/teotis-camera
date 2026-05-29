@@ -82,7 +82,7 @@ private class PortraitModeController(
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
-            headline = "Portrait pipeline ready"
+            headline = "人像管线就绪"
         )
     )
 
@@ -95,9 +95,9 @@ private class PortraitModeController(
         styleIndex = styleIndex.coerceAtMost(currentStyles().lastIndex)
         mutableSnapshot.value = buildSnapshot(
             headline = if (depthEffectEnabled()) {
-                "Portrait mode active"
+                "人像模式已激活"
             } else {
-                "Portrait focus active"
+                "人像对焦已激活"
             }
         )
     }
@@ -109,9 +109,9 @@ private class PortraitModeController(
     ) {
         mutableSnapshot.value = buildSnapshot(
             headline = if (depthEffectEnabled()) {
-                "Portrait resolution updated"
+                "人像分辨率已更新"
             } else {
-                "Focus resolution updated"
+                "对焦分辨率已更新"
             }
         )
     }
@@ -121,9 +121,9 @@ private class PortraitModeController(
     ) {
         mutableSnapshot.value = buildSnapshot(
             headline = if (depthEffectEnabled()) {
-                "Portrait quality updated"
+                "人像画质已更新"
             } else {
-                "Focus quality updated"
+                "对焦画质已更新"
             }
         )
     }
@@ -133,9 +133,9 @@ private class PortraitModeController(
         styleIndex = resolvedDefaultStyleIndex().coerceAtMost(currentStyles().lastIndex)
         mutableSnapshot.value = buildSnapshot(
             headline = if (depthEffectEnabled()) {
-                "Portrait mode active"
+                "人像模式已激活"
             } else {
-                "Portrait focus active"
+                "人像对焦已激活"
             }
         )
         context.onEffectSpecChanged(buildEffectSpec())
@@ -144,7 +144,7 @@ private class PortraitModeController(
     override suspend fun onExit() {
         context.eventSink("portrait.exit")
         mutableSnapshot.value = buildSnapshot(
-            headline = "Portrait mode inactive"
+            headline = "人像模式未激活"
         )
     }
 
@@ -162,9 +162,9 @@ private class PortraitModeController(
         reduceStillShotSessionEvent(
             event = event,
             text = StillShotSessionEventText(
-                shotStartedHeadline = "Portrait capture in progress",
-                shotCompletedHeadline = "Portrait saved",
-                shotFailedHeadline = "Portrait capture failed"
+                shotStartedHeadline = "人像拍摄进行中",
+                shotCompletedHeadline = "人像已保存",
+                shotFailedHeadline = "人像拍摄失败"
             ),
             updateSnapshot = { headline, detail ->
                 mutableSnapshot.value = if (detail == null) {
@@ -182,9 +182,9 @@ private class PortraitModeController(
         context.eventSink("portrait.capture.requested.${style.id}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (countdownDuration() == CountdownDuration.OFF) {
-                "Portrait capture requested"
+                "人像拍摄已请求"
             } else {
-                "Portrait countdown armed"
+                "人像倒计时已启动"
             }
         )
         val effectSpec = buildEffectSpec()
@@ -345,13 +345,13 @@ private class PortraitModeController(
         context.eventSink("portrait.style.selected.${style.id}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (depthEffectEnabled()) {
-                "Portrait style updated"
+                "人像风格已更新"
             } else {
-                "Portrait focus style updated"
+                "人像对焦风格已更新"
             }
         )
         context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("Portrait style: ${style.label}")
+        return ModeSignal.ShowHint("人像风格: ${style.label}")
     }
 
     private suspend fun toggleProVariant(): ModeSignal {
@@ -360,14 +360,14 @@ private class PortraitModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = if (proVariantEnabled) {
                 if (manualControlsEnabled()) {
-                    "Portrait Pro active"
+                    "人像专业已激活"
                 } else {
-                    "Portrait Pro assist active"
+                    "人像专业辅助已激活"
                 }
             } else if (depthEffectEnabled()) {
-                "Portrait mode active"
+                "人像模式已激活"
             } else {
-                "Portrait focus active"
+                "人像对焦已激活"
             }
         )
         return result.signal
@@ -380,10 +380,10 @@ private class PortraitModeController(
         return ModeSnapshot(
             id = ModeId.PORTRAIT,
             uiSpec = ModeUiSpec(
-                title = "Portrait",
-                shutterLabel = "Capture Portrait",
-                secondaryActionLabel = "Cycle Portrait Style",
-                tertiaryActionLabel = "Cycle Frame",
+                title = "人像",
+                shutterLabel = "拍摄人像",
+                secondaryActionLabel = "切换人像风格",
+                tertiaryActionLabel = "切换画幅",
                 proActionLabel = proVariantState.proActionLabel()
             ),
             state = ModeState(
@@ -469,15 +469,15 @@ private class PortraitModeController(
     private fun styleSummary(style: PortraitStyle): String {
         val portraitSettings = portraitSettings()
         val commonSummary = buildString {
-            append("Profile ${portraitSettings.portraitProfile.label}")
-            append(" | Beauty ${portraitSettings.portraitBeautyPreset.label}")
+            append("配置 ${portraitSettings.portraitProfile.label}")
+            append(" | 美颜 ${portraitSettings.portraitBeautyPreset.label}")
             append(" ${portraitSettings.portraitBeautyStrength.label}")
-            append(" | Bokeh ${portraitSettings.portraitBokehEffect.label}")
+            append(" | 虚化 ${portraitSettings.portraitBokehEffect.label}")
         }
         val standardSummary = if (depthEffectEnabled()) {
-            "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Depth strength ${style.bokehStrength} | Subject tracking ${style.subjectTracking} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Portrait depth rendering active."
+            "风格 ${style.label} | $commonSummary | 静态 ${runtimeState().stillCaptureQuality.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 实况 ${onOffLabel(livePhotoEnabledByDefault())} | 深度强度 ${style.bokehStrength} | 主体追踪 ${style.subjectTracking} | 定时 ${countdownDuration().label} | 画幅 ${currentFrameRatio().label} | 人像深度渲染已激活。"
         } else {
-            "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Focus-priority portrait fallback because depth effect is unavailable on this device."
+            "风格 ${style.label} | $commonSummary | 静态 ${runtimeState().stillCaptureQuality.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 实况 ${onOffLabel(livePhotoEnabledByDefault())} | 定时 ${countdownDuration().label} | 画幅 ${currentFrameRatio().label} | 对焦优先人像降级，因为此设备不支持深度效果。"
         }
         if (!proVariantEnabled) {
             return standardSummary
@@ -497,9 +497,9 @@ private class PortraitModeController(
     private suspend fun cycleFrameRatio(): ModeSignal =
         frameRatioDelegate.cycleFrameRatio(
             snapshotHeadline = if (depthEffectEnabled()) {
-                "Portrait frame updated"
+                "人像画幅已更新"
             } else {
-                "Focus frame updated"
+                "对焦画幅已更新"
             },
             updateSnapshot = { headline ->
                 mutableSnapshot.value = buildSnapshot(headline = headline)
@@ -516,7 +516,7 @@ private class PortraitModeController(
 
     private fun currentFrameRatio(): FrameRatio = frameRatioDelegate.currentFrameRatio()
 
-    private fun onOffLabel(enabled: Boolean): String = if (enabled) "On" else "Off"
+    private fun onOffLabel(enabled: Boolean): String = if (enabled) "开" else "关"
 
     private fun selectedWatermarkTemplate(): WatermarkTemplate {
         val persistedTemplateId = context.settingsSnapshot.persisted.photo.defaultWatermarkTemplateId
@@ -570,49 +570,49 @@ private class PortraitModeController(
         private val DEFAULT_PORTRAIT_STYLES = listOf(
             PortraitStyle(
                 id = "portrait-original",
-                label = "Portrait Original",
+                label = "人像-原色",
                 bokehStrength = 1.8f,
                 subjectTracking = true,
                 renderSpec = defaultFilterRenderSpecOrNull("portrait-original")
             ),
             PortraitStyle(
                 id = "portrait-vivid",
-                label = "Portrait Vivid",
+                label = "人像-鲜艳",
                 bokehStrength = 2.0f,
                 subjectTracking = true,
                 renderSpec = defaultFilterRenderSpecOrNull("portrait-vivid")
             ),
             PortraitStyle(
                 id = "portrait-blue",
-                label = "Portrait Blue",
+                label = "人像-蓝调",
                 bokehStrength = 2.1f,
                 subjectTracking = true,
                 renderSpec = defaultFilterRenderSpecOrNull("portrait-blue")
             ),
             PortraitStyle(
                 id = "portrait-retro",
-                label = "Portrait Retro",
+                label = "人像-复古",
                 bokehStrength = 2.4f,
                 subjectTracking = true,
                 renderSpec = defaultFilterRenderSpecOrNull("portrait-retro")
             ),
             PortraitStyle(
                 id = "portrait-ccd",
-                label = "Portrait CCD",
+                label = "人像-CCD",
                 bokehStrength = 1.7f,
                 subjectTracking = false,
                 renderSpec = defaultFilterRenderSpecOrNull("portrait-ccd")
             ),
             PortraitStyle(
                 id = "portrait-chasing-light",
-                label = "Portrait Chasing Light",
+                label = "人像-追光",
                 bokehStrength = 1.6f,
                 subjectTracking = true,
                 renderSpec = defaultFilterRenderSpecOrNull("portrait-chasing-light")
             ),
             PortraitStyle(
                 id = "portrait-rich",
-                label = "Portrait Rich",
+                label = "人像-浓郁",
                 bokehStrength = 2.2f,
                 subjectTracking = false,
                 renderSpec = defaultFilterRenderSpecOrNull("portrait-rich")

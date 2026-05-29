@@ -54,14 +54,14 @@ private class DocumentModeController(
     private var profileIndex = 0
 
     private val uiSpec = ModeUiSpec(
-        title = "Document",
-        shutterLabel = "Scan Document",
-        secondaryActionLabel = "Cycle Scan Style"
+        title = "文档",
+        shutterLabel = "扫描文档",
+        secondaryActionLabel = "切换扫描风格"
     )
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
-            headline = "Document pipeline ready"
+            headline = "文档管线就绪"
         )
     )
 
@@ -74,9 +74,9 @@ private class DocumentModeController(
         profileIndex = profileIndex.coerceAtMost(currentProfiles().lastIndex)
         mutableSnapshot.value = buildSnapshot(
             headline = if (enhancementEnabled()) {
-                "Document scan active"
+                "文档扫描已激活"
             } else {
-                "Document archive active"
+                "文档归档已激活"
             }
         )
     }
@@ -88,9 +88,9 @@ private class DocumentModeController(
     ) {
         mutableSnapshot.value = buildSnapshot(
             headline = if (enhancementEnabled()) {
-                "Document resolution updated"
+                "文档分辨率已更新"
             } else {
-                "Archive resolution updated"
+                "归档分辨率已更新"
             }
         )
     }
@@ -99,9 +99,9 @@ private class DocumentModeController(
         context.eventSink("document.enter")
         mutableSnapshot.value = buildSnapshot(
             headline = if (enhancementEnabled()) {
-                "Document scan active"
+                "文档扫描已激活"
             } else {
-                "Document archive active"
+                "文档归档已激活"
             }
         )
         context.onEffectSpecChanged(buildEffectSpec())
@@ -110,7 +110,7 @@ private class DocumentModeController(
     override suspend fun onExit() {
         context.eventSink("document.exit")
         mutableSnapshot.value = buildSnapshot(
-            headline = "Document mode inactive"
+            headline = "文档模式未激活"
         )
     }
 
@@ -128,9 +128,9 @@ private class DocumentModeController(
         reduceStillShotSessionEvent(
             event = event,
             text = StillShotSessionEventText(
-                shotStartedHeadline = "Document scan in progress",
-                shotCompletedHeadline = "Document saved",
-                shotFailedHeadline = "Document capture failed"
+                shotStartedHeadline = "文档扫描进行中",
+                shotCompletedHeadline = "文档已保存",
+                shotFailedHeadline = "文档拍摄失败"
             ),
             updateSnapshot = { headline, detail ->
                 mutableSnapshot.value = if (detail == null) {
@@ -146,7 +146,7 @@ private class DocumentModeController(
         val profile = currentProfile()
         context.eventSink("document.capture.requested.${profile.id}")
         mutableSnapshot.value = buildSnapshot(
-            headline = "Document capture requested"
+            headline = "文档拍摄已请求"
         )
         val effectSpec = buildEffectSpec()
         val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
@@ -220,13 +220,13 @@ private class DocumentModeController(
         context.eventSink("document.profile.selected.${profile.id}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (enhancementEnabled()) {
-                "Document style updated"
+                "文档风格已更新"
             } else {
-                "Archive style updated"
+                "归档风格已更新"
             }
         )
         context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("Scan style: ${profile.label}")
+        return ModeSignal.ShowHint("扫描风格: ${profile.label}")
     }
 
     private fun buildSnapshot(
@@ -262,9 +262,9 @@ private class DocumentModeController(
 
     private fun profileSummary(profile: DocumentProfile): String {
         return if (enhancementEnabled()) {
-            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Auto crop ${profile.autoCrop} | Contrast ${profile.contrastLabel} | Output tuned for scanned documents."
+            "风格 ${profile.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 自动裁边 ${profile.autoCrop} | 对比度 ${profile.contrastLabel} | 输出已针对扫描文档进行优化。"
         } else {
-            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only because document enhancement is unavailable on this device."
+            "风格 ${profile.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 仅基础拍摄，因为此设备不支持文档增强。"
         }
     }
 
@@ -300,23 +300,23 @@ private class DocumentModeController(
         private val ENHANCED_PROFILES = listOf(
             DocumentProfile(
                 id = "receipt",
-                label = "Receipt",
+                label = "收据",
                 autoCrop = true,
-                contrastLabel = "High",
+                contrastLabel = "高",
                 algorithmProfile = "document-receipt-scan"
             ),
             DocumentProfile(
                 id = "whiteboard",
-                label = "Whiteboard",
+                label = "白板",
                 autoCrop = true,
-                contrastLabel = "Balanced",
+                contrastLabel = "平衡",
                 algorithmProfile = "document-whiteboard-scan"
             ),
             DocumentProfile(
                 id = "contract",
-                label = "Contract",
+                label = "合同",
                 autoCrop = false,
-                contrastLabel = "Natural",
+                contrastLabel = "自然",
                 algorithmProfile = "document-contract-scan"
             )
         )
@@ -324,16 +324,16 @@ private class DocumentModeController(
         private val BASIC_PROFILES = listOf(
             DocumentProfile(
                 id = "archive",
-                label = "Archive",
+                label = "归档",
                 autoCrop = false,
-                contrastLabel = "Natural",
+                contrastLabel = "自然",
                 algorithmProfile = "document-basic-archive"
             ),
             DocumentProfile(
                 id = "color",
-                label = "Color Copy",
+                label = "彩色复印",
                 autoCrop = false,
-                contrastLabel = "Balanced",
+                contrastLabel = "平衡",
                 algorithmProfile = "document-basic-color"
             )
         )

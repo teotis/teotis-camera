@@ -74,7 +74,7 @@ private class PhotoModeController(
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
-            headline = "Photo pipeline ready"
+            headline = "拍照管线就绪"
         )
     )
 
@@ -88,7 +88,7 @@ private class PhotoModeController(
             flashModeIndex = 0
         }
         mutableSnapshot.value = buildSnapshot(
-            headline = "Photo mode active"
+            headline = "拍照模式已激活"
         )
     }
 
@@ -98,7 +98,7 @@ private class PhotoModeController(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
     ) {
         mutableSnapshot.value = buildSnapshot(
-            headline = "Photo resolution updated"
+            headline = "拍照分辨率已更新"
         )
     }
 
@@ -106,7 +106,7 @@ private class PhotoModeController(
         stillCaptureQuality: com.opencamera.core.media.StillCaptureQualityPreference
     ) {
         mutableSnapshot.value = buildSnapshot(
-            headline = "Photo quality updated"
+            headline = "拍照画质已更新"
         )
     }
 
@@ -114,7 +114,7 @@ private class PhotoModeController(
         context.eventSink("photo.enter")
         selectedFilter = resolvedDefaultFilter()
         mutableSnapshot.value = buildSnapshot(
-            headline = "Photo mode active"
+            headline = "拍照模式已激活"
         )
         context.onEffectSpecChanged(buildEffectSpec(currentFlashMode()))
     }
@@ -122,8 +122,8 @@ private class PhotoModeController(
     override suspend fun onExit() {
         context.eventSink("photo.exit")
         mutableSnapshot.value = buildSnapshot(
-            headline = "Photo mode inactive",
-            detail = "Switch back to photo to resume still capture."
+            headline = "拍照模式未激活",
+            detail = "切换回拍照以继续静态拍摄。"
         )
     }
 
@@ -137,9 +137,9 @@ private class PhotoModeController(
                 )
                 mutableSnapshot.value = buildSnapshot(
                     headline = if (countdownDuration() == CountdownDuration.OFF) {
-                        "Still capture requested"
+                        "静态拍摄已请求"
                     } else {
-                        "Countdown armed"
+                        "倒计时已启动"
                     }
                 )
                 val effectSpec = buildEffectSpec(flashMode)
@@ -232,10 +232,10 @@ private class PhotoModeController(
         reduceStillShotSessionEvent(
             event = event,
             text = StillShotSessionEventText(
-                shotStartedHeadline = "Photo capture in progress",
-                shotStartedDetail = "Unified shot pipeline accepted the photo save task.",
-                shotCompletedHeadline = "Photo saved",
-                shotFailedHeadline = "Photo capture failed"
+                shotStartedHeadline = "拍照进行中",
+                shotStartedDetail = "统一拍摄管线接受了照片保存任务。",
+                shotCompletedHeadline = "照片已保存",
+                shotFailedHeadline = "拍照失败"
             ),
             updateSnapshot = { headline, detail ->
                 mutableSnapshot.value = if (detail == null) {
@@ -249,16 +249,16 @@ private class PhotoModeController(
 
     private suspend fun cycleFlashMode(): ModeSignal {
         if (!currentFlashSupported()) {
-            return ModeSignal.ShowHint("Flash control is unavailable on this device")
+            return ModeSignal.ShowHint("此设备不支持闪光灯控制")
         }
         flashModeIndex = (flashModeIndex + 1) % currentFlashModes().size
         val flashMode = currentFlashMode()
         context.eventSink("photo.flash.selected.${flashMode.name.lowercase()}")
         mutableSnapshot.value = buildSnapshot(
-            headline = "Flash mode updated"
+            headline = "闪光灯模式已更新"
         )
         context.onEffectSpecChanged(buildEffectSpec(flashMode))
-        return ModeSignal.ShowHint("Flash: ${flashMode.label}")
+        return ModeSignal.ShowHint("闪光灯: ${flashMode.label}")
     }
 
     private fun buildSnapshot(
@@ -268,14 +268,14 @@ private class PhotoModeController(
         return ModeSnapshot(
             id = ModeId.PHOTO,
             uiSpec = ModeUiSpec(
-                title = "Photo",
-                shutterLabel = "Capture Still",
+                title = "拍照",
+                shutterLabel = "拍摄静态",
                 secondaryActionLabel = if (currentFlashSupported()) {
-                    "Cycle Flash"
+                    "切换闪光灯"
                 } else {
-                    "Flash Unsupported"
+                    "闪光灯不支持"
                 },
-                tertiaryActionLabel = "Cycle Frame"
+                tertiaryActionLabel = "切换画幅"
             ),
             state = ModeState(
                 headline = headline,
@@ -288,9 +288,9 @@ private class PhotoModeController(
 
     private fun defaultDetail(): String {
         return if (currentFlashSupported()) {
-            "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash ${currentFlashMode().label} | Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
+            "静态 ${runtimeState().stillCaptureQuality.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 滤镜 ${selectedFilter.label} | 水印 ${selectedWatermarkTemplate().label} | 实况 ${onOffLabel(livePhotoEnabledByDefault())} | 定时 ${countdownDuration().label} | 闪光灯 ${currentFlashMode().label} | 画幅 ${currentFrameRatio().label} | 按下快门以发出静态拍摄请求。"
         } else {
-            "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Flash control unavailable on this device. Frame ${currentFrameRatio().label} | Press shutter to emit a still capture request."
+            "静态 ${runtimeState().stillCaptureQuality.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 滤镜 ${selectedFilter.label} | 水印 ${selectedWatermarkTemplate().label} | 实况 ${onOffLabel(livePhotoEnabledByDefault())} | 定时 ${countdownDuration().label} | 此设备不支持闪光灯控制。画幅 ${currentFrameRatio().label} | 按下快门以发出静态拍摄请求。"
         }
     }
 
@@ -421,7 +421,7 @@ private class PhotoModeController(
 
     private suspend fun cycleFrameRatio(): ModeSignal =
         frameRatioDelegate.cycleFrameRatio(
-            snapshotHeadline = "Frame ratio updated",
+            snapshotHeadline = "画幅已更新",
             updateSnapshot = { headline ->
                 mutableSnapshot.value = buildSnapshot(headline = headline)
             }
@@ -480,7 +480,7 @@ private class PhotoModeController(
         ) ?: DEFAULT_PHOTO_FILTER
     }
 
-    private fun onOffLabel(enabled: Boolean): String = if (enabled) "On" else "Off"
+    private fun onOffLabel(enabled: Boolean): String = if (enabled) "开" else "关"
 
     companion object {
         private val DEFAULT_PHOTO_FILTER = FilterProfile(
