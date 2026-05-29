@@ -33,11 +33,11 @@ enum class StillCaptureQualityPreference(
 ) {
     LATENCY(
         tagValue = "latency",
-        label = "Fast"
+        label = "快速"
     ),
     QUALITY(
         tagValue = "quality",
-        label = "Max"
+        label = "最高"
     );
 
     companion object {

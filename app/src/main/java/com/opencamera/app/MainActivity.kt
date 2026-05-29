@@ -785,10 +785,10 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         runCatching {
                 val model = latestDevLogRenderModel ?: return
                 val file = devLogExporter.export(model.exportContent, type = selectedDevLogTab)
-                views.preview.captureOutput.text = "Debug log exported: ${file.absolutePath}"
+                views.preview.captureOutput.text = getString(R.string.toast_debug_log_exported, file.absolutePath)
             }
             .onFailure {
-                Toast.makeText(this, "Export failed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -798,7 +798,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
             refreshDevLogModel()
         }.onFailure {
-            Toast.makeText(this, "Cleanup failed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.toast_cleanup_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -808,7 +808,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
             refreshDevLogModel()
         }.onFailure {
-            Toast.makeText(this, "Cleanup failed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.toast_cleanup_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
