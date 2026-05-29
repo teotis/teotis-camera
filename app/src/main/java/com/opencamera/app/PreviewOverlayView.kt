@@ -201,12 +201,17 @@ class PreviewOverlayView @JvmOverloads constructor(
             ratioHeight = frameRatio?.height ?: 0,
             previewContentAspect = renderModel.previewContentAspect
         )
-        val zoom = renderModel.frame?.zoomRatio ?: 1f
-        if (zoom <= 1f) return geometry
-        val scale = 1f / zoom
-        return geometry.copy(
-            activeFrameRect = scaleRectAroundCenter(geometry.activeFrameRect, scale)
+        val previewZoom = renderModel.frame?.previewZoomRatio ?: 1f
+        if (previewZoom <= 1f) return geometry
+        val scale = 1f / previewZoom
+        val scaled = scaleRectAroundCenter(geometry.activeFrameRect, scale)
+        val clamped = RectF(
+            scaled.left.coerceIn(geometry.contentRect.left, geometry.contentRect.right),
+            scaled.top.coerceIn(geometry.contentRect.top, geometry.contentRect.bottom),
+            scaled.right.coerceIn(geometry.contentRect.left, geometry.contentRect.right),
+            scaled.bottom.coerceIn(geometry.contentRect.top, geometry.contentRect.bottom)
         )
+        return geometry.copy(activeFrameRect = clamped)
     }
 
     private fun activeFrameRectOrFullView(): RectF {
@@ -632,12 +637,16 @@ internal fun clampReticleCenter(
     )
 }
 
+private const val DEFAULT_SENSOR_CONTENT_WIDTH = 4
+private const val DEFAULT_SENSOR_CONTENT_HEIGHT = 3
+
 /**
  * Build [PreviewContentGeometry] for the given view dimensions and optional frame ratio.
  *
  * When [previewContentAspect] is provided, [contentRect] is the fitCenter content area
- * within the view (e.g. a 4:3 camera preview letterboxed in a 16:9 view). Otherwise
- * [contentRect] equals the full view.
+ * within the view (e.g. a 4:3 camera preview letterboxed in a 16:9 view). When null,
+ * defaults to the sensor's native 4:3 aspect ratio so that frame overlays stay within
+ * the actual preview content bounds.
  *
  * When [ratioWidth] / [ratioHeight] are both > 0 the active frame is a centered
  * sub-rect of [contentRect] matching that ratio. Otherwise the active frame
@@ -654,12 +663,12 @@ internal fun previewContentGeometry(
     ratioHeight: Int = 0,
     previewContentAspect: PreviewContentAspect? = null
 ): PreviewContentGeometry {
-    val contentRect = if (previewContentAspect != null &&
-        previewContentAspect.width > 0 && previewContentAspect.height > 0
-    ) {
+    val effectiveAspect = previewContentAspect
+        ?: PreviewContentAspect(DEFAULT_SENSOR_CONTENT_WIDTH, DEFAULT_SENSOR_CONTENT_HEIGHT)
+    val contentRect = if (effectiveAspect.width > 0 && effectiveAspect.height > 0) {
         val fitRect = computeFrameRect(
             viewWidth, viewHeight,
-            previewContentAspect.width, previewContentAspect.height
+            effectiveAspect.width, effectiveAspect.height
         )
         RectF(fitRect.left, fitRect.top, fitRect.right, fitRect.bottom)
     } else {

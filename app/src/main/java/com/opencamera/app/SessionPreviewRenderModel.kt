@@ -37,7 +37,8 @@ internal data class PreviewFrameRenderModel(
     val label: String,
     val dimOutsideFrame: Boolean,
     val bottomInsetPx: Float = 0f,
-    val zoomRatio: Float = 1f
+    val zoomRatio: Float = 1f,
+    val previewZoomRatio: Float = 1f
 )
 
 internal fun focusReticleRenderModel(
@@ -90,7 +91,9 @@ internal fun previewOverlayRenderModel(
             ratio = frameRatio,
             label = frameRatio.label,
             dimOutsideFrame = true,
-            zoomRatio = state.activeDeviceGraph.preview.zoomRatio
+            zoomRatio = state.activeDeviceGraph.preview.zoomRatio,
+            // TODO(pkg02): replace with state.activeDeviceGraph.preview.previewZoomRatio once merged
+            previewZoomRatio = state.activeDeviceGraph.preview.zoomRatio
         )
     } else {
         null

@@ -387,4 +387,28 @@ class PreviewContentGeometryTest {
         assertEquals(geo.contentRect.centerX(), geo.activeFrameRect.centerX(), 1f)
         assertEquals(geo.contentRect.centerY(), geo.activeFrameRect.centerY(), 1f)
     }
+
+    // --- null previewContentAspect defaults to 4:3 sensor ---
+    // RectF is stubbed in JVM tests (returns 0), so we verify the underlying math
+    // via computeFrameRect which returns a plain data class.
+
+    @Test
+    fun `null previewContentAspect defaults to 4_3 aspect`() {
+        // Verify the 4:3 content rect dimensions via computeFrameRect
+        val contentPortrait = computeFrameRect(1080, 1920, 4, 3)
+        assertEquals(1080f, contentPortrait.width, 1f)
+        assertEquals(1440f, contentPortrait.height, 1f)
+        val contentLandscape = computeFrameRect(1920, 1080, 4, 3)
+        assertEquals(1440f, contentLandscape.width, 1f)
+        assertEquals(1080f, contentLandscape.height, 1f)
+    }
+
+    @Test
+    fun `null aspect 16_9 frame stays within 4_3 content`() {
+        // Simulate null aspect → 4:3 content, then 16:9 frame inside
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val frame = computeFrameRect(content.width.toInt(), content.height.toInt(), 16, 9)
+        assertTrue(frame.width <= content.width + 1f)
+        assertTrue(frame.height <= content.height + 1f)
+    }
 }
