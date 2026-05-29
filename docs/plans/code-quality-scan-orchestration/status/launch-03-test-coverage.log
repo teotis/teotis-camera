@@ -1,0 +1,5 @@
+backgrounded · 446c2087
+  claude agents             list sessions
+  claude attach 446c2087    open in this terminal
+  claude logs 446c2087      show recent output
+  claude stop 446c2087      stop this session

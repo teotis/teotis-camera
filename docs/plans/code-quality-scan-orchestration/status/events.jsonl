@@ -1,1 +1,12 @@
 
+{"ts":"2026-05-29T19:44:15Z","event":"launch_requested","package_id":"01-static-analysis","branch":"agent/quality-scan/01-static-analysis","worktree":"docs/plans/code-quality-scan-orchestration/scratch/01-static-analysis/worktree","finalize":"0"}
+{"ts":"2026-05-29T19:44:16Z","event":"state_changed","package_id":"01-static-analysis","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T19:44:16Z","event":"launch_succeeded","package_id":"01-static-analysis","session_id":"30ff27f4","new_state":"launched","branch":"agent/quality-scan/01-static-analysis","worktree":"docs/plans/code-quality-scan-orchestration/scratch/01-static-analysis/worktree"}
+{"ts":"2026-05-29T19:44:22Z","event":"scratch_path_requested","package_id":"01-static-analysis","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/code-quality-scan-orchestration/scratch/01-static-analysis"}
+{"ts":"2026-05-29T19:44:30Z","event":"launch_requested","package_id":"02-arch-compliance","branch":"agent/quality-scan/02-arch-compliance","worktree":"docs/plans/code-quality-scan-orchestration/scratch/02-arch-compliance/worktree","finalize":"0"}
+{"ts":"2026-05-29T19:44:31Z","event":"state_changed","package_id":"02-arch-compliance","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T19:44:31Z","event":"launch_succeeded","package_id":"02-arch-compliance","session_id":"e62784eb","new_state":"launched","branch":"agent/quality-scan/02-arch-compliance","worktree":"docs/plans/code-quality-scan-orchestration/scratch/02-arch-compliance/worktree"}
+{"ts":"2026-05-29T19:44:37Z","event":"launch_requested","package_id":"03-test-coverage","branch":"agent/quality-scan/03-test-coverage","worktree":"docs/plans/code-quality-scan-orchestration/scratch/03-test-coverage/worktree","finalize":"0"}
+{"ts":"2026-05-29T19:44:38Z","event":"state_changed","package_id":"03-test-coverage","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T19:44:38Z","event":"launch_succeeded","package_id":"03-test-coverage","session_id":"446c2087","new_state":"launched","branch":"agent/quality-scan/03-test-coverage","worktree":"docs/plans/code-quality-scan-orchestration/scratch/03-test-coverage/worktree"}
+{"ts":"2026-05-29T19:44:50Z","event":"scratch_path_requested","package_id":"03-test-coverage","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/code-quality-scan-orchestration/scratch/03-test-coverage"}
