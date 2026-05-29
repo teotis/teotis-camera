@@ -1,7 +1,7 @@
 # Package Status: 01-architecture-boundary-integrity
 
 ## State
-**Status**: launched
+**Status**: completed
 - **Launched**: pending
 - **Completed**: pending
 
