@@ -25,3 +25,5 @@
 {"ts":"2026-05-29T12:10:44Z","event":"state_changed","package_id":"06-platform-configuration-branches","old_state":"pending","new_state":"launched"}
 {"ts":"2026-05-29T12:10:44Z","event":"launch_succeeded","package_id":"06-platform-configuration-branches","session_id":"2e26ce54","new_state":"launched","branch":"agent/abstraction-analysis/06-platform-configuration-branches","worktree":""}
 {"ts":"2026-05-29T12:11:20Z","event":"scratch_path_requested","package_id":"05-conversion-glue-detection","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/abstraction-architect-analysis/scratch/05-conversion-glue-detection"}
+{"ts":"2026-05-29T12:30:06Z","event":"state_changed","package_id":"05-conversion-glue-detection","old_state":"launched","new_state":"completed"}
+{"ts":"2026-05-29T13:14:46Z","event":"scratch_path_requested","package_id":"06-platform-configuration-branches","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/abstraction-architect-analysis/scratch/06-platform-configuration-branches"}
