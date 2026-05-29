@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenCamera 目录结构工程演进诊断报告</title>
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  themeVariables: {
+    fontSize: '16px',
+    primaryColor: '#334155',
+    primaryTextColor: '#e2e8f0',
+    primaryBorderColor: '#64748b',
+    lineColor: '#94a3b8',
+    secondaryColor: '#1e293b',
+    tertiaryColor: '#334155',
+    nodeBorder: '#64748b',
+    clusterBkg: '#1e293b',
+    clusterBorder: '#475569',
+    titleColor: '#e2e8f0',
+    edgeLabelBackground: '#1e293b'
+  }
+});
+</script>
+<style>
+:root {
+  --bg: #15191f;
+  --card-bg: #1e2330;
+  --card-border: #2d3748;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-green: #3fb950;
+  --accent-blue: #58a6ff;
+  --accent-yellow: #d29922;
+  --accent-red: #f85149;
+  --accent-gray: #8b949e;
+  --topo-bg: #15191f;
+  --topo-current-label-bg: rgba(248,81,73,0.15);
+  --topo-current-label-color: #f85149;
+  --topo-current-border: rgba(248,81,73,0.25);
+  --topo-elevated-label-bg: rgba(63,185,80,0.15);
+  --topo-elevated-label-color: #3fb950;
+  --topo-elevated-border: rgba(63,185,80,0.25);
+  --lb-backdrop: rgba(0,0,0,0.88);
+  --lb-content-bg: #15191f;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text-primary); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; }
+a { color: var(--accent-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Layout */
+.layout { display: flex; min-height: 100vh; }
+.toc { position: sticky; top: 0; height: 100vh; width: 260px; min-width: 260px; background: #111520; border-right: 1px solid var(--card-border); padding: 20px 16px; overflow-y: auto; z-index: 100; }
+.toc h3 { color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; }
+.toc a { display: block; padding: 6px 12px; border-radius: 6px; color: var(--text-secondary); font-size: 14px; margin-bottom: 2px; transition: all 0.15s; }
+.toc a:hover { background: rgba(88,166,255,0.1); color: var(--accent-blue); }
+.toc a.active { background: rgba(88,166,255,0.15); color: var(--accent-blue); font-weight: 600; }
+.main { flex: 1; max-width: 960px; padding: 40px 48px; margin: 0 auto; }
+
+/* Cover */
+.cover { margin-bottom: 48px; padding: 32px; background: linear-gradient(135deg, #1a2332 0%, #1e293b 100%); border-radius: 12px; border: 1px solid var(--card-border); }
+.cover h1 { font-size: 28px; margin-bottom: 8px; }
+.cover .subtitle { color: var(--text-secondary); font-size: 16px; margin-bottom: 16px; }
+.cover .verdict { background: rgba(248,81,73,0.12); border-left: 4px solid var(--accent-red); padding: 16px 20px; border-radius: 0 8px 8px 0; margin-top: 16px; }
+.cover .verdict strong { color: var(--accent-red); }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin: 2px 4px 2px 0; }
+.badge-green { background: rgba(63,185,80,0.15); color: var(--accent-green); }
+.badge-blue { background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+.badge-yellow { background: rgba(210,153,34,0.15); color: var(--accent-yellow); }
+.badge-red { background: rgba(248,81,73,0.15); color: var(--accent-red); }
+.badge-gray { background: rgba(139,148,158,0.15); color: var(--accent-gray); }
+
+/* Cards */
+.card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 24px; margin-bottom: 24px; }
+.card h2 { font-size: 22px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--card-border); }
+.card h3 { font-size: 18px; margin: 20px 0 12px; color: var(--text-primary); }
+.card h4 { font-size: 15px; margin: 16px 0 8px; color: var(--text-secondary); }
+.rec-card { border-left: 4px solid var(--accent-blue); }
+.rec-card.pilot-now { border-left-color: var(--accent-green); }
+.rec-card.gather-evidence { border-left-color: var(--accent-yellow); }
+.rec-card.stage-later { border-left-color: var(--accent-gray); }
+.rec-card.do-not-advance { border-left-color: var(--accent-red); opacity: 0.8; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--card-border); }
+th { color: var(--text-secondary); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+td { color: var(--text-primary); }
+
+/* Score bar */
+.score-bar { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.score-label { width: 100px; font-size: 13px; color: var(--text-secondary); }
+.score-track { flex: 1; height: 6px; background: #2d3748; border-radius: 3px; overflow: hidden; }
+.score-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.score-val { width: 20px; text-align: right; font-size: 13px; font-weight: 600; }
+
+/* Hotspot table */
+.hotspot-row { cursor: pointer; transition: background 0.15s; }
+.hotspot-row:hover { background: rgba(88,166,255,0.08); }
+.heat-high { color: var(--accent-red); font-weight: 700; }
+.heat-med { color: var(--accent-yellow); font-weight: 600; }
+.heat-low { color: var(--accent-green); }
+
+/* Comparison */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+.compare .current { background: rgba(248,81,73,0.06); border: 1px solid rgba(248,81,73,0.2); border-radius: 8px; padding: 16px; }
+.compare .current h4 { color: var(--accent-red); }
+.compare .breakthrough { background: rgba(63,185,80,0.06); border: 1px solid rgba(63,185,80,0.2); border-radius: 8px; padding: 16px; }
+.compare .breakthrough h4 { color: var(--accent-green); }
+
+/* Topology */
+.topology-compare { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; }
+.topology-diagram { flex: 1; min-width: 340px; cursor: pointer; }
+.topology-diagram .mermaid { min-height: 380px; width: 100%; background: var(--topo-bg); }
+.topology-diagram .label { font-size: 14px; font-weight: 600; margin-bottom: 8px; padding: 4px 12px; border-radius: 4px; display: inline-block; }
+.topology-diagram.current .label { background: var(--topo-current-label-bg); color: var(--topo-current-label-color); }
+.topology-diagram.current .mermaid { border: 2px solid var(--topo-current-border); border-radius: 8px; padding: 16px; }
+.topology-diagram.elevated .label { background: var(--topo-elevated-label-bg); color: var(--topo-elevated-label-color); }
+.topology-diagram.elevated .mermaid { border: 2px solid var(--topo-elevated-border); border-radius: 8px; padding: 16px; }
+
+/* Lightbox */
+.lightbox { display: none; position: fixed; inset: 0; z-index: 9999; background: var(--lb-backdrop); cursor: pointer; }
+.lightbox.active { display: flex; align-items: center; justify-content: center; }
+.lightbox .mermaid { min-width: 700px; min-height: 500px; max-width: 94vw; max-height: 92vh; overflow: auto; background: var(--lb-content-bg); border-radius: 8px; padding: 24px; }
+
+/* Collapsible */
+details { margin: 12px 0; }
+details summary { cursor: pointer; color: var(--accent-blue); font-size: 14px; padding: 8px 0; }
+details summary:hover { text-decoration: underline; }
+details[open] summary { margin-bottom: 8px; }
+
+/* Review */
+.review-section { margin-top: 16px; padding: 16px; background: rgba(88,166,255,0.04); border: 1px solid rgba(88,166,255,0.15); border-radius: 8px; }
+.review-section textarea { width: 100%; min-height: 60px; background: #0d1117; color: var(--text-primary); border: 1px solid var(--card-border); border-radius: 6px; padding: 10px; font-size: 14px; resize: vertical; }
+.review-section .stars { display: flex; gap: 4px; margin: 8px 0; }
+.review-section .stars span { cursor: pointer; font-size: 20px; color: var(--text-muted); transition: color 0.15s; }
+.review-section .stars span.on { color: var(--accent-yellow); }
+.review-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.review-tag { padding: 4px 12px; border-radius: 16px; font-size: 12px; cursor: pointer; border: 1px solid var(--card-border); color: var(--text-secondary); transition: all 0.15s; }
+.review-tag.selected { background: rgba(88,166,255,0.2); border-color: var(--accent-blue); color: var(--accent-blue); }
+
+/* FAB */
+.fab { position: fixed; bottom: 24px; right: 24px; background: var(--accent-blue); color: #fff; border: none; border-radius: 28px; padding: 14px 24px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.4); z-index: 1000; transition: transform 0.15s; }
+.fab:hover { transform: scale(1.05); }
+
+/* Toast */
+.toast { position: fixed; bottom: 80px; right: 24px; background: #238636; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 14px; z-index: 1001; opacity: 0; transition: opacity 0.3s; }
+.toast.show { opacity: 1; }
+
+/* Pilot board */
+.pilot-phase { display: grid; grid-template-columns: 80px 1fr; gap: 0; margin: 8px 0; }
+.pilot-phase .phase-label { font-weight: 700; color: var(--accent-blue); font-size: 14px; padding: 8px 0; }
+.pilot-phase .phase-content { border-left: 2px solid var(--card-border); padding: 8px 16px; }
+
+/* Utility */
+.mt-16 { margin-top: 16px; }
+.mt-8 { margin-top: 8px; }
+.mb-8 { margin-bottom: 8px; }
+.text-sm { font-size: 14px; }
+.text-muted { color: var(--text-muted); }
+.flex-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+code { background: rgba(88,166,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: var(--accent-blue); }
+
+@media (max-width: 900px) {
+  .toc { display: none; }
+  .main { padding: 24px 16px; }
+  .compare { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- TOC -->
+<nav class="toc">
+  <h3>导航</h3>
+  <a href="#cover">诊断结论</a>
+  <a href="#exec-summary">执行摘要</a>
+  <a href="#hotspot">热点地图</a>
+  <a href="#fact-ledger">事实台账</a>
+  <a href="#matrix">收益/风险矩阵</a>
+  <a href="#dominant">主导约束</a>
+  <a href="#rec-01">R1: 仓库瘦身</a>
+  <a href="#rec-02">R2: app 模块解耦</a>
+  <a href="#rec-03">R3: Session 巨型测试拆分</a>
+  <a href="#rec-04">R4: core 依赖重排</a>
+  <a href="#rec-05">R5: mode-fullclear 补测试</a>
+  <a href="#rec-06">R6: docs/plans 归档策略</a>
+  <a href="#pilot-board">试点演进看板</a>
+  <a href="#ownership">权责地图</a>
+  <a href="#self-review">自审</a>
+</nav>
+
+<main class="main">
+
+<!-- Cover -->
+<section id="cover" class="cover">
+  <h1>OpenCamera 目录结构工程演进诊断</h1>
+  <div class="subtitle">分析范围: 全仓库目录结构、模块边界、依赖关系、磁盘占用、变更热点 | 诊断模式 | 2026-05-29</div>
+  <div class="verdict">
+    <strong>主导约束:</strong> 仓库体积膨胀（78GB，源码仅 ~600MB）叠加 app 模块扁平化上帝类耦合，共同压制了构建速度、增量效率和模块独立交付能力。第一突破点应为 <strong>仓库瘦身 + worktree 清理</strong>——零风险、立竿见影、释放磁盘和 git 性能。
+  </div>
+  <p class="text-sm text-muted mt-8">本报告为诊断报告，不构成代码修改授权。所有建议需经明确授权后方可执行。</p>
+</section>
+
+<!-- Exec Summary -->
+<section id="exec-summary" class="card">
+  <h2>1. 执行摘要: 现在应该做什么</h2>
+
+  <h3><span class="badge badge-green">Pilot Now</span> 立即试点</h3>
+  <table>
+    <tr><th>编号</th><th>建议</th><th>收益</th><th>风险</th></tr>
+    <tr><td>R1</td><td>仓库瘦身: 清理 72 个 worktree（67GB）+ public/teotis-camera 副本（1.4GB）</td><td>释放 ~68GB 磁盘，git 操作加速</td><td><span class="badge badge-green">极低</span></td></tr>
+    <tr><td>R2</td><td>app 模块内部分包重组: 将 40+ 扁平文件按职责拆入子包</td><td>降低认知负荷，为后续解耦奠基</td><td><span class="badge badge-green">低</span></td></tr>
+    <tr><td>R3</td><td>DefaultCameraSessionTest 5594 行巨型测试拆分</td><td>降低维护成本，提升测试可读性</td><td><span class="badge badge-green">低</span></td></tr>
+  </table>
+
+  <h3 class="mt-16"><span class="badge badge-yellow">Gather Evidence Then Pilot</span> 先收集证据再试点</h3>
+  <table>
+    <tr><th>编号</th><th>建议</th><th>缺失证据</th></tr>
+    <tr><td>R4</td><td>core 模块依赖图重排: mode 传递暴露 5 个模块</td><td>需要构建耗时基线和 API 使用面分析</td></tr>
+    <tr><td>R5</td><td>feature/mode-fullclear 补充测试</td><td>需要确认模块稳定性和回归风险</td></tr>
+  </table>
+
+  <h3 class="mt-16"><span class="badge badge-gray">Stage for Later</span> 暂缓</h3>
+  <table>
+    <tr><th>编号</th><th>建议</th><th>暂缓原因</th></tr>
+    <tr><td>R6</td><td>docs/plans/ 1.1GB 编排文档归档策略</td><td>文档承载历史决策链，需业务方确认哪些可归档</td></tr>
+  </table>
+
+  <h3 class="mt-16">稳定性底线</h3>
+  <ul style="padding-left:20px;color:var(--text-secondary)">
+    <li>不得破坏现有模块间的编译依赖关系</li>
+    <li>不得删除未备份的 worktree 中的未合并工作</li>
+    <li>所有目录重组必须保持 git 历史可追溯（使用 <code>git mv</code>）</li>
+  </ul>
+</section>
+
+<!-- Hotspot Map -->
+<section id="hotspot" class="card">
+  <h2>1A. 战术入口地图: 热点 x 变更频率 x 业务影响</h2>
+  <p class="text-sm text-muted mb-8">基于最近 100 次提交的文件变更频率、文件大小和模块关键度综合评估。</p>
+  <table>
+    <tr><th>热点区域</th><th>变更频率</th><th>复杂度</th><th>业务影响</th><th>建议优先级</th></tr>
+    <tr class="hotspot-row"><td><code>SessionUiRenderModel.kt</code></td><td class="heat-high">7 次</td><td class="heat-high">2325 行 / 47 跨模块 import</td><td class="heat-high">UI 状态中枢</td><td><span class="badge badge-yellow">需证据</span></td></tr>
+    <tr class="hotspot-row"><td><code>SessionCockpitRenderModel.kt</code></td><td class="heat-high">11 次</td><td class="heat-med">816 行</td><td class="heat-high">驾驶舱渲染</td><td><span class="badge badge-yellow">需证据</span></td></tr>
+    <tr class="hotspot-row"><td><code>DefaultCameraSessionTest.kt</code></td><td class="heat-med">5 次</td><td class="heat-high">5594 行</td><td class="heat-high">Session 核心测试</td><td><span class="badge badge-green">Pilot Now</span></td></tr>
+    <tr class="hotspot-row"><td><code>FullClearModePlugin.kt</code></td><td class="heat-high">8 次</td><td class="heat-med">中等</td><td class="heat-med">新模式交付</td><td><span class="badge badge-green">Pilot Now</span></td></tr>
+    <tr class="hotspot-row"><td><code>.claude/worktrees/</code> (49个)</td><td class="heat-high">持续膨胀</td><td class="heat-high">46GB</td><td class="heat-high">磁盘/git 性能</td><td><span class="badge badge-green">Pilot Now</span></td></tr>
+    <tr class="hotspot-row"><td><code>docs/plans/</code> (1.1GB)</td><td class="heat-med">~50 commits</td><td class="heat-high">170+ 文件</td><td class="heat-med">历史决策</td><td><span class="badge badge-gray">暂缓</span></td></tr>
+    <tr class="hotspot-row"><td><code>public/teotis-camera/</code></td><td class="heat-low">5 次</td><td class="heat-high">1.4GB 全量副本</td><td class="heat-low">发布产物</td><td><span class="badge badge-green">Pilot Now</span></td></tr>
+  </table>
+</section>
+
+<!-- Fact Ledger -->
+<section id="fact-ledger" class="card">
+  <h2>2. 事实台账与系统地图</h2>
+
+  <h3>项目概览</h3>
+  <table>
+    <tr><th>维度</th><th>数据</th></tr>
+    <tr><td>语言</td><td>Kotlin 220 文件, Python 1 文件</td></tr>
+    <tr><td>模块数</td><td>1 app + 7 core + 8 feature = 16 Gradle 模块</td></tr>
+    <tr><td>源码行数（估算）</td><td>~40,000 行 Kotlin</td></tr>
+    <tr><td>仓库总大小</td><td>78GB</td></tr>
+    <tr><td>源码实际大小</td><td>~600MB (app 197MB + core 234MB + feature 130MB)</td></tr>
+    <tr><td>worktree 占用</td><td>67GB (72 个 worktree)</td></tr>
+    <tr><td>docs/plans/</td><td>1.1GB, 170+ 编排文档</td></tr>
+    <tr><td>public/teotis-camera/</td><td>1.4GB 全量代码副本（已 git track）</td></tr>
+    <tr><td>测试文件</td><td>~100 个 Test.kt 文件</td></tr>
+    <tr><td>无测试模块</td><td>feature/mode-fullclear</td></tr>
+  </table>
+
+  <h3 class="mt-16">事实台账</h3>
+  <table>
+    <tr><th>ID</th><th>可验证事实</th><th>证据位置</th><th>能力影响</th><th>待验证</th></tr>
+    <tr><td>F-01</td><td>仓库 78GB，源码仅 ~600MB；72 个 worktree 占 67GB</td><td><code>du -sh .worktrees .claude/worktrees</code></td><td>git 操作缓慢，磁盘压力</td><td>是否有 worktree 含未合并工作</td></tr>
+    <tr><td>F-02</td><td>app 模块 40+ .kt 文件在一个扁平包 <code>com.opencamera.app</code></td><td><code>app/src/main/java/com/opencamera/app/</code></td><td>认知负荷高，职责边界模糊</td><td>无</td></tr>
+    <tr><td>F-03</td><td><code>SessionUiRenderModel.kt</code> 2325 行，47 个跨模块 import，覆盖 6 个 core 模块</td><td>文件头部 import 区</td><td>改动此文件影响面大</td><td>运行时实际调用深度</td></tr>
+    <tr><td>F-04</td><td><code>AppContainer.kt</code> 51 个跨模块 import，DI 枢纽</td><td>文件头部 import 区</td><td>新增模块必须修改此处</td><td>无</td></tr>
+    <tr><td>F-05</td><td><code>DefaultCameraSessionTest.kt</code> 5594 行，被修改 20+ 次</td><td><code>git log -- core/session/src/test/.../DefaultCameraSessionTest.kt</code></td><td>每次 Session 改动都需维护此巨文件</td><td>无</td></tr>
+    <tr><td>F-06</td><td><code>core:mode</code> 使用 <code>api()</code> 依赖暴露 5 个 core 模块给下游</td><td><code>core/mode/build.gradle.kts</code></td><td>下游隐式传递依赖</td><td>移除 api 改 impl 的编译影响</td></tr>
+    <tr><td>F-07</td><td><code>core:session</code> testImplementation 依赖全部 7 个 feature 模块</td><td><code>core/session/build.gradle.kts</code></td><td>测试耦合到具体 feature 实现</td><td>是否可用 mock 替代</td></tr>
+    <tr><td>F-08</td><td><code>feature/mode-fullclear</code> 无任何测试文件</td><td>目录扫描</td><td>新功能无回归保护</td><td>无</td></tr>
+    <tr><td>F-09</td><td><code>public/teotis-camera/</code> 1.4GB 全量代码副本已被 git track</td><td><code>git ls-files -- public/teotis-camera</code></td><td>仓库膨胀，clone 变慢</td><td>该副本的实际用途</td></tr>
+    <tr><td>F-10</td><td><code>._CaptureRecordingSessionProcessor.kt</code> macOS 资源分支文件在仓库中</td><td>文件列表</td><td>代码异味，跨平台干扰</td><td>无</td></tr>
+    <tr><td>F-11</td><td><code>docs/plans/</code> 有 170+ 编排文档/目录，约 50 次提交涉及</td><td><code>git log -- docs/plans/</code></td><td>历史决策可追溯但占用大</td><td>哪些已完成可归档</td></tr>
+    <tr><td>F-12</td><td>8 个 feature 模块结构一致: 各 1 个 Plugin.kt + 依赖 core:mode 和 core:effect</td><td>各 <code>feature/*/build.gradle.kts</code></td><td>模式清晰但扩展时重复</td><td>无</td></tr>
+    <tr><td>F-13</td><td><code>SessionCockpitRenderModel.kt</code> 最近 100 次提交中变更 11 次，排名第一</td><td><code>git log --name-only -100</code></td><td>高频变更热点</td><td>变更是否收敛</td></tr>
+  </table>
+</section>
+
+<!-- Matrix -->
+<section id="matrix" class="card">
+  <h2>3. 全局矩阵: 能力收益 x 稳定性风险</h2>
+  <p class="text-sm text-muted mb-8">每个建议的定位。X 轴: 稳定性风险/过渡成本（低→高），Y 轴: 开发能力收益（低→高）。右上角为优先区。</p>
+  <svg width="100%" height="420" viewBox="0 0 800 420" style="background:#0d1117;border-radius:8px;">
+    <!-- Axes -->
+    <line x1="80" y1="380" x2="760" y2="380" stroke="#30363d" stroke-width="1"/>
+    <line x1="80" y1="380" x2="80" y2="30" stroke="#30363d" stroke-width="1"/>
+    <text x="420" y="410" text-anchor="middle" fill="#8b949e" font-size="13">稳定性风险 / 过渡成本 →</text>
+    <text x="25" y="200" text-anchor="middle" fill="#8b949e" font-size="13" transform="rotate(-90,25,200)">开发能力收益 →</text>
+    <!-- Priority zone -->
+    <rect x="80" y="30" width="340" height="175" fill="rgba(63,185,80,0.06)" stroke="rgba(63,185,80,0.2)" stroke-dasharray="6,4"/>
+    <text x="250" y="50" fill="#3fb950" font-size="12" text-anchor="middle">优先区</text>
+    <!-- Points -->
+    <circle cx="140" cy="80" r="12" fill="rgba(63,185,80,0.7)" stroke="#3fb950" stroke-width="2"/>
+    <text x="140" y="65" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="600">R1</text>
+    <circle cx="220" cy="120" r="10" fill="rgba(63,185,80,0.7)" stroke="#3fb950" stroke-width="2"/>
+    <text x="220" y="108" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="600">R2</text>
+    <circle cx="200" cy="160" r="10" fill="rgba(63,185,80,0.7)" stroke="#3fb950" stroke-width="2"/>
+    <text x="200" y="148" text-anchor="middle" fill="#3fb950" font-size="12" font-weight="600">R3</text>
+    <circle cx="450" cy="100" r="10" fill="rgba(210,153,34,0.7)" stroke="#d29922" stroke-width="2"/>
+    <text x="450" y="88" text-anchor="middle" fill="#d29922" font-size="12" font-weight="600">R4</text>
+    <circle cx="350" cy="200" r="8" fill="rgba(210,153,34,0.7)" stroke="#d29922" stroke-width="2"/>
+    <text x="350" y="190" text-anchor="middle" fill="#d29922" font-size="12" font-weight="600">R5</text>
+    <circle cx="500" cy="300" r="8" fill="rgba(139,148,158,0.7)" stroke="#8b949e" stroke-width="2"/>
+    <text x="500" y="290" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="600">R6</text>
+    <!-- Labels -->
+    <text x="160" y="85" fill="#c9d1d9" font-size="11">仓库瘦身</text>
+    <text x="240" y="125" fill="#c9d1d9" font-size="11">app 分包</text>
+    <text x="220" y="165" fill="#c9d1d9" font-size="11">测试拆分</text>
+    <text x="470" y="105" fill="#c9d1d9" font-size="11">依赖重排</text>
+    <text x="370" y="205" fill="#c9d1d9" font-size="11">补测试</text>
+    <text x="520" y="305" fill="#c9d1d9" font-size="11">文档归档</text>
+  </svg>
+</section>
+
+<!-- Dominant Constraint -->
+<section id="dominant" class="card">
+  <h2>4. 主导约束判断</h2>
+  <div style="background:rgba(248,81,73,0.08);border-left:4px solid var(--accent-red);padding:16px 20px;border-radius:0 8px 8px 0;margin:16px 0;">
+    <p><strong>主导约束:</strong> 仓库体积膨胀（78GB）与 app 模块扁平化耦合的叠加效应。</p>
+    <p class="mt-8"><strong>为什么优先于其他可见重构:</strong> SessionUiRenderModel 2325 行虽然更"吸引眼球"，但它是能力阻塞型债务的<strong>症状</strong>而非<strong>根因</strong>。根因是: (1) app 模块 40+ 文件无分包，职责边界模糊导致任何 UI 变更都需理解全局；(2) 仓库 78GB 使得 git 操作、CI clone、worktree 管理全部变慢，每次开发迭代都承受隐性税。先瘦身 + 分包，后续拆解 SessionUiRenderModel 的成本会大幅下降。</p>
+    <p class="mt-8"><strong>受影响能力:</strong> 构建速度、增量效率、新开发者上手速度、模块独立交付能力。</p>
+    <p class="mt-8"><strong>不作为的机会成本:</strong> 每次 git 操作多等数秒；每次新增功能需理解 40+ 文件的隐式职责；worktree 管理持续消耗磁盘。</p>
+    <p class="mt-8"><strong>置信度:</strong> 高（磁盘数据可直接验证）。<strong>可证伪条件:</strong> 如果 worktree 中存在大量未合并的关键工作，则清理需更谨慎。</p>
+  </div>
+</section>
+
+<!-- R1: Repo Cleanup -->
+<section id="rec-01" class="card rec-card pilot-now">
+  <h2><span class="badge badge-green">Pilot Now</span> R1: 仓库瘦身 — 清理 worktree 和冗余副本</h2>
+
+  <div class="flex-wrap mb-8">
+    <span class="badge badge-green">收益 5</span>
+    <span class="badge badge-green">可试点性 5</span>
+    <span class="badge badge-green">稳定性风险 1</span>
+    <span class="badge badge-green">可复制性 5</span>
+    <span class="badge badge-blue">证据 5</span>
+    <span class="badge badge-green">成本 1</span>
+  </div>
+  <div class="flex-wrap mb-8">
+    <span class="badge badge-blue">证据优先</span>
+    <span class="badge badge-blue">可逆验证</span>
+  </div>
+
+  <h3>证据与影响</h3>
+  <table>
+    <tr><th>项目</th><th>大小</th><th>数量</th></tr>
+    <tr><td><code>.claude/worktrees/</code></td><td>46GB</td><td>49 个 worktree</td></tr>
+    <tr><td><code>.worktrees/</code></td><td>21GB</td><td>23 个 worktree</td></tr>
+    <tr><td><code>public/teotis-camera/</code></td><td>1.4GB</td><td>全量代码副本，已被 git track</td></tr>
+    <tr><td><strong>合计可释放</strong></td><td><strong>~68GB</strong></td><td></td></tr>
+  </table>
+
+  <h3>为何持续存在</h3>
+  <p class="text-sm">技术原因: Claude Code worktree 自动创建但无自动清理机制；<code>public/teotis-camera</code> 可能是发布流程产物但未被 .gitignore 排除。组织原因: 缺乏定期仓库卫生巡检流程。</p>
+
+  <h3>保护 / 实验 / 延迟</h3>
+  <ul style="padding-left:20px">
+    <li><strong>保护:</strong> main 分支、所有已合并的提交历史</li>
+    <li><strong>实验:</strong> worktree 清理（可逐个确认后删除）</li>
+    <li><strong>延迟:</strong> <code>public/teotis-camera</code> 的用途需确认后再决定是否移除或 .gitignore</li>
+  </ul>
+
+  <h3>当前 vs 突破</h3>
+  <div class="compare">
+    <div class="current">
+      <h4>当前状态</h4>
+      <p>72 个 worktree 占 67GB；git 操作缓慢；<code>public/teotis-camera</code> 1.4GB 被 track</p>
+    </div>
+    <div class="breakthrough">
+      <h4>突破目标</h4>
+      <p>清理无未合并工作的 worktree；将 <code>public/</code> 加入 .gitignore 或移除副本；释放 ~68GB</p>
+    </div>
+  </div>
+
+  <h3>试点合同</h3>
+  <table>
+    <tr><th>维度</th><th>内容</th></tr>
+    <tr><td>未知</td><td>哪些 worktree 含未合并工作</td></tr>
+    <tr><td>范围</td><td><code>.claude/worktrees/</code> + <code>.worktrees/</code> + <code>public/teotis-camera/</code></td></tr>
+    <tr><td>负责</td><td>项目维护者</td></tr>
+    <tr><td>指标</td><td>释放磁盘量、git status 响应时间</td></tr>
+    <tr><td>时间盒</td><td>1 小时</td></tr>
+    <tr><td>回滚</td><td>worktree 可重新创建；public 副本可从 git 恢复</td></tr>
+    <tr><td>停止条件</td><td>发现 worktree 含未合并的关键实验</td></tr>
+  </table>
+
+  <h3>退出路线</h3>
+  <p class="text-sm">如果发现 worktree 含未合并工作: 暂停该 worktree 清理，合并或 cherry-pick 后再删除。其余 worktree 可继续清理。</p>
+
+  <div class="topology-compare">
+    <div class="topology-diagram current">
+      <div class="label">当前阻塞拓扑</div>
+      <div class="mermaid">flowchart TB
+        subgraph repo["仓库 78GB"]
+          src["源码 ~600MB"]
+          wt1[".claude/worktrees 46GB"]
+          wt2[".worktrees 21GB"]
+          pub["public/teotis-camera 1.4GB"]
+          docs["docs/plans 1.1GB"]
+        end
+        git["git 操作"] -->|"遍历对象"| repo
+        dev["开发者"] -->|"clone/pull 缓慢"| git
+        ci["CI"] -->|"clone 超时"| git
+        style wt1 fill:#f85149,color:#fff
+        style wt2 fill:#f85149,color:#fff
+        style pub fill:#d29922,color:#fff
+      </div>
+    </div>
+    <div class="topology-diagram elevated">
+      <div class="label">突破与展开拓扑</div>
+      <div class="mermaid">flowchart TB
+        subgraph repo["仓库 ~1.8GB"]
+          src["源码 ~600MB"]
+          clean["已清理空间"]
+          docs["docs/plans 1.1GB 归档待定"]
+        end
+        git["git 操作"] -->|"快速"| repo
+        dev["开发者"] -->|"高效"| git
+        ci["CI"] -->|"快速"| git
+        check["检查未合并工作"] -->|"安全删除"| clean
+        style clean fill:#3fb950,color:#fff
+        style check fill:#58a6ff,color:#fff
+      </div>
+    </div>
+  </div>
+
+  <h3>采用经济学</h3>
+  <table>
+    <tr><th>角色</th><th>内容</th></tr>
+    <tr><td>受益方</td><td>所有开发者（git 速度）、CI（clone 速度）</td></tr>
+    <tr><td>成本承担</td><td>几乎为零（自动清理脚本）</td></tr>
+    <tr><td>审批权</td><td>项目维护者</td></tr>
+    <tr><td>运营负责人</td><td>项目维护者</td></tr>
+  </table>
+
+  <h3>从局部到全局</h3>
+  <p class="text-sm">标准化资产: 可编写 <code>scripts/cleanup_worktrees.sh</code> 脚本，定期检查并提示废弃 worktree。后续可加入 CI pre-check。</p>
+
+  <details>
+    <summary>证据详情</summary>
+    <pre style="background:#0d1117;padding:12px;border-radius:6px;font-size:13px;overflow-x:auto;">
+# worktree 清单（部分）
+.claude/worktrees/01-app-unit-test-gate-cleanup  d895f784
+.claude/worktrees/01-effect-test-contract        a4a2586c
+.claude/worktrees/02-shutter-state-animation-v2  98ab517a
+.claude/worktrees/99-finalize                    499a5d9e
+... (共 49 个)
+
+.worktrees/ 下共 23 个
+
+# public/teotis-camera 已 git track
+$ git ls-files -- public/teotis-camera
+public/teotis-camera
+    </pre>
+  </details>
+
+  <div class="review-section" data-rec="R1">
+    <div class="stars"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+    <div class="review-tags">
+      <span class="review-tag" data-tag="agree">同意试点</span>
+      <span class="review-tag" data-tag="evidence">方向接受，先收集证据</span>
+      <span class="review-tag" data-tag="risk">关注稳定性风险</span>
+      <span class="review-tag" data-tag="exists">已存在/误判</span>
+      <span class="review-tag" data-tag="priority">与业务优先级不符</span>
+    </div>
+    <textarea placeholder="评审意见..."></textarea>
+  </div>
+</section>
+
+<!-- R2: App Module Restructure -->
+<section id="rec-02" class="card rec-card pilot-now">
+  <h2><span class="badge badge-green">Pilot Now</span> R2: app 模块内部分包重组</h2>
+
+  <div class="flex-wrap mb-8">
+    <span class="badge badge-green">收益 4</span>
+    <span class="badge badge-green">可试点性 4</span>
+    <span class="badge badge-green">稳定性风险 2</span>
+    <span class="badge badge-green">可复制性 4</span>
+    <span class="badge badge-blue">证据 4</span>
+    <span class="badge badge-yellow">成本 3</span>
+  </div>
+  <div class="flex-wrap mb-8">
+    <span class="badge badge-blue">证据优先</span>
+    <span class="badge badge-blue">可逆验证</span>
+  </div>
+
+  <h3>证据与影响</h3>
+  <p>app 模块 <code>com.opencamera.app</code> 包含 40+ .kt 文件，仅 2 个子包:</p>
+  <table>
+    <tr><th>包</th><th>文件数</th><th>代表性文件</th></tr>
+    <tr><td><code>com.opencamera.app</code> (根)</td><td>40+</td><td>SessionUiRenderModel(2325行), MainActivity(910行), AppContainer(51 imports)</td></tr>
+    <tr><td><code>com.opencamera.app.camera</code></td><td>22</td><td>CameraXCaptureAdapter, CameraSessionCoordinator</td></tr>
+    <tr><td><code>com.opencamera.app.gesture</code></td><td>5</td><td>GestureRouter, GesturePolicy</td></tr>
+    <tr><td><code>com.opencamera.app.i18n</code></td><td>1</td><td>AppTextResolver</td></tr>
+    <tr><td><code>com.opencamera.app.camera.live</code></td><td>4</td><td>LivePreviewFrameSource</td></tr>
+    <tr><td><code>com.opencamera.app.camera.device</code></td><td>1</td><td>CameraDeviceAdapter</td></tr>
+  </table>
+
+  <h3>当前 vs 突破</h3>
+  <div class="compare">
+    <div class="current">
+      <h4>当前状态</h4>
+      <p>40+ 文件平铺在同一包；Session 相关 7 个 RenderModel 混杂 UI、Settings、Camera 职责；新增功能需扫描整个目录理解上下文。</p>
+    </div>
+    <div class="breakthrough">
+      <h4>突破目标</h4>
+      <p>按职责分子包: <code>render/</code>（RenderModel 系列）、<code>ui/</code>（View 系列）、<code>settings/</code>（设置相关）、<code>orientation/</code>（方向相关）。仅移动文件，不改逻辑。</p>
+    </div>
+  </div>
+
+  <h3>试点合同</h3>
+  <table>
+    <tr><th>维度</th><th>内容</th></tr>
+    <tr><td>未知</td><td>分包后 import 路径变更的影响范围</td></tr>
+    <tr><td>范围</td><td>先试点 <code>render/</code> 子包（7 个 RenderModel 文件）</td></tr>
+    <tr><td>负责</td><td>app 模块负责人</td></tr>
+    <tr><td>指标</td><td>编译通过、测试通过、无运行时 ClassNotFound</td></tr>
+    <tr><td>时间盒</td><td>2 小时</td></tr>
+    <tr><td>回滚</td><td><code>git mv</code> 可逆</td></tr>
+  </table>
+
+  <h3>采用经济学</h3>
+  <table>
+    <tr><th>角色</th><th>内容</th></tr>
+    <tr><td>受益方</td><td>所有 app 模块开发者（认知负荷降低）</td></tr>
+    <tr><td>成本承担</td><td>IDE 重构 + import 路径更新</td></tr>
+    <tr><td>审批权</td><td>项目维护者</td></tr>
+  </table>
+
+  <div class="topology-compare">
+    <div class="topology-diagram current">
+      <div class="label">当前阻塞拓扑</div>
+      <div class="mermaid">flowchart TB
+        subgraph app["com.opencamera.app (40+ files)"]
+          srm["SessionUiRenderModel 2325行"]
+          mact["MainActivity 910行"]
+          appc["AppContainer 51 imports"]
+          v1["PreviewOverlayView"]
+          v2["FocalLengthSliderView"]
+          v3["FilterPaletteView"]
+          r1["SessionCockpitRenderModel"]
+          r2["CameraCockpitRenderModel"]
+          misc["30+ 其他文件"]
+        end
+        core["core 模块"] -->|"47 imports"| srm
+        core -->|"51 imports"| appc
+        srm -->|"互相引用"| r1
+        style app fill:#1a1a2e,stroke:#f85149
+      </div>
+    </div>
+    <div class="topology-diagram elevated">
+      <div class="label">突破与展开拓扑</div>
+      <div class="mermaid">flowchart TB
+        subgraph app["com.opencamera.app"]
+          subgraph render["render/"]
+            srm["SessionUiRenderModel"]
+            r1["SessionCockpitRenderModel"]
+            r2["CameraCockpitRenderModel"]
+          end
+          subgraph ui["ui/"]
+            v1["PreviewOverlayView"]
+            v2["FocalLengthSliderView"]
+          end
+          subgraph settings["settings/"]
+            sp["SessionSettingsManager"]
+          end
+          mact["MainActivity"]
+          appc["AppContainer"]
+        end
+        core["core 模块"] -->|"清晰边界"| render
+        core -->|"清晰边界"| settings
+        style render fill:#1a3a2e,stroke:#3fb950
+        style ui fill:#1a2a3e,stroke:#58a6ff
+        style settings fill:#2a1a3e,stroke:#d29922
+      </div>
+    </div>
+  </div>
+
+  <details>
+    <summary>app 模块文件清单（按行数排序前 15）</summary>
+    <pre style="background:#0d1117;padding:12px;border-radius:6px;font-size:13px;overflow-x:auto;">
+2325 SessionUiRenderModel.kt      ← 耦合中心
+ 910 MainActivity.kt              ← Activity 厚壳
+ 816 SessionCockpitRenderModel.kt ← 高频变更
+ 813 PreviewOverlayView.kt
+ 442 MainActivityActionBinder.kt
+ 409 MainActivityViews.kt
+ 381 FocalLengthSliderView.kt
+ 311 ShutterVisualDrawable.kt
+ 245 CockpitPanelRouter.kt
+ 236 CockpitSurfaceRenderer.kt
+ 231 SessionSettingsManager.kt
+ 230 FilterLabPanelRenderer.kt
+ 218 SettingsPanelRenderer.kt
+ 200 CameraCockpitRenderModel.kt
+    </pre>
+  </details>
+
+  <div class="review-section" data-rec="R2">
+    <div class="stars"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+    <div class="review-tags">
+      <span class="review-tag" data-tag="agree">同意试点</span>
+      <span class="review-tag" data-tag="evidence">方向接受，先收集证据</span>
+      <span class="review-tag" data-tag="risk">关注稳定性风险</span>
+      <span class="review-tag" data-tag="exists">已存在/误判</span>
+      <span class="review-tag" data-tag="priority">与业务优先级不符</span>
+    </div>
+    <textarea placeholder="评审意见..."></textarea>
+  </div>
+</section>
+
+<!-- R3: Test Split -->
+<section id="rec-03" class="card rec-card pilot-now">
+  <h2><span class="badge badge-green">Pilot Now</span> R3: DefaultCameraSessionTest 巨型测试拆分</h2>
+
+  <div class="flex-wrap mb-8">
+    <span class="badge badge-green">收益 4</span>
+    <span class="badge badge-green">可试点性 5</span>
+    <span class="badge badge-green">稳定性风险 1</span>
+    <span class="badge badge-green">可复制性 3</span>
+    <span class="badge badge-blue">证据 5</span>
+    <span class="badge badge-green">成本 2</span>
+  </div>
+
+  <h3>证据与影响</h3>
+  <p><code>DefaultCameraSessionTest.kt</code> 有 <strong>5594 行</strong>，被修改 <strong>20+ 次</strong>。这是 core:session 模块唯一的巨型测试文件，每次 Session 行为变更都需要维护此文件。</p>
+
+  <h3>当前 vs 突破</h3>
+  <div class="compare">
+    <div class="current">
+      <h4>当前状态</h4>
+      <p>5594 行单文件；测试覆盖 Session 的拍摄、录制、预览、文档批处理等所有子系统；合并冲突风险高。</p>
+    </div>
+    <div class="breakthrough">
+      <h4>突破目标</h4>
+      <p>按职责拆为: <code>CaptureSessionTest</code>、<code>RecordingSessionTest</code>、<code>PreviewSessionTest</code>、<code>DocumentBatchSessionTest</code> 等。已有 9 个独立测试文件可作模板。</p>
+    </div>
+  </div>
+
+  <h3>试点合同</h3>
+  <table>
+    <tr><th>维度</th><th>内容</th></tr>
+    <tr><td>范围</td><td>先拆出 DocumentBatch 相关测试（最近新增，边界清晰）</td></tr>
+    <tr><td>指标</td><td>拆分后全部测试通过、行数均衡</td></tr>
+    <tr><td>时间盒</td><td>2 小时</td></tr>
+    <tr><td>回滚</td><td><code>git revert</code></td></tr>
+  </table>
+
+  <details>
+    <summary>core:session 现有测试文件</summary>
+    <pre style="background:#0d1117;padding:12px;border-radius:6px;font-size:13px;">
+5594 DefaultCameraSessionTest.kt          ← 待拆分
+  CaptureFeedbackPolicyTest.kt
+  CaptureRecordingSessionProcessorTest.kt
+  LowLightPromptExpiryTest.kt
+  PerformanceLinkEventTest.kt
+  PreviewRecoverySessionProcessorTest.kt
+  PreviewSessionMutationsTest.kt
+  SessionDiagnosticsTest.kt
+  SessionIntentOwnershipTest.kt
+  ThermalBudgetBridgeTest.kt
+    </pre>
+  </details>
+
+  <div class="review-section" data-rec="R3">
+    <div class="stars"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+    <div class="review-tags">
+      <span class="review-tag" data-tag="agree">同意试点</span>
+      <span class="review-tag" data-tag="evidence">方向接受，先收集证据</span>
+      <span class="review-tag" data-tag="risk">关注稳定性风险</span>
+      <span class="review-tag" data-tag="exists">已存在/误判</span>
+      <span class="review-tag" data-tag="priority">与业务优先级不符</span>
+    </div>
+    <textarea placeholder="评审意见..."></textarea>
+  </div>
+</section>
+
+<!-- R4: Core Dependency -->
+<section id="rec-04" class="card rec-card gather-evidence">
+  <h2><span class="badge badge-yellow">Gather Evidence</span> R4: core 模块依赖图重排</h2>
+
+  <div class="flex-wrap mb-8">
+    <span class="badge badge-green">收益 4</span>
+    <span class="badge badge-yellow">可试点性 3</span>
+    <span class="badge badge-yellow">稳定性风险 3</span>
+    <span class="badge badge-green">可复制性 4</span>
+    <span class="badge badge-yellow">证据 2</span>
+    <span class="badge badge-yellow">成本 3</span>
+  </div>
+
+  <h3>证据与影响</h3>
+  <p>core 模块依赖图:</p>
+  <div class="mermaid" style="min-height:300px;">flowchart TB
+    settings["core:settings"]
+    media["core:media"] --> settings
+    effect["core:effect"] --> settings
+    effect --> media
+    capability["core:capability"] --> effect
+    capability --> media
+    device["core:device"] --> media
+    device --> settings
+    device --> capability
+    mode["core:mode"] -->|"api()"| device
+    mode -->|"api()"| media
+    mode -->|"api()"| settings
+    mode -->|"api()"| effect
+    mode -->|"api()"| capability
+    session["core:session"] --> device
+    session --> media
+    session --> mode
+    session --> effect
+    session --> capability
+    session --> settings
+    style mode fill:#d29922,color:#fff
+    style session fill:#f85149,color:#fff
+  </div>
+
+  <h3>核心问题</h3>
+  <ul style="padding-left:20px">
+    <li><code>core:mode</code> 使用 <code>api()</code> 传递暴露 5 个模块 → 下游隐式获得全部传递依赖</li>
+    <li><code>core:session</code> testImplementation 依赖全部 7 个 feature 模块 → 测试耦合到具体实现</li>
+  </ul>
+
+  <h3>缺失证据</h3>
+  <ul style="padding-left:20px">
+    <li>构建耗时基线（增量 vs 全量）</li>
+    <li><code>api()</code> → <code>implementation()</code> 的编译影响范围</li>
+    <li>feature 模块在 session 测试中的实际使用方式（是否可 mock 替代）</li>
+  </ul>
+
+  <div class="review-section" data-rec="R4">
+    <div class="stars"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+    <div class="review-tags">
+      <span class="review-tag" data-tag="agree">同意试点</span>
+      <span class="review-tag" data-tag="evidence">方向接受，先收集证据</span>
+      <span class="review-tag" data-tag="risk">关注稳定性风险</span>
+      <span class="review-tag" data-tag="exists">已存在/误判</span>
+      <span class="review-tag" data-tag="priority">与业务优先级不符</span>
+    </div>
+    <textarea placeholder="评审意见..."></textarea>
+  </div>
+</section>
+
+<!-- R5: FullClear Tests -->
+<section id="rec-05" class="card rec-card gather-evidence">
+  <h2><span class="badge badge-yellow">Gather Evidence</span> R5: feature/mode-fullclear 补充测试</h2>
+
+  <div class="flex-wrap mb-8">
+    <span class="badge badge-yellow">收益 3</span>
+    <span class="badge badge-green">可试点性 4</span>
+    <span class="badge badge-green">稳定性风险 1</span>
+    <span class="badge badge-green">可复制性 5</span>
+    <span class="badge badge-yellow">证据 3</span>
+    <span class="badge badge-green">成本 2</span>
+  </div>
+
+  <h3>证据与影响</h3>
+  <p><code>feature/mode-fullclear</code> 是唯一没有测试文件的 feature 模块，但同时也是最近变更最频繁的（8 次变更）。</p>
+  <p>其他 7 个 feature 模块均有对应的 <code>*PluginTest.kt</code>，模式一致。</p>
+
+  <h3>缺失证据</h3>
+  <ul style="padding-left:20px">
+    <li>FullClearModePlugin 是否已稳定（近期是否有频繁行为变更）</li>
+    <li>其他 feature 模块测试的实际覆盖深度（是否只是 smoke test）</li>
+  </ul>
+
+  <div class="review-section" data-rec="R5">
+    <div class="stars"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+    <div class="review-tags">
+      <span class="review-tag" data-tag="agree">同意试点</span>
+      <span class="review-tag" data-tag="evidence">方向接受，先收集证据</span>
+      <span class="review-tag" data-tag="risk">关注稳定性风险</span>
+      <span class="review-tag" data-tag="exists">已存在/误判</span>
+      <span class="review-tag" data-tag="priority">与业务优先级不符</span>
+    </div>
+    <textarea placeholder="评审意见..."></textarea>
+  </div>
+</section>
+
+<!-- R6: Docs Archive -->
+<section id="rec-06" class="card rec-card stage-later">
+  <h2><span class="badge badge-gray">Stage for Later</span> R6: docs/plans/ 归档策略</h2>
+
+  <div class="flex-wrap mb-8">
+    <span class="badge badge-yellow">收益 3</span>
+    <span class="badge badge-gray">可试点性 2</span>
+    <span class="badge badge-yellow">稳定性风险 2</span>
+    <span class="badge badge-gray">可复制性 2</span>
+    <span class="badge badge-yellow">证据 3</span>
+    <span class="badge badge-yellow">成本 3</span>
+  </div>
+
+  <h3>证据与影响</h3>
+  <p><code>docs/plans/</code> 包含 <strong>170+ 编排文档/目录</strong>，占 <strong>1.1GB</strong>，涉及约 50 次提交。这些文档记录了从 2026-05-21 到 2026-05-29 的密集开发编排历史。</p>
+
+  <h3>暂缓原因</h3>
+  <ul style="padding-left:20px">
+    <li>文档承载历史决策链，删除需业务方确认</li>
+    <li>部分编排可能仍在进行中（如 <code>i18n-multi-language-system</code>、<code>preview-zoom-discrete-stepping</code>）</li>
+    <li>归档策略需要与团队协作流程对齐</li>
+  </ul>
+
+  <div class="review-section" data-rec="R6">
+    <div class="stars"><span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span></div>
+    <div class="review-tags">
+      <span class="review-tag" data-tag="agree">同意试点</span>
+      <span class="review-tag" data-tag="evidence">方向接受，先收集证据</span>
+      <span class="review-tag" data-tag="risk">关注稳定性风险</span>
+      <span class="review-tag" data-tag="exists">已存在/误判</span>
+      <span class="review-tag" data-tag="priority">与业务优先级不符</span>
+    </div>
+    <textarea placeholder="评审意见..."></textarea>
+  </div>
+</section>
+
+<!-- Pilot Board -->
+<section id="pilot-board" class="card">
+  <h2>6. 试点演进看板</h2>
+
+  <div class="pilot-phase">
+    <div class="phase-label">0→1</div>
+    <div class="phase-content">
+      <p><strong>收集证据 & 建立可观测性</strong></p>
+      <p class="text-sm text-muted">R1: 确认 worktree 未合并状态 | R4: 测量构建耗时基线</p>
+    </div>
+  </div>
+  <div class="pilot-phase">
+    <div class="phase-label">1→2</div>
+    <div class="phase-content">
+      <p><strong>受控试点</strong></p>
+      <p class="text-sm text-muted">R1: 清理 worktree + public 副本 | R2: 先移动 render/ 子包 | R3: 拆出 DocumentBatch 测试</p>
+    </div>
+  </div>
+  <div class="pilot-phase">
+    <div class="phase-label">2→3</div>
+    <div class="phase-content">
+      <p><strong>标准化复制</strong></p>
+      <p class="text-sm text-muted">编写 worktree 清理脚本 | app 分包模板 | 测试拆分指南</p>
+    </div>
+  </div>
+  <div class="pilot-phase">
+    <div class="phase-label">3→4</div>
+    <div class="phase-content">
+      <p><strong>全面铺展 & 旧路径退役</strong></p>
+      <p class="text-sm text-muted">R4: core 依赖重排 | R6: docs 归档 | 旧包名通过 typealias 过渡后移除</p>
+    </div>
+  </div>
+</section>
+
+<!-- Ownership -->
+<section id="ownership" class="card">
+  <h2>7. 权责地图</h2>
+  <table>
+    <tr><th>建议</th><th>负责人</th><th>受益方</th><th>成本承担</th><th>审批权</th></tr>
+    <tr><td>R1 仓库瘦身</td><td>项目维护者</td><td>全员</td><td>近零</td><td>项目维护者</td></tr>
+    <tr><td>R2 app 分包</td><td>app 模块开发者</td><td>app 模块开发者</td><td>IDE 重构</td><td>项目维护者</td></tr>
+    <tr><td>R3 测试拆分</td><td>Session 模块开发者</td><td>Session 模块开发者</td><td>拆分 + 验证</td><td>项目维护者</td></tr>
+    <tr><td>R4 依赖重排</td><td>待定</td><td>全员</td><td>编译修复</td><td>项目维护者</td></tr>
+    <tr><td>R5 补测试</td><td>FullClear 开发者</td><td>FullClear 开发者</td><td>编写测试</td><td>项目维护者</td></tr>
+    <tr><td>R6 文档归档</td><td>待定</td><td>全员</td><td>确认 + 移动</td><td>业务方</td></tr>
+  </table>
+</section>
+
+<!-- Self Review -->
+<section id="self-review" class="card">
+  <h2>8. 自审</h2>
+  <table>
+    <tr><th>维度</th><th>说明</th></tr>
+    <tr><td>未读/未验证区域</td><td>未运行 <code>./gradlew build</code> 验证实际构建耗时；未检查 worktree 中是否有未合并的关键实验</td></tr>
+    <tr><td>基于推断而非事实</td><td>app 分包的具体子包划分基于文件名推断，未深入阅读每个文件的职责</td></tr>
+    <tr><td>用户需补充的业务约束</td><td><code>public/teotis-camera</code> 的实际用途（发布产物？历史备份？）；哪些 docs/plans 是已完成的</td></tr>
+    <tr><td>本轮最可能出错之处</td><td>低估了 SessionUiRenderModel 拆分的紧迫性——如果它确实是每次迭代的瓶颈，则应提升优先级</td></tr>
+  </table>
+</section>
+
+</main>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('active')">
+  <div class="mermaid" id="lb-content"></div>
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="exportReview()">导出评审下一轮</button>
+<div class="toast" id="toast">已复制。粘贴到 AI 中进行下一轮务实工程演进评审。</div>
+
+<script>
+// TOC scroll linkage
+const sections = document.querySelectorAll('section[id]');
+const tocLinks = document.querySelectorAll('.toc a');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      tocLinks.forEach(l => l.classList.remove('active'));
+      const link = document.querySelector(`.toc a[href="#${entry.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => observer.observe(s));
+
+// Star ratings
+document.querySelectorAll('.review-section .stars span').forEach(star => {
+  star.addEventListener('click', () => {
+    const parent = star.parentElement;
+    const val = parseInt(star.dataset.v);
+    parent.querySelectorAll('span').forEach(s => {
+      s.classList.toggle('on', parseInt(s.dataset.v) <= val);
+    });
+    parent.dataset.rating = val;
+  });
+});
+
+// Review tags
+document.querySelectorAll('.review-tag').forEach(tag => {
+  tag.addEventListener('click', () => {
+    tag.parentElement.querySelectorAll('.review-tag').forEach(t => t.classList.remove('selected'));
+    tag.classList.add('selected');
+  });
+});
+
+// Lightbox for topology diagrams
+document.querySelectorAll('.topology-diagram .mermaid').forEach(el => {
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    const lb = document.getElementById('lightbox');
+    const content = document.getElementById('lb-content');
+    content.innerHTML = el.innerHTML;
+    lb.classList.add('active');
+  });
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('active');
+});
+
+// Export review
+function exportReview() {
+  let md = '# 务实工程演进评审反馈\n\n';
+  document.querySelectorAll('.review-section').forEach(sec => {
+    const rec = sec.dataset.rec;
+    const stars = sec.querySelector('.stars');
+    const rating = stars ? stars.dataset.rating || '未评分' : '未评分';
+    const selectedTag = sec.querySelector('.review-tag.selected');
+    const tagText = selectedTag ? selectedTag.textContent : '未选择';
+    const textarea = sec.querySelector('textarea');
+    const comment = textarea ? textarea.value : '';
+    md += `## ${rec}\n`;
+    md += `- 评分: ${'★'.repeat(parseInt(rating) || 0)}${'☆'.repeat(5 - (parseInt(rating) || 0))} (${rating}/5)\n`;
+    md += `- 状态: ${tagText}\n`;
+    md += `- 评审意见: ${comment || '无'}\n\n`;
+  });
+  md += '---\n\n';
+  md += '[Next Round Action Directive] Incorporate my review from the perspective of pragmatic engineering renewal: do not advance a proposal merely because it is conceptually elegant, and do not stop action merely because the legacy system is complex. First revise the dominant-constraint judgment according to evidence, then re-rank the recommendations by capability benefit, pilotability, stability floor, replication and scale cost, accountable ownership, and rollback capability. For directions I approved that already have sufficient evidence and safety boundaries, provide a minimum executable pilot package, acceptance metrics, rollback plan, and path from local validation to scaled adoption. Only modify code directly within a scope I have explicitly authorized for implementation. For directions I challenged, clearly state why they are retained, revised, or abandoned.';
+  navigator.clipboard.writeText(md).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  });
+}
+</script>
+</body>
+</html>
