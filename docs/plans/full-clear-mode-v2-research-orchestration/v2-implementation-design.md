@@ -149,7 +149,7 @@ fun assessFullClearScene(
 ): FullClearSceneAssessment {
     // 1. Check if any route is possible
     val routeResult = selectFullClearRoute(capabilities, nearHint, farHint, stability)
-
+    
     // 2. Build diagnostics
     val diags = buildList {
         add("fc:assessment:route=${routeResult.route.name.lowercase()}")
@@ -157,7 +157,7 @@ fun assessFullClearScene(
         nearHint.source.let { add("fc:near-source=$it") }
         stability.source.let { add("fc:stability-source=$it") }
     }
-
+    
     return FullClearSceneAssessment(
         nearSubject = nearHint,
         farBackground = farHint,
@@ -258,19 +258,23 @@ fun selectFullClearRoute(
     farHint: SubjectDistanceEstimate,
     stability: SceneStabilitySignal
 ): RouteSelectionResult {
+    // Degradation reasons accumulate; the best available route wins
+
     // 1. Unsupported check
     if (!capabilities.supportsManualControls && !capabilities.hasUltraWideLens) {
         return RouteSelectionResult(FullClearRoute.UNSUPPORTED, 0f, listOf("no-manual-controls-no-uw"))
     }
 
-    // 2. Deep-DOF path: always preferred when ultra-wide exists
+    // 2. Deep-DOF path: always preferred when ultra-wide exists and subject is not too close
     if (capabilities.hasUltraWideLens) {
         val uwMinDiopters = capabilities.ultraWideMinFocusDiopters ?: 0f
         val nearDiopters = nearHint.minDiopters
         if (nearDiopters == null || nearDiopters <= uwMinDiopters) {
+            // Subject within ultra-wide focus range → route to deep-DOF
             val confidence = if (nearDiopters != null) 0.9f else 0.7f
             return RouteSelectionResult(FullClearRoute.DEEP_DOF_LENS, confidence, emptyList())
         }
+        // Subject too close → deep-DOF degraded but still preferred over nothing
         if (!capabilities.focusDistanceWritable) {
             return RouteSelectionResult(
                 FullClearRoute.DEEP_DOF_LENS, 0.5f,
@@ -282,6 +286,7 @@ fun selectFullClearRoute(
     // 3. Focus bracket path: requires writable focus distance
     if (capabilities.focusDistanceWritable && capabilities.maxBracketFrames >= 2) {
         if (!stability.isStable) {
+            // Bracket requires stability
             return RouteSelectionResult(
                 FullClearRoute.FOCUS_BRACKET, 0.3f,
                 listOf("bracket-unstable")
@@ -295,7 +300,7 @@ fun selectFullClearRoute(
         return RouteSelectionResult(FullClearRoute.FOCUS_BRACKET, confidence, emptyList())
     }
 
-    // 4. Lens-pair bracket: experimental
+    // 4. Lens-pair bracket: experimental, requires both tele and wide
     if (capabilities.hasTelephotoLens && capabilities.hasUltraWideLens) {
         return RouteSelectionResult(
             FullClearRoute.LENS_PAIR_BRACKET, 0.3f,
@@ -326,7 +331,7 @@ data class FocusBracketStep(
 
 data class FullClearCapturePlan(
     val route: FullClearRoute,
-    val lensNode: LensNode,
+    val lensNode: LensNode,  // WIDE, TELEPHOTO, etc.
     val bracketSteps: List<FocusBracketStep>,
     val maxTotalLatencyMs: Long,
     val fallbackPolicy: FullClearFallbackPolicy,
@@ -334,8 +339,13 @@ data class FullClearCapturePlan(
 )
 
 enum class FullClearFallbackPolicy {
+    /** On any bracket frame failure, save the best captured frame. */
     SAVE_BEST_AVAILABLE_FRAME,
+
+    /** On bracket failure, retry as single-frame with best-guess focus. */
     RETRY_SINGLE_FRAME,
+
+    /** On failure, report error to user. */
     REPORT_ERROR
 }
 
@@ -347,7 +357,7 @@ fun buildFullClearCapturePlan(
     return when (route) {
         FullClearRoute.DEEP_DOF_LENS -> FullClearCapturePlan(
             route = route,
-            lensNode = LensNode.WIDE,
+            lensNode = LensNode.WIDE,  // ultra-wide mapped through zoom
             bracketSteps = emptyList(),
             maxTotalLatencyMs = 1_000L,
             fallbackPolicy = FullClearFallbackPolicy.RETRY_SINGLE_FRAME,
@@ -356,15 +366,14 @@ fun buildFullClearCapturePlan(
 
         FullClearRoute.FOCUS_BRACKET -> {
             val nearDiopters = assessment.nearSubject.minDiopters ?: 3f
-            val farDiopters = 0f
+            val farDiopters = 0f  // infinity
             val frameCount = capabilities.maxBracketFrames.coerceIn(3, 6)
             val steps = buildFocusBracketSteps(nearDiopters, farDiopters, frameCount)
             FullClearCapturePlan(
                 route = route,
                 lensNode = LensNode.WIDE,
                 bracketSteps = steps,
-                maxTotalLatencyMs = frameCount *
-                    (capabilities.focusDistancePerFrameLatencyMs ?: 300L) + 2_000L,
+                maxTotalLatencyMs = frameCount * (capabilities.focusDistancePerFrameLatencyMs ?: 300L) + 2_000L,
                 fallbackPolicy = FullClearFallbackPolicy.SAVE_BEST_AVAILABLE_FRAME,
                 diagnostics = listOf(
                     "fc:plan:focus-bracket:frames=$frameCount",
@@ -412,7 +421,9 @@ private fun buildFocusBracketSteps(
     frameCount: Int
 ): List<FocusBracketStep> {
     val steps = mutableListOf<FocusBracketStep>()
+    // Near focus
     steps.add(FocusBracketStep(0, nearDiopters, "near"))
+    // Mid points
     if (frameCount > 2) {
         val midCount = frameCount - 2
         for (i in 1..midCount) {
@@ -421,6 +432,7 @@ private fun buildFocusBracketSteps(
             steps.add(FocusBracketStep(i, diopters, "mid-$i"))
         }
     }
+    // Far focus
     steps.add(FocusBracketStep(frameCount - 1, farDiopters, "far"))
     return steps
 }
@@ -529,6 +541,8 @@ The app-layer CameraX adapter reads `perFrameFocusOverrides` and applies the cor
 
 ### Capability Detection
 
+New capability queries added to `DeviceCapabilities` or a V2-specific extension:
+
 ```kotlin
 // Placement: core/device
 
@@ -538,14 +552,21 @@ fun DeviceCapabilities.fullClearCapabilities(): FullClearDeviceCapabilities =
 
 Real-device profiling values (`ultraWideMinFocusDiopters`, `focusDistancePerFrameLatencyMs`, `lensSwitchLatencyMs`) are populated by the app-layer Camera2 query at session start, stored in `DeviceCapabilities`, and consumed by the pure route selection function. This keeps the route selection testable: tests inject `FullClearDeviceCapabilities` with known values; real devices provide real values.
 
-### DeviceGraphSpec For Full Clear Route
+### DeviceGraphSpec Extension
+
+For the deep-DOF path, the mode controller needs to request the ultra-wide lens:
 
 ```kotlin
+// The existing DeviceGraphSpec already supports zoom ratio selection
+// which maps to lens switching through ZoomRatioCapability.lensNodeMap.
+// V2 uses the existing mechanism:
+
 fun fullClearDeviceGraph(
     plan: FullClearCapturePlan,
     runtimeState: ModeRuntimeState
 ): DeviceGraphSpec {
     val base = stillCaptureDeviceGraph(runtimeState)
+    // For deep-DOF, request 0.5x or 0.6x zoom to engage ultra-wide
     val zoomForRoute = when (plan.route) {
         FullClearRoute.DEEP_DOF_LENS -> 0.6f
         else -> base.preview.zoomRatio
@@ -571,10 +592,22 @@ data class FullClearFusionReport(
     val route: FullClearRoute,
     val lensUsed: LensNode,
     val bracketFrameCount: Int,
-    val alignmentConfidence: Float,
-    val alignmentMetric: String,     // "homography_ncc", "homography_only", "none"
-    val fusionConfidence: Float,
-    val fusionMetric: String,        // "laplacian_pyramid", "simple_blend", "none"
+    // Alignment stage diagnostics
+    val alignmentConfidence: Float,       // 0.0–1.0 composite alignment score
+    val alignmentMetric: String,          // "orb_homography_ncc", "homography_only", "none"
+    val perFrameInlierRatios: List<Float>, // one per non-reference frame
+    // Breathing stage diagnostics
+    val breathingSeverity: Float,         // 0.0–1.0, from scale deviation and overlap loss
+    val breathingOverlapRatio: Float,     // overlap ratio after breathing correction
+    // Sharpness stage diagnostics
+    val perFrameSharpnessScores: List<Float>, // Laplacian variance per frame
+    val referenceFrameIndex: Int,         // which frame was used as alignment reference
+    // Fusion stage diagnostics
+    val fusionConfidence: Float,          // 0.0–1.0 composite fusion quality score
+    val fusionMetric: String,             // "laplacian_pyramid_max", "simple_blend", "none"
+    val edgeConsistencyScore: Float,      // 0.0–1.0, ghost/double-edge detection
+    val ghostRejectionApplied: Boolean,   // whether ghost rejection was triggered
+    // Result
     val resultState: FullClearResultState,
     val degradationReasons: List<String>,
     val timestampMs: Long,
@@ -584,10 +617,26 @@ data class FullClearFusionReport(
         add("fc:route=${route.name.lowercase()}")
         add("fc:lens=${lensUsed.tagValue}")
         add("fc:frames=$bracketFrameCount")
+        add("fc:ref-frame=$referenceFrameIndex")
+        // Alignment
         add("fc:align-confidence=$alignmentConfidence")
         add("fc:align-metric=$alignmentMetric")
+        perFrameInlierRatios.forEachIndexed { i, r ->
+            add("fc:align-inlier[$i]=$r")
+        }
+        // Breathing
+        add("fc:breathing-severity=$breathingSeverity")
+        add("fc:breathing-overlap=$breathingOverlapRatio")
+        // Sharpness
+        perFrameSharpnessScores.forEachIndexed { i, s ->
+            add("fc:sharpness[$i]=$s")
+        }
+        // Fusion
         add("fc:fusion-confidence=$fusionConfidence")
         add("fc:fusion-metric=$fusionMetric")
+        add("fc:edge-consistency=$edgeConsistencyScore")
+        add("fc:ghost-rejection=$ghostRejectionApplied")
+        // Result
         add("fc:result=${resultState.name.lowercase()}")
         degradationReasons.forEach { add("fc:degraded=$it") }
         add("fc:timestamp=$timestampMs")
@@ -596,18 +645,28 @@ data class FullClearFusionReport(
 }
 
 enum class FullClearResultState {
+    /** Multi-frame fusion succeeded with acceptable confidence. */
     FUSED,
+
+    /** Fusion gates failed or were bypassed; single sharpest frame saved. */
     BEST_FRAME,
+
+    /** Fusion applied but with known quality issues (breathing, ghost, etc.). */
     DEGRADED
 }
 ```
 
 ### FullClearFusionProcessor
 
-A new `AlgorithmProcessor` implementation reusing the existing `MULTI_FRAME_MERGE` algorithm type:
+A new `AlgorithmProcessor` implementation (like the existing `MultiFrameMergePlaceholderPostProcessor`):
 
 ```kotlin
 // Placement: core/media or app layer
+
+**FullClearFusionProcessor** delegates to the fusion pipeline stages defined below. The processor itself is a thin orchestrator; each stage is independently testable.
+
+```kotlin
+// Placement: core/media
 
 class FullClearFusionProcessor : AlgorithmProcessor {
     override val type: AlgorithmType = AlgorithmType.MULTI_FRAME_MERGE
@@ -618,41 +677,77 @@ class FullClearFusionProcessor : AlgorithmProcessor {
     }
 
     override suspend fun process(request: AlgorithmRequest): AlgorithmResult {
-        val frameCount = request.metadata.customTags["fcFrameCount"]?.toIntOrNull() ?: 1
         val route = request.metadata.customTags["fcRoute"] ?: "unknown"
+        val frameCount = request.metadata.customTags["fcFrameCount"]?.toIntOrNull() ?: 1
+        val sessionId = request.metadata.customTags["sessionId"] ?: "unknown"
 
-        // 1. Load frames
-        // 2. Coarse alignment (global homography)
-        // 3. Alignment confidence check → gate fusion
-        // 4. Lens breathing compensation
-        // 5. Sharpness map per frame
-        // 6. Laplacian pyramid fusion
-        // 7. Fusion confidence check → gate output
-        // 8. Fallback: save best single frame if confidence below threshold
+        // Stage 0: Load and normalize frames
+        val frames = loadFrames(request.inputs)
+        val normalized = ExposureNormalizer.normalize(frames)
 
-        val report = FullClearFusionReport(
-            route = FullClearRoute.valueOf(route.uppercase()),
-            lensUsed = LensNode.WIDE,
-            bracketFrameCount = frameCount,
-            alignmentConfidence = 0f,  // placeholder
-            alignmentMetric = "none",
-            fusionConfidence = 0f,     // placeholder
-            fusionMetric = "none",
-            resultState = FullClearResultState.BEST_FRAME,
-            degradationReasons = listOf("fc:placeholder-processor"),
-            timestampMs = System.currentTimeMillis(),
-            sessionId = request.metadata.customTags["sessionId"] ?: "unknown"
+        // Stage 1: Coarse alignment (ORB + homography)
+        val refIndex = selectReferenceFrame(normalized)
+        val alignments = normalized.mapIndexedNotNull { i, frame ->
+            if (i == refIndex) null
+            else FrameAligner.align(normalized[refIndex], frame, i)
+        }
+
+        // Stage 2: Alignment confidence gate
+        val alignmentResult = AlignmentConfidenceEvaluator.evaluate(alignments)
+        if (alignmentResult.confidence < ALIGNMENT_THRESHOLD) {
+            return buildBestFrameResult(request, frames, refIndex, route, sessionId,
+                alignmentResult, degradationReasons = listOf("alignment-below-threshold"))
+        }
+
+        // Stage 3: Lens breathing compensation
+        val breathingResult = BreathingCompensator.compensate(
+            normalized[refIndex], normalized, alignments
+        )
+
+        // Stage 4: Sharpness maps
+        val sharpnessMaps = SharpnessMapGenerator.generate(normalized)
+
+        // Stage 5: Laplacian pyramid fusion
+        val fusedImage = LaplacianPyramidFuser.fuse(
+            frames = normalized,
+            alignments = alignments,
+            sharpnessMaps = sharpnessMaps,
+            referenceIndex = refIndex,
+            breathingCompensation = breathingResult
+        )
+
+        // Stage 6: Fusion confidence gate
+        val fusionConf = FusionConfidenceEvaluator.evaluate(
+            fusedImage, normalized, alignments
+        )
+        if (fusionConf.confidence < FUSION_THRESHOLD) {
+            return buildBestFrameResult(request, frames, refIndex, route, sessionId,
+                alignmentConfidence = alignmentResult.confidence,
+                breathingResult = breathingResult,
+                sharpnessMaps = sharpnessMaps,
+                fusionConfidence = fusionConf,
+                degradationReasons = listOf("fusion-below-threshold")
+            )
+        }
+
+        // Stage 7: Output selection
+        val report = buildFusionReport(
+            route = route, refIndex = refIndex, frameCount = frameCount,
+            alignments = alignments, alignmentResult = alignmentResult,
+            breathingResult = breathingResult, sharpnessMaps = sharpnessMaps,
+            fusionConf = fusionConf, resultState = FullClearResultState.FUSED,
+            sessionId = sessionId
         )
 
         return AlgorithmResult.Applied(
-            output = request.inputs.first().handle,
+            output = fusedImage.handle,
             notes = report.toPipelineNotes()
         )
     }
 }
 ```
 
-**Real fusion is deferred to package 04 (algorithm design).** The architecture preserves the contract while the algorithm is designed separately.
+
 
 ### ShotGraph for Full Clear
 
@@ -669,7 +764,531 @@ ShotGraph for FOCUS_BRACKET:
     - PRIMARY_STILL (mimeType = image/jpeg)
 ```
 
-No new `ShotKind` needed. No new `AlgorithmType` needed for the initial contract. V2-specific behavior (focus-distance per frame, alignment check, fusion confidence) is driven by metadata tags.
+No new `ShotKind` needed. No new `AlgorithmType` needed for the initial contract. The V2-specific behavior (focus-distance per frame, alignment check, fusion confidence) is driven by metadata tags on the `ShotRequest` and `AlgorithmRequest`.
+
+---
+
+## V2 Fusion Algorithm Design
+
+This section defines the fusion algorithm stages, confidence gates, fallback decision tree, and data contracts. Every stage is designed as a pure function on input frames — no HAL, no CameraX, no I/O inside the algorithm. This makes every stage independently unit-testable with synthetic frame pairs.
+
+### Algorithm Overview
+
+```
+Bracket Frames (N) ──────────────────────────────────────────────────────┐
+                                                                          │
+  ┌──────────────────────────────────────────────────────────────────┐   │
+  │ Stage 0: Exposure Normalization                                   │   │
+  │   • Convert YUV → linear RGB working space                        │   │
+  │   • Histogram-mean matching across frames                         │   │
+  │   • Select reference frame (highest Laplacian variance)           │   │
+  └────────────────────────────┬─────────────────────────────────────┘   │
+                               ▼                                          │
+  ┌──────────────────────────────────────────────────────────────────┐   │
+  │ Stage 1: Coarse Alignment (ORB + Homography)                      │   │
+  │   • Detect ORB features on each frame                             │   │
+  │   • Match features: reference ↔ each bracket frame                │   │
+  │   • Estimate global homography via RANSAC                         │   │
+  │   • Output: N-1 homography matrices, inlier ratios                │   │
+  └────────────────────────────┬─────────────────────────────────────┘   │
+                               ▼                                          │
+  ┌──────────────────────────────────────────────────────────────────┐   │
+  │ Stage 2: Alignment Confidence Gate                                 │   │
+  │   • Warp each frame by its homography                             │   │
+  │   • Compute NCC on 16×16 grid between warped frame and reference  │   │
+  │   • alignmentConfidence = mean(grid NCC) × mean(inlier ratio)     │   │
+  │   • GATE: if < 0.6 → BEST_FRAME fallback                          │   │
+  └────────────────────────────┬─────────────────────────────────────┘   │
+                               ▼ (passed)                                 │
+  ┌──────────────────────────────────────────────────────────────────┐   │
+  │ Stage 3: Lens Breathing Compensation                              │   │
+  │   • Extract scale component from homography matrices              │   │
+  │   • If scale deviation > 5%: crop/scale to match reference FOV    │   │
+  │   • Compute corrected overlap ratio                               │   │
+  │   • breathingSeverity = f(scale deviation, overlap loss)          │   │
+  └────────────────────────────┬─────────────────────────────────────┘   │
+                               ▼                                          │
+  ┌──────────────────────────────────────────────────────────────────┐   │
+  │ Stage 4: Sharpness Map Per Frame                                  │   │
+  │   • Compute Laplacian variance on 8×8 blocks per frame            │   │
+  │   • Normalize scores to [0, 1] per frame                          │   │
+  │   • Bilinear interpolation to per-pixel weight map                │   │
+  └────────────────────────────┬─────────────────────────────────────┘   │
+                               ▼                                          │
+  ┌──────────────────────────────────────────────────────────────────┐   │
+  │ Stage 5: Laplacian Pyramid Fusion                                 │   │
+  │   • Build Gaussian pyramid (4 levels) per aligned frame           │   │
+  │   • Build Laplacian pyramid from Gaussian differences             │   │
+  │   • At each level: blend using per-pixel max-sharpness weight     │   │
+  │   • Collapse pyramid → fused RGB image                            │   │
+  └────────────────────────────┬─────────────────────────────────────┘   │
+                               ▼                                          │
+  ┌──────────────────────────────────────────────────────────────────┐   │
+  │ Stage 6: Fusion Confidence Gate                                    │   │
+  │   • Edge consistency: Canny on fused vs per-frame edges           │   │
+  │   • Ghost detection: double-edge signature in fused result        │   │
+  │   • Artifact check: variance in fused flat regions                │   │
+  │   • GATE: if fusionConfidence < 0.5 → BEST_FRAME fallback         │   │
+  └────────────────────────────┬─────────────────────────────────────┘   │
+                               ▼ (passed)                                 │
+  ┌──────────────────────────────────────────────────────────────────┐   │
+  │ Stage 7: Output Selection                                         │   │
+  │   • FUSED: both gates passed, no severe breathing                 │   │
+  │   • DEGRADED: gates passed but breathing severity > 0.3           │   │
+  │   • BEST_FRAME: any gate failed → save sharpest single frame      │   │
+  └──────────────────────────────────────────────────────────────────┘   │
+```
+
+### Algorithm Thresholds
+
+All thresholds are tunable constants, not magic numbers. They should be validated on real-device data during implementation.
+
+| Threshold | Default | Meaning | Validation Method |
+|---|---|---|---|
+| `ALIGNMENT_THRESHOLD` | 0.6 | Minimum alignment confidence to proceed to fusion | Real-device pass rate on handheld bracket pairs |
+| `FUSION_THRESHOLD` | 0.5 | Minimum fusion confidence to accept fused output | Perceptual comparison: fused vs best-frame |
+| `BREATHING_SEVERITY_THRESHOLD` | 0.3 | Max breathing severity before result is marked DEGRADED | Real-device lens characterization |
+| `INLIER_RATIO_MIN` | 0.3 | Minimum inlier ratio for homography to be considered valid | ORB on smartphone bracket frames |
+| `SCALE_DEVIATION_MAX` | 0.05 | Max homography scale deviation from identity (5%) before breathing correction activates | Lens calibration data |
+| `OVERLAP_MIN` | 0.8 | Minimum corrected overlap ratio before breathing is considered severe | Real-device FOV shift measurement |
+| `SHARPNESS_MIN` | 0.1 | Per-frame mean sharpness below which a frame is tagged as potentially blurred | OOF detection on real frames |
+| `PYRAMID_LEVELS` | 4 | Number of Laplacian pyramid levels | Determined by bracket frame resolution |
+| `NCC_GRID_SIZE` | 16 | Grid dimension for NCC computation | Balance between spatial precision and noise |
+
+### Stage 0: Exposure Normalization
+
+**Purpose**: Different focus distances produce different exposures (AF adjusts exposure per focus plane). Before alignment and fusion, frames must be normalized to comparable brightness and color.
+
+**Algorithm**:
+1. Convert each frame from YUV_420_888 (CameraX default) to linear RGB working space.
+2. Compute per-channel histogram mean (R, G, B) for each frame.
+3. Select the frame with the highest Laplacian variance as the reference frame. This is typically the mid-focus frame where the subject is sharpest.
+4. For each non-reference frame, compute per-channel gain: `gain_c = mean_ref_c / mean_frame_c`, clamped to [0.5, 2.0] to prevent extreme correction.
+5. Apply gain to each non-reference frame.
+6. Clip to [0.0, 1.0] range.
+
+**Contract**:
+```kotlin
+object ExposureNormalizer {
+    data class NormalizedFrames(
+        val frames: List<RGBFrame>,
+        val referenceIndex: Int,
+        val perFrameGains: List<FloatArray>,  // [R, G, B] per frame
+        val diagnostics: List<String>
+    )
+
+    fun normalize(frames: List<ImageProxy>): NormalizedFrames
+    fun selectReferenceFrame(frames: List<RGBFrame>): Int  // highest Laplacian variance
+}
+```
+
+**Testability**: Pure function on pixel buffers. Test with synthetic frames of known brightness offsets → verify gain computation and clipping.
+
+### Stage 1: Coarse Alignment (ORB + Homography)
+
+**Purpose**: Estimate the geometric transform between each bracket frame and the reference frame. Handheld bracket frames have small inter-frame translations (hand shake) and small rotations.
+
+**Algorithm**:
+1. Detect ORB features on each frame (target: 500 features per frame). ORB is chosen over SIFT for speed and over Harris corners for rotation invariance. The inter-frame motion between bracket frames is small (< 5% frame dimension), so feature quality matters more than feature quantity.
+2. For each non-reference frame `i`:
+   a. Match ORB descriptors between reference and frame `i` using brute-force Hamming distance with Lowe's ratio test (ratio = 0.75).
+   b. Filter matches: keep only matches where `best_distance < 0.75 * second_best_distance`.
+   c. Estimate global homography (3×3 matrix) from matched point pairs using RANSAC with 4-point minimal solver.
+   d. Record inlier ratio: `inliers.count / matches.count`.
+3. If inlier ratio < `INLIER_RATIO_MIN` (0.3) for any frame pair, that frame is excluded from fusion. If all frame pairs fail, alignment is impossible → BEST_FRAME fallback.
+
+**Contract**:
+```kotlin
+data class FrameAlignment(
+    val frameIndex: Int,
+    val homography: FloatArray,   // 3×3 row-major
+    val inlierCount: Int,
+    val matchCount: Int,
+    val inlierRatio: Float        // inlierCount / matchCount
+)
+
+object FrameAligner {
+    fun align(ref: RGBFrame, target: RGBFrame, targetIndex: Int): FrameAlignment?
+    // Returns null if inlier ratio < INLIER_RATIO_MIN
+}
+```
+
+**Testability**: Pure function. Test with synthetic frame pairs:
+- Identity transform (same image) → verify homography ≈ identity, inlier ratio ≈ 1.0
+- Known translation (10px right, 5px down) → verify homography encodes correct translation
+- Known rotation (2°) → verify homography encodes correct rotation
+- Purely random images → verify inlier ratio < 0.3, returns null
+
+### Stage 2: Alignment Confidence Gate
+
+**Purpose**: Even when homography estimation "succeeds" (enough inliers), the alignment may be poor due to parallax, subject movement, or rolling shutter. NCC on a grid provides spatially-aware alignment quality.
+
+**Algorithm**:
+1. Warp each non-reference frame by its homography matrix (bilinear interpolation).
+2. For each warped frame pair `(warped_i, reference)`:
+   a. Divide both images into an `NCC_GRID_SIZE × NCC_GRID_SIZE` grid (16×16 = 256 cells).
+   b. For each grid cell, compute Normalized Cross-Correlation (NCC):
+      `NCC = Σ((A - μ_A)(B - μ_B)) / sqrt(Σ(A - μ_A)² · Σ(B - μ_B)²)`
+   c. The grid NCC score for frame `i` is the mean of all cell NCC values.
+3. Composite alignment confidence:
+   `alignmentConfidence = mean(grid_ncc_scores) * mean(all_inlier_ratios)`
+   This weights both feature-level agreement (inliers) and pixel-level agreement (NCC).
+4. Gate: if `alignmentConfidence < ALIGNMENT_THRESHOLD (0.6)` → BEST_FRAME fallback.
+
+**Contract**:
+```kotlin
+data class AlignmentConfidenceResult(
+    val confidence: Float,              // composite 0–1
+    val perFrameNccScores: List<Float>, // mean NCC per frame pair
+    val perFrameInlierRatios: List<Float>,
+    val passed: Boolean                 // confidence >= ALIGNMENT_THRESHOLD
+)
+
+object AlignmentConfidenceEvaluator {
+    fun evaluate(alignments: List<FrameAlignment>): AlignmentConfidenceResult
+}
+```
+
+**Testability**: Pure function. Test with:
+- Perfectly aligned frames (same image) → verify confidence ≈ 1.0
+- Slightly misaligned frames (1-2px shift) → verify confidence ≈ 0.9
+- Moderately misaligned (5px shift) → verify confidence ≈ 0.7
+- Heavily misaligned (20px shift or rotation > 5°) → verify confidence < 0.6, passed = false
+
+### Stage 3: Lens Breathing Compensation
+
+**Purpose**: Focus changes on some lenses cause noticeable field-of-view shift (breathing). The near-focus frame may have a different FOV than the far-focus frame, causing edge artifacts in fusion even when alignment is correct.
+
+**Algorithm**:
+1. Extract the scale component from each homography matrix by decomposing `H = K * R * K^-1` or simply reading the diagonal elements.
+2. Compute scale deviation: `|scale - 1.0|` for each frame pair.
+3. If any frame pair has scale deviation > `SCALE_DEVIATION_MAX (0.05, i.e. 5%)`:
+   a. Determine the largest frame (smallest scale, widest FOV) as the crop reference.
+   b. Crop all other frames to match the largest frame's FOV in the aligned coordinate space.
+   c. Compute overlap ratio: `intersection_area / reference_frame_area`.
+4. Compute breathing severity:
+   `breathingSeverity = max(scale_deviation / 0.15, 1.0 - overlap_ratio) * (1.0 - overlap_ratio <= 0.2 ? 0.5 : 1.0)`
+   This produces 0.0 (no breathing) to 1.0 (severe breathing, large FOV mismatch).
+5. Record the crop region and overlap ratio in diagnostics.
+
+**Contract**:
+```kotlin
+data class BreathingCompensationResult(
+    val scaleDeviations: List<Float>,   // per frame pair
+    val correctedOverlapRatio: Float,   // after correction
+    val severity: Float,                // 0–1 composite
+    val cropRect: Rect?,                // applied crop, null if no correction needed
+    val diagnostics: List<String>
+)
+
+object BreathingCompensator {
+    fun compensate(
+        reference: RGBFrame,
+        frames: List<RGBFrame>,
+        alignments: List<FrameAlignment>
+    ): BreathingCompensationResult
+}
+```
+
+**Testability**: Pure function. Test with:
+- Frames with known scale factors (1.0, 1.02, 0.98) → verify severity ≈ 0
+- Frames with large scale mismatch (1.0, 1.10) → verify severity > 0.5, crop applied
+- Frames with extreme mismatch (1.0, 1.20) → verify severity > 0.8
+
+### Stage 4: Sharpness Map Per Frame
+
+**Purpose**: Each bracket frame is sharp in a different depth plane. The sharpness map tells the fusion stage which pixels to take from which frame.
+
+**Algorithm**:
+1. Convert each aligned frame to grayscale.
+2. Divide each frame into 8×8 pixel blocks (tunable based on resolution; assume ~12MP input).
+3. For each block, compute Laplacian variance:
+   `var = variance(∇²I) = Σ(∇²I - μ_∇²)² / N`
+   where `∇²I` is the Laplacian of the image (3×3 kernel: `[[0,1,0],[1,-4,1],[0,1,0]]`).
+4. Normalize per-frame block scores to [0, 1] range (min-max normalization within each frame).
+5. Compute per-frame mean sharpness. Tag any frame with mean sharpness < `SHARPNESS_MIN (0.1)` as potentially blurred.
+6. Generate per-pixel weight map by bilinear interpolation between block centers.
+7. Output: N sharpness maps (same dimensions as reference frame).
+
+**Contract**:
+```kotlin
+data class SharpnessMap(
+    val frameIndex: Int,
+    val blockScores: FloatArray,   // length = (width/8) * (height/8)
+    val meanSharpness: Float,      // mean of blockScores
+    val perPixelWeights: FloatArray // width * height, computed on demand
+)
+
+object SharpnessMapGenerator {
+    fun generate(frames: List<RGBFrame>): List<SharpnessMap>
+}
+```
+
+**Testability**: Pure function. Test with:
+- Synthetic sharp frame (high-frequency pattern) → verify meanSharpness > 0.5
+- Synthetic blurred frame (Gaussian blur σ=5) → verify meanSharpness < 0.1
+- Frame with sharp region + blurred region → verify block-level scores reflect local sharpness
+
+### Stage 5: Laplacian Pyramid Fusion
+
+**Purpose**: Multi-scale fusion avoids seam artifacts that occur with single-scale pixel selection. The Laplacian pyramid decomposes each frame into frequency bands; fusion selects the sharpest contribution at each scale.
+
+**Algorithm**:
+1. Build Gaussian pyramid for each aligned frame (default: 4 levels).
+   - Level 0 = original resolution
+   - Level k = Gaussian blur (σ = 2^k) + downsample ×2 of level k-1
+2. Build Laplacian pyramid from Gaussian differences:
+   - For levels 0 to N-2: `L_k = G_k - expand(G_{k+1})`
+   - Level N-1 (coarsest): `L_{N-1} = G_{N-1}`
+3. Build weight pyramids from sharpness maps:
+   - For each frame's sharpness map, build the same pyramid.
+   - At each level: normalize weights across frames so `Σ weight_i = 1` per pixel.
+4. Blend at each level:
+   - `L_fused_k(x, y) = Σ_i weight_i_k(x, y) * L_i_k(x, y)`
+5. Collapse pyramid (reverse process → reconstruct full-resolution fused image).
+
+**Contract**:
+```kotlin
+object LaplacianPyramidFuser {
+    data class PyramidConfig(
+        val levels: Int = 4,
+        val gaussianKernelSigma: Float = 1.0f
+    )
+
+    fun fuse(
+        frames: List<RGBFrame>,
+        alignments: List<FrameAlignment>,
+        sharpnessMaps: List<SharpnessMap>,
+        referenceIndex: Int,
+        breathingCompensation: BreathingCompensationResult,
+        config: PyramidConfig = PyramidConfig()
+    ): RGBFrame
+}
+```
+
+**Testability**: Pure function. Test with:
+- Two identical frames → verify fused output equals input
+- One all-sharp frame + one all-blurred frame → verify fused output matches sharp frame
+- Half-sharp/half-blurred complementary frames → verify fused output is sharp everywhere (seam-free)
+- Three frames with different sharp regions → verify no color shift at blend boundaries
+
+### Stage 6: Fusion Confidence Gate
+
+**Purpose**: Detect fusion artifacts (ghosting, double edges, unnatural flat regions) post-fusion. This is a safety net — even when alignment passed the confidence check, fusion can produce artifacts due to parallax, subject motion between frames, or lighting changes.
+
+**Algorithm**:
+1. **Edge consistency check**:
+   a. Run Canny edge detection on the fused image and on each source frame.
+   b. For each edge pixel in the fused image, check if a corresponding edge exists in at least one source frame within a 2px radius.
+   c. `edgeConsistencyScore = matched_edge_pixels / total_fused_edge_pixels` (0–1).
+   d. A low score means the fusion created edges that don't exist in any source (ghost artifact).
+2. **Ghost detection**:
+   a. For edge pixels in the fused image that have NO corresponding source edge, check the local neighborhood (5×5) for pairs of parallel/nearby edges in source frames.
+   b. If found, this is a "double-edge" ghost signature.
+   c. `ghostRejectionApplied = count(double_edge_regions) > 0`.
+3. **Artifact check**:
+   a. Identify "flat" regions in the fused image (Laplacian variance < 0.01 in 16×16 blocks).
+   b. For each flat region, compute per-channel variance of pixel values.
+   c. High variance in a flat region indicates fusion noise/artifacts.
+   d. `artifactScore = 1.0 - (artifact_free_regions / total_flat_regions)` → 0 = clean, 1 = severe artifacts.
+4. Composite fusion confidence:
+   `fusionConfidence = 0.4 * edgeConsistencyScore + 0.3 * (1.0 - artifactScore) + 0.3 * (if (ghostRejectionApplied) 0.3 else 1.0)`
+5. Gate: if `fusionConfidence < FUSION_THRESHOLD (0.5)` → BEST_FRAME fallback.
+
+**Contract**:
+```kotlin
+data class FusionConfidenceResult(
+    val edgeConsistencyScore: Float,  // 0–1, higher = better
+    val artifactScore: Float,         // 0–1, lower = better
+    val ghostRejectionApplied: Boolean,
+    val confidence: Float,            // composite 0–1
+    val diagnostics: List<String>
+)
+
+object FusionConfidenceEvaluator {
+    fun evaluate(
+        fused: RGBFrame,
+        sources: List<RGBFrame>,
+        alignments: List<FrameAlignment>
+    ): FusionConfidenceResult
+}
+```
+
+**Testability**: Pure function. Test with:
+- Fused = source → verify confidence ≈ 1.0, edgeConsistencyScore ≈ 1.0
+- Fused with synthetic double edges → verify ghostRejectionApplied = true, confidence < 0.5
+- Fused with random noise in flat regions → verify artifactScore > 0.5, confidence reduced
+- Fused from misaligned frames → verify edgeConsistencyScore < 0.7
+
+### Stage 7: Output Selection Decision Tree
+
+**Purpose**: Make the final decision on what to save, based on all accumulated confidence scores. BEST_FRAME is a first-class successful outcome, not an error.
+
+```
+                    ┌─────────────────────┐
+                    │ alignmentConfidence │
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              ▼                ▼                ▼
+         < ALIGNMENT      [0.6, 0.8)       ≥ 0.8
+         _THRESHOLD (0.6)                   │
+              │                │                │
+              ▼                ▼                │
+         BEST_FRAME      ┌──────────┐          │
+                         │ fusion   │          │
+                         │ confidence│          │
+                         └─────┬────┘          │
+                               │                │
+                    ┌──────────┼──────────┐    │
+                    ▼          ▼          ▼    │
+               < FUSION   [0.5, 0.7)   ≥ 0.7  │
+               _THRESHOLD    │           │     │
+               (0.5)         │           │     │
+                    │         │           │     │
+                    ▼         ▼           ▼     ▼
+               BEST_FRAME  ┌──────────────┐   │
+                           │ breathing    │   │
+                           │ severity     │   │
+                           └──────┬───────┘   │
+                                  │            │
+                         ┌────────┼────────┐   │
+                         ▼        ▼        ▼   │
+                       > 0.3   ≤ 0.3      0    │
+                         │        │        │   │
+                         ▼        ▼        ▼   ▼
+                      DEGRADED  FUSED    FUSED
+```
+
+**Selection rules in code**:
+1. If `alignmentConfidence < ALIGNMENT_THRESHOLD` (0.6) → output = sharpest single frame, resultState = `BEST_FRAME`.
+2. If `fusionConfidence < FUSION_THRESHOLD` (0.5) → output = sharpest single frame, resultState = `BEST_FRAME`.
+3. If `breathingSeverity > BREATHING_SEVERITY_THRESHOLD` (0.3) → output = fused, resultState = `DEGRADED` (fusion succeeded but breathing may cause edge artifacts).
+4. Otherwise → output = fused, resultState = `FUSED`.
+
+**Sharpest frame selection** (for BEST_FRAME fallback):
+- Use `perFrameSharpnessScores` from Stage 4.
+- Select the frame with the highest `meanSharpness`.
+- This is already computed and cached; no additional work needed.
+
+**Key design principle**: BEST_FRAME is NOT an error. It means "the algorithm determined that fusion would produce worse output than a single frame." This is an honest answer to the user: the saved image is as good as the system can produce under the conditions.
+
+### Fallback Decision Tree Contract
+
+```kotlin
+object FullClearOutputSelector {
+    data class OutputDecision(
+        val resultState: FullClearResultState,
+        val outputFrameIndex: Int,       // which frame to save (for BEST_FRAME)
+        val fusedImage: RGBFrame?,       // non-null for FUSED/DEGRADED
+        val decisionPath: List<String>,  // decision trace for diagnostics
+        val report: FullClearFusionReport
+    )
+
+    fun select(
+        route: FullClearRoute,
+        frames: List<RGBFrame>,
+        alignmentResult: AlignmentConfidenceResult,
+        breathingResult: BreathingCompensationResult,
+        sharpnessMaps: List<SharpnessMap>,
+        fusionConfidence: FusionConfidenceResult?,
+        fusedImage: RGBFrame?,
+        sessionId: String
+    ): OutputDecision
+}
+```
+
+### Per-Stage Degradation Classification
+
+Each stage can independently classify what went wrong, providing structured diagnostics for later QA:
+
+| Stage | Degradation Tag | Meaning | User-Visible? |
+|---|---|---|---|
+| Alignment | `alignment-low-inliers` | Few feature matches between frames | No (internal) |
+| Alignment | `alignment-low-ncc` | Pixel-level alignment poor despite feature matches | No (internal) |
+| Alignment | `alignment-rotation` | Inter-frame rotation exceeds homography limits | No (internal) |
+| Breathing | `breathing-mild` | Scale deviation 5-10%, mild correction applied | No (internal) |
+| Breathing | `breathing-severe` | Scale deviation > 15%, large crop applied | Could affect composition |
+| Sharpness | `frame-blurred` | One or more frames below sharpness threshold | No (internal, but degrades fusion) |
+| Sharpness | `all-frames-blurred` | All frames below threshold (camera shake) | User should retry |
+| Fusion | `fusion-ghost` | Double-edge artifact detected post-fusion | Yes, causes visible artifacts |
+| Fusion | `fusion-artifact` | Noise detected in flat regions | Yes, may be visible |
+| Fusion | `fusion-low-edge-consistency` | Fused edges not present in any source | Yes, hallucinated detail |
+| General | `bracket-abandoned` | Fusion not attempted (alignment failed early) | No (result is best-frame) |
+| General | `best-frame-selected` | Sharpest single frame saved instead of fusion | Shown in UI as guidance |
+
+### Data Contracts Summary
+
+All algorithm stages use the following intermediate data structures, which flow through the pipeline without I/O:
+
+```kotlin
+// Stage 0 output
+data class NormalizedFrameSet(
+    val frames: List<RGBFrame>,
+    val referenceIndex: Int,
+    val perFrameGains: List<FloatArray>
+)
+
+// Stage 1 output
+data class FrameAlignment(
+    val frameIndex: Int,
+    val homography: FloatArray,
+    val inlierRatio: Float,
+    val matchCount: Int
+)
+
+// Stage 2 output
+data class AlignmentConfidenceResult(
+    val confidence: Float,
+    val perFrameNccScores: List<Float>,
+    val perFrameInlierRatios: List<Float>,
+    val passed: Boolean
+)
+
+// Stage 3 output
+data class BreathingCompensationResult(
+    val scaleDeviations: List<Float>,
+    val correctedOverlapRatio: Float,
+    val severity: Float,
+    val cropRect: Rect?
+)
+
+// Stage 4 output
+data class SharpnessMap(
+    val frameIndex: Int,
+    val blockScores: FloatArray,
+    val meanSharpness: Float,
+    val perPixelWeights: FloatArray?
+)
+
+// Stage 5 output: RGBFrame (fused image)
+
+// Stage 6 output
+data class FusionConfidenceResult(
+    val edgeConsistencyScore: Float,
+    val artifactScore: Float,
+    val ghostRejectionApplied: Boolean,
+    val confidence: Float
+)
+
+// Stage 7 output: OutputDecision (see above)
+```
+
+### Algorithm Limitations Documented
+
+These are documented so future implementors know what the algorithm does NOT handle:
+
+1. **No parallax handling**: Global homography assumes planar scenes or distant backgrounds. Close subjects with significant depth variation will produce local misalignment that the NCC grid may detect (→ fallback) but cannot correct. Full parallax handling requires dense optical flow or depth-aware warping, which is out of scope for V2.
+
+2. **No subject motion compensation**: If the subject or background elements move between bracket frames (wind-blown leaves, walking people), the fusion will create ghost artifacts. The ghost detection in Stage 6 may catch this, but there is no motion-segmentation or inpainting fallback.
+
+3. **No HDR fusion**: Exposure normalization matches global brightness but does not recover clipped highlights or crushed shadows. If bracket frames have different exposures (AE varies with focus point), clipped regions remain clipped.
+
+4. **No semantic understanding**: The algorithm fuses based on low-level features (sharpness, edges). It does not know that a face should come from one frame and the background from another. Sharpness-based fusion usually handles this correctly for focus stacks, but it can fail for scenes where sharpness is ambiguous (repetitive textures, flat colored surfaces).
+
+5. **ORB feature fragility**: ORB is fast but not as robust as SIFT for large viewpoint changes. If rotation between frames exceeds ~15°, ORB matching may fail. This is unlikely for focus brackets (frames are captured < 500ms apart) but possible with lens switching.
+
+6. **Pyramid level count assumes ~12MP input**: With 4 pyramid levels and 12MP input, the coarsest level is ~0.75MP (adequate for low-frequency blending). Lower-resolution input may need fewer levels.
 
 ---
 
@@ -690,51 +1309,55 @@ Each V2 product state maps to `ModeState` fields:
 | `best_frame` | "已保存最佳帧" | "本次未使用融合处理" | true |
 | `degraded` | "已保存单帧" | "全清处理未能完成" | true |
 
+These are all set by the mode controller in response to session events and scene assessment.
+
 ---
 
 ## Android/CameraX/Camera2 Constraints
 
 ### Constraint 1: Focus Distance Is Not Always Writable
 
-**Impact**: `FOCUS_BRACKET` route depends on `ManualControlCapabilityMatrix.focusDistance == APPLY`.
+**Impact**: `FOCUS_BRACKET` route availability depends on `ManualControlCapabilityMatrix.focusDistance == APPLY`.
 
-**Detection**: Write test focus value via `Camera2Interop.Extender`, capture frame, read back EXIF. If mismatch, mark degraded.
+**Detection**: Write a test value via `Camera2Interop.Extender<ImageCapture.Builder>.setCaptureRequestOption(CaptureRequest.LENS_FOCUS_DISTANCE, value)`, capture a frame, read back the EXIF focus distance. If it doesn't match, mark as `DEGRADED_SINGLE_FRAME`.
 
-**Fallback**: Route to `DEEP_DOF_LENS` if ultra-wide available, otherwise `BEST_FRAME_ONLY`.
+**Fallback**: Route to `DEEP_DOF_LENS` if ultra-wide is available, otherwise `BEST_FRAME_ONLY`.
 
-**Test strategy**: Unit test `FullClearDeviceCapabilities.from()` with `focusDistance == SAVED_ONLY` → verify `focusDistanceWritable == false` → verify route selector returns non-bracket route.
+**Test strategy**: Unit test `FullClearDeviceCapabilities.from()` with a `DeviceCapabilities` fixture where `focusDistance == SAVED_ONLY` → verify `focusDistanceWritable == false` → verify route selector returns non-bracket route.
 
 ### Constraint 2: Per-Frame Focus Latency
 
-**Impact**: Bracket frame count and inter-frame delay depend on lens focus speed.
+**Impact**: Focus bracket frame count and inter-frame delay depend on how fast the lens can change focus.
 
-**Detection (real device only)**: Time a 3-frame bracket end-to-end. If > 500ms per frame, reduce to 2 frames.
+**Detection (real device only)**: Time a 3-frame bracket (near → mid → far) end-to-end. Profile per-frame latency. If > 500ms per frame, reduce bracket to 2 frames (degraded-rebind path per product definition).
 
-**Gating**: `maxBracketFrames` in `FullClearDeviceCapabilities` populated by real-device profiling. Default conservative: 3.
+**Gating**: `maxBracketFrames` in `FullClearDeviceCapabilities` is populated by real-device profiling. Default conservative value is 3. Tests inject known values.
 
-**Test strategy**: Unit test with `focusDistancePerFrameLatencyMs = 100` → 5-frame plan. With `800ms` → degraded 2-frame plan.
+**Test strategy**: Unit test with `focusDistancePerFrameLatencyMs = 100` → verify 5-frame plan. With `focusDistancePerFrameLatencyMs = 800` → verify degraded 2-frame plan.
 
 ### Constraint 3: Lens Switching Disrupts Preview
 
-**Impact**: `LENS_PAIR_BRACKET` requires mid-bracket lens switch; marked experimental.
+**Impact**: `LENS_PAIR_BRACKET` requires switching lenses mid-bracket, which causes a preview gap in CameraX. This route is marked experimental/degraded.
 
-**Detection (real device only)**: Time lens-switch-and-capture cycle. If > 1s, route not recommended.
+**Detection (real device only)**: Time a lens-switch-and-capture cycle. If > 1s, route is not recommended for handheld.
+
+**Gating**: `LENS_PAIR_BRACKET` is only offered when `DEEP_DOF_LENS` and `FOCUS_BRACKET` are both unavailable, AND the device has both tele and ultra-wide lenses.
 
 **Test strategy**: Unit test with `lensSwitchLatencyMs = 2_000` → verify `LENS_PAIR_BRACKET` confidence < 0.3.
 
 ### Constraint 4: Motion During Bracket
 
-**Impact**: Gyro motion invalidates alignment. Fusion gated on post-capture alignment confidence.
+**Impact**: Gyro motion during bracket capture invalidates alignment. Fusion must be gated on post-capture alignment confidence, not just pre-capture stability.
 
-**Gating**: Pre-capture gyro check → shutter gate. Post-capture alignment check → fusion gate. Two independent gates.
+**Gating**: Pre-capture gyro check enables/disables the shutter. Post-capture alignment check gates fusion. Two independent gates.
 
-**Test strategy**: Unit test `alignmentConfidence < threshold` → `resultState == BEST_FRAME`. Unit test `stability.isStable == false` → route confidence reduced.
+**Test strategy**: Unit test alignment gate: `alignmentConfidence < threshold` → verify `resultState == BEST_FRAME`. Test pre-capture gate: `stability.isStable == false` → verify route confidence reduced.
 
 ### Constraint 5: Thermal Throttling Reduces Frame Budget
 
-**Impact**: `ResourceAdmissionPolicy.admitMultiFrame()` reduces frame count under thermal stress.
+**Impact**: Existing `ResourceAdmissionPolicy.admitMultiFrame()` already reduces frame count under thermal stress. V2 must respect this.
 
-**Integration**: Check `FullClearCapturePlan.maxTotalLatencyMs` against admitted budget. Budget cuts frame count → plan degrades.
+**Integration**: `FullClearCapturePlan.maxTotalLatencyMs` should be checked against the admitted budget. If the budget cuts frame count, the plan degrades.
 
 **Test strategy**: Unit test with `CameraThermalState.HOT` → verify `admitMultiFrame` reduces effective frame count → verify plan builder reduces bracket steps.
 
@@ -742,7 +1365,7 @@ Each V2 product state maps to `ModeState` fields:
 
 **Impact**: V2 outputs JPEG only. RAW fusion is a non-goal (per product definition).
 
-**Gating**: `CaptureStrategy.MultiFrame` with `postProcessSpec` always produces JPEG output. Existing pipeline enforces this.
+**Gating**: `CaptureStrategy.MultiFrame` with `postProcessSpec` always produces JPEG output. The existing pipeline enforces this.
 
 ---
 
@@ -752,7 +1375,7 @@ Mapping product definition capabilities to code contracts:
 
 | Product Capability | Code Contract | Detection |
 |---|---|---|
-| Deep-DOF Lens Path | `FullClearRoute.DEEP_DOF_LENS` | `FullClearDeviceCapabilities.hasUltraWideLens` && `lensNodeMap` |
+| Deep-DOF Lens Path | `FullClearRoute.DEEP_DOF_LENS` | `FullClearDeviceCapabilities.hasUltraWideLens` && `ZoomRatioCapability.lensNodeMap` |
 | Focus Bracket Path | `FullClearRoute.FOCUS_BRACKET` | `ManualControlCapabilityMatrix.focusDistance == APPLY` |
 | Lens-Aware Routing | `FullClearRoute.LENS_PAIR_BRACKET` | `lensNodeMap` size > 1 |
 | Alignment Confidence | `FullClearFusionReport.alignmentConfidence` | Computed post-capture in `FullClearFusionProcessor` |
@@ -766,9 +1389,9 @@ Mapping product definition capabilities to code contracts:
 ### Risk 1: Per-Frame Focus Override on CameraX
 
 **Severity**: Medium
-**Description**: Adding `perFrameFocusOverrides` requires the app-layer CameraX adapter to reconfigure `ImageCapture` between frames, which may not be directly supported by CameraX's builder pattern.
+**Description**: The existing `DeviceShotRequest` model assumes all frames in a multi-frame shot use the same capture parameters. Adding `perFrameFocusOverrides` requires the app-layer CameraX adapter to reconfigure `ImageCapture` between frames, which may not be directly supported by CameraX's builder pattern.
 
-**Mitigation**: Fall back to Camera2 interop mode: create a new `CaptureRequest` per frame with different `LENS_FOCUS_DISTANCE`, submitted through `Camera2Interop.Extender`.
+**Mitigation**: If CameraX per-frame reconfiguration proves unreliable, fall back to Camera2 interop mode: create a new `CaptureRequest` per frame with different `LENS_FOCUS_DISTANCE`, submitted through `Camera2Interop.Extender`. This is a well-known pattern.
 
 **Verification**: Unit test `DeviceShotRequestTranslator` with `perFrameFocusOverrides` → verify correct frame-indexed focus values. Integration test on real device with Camera2 interop.
 
@@ -777,38 +1400,38 @@ Mapping product definition capabilities to code contracts:
 **Severity**: High
 **Description**: Handheld bracket frames have inter-frame motion from hand shake, subject movement, and lens breathing. Alignment may fail more often than it succeeds.
 
-**Mitigation**: Architecture gates fusion on alignment confidence. If alignment fails, falls back to best-frame. `resultState == BEST_FRAME` is a valid and expected outcome.
+**Mitigation**: The architecture gates fusion on alignment confidence. If alignment fails, the system falls back to best-frame. The product promise says "V2 does not guarantee both near and far planes are equally sharp." This is honest in code: `resultState == BEST_FRAME` is a valid and expected outcome.
 
-**Verification**: Alignment confidence gate is a pure function on frame pairs → fully unit-testable. Real-device pass rate validated in package 05.
+**Verification**: The alignment confidence gate is a pure function on frame pairs → fully unit-testable. Real-device pass rate must be validated in package 05.
 
 ### Risk 3: Lens Breathing Changes Framing
 
 **Severity**: Medium
-**Description**: Focus changes on some lenses cause FOV shift (breathing), confusing alignment and producing fusion edge artifacts.
+**Description**: Focus changes on some lenses cause noticeable FOV shift (breathing), which confuses alignment and produces edge artifacts in fusion.
 
-**Mitigation**: Lens breathing compensation in fusion processor (crop/scale each frame to reference FOV). Severe breathing → degrade to best-frame.
+**Mitigation**: Lens breathing compensation in the fusion processor (crop/scale each frame to match the reference frame's FOV). If breathing is too severe, degrade to best-frame.
 
 **Verification**: Unit test breathing compensation with synthetic FOV-shifted frame pairs.
 
 ### Risk 4: Ultra-Wide Minimum Focus Distance Unknown
 
 **Severity**: Low
-**Description**: `LENS_INFO_MINIMUM_FOCUS_DISTANCE` may return 0 (unknown) on some devices.
+**Description**: `LENS_INFO_MINIMUM_FOCUS_DISTANCE` may return 0 (unknown) on some devices. The route selector can't determine if the subject is within the ultra-wide's focus range.
 
-**Mitigation**: When unknown, assume ultra-wide can focus close. Worst case: blurry near subject, user retries. Fallback: `BEST_FRAME_ONLY`.
+**Mitigation**: When minimum focus distance is unknown, assume the ultra-wide can focus close (most modern ultra-wides can). The worst case is a blurry near subject, which the user will see and can retry. The fallback is `BEST_FRAME_ONLY`.
 
 ### Risk 5: No Existing V1 FullClear Mode Plugin
 
 **Severity**: Low
-**Description**: `ModeId.FULL_CLEAR` exists in enum but no `feature/mode-full-clear` module. V2 must create entire mode plugin from scratch.
+**Description**: `ModeId.FULL_CLEAR` exists in the enum but there is no `feature/mode-full-clear` module implementing a `FullClearModePlugin`. V2 must create the entire mode plugin from scratch.
 
-**Mitigation**: Follow `NightModePlugin` pattern exactly. V2 mode is simpler: fewer profiles, no flash logic, no live photo, no filter rendering.
+**Mitigation**: Follow the `NightModePlugin` pattern exactly. The code structure is well-established. The V2 mode is simpler than Night: it has fewer profiles, no flash logic, no live photo, no filter rendering.
 
 ---
 
 ## Test Strategy
 
-### Unit Tests (No Device Required)
+### Unit Tests: Architecture Contracts (No Device Required)
 
 All core contracts are pure functions → fully unit-testable without Android framework:
 
@@ -824,7 +1447,7 @@ All core contracts are pure functions → fully unit-testable without Android fr
    - No manual controls + no ultra-wide → `UNSUPPORTED`
    - Tele + ultra-wide but no focus write → `LENS_PAIR_BRACKET` (degraded)
    - Unstable + focus writable → `FOCUS_BRACKET` with reduced confidence
-   - All routes → verify `degradationReasons` populated
+   - All routes → verify `degradationReasons` are populated
 
 3. **`buildFullClearCapturePlan` tests**:
    - `DEEP_DOF_LENS` → 0 bracket steps, single frame
@@ -834,8 +1457,10 @@ All core contracts are pure functions → fully unit-testable without Android fr
 
 4. **`FullClearFusionReport` tests**:
    - `toPipelineNotes()` produces correctly formatted tags
-   - All required fields present regardless of result state
-   - `BEST_FRAME` result still records route and degradation reasons
+   - All per-stage fields present regardless of result state
+   - `BEST_FRAME` result still records route, alignment diagnostics, and degradation reasons
+   - `FUSED` result has all fusion-stage fields populated (edge consistency, ghost rejection)
+   - `DEGRADED` result has breathing severity > 0.3 and fusion confidence in acceptable range
 
 5. **`FullClearModeController` tests** (using test ModeContext):
    - Shutter press with `DEEP_DOF_LENS` route → emits `CaptureStrategy.SingleFrame`
@@ -844,18 +1469,175 @@ All core contracts are pure functions → fully unit-testable without Android fr
    - User guidance headline updates on route change
    - `isShutterEnabled` is false when route is `UNSUPPORTED`
 
-### Real-Device Tests (Deferred to Package 05)
+### Unit Tests: Algorithm Stages (No Device Required, Synthetic Frame Pairs)
 
-- Per-frame focus distance write + verify on physical device
-- Lens switch latency profiling
-- Gyro stability threshold tuning
-- End-to-end bracket capture + fusion pass rate
-- Thermal degradation behavior under sustained use
+Each algorithm stage is a pure function → testable with programmatically generated frame pairs. No real camera frames needed.
+
+#### Stage 0: ExposureNormalizer
+
+| Test Case | Input | Expected |
+|---|---|---|
+| Identical frames | 3 copies of same image | gains = [1.0, 1.0, 1.0], ref = sharpest (all tie) |
+| Dark frame + bright frame | Same content, ×0.5 and ×1.5 brightness | gains ≈ [2.0, 0.67] (clamped to [0.5, 2.0]) |
+| Extreme brightness gap | ×0.2 and ×3.0 | gains clamped to [0.5, 2.0] |
+| Select reference frame | Frame A (Gaussian blur σ=3), Frame B (sharp) | referenceIndex = 1 (Frame B sharper) |
+| Color cast correction | Frame A neutral, Frame B warm (R gain 1.3) | R gain applied to warm frame |
+
+#### Stage 1: FrameAligner
+
+| Test Case | Input | Expected |
+|---|---|---|
+| Identity | Two identical frames | homography ≈ identity, inlierRatio > 0.9 |
+| Translation | 10px right, 5px down | homography encodes correct tx, ty |
+| Small rotation | 2° rotation | homography encodes correct angle |
+| Scale change | 5% zoom | homography scale component ≈ 0.95 or 1.05 |
+| Large rotation | 30° rotation | inlierRatio < 0.3, returns null (ORB limit) |
+| Random noise images | Two unrelated images | inlierRatio < 0.3, returns null |
+
+#### Stage 2: AlignmentConfidenceEvaluator
+
+| Test Case | Input | Expected |
+|---|---|---|
+| Perfect alignment | inlierRatio = 0.95, NCC ≈ 1.0 | confidence > 0.9, passed = true |
+| Good alignment | inlierRatio = 0.70, NCC ≈ 0.85 | confidence ≈ 0.6, passed = true (borderline) |
+| Poor NCC | inlierRatio = 0.80, NCC = 0.3 (parallax) | confidence < 0.5, passed = false |
+| Poor inliers | inlierRatio = 0.30, NCC = 0.8 | confidence < 0.4, passed = false |
+| Mixed frames | Frame 1 OK, Frame 2 poor | confidence weighted down by poor frame |
+| Single frame pair | One alignment only | confidence based on single pair |
+
+#### Stage 3: BreathingCompensator
+
+| Test Case | Input | Expected |
+|---|---|---|
+| No breathing | scale = 1.0 on all alignments | severity = 0.0, no crop applied |
+| Mild breathing | scale = 1.06 (6% deviation) | severity > 0, < 0.3, crop applied |
+| Moderate breathing | scale = 1.12 (12% deviation) | severity ≈ 0.5 |
+| Severe breathing | scale = 1.20 (20% deviation) | severity > 0.8, overlap ratio < 0.8 |
+| Mixed | Frame 1 scale = 1.02, Frame 2 scale = 1.15 | severity computed from worst frame |
+
+#### Stage 4: SharpnessMapGenerator
+
+| Test Case | Input | Expected |
+|---|---|---|
+| All sharp | High-frequency pattern (checkerboard) | meanSharpness > 0.5 |
+| All blurred | Gaussian blur σ=5 | meanSharpness < 0.1 |
+| Half sharp, half blurred | Left half sharp, right half blurred | block scores high on left, low on right |
+| Different sharp regions | Frame A sharp left, Frame B sharp right | per-frame maps correctly localize sharpness |
+| Empty/uniform image | Solid gray frame | meanSharpness ≈ 0.0 (no edges) |
+
+#### Stage 5: LaplacianPyramidFuser
+
+| Test Case | Input | Expected |
+|---|---|---|
+| Identical frames | 2 copies of same image | output = input (no artifacts) |
+| Best frame all sharp | Frame A sharp, Frame B blurred | output ≈ Frame A |
+| Complementary sharpness | Frame A sharp left+blur right; Frame B blur left+sharp right | output sharp everywhere, no seam visible |
+| Three frames | Sharp near, mid, far each sharp in different region | output sharp in all regions |
+| Color fidelity | Different color balance across frames | no color shift at blend boundaries |
+
+#### Stage 6: FusionConfidenceEvaluator
+
+| Test Case | Input | Expected |
+|---|---|---|
+| Perfect fusion | fused = any source frame | confidence > 0.9, edgeConsistencyScore ≈ 1.0 |
+| Ghost present | fused = source + offset copy blended 50% | ghostRejectionApplied = true, confidence < 0.5 |
+| Artifacts | fused = source + random noise (σ=0.1) | artifactScore > 0.3, confidence reduced |
+| Missing edges | fused = blurred version of source | edgeConsistencyScore < 0.7 |
+| Natural fusion | fused from well-aligned frames | confidence > 0.7 |
+
+#### Stage 7: FullClearOutputSelector
+
+| Test Case | Input | Expected |
+|---|---|---|
+| Both gates pass, no breathing | alignmentConf > 0.8, fusionConf > 0.7, breathingSev = 0 | resultState = FUSED |
+| Alignment fail | alignmentConf = 0.4 | resultState = BEST_FRAME, sharpest frame selected |
+| Fusion fail | alignmentConf = 0.8, fusionConf = 0.3 | resultState = BEST_FRAME |
+| Degraded path | alignmentConf = 0.7, fusionConf = 0.6, breathingSev = 0.5 | resultState = DEGRADED |
+| Borderline pass | alignmentConf = 0.61, fusionConf = 0.51, breathingSev = 0.0 | resultState = FUSED |
+| Decision trace recorded | Any case | decisionPath contains all gate evaluations |
+
+### Synthetic Test Data Generation
+
+For implementation, synthetic frame pairs can be generated with:
+
+1. **Geometric transforms**: OpenCV `warpPerspective` with known homography matrices for translation/rotation/scale testing.
+2. **Sharpness variation**: Gaussian blur with controlled σ applied to regions of frames.
+3. **Exposure variation**: Per-channel gain multiplication.
+4. **Breathing simulation**: Scale + crop with known scale factors.
+5. **Ghost simulation**: Blend two offset copies of the same image at 50% opacity.
+6. **Artifact simulation**: Add Gaussian noise to flat regions of fused output.
+
+All synthetic test images can be generated at implementation time (e.g., 512×512 grayscale or RGB buffers). No external test assets required.
+
+### Real-Device Test Matrix (Deferred to Package 05)
+
+These tests require physical device + controlled scenes. They cannot be automated without hardware.
+
+#### Device Capability Profiling
+
+| Test | Method | Metric | Success Criteria |
+|---|---|---|---|
+| Per-frame focus latency | Time 5-frame bracket (near→far), measure inter-frame interval | ms per frame | < 500ms/frame for 5-frame bracket |
+| Focus distance writability | Set LENS_FOCUS_DISTANCE, capture, read EXIF | Match between set and EXIF | EXIF distance within 10% of set value |
+| Lens switch latency | Time tele→wide→tele cycle (10 iterations) | ms per switch | < 1s for acceptable handheld |
+| Ultra-wide min focus | Gradual approach to near subject, note where AF fails | diopters | Recorded per device model |
+| Gyro noise floor | Record gyro while device on tripod | rad/s RMS | < 0.01 rad/s noise |
+
+#### Algorithm Pass Rate
+
+| Test | Scene | Bracket Count | Metric | Target |
+|---|---|---|---|---|
+| Tripod bracket | Textured static scene (bookshelf) | 5 frames | fusion pass rate | > 90% FUSED |
+| Handheld bracket (steady) | Textured static scene, two-handed grip | 3 frames | fusion pass rate | > 60% FUSED + DEGRADED |
+| Handheld bracket (walking) | Outdoors, natural walking | 3 frames | alignment confidence | < 0.3 (expect BEST_FRAME) |
+| Breathing lens | Lens known to breathe (e.g., some telephotos) | 3 frames | breathing severity | > 0.3 (expect DEGRADED) |
+| Subject motion | Wind-blown leaves in bracket frames | 3 frames | ghost detection | ghostRejectionApplied = true |
+| Low light | Indoor dim lighting, ISO > 800 | 3 frames | sharpness scores | meanSharpness < 0.3 (noise dominates) |
+| Macro near-far | Close subject (10cm) + distant background (10m) | 5 frames | visual quality | Perceptual A/B vs single frame |
+
+#### End-to-End Pipeline
+
+| Test | Method | Success Criteria |
+|---|---|---|
+| Shutter-to-save latency | Measure from tap to ShotResult callback | < 3s for 3-frame bracket (per product def) |
+| Thermal degradation | Run 20 brackets in 2 minutes | Frame count degrades gracefully, no crash |
+| Memory | Profile heap during 5-frame fusion at 12MP | < 200MB peak (typical Android budget) |
+| Diagnostics completeness | Check pipelineNotes after each shot | All `fc:*` tags present, no null/empty required fields |
+| Fallback correctness | Force alignment failure (shake during bracket) | BEST_FRAME saved, degradation reasons logged |
+
+#### Perceptual Quality (Requires Human Judgment)
+
+| Test | Scene | Comparison | Judgment |
+|---|---|---|---|
+| A/B vs single frame | Close subject + distant background | FUSED vs best single frame from bracket | Is FUSED better? (Yes/No/Equal) |
+| A/B vs V1 | Same scene | V2 FUSED vs V1 best frame | Is V2 improvement visible? |
+| Edge artifact check | High-contrast edges in scene | FUSED image at 100% zoom | Any visible halos, double edges, or blend seams? |
+| Color consistency | Scene with uniform colored surface | Compare fused to source frames at 100% | Any color banding or shift at blend boundaries? |
+
+### What Cannot Be Proven Locally
+
+The following algorithm properties require real-device data and cannot be verified through synthetic tests or design review alone:
+
+1. **Handheld alignment pass rate**: The actual percentage of bracket captures that pass the alignment confidence gate on a specific device model. Synthetic tests verify the gate logic but not the distribution of real inter-frame motion.
+
+2. **Perceptual fusion quality**: Whether fused output "looks better" than the best single frame. This requires human A/B judgment on real scenes with real bracket frames. Synthetic tests can verify no artifacts, but not aesthetic superiority.
+
+3. **Ghost rejection effectiveness on real scenes**: The ghost detection logic can be verified with synthetic double edges, but real ghost artifacts (from subject motion, parallax, lighting changes) have different signatures that may or may not be caught.
+
+4. **Threshold calibration**: The default thresholds (0.6 alignment, 0.5 fusion, 0.3 breathing) are educated estimates based on algorithm design principles. Real-device tuning may shift these significantly.
+
+5. **ORB feature match quality on smartphone sensors**: Feature detection and matching performance depends on sensor noise characteristics, lens sharpness, and ISP processing (denoising, sharpening) applied before the algorithm sees the frames.
+
+6. **Lens breathing characterization**: Breathing severity depends on the specific lens module. Some lenses breathe more than others. The breathing compensation algorithm's effectiveness can only be measured per device model.
+
+7. **Latency budget feasibility**: The total end-to-end latency (focus change + capture + fusion) meeting the < 3s target depends on real device performance, which synthetic tests cannot measure.
+
+8. **Memory footprint on real frames**: Peak memory during pyramid fusion depends on frame resolution, bit depth, and the number of intermediate buffers. The 200MB target is an estimate.
 
 ### Verification Command
 
 ```bash
-grep -n "Mode Plugin\|Session Kernel\|Device Adapter\|Media Pipeline\|FullClearRoute\|FullClearCapturePlan\|FullClearSceneAssessment\|FullClearFusionReport\|FullClearDeviceCapabilities\|FullClearModeController\|FullClearFallbackPolicy" docs/plans/full-clear-mode-v2-research-orchestration/v2-implementation-design.md
+rtk grep -n "alignment\|confidence\|fallback\|FullClearFusionReport\|best-frame\|lens-breathing\|exposure.normalization\|sharpness.map\|laplacian.pyramid\|fusion.confidence\|ghost.rejection\|output.selection\|synthetic.test\|real-device\|degration\|FUSED\|BEST_FRAME\|DEGRADED" docs/plans/full-clear-mode-v2-research-orchestration/v2-implementation-design.md docs/plans/full-clear-mode-v2-research-orchestration/v2-roadmap.md
 ```
 
 ---
