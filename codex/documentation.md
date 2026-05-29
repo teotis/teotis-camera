@@ -3,6 +3,7 @@
 - 里程碑：按用户当前轮授权，`6B-8` 已完成并允许进入下一阶段；当前 stage 已切换为第 `7` 阶段“稳定性治理与自动化补强”。
 - 产品 2.0 标准入口：[`Product-2.0-Standard.md`](/Volumes/Extreme_SSD/project/codex_camera/codex/Product-2.0-Standard.md) 是后续判断 `2.0 / V2 / GO / NO GO / 真机验收 / 产品验收` 的规范基准；任何相关任务应先读该文档，再结合本状态页和最新真机/门禁报告判断。
 - 阶段进度：原第 `6` 阶段基线与追加包维持已完成/已冻结判断；第 `7` 阶段当前进度更新为 `80%`。
+- 工作流定位更新：`codex/plan.md` 已降级为预研、用户研究、新功能规划或其他显式计划行为的材料，不再作为默认执行路线图；后续推进默认由用户最新需求、`codex/documentation.md` 当前状态、相关 `docs/plans/**` 专项材料、代码现实与验证结果共同驱动。`AGENTS.md`、`codex/implement.md` 与 `codex/workflow_guide.md` 已同步该口径。
 - 架构口径更新：工程对外介绍、面试表述与高层总结统一采用“四层主链路 + 横切治理能力”的说法；四层主链路指 `Mode Plugin / Session Kernel / Device Adapter / Media Pipeline`，其中后处理归入媒体管线内部能力，稳定性 / 可观测性 / 恢复 / 自动化验证作为跨层治理能力描述，不再与主链路并列拆成独立业务层。
 - 当前阶段判断：第 `7` 阶段已经不再只有 `trace + metrics + PreviewError` 的半成品。当前仓内已建立 `diagnostics owner + runtime issue owner + recovery failure owner + zoom owner + thermal owner + background recovery owner + perf threshold owner + provider invalidation owner + preview startup stall watchdog owner` 的稳定性主链，但距离 stage exit checklist 仍有平台/真机侧缺口。
 - 工程复盘与加固：第 `7` 阶段当前已完成多条已验证闭环：

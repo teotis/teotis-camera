@@ -11,7 +11,7 @@
 
 ```C++
 任务请求：
-先阅读 codex/plan.md、codex/prompt.md、codex/implement.md、codex/documentation.md，理解当前项目目标、当前阶段、阶段边界、已有进展，以及前面已经识别出的架构问题。
+先阅读 codex/documentation.md、codex/implement.md，并按需阅读 codex/prompt.md 与相关 docs/plans/** 文件，理解当前项目真实状态、当前需求边界、已有进展，以及前面已经识别出的架构问题。只有在本轮任务明确涉及预研、用户研究、新功能规划或计划维护时，才阅读 codex/plan.md。
 再阅读 OpenCamera 当前核心实现代码，基于现有代码现实与上述 codex 文件要求，执行一次当前阶段内的工程复盘与加固。
 本次任务目标不是继续加新 feature，不是跨阶段推进，而是：
 复盘当前阶段是否真正闭环
@@ -79,7 +79,7 @@ God Object 倾向
 ```Markdown
 任务请求：
 
-先阅读 `codex/plan.md`、`codex/prompt.md`、`codex/implement.md`、`codex/documentation.md`，理解当前项目目标、阶段和已有进展。
+先阅读 `codex/documentation.md`、`codex/implement.md`，并按需阅读 `codex/prompt.md` 与相关 `docs/plans/**` 文件，理解当前项目目标、阶段和已有进展。只有在本轮诊断明确涉及预研、用户研究、新功能规划或计划维护时，才阅读 `codex/plan.md`。
 再阅读 `OpenCamera` 当前核心功能代码，重点分析当前架构中的状态主体划分是否合理。
 
 本次任务只做“架构诊断”，不做功能开发，不做无关代码修改；除 `documentation.md` 外，不修改其他指导文件和业务代码。
@@ -116,8 +116,8 @@ God Object 倾向
 ```Markdown
 （如果当前已经满足进入下一阶段的条件，那我决策允许进入）
 （对于显著依赖底层和硬件的需求能力，可以暂时只完成上层部分，并使用时提示暂不支持，与下层的连接做成通用结构，允许日后快速针对具体设备具体适配）
-阅读 codex文件夹内容，锁定当前 stage 与当前最高优先级未完成闭环。
-本次只允许在当前 stage 内推进，不得跨阶段。
+以我的最新需求为主，先阅读 `codex/documentation.md` 和 `codex/implement.md`，必要时补读 `codex/prompt.md`、`docs/plans/INDEX.md` 与相关专项方案，锁定当前最高优先级未完成闭环。`codex/plan.md` 只在本轮明确需要预研、用户研究、新功能规划或计划维护时阅读。
+本次只允许在当前需求/阶段边界内推进，不得跨阶段或跨需求扩散。
 
 未命中停止条件前，不因完成单个 patch、单次测试通过、单次 documentation 更新而停止。
 你必须持续重复：
@@ -141,7 +141,7 @@ God Object 倾向
 ```Markdown
 任务请求：
 
-先阅读 `codex/plan.md`、`codex/prompt.md`、`codex/implement.md`、`codex/documentation.md`，理解 `OpenCamera` 的项目目标、架构方向、当前阶段、已完成能力和当前边界。
+先阅读 `codex/documentation.md`、`codex/implement.md`，并按需阅读 `codex/prompt.md` 与相关 `docs/plans/**` 文件，理解 `OpenCamera` 的项目目标、架构方向、当前阶段、已完成能力和当前边界。只有在本轮对外材料需要引用新规划/预研结论时，才阅读 `codex/plan.md`。
 再阅读 `OpenCamera` 当前核心代码与关键模块实现，但本次任务的目标不是继续开发，而是为了**向外部人员介绍项目**，整理一份适合对外讲解的项目介绍材料。
 
 本次任务目标：
@@ -216,7 +216,7 @@ God Object 倾向
 ```Markdown
 任务请求：
 
-先阅读 `codex/plan.md`、`codex/prompt.md`、`codex/implement.md`、`codex/documentation.md`，理解当前项目背景、架构方向和整体上下文。
+先阅读 `codex/documentation.md`、`codex/implement.md`，并按需阅读 `codex/prompt.md` 与相关 `docs/plans/**` 文件，理解当前项目背景、架构方向和整体上下文。只有在本轮功能介绍需要引用新规划/预研结论时，才阅读 `codex/plan.md`。
 再阅读 `OpenCamera` 中与【功能名】直接相关的核心代码、关键调用链、关键状态流转和 UI 交互实现。
 
 本次任务目标不是继续开发，而是为了**向外部人员介绍 OpenCamera 中的某个具体功能**，输出一份适合对外讲解的功能介绍文档。

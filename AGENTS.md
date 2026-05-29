@@ -53,31 +53,26 @@ Important boundaries:
 - Do not create a second hidden session kernel in coordinators, managers, bridges, UI, or adapters.
 - Any hardware-dependent capability must have explicit `supported`, `unsupported`, or `degraded` semantics that can be tested.
 
-## Current Stage
-
-- Current milestone: Stage `7`, stability governance and automation hardening.
-- Current documented progress: about `80%`.
-- Stage `6` and `6B-*` feature work is considered complete/frozen unless the user explicitly reopens it.
-- Stage `7` already has owners for diagnostics, runtime issue forwarding, recovery failure handling, zoom, thermal issue forwarding, background recovery, performance budget, provider invalidation, and preview startup stall watchdog.
-- Remaining high-value gaps are mostly platform/real-device dependent, especially true provider death/restart signals, long-running real-device recovery behavior, and device-specific performance thresholds.
-- Do not enter a new stage without explicit user approval. One approval only applies to one stage transition.
-
 ## Required Working Loop
 
 When the user asks to continue or advance work without naming a narrow target:
 
-1. Read `codex/plan.md`, `codex/prompt.md`, and `codex/documentation.md`.
-2. Compare those docs with current code and verification results.
-3. Identify the current stage, biggest verified gap, and the smallest valuable closed loop.
-4. Implement only that stage-local closed loop.
-5. Run focused verification first, then the necessary stage verification.
-6. Fix failures before stacking new changes.
-7. Update `codex/documentation.md` after a meaningful verified loop or before stopping.
-8. Reassess whether another high-value closed loop remains before ending.
+1. Treat the user's latest request as the primary driver.
+2. Read `codex/documentation.md` for current status, verification baseline, residual risks, and recent verified loops.
+3. Read `codex/prompt.md` only when broader project intent or architecture context is needed.
+4. Read relevant files under `docs/plans/` when the request names an existing handoff, orchestration, feature plan, or research package.
+5. Read `codex/plan.md` only when the task is explicitly about pre-research, user research, creating a new plan, or updating planning material; it is not the default execution roadmap.
+6. Compare the relevant docs with current code and verification results.
+7. Identify the demand-local highest-value verified gap and the smallest valuable closed loop.
+8. Implement only that request-local closed loop.
+9. Run focused verification first, then the necessary stage verification.
+10. Fix failures before stacking new changes.
+11. Update `codex/documentation.md` after a meaningful verified loop or before stopping.
+12. Reassess whether another high-value closed loop remains before ending.
 
 Stop when:
 
-- Stage completion requires user approval to cross into the next stage.
+- Stage or milestone completion requires user approval to cross into the next stage or a broader scope.
 - Further progress needs external information, device access, permissions, or user decision.
 - Remaining work is low value or would add more complexity than benefit.
 - Verification cannot be made meaningful in the local environment.
@@ -144,8 +139,9 @@ If Gradle shows transient Kotlin/build-directory errors in `~/.codex-build/OpenC
   - Historical archive
 - Update it after meaningful verified changes.
 - Agent handoff and orchestration documents must live under `docs/plans/`. Do not create or revive `codex/agent_plans/`; link new package indexes from `docs/plans/INDEX.md`.
-- Do not rewrite `codex/plan.md`, `codex/prompt.md`, or `codex/implement.md` core rules unless the user explicitly asks. Suggestions about those files should be recorded separately.
-- Some historical docs contain old absolute paths. Treat the current workspace `/Volumes/Extreme_SSD/project/codex_camera` as authoritative.
+- `codex/plan.md` is reserved for pre-research, user research, new feature planning, or other explicit planning work. Do not use it as the default source of truth for ongoing execution.
+- Do not rewrite `codex/prompt.md` or `codex/implement.md` core rules unless the user explicitly asks. Suggestions about those files should be recorded separately.
+- Some historical docs contain old absolute paths. Treat the current workspace `/Volumes/Extreme_SSD/project/open_camera` as authoritative.
 
 ## Edit Constraints
 
