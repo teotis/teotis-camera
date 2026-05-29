@@ -1,0 +1,5 @@
+package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
+01-strings-xml	packages/01-strings-xml.md	status/01-strings-xml.md		status	1	agent/ui-i18n-cleanup/01-strings-xml	.claude/worktrees/01-strings-xml	0	0
+02-layout-xml	packages/02-layout-xml.md	status/02-layout-xml.md		status	1	agent/ui-i18n-cleanup/02-layout-xml	.claude/worktrees/02-layout-xml	0	0
+03-kotlin-hardcoded	packages/03-kotlin-hardcoded.md	status/03-kotlin-hardcoded.md		status	1	agent/ui-i18n-cleanup/03-kotlin-hardcoded	.claude/worktrees/03-kotlin-hardcoded	0	0
+99-finalize	packages/99-finalize.md	status/99-finalize.md	01-strings-xml,02-layout-xml,03-kotlin-hardcoded	status+code	final	agent/ui-i18n-cleanup/99-finalize	.claude/worktrees/99-finalize	0	1
