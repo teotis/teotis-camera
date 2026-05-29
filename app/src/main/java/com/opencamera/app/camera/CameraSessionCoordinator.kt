@@ -137,6 +137,14 @@ class CameraSessionCoordinator(
             is DeviceEvent.ShotStarted -> session.dispatch(
                 SessionIntent.ShotStarted(event.shot)
             )
+            is DeviceEvent.CaptureCommitted -> session.dispatch(
+                SessionIntent.CaptureCommitted(
+                    shotId = event.shotId,
+                    mediaType = event.mediaType,
+                    source = event.source,
+                    elapsedTimestampMs = event.elapsedTimestampMs
+                )
+            )
             is DeviceEvent.DataReceived -> session.dispatch(
                 SessionIntent.DataReceived(event.shotId, event.mediaType)
             )

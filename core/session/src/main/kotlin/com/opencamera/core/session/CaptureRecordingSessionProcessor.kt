@@ -76,6 +76,12 @@ internal class CaptureRecordingSessionProcessor(
             is SessionIntent.CountdownTick -> handleCountdownTick(intent.remainingSeconds)
             SessionIntent.CountdownCompleted -> handleCountdownCompleted()
             is SessionIntent.ShotStarted -> handleShotStarted(intent.shot)
+            is SessionIntent.CaptureCommitted -> handleCaptureCommitted(
+                shotId = intent.shotId,
+                mediaType = intent.mediaType,
+                source = intent.source,
+                elapsedTimestampMs = intent.elapsedTimestampMs
+            )
             is SessionIntent.DataReceived -> handleDataReceived(intent.shotId, intent.mediaType)
             is SessionIntent.ShotCompleted -> handleShotCompleted(intent.result)
             is SessionIntent.ShotFailed -> handleShotFailed(
@@ -242,6 +248,7 @@ internal class CaptureRecordingSessionProcessor(
                 presentation = s.presentation.copy(
                     countdownRemainingSeconds = null,
                     pendingCaptureFeedback = null,
+                    captureReadiness = null,
                     recordingStartedAtElapsedMillis = displayedStartedAt,
                     recordingElapsedMillis = if (shot.mediaType == MediaType.VIDEO) 0L else null,
                     lastAction = if (shot.mediaType == MediaType.PHOTO) {
@@ -350,6 +357,39 @@ internal class CaptureRecordingSessionProcessor(
         }
     }
 
+    private fun canSignalReadinessOnCaptureCommitted(shot: ShotRequest): Boolean {
+        if (shot.mediaType != MediaType.PHOTO) return false
+        if (shot.livePhotoSpec != null) return false
+        return shot.shotKind == ShotKind.STILL_CAPTURE
+    }
+
+    private fun handleCaptureCommitted(
+        shotId: String,
+        mediaType: MediaType,
+        source: String,
+        elapsedTimestampMs: Long?
+    ) {
+        updateState.update { s ->
+            val activeShot = s.activeShot ?: return@update s
+            if (activeShot.shotId != shotId || mediaType != MediaType.PHOTO) return@update s
+            if (canSignalReadinessOnCaptureCommitted(activeShot)) {
+                s.copy(
+                    presentation = s.presentation.copy(
+                        captureReadiness = com.opencamera.core.device.CaptureReadiness(
+                            shotId = shotId,
+                            mediaType = mediaType,
+                            source = source,
+                            elapsedTimestampMs = elapsedTimestampMs
+                        )
+                    )
+                )
+            } else {
+                s
+            }
+        }
+        trace.record("capture.committed", "shotId=$shotId,source=$source")
+    }
+
     private suspend fun handleShotCompleted(result: ShotResult) {
         currentController().onSessionEvent(ModeSessionEvent.ShotCompleted(result))
         recordingElapsedJob?.cancel()
@@ -371,6 +411,7 @@ internal class CaptureRecordingSessionProcessor(
                     recordingStartedAtElapsedMillis = null,
                     recordingElapsedMillis = null,
                     pendingPostprocess = null,
+                    captureReadiness = null,
                     previewThumbnailPath = result.thumbnailSource.outputPathOrNull()
                         ?: s.presentation.previewThumbnailPath,
                     latestThumbnailSource = when (result.thumbnailSource) {
@@ -540,6 +581,7 @@ internal class CaptureRecordingSessionProcessor(
                     recordingStartedAtElapsedMillis = null,
                     recordingElapsedMillis = null,
                     pendingPostprocess = null,
+                    captureReadiness = null,
                     lastAction = if (mediaType == MediaType.PHOTO) {
                         "Photo capture failed"
                     } else {

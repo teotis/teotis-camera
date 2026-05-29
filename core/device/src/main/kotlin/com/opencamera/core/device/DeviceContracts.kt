@@ -11,6 +11,13 @@ import com.opencamera.core.settings.ManualCaptureParams
 import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
 
+data class CaptureReadiness(
+    val shotId: String,
+    val mediaType: com.opencamera.core.media.MediaType,
+    val source: String,
+    val elapsedTimestampMs: Long? = null
+)
+
 enum class PhotoLowLightStrategySupport {
     UNSUPPORTED,
     DEGRADED_SINGLE_FRAME,
@@ -619,6 +626,12 @@ sealed interface DeviceEvent {
     data class PreviewError(val reason: String) : DeviceEvent
     data class RuntimeIssue(val issue: DeviceRuntimeIssue) : DeviceEvent
     data class ShotStarted(val shot: ShotRequest) : DeviceEvent
+    data class CaptureCommitted(
+        val shotId: String,
+        val mediaType: MediaType,
+        val source: String,
+        val elapsedTimestampMs: Long? = null
+    ) : DeviceEvent
     data class DataReceived(val shotId: String, val mediaType: MediaType) : DeviceEvent
     data class ShotCompleted(val result: ShotResult) : DeviceEvent
     data class ShotFailed(
