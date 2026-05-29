@@ -2,9 +2,9 @@
 
 ## State
 
-`pending`
+`invalid`
 
-**Status**: pending
+**Status**: invalid
 
 ## Evidence
 

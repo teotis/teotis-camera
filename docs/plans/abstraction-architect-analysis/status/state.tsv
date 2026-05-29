@@ -1,0 +1,9 @@
+package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error	failed_command	conflict_files	log_summary	recovery_hint
+01-architecture-boundary-integrity	launched	2026-05-29T09:50:28Z	pending	8cf70cfb	agent/abstraction-analysis/01-architecture-boundary-integrity		pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+02-domain-model-unification	launched	2026-05-29T09:51:47Z	pending	3eb95c68	agent/abstraction-analysis/02-domain-model-unification		pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+03-session-kernel-invariants	launched	2026-05-29T09:52:03Z	pending	50142c0b	agent/abstraction-analysis/03-session-kernel-invariants		pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+04-cross-cutting-concerns	launched	2026-05-29T09:52:05Z	pending	b34b524b	agent/abstraction-analysis/04-cross-cutting-concerns		pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+05-conversion-glue-detection	pending	pending	pending	pending	agent/abstraction-analysis/05-conversion-glue-detection		pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+06-platform-configuration-branches	pending	pending	pending	pending	agent/abstraction-analysis/06-platform-configuration-branches		pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+07-synthesis-html-report	pending	pending	pending	pending	agent/abstraction-analysis/07-synthesis-html-report		pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
+99-finalize	pending	pending	pending	pending	agent/abstraction-analysis/99-finalize		pending	pending	pending	pending	pending	pending	pending	pending	pending	pending

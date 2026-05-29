@@ -1,0 +1,13 @@
+{"ts":"2026-05-29T09:50:27Z","event":"launch_requested","package_id":"01-architecture-boundary-integrity","branch":"agent/abstraction-analysis/01-architecture-boundary-integrity","worktree":"","finalize":"0"}
+{"ts":"2026-05-29T09:50:28Z","event":"state_changed","package_id":"01-architecture-boundary-integrity","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T09:50:28Z","event":"launch_succeeded","package_id":"01-architecture-boundary-integrity","session_id":"8cf70cfb","new_state":"launched","branch":"agent/abstraction-analysis/01-architecture-boundary-integrity","worktree":""}
+{"ts":"2026-05-29T09:51:46Z","event":"launch_requested","package_id":"02-domain-model-unification","branch":"agent/abstraction-analysis/02-domain-model-unification","worktree":"","finalize":"0"}
+{"ts":"2026-05-29T09:51:47Z","event":"state_changed","package_id":"02-domain-model-unification","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T09:51:47Z","event":"launch_succeeded","package_id":"02-domain-model-unification","session_id":"3eb95c68","new_state":"launched","branch":"agent/abstraction-analysis/02-domain-model-unification","worktree":""}
+{"ts":"2026-05-29T09:52:02Z","event":"launch_requested","package_id":"03-session-kernel-invariants","branch":"agent/abstraction-analysis/03-session-kernel-invariants","worktree":"","finalize":"0"}
+{"ts":"2026-05-29T09:52:03Z","event":"state_changed","package_id":"03-session-kernel-invariants","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T09:52:03Z","event":"launch_succeeded","package_id":"03-session-kernel-invariants","session_id":"50142c0b","new_state":"launched","branch":"agent/abstraction-analysis/03-session-kernel-invariants","worktree":""}
+{"ts":"2026-05-29T09:52:04Z","event":"launch_requested","package_id":"04-cross-cutting-concerns","branch":"agent/abstraction-analysis/04-cross-cutting-concerns","worktree":"","finalize":"0"}
+{"ts":"2026-05-29T09:52:05Z","event":"state_changed","package_id":"04-cross-cutting-concerns","old_state":"pending","new_state":"launched"}
+{"ts":"2026-05-29T09:52:05Z","event":"launch_succeeded","package_id":"04-cross-cutting-concerns","session_id":"b34b524b","new_state":"launched","branch":"agent/abstraction-analysis/04-cross-cutting-concerns","worktree":""}
+{"ts":"2026-05-29T09:52:48Z","event":"scratch_path_requested","package_id":"04-cross-cutting-concerns","path":"/Volumes/Extreme_SSD/project/open_camera/docs/plans/abstraction-architect-analysis/scratch/04-cross-cutting-concerns"}
