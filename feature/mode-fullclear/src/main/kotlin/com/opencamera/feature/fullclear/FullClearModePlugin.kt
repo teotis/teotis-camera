@@ -36,12 +36,12 @@ private class FullClearModeController(
         ModeSnapshot(
             id = ModeId.FULL_CLEAR,
             uiSpec = ModeUiSpec(
-                title = "Full Clear",
-                shutterLabel = "Capture"
+                title = "全清",
+                shutterLabel = "拍摄"
             ),
             state = ModeState(
-                headline = "Full Clear mode active",
-                detail = "Full clear capture pipeline ready."
+                headline = "全清模式已激活",
+                detail = "全清拍摄管线就绪。"
             )
         )
     )
@@ -64,7 +64,7 @@ private class FullClearModeController(
         context.eventSink("fullclear.enter")
         mutableSnapshot.value = mutableSnapshot.value.copy(
             state = mutableSnapshot.value.state.copy(
-                headline = "Full Clear mode active"
+                headline = "全清模式已激活"
             )
         )
     }

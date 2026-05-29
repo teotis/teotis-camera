@@ -82,7 +82,7 @@ private class PortraitModeController(
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
-            headline = "Portrait pipeline ready"
+            headline = "人像管线就绪"
         )
     )
 
@@ -95,7 +95,7 @@ private class PortraitModeController(
         styleIndex = styleIndex.coerceAtMost(currentStyles().lastIndex)
         mutableSnapshot.value = buildSnapshot(
             headline = if (depthEffectEnabled()) {
-                "Portrait mode active"
+                "人像模式已激活"
             } else {
                 "Portrait focus active"
             }
@@ -133,7 +133,7 @@ private class PortraitModeController(
         styleIndex = resolvedDefaultStyleIndex().coerceAtMost(currentStyles().lastIndex)
         mutableSnapshot.value = buildSnapshot(
             headline = if (depthEffectEnabled()) {
-                "Portrait mode active"
+                "人像模式已激活"
             } else {
                 "Portrait focus active"
             }
@@ -365,7 +365,7 @@ private class PortraitModeController(
                     "Portrait Pro assist active"
                 }
             } else if (depthEffectEnabled()) {
-                "Portrait mode active"
+                "人像模式已激活"
             } else {
                 "Portrait focus active"
             }
