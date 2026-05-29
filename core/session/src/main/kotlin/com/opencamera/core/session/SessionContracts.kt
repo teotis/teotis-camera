@@ -199,7 +199,8 @@ data class SessionPresentationState(
     val recordingStartedAtElapsedMillis: Long? = null,
     val recordingElapsedMillis: Long? = null,
     val documentBatch: DocumentBatchState = DocumentBatchState.inactive(),
-    val pendingPostprocess: PendingPostprocessUiState? = null
+    val pendingPostprocess: PendingPostprocessUiState? = null,
+    val captureReadiness: com.opencamera.core.device.CaptureReadiness? = null
 )
 
 data class SessionState(
@@ -315,6 +316,12 @@ sealed interface SessionIntent {
     data class PreviewRuntimeIssue(val issue: DeviceRuntimeIssue) : SessionIntent
     data class PreviewStopped(val reason: String) : SessionIntent
     data class ShotStarted(val shot: ShotRequest) : SessionIntent
+    data class CaptureCommitted(
+        val shotId: String,
+        val mediaType: MediaType,
+        val source: String,
+        val elapsedTimestampMs: Long? = null
+    ) : SessionIntent
     data class DataReceived(val shotId: String, val mediaType: MediaType) : SessionIntent
     data class ShotCompleted(val result: ShotResult) : SessionIntent
     data class ShotFailed(

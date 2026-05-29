@@ -2,7 +2,7 @@
 
 ## State
 
-`completed`
+`finalized`
 
 ## Worktree
 
