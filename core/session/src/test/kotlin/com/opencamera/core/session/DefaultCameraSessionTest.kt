@@ -2719,6 +2719,114 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `live photo does not rearm on DataReceived keeps activeShot until ShotCompleted`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(livePhotoEnabledByDefault = true)
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(ShotKind.LIVE_PHOTO, shot.shotKind)
+
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+
+        session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
+        runCurrent()
+        assertEquals(CaptureStatus.DATA_RECEIVED, session.state.value.captureStatus)
+        // Conservative capture: activeShot stays set, shutter remains blocked
+        assertNotNull(session.state.value.activeShot)
+        assertEquals(shot.shotId, session.state.value.activeShot?.shotId)
+
+        // ShotCompleted clears activeShot
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/live.jpg",
+                    saveRequest = SaveRequest.photoLibrary(
+                        metadata = MediaMetadata(customTags = mapOf("livePhotoDefault" to "on"))
+                    ),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/live.jpg"),
+                    metadata = MediaMetadata(customTags = mapOf("livePhotoDefault" to "on")),
+                    livePhotoBundle = LivePhotoBundle(
+                        stillPath = "Pictures/OpenCamera/live.jpg",
+                        motionPath = "Pictures/OpenCamera/live.live.mp4",
+                        sidecarPath = "Pictures/OpenCamera/live.live.json",
+                        motionDurationMillis = 1500,
+                        motionMimeType = "video/mp4",
+                        sidecarMimeType = "application/vnd.opencamera.live+json"
+                    )
+                )
+            )
+        )
+        advanceUntilIdle()
+        assertNull(session.state.value.activeShot)
+    }
+
+    @Test
+    fun `multi frame capture does not rearm on DataReceived keeps activeShot until ShotCompleted`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(ShotKind.MULTI_FRAME_CAPTURE, shot.shotKind)
+
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+
+        session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
+        runCurrent()
+        assertEquals(CaptureStatus.DATA_RECEIVED, session.state.value.captureStatus)
+        // Conservative capture: activeShot stays set, shutter remains blocked
+        assertNotNull(session.state.value.activeShot)
+        assertEquals(shot.shotId, session.state.value.activeShot?.shotId)
+
+        // ShotCompleted clears activeShot
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/night.jpg",
+                    saveRequest = SaveRequest.photoLibrary(
+                        metadata = MediaMetadata(customTags = mapOf("profile" to "tripod"))
+                    ),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/night.jpg"),
+                    metadata = MediaMetadata(customTags = mapOf("profile" to "tripod"))
+                )
+            )
+        )
+        advanceUntilIdle()
+        assertNull(session.state.value.activeShot)
+    }
+
+    @Test
     fun `session state exposes independent active device graph for active mode`() = runTest {
         val session = createSession(InMemorySessionTrace(), this)
 
