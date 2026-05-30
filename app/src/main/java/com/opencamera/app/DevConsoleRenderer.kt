@@ -26,14 +26,12 @@ internal class DevConsoleRenderer(
         views.tabKey.isEnabled = model.selectedTab != DevLogTab.KEY
         views.tabCore.isEnabled = model.selectedTab != DevLogTab.CORE
         views.tabError.isEnabled = model.selectedTab != DevLogTab.ERROR
-        views.tabLink.isEnabled = model.selectedTab != DevLogTab.LINK
         views.tabAll.isEnabled = model.selectedTab != DevLogTab.ALL
         val activeAlpha = 1f
         val inactiveAlpha = 0.84f
         views.tabKey.alpha = if (model.selectedTab == DevLogTab.KEY) activeAlpha else inactiveAlpha
         views.tabCore.alpha = if (model.selectedTab == DevLogTab.CORE) activeAlpha else inactiveAlpha
         views.tabError.alpha = if (model.selectedTab == DevLogTab.ERROR) activeAlpha else inactiveAlpha
-        views.tabLink.alpha = if (model.selectedTab == DevLogTab.LINK) activeAlpha else inactiveAlpha
         views.tabAll.alpha = if (model.selectedTab == DevLogTab.ALL) activeAlpha else inactiveAlpha
 
         val hasStorage = model.storageUsedDisplay.isNotBlank()

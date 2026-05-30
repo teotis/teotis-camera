@@ -1629,7 +1629,8 @@ internal fun defaultFilterLabFamily(activeMode: ModeId): FilterLabFamily {
         ModeId.PHOTO,
         ModeId.DOCUMENT,
         ModeId.NIGHT,
-        ModeId.PRO -> FilterLabFamily.PHOTO
+        ModeId.PRO,
+        ModeId.FULL_CLEAR -> FilterLabFamily.PHOTO
     }
 }
 

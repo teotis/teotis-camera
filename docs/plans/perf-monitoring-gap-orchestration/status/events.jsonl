@@ -2,3 +2,4 @@
 {"ts":"2026-05-30T18:25:58Z","event":"launch_requested","package_id":"01-capture-latency-timing","branch":"agent/perf-monitoring-gap/01-capture-latency-timing","worktree":"/Volumes/Extreme_SSD/project/open_camera/.worktrees/perf-monitoring-gap/01-capture-latency-timing","finalize":"0"}
 {"ts":"2026-05-30T18:26:00Z","event":"state_changed","package_id":"01-capture-latency-timing","old_state":"pending","new_state":"launched"}
 {"ts":"2026-05-30T18:26:00Z","event":"launch_succeeded","package_id":"01-capture-latency-timing","session_id":"33628db0","new_state":"launched","branch":"agent/perf-monitoring-gap/01-capture-latency-timing","worktree":"/Volumes/Extreme_SSD/project/open_camera/.worktrees/perf-monitoring-gap/01-capture-latency-timing"}
+{"ts":"2026-05-30T18:50:57Z","event":"state_changed","package_id":"01-capture-latency-timing","old_state":"launched","new_state":"completed"}

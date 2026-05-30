@@ -335,7 +335,6 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
             text = text,
-            linkEvents = container.linkRecorder.snapshot(),
             storageSummary = if (activePanelRoute is CockpitPanelRoute.DevConsole) {
                 runCatching { devLogExporter.storageSummary() }.getOrNull()
             } else null
@@ -396,7 +395,6 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
             text = AppTextResolver(this),
-            linkEvents = container.linkRecorder.snapshot(),
             storageSummary = summary
         )
         latestDevLogRenderModel = model

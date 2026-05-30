@@ -4,7 +4,7 @@
 
 ## Evidence
 
-- Worktree: `/Volumes/Extreme_SSD/project/open_camera/.worktrees/perf-monitoring-gap/01-capture-latency-timing`
+`completed`
 - Branch: `agent/perf-monitoring-gap/01-capture-latency-timing`
 - Base commit: `e6e84af2`
 - Commit hash: `69c7d49d1e8421bdbec34f92ce2b9d54dcce53c4`
