@@ -95,6 +95,7 @@ import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
 import com.opencamera.core.media.CompositeMediaPostProcessor
 import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.withSaveIoTiming
 import com.opencamera.core.media.FlashMode as CaptureFlashMode
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.LiveMotionSource
@@ -141,6 +142,9 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
+import com.opencamera.core.session.LinkEventStatus
+import com.opencamera.core.session.PerformanceLinkEvent
+import com.opencamera.core.session.PerformanceLinkRecorder
 
 data class CameraLensProfile(
     val lensFacing: LensFacing,
@@ -1314,7 +1318,8 @@ class CameraXCaptureAdapter(
             PipelineMetadataPostProcessor()
         )
     ),
-    private val livePreviewFrameSource: com.opencamera.app.camera.live.LivePreviewFrameSource? = null
+    private val livePreviewFrameSource: com.opencamera.app.camera.live.LivePreviewFrameSource? = null,
+    private val linkRecorder: com.opencamera.core.session.PerformanceLinkRecorder? = null
 ) : CameraDeviceAdapter {
     private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var cameraProvider: ProcessCameraProvider? = null
@@ -1363,6 +1368,23 @@ class CameraXCaptureAdapter(
     private var currentStillCaptureOutputSize: StillCaptureOutputSize? = null
     private var currentManualCaptureConfig: Camera2ManualCaptureConfig? = null
     private var currentVideoSpec: VideoSpec? = null
+    // G6: Preview FPS tracker
+    private val previewFpsTracker = com.opencamera.core.media.PreviewFpsTracker()
+    // G9: Video recording quality tracker
+    val videoRecordingQualityTracker = com.opencamera.core.media.VideoRecordingQualityTracker()
+
+    fun runtimeMetricsSnapshot(): com.opencamera.core.media.RuntimeMetricsSnapshot {
+        return com.opencamera.core.media.RuntimeMetricsSnapshot(
+            previewFps = previewFpsTracker.toSnapshot(),
+            algorithmQueue = com.opencamera.core.media.queryAlgorithmQueueSnapshot(
+                com.opencamera.core.media.CameraResourceBudget()
+            ),
+            videoRecordingQuality = videoRecordingQualityTracker.toSnapshot(),
+            memoryPressure = com.opencamera.core.media.MemoryPressureSnapshot.sample(
+                com.opencamera.core.media.CameraResourceBudget()
+            )
+        )
+    }
     private var previewSnapshotGeneration: Int = 0
     private var suppressPreviewStateEvents = false
     private var currentOutputRotation: com.opencamera.core.device.CameraOutputRotation =
@@ -1678,6 +1700,7 @@ class CameraXCaptureAdapter(
             applyVideoTorch(false)
             livePreviewFrameSource?.stop("release")
             if (activeRecording != null) {
+                videoRecordingQualityTracker.stopRecording()
                 activeVideoPlan?.request?.shotId?.let { lifecycleInterruptedShotIds.add(it) }
                 val interruptedPlan = activeVideoPlan
                 activeRecording?.close()
@@ -2313,13 +2336,14 @@ class CameraXCaptureAdapter(
                 postProcessCompletedAtElapsedMillis = postProcessCompletedAt
             )
         )
+        val t = timedResult.timing
+        val deviceStarted = t.deviceCaptureStartedAtElapsedMillis
+        val deviceCompleted = t.deviceCaptureCompletedAtElapsedMillis
+        val requested = t.requestedAtElapsedMillis
         val timingNotes = buildList {
-            val t = timedResult.timing
-            val deviceStarted = t.deviceCaptureStartedAtElapsedMillis
-            val deviceCompleted = t.deviceCaptureCompletedAtElapsedMillis
-            val requested = t.requestedAtElapsedMillis
             if (deviceStarted != null && deviceCompleted != null && deviceStarted > 0 && deviceCompleted > 0) {
                 add("timing:device=${deviceCompleted - deviceStarted}ms")
+                add("timing:save-io=${deviceCompleted - deviceStarted}ms")
             }
             if (deviceCompleted != null && deviceCompleted > 0) {
                 add("timing:postprocess=${postProcessCompletedAt - deviceCompleted}ms")
@@ -2331,7 +2355,24 @@ class CameraXCaptureAdapter(
         val resultWithTiming = timedResult.copy(
             pipelineNotes = timedResult.pipelineNotes + timingNotes
         )
-        _events.emit(DeviceEvent.ShotCompleted(resultWithTiming))
+        val saveIoResult = if (deviceStarted != null && deviceCompleted != null && deviceStarted > 0 && deviceCompleted > 0) {
+            val resultWithSaveIo = resultWithTiming.withSaveIoTiming(deviceStarted, deviceCompleted)
+            linkRecorder?.recordEvent(PerformanceLinkEvent(
+                flow = "save",
+                stage = "file-io",
+                status = LinkEventStatus.COMPLETED,
+                correlationId = plan.request.shotId,
+                startElapsedMillis = deviceStarted,
+                endElapsedMillis = deviceCompleted,
+                durationMillis = deviceCompleted - deviceStarted,
+                detail = plan.request.mediaType.name.lowercase(),
+                source = "CameraXCaptureAdapter"
+            ))
+            resultWithSaveIo
+        } else {
+            resultWithTiming
+        }
+        _events.emit(DeviceEvent.ShotCompleted(saveIoResult))
     }
 
     private suspend fun emitShotFailure(
@@ -2340,6 +2381,7 @@ class CameraXCaptureAdapter(
         reason: String
     ) {
         applyVideoTorch(false)
+        videoRecordingQualityTracker.stopRecording()
         withContext(Dispatchers.Main.immediate) {
             activeRecording?.close()
             activeRecording = null
@@ -2573,10 +2615,26 @@ class CameraXCaptureAdapter(
             activeRecording = pending.start(ContextCompat.getMainExecutor(context)) { event ->
                 when (event) {
                     is VideoRecordEvent.Start -> {
+                        val recordingStartedAt = SystemClock.elapsedRealtime()
+                        linkRecorder?.recordEvent(PerformanceLinkEvent(
+                            flow = "recording",
+                            stage = "start",
+                            status = LinkEventStatus.COMPLETED,
+                            correlationId = plan.request.shotId,
+                            startElapsedMillis = requestedAt,
+                            endElapsedMillis = recordingStartedAt,
+                            durationMillis = recordingStartedAt - requestedAt,
+                            detail = null,
+                            source = "CameraXCaptureAdapter"
+                        ))
+                        videoRecordingQualityTracker.startRecording(
+                            runtimeVideoSpec.frameRate.storageKey.toIntOrNull()
+                        )
                         _events.tryEmit(DeviceEvent.ShotStarted(plan.request))
                     }
 
                     is VideoRecordEvent.Finalize -> {
+                        videoRecordingQualityTracker.stopRecording()
                         adapterScope.launch {
                             applyVideoTorch(false)
                         }
@@ -2619,6 +2677,7 @@ class CameraXCaptureAdapter(
                 "Active recording ${plan.request.shotId} does not match stop request $shotId"
             }
             recording.stop()
+            videoRecordingQualityTracker.stopRecording()
         }
     }
 
@@ -2877,6 +2936,9 @@ class CameraXCaptureAdapter(
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                     analysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
+                        val frameNanos = System.nanoTime()
+                        previewFpsTracker.recordFrame(frameNanos)
+                        videoRecordingQualityTracker.recordFrame(frameNanos)
                         (livePreviewFrameSource as? CameraXLivePreviewFrameSource)?.onAnalyzeFrame(
                             imageProxy,
                             imageProxy.imageInfo.rotationDegrees
@@ -3015,6 +3077,7 @@ class CameraXCaptureAdapter(
         livePreviewFrameSource?.stop("unbind")
         provider.unbindAll()
         if (closeActiveRecording) {
+            videoRecordingQualityTracker.stopRecording()
             activeRecording?.close()
             activeRecording = null
             activeVideoPlan = null
@@ -3037,6 +3100,9 @@ class CameraXCaptureAdapter(
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
                     analysis.setAnalyzer(ContextCompat.getMainExecutor(context)) { imageProxy ->
+                        val frameNanos = System.nanoTime()
+                        previewFpsTracker.recordFrame(frameNanos)
+                        videoRecordingQualityTracker.recordFrame(frameNanos)
                         (livePreviewFrameSource as? CameraXLivePreviewFrameSource)?.onAnalyzeFrame(
                             imageProxy,
                             imageProxy.imageInfo.rotationDegrees

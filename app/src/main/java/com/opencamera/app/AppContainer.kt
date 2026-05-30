@@ -43,6 +43,8 @@ import com.opencamera.core.media.PipelineMetadataPostProcessor
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.mode.ModeRegistry
 import com.opencamera.core.settings.SessionSettingsSnapshot
+import com.opencamera.core.session.LinkEventStatus
+import com.opencamera.core.session.PerformanceLinkEvent
 import com.opencamera.core.session.CameraSession
 import com.opencamera.core.session.DefaultCameraSession
 import com.opencamera.core.session.InMemorySessionTrace
@@ -80,7 +82,7 @@ class AppContainer(
     }
 
     private val mediaPostProcessor = CompositeMediaPostProcessor(
-        listOf(
+        processors = listOf(
             MultiFrameMergePlaceholderPostProcessor(),
             DocumentAutoCropPostProcessor(
                 AndroidDocumentAutoCropEditor(appContext)
@@ -123,7 +125,20 @@ class AppContainer(
                 AndroidPhotoSelfieMirrorEditor(appContext)
             ),
             PipelineMetadataPostProcessor()
-        )
+        ),
+        onProcessorTimed = { name, elapsedMs ->
+            linkRecorder.recordEvent(PerformanceLinkEvent(
+                flow = "postprocess",
+                stage = name,
+                status = if (elapsedMs >= 0) LinkEventStatus.COMPLETED else LinkEventStatus.FAILED,
+                correlationId = "postprocess:$name",
+                startElapsedMillis = System.nanoTime() / 1_000_000L - elapsedMs,
+                endElapsedMillis = System.nanoTime() / 1_000_000L,
+                durationMillis = elapsedMs,
+                detail = null,
+                source = "CompositeMediaPostProcessor"
+            ))
+        }
     )
 
     private val modeRegistry = ModeRegistry(
@@ -151,7 +166,8 @@ class AppContainer(
         context = appContext,
         shotExecutor = shotExecutor,
         mediaPostProcessor = mediaPostProcessor,
-        livePreviewFrameSource = livePreviewFrameSource
+        livePreviewFrameSource = livePreviewFrameSource,
+        linkRecorder = linkRecorder
     )
 
     val effectCapabilityResolver = EffectCapabilityResolver(

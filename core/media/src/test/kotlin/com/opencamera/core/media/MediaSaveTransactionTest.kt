@@ -7,6 +7,26 @@ import java.io.File
 
 class MediaSaveTransactionTest {
 
+    @Test
+    fun `withSaveIoTiming adds save-io timing to pipelineNotes`() {
+        val result = photoResult().withSaveIoTiming(
+            saveIoStartMs = 1000L,
+            saveIoEndMs = 1050L
+        )
+        assertTrue(result.pipelineNotes.contains("timing:save-io=50ms"))
+    }
+
+    @Test
+    fun `withSaveIoTiming zero delta records zero`() {
+        val result = photoResult().withSaveIoTiming(
+            saveIoStartMs = 2000L,
+            saveIoEndMs = 2000L
+        )
+        assertTrue(result.pipelineNotes.contains("timing:save-io=0ms"))
+    }
+
+    // Original tests below
+
     private fun photoResult(
         intermediatePaths: List<String> = emptyList(),
         livePhotoBundle: LivePhotoBundle? = null

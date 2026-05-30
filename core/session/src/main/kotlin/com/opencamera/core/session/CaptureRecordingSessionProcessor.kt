@@ -562,6 +562,28 @@ internal class CaptureRecordingSessionProcessor(
                 }
             }
         }
+
+        // G1: Shutter-to-Capture latency
+        if (result.mediaType == MediaType.PHOTO) {
+            val deviceStarted = result.timing.deviceCaptureStartedAtElapsedMillis
+            if (requested != null && deviceStarted != null) {
+                val shutterToDeviceMs = deviceStarted - requested
+                trace.record("capture.shutter.to.device", "${shutterToDeviceMs}ms")
+                linkRecorder.recordEvent(
+                    PerformanceLinkEvent(
+                        flow = "capture",
+                        stage = "shutter-to-device",
+                        status = LinkEventStatus.COMPLETED,
+                        correlationId = result.shotId,
+                        startElapsedMillis = requested,
+                        endElapsedMillis = deviceStarted,
+                        durationMillis = shutterToDeviceMs,
+                        detail = null,
+                        source = "CaptureRecordingSessionProcessor"
+                    )
+                )
+            }
+        }
     }
 
     private fun latestLivePhotoBundleFor(result: ShotResult): LivePhotoBundle? {

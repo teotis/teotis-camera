@@ -4365,6 +4365,202 @@ class DefaultCameraSessionTest {
         job.cancel()
     }
 
+    // --- G2/G3 Switch Latency Timing ---
+
+    @Test
+    fun `mode switch records link event with correct flow and stage`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(64))
+        advanceUntilIdle()
+
+        assertEquals(ModeId.PHOTO, session.state.value.activeMode)
+
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(180))
+        advanceUntilIdle()
+
+        val events = session.linkEventSnapshot()
+        val modeSwitchEvents = events.filter { it.flow == "mode-switch" && it.stage == "total" }
+        assertEquals(1, modeSwitchEvents.size)
+        val modeEvent = modeSwitchEvents.first()
+        assertEquals(LinkEventStatus.COMPLETED, modeEvent.status)
+        assertNotNull(modeEvent.durationMillis)
+        assertTrue(modeEvent.durationMillis!! >= 0)
+        assertEquals("DefaultCameraSession", modeEvent.source)
+    }
+
+    @Test
+    fun `mode switch records sub-step trace events`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(64))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(120))
+        advanceUntilIdle()
+
+        val traceEvents = trace.snapshot()
+        assertTrue(traceEvents.any { it.name == "mode.switch.unbind" })
+        assertTrue(traceEvents.any { it.name == "mode.switch.bind" })
+        assertTrue(traceEvents.any { it.name == "mode.switch.first.frame" })
+        // existing events preserved
+        assertTrue(traceEvents.any { it.name == "mode.switched" })
+        assertTrue(traceEvents.any { it.name == "mode.switch.started" })
+    }
+
+    @Test
+    fun `lens switch records link event with correct flow and stage`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT)
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(55))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.LensFacingToggled)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(210))
+        advanceUntilIdle()
+
+        val events = session.linkEventSnapshot()
+        val lensSwitchEvents = events.filter { it.flow == "lens-switch" && it.stage == "total" }
+        assertEquals(1, lensSwitchEvents.size)
+        val lensEvent = lensSwitchEvents.first()
+        assertEquals(LinkEventStatus.COMPLETED, lensEvent.status)
+        assertNotNull(lensEvent.durationMillis)
+        assertTrue(lensEvent.durationMillis!! >= 0)
+        assertEquals("DefaultCameraSession", lensEvent.source)
+    }
+
+    @Test
+    fun `lens switch records sub-step trace events`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT)
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(55))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.LensFacingToggled)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(150))
+        advanceUntilIdle()
+
+        val traceEvents = trace.snapshot()
+        assertTrue(traceEvents.any { it.name == "lens.switch.unbind" })
+        assertTrue(traceEvents.any { it.name == "lens.switch.bind" })
+        assertTrue(traceEvents.any { it.name == "lens.switch.first.frame" })
+        // existing events preserved
+        assertTrue(traceEvents.any { it.name == "lens.switched" })
+        assertTrue(traceEvents.any { it.name == "lens.switch.started" })
+    }
+
+    @Test
+    fun `mode switch span completed as failed on preview error`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(64))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewError("camera disconnected"))
+        advanceUntilIdle()
+
+        val events = session.linkEventSnapshot()
+        val failedEvents = events.filter { it.flow == "mode-switch" && it.status == LinkEventStatus.FAILED }
+        assertEquals(1, failedEvents.size)
+    }
+
+    @Test
+    fun `mode switch blocked by active shot does not start link span`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(64))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        // Try switching while a shot is active
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        advanceUntilIdle()
+
+        val events = session.linkEventSnapshot()
+        val modeSwitchEvents = events.filter { it.flow == "mode-switch" }
+        assertTrue(modeSwitchEvents.isEmpty())
+        assertTrue(trace.snapshot().any { it.name == "mode.switch.blocked" })
+    }
+
+    @Test
+    fun `lens switch blocked by countdown does not start link span`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(
+                        countdownDuration = CountdownDuration.SECONDS_3
+                    )
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(64))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+
+        session.dispatch(SessionIntent.LensFacingToggled)
+        advanceUntilIdle()
+
+        val events = session.linkEventSnapshot()
+        val lensSwitchEvents = events.filter { it.flow == "lens-switch" }
+        assertTrue(lensSwitchEvents.isEmpty())
+        assertTrue(trace.snapshot().any { it.name == "lens.switch.blocked" })
+    }
+
     private fun createSession(
         trace: InMemorySessionTrace,
         testScope: TestScope,

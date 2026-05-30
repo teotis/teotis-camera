@@ -5,9 +5,14 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.media.CameraPerformanceClass
 import com.opencamera.core.media.CameraThermalState
+import com.opencamera.core.media.AlgorithmQueueSnapshot
+import com.opencamera.core.media.CameraResourceBudget
+import com.opencamera.core.media.PreviewFpsSnapshot
 import com.opencamera.core.media.ResourceDiagnosticsSnapshot
+import com.opencamera.core.media.RuntimeMetricsSnapshot
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.media.VideoRecordingQualitySnapshot
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
@@ -16,6 +21,7 @@ import com.opencamera.core.settings.SessionSettingsSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -359,5 +365,42 @@ class SessionDiagnosticsTest {
         val state = defaultSessionState()
         val dump = buildSessionDebugDump(state = state, traceEvents = emptyList())
         assertTrue(dump.recentLinkEvents.isEmpty())
+    }
+
+    // ── Runtime metrics diagnostics tests ──────────────────────────
+
+    @Test
+    fun `session debug dump includes runtime metrics when provided`() {
+        val state = defaultSessionState()
+        val budget = CameraResourceBudget(
+            memoryBytes = 256L * 1024 * 1024,
+            maxConcurrentAlgorithmJobs = 4
+        )
+        val runtimeMetrics = RuntimeMetricsSnapshot.empty(budget)
+        val dump = buildSessionDebugDump(
+            state = state,
+            traceEvents = emptyList(),
+            runtimeMetrics = runtimeMetrics
+        )
+        assertNotNull(dump.runtimeMetrics)
+        assertEquals(PreviewFpsSnapshot.EMPTY, dump.runtimeMetrics?.previewFps)
+        assertEquals(AlgorithmQueueSnapshot.EMPTY, dump.runtimeMetrics?.algorithmQueue)
+        assertEquals(VideoRecordingQualitySnapshot.EMPTY, dump.runtimeMetrics?.videoRecordingQuality)
+    }
+
+    @Test
+    fun `session debug dump has null runtime metrics by default`() {
+        val state = defaultSessionState()
+        val dump = buildSessionDebugDump(state = state, traceEvents = emptyList())
+        assertNull(dump.runtimeMetrics)
+    }
+
+    @Test
+    fun `runtime metrics snapshot includes memory pressure from budget`() {
+        val budget = CameraResourceBudget(memoryBytes = 128L * 1024 * 1024)
+        val runtimeMetrics = RuntimeMetricsSnapshot.empty(budget)
+        assertEquals(128L * 1024 * 1024, runtimeMetrics.memoryPressure.budgetBytes)
+        assertTrue(runtimeMetrics.memoryPressure.usedMemoryBytes > 0L)
+        assertTrue(runtimeMetrics.memoryPressure.pressureRatio in 0f..1f)
     }
 }
