@@ -12,6 +12,7 @@ import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
+import com.opencamera.core.session.TraceEventDomain
 import com.opencamera.core.session.buildSessionDebugDump
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.ColorLabSpec
@@ -1698,7 +1699,8 @@ internal fun devLogRenderModel(
     selectedTab: DevLogTab,
     text: AppTextResolver,
     resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
-    storageSummary: StorageSummary? = null
+    storageSummary: StorageSummary? = null,
+    selectedDomain: TraceEventDomain? = null
 ): DevLogRenderModel {
     if (!isDebugBuild) {
         return DevLogRenderModel(
@@ -1716,9 +1718,13 @@ internal fun devLogRenderModel(
     val errorEvents = traceEvents.filter { isErrorEvent(it.name) }
     val allEvents = traceEvents
 
+    val domainTabs = TraceEventDomain.entries.map { domain ->
+        DomainTabCount(domain = domain, count = traceEvents.count { it.domain == domain })
+    }.filter { it.count > 0 }
+
     fun formatEvents(events: List<SessionTraceEvent>): String {
         return events.joinToString("\n") { event ->
-            "${event.sequence}. ${event.name} -> ${event.detail}"
+            "[${event.domain.label}] ${event.sequence}. ${event.name} -> ${event.detail}"
         }
     }
 
@@ -1735,11 +1741,26 @@ internal fun devLogRenderModel(
         }
     }
 
-    val tabContent = when (selectedTab) {
-        DevLogTab.KEY -> formatEvents(keyEvents)
-        DevLogTab.CORE -> formatEvents(coreEvents)
-        DevLogTab.ERROR -> formatEvents(errorEvents)
-        DevLogTab.ALL -> formatEvents(allEvents)
+    val domainFiltered = if (selectedDomain != null) {
+        when (selectedTab) {
+            DevLogTab.KEY -> keyEvents.filter { it.domain == selectedDomain }
+            DevLogTab.CORE -> coreEvents.filter { it.domain == selectedDomain }
+            DevLogTab.ERROR -> errorEvents.filter { it.domain == selectedDomain }
+            DevLogTab.ALL -> allEvents.filter { it.domain == selectedDomain }
+        }
+    } else {
+        null
+    }
+
+    val tabContent = if (domainFiltered != null) {
+        formatEvents(domainFiltered)
+    } else {
+        when (selectedTab) {
+            DevLogTab.KEY -> formatEvents(keyEvents)
+            DevLogTab.CORE -> formatEvents(coreEvents)
+            DevLogTab.ERROR -> formatEvents(errorEvents)
+            DevLogTab.ALL -> formatEvents(allEvents)
+        }
     }
 
     val exportContent = buildString {
@@ -1774,14 +1795,15 @@ internal fun devLogRenderModel(
         }
     }
 
+    val domainFilteredCount = domainFiltered?.size
     return DevLogRenderModel(
         isAvailable = true,
         selectedTab = selectedTab,
         title = when (selectedTab) {
-            DevLogTab.KEY -> text.devLogTitleKey(keyEvents.size)
-            DevLogTab.CORE -> text.devLogTitleCore(coreEvents.size)
-            DevLogTab.ERROR -> text.devLogTitleError(errorEvents.size)
-            DevLogTab.ALL -> text.devLogTitleAll(allEvents.size)
+            DevLogTab.KEY -> text.devLogTitleKey(domainFilteredCount ?: keyEvents.size)
+            DevLogTab.CORE -> text.devLogTitleCore(domainFilteredCount ?: coreEvents.size)
+            DevLogTab.ERROR -> text.devLogTitleError(domainFilteredCount ?: errorEvents.size)
+            DevLogTab.ALL -> text.devLogTitleAll(domainFilteredCount ?: allEvents.size)
         },
         summaryText = summaryText,
         content = tabContent,
@@ -1789,7 +1811,9 @@ internal fun devLogRenderModel(
         storageUsedDisplay = storageSummary?.usedDisplay ?: "",
         storageCapacityDisplay = storageSummary?.capacityDisplay ?: "",
         storageUsageRatio = storageSummary?.usageRatio ?: 0f,
-        canCleanup = (storageSummary?.usedBytes ?: 0L) > 0L
+        canCleanup = (storageSummary?.usedBytes ?: 0L) > 0L,
+        domainTabs = domainTabs,
+        selectedDomain = selectedDomain
     )
 }
 
