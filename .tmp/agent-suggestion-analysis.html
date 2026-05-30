@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>外部 Agent 建议落地分析报告</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+  --blue: #58a6ff;
+  --purple: #bc8cff;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+h1 { font-size: 28px; margin-bottom: 8px; }
+h2 { font-size: 22px; margin: 32px 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+h3 { font-size: 18px; margin: 24px 0 12px; }
+.subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 24px; }
+.verdict-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 16px 0; }
+.verdict-card.reject { border-left: 4px solid var(--red); }
+.verdict-card.accept { border-left: 4px solid var(--green); }
+.verdict-card.partial { border-left: 4px solid var(--yellow); }
+.verdict-card.fix { border-left: 4px solid var(--blue); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-right: 6px; }
+.badge-reject { background: rgba(248,81,73,0.15); color: var(--red); }
+.badge-accept { background: rgba(63,185,80,0.15); color: var(--green); }
+.badge-partial { background: rgba(210,153,34,0.15); color: var(--yellow); }
+.badge-fix { background: rgba(88,166,255,0.15); color: var(--blue); }
+.evidence { background: #1c2128; border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin: 12px 0; font-family: 'SF Mono', Monaco, monospace; font-size: 13px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--surface); color: var(--text-muted); font-weight: 600; font-size: 13px; }
+td { font-size: 14px; }
+.metric { display: inline-block; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 16px; margin: 4px; text-align: center; }
+.metric-value { font-size: 24px; font-weight: 700; }
+.metric-label { font-size: 12px; color: var(--text-muted); }
+.summary-box { background: var(--surface); border: 2px solid var(--green); border-radius: 8px; padding: 20px; margin: 20px 0; }
+.summary-box h3 { margin-top: 0; color: var(--green); }
+.toc { position: fixed; left: 20px; top: 100px; width: 220px; font-size: 13px; }
+.toc a { color: var(--text-muted); text-decoration: none; display: block; padding: 4px 0; }
+.toc a:hover, .toc a.active { color: var(--blue); }
+@media (max-width: 1400px) { .toc { display: none; } }
+.collapsible { cursor: pointer; user-select: none; }
+.collapsible::before { content: ''; display: inline-block; width: 0; height: 0; border-left: 6px solid var(--text-muted); border-top: 4px solid transparent; border-bottom: 4px solid transparent; margin-right: 8px; transition: transform 0.2s; }
+.collapsible.open::before { transform: rotate(90deg); }
+.collapsible-content { display: none; margin: 8px 0 8px 14px; }
+.collapsible-content.show { display: block; }
+.fact-row td:first-child { font-weight: 600; color: var(--blue); width: 80px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>外部 Agent 建议落地分析报告</h1>
+<p class="subtitle">OpenCamera 项目 &mdash; 2026-05-31 &mdash; 诊断模式 &mdash; 基于代码实际验证</p>
+
+<div class="summary-box">
+<h3>一句话结论</h3>
+<p><strong>5 项建议中仅 2 项值得落地</strong>：编译错误修复（简单参数缺失 + when 分支遗漏）和 i18n 测试修复（设置 Locale 即可）。其余 3 项大文件拆分建议基于表面指标，不符合项目已有的分层架构契约，落地反而破坏边界。</p>
+</div>
+
+<!-- 事实账本 -->
+<h2>1. 事实账本：验证 vs 外部 Agent 声明</h2>
+
+<table>
+<tr><th>ID</th><th>外部 Agent 声明</th><th>实际验证结果</th><th>判定</th></tr>
+<tr class="fact-row"><td>F-01</td><td>CameraXCaptureAdapter CC=508, 3371 行</td><td>行数确认 3371，方法数 112。但类本身从第 1296 行开始，前 1295 行是 <code>internal fun</code> 工具函数（设备能力检测、视频规格解析、实时照片处理等），不在类内部。</td><td>部分准确</td></tr>
+<tr class="fact-row"><td>F-02</td><td>SessionUiRenderModel CC=473, 2325 行</td><td>行数确认 2325，方法数 56，包含 23 个独立 data class。函数已按 UI 区域组织：sessionSettingsRenderModel、filterLabPageRenderModel、watermarkLabSelectorRenderModel 等。</td><td>准确但误导</td></tr>
+<tr class="fact-row"><td>F-03</td><td>DefaultCameraSession CC=250, 1821 行</td><td>行数确认 1821，方法数 64。这是 Session Kernel 核心状态机，处理 Intent 分发、生命周期、模式切换、缩放、拍摄等。</td><td>准确</td></tr>
+<tr class="fact-row"><td>F-04</td><td>100 个测试失败，63% i18n 字符串不匹配</td><td><strong>实际仅 5 个测试失败</strong>（952 个测试中）。其中 1 个确认是 i18n 问题：测试期望英文 "Temp Shift" 但得到中文 "色温偏移"。其余 4 个失败原因不同。</td><td>严重夸大</td></tr>
+<tr class="fact-row"><td>F-05</td><td>app 模块编译错误 &mdash; Kotlin 编译器内部错误</td><td><strong>不是编译器内部错误</strong>。是两个普通编译错误：(1) <code>devLogRenderModel()</code> 移除了 <code>linkEvents</code> 参数但 MainActivity.kt 两处调用仍传递该参数；(2) <code>defaultFilterLabFamily()</code> 的 when 表达式缺少 <code>FULL_CLEAR</code> 分支。</td><td>完全错误</td></tr>
+</table>
+
+<!-- 建议逐一分析 -->
+<h2>2. 五项建议逐一判定</h2>
+
+<!-- 建议 1 -->
+<div class="verdict-card reject">
+<h3>建议 1：CameraXCaptureAdapter 拆分为 Capture/Photo/Video/Config 模块</h3>
+<p><span class="badge badge-reject">不建议落地</span></p>
+
+<p><strong>判定理由：拆分建议违反项目架构契约</strong></p>
+
+<p>AGENTS.md 明确定义了四层架构：<code>Mode Plugin → Session Kernel → Device Adapter → Media Pipeline</code>。CameraXCaptureAdapter 是 <strong>Device Adapter 层</strong>，其职责就是将抽象的设备请求翻译为 CameraX/Camera2 平台调用。</p>
+
+<div class="collapsible" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('show')">
+<strong>展开：为什么拆分不合理</strong>
+</div>
+<div class="collapsible-content">
+<ol>
+<li><strong>前 1295 行是工具函数而非类方法</strong>：文件中大量 <code>internal fun</code> 是设备能力检测（detectZoomRatioCapability、detectPreviewBrightnessRange）、视频规格解析（buildVideoSpecConstraints）、实时照片处理（materializeLivePhotoSidecar）等。这些已经是独立函数，拆分只是移动文件位置，不改变耦合关系。</li>
+<li><strong>类本身约 2075 行、44 个方法</strong>：对于一个 CameraX 适配器来说偏大但不异常。CameraX API 本身就有 Preview、ImageCapture、VideoCapture、Camera2Interop 等多个 UseCase，适配器需要统一管理它们的绑定和生命周期。</li>
+<li><strong>拆分引入的复杂度</strong>：Capture/Photo/Video/Config 四个模块之间需要共享 CameraProvider、Camera 实例、PreviewView、生命周期绑定状态。拆分后需要一个协调层来管理这些共享状态，反而增加耦合。</li>
+<li><strong>已有边界</strong>：项目的 core/device 模块已经定义了 DeviceCapabilities、DeviceCommand、DeviceEvent 等抽象合约。CameraXCaptureAdapter 作为这些合约的实现，内部职责已经由合约边界约束。</li>
+</ol>
+</div>
+
+<p><strong>如果确实需要优化</strong>：可以将前 1295 行的工具函数提取到独立的 <code>CameraXCapabilityDetector.kt</code> 和 <code>CameraXVideoSpecResolver.kt</code> 文件中，但这只是文件组织层面的调整，不需要改变模块边界或架构。</p>
+</div>
+
+<!-- 建议 2 -->
+<div class="verdict-card reject">
+<h3>建议 2：SessionUiRenderModel 按 UI 区域拆分渲染模型</h3>
+<p><span class="badge badge-reject">不建议落地</span></p>
+
+<p><strong>判定理由：已经按 UI 区域组织，拆分是伪需求</strong></p>
+
+<p>文件包含 23 个独立的 data class，每个对应一个 UI 区域的渲染模型。函数也已经按区域分组：</p>
+
+<div class="evidence">
+sessionSettingsRenderModel() → 设置面板<br>
+sessionSettingsPageRenderModel() → 设置页面<br>
+runtimeProControlsRenderModel() → 专业控制<br>
+filterLabPageRenderModel() → 滤镜实验室<br>
+watermarkLabSelectorRenderModel() → 水印选择器<br>
+portraitLabPageRenderModel() → 人像实验室<br>
+documentBatchOrganizerRenderModel() → 文档批处理<br>
+devLogRenderModel() → 开发日志<br>
+colorLabPanelRenderModel() → 色彩面板
+</div>
+
+<p>这些函数都是 <code>internal fun</code>（顶层函数），不是类方法。它们接收 SessionState 和 AppTextResolver 作为参数，返回对应的 data class。这是 Kotlin 惯用的函数式风格，每个函数已经是独立的渲染逻辑单元。</p>
+
+<p><strong>拆分的唯一效果</strong>是把 23 个 data class 和 56 个函数分散到多个文件中。这不会减少任何复杂度，只是增加了文件数量。对于 Kotlin 项目，单文件组织同类的 data class 和工厂函数是常见且合理的做法。</p>
+</div>
+
+<!-- 建议 3 -->
+<div class="verdict-card fix">
+<h3>建议 3：i18n 测试修复</h3>
+<p><span class="badge badge-fix">应落地但范围远小于声明</span></p>
+
+<p><strong>实际状况</strong>：952 个测试中仅 5 个失败，其中确认 1 个是 i18n 问题。</p>
+
+<div class="evidence">
+SessionUiRenderModelTest.kt:1057<br>
+expected: "Temp Shift\nOff\nTap to cycle"<br>
+actual: "色温偏移\nOff\n..."
+</div>
+
+<p><strong>根因</strong>：测试使用 <code>TestAppTextResolver</code> 但该 resolver 在某些方法上返回了中文而非英文。测试环境的 Locale 默认为中文。</p>
+
+<p><strong>修复方案</strong>（二选一）：</p>
+<ol>
+<li>在测试类上添加 <code>@Config(qualifiers = "en")</code> 或在 setUp 中设置 <code>Locale.setDefault(Locale.US)</code></li>
+<li>修复 <code>TestAppTextResolver</code> 使其对所有方法返回一致的英文测试字符串</li>
+</ol>
+
+<p><strong>注意</strong>：外部 Agent 声称"100 个测试失败，63% 是 i18n"是严重夸大的。实际仅 5 个失败，且 i18n 问题只是其中之一。</p>
+</div>
+
+<!-- 建议 4 -->
+<div class="verdict-card fix">
+<h3>建议 4：app 模块编译错误排查</h3>
+<p><span class="badge badge-fix">应落地 &mdash; 已定位根因</span></p>
+
+<p><strong>外部 Agent 声称的"Kotlin 编译器内部错误"完全错误。</strong>实际是两个普通的代码错误：</p>
+
+<h4>错误 1：linkEvents 参数缺失</h4>
+<div class="evidence">
+MainActivity.kt:338 和 399 调用 devLogRenderModel() 时传递 linkEvents 参数<br>
+但 SessionUiRenderModel.kt:1695 的函数签名中该参数已被移除
+</div>
+<p><strong>修复</strong>：删除 MainActivity.kt 中两处 <code>linkEvents = container.linkRecorder.snapshot(),</code> 参数。</p>
+
+<h4>错误 2：when 表达式不完整</h4>
+<div class="evidence">
+SessionUiRenderModel.kt:1625 defaultFilterLabFamily() 函数<br>
+when (activeMode) 缺少 ModeId.FULL_CLEAR 分支<br>
+ModeId.FULL_CLEAR 已在 core/mode 模块中定义
+</div>
+<p><strong>修复</strong>：在 when 表达式中添加 <code>ModeId.FULL_CLEAR</code> 分支，映射到合适的 FilterLabFamily（可能是 PHOTO）。</p>
+
+<p><strong>重要发现</strong>：单独运行 <code>:app:compileDebugKotlin</code> 时编译成功（使用缓存），但运行测试时触发重新编译才暴露错误。这说明错误是最近引入的，之前的工作区缓存掩盖了问题。</p>
+</div>
+
+<!-- 建议 5 -->
+<div class="verdict-card reject">
+<h3>建议 5：DefaultCameraSession 复杂度降低</h3>
+<p><span class="badge badge-reject">不建议落地</span></p>
+
+<p><strong>判定理由：这是 Session Kernel 核心，复杂度是职责的必然结果</strong></p>
+
+<p>DefaultCameraSession 是 AGENTS.md 定义的 Session Kernel，是整个应用的运行时核心。它负责：</p>
+<ul>
+<li>Intent 分发（SessionIntent → 处理逻辑）</li>
+<li>生命周期管理（boot/shutdown/mode switch）</li>
+<li>预览状态机（starting/active/error/recovery）</li>
+<li>拍摄/录制协调</li>
+<li>缩放、亮度、对焦等运行时控制</li>
+<li>文档批处理状态管理</li>
+</ul>
+
+<p>64 个方法处理这些职责是合理的。架构契约明确指出："Session Kernel is the only runtime owner for session state, preview/capture/recording state, recovery decisions, and state transitions." 这些职责集中在同一个类中是设计意图，不是技术债。</p>
+
+<p><strong>拆分的风险</strong>：将状态机逻辑分散到多个类会导致状态同步问题。当前的集中式设计保证了状态转换的原子性和一致性。拆分需要引入复杂的协调机制，得不偿失。</p>
+</div>
+
+<!-- 综合矩阵 -->
+<h2>3. 综合决策矩阵</h2>
+
+<table>
+<tr>
+<th>建议</th>
+<th>开发收益</th>
+<th>可试点性</th>
+<th>稳定性风险</th>
+<th>证据强度</th>
+<th>判定</th>
+</tr>
+<tr>
+<td>CameraXCaptureAdapter 拆分</td>
+<td style="color:var(--red)">低</td>
+<td style="color:var(--red)">低（共享状态多）</td>
+<td style="color:var(--yellow)">中</td>
+<td style="color:var(--red)">弱（指标驱动）</td>
+<td><span class="badge badge-reject">不推进</span></td>
+</tr>
+<tr>
+<td>SessionUiRenderModel 拆分</td>
+<td style="color:var(--red)">低</td>
+<td style="color:var(--yellow)">中</td>
+<td style="color:var(--green)">低</td>
+<td style="color:var(--red)">弱（已按区域组织）</td>
+<td><span class="badge badge-reject">不推进</span></td>
+</tr>
+<tr>
+<td>i18n 测试修复</td>
+<td style="color:var(--green)">中</td>
+<td style="color:var(--green)">高</td>
+<td style="color:var(--green)">低</td>
+<td style="color:var(--green)">强（已验证）</td>
+<td><span class="badge badge-accept">立即执行</span></td>
+</tr>
+<tr>
+<td>编译错误修复</td>
+<td style="color:var(--green)">高</td>
+<td style="color:var(--green)">高</td>
+<td style="color:var(--green)">低</td>
+<td style="color:var(--green)">强（已定位）</td>
+<td><span class="badge badge-accept">立即执行</span></td>
+</tr>
+<tr>
+<td>DefaultCameraSession 复杂度降低</td>
+<td style="color:var(--red)">低</td>
+<td style="color:var(--red)">低（核心状态机）</td>
+<td style="color:var(--red)">高</td>
+<td style="color:var(--red)">弱（CC 指标）</td>
+<td><span class="badge badge-reject">不推进</span></td>
+</tr>
+</table>
+
+<!-- 诊断盲区 -->
+<h2>4. 诊断盲区与外部 Agent 分析缺陷</h2>
+
+<div class="verdict-card partial">
+<h3>外部 Agent 分析的主要问题</h3>
+<ol>
+<li><strong>指标迷信</strong>：仅凭圈复杂度（CC）和行数就建议拆分，没有分析代码的实际组织结构、架构契约、调用关系和职责边界。</li>
+<li><strong>数据失真</strong>：声称 100 个测试失败，实际仅 5 个。声称"Kotlin 编译器内部错误"，实际是普通的参数缺失和分支遗漏。</li>
+<li><strong>忽略架构契约</strong>：项目 AGENTS.md 明确定义了四层架构和各层职责边界。CameraXCaptureAdapter 是 Device Adapter 层、DefaultCameraSession 是 Session Kernel，这些都是架构设计意图，不是技术债。</li>
+<li><strong>混淆文件组织与模块边界</strong>：SessionUiRenderModel 的 23 个 data class 和 56 个函数已经是独立的逻辑单元，只是放在同一个文件中。文件组织 ≠ 模块架构。</li>
+<li><strong>未区分工具函数与类方法</strong>：CameraXCaptureAdapter 的 112 个方法中，大量是文件级 <code>internal fun</code>，不是类的成员方法。</li>
+</ol>
+</div>
+
+<!-- 执行建议 -->
+<h2>5. 推荐执行计划</h2>
+
+<h3>立即执行（Pilot Now）</h3>
+<ol>
+<li><strong>修复编译错误</strong>（预计 10 分钟）
+  <ul>
+  <li>删除 MainActivity.kt:338 和 399 的 <code>linkEvents</code> 参数</li>
+  <li>在 SessionUiRenderModel.kt:1625 的 when 中添加 <code>ModeId.FULL_CLEAR</code> 分支</li>
+  </ul>
+</li>
+<li><strong>修复 i18n 测试</strong>（预计 15 分钟）
+  <ul>
+  <li>在 SessionUiRenderModelTest 类上添加 <code>@Config(qualifiers = "en")</code></li>
+  <li>或修复 TestAppTextResolver 使其返回一致的英文字符串</li>
+  </ul>
+</li>
+</ol>
+
+<h3>可选优化（Gather Evidence Then Pilot）</h3>
+<ul>
+<li>将 CameraXCaptureAdapter.kt 前 1295 行的工具函数提取到独立文件（仅文件组织层面，不改变模块边界）</li>
+<li>这需要先验证：提取后是否影响 IDE 导航、是否需要调整 internal 可见性</li>
+</ul>
+
+<h3>不推进</h3>
+<ul>
+<li>CameraXCaptureAdapter 模块拆分</li>
+<li>SessionUiRenderModel 按 UI 区域拆分</li>
+<li>DefaultCameraSession 复杂度降低</li>
+</ul>
+
+</div>
+</div>
+
+<script>
+// Collapsible sections
+document.querySelectorAll('.collapsible').forEach(el => {
+  el.addEventListener('click', () => {
+    el.classList.toggle('open');
+    el.nextElementSibling.classList.toggle('show');
+  });
+});
+</script>
+</body>
+</html>
