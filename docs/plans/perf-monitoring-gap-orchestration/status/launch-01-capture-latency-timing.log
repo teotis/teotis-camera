@@ -1,0 +1,6 @@
+Starting background service…
+backgrounded · 33628db0
+  claude agents             list sessions
+  claude attach 33628db0    open in this terminal
+  claude logs 33628db0      show recent output
+  claude stop 33628db0      stop this session

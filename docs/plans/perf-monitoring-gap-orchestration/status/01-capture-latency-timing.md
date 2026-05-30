@@ -19,5 +19,5 @@
 ## Notes
 
 - Instruments G1: Shutter-to-Capture latency
-- Uses existing `PerformanceLinkRecorder` infrastructure
+`launched`
 - Allowed paths: `core/session/CaptureRecordingSessionProcessor.kt`, `core/session/DefaultCameraSession.kt`
