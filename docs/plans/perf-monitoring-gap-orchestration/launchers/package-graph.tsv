@@ -1,0 +1,6 @@
+package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
+01-capture-latency-timing	packages/01-capture-latency-timing.md	status/01-capture-latency-timing.md		status	1	agent/perf-monitoring-gap/01-capture-latency-timing	/Volumes/Extreme_SSD/project/open_camera/.worktrees/perf-monitoring-gap/01-capture-latency-timing	0	0
+02-switch-latency-timing	packages/02-switch-latency-timing.md	status/02-switch-latency-timing.md		status	1	agent/perf-monitoring-gap/02-switch-latency-timing	/Volumes/Extreme_SSD/project/open_camera/.worktrees/perf-monitoring-gap/02-switch-latency-timing	0	0
+03-pipeline-timing	packages/03-pipeline-timing.md	status/03-pipeline-timing.md		status	1	agent/perf-monitoring-gap/03-pipeline-timing	/Volumes/Extreme_SSD/project/open_camera/.worktrees/perf-monitoring-gap/03-pipeline-timing	0	0
+04-runtime-metrics	packages/04-runtime-metrics.md	status/04-runtime-metrics.md		status	1	agent/perf-monitoring-gap/04-runtime-metrics	/Volumes/Extreme_SSD/project/open_camera/.worktrees/perf-monitoring-gap/04-runtime-metrics	0	0
+99-finalize	packages/99-finalize.md	status/99-finalize.md	01-capture-latency-timing,02-switch-latency-timing,03-pipeline-timing,04-runtime-metrics	status+code	final	agent/perf-monitoring-gap/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.worktrees/perf-monitoring-gap/99-finalize	0	1
