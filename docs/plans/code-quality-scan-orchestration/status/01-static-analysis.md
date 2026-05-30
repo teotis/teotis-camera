@@ -2,7 +2,7 @@
 
 ## State
 
-`launched`
+`stale`
 
 ## Evidence
 
