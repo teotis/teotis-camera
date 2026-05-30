@@ -83,13 +83,14 @@ class CaptureRecordingSessionProcessorTest {
         val modeController = FakeModeController()
         val dispatchedIntents = mutableListOf<SessionIntent>()
         val shotExecutor = com.opencamera.core.media.ShotExecutor()
+        val linkRecorder = InMemoryPerformanceLinkRecorder()
 
         val processor = CaptureRecordingSessionProcessor(
             scope = scope,
             state = state,
             effects = effects,
             trace = trace,
-            linkRecorder = InMemoryPerformanceLinkRecorder(),
+            linkRecorder = linkRecorder,
             shotExecutor = shotExecutor,
             currentController = { modeController },
             resolvedActiveDeviceGraph = { initialState.activeDeviceGraph },
@@ -350,6 +351,38 @@ class CaptureRecordingSessionProcessorTest {
 
         assertNull(harness.state.value.shutterPressedAtElapsedMillis)
         assertEquals(CaptureStatus.SAVING, harness.state.value.captureStatus)
+    }
+
+    // ── G1 Shutter-to-Device Latency ──────────────────────────────────
+
+    @Test
+    fun `handleShotCompleted records shutter-to-device link event for photo`() = runTest {
+        val harness = Harness(runningState().copy(
+            activeShot = testShotRequest("shot-g1", MediaType.PHOTO)
+        ))
+        val result = testShotResult("shot-g1", MediaType.PHOTO).copy(
+            timing = ShotTiming(
+                requestedAtElapsedMillis = 1000L,
+                deviceCaptureStartedAtElapsedMillis = 1150L,
+                deviceCaptureCompletedAtElapsedMillis = 1300L,
+                postProcessCompletedAtElapsedMillis = 1500L
+            )
+        )
+        harness.process(SessionIntent.ShotCompleted(result))
+
+        val linkEvents = harness.linkRecorder.snapshot()
+        val shutterEvent = linkEvents.find {
+            it.flow == "capture" && it.stage == "shutter-to-device"
+        }
+        assertNotNull(shutterEvent, "Expected capture/shutter-to-device link event")
+        assertEquals("capture", shutterEvent.flow)
+        assertEquals("shutter-to-device", shutterEvent.stage)
+        assertEquals(LinkEventStatus.COMPLETED, shutterEvent.status)
+        assertEquals(150L, shutterEvent.durationMillis)
+        assertEquals(1000L, shutterEvent.startElapsedMillis)
+        assertEquals(1150L, shutterEvent.endElapsedMillis)
+        assertEquals("shot-g1", shutterEvent.correlationId)
+        assertTrue(harness.trace.snapshot().any { it.name == "capture.shutter.to.device" })
     }
 
     @Test
