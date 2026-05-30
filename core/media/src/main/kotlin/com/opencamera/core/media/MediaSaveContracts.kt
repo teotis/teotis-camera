@@ -15,6 +15,11 @@ data class MediaSaveTransactionResult(
     val cleanupNotes: List<String>
 )
 
+fun ShotResult.withSaveIoTiming(saveIoStartMs: Long, saveIoEndMs: Long): ShotResult {
+    val deltaMs = saveIoEndMs - saveIoStartMs
+    return addPipelineNotes("timing:save-io=${deltaMs}ms")
+}
+
 fun ShotResult.toTransactionResult(
     additionalArtifacts: Map<MediaArtifactRole, List<MediaOutputHandle>> = emptyMap()
 ): MediaSaveTransactionResult {

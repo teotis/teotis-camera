@@ -3,7 +3,8 @@ package com.opencamera.core.media
 import java.io.File
 
 class CompositeMediaPostProcessor(
-    private val processors: List<MediaPostProcessor>
+    private val processors: List<MediaPostProcessor>,
+    private val onProcessorTimed: ((name: String, elapsedMs: Long) -> Unit)? = null
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         var current = result
@@ -17,7 +18,9 @@ class CompositeMediaPostProcessor(
                 current.addPipelineNotes("postprocess:failed:$name")
             }
             val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L
-            processorTimings.add(processor.diagnosticName() to elapsedMs)
+            val name = processor.diagnosticName()
+            processorTimings.add(name to elapsedMs)
+            onProcessorTimed?.invoke(name, elapsedMs)
         }
         val timingNotes = processorTimings
             .filter { it.second > 2 }
