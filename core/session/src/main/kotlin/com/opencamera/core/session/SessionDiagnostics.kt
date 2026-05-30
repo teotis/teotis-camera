@@ -2,6 +2,7 @@ package com.opencamera.core.session
 
 import com.opencamera.core.device.CameraOutputRotation
 import com.opencamera.core.media.ResourceDiagnosticsSnapshot
+import com.opencamera.core.media.RuntimeMetricsSnapshot
 import com.opencamera.core.mode.ModeId
 
 enum class PreviewStartCategory(
@@ -63,6 +64,7 @@ data class SessionDebugDump(
     val recoveryTrace: RecoveryTraceSnapshot,
     val recentEvents: List<SessionTraceEvent>,
     val resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
+    val runtimeMetrics: RuntimeMetricsSnapshot? = null,
     val recentLinkEvents: List<PerformanceLinkEvent> = emptyList()
 )
 
@@ -117,6 +119,7 @@ fun buildSessionDebugDump(
     recentEventLimit: Int = 12,
     recoveryEventLimit: Int = 8,
     resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
+    runtimeMetrics: RuntimeMetricsSnapshot? = null,
     linkEvents: List<PerformanceLinkEvent> = emptyList()
 ): SessionDebugDump {
     return SessionDebugDump(
@@ -136,6 +139,7 @@ fun buildSessionDebugDump(
         ),
         recentEvents = traceEvents.takeLast(recentEventLimit),
         resourceDiagnostics = resourceDiagnostics,
+        runtimeMetrics = runtimeMetrics,
         recentLinkEvents = linkEvents.takeLast(recentEventLimit)
     )
 }
