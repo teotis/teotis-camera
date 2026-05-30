@@ -19,5 +19,5 @@
 ## Notes
 
 - Instruments G2: Mode Switch Latency, G3: Lens Switch Latency
-- Uses existing `PerformanceLinkRecorder` infrastructure
+`completed`
 - Allowed paths: `core/session/DefaultCameraSession.kt`, `core/session/PreviewRecoverySessionProcessor.kt`
