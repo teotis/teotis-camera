@@ -1,7 +1,7 @@
 # Package Status: 99-finalize
 
 ## State
-`invalid`
+`finalized`
 
 ## Summary
 合并所有测试包到集成分支，运行全量测试验证，合并回 mainline，清理 worktree/branch。
