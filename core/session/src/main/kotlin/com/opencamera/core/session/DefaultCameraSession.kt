@@ -84,6 +84,7 @@ class DefaultCameraSession(
     private var sessionStillCaptureOutputSize = initialStillCaptureOutputSize
     private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
     private var sessionSettingsSnapshot = settingsSnapshot
+    private var pendingSwitchTraceHandle: TraceHandle? = null
     private var currentController: ModeController = createController(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
@@ -368,6 +369,21 @@ class DefaultCameraSession(
     }
 
     private suspend fun processPreviewRecoveryIntent(intent: SessionIntent) {
+        if (intent is SessionIntent.PreviewFirstFrameAvailable) {
+            pendingSwitchTraceHandle?.let { handle ->
+                trace.end(handle, "mode=${_state.value.activeMode}")
+                pendingSwitchTraceHandle = null
+            }
+        }
+        if (intent is SessionIntent.PreviewError ||
+            intent is SessionIntent.PreviewSurfaceLost ||
+            intent is SessionIntent.PreviewRuntimeIssue
+        ) {
+            pendingSwitchTraceHandle?.let { handle ->
+                trace.end(handle, "failed")
+                pendingSwitchTraceHandle = null
+            }
+        }
         previewRecoveryProcessor.process(intent)
     }
 
@@ -475,6 +491,7 @@ class DefaultCameraSession(
             return
         }
 
+        pendingSwitchTraceHandle = trace.begin("mode.switch")
         currentController.onExit()
         currentController = createController(
             modeId = modeId,
@@ -604,6 +621,7 @@ class DefaultCameraSession(
         }
 
         sessionLensFacing = nextLensFacing
+        pendingSwitchTraceHandle = trace.begin("lens.switch")
         currentController.onLensFacingChanged(nextLensFacing)
         resetPreviewBrightness()
         updateState(

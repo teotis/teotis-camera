@@ -7,15 +7,26 @@ class CompositeMediaPostProcessor(
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         var current = result
+        val processorTimings = mutableListOf<Pair<String, Long>>()
         processors.forEach { processor ->
+            val startNanos = System.nanoTime()
             current = try {
                 processor.process(current)
             } catch (_: Throwable) {
                 val name = processor.diagnosticName()
                 current.addPipelineNotes("postprocess:failed:$name")
             }
+            val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L
+            processorTimings.add(processor.diagnosticName() to elapsedMs)
         }
-        return current
+        val timingNotes = processorTimings
+            .filter { it.second > 2 }
+            .map { "timing:postprocess:${it.first}=${it.second}ms" }
+        return if (timingNotes.isNotEmpty()) {
+            current.addPipelineNotes(*timingNotes.toTypedArray())
+        } else {
+            current
+        }
     }
 }
 

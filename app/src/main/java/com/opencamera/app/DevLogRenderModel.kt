@@ -1,6 +1,13 @@
 package com.opencamera.app
 
-internal enum class DevLogTab { KEY, CORE, ERROR, LINK, ALL }
+import com.opencamera.core.session.TraceEventDomain
+
+internal enum class DevLogTab { KEY, CORE, ERROR, ALL }
+
+internal data class DomainTabCount(
+    val domain: TraceEventDomain,
+    val count: Int
+)
 
 internal data class DevLogRenderModel(
     val isAvailable: Boolean,
@@ -12,5 +19,7 @@ internal data class DevLogRenderModel(
     val storageUsedDisplay: String = "",
     val storageCapacityDisplay: String = "",
     val storageUsageRatio: Float = 0f,
-    val canCleanup: Boolean = false
+    val canCleanup: Boolean = false,
+    val domainTabs: List<DomainTabCount> = emptyList(),
+    val selectedDomain: TraceEventDomain? = null
 )

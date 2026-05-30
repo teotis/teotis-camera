@@ -12,10 +12,7 @@ import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
-import com.opencamera.core.session.DevLogTag
-import com.opencamera.core.session.LinkEventStatus
-import com.opencamera.core.session.PerformanceLinkEvent
-import com.opencamera.core.session.toLinkLogLine
+import com.opencamera.core.session.TraceEventDomain
 import com.opencamera.core.session.buildSessionDebugDump
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.ColorLabSpec
@@ -167,10 +164,10 @@ internal data class PortraitLabPageRenderModel(
 internal enum class FilterLabFamily(
     val label: String
 ) {
-    PHOTO("照片"),
-    HUMANISTIC("人文"),
-    PORTRAIT("人像"),
-    VIDEO("视频")
+    PHOTO("Photo"),
+    HUMANISTIC("Humanistic"),
+    PORTRAIT("Portrait"),
+    VIDEO("Video")
 }
 
 internal data class FilterLabTabRenderModel(
@@ -187,18 +184,18 @@ internal enum class FilterAdjustmentMode {
 internal enum class FilterAdvancedControl(
     val label: String
 ) {
-    EXPOSURE("曝光"),
-    SOFT_GLOW("柔光"),
-    HALO("光晕"),
-    GRAIN("颗粒"),
-    SHARPNESS("锐度"),
-    VIGNETTE("暗角"),
-    HIGHLIGHTS("高光"),
-    SHADOWS("阴影"),
-    WARM_BOOST("暖色增强"),
-    COOL_BOOST("冷色增强"),
-    TEMPERATURE_SHIFT("色温偏移"),
-    TINT_SHIFT("色调偏移")
+    EXPOSURE("Exposure"),
+    SOFT_GLOW("Soft Glow"),
+    HALO("Halo"),
+    GRAIN("Grain"),
+    SHARPNESS("Sharpness"),
+    VIGNETTE("Vignette"),
+    HIGHLIGHTS("Highlights"),
+    SHADOWS("Shadows"),
+    WARM_BOOST("Warm Boost"),
+    COOL_BOOST("Cool Boost"),
+    TEMPERATURE_SHIFT("Temp Shift"),
+    TINT_SHIFT("Tint Shift")
 }
 
 internal data class FilterLabFilterItemRenderModel(
@@ -999,7 +996,7 @@ private fun manualSupportSummary(
     collect("ISO", capabilities.iso)
     collect("S", capabilities.shutter)
     collect("EV", capabilities.exposureCompensation)
-    collect(text.focusLabel(), capabilities.focusDistance)
+    collect("Focus", capabilities.focusDistance)
     collect("A", capabilities.aperture)
     collect("WB", capabilities.whiteBalance)
 
@@ -1632,8 +1629,7 @@ internal fun defaultFilterLabFamily(activeMode: ModeId): FilterLabFamily {
         ModeId.PHOTO,
         ModeId.DOCUMENT,
         ModeId.NIGHT,
-        ModeId.PRO,
-        ModeId.FULL_CLEAR -> FilterLabFamily.PHOTO
+        ModeId.PRO -> FilterLabFamily.PHOTO
     }
 }
 
@@ -1655,37 +1651,45 @@ private fun <T> nextListValueOrNull(current: T, values: List<T>): T? {
 
 // -- Dev Log --
 
-private fun SessionTraceEvent.hasTag(tag: DevLogTag): Boolean {
-    if (tags.contains(tag)) return true
-    // Name-based fallback for events without explicit tags (backward compatibility)
-    return inferredTags().contains(tag)
-}
+private val KEY_EVENT_NAMES = setOf(
+    "session.created", "session.booted", "session.stopped",
+    "mode.switched", "lens.switched", "zoom.updated",
+    "preview.first.frame", "preview.host.attached", "preview.host.detached",
+    "capture.photo", "capture.saved", "capture.timing",
+    "capture.shutter.to.device",
+    "recording.started", "recording.saved", "recording.timing",
+    "recording.startup.latency",
+    "mode.switch.completed", "lens.switch.completed",
+    "permissions.updated", "device.capabilities.updated", "settings.updated"
+)
 
-private fun SessionTraceEvent.inferredTags(): Set<DevLogTag> {
-    val result = mutableSetOf<DevLogTag>()
-    val n = name
-    if (".blocked" in n || ".unavailable" in n || ".skipped" in n || ".failed" in n || ".error" in n || ".issue" in n) {
-        result += DevLogTag.ERROR
-    }
-    if (n.startsWith("session.")) result += DevLogTag.LIFECYCLE
-    if (n.startsWith("mode.") && n != "mode.event" && n != "mode.signal" && n != "mode.hint") result += DevLogTag.MODE
-    if (n.startsWith("mode.event") || n.startsWith("mode.signal") || n.startsWith("mode.hint")) result += DevLogTag.INTENT
-    if (n.startsWith("capture.") && !n.startsWith("capture.feedback")) result += DevLogTag.CAPTURE
-    if (n.startsWith("capture.feedback")) result += DevLogTag.PREVIEW
-    if (n.endsWith(".timing")) result += DevLogTag.TIMING
-    if (n.startsWith("recording.")) result += DevLogTag.RECORDING
-    if (n.startsWith("preview.")) result += DevLogTag.PREVIEW
-    if (n.startsWith("lens.")) result += DevLogTag.LENS
-    if (n.startsWith("zoom.")) result += DevLogTag.ZOOM
-    if (n.startsWith("permissions.")) result += DevLogTag.PERMISSION
-    if (n.startsWith("settings.") || n.startsWith("device.")) result += DevLogTag.SETTINGS
-    if (n.startsWith("intent.")) result += DevLogTag.INTENT
-    if ("recovery" in n) result += DevLogTag.RECOVERY
-    if (n.startsWith("preview.first.frame") || n.startsWith("preview.binding") || n.startsWith("shot.plan")) {
-        result += DevLogTag.PERFORMANCE
-    }
-    if (n.startsWith("resource") || n.startsWith("thermal") || n.startsWith("class.")) result += DevLogTag.RESOURCE
-    return result
+private val CORE_EVENT_NAMES = setOf(
+    "preview.binding.started", "preview.recovery.started", "preview.recovery.requested",
+    "preview.stopped", "preview.snapshot.updated", "preview.snapshot.ignored",
+    "capture.countdown.started", "capture.countdown.tick", "capture.countdown.completed",
+    "capture.saving",
+    "capture.feedback.snapshot.requested", "capture.feedback.snapshot.updated",
+    "capture.feedback.snapshot.skipped",
+    "recording.requested",
+    "shot.plan.failed",
+    "mode.switch.started", "lens.switch.started",
+    "mode.signal", "mode.event", "mode.hint",
+    "intent.received"
+)
+
+private val ERROR_EVENT_NAMES = setOf(
+    "preview.error", "preview.surface.lost", "preview.runtime.issue",
+    "preview.recovery.failed", "preview.blocked",
+    "capture.failed", "recording.failed", "recording.stop.blocked",
+    "mode.switch.blocked", "mode.intent.blocked",
+    "lens.switch.blocked", "zoom.switch.blocked",
+    "still-quality.blocked", "still-resolution.blocked", "settings.update.blocked"
+)
+
+private val ERROR_SUFFIXES = listOf(".unavailable", ".skipped")
+
+private fun isErrorEvent(name: String): Boolean {
+    return name in ERROR_EVENT_NAMES || ERROR_SUFFIXES.any { name.endsWith(it) }
 }
 
 internal fun devLogRenderModel(
@@ -1696,7 +1700,7 @@ internal fun devLogRenderModel(
     text: AppTextResolver,
     resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
     storageSummary: StorageSummary? = null,
-    linkEvents: List<PerformanceLinkEvent> = emptyList()
+    selectedDomain: TraceEventDomain? = null
 ): DevLogRenderModel {
     if (!isDebugBuild) {
         return DevLogRenderModel(
@@ -1709,21 +1713,22 @@ internal fun devLogRenderModel(
         )
     }
 
-    val keyEvents = traceEvents.filter { it.hasTag(DevLogTag.LIFECYCLE) || it.hasTag(DevLogTag.MODE) || it.hasTag(DevLogTag.CAPTURE) || it.hasTag(DevLogTag.RECORDING) || it.hasTag(DevLogTag.PERFORMANCE) || it.hasTag(DevLogTag.TIMING) }
-    val coreEvents = traceEvents.filter { it.hasTag(DevLogTag.PREVIEW) || it.hasTag(DevLogTag.RECOVERY) || it.hasTag(DevLogTag.SETTINGS) || it.hasTag(DevLogTag.PERMISSION) || it.hasTag(DevLogTag.LENS) || it.hasTag(DevLogTag.INTENT) || it.hasTag(DevLogTag.ZOOM) || it.hasTag(DevLogTag.RESOURCE) }
-    val errorEvents = traceEvents.filter { it.hasTag(DevLogTag.ERROR) }
+    val keyEvents = traceEvents.filter { it.name in KEY_EVENT_NAMES }
+    val coreEvents = traceEvents.filter { it.name in CORE_EVENT_NAMES }
+    val errorEvents = traceEvents.filter { isErrorEvent(it.name) }
     val allEvents = traceEvents
+
+    val domainTabs = TraceEventDomain.entries.map { domain ->
+        DomainTabCount(domain = domain, count = traceEvents.count { it.domain == domain })
+    }.filter { it.count > 0 }
 
     fun formatEvents(events: List<SessionTraceEvent>): String {
         return events.joinToString("\n") { event ->
-            val tagLabels = if (event.tags.isNotEmpty()) {
-                " [${event.tags.joinToString(",") { it.displayName }}]"
-            } else ""
-            "${event.sequence}. ${event.name} -> ${event.detail}$tagLabels"
+            "[${event.domain.label}] ${event.sequence}. ${event.name} -> ${event.detail}"
         }
     }
 
-    val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics, linkEvents = linkEvents)
+    val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics)
     val perf = debugDump.perfSnapshot
     val recovery = debugDump.recoveryTrace
 
@@ -1734,42 +1739,28 @@ internal fun devLogRenderModel(
         debugDump.resourceDiagnostics?.let { res ->
             appendLine("Resource: thermal=${res.thermalState.tagValue} | class=${res.performanceClass.tagValue} | jobs=${res.activeAlgorithmJobs}/${res.maxConcurrentAlgorithmJobs}")
         }
-        if (linkEvents.isNotEmpty()) {
-            appendLine("Link Flow (${linkEvents.size} events):")
-            linkEvents.takeLast(8).forEach { event ->
-                val timing = event.durationMillis?.let { " ${it}ms" } ?: ""
-                appendLine("  ${event.flow}/${event.stage} -> ${event.status.label}$timing")
-            }
-        }
     }
 
-    val linkContent = buildString {
-        if (linkEvents.isNotEmpty()) {
-            appendLine("=== LINK FLOW SUMMARY ===")
-            val byFlow = linkEvents.groupBy { it.flow }
-            byFlow.forEach { (flow, events) ->
-                val completed = events.count { it.status == LinkEventStatus.COMPLETED }
-                val failed = events.count { it.status == LinkEventStatus.FAILED }
-                val degraded = events.count { it.status == LinkEventStatus.DEGRADED }
-                val totalMs = events.mapNotNull { it.durationMillis }.sum()
-                appendLine("$flow: ${events.size} events ($completed completed, $degraded degraded, $failed failed), total=${totalMs}ms")
-                events.forEach { event ->
-                    val timing = event.durationMillis?.let { " ${it}ms" } ?: " --ms"
-                    appendLine("  [${event.status.label}] ${event.stage}$timing ${event.detail ?: ""}")
-                }
-            }
-            appendLine()
-            appendLine("=== LINK FLOW EVENTS (MACHINE) ===")
-            linkEvents.forEach { event -> appendLine(event.toLinkLogLine()) }
+    val domainFiltered = if (selectedDomain != null) {
+        when (selectedTab) {
+            DevLogTab.KEY -> keyEvents.filter { it.domain == selectedDomain }
+            DevLogTab.CORE -> coreEvents.filter { it.domain == selectedDomain }
+            DevLogTab.ERROR -> errorEvents.filter { it.domain == selectedDomain }
+            DevLogTab.ALL -> allEvents.filter { it.domain == selectedDomain }
         }
+    } else {
+        null
     }
 
-    val tabContent = when (selectedTab) {
-        DevLogTab.KEY -> formatEvents(keyEvents)
-        DevLogTab.CORE -> formatEvents(coreEvents)
-        DevLogTab.ERROR -> formatEvents(errorEvents)
-        DevLogTab.LINK -> linkContent.ifEmpty { "No link flow events recorded yet" }
-        DevLogTab.ALL -> formatEvents(allEvents)
+    val tabContent = if (domainFiltered != null) {
+        formatEvents(domainFiltered)
+    } else {
+        when (selectedTab) {
+            DevLogTab.KEY -> formatEvents(keyEvents)
+            DevLogTab.CORE -> formatEvents(coreEvents)
+            DevLogTab.ERROR -> formatEvents(errorEvents)
+            DevLogTab.ALL -> formatEvents(allEvents)
+        }
     }
 
     val exportContent = buildString {
@@ -1779,8 +1770,6 @@ internal fun devLogRenderModel(
         appendLine(formatEvents(coreEvents))
         appendLine("=== ERROR EVENTS ===")
         appendLine(formatEvents(errorEvents))
-        appendLine("=== LINK FLOW EVENTS ===")
-        appendLine(linkContent)
         appendLine("=== ALL EVENTS ===")
         appendLine(formatEvents(allEvents))
         debugDump.resourceDiagnostics?.let { res ->
@@ -1791,33 +1780,30 @@ internal fun devLogRenderModel(
         append(coreSummary)
     }
 
-    val lastLink = linkEvents.lastOrNull()
+    val lastTiming = traceEvents.lastOrNull { it.name.endsWith(".timing") }
     val lastIssue = errorEvents.lastOrNull()
     val summaryText = buildString {
         append("状态: ${debugDump.previewStatus} | ")
         append("模式: ${debugDump.activeMode.name} | ")
         append("拍摄: ${debugDump.captureStatus} | ")
         append("录制: ${debugDump.recordingStatus}")
-        if (lastLink != null) {
-            append(" | Link: ${lastLink.flow}/${lastLink.stage}=${lastLink.status.label}")
-            if (lastLink.durationMillis != null) {
-                append(" ${lastLink.durationMillis}ms")
-            }
+        if (lastTiming != null) {
+            append(" | 最后耗时: ${lastTiming.detail}")
         }
         if (lastIssue != null) {
             append(" | 最近问题: ${lastIssue.name}")
         }
     }
 
+    val domainFilteredCount = domainFiltered?.size
     return DevLogRenderModel(
         isAvailable = true,
         selectedTab = selectedTab,
         title = when (selectedTab) {
-            DevLogTab.KEY -> text.devLogTitleKey(keyEvents.size)
-            DevLogTab.CORE -> text.devLogTitleCore(coreEvents.size)
-            DevLogTab.ERROR -> text.devLogTitleError(errorEvents.size)
-            DevLogTab.LINK -> text.devLogTitleLink(linkEvents.size)
-            DevLogTab.ALL -> text.devLogTitleAll(allEvents.size)
+            DevLogTab.KEY -> text.devLogTitleKey(domainFilteredCount ?: keyEvents.size)
+            DevLogTab.CORE -> text.devLogTitleCore(domainFilteredCount ?: coreEvents.size)
+            DevLogTab.ERROR -> text.devLogTitleError(domainFilteredCount ?: errorEvents.size)
+            DevLogTab.ALL -> text.devLogTitleAll(domainFilteredCount ?: allEvents.size)
         },
         summaryText = summaryText,
         content = tabContent,
@@ -1825,7 +1811,9 @@ internal fun devLogRenderModel(
         storageUsedDisplay = storageSummary?.usedDisplay ?: "",
         storageCapacityDisplay = storageSummary?.capacityDisplay ?: "",
         storageUsageRatio = storageSummary?.usageRatio ?: 0f,
-        canCleanup = (storageSummary?.usedBytes ?: 0L) > 0L
+        canCleanup = (storageSummary?.usedBytes ?: 0L) > 0L,
+        domainTabs = domainTabs,
+        selectedDomain = selectedDomain
     )
 }
 
@@ -2066,10 +2054,10 @@ private enum class FilterAdjustmentLevel(
     val floatValue: Float,
     val brightnessValue: Int
 ) {
-    OFF("关", 0f, 0),
-    LOW("低", 0.10f, 6),
-    MEDIUM("中", 0.20f, 12),
-    HIGH("高", 0.30f, 18)
+    OFF("Off", 0f, 0),
+    LOW("Low", 0.10f, 6),
+    MEDIUM("Medium", 0.20f, 12),
+    HIGH("High", 0.30f, 18)
 }
 
 private fun FilterRenderSpec.currentLevel(
