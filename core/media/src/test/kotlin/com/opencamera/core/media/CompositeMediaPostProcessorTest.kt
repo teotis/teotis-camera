@@ -56,6 +56,24 @@ class CompositeMediaPostProcessorTest {
     }
 
     @Test
+    fun `onProcessorTimed callback receives each processor name and elapsed ms`() = runTest {
+        val timings = mutableListOf<Pair<String, Long>>()
+        val first = NoteAppendingProcessor("a:done")
+        val second = NoteAppendingProcessor("b:done")
+        val composite = CompositeMediaPostProcessor(
+            processors = listOf(first, second),
+            onProcessorTimed = { name, elapsedMs -> timings.add(name to elapsedMs) }
+        )
+
+        composite.process(baseResult())
+
+        assertEquals(2, timings.size)
+        assertEquals("NoteAppendingProcessor", timings[0].first)
+        assertTrue(timings[0].second >= 0)
+        assertEquals("NoteAppendingProcessor", timings[1].first)
+    }
+
+    @Test
     fun `multiple throwing processors all record failure notes`() = runTest {
         val first = ThrowingProcessor(RuntimeException("first-crash"))
         val second = ThrowingProcessor(IllegalStateException("second-crash"))

@@ -95,6 +95,7 @@ import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
 import com.opencamera.core.media.CompositeMediaPostProcessor
 import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.withSaveIoTiming
 import com.opencamera.core.media.FlashMode as CaptureFlashMode
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.LiveMotionSource
@@ -141,6 +142,9 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
+import com.opencamera.core.session.LinkEventStatus
+import com.opencamera.core.session.PerformanceLinkEvent
+import com.opencamera.core.session.PerformanceLinkRecorder
 
 data class CameraLensProfile(
     val lensFacing: LensFacing,
@@ -1314,7 +1318,8 @@ class CameraXCaptureAdapter(
             PipelineMetadataPostProcessor()
         )
     ),
-    private val livePreviewFrameSource: com.opencamera.app.camera.live.LivePreviewFrameSource? = null
+    private val livePreviewFrameSource: com.opencamera.app.camera.live.LivePreviewFrameSource? = null,
+    private val linkRecorder: com.opencamera.core.session.PerformanceLinkRecorder? = null
 ) : CameraDeviceAdapter {
     private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var cameraProvider: ProcessCameraProvider? = null
@@ -2313,13 +2318,14 @@ class CameraXCaptureAdapter(
                 postProcessCompletedAtElapsedMillis = postProcessCompletedAt
             )
         )
+        val t = timedResult.timing
+        val deviceStarted = t.deviceCaptureStartedAtElapsedMillis
+        val deviceCompleted = t.deviceCaptureCompletedAtElapsedMillis
+        val requested = t.requestedAtElapsedMillis
         val timingNotes = buildList {
-            val t = timedResult.timing
-            val deviceStarted = t.deviceCaptureStartedAtElapsedMillis
-            val deviceCompleted = t.deviceCaptureCompletedAtElapsedMillis
-            val requested = t.requestedAtElapsedMillis
             if (deviceStarted != null && deviceCompleted != null && deviceStarted > 0 && deviceCompleted > 0) {
                 add("timing:device=${deviceCompleted - deviceStarted}ms")
+                add("timing:save-io=${deviceCompleted - deviceStarted}ms")
             }
             if (deviceCompleted != null && deviceCompleted > 0) {
                 add("timing:postprocess=${postProcessCompletedAt - deviceCompleted}ms")
@@ -2331,7 +2337,24 @@ class CameraXCaptureAdapter(
         val resultWithTiming = timedResult.copy(
             pipelineNotes = timedResult.pipelineNotes + timingNotes
         )
-        _events.emit(DeviceEvent.ShotCompleted(resultWithTiming))
+        val saveIoResult = if (deviceStarted != null && deviceCompleted != null && deviceStarted > 0 && deviceCompleted > 0) {
+            val resultWithSaveIo = resultWithTiming.withSaveIoTiming(deviceStarted, deviceCompleted)
+            linkRecorder?.recordEvent(PerformanceLinkEvent(
+                flow = "save",
+                stage = "file-io",
+                status = LinkEventStatus.COMPLETED,
+                correlationId = plan.request.shotId,
+                startElapsedMillis = deviceStarted,
+                endElapsedMillis = deviceCompleted,
+                durationMillis = deviceCompleted - deviceStarted,
+                detail = plan.request.mediaType.name.lowercase(),
+                source = "CameraXCaptureAdapter"
+            ))
+            resultWithSaveIo
+        } else {
+            resultWithTiming
+        }
+        _events.emit(DeviceEvent.ShotCompleted(saveIoResult))
     }
 
     private suspend fun emitShotFailure(
@@ -2573,6 +2596,18 @@ class CameraXCaptureAdapter(
             activeRecording = pending.start(ContextCompat.getMainExecutor(context)) { event ->
                 when (event) {
                     is VideoRecordEvent.Start -> {
+                        val recordingStartedAt = SystemClock.elapsedRealtime()
+                        linkRecorder?.recordEvent(PerformanceLinkEvent(
+                            flow = "recording",
+                            stage = "start",
+                            status = LinkEventStatus.COMPLETED,
+                            correlationId = plan.request.shotId,
+                            startElapsedMillis = requestedAt,
+                            endElapsedMillis = recordingStartedAt,
+                            durationMillis = recordingStartedAt - requestedAt,
+                            detail = null,
+                            source = "CameraXCaptureAdapter"
+                        ))
                         _events.tryEmit(DeviceEvent.ShotStarted(plan.request))
                     }
 
