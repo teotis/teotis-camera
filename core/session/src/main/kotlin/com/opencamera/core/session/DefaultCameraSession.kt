@@ -85,6 +85,7 @@ class DefaultCameraSession(
     private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
     private var sessionSettingsSnapshot = settingsSnapshot
     private var pendingSwitchTraceHandle: TraceHandle? = null
+    private var pendingSwitchSpan: PerformanceSpanSnapshot? = null
     private var currentController: ModeController = createController(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
@@ -374,6 +375,16 @@ class DefaultCameraSession(
                 trace.end(handle, "mode=${_state.value.activeMode}")
                 pendingSwitchTraceHandle = null
             }
+            pendingSwitchSpan?.let { span ->
+                linkRecorder.completeSpan(
+                    span,
+                    status = LinkEventStatus.COMPLETED,
+                    detail = "firstFrameLatency=${intent.firstFrameLatencyMillis}ms"
+                )
+                val frameTrace = if (span.flow == "mode-switch") "mode.switch.first.frame" else "lens.switch.first.frame"
+                trace.record(frameTrace, "${intent.firstFrameLatencyMillis}ms")
+                pendingSwitchSpan = null
+            }
         }
         if (intent is SessionIntent.PreviewError ||
             intent is SessionIntent.PreviewSurfaceLost ||
@@ -382,6 +393,10 @@ class DefaultCameraSession(
             pendingSwitchTraceHandle?.let { handle ->
                 trace.end(handle, "failed")
                 pendingSwitchTraceHandle = null
+            }
+            pendingSwitchSpan?.let { span ->
+                linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = "preview error")
+                pendingSwitchSpan = null
             }
         }
         previewRecoveryProcessor.process(intent)
@@ -491,7 +506,17 @@ class DefaultCameraSession(
             return
         }
 
+        val previousModeId = currentController.id
         pendingSwitchTraceHandle = trace.begin("mode.switch")
+        val modeCorrelationId = "mode-${modeId.name}-${System.nanoTime()}"
+        pendingSwitchSpan = linkRecorder.startSpan(
+            flow = "mode-switch",
+            stage = "total",
+            correlationId = modeCorrelationId,
+            detail = "from=${previousModeId.name},to=${modeId.name}",
+            source = "DefaultCameraSession"
+        )
+        trace.record("mode.switch.unbind", previousModeId.name)
         currentController.onExit()
         currentController = createController(
             modeId = modeId,
@@ -500,6 +525,7 @@ class DefaultCameraSession(
             stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset
         )
         currentController.onEnter()
+        trace.record("mode.switch.bind", modeId.name)
         resetPreviewBrightness()
 
         val newDocumentBatch = if (currentController.id == ModeId.DOCUMENT &&
@@ -620,9 +646,20 @@ class DefaultCameraSession(
             return
         }
 
+        val previousLensFacing = sessionLensFacing
         sessionLensFacing = nextLensFacing
         pendingSwitchTraceHandle = trace.begin("lens.switch")
+        val lensCorrelationId = "lens-${nextLensFacing.name}-${System.nanoTime()}"
+        pendingSwitchSpan = linkRecorder.startSpan(
+            flow = "lens-switch",
+            stage = "total",
+            correlationId = lensCorrelationId,
+            detail = "from=${previousLensFacing.label},to=${nextLensFacing.label}",
+            source = "DefaultCameraSession"
+        )
+        trace.record("lens.switch.unbind", previousLensFacing.name)
         currentController.onLensFacingChanged(nextLensFacing)
+        trace.record("lens.switch.bind", nextLensFacing.name)
         resetPreviewBrightness()
         updateState(
             modeSnapshot = currentController.snapshot.value,
