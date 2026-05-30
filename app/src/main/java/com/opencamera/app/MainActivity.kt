@@ -29,7 +29,11 @@ import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.RecordingStatus
 import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.effect.WatermarkHintSpec
+import com.opencamera.core.effect.WatermarkPreviewShape
 import com.opencamera.core.settings.PersistedSettingsAction
+import com.opencamera.core.settings.WatermarkFrameBackground
+import com.opencamera.core.settings.watermarkStyleFor
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -302,7 +306,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 state = state,
                 effectAdapter = container.previewEffectAdapter,
                 maskSnapshot = container.previewMaskSnapshot,
-                previewContentAspect = previewRatioToContentAspect(state.previewRatio)
+                previewContentAspect = previewRatioToContentAspect(state.previewRatio),
+                stagedWatermarkHint = stagedWatermarkHintForOverlay(state)
             )
         )
         views.preview.overlayView.updateFocusReticle(
@@ -330,6 +335,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
             text = text,
+            linkEvents = container.linkRecorder.snapshot(),
             storageSummary = if (activePanelRoute is CockpitPanelRoute.DevConsole) {
                 runCatching { devLogExporter.storageSummary() }.getOrNull()
             } else null
@@ -390,6 +396,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
             text = AppTextResolver(this),
+            linkEvents = container.linkRecorder.snapshot(),
             storageSummary = summary
         )
         latestDevLogRenderModel = model
@@ -435,15 +442,15 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 
     private fun maybePlayShutterSound(state: SessionState) {
-        val activeShot = state.activeShot
+        val readiness = state.presentation.captureReadiness ?: return
         val shouldPlay = state.settings.persisted.common.shutterSoundEnabled &&
-            activeShot?.mediaType == com.opencamera.core.media.MediaType.PHOTO &&
-            activeShot.shotId != lastPlayedShutterSoundShotId
+            readiness.mediaType == com.opencamera.core.media.MediaType.PHOTO &&
+            readiness.shotId != lastPlayedShutterSoundShotId
         if (!shouldPlay) {
             return
         }
         shutterClickSound.play(MediaActionSound.SHUTTER_CLICK)
-        lastPlayedShutterSoundShotId = activeShot?.shotId
+        lastPlayedShutterSoundShotId = readiness.shotId
     }
 
     private fun buildUiSnapshot(): MainActivityUiSnapshot {
@@ -780,10 +787,10 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         runCatching {
                 val model = latestDevLogRenderModel ?: return
                 val file = devLogExporter.export(model.exportContent, type = selectedDevLogTab)
-                views.preview.captureOutput.text = "Debug log exported: ${file.absolutePath}"
+                views.preview.captureOutput.text = getString(R.string.toast_debug_log_exported, file.absolutePath)
             }
             .onFailure {
-                Toast.makeText(this, "Export failed", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
             }
     }
 
@@ -793,7 +800,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
             refreshDevLogModel()
         }.onFailure {
-            Toast.makeText(this, "Cleanup failed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.toast_cleanup_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -803,7 +810,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
             refreshDevLogModel()
         }.onFailure {
-            Toast.makeText(this, "Cleanup failed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.toast_cleanup_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -847,5 +854,57 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         control: FilterAdvancedControl
     ): String {
         return first { item -> item.control == control }.buttonLabel
+    }
+
+    private fun buildStagedWatermarkHint(
+        state: SessionState,
+        templateId: String
+    ): WatermarkHintSpec? {
+        val style = state.settings.persisted.photo.watermarkStyleFor(templateId)
+        val shape = when (templateId) {
+            "pure-text" -> WatermarkPreviewShape.TEXT_ONLY
+            "blur-four-border" -> WatermarkPreviewShape.FOUR_BORDER
+            "professional-bottom-bar" -> WatermarkPreviewShape.BOTTOM_BAR
+            "travel-polaroid", "retro-frame" -> WatermarkPreviewShape.EXPANDED_FRAME
+            else -> WatermarkPreviewShape.BACKED_TEXT
+        }
+        val previewLabels = if (templateId == "professional-bottom-bar") {
+            listOf(state.settings.persisted.photo.defaultWatermarkTemplateId)
+        } else {
+            emptyList()
+        }
+        val barBackground = if (templateId == "professional-bottom-bar") {
+            when (style.frameBackground) {
+                WatermarkFrameBackground.DARK -> 0xFE000000.toInt()
+                WatermarkFrameBackground.WHITE -> -1
+                WatermarkFrameBackground.SOURCE_BLUR -> 0xFE000000.toInt()
+                WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> 0xFE000000.toInt()
+                WatermarkFrameBackground.SOURCE_VIVID_BLUR -> 0xFE000000.toInt()
+            }
+        } else 0
+        return WatermarkHintSpec(
+            templateId = templateId,
+            placement = style.textPlacement,
+            previewText = templateId,
+            opacity = style.textOpacity.alphaFraction * 0.6f,
+            shape = shape,
+            textScale = style.textScale.multiplier,
+            previewLabels = previewLabels,
+            barBackground = barBackground
+        )
+    }
+
+    private fun stagedWatermarkHintForOverlay(state: SessionState): WatermarkHintSpec? {
+        val route = activePanelRoute
+        if (route !is CockpitPanelRoute.Settings) return null
+        val defaultId = state.settings.persisted.photo.defaultWatermarkTemplateId
+        return when (route.subpage) {
+            SettingsSubpage.WATERMARK_DETAIL -> {
+                val templateId = panelState.selectedWatermarkDetailTemplateId ?: defaultId
+                if (templateId != defaultId) buildStagedWatermarkHint(state, templateId) else null
+            }
+            SettingsSubpage.WATERMARK_SELECTOR -> null
+            else -> null
+        }
     }
 }

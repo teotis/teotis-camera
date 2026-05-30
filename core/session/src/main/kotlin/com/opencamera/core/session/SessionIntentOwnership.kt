@@ -60,6 +60,7 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     is SessionIntent.CountdownTick,
     SessionIntent.CountdownCompleted,
     is SessionIntent.ShotStarted,
+    is SessionIntent.CaptureCommitted,
     is SessionIntent.DataReceived,
     is SessionIntent.ShotCompleted,
     is SessionIntent.ShotFailed -> SessionIntentOwner.CAPTURE_RECORDING

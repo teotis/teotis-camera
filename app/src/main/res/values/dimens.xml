@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Spacing scale -->
+    <dimen name="space_1">1dp</dimen>
     <dimen name="space_2">2dp</dimen>
     <dimen name="space_4">4dp</dimen>
     <dimen name="space_8">8dp</dimen>
@@ -12,7 +13,7 @@
     <dimen name="touch_target_min">44dp</dimen>
     <dimen name="touch_target_shutter">72dp</dimen>
     <dimen name="mode_chip_min_width">64dp</dimen>
-    <dimen name="mode_chip_min_height">32dp</dimen>
+    <dimen name="mode_chip_min_height">28dp</dimen>
     <dimen name="zoom_chip_min_width">36dp</dimen>
     <dimen name="zoom_chip_min_height">26dp</dimen>
 

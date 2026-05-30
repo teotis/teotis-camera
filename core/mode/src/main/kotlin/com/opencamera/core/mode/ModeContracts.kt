@@ -27,6 +27,7 @@ enum class ModeId {
     PORTRAIT,
     PRO,
     NIGHT,
+    FULL_CLEAR,
     VIDEO
 }
 
@@ -60,6 +61,10 @@ fun ModeId.catalogProfile(): ModeCatalogProfile {
         ModeId.NIGHT -> ModeCatalogProfile(
             displayName = "Scenery",
             buttonLabel = "Scenery"
+        )
+        ModeId.FULL_CLEAR -> ModeCatalogProfile(
+            displayName = "Full Clear",
+            buttonLabel = "全清"
         )
         ModeId.VIDEO -> ModeCatalogProfile(
             displayName = "Video",

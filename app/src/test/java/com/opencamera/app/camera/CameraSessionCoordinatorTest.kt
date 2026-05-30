@@ -1234,6 +1234,48 @@ class CameraSessionCoordinatorTest {
         assertEquals(com.opencamera.core.device.LensNode.TELEPHOTO, lensSwitch[0].lensNode)
     }
 
+    @Test
+    fun `CaptureCommitted device event forwards as SessionIntent`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        val shot = ShotRequest(
+            shotId = "shot-still-1",
+            shotKind = com.opencamera.core.media.ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(relativePath = "Pictures/OpenCamera"),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+            captureProfile = com.opencamera.core.media.CaptureProfile()
+        )
+
+        adapter.emit(DeviceEvent.ShotStarted(shot))
+        adapter.emit(
+            DeviceEvent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 1234L
+            )
+        )
+        advanceUntilIdle()
+
+        val captureCommittedIntent = session.recordedIntents.filterIsInstance<SessionIntent.CaptureCommitted>()
+        assertEquals(1, captureCommittedIntent.size)
+        val intent = captureCommittedIntent[0]
+        assertEquals(shot.shotId, intent.shotId)
+        assertEquals(MediaType.PHOTO, intent.mediaType)
+        assertEquals("camera2:onCaptureCompleted", intent.source)
+        assertEquals(1234L, intent.elapsedTimestampMs)
+    }
+
     private class TestLifecycleOwner : LifecycleOwner {
         private val delegateLifecycle = object : Lifecycle() {
             override fun addObserver(observer: LifecycleObserver) = Unit

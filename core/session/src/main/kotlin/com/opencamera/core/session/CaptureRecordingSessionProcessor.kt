@@ -52,6 +52,7 @@ internal class CaptureRecordingSessionProcessor(
     private val state: MutableStateFlow<SessionState>,
     private val effects: MutableSharedFlow<SessionEffect>,
     private val trace: SessionTrace,
+    private val linkRecorder: PerformanceLinkRecorder,
     private val shotExecutor: ShotExecutor,
     private val currentController: () -> ModeController,
     private val resolvedActiveDeviceGraph: () -> DeviceGraphSpec,
@@ -62,6 +63,7 @@ internal class CaptureRecordingSessionProcessor(
     private var pendingCountdownStrategy: CaptureStrategy? = null
     private var recordingWatchdogJob: Job? = null
     private var recordingElapsedJob: Job? = null
+    private val activeShotSpans = mutableMapOf<String, PerformanceSpanSnapshot>()
 
     // ── Public queries ──────────────────────────────────────────────
 
@@ -74,6 +76,12 @@ internal class CaptureRecordingSessionProcessor(
             is SessionIntent.CountdownTick -> handleCountdownTick(intent.remainingSeconds)
             SessionIntent.CountdownCompleted -> handleCountdownCompleted()
             is SessionIntent.ShotStarted -> handleShotStarted(intent.shot)
+            is SessionIntent.CaptureCommitted -> handleCaptureCommitted(
+                shotId = intent.shotId,
+                mediaType = intent.mediaType,
+                source = intent.source,
+                elapsedTimestampMs = intent.elapsedTimestampMs
+            )
             is SessionIntent.DataReceived -> handleDataReceived(intent.shotId, intent.mediaType)
             is SessionIntent.ShotCompleted -> handleShotCompleted(intent.result)
             is SessionIntent.ShotFailed -> handleShotFailed(
@@ -240,6 +248,7 @@ internal class CaptureRecordingSessionProcessor(
                 presentation = s.presentation.copy(
                     countdownRemainingSeconds = null,
                     pendingCaptureFeedback = null,
+                    captureReadiness = null,
                     recordingStartedAtElapsedMillis = displayedStartedAt,
                     recordingElapsedMillis = if (shot.mediaType == MediaType.VIDEO) 0L else null,
                     lastAction = if (shot.mediaType == MediaType.PHOTO) {
@@ -284,6 +293,22 @@ internal class CaptureRecordingSessionProcessor(
             if (shot.mediaType == MediaType.PHOTO) "capture.saving" else "recording.started",
             "shot=${shot.shotId},mode=${currentController().id}"
         )
+        // Record link event for device capture started
+        activeShotSpans[shot.shotId]?.let { _ ->
+            linkRecorder.recordEvent(
+                PerformanceLinkEvent(
+                    flow = if (shot.mediaType == MediaType.PHOTO) "capture" else "recording",
+                    stage = "device_started",
+                    status = LinkEventStatus.STARTED,
+                    correlationId = shot.shotId,
+                    startElapsedMillis = System.nanoTime() / 1_000_000L,
+                    endElapsedMillis = null,
+                    durationMillis = null,
+                    detail = "mode=${currentController().id}",
+                    source = "CaptureRecordingSessionProcessor"
+                )
+            )
+        }
     }
 
     private fun canRearmOnDataReceived(shot: ShotRequest): Boolean {
@@ -299,13 +324,84 @@ internal class CaptureRecordingSessionProcessor(
             if (canRearmOnDataReceived(activeShot)) {
                 s.copy(
                     captureStatus = CaptureStatus.DATA_RECEIVED,
-                    activeShot = null
+                    activeShot = null,
+                    presentation = s.presentation.copy(
+                        captureReadiness = s.presentation.captureReadiness
+                            ?: com.opencamera.core.device.CaptureReadiness(
+                                shotId = shotId,
+                                mediaType = mediaType,
+                                source = "DeviceEvent.DataReceived",
+                                elapsedTimestampMs = null
+                            ),
+                        pendingPostprocess = PendingPostprocessUiState(
+                            shotId = shotId,
+                            mediaType = mediaType,
+                            message = "",
+                            warnBeforeExit = true
+                        )
+                    )
                 )
             } else {
                 s.copy(captureStatus = CaptureStatus.DATA_RECEIVED)
             }
         }
         trace.record("capture.data.received", "shotId=$shotId")
+        // Record link event for data received
+        activeShotSpans[shotId]?.let { _ ->
+            linkRecorder.recordEvent(
+                PerformanceLinkEvent(
+                    flow = "capture",
+                    stage = "data_received",
+                    status = LinkEventStatus.COMPLETED,
+                    correlationId = shotId,
+                    startElapsedMillis = System.nanoTime() / 1_000_000L,
+                    endElapsedMillis = null,
+                    durationMillis = null,
+                    detail = null,
+                    source = "CaptureRecordingSessionProcessor"
+                )
+            )
+        }
+    }
+
+    private fun canSignalReadinessOnCaptureCommitted(shot: ShotRequest): Boolean {
+        if (shot.mediaType != MediaType.PHOTO) return false
+        if (shot.livePhotoSpec != null) return false
+        return shot.shotKind == ShotKind.STILL_CAPTURE
+    }
+
+    private fun handleCaptureCommitted(
+        shotId: String,
+        mediaType: MediaType,
+        source: String,
+        elapsedTimestampMs: Long?
+    ) {
+        updateState.update { s ->
+            val activeShot = s.activeShot ?: return@update s
+            if (activeShot.shotId != shotId || mediaType != MediaType.PHOTO) return@update s
+            if (canSignalReadinessOnCaptureCommitted(activeShot)) {
+                s.copy(
+                    activeShot = null,
+                    presentation = s.presentation.copy(
+                        captureReadiness = com.opencamera.core.device.CaptureReadiness(
+                            shotId = shotId,
+                            mediaType = mediaType,
+                            source = source,
+                            elapsedTimestampMs = elapsedTimestampMs
+                        ),
+                        pendingPostprocess = PendingPostprocessUiState(
+                            shotId = shotId,
+                            mediaType = mediaType,
+                            message = "",
+                            warnBeforeExit = true
+                        )
+                    )
+                )
+            } else {
+                s
+            }
+        }
+        trace.record("capture.committed", "shotId=$shotId,source=$source")
     }
 
     private suspend fun handleShotCompleted(result: ShotResult) {
@@ -328,6 +424,8 @@ internal class CaptureRecordingSessionProcessor(
                     countdownRemainingSeconds = null,
                     recordingStartedAtElapsedMillis = null,
                     recordingElapsedMillis = null,
+                    pendingPostprocess = null,
+                    captureReadiness = null,
                     previewThumbnailPath = result.thumbnailSource.outputPathOrNull()
                         ?: s.presentation.previewThumbnailPath,
                     latestThumbnailSource = when (result.thumbnailSource) {
@@ -412,6 +510,19 @@ internal class CaptureRecordingSessionProcessor(
             if (result.mediaType == MediaType.PHOTO) "capture.saved" else "recording.saved",
             result.outputPath
         )
+        // Complete capture/recording link span
+        activeShotSpans.remove(result.shotId)?.let { span ->
+            val hasFailures = result.hasPostProcessFailures()
+            val linkStatus = when {
+                hasFailures -> LinkEventStatus.DEGRADED
+                else -> LinkEventStatus.COMPLETED
+            }
+            linkRecorder.completeSpan(
+                span,
+                status = linkStatus,
+                detail = result.postProcessFailureSummary()
+            )
+        }
         val t = result.timing
         val requested = t.requestedAtElapsedMillis
         val postCompleted = t.postProcessCompletedAtElapsedMillis
@@ -450,6 +561,7 @@ internal class CaptureRecordingSessionProcessor(
     ) {
         val currentActiveShot = state.value.activeShot
         if (currentActiveShot == null) {
+            clearPendingPostprocessIfMatches(shotId)
             trace.record("shot.failed.orphaned", "shotId=$shotId,reason=$reason")
             return
         }
@@ -482,6 +594,8 @@ internal class CaptureRecordingSessionProcessor(
                     countdownRemainingSeconds = null,
                     recordingStartedAtElapsedMillis = null,
                     recordingElapsedMillis = null,
+                    pendingPostprocess = null,
+                    captureReadiness = null,
                     lastAction = if (mediaType == MediaType.PHOTO) {
                         "Photo capture failed"
                     } else {
@@ -497,6 +611,21 @@ internal class CaptureRecordingSessionProcessor(
             if (mediaType == MediaType.PHOTO) "capture.failed" else "recording.failed",
             "$shotId:$reason"
         )
+        // Complete capture/recording link span as failed
+        activeShotSpans.remove(shotId)?.let { span ->
+            linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = reason)
+        }
+    }
+
+    private fun clearPendingPostprocessIfMatches(shotId: String) {
+        val pending = state.value.presentation.pendingPostprocess
+        if (pending != null && pending.shotId == shotId) {
+            updateState.update { s ->
+                s.copy(
+                    presentation = s.presentation.copy(pendingPostprocess = null)
+                )
+            }
+        }
     }
 
     suspend fun handleInterruptedShotFailure(
@@ -515,6 +644,10 @@ internal class CaptureRecordingSessionProcessor(
             if (shot.mediaType == MediaType.PHOTO) "capture.failed" else "recording.failed",
             "${shot.shotId}:$reason"
         )
+        // Complete capture/recording link span as failed
+        activeShotSpans.remove(shot.shotId)?.let { span ->
+            linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = reason)
+        }
     }
 
     // ── Capture strategy ────────────────────────────────────────────
@@ -569,6 +702,7 @@ internal class CaptureRecordingSessionProcessor(
             startRecordingWatchdog(RecordingStatus.REQUESTING, 10_000L)
         }
         effects.emit(SessionEffect.ExecuteShot(plan))
+        val flow = if (plan.request.mediaType == MediaType.PHOTO) "capture" else "recording"
         trace.record(
             if (plan.request.mediaType == MediaType.PHOTO) {
                 "capture.photo"
@@ -576,6 +710,14 @@ internal class CaptureRecordingSessionProcessor(
                 "recording.requested"
             },
             "mode=${currentController().id},shot=${plan.request.shotId}"
+        )
+        // Start capture/recording link span
+        activeShotSpans[plan.request.shotId] = linkRecorder.startSpan(
+            flow = flow,
+            stage = "requested",
+            correlationId = plan.request.shotId,
+            detail = "mode=${currentController().id}",
+            source = "CaptureRecordingSessionProcessor"
         )
     }
 

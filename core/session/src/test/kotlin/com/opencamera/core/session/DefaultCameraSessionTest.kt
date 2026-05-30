@@ -22,12 +22,17 @@ import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.LiveTemporalWindow
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.LivePhotoCaptureSpec
+import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
+import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.feature.document.DocumentModePlugin
 import com.opencamera.core.mode.ModeId
@@ -868,6 +873,128 @@ class DefaultCameraSessionTest {
         assertEquals(3.5f, session.state.value.activeDeviceGraph.preview.zoomRatio)
         assertEquals("Zoom set to 3.5x", session.state.value.lastAction)
         assertTrue(trace.snapshot().any { it.name == "zoom.updated" && it.detail == "3.5x" })
+    }
+
+    @Test
+    fun `apply zoom ratio with lens node map sets discrete previewZoomRatio`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        // captureZoom = 3.0 → previewZoom = 2.0 (largest threshold ≤ 3.0)
+        session.dispatch(SessionIntent.ApplyZoomRatio(3.0f))
+        advanceUntilIdle()
+
+        assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.zoomRatio)
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+    }
+
+    @Test
+    fun `previewZoomRatio stays discrete when captureZoom changes within same lens range`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        // captureZoom = 2.5 → previewZoom = 2.0
+        session.dispatch(SessionIntent.ApplyZoomRatio(2.5f))
+        advanceUntilIdle()
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+
+        // captureZoom = 3.5 → still previewZoom = 2.0 (same lens range)
+        session.dispatch(SessionIntent.ApplyZoomRatio(3.5f))
+        advanceUntilIdle()
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+    }
+
+    @Test
+    fun `previewZoomRatio jumps when captureZoom crosses lens threshold`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        // captureZoom = 4.5 → previewZoom = 2.0 (TELEPHOTO range)
+        session.dispatch(SessionIntent.ApplyZoomRatio(4.5f))
+        advanceUntilIdle()
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+
+        // captureZoom = 6.0 → previewZoom = 5.0 (PERISCOPE range)
+        session.dispatch(SessionIntent.ApplyZoomRatio(6.0f))
+        advanceUntilIdle()
+        assertEquals(5.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+    }
+
+    @Test
+    fun `previewZoomRatio is always less than or equal to captureZoomRatio`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        val testRatios = listOf(0.6f, 1.0f, 1.5f, 2.0f, 3.0f, 5.0f, 7.0f, 10.0f)
+        for (captureZoom in testRatios) {
+            session.dispatch(SessionIntent.ApplyZoomRatio(captureZoom))
+            advanceUntilIdle()
+            val previewZoom = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+            assertTrue(
+                previewZoom <= session.state.value.activeDeviceGraph.preview.zoomRatio,
+                "previewZoomRatio ($previewZoom) should be <= captureZoomRatio (${session.state.value.activeDeviceGraph.preview.zoomRatio}) at captureZoom=$captureZoom"
+            )
+        }
     }
 
     @Test
@@ -2716,6 +2843,114 @@ class DefaultCameraSessionTest {
         assertEquals(shot1.shotId, session.state.value.activeShot?.shotId)
         assertEquals("Wait for current capture to finish before sending another command", session.state.value.lastAction)
         assertTrue(trace.snapshot().any { it.name == "mode.intent.blocked" })
+    }
+
+    @Test
+    fun `live photo does not rearm on DataReceived keeps activeShot until ShotCompleted`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(livePhotoEnabledByDefault = true)
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(ShotKind.LIVE_PHOTO, shot.shotKind)
+
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+
+        session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
+        runCurrent()
+        assertEquals(CaptureStatus.DATA_RECEIVED, session.state.value.captureStatus)
+        // Conservative capture: activeShot stays set, shutter remains blocked
+        assertNotNull(session.state.value.activeShot)
+        assertEquals(shot.shotId, session.state.value.activeShot?.shotId)
+
+        // ShotCompleted clears activeShot
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/live.jpg",
+                    saveRequest = SaveRequest.photoLibrary(
+                        metadata = MediaMetadata(customTags = mapOf("livePhotoDefault" to "on"))
+                    ),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/live.jpg"),
+                    metadata = MediaMetadata(customTags = mapOf("livePhotoDefault" to "on")),
+                    livePhotoBundle = LivePhotoBundle(
+                        stillPath = "Pictures/OpenCamera/live.jpg",
+                        motionPath = "Pictures/OpenCamera/live.live.mp4",
+                        sidecarPath = "Pictures/OpenCamera/live.live.json",
+                        motionDurationMillis = 1500,
+                        motionMimeType = "video/mp4",
+                        sidecarMimeType = "application/vnd.opencamera.live+json"
+                    )
+                )
+            )
+        )
+        advanceUntilIdle()
+        assertNull(session.state.value.activeShot)
+    }
+
+    @Test
+    fun `multi frame capture does not rearm on DataReceived keeps activeShot until ShotCompleted`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(ShotKind.MULTI_FRAME_CAPTURE, shot.shotKind)
+
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+
+        session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
+        runCurrent()
+        assertEquals(CaptureStatus.DATA_RECEIVED, session.state.value.captureStatus)
+        // Conservative capture: activeShot stays set, shutter remains blocked
+        assertNotNull(session.state.value.activeShot)
+        assertEquals(shot.shotId, session.state.value.activeShot?.shotId)
+
+        // ShotCompleted clears activeShot
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/night.jpg",
+                    saveRequest = SaveRequest.photoLibrary(
+                        metadata = MediaMetadata(customTags = mapOf("profile" to "tripod"))
+                    ),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/night.jpg"),
+                    metadata = MediaMetadata(customTags = mapOf("profile" to "tripod"))
+                )
+            )
+        )
+        advanceUntilIdle()
+        assertNull(session.state.value.activeShot)
     }
 
     @Test
@@ -5106,5 +5341,470 @@ class DefaultCameraSessionTest {
         // Ratio is above 2x but TELEPHOTO is unavailable → WIDE
         val result = session.evaluateLensNode(3.0f, null, mapWithUnavailable)
         assertEquals(LensNode.WIDE, result)
+    }
+
+    // ── computePreviewZoomRatio tests ──────────────────────────────────
+
+    @Test
+    fun `computePreviewZoomRatio returns captureZoom when lens node map is empty`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val result = session.computePreviewZoomRatio(3.0f, emptyMap())
+        assertEquals(3.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns 1f when captureZoom below 1 and empty map`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val result = session.computePreviewZoomRatio(0.5f, emptyMap())
+        assertEquals(1.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns threshold for two-node map`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // captureZoom = 1.5 → largest threshold <= 1.5 is 0 (WIDE)
+        val result = session.computePreviewZoomRatio(1.5f, twoNodeMap)
+        assertEquals(0.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns 2 for two-node map at threshold`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // captureZoom = 2.0 → largest threshold <= 2.0 is 2.0 (TELEPHOTO)
+        val result = session.computePreviewZoomRatio(2.0f, twoNodeMap)
+        assertEquals(2.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns 5 for three-node map at periscope threshold`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // captureZoom = 5.0 → largest threshold <= 5.0 is 5.0 (PERISCOPE)
+        val result = session.computePreviewZoomRatio(5.0f, threeNodeMap)
+        assertEquals(5.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns max threshold for captureZoom above all thresholds`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // captureZoom = 10.0 → max threshold is 5.0 (PERISCOPE)
+        val result = session.computePreviewZoomRatio(10.0f, threeNodeMap)
+        assertEquals(5.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio previewZoomRatio always less than or equal to captureZoom`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val testRatios = listOf(0.6f, 1.0f, 1.5f, 2.0f, 3.0f, 5.0f, 8.0f, 10.0f)
+        for (captureZoom in testRatios) {
+            val previewZoom = session.computePreviewZoomRatio(captureZoom, threeNodeMap)
+            assertTrue(
+                previewZoom <= captureZoom,
+                "previewZoomRatio ($previewZoom) should be <= captureZoom ($captureZoom)"
+            )
+        }
+    }
+
+    @Test
+    fun `computePreviewZoomRatio returns smallest threshold when captureZoom below all thresholds`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // All thresholds: 0, 2, 5. captureZoom = 0.3 → largest <= 0.3 is 0
+        val result = session.computePreviewZoomRatio(0.3f, threeNodeMap)
+        assertEquals(0.0f, result)
+    }
+
+    @Test
+    fun `computePreviewZoomRatio with unavailable node ignores it`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        val mapWithUnavailable = mapOf(
+            LensNode.WIDE to LensNodeAvailability(
+                node = LensNode.WIDE, available = true, thresholdRatio = 0f, physicalCameraId = "0"
+            ),
+            LensNode.TELEPHOTO to LensNodeAvailability(
+                node = LensNode.TELEPHOTO, available = false, thresholdRatio = 2.0f
+            )
+        )
+        // captureZoom = 3.0 → only WIDE (0) is available → returns 0
+        val result = session.computePreviewZoomRatio(3.0f, mapWithUnavailable)
+        assertEquals(0.0f, result)
+    }
+
+    // ── CaptureReadiness contract tests ───────────────────────────────
+
+    @Test
+    fun `CaptureCommitted sets readiness for ordinary still capture`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(CaptureStatus.REQUESTED, session.state.value.captureStatus)
+
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+
+        val readiness = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(shot.shotId, readiness.shotId)
+        assertEquals(MediaType.PHOTO, readiness.mediaType)
+        assertEquals("camera2:onCaptureCompleted", readiness.source)
+        assertEquals(450L, readiness.elapsedTimestampMs)
+        assertTrue(trace.snapshot().any { it.name == "capture.committed" })
+    }
+
+    @Test
+    fun `CaptureCommitted re-arms ordinary still capture for next shutter press`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot1 = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot1))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot1.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+
+        assertNull(
+            session.state.value.activeShot,
+            "ordinary still capture should be truly re-armed at CaptureCommitted"
+        )
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+
+        val shot2 = assertNotNull(session.state.value.activeShot)
+        assertTrue(shot2.shotId != shot1.shotId)
+        assertEquals(CaptureStatus.REQUESTED, session.state.value.captureStatus)
+    }
+
+    @Test
+    fun `DataReceived sets capture readiness fallback when Camera2 committed callback is absent`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
+        runCurrent()
+
+        val readiness = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(shot.shotId, readiness.shotId)
+        assertEquals("DeviceEvent.DataReceived", readiness.source)
+        assertNull(session.state.value.activeShot)
+    }
+
+    @Test
+    fun `CaptureCommitted does not set readiness for multi-frame capture`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        // Simulate a night/multi-frame shot
+        val multiFrameShot = ShotRequest(
+            shotId = "shot-mf-1",
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = com.opencamera.core.media.PostProcessSpec(
+                algorithmProfile = "night-multiframe-tripod"
+            ),
+            captureProfile = com.opencamera.core.media.CaptureProfile(frameCount = 12)
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(multiFrameShot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = multiFrameShot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 800L
+            )
+        )
+        runCurrent()
+
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Multi-frame capture must NOT set readiness (conservative)"
+        )
+    }
+
+    @Test
+    fun `CaptureCommitted does not set readiness for live photo`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        val livePhotoShot = ShotRequest(
+            shotId = "shot-live-1",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = com.opencamera.core.media.PostProcessSpec(),
+            captureProfile = com.opencamera.core.media.CaptureProfile(),
+            livePhotoSpec = com.opencamera.core.media.LivePhotoCaptureSpec()
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(livePhotoShot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = livePhotoShot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 600L
+            )
+        )
+        runCurrent()
+
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Live photo must NOT set readiness (conservative)"
+        )
+    }
+
+    @Test
+    fun `capture readiness is cleared on next ShotStarted`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        // First capture: set readiness
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot1 = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot1))
+        runCurrent()
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot1.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+        assertNotNull(session.state.value.presentation.captureReadiness)
+
+        // Complete first shot via DataReceived + ShotCompleted
+        session.dispatch(SessionIntent.DataReceived(shot1.shotId, MediaType.PHOTO))
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = shot1.shotId,
+                    mediaType = MediaType.PHOTO,
+                    outputPath = "Pictures/OpenCamera/first.jpg",
+                    saveRequest = SaveRequest.photoLibrary(),
+                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/first.jpg"),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        runCurrent()
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        // Second capture: readiness should start null, then be set again
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot2 = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot2))
+        runCurrent()
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Readiness must be cleared when new shot starts"
+        )
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot2.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 500L
+            )
+        )
+        runCurrent()
+        val readiness2 = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(shot2.shotId, readiness2.shotId)
+    }
+
+    @Test
+    fun `CaptureCommitted does not set readiness when activeShot mismatched`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+
+        // Dispatch CaptureCommitted with wrong shotId
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = "wrong-shot-id",
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 300L
+            )
+        )
+        runCurrent()
+
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Readiness must NOT be set for mismatched shotId"
+        )
+    }
+
+    @Test
+    fun `CaptureCommitted is idempotent and handled once per shot`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+        val readiness1 = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(450L, readiness1.elapsedTimestampMs)
+
+        // Second CaptureCommitted for same shot: readiness remains the first handled value.
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 500L
+            )
+        )
+        runCurrent()
+        assertEquals(
+            450L,
+            session.state.value.presentation.captureReadiness?.elapsedTimestampMs,
+            "Readiness should be handled once for the committed shot"
+        )
+    }
+
+    @Test
+    fun `CaptureCommitted does not break recording stop semantics`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val videoShot = assertNotNull(session.state.value.activeShot)
+        assertEquals(MediaType.VIDEO, videoShot.mediaType)
+
+        session.dispatch(SessionIntent.ShotStarted(videoShot))
+        runCurrent()
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+
+        // CaptureCommitted for a video shot: readiness must NOT be set
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = videoShot.shotId,
+                mediaType = MediaType.VIDEO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 200L
+            )
+        )
+        runCurrent()
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        // Recording still active after CaptureCommitted
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+        assertEquals(videoShot.shotId, session.state.value.activeShot?.shotId)
+
+        // Stop recording (via ShotCompleted) works normally
+        session.dispatch(
+            SessionIntent.ShotCompleted(
+                ShotResult(
+                    shotId = videoShot.shotId,
+                    mediaType = MediaType.VIDEO,
+                    outputPath = "Movies/OpenCamera/test.mp4",
+                    saveRequest = videoShot.saveRequest,
+                    thumbnailSource = ThumbnailSource.SavedMedia("Movies/OpenCamera/test.mp4"),
+                    metadata = SaveRequest.photoLibrary().metadata
+                )
+            )
+        )
+        runCurrent()
+
+        assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+        assertNull(session.state.value.activeShot)
     }
 }

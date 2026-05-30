@@ -15,6 +15,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
         ModeId.PORTRAIT -> "Port"
         ModeId.PRO -> "Pro"
         ModeId.VIDEO -> "Video"
+        ModeId.FULL_CLEAR -> "Full Clear"
     }
 
     override fun modeTrackLabel(modeId: ModeId): String = modeDisplayName(modeId)
@@ -58,6 +59,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun quickResolution(): String = "Size"
     override fun quickLive(): String = "Live"
     override fun quickTimer(): String = "Timer"
+    override fun quickWatermark(): String = "Watermark"
     override fun moreControls(): String = "More"
     override fun stopSession(): String = "Stop Session"
     override fun restartSession(): String = "Restart Session"
@@ -137,6 +139,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun devLogTitleCore(count: Int): String = "Pipeline Log ($count)"
     override fun devLogTitleError(count: Int): String = "Error Log ($count)"
     override fun devLogTitleAll(count: Int): String = "All Events ($count)"
+    override fun devLogTitleLink(count: Int): String = "Link Flow ($count)"
     override fun filterCtrlExposure(): String = "Exposure"
     override fun filterCtrlSoftGlow(): String = "Soft Glow"
     override fun filterCtrlHalo(): String = "Halo"
@@ -358,6 +361,9 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun disabledFrameRatioUnsupportedMode(): String = "Frame ratio not supported in current mode"
     override fun disabledFrameRatioActiveShot(): String = "Wait for current capture to finish"
     override fun disabledFrameRatioCountdown(): String = "Wait for countdown to finish"
+
+    // Processing status
+    override fun statusProcessingPhotoKeepOpen(): String = "Processing photo. Please keep OpenCamera open."
 
     // Recording status
     override fun statusRecordingStarting(): String = "Starting…"

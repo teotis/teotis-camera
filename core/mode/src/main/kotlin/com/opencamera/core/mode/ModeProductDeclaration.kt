@@ -291,6 +291,47 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
             )
         )
 
+        ModeId.FULL_CLEAR -> ModeProductDeclaration(
+            modeId = this,
+            displayName = "Full Clear",
+            primaryGate = PrimaryCapabilityGate(
+                kind = CapabilityRequirementKind.STILL_CAPTURE,
+                unsupportedMessage = "Full Clear mode requires still capture support"
+            ),
+            requirements = listOf(
+                ModeCapabilityRequirement(
+                    id = "fullclear-focus-bracket",
+                    kind = CapabilityRequirementKind.MULTI_FRAME_CAPTURE,
+                    isOptional = true,
+                    degradationDescription = "Multi-focus bracket capture unavailable; degrades to single-frame best-effort capture",
+                    fallbackId = "fullclear-single-frame"
+                ),
+                ModeCapabilityRequirement(
+                    id = "fullclear-focus-stack",
+                    kind = CapabilityRequirementKind.FILTER_CAPTURE_RENDER,
+                    isOptional = true,
+                    degradationDescription = "Focus stack fusion unavailable; degrades to honest best-frame selection with degradation notes",
+                    fallbackId = "fullclear-best-frame"
+                )
+            ),
+            strategyVariants = listOf(
+                ModeStrategyVariant(
+                    id = "fullclear-bracket",
+                    type = ModeStrategyType.MULTI_FRAME,
+                    conditionDescription = "Multi-focus bracket capture with V1 focus-stack fusion when device supports multi-frame capture",
+                    requiredCapabilityIds = listOf("fullclear-focus-bracket")
+                ),
+                ModeStrategyVariant(
+                    id = "fullclear-single-frame",
+                    type = ModeStrategyType.SINGLE_FRAME,
+                    conditionDescription = "Single-frame best-effort capture when focus bracket is unavailable"
+                )
+            ),
+            effectProfile = ModeEffectProfile(
+                usesFrameEffect = true
+            )
+        )
+
         ModeId.VIDEO -> ModeProductDeclaration(
             modeId = this,
             displayName = "Video",

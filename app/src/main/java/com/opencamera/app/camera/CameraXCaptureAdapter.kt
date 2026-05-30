@@ -5,9 +5,12 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.ImageFormat
 import android.graphics.Bitmap
+import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.StreamConfigurationMap
 import android.media.CamcorderProfile
 import android.media.MediaRecorder
@@ -1316,6 +1319,32 @@ class CameraXCaptureAdapter(
     private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageCapture: ImageCapture? = null
+    @Volatile private var captureCommittedArmedShotId: String? = null
+    @Volatile private var captureCommittedArmedMediaType: MediaType? = null
+    @Volatile private var captureCommittedElapsedMs: Long? = null
+    private val sessionCaptureCallback = object : CameraCaptureSession.CaptureCallback() {
+        override fun onCaptureCompleted(
+            session: CameraCaptureSession,
+            request: CaptureRequest,
+            result: TotalCaptureResult
+        ) {
+            super.onCaptureCompleted(session, request, result)
+            val intent = result.get(CaptureResult.CONTROL_CAPTURE_INTENT)
+            if (intent != CaptureRequest.CONTROL_CAPTURE_INTENT_STILL_CAPTURE) return
+            val shotId = captureCommittedArmedShotId ?: return
+            val mediaType = captureCommittedArmedMediaType ?: return
+            val elapsed = SystemClock.elapsedRealtime()
+            captureCommittedElapsedMs = elapsed
+            _events.tryEmit(
+                DeviceEvent.CaptureCommitted(
+                    shotId = shotId,
+                    mediaType = mediaType,
+                    source = "Camera2CaptureSession.onCaptureCompleted",
+                    elapsedTimestampMs = elapsed
+                )
+            )
+        }
+    }
     private var videoCapture: VideoCapture<Recorder>? = null
     private var boundCamera: Camera? = null
     private var activeRecording: Recording? = null
@@ -1692,11 +1721,6 @@ class CameraXCaptureAdapter(
                 zoomRatio = normalizedZoomRatio
             )
         )
-        // Still preview path: CameraX stays at 1x (full lens) so the user sees
-        // the complete sensor image. The overlay frame rect scales by 1/zoom to
-        // indicate the capture window, and the zoom crop is applied in post-processing.
-        // Video path: CameraX zoom is applied normally.
-        if (activeGraph.template == CaptureTemplate.STILL_CAPTURE) return
         val camera = boundCamera ?: return
         camera.cameraControl.setZoomRatio(normalizedZoomRatio).await()
     }
@@ -1745,6 +1769,11 @@ class CameraXCaptureAdapter(
             capabilityMatrix = deviceRequest.manualControlCapabilities
         )
 
+        if (plan.request.shotKind == ShotKind.STILL_CAPTURE) {
+            captureCommittedArmedShotId = plan.request.shotId
+            captureCommittedArmedMediaType = plan.request.mediaType
+        }
+
         val execution = when (plan.request.shotKind) {
             ShotKind.STILL_CAPTURE -> {
                 val request = createPhotoOutputRequest(plan.saveTask.saveRequest)
@@ -1766,6 +1795,9 @@ class CameraXCaptureAdapter(
 
         when (execution) {
             is PhotoCaptureOutcome.Failure -> {
+                captureCommittedArmedShotId = null
+                captureCommittedArmedMediaType = null
+                captureCommittedElapsedMs = null
                 cleanupAbsoluteFilePaths(execution.cleanupPaths)
                 emitShotFailure(
                     shotId = plan.request.shotId,
@@ -1776,10 +1808,21 @@ class CameraXCaptureAdapter(
             }
 
             is PhotoCaptureOutcome.Success -> {
+                val committedElapsed = captureCommittedElapsedMs
+                captureCommittedArmedShotId = null
+                captureCommittedArmedMediaType = null
+                captureCommittedElapsedMs = null
                 _events.emit(DeviceEvent.DataReceived(
                     shotId = plan.request.shotId,
                     mediaType = plan.request.mediaType
                 ))
+                val captureTimingDiagnostics = buildList {
+                    add("timing:requested-at-elapsed=$requestedAt")
+                    if (committedElapsed != null) {
+                        add("timing:capture-committed-at-elapsed=$committedElapsed")
+                        add("timing:request-to-committed-ms=${committedElapsed - requestedAt}")
+                    }
+                }
                 val shotCompletedParams = ShotCompletedParams(
                     plan = plan,
                     outputPath = execution.outputPath,
@@ -1788,6 +1831,7 @@ class CameraXCaptureAdapter(
                     intermediateOutputPaths = execution.intermediateOutputPaths,
                     deviceDiagnostics = deviceRequest.diagnostics +
                         adapterManualDiagnostics +
+                        captureTimingDiagnostics +
                         execution.diagnostics,
                     requestedAtElapsedMillis = requestedAt,
                     deviceCaptureStartedAtElapsedMillis = execution.deviceCaptureStartedAtElapsedMillis,
@@ -2866,9 +2910,7 @@ class CameraXCaptureAdapter(
 
         // Apply current zoom ratio to the newly bound camera
         val currentZoom = activeGraph.preview.zoomRatio
-        if (activeGraph.template != CaptureTemplate.STILL_CAPTURE) {
-            boundUseCaseCamera.cameraControl.setZoomRatio(currentZoom)
-        }
+        boundUseCaseCamera.cameraControl.setZoomRatio(currentZoom)
     }
 
     private suspend fun ensureStillCaptureRequest(deviceRequest: DeviceShotRequest) {
@@ -3056,11 +3098,7 @@ class CameraXCaptureAdapter(
         cameraProvider = provider
         boundCamera = boundUseCaseCamera
         observeCameraState(boundUseCaseCamera)
-        // Still preview: keep CameraX at 1x for full-lens preview; zoom crop is
-        // applied in post-processing. Video: apply CameraX zoom normally.
-        if (deviceGraph.template != CaptureTemplate.STILL_CAPTURE) {
-            boundUseCaseCamera.cameraControl.setZoomRatio(deviceGraph.preview.zoomRatio)
-        }
+        boundUseCaseCamera.cameraControl.setZoomRatio(deviceGraph.preview.zoomRatio)
         currentTorchEnabled = false
         currentGraph = deviceGraph
         boundLifecycleOwner = lifecycleOwner
@@ -3115,6 +3153,7 @@ class CameraXCaptureAdapter(
             .setCaptureMode(captureMode)
             .setResolutionSelector(resolutionSelector)
             .setTargetRotation(mapOutputRotationToSurface(currentOutputRotation))
+        Camera2Interop.Extender(builder).setSessionCaptureCallback(sessionCaptureCallback)
         manualCaptureConfig?.let { config ->
             applyCamera2ManualCaptureConfig(builder, config)
         }

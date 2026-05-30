@@ -79,7 +79,7 @@ private class HumanisticModeController(
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
-            headline = "Humanistic pipeline ready"
+            headline = "人文管线就绪"
         )
     )
 
@@ -90,7 +90,7 @@ private class HumanisticModeController(
 
     override suspend fun onDeviceCapabilitiesChanged(deviceCapabilities: DeviceCapabilities) {
         mutableSnapshot.value = buildSnapshot(
-            headline = "Humanistic mode active"
+            headline = "人文模式已激活"
         )
     }
 
@@ -101,7 +101,7 @@ private class HumanisticModeController(
         stillCaptureResolutionPreset: StillCaptureResolutionPreset
     ) {
         mutableSnapshot.value = buildSnapshot(
-            headline = "Humanistic resolution updated"
+            headline = "人文分辨率已更新"
         )
     }
 
@@ -109,7 +109,7 @@ private class HumanisticModeController(
         context.eventSink("humanistic.enter")
         styleIndex = resolvedDefaultStyleIndex()
         mutableSnapshot.value = buildSnapshot(
-            headline = "Humanistic mode active"
+            headline = "人文模式已激活"
         )
         context.onEffectSpecChanged(buildEffectSpec())
     }
@@ -117,8 +117,8 @@ private class HumanisticModeController(
     override suspend fun onExit() {
         context.eventSink("humanistic.exit")
         mutableSnapshot.value = buildSnapshot(
-            headline = "Humanistic mode inactive",
-            detail = "Switch back to Humanistic to resume street-life capture."
+            headline = "人文模式未激活",
+            detail = "切换回人文模式以继续街拍。"
         )
     }
 
@@ -136,10 +136,10 @@ private class HumanisticModeController(
         reduceStillShotSessionEvent(
             event = event,
             text = StillShotSessionEventText(
-                shotStartedHeadline = "Humanistic capture in progress",
-                shotStartedDetail = "Street-life still request accepted by the unified shot pipeline.",
-                shotCompletedHeadline = "Humanistic photo saved",
-                shotFailedHeadline = "Humanistic capture failed"
+                shotStartedHeadline = "人文拍摄进行中",
+                shotStartedDetail = "街拍请求已被统一拍摄管线接受。",
+                shotCompletedHeadline = "人文照片已保存",
+                shotFailedHeadline = "人文拍摄失败"
             ),
             updateSnapshot = { headline, detail ->
                 mutableSnapshot.value = if (detail == null) {
@@ -156,9 +156,9 @@ private class HumanisticModeController(
         context.eventSink("humanistic.capture.requested.${style.id}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (countdownDuration() == CountdownDuration.OFF) {
-                "Humanistic capture requested"
+                "人文拍摄已请求"
             } else {
-                "Humanistic countdown armed"
+                "人文倒计时已启动"
             }
         )
         val effectSpec = buildEffectSpec()
@@ -279,10 +279,10 @@ private class HumanisticModeController(
         val style = currentStyle()
         context.eventSink("humanistic.style.selected.${style.id}")
         mutableSnapshot.value = buildSnapshot(
-            headline = "Humanistic style updated"
+            headline = "人文风格已更新"
         )
         context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("Humanistic style: ${style.label}")
+        return ModeSignal.ShowHint("人文风格: ${style.label}")
     }
 
     private suspend fun toggleProVariant(): ModeSignal {
@@ -291,12 +291,12 @@ private class HumanisticModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = if (proVariantEnabled) {
                 if (manualControlsEnabled()) {
-                    "Humanistic Pro active"
+                    "人文专业已激活"
                 } else {
-                    "Humanistic Pro assist active"
+                    "人文专业辅助已激活"
                 }
             } else {
-                "Humanistic mode active"
+                "人文模式已激活"
             }
         )
         return result.signal
@@ -304,7 +304,7 @@ private class HumanisticModeController(
 
     private suspend fun cycleFrameRatio(): ModeSignal =
         frameRatioDelegate.cycleFrameRatio(
-            snapshotHeadline = "Humanistic frame updated",
+            snapshotHeadline = "人文画幅已更新",
             updateSnapshot = { headline ->
                 mutableSnapshot.value = buildSnapshot(headline = headline)
             }
@@ -325,10 +325,10 @@ private class HumanisticModeController(
         return ModeSnapshot(
             id = ModeId.HUMANISTIC,
             uiSpec = ModeUiSpec(
-                title = "Humanistic",
-                shutterLabel = "Capture Humanistic",
-                secondaryActionLabel = "Cycle Humanistic Style",
-                tertiaryActionLabel = "Cycle Frame",
+                title = "人文",
+                shutterLabel = "拍摄人文",
+                secondaryActionLabel = "切换人文风格",
+                tertiaryActionLabel = "切换画幅",
                 proActionLabel = proVariantState.proActionLabel()
             ),
             state = ModeState(
@@ -344,13 +344,13 @@ private class HumanisticModeController(
     private fun defaultDetail(): String {
         val style = currentStyle()
         val standardSummary = buildString {
-            append("Default style ${style.label}")
-            append(" | Size ${runtimeState().stillCaptureResolutionPreset.label}")
-            append(" | Watermark ${selectedWatermarkTemplate().label}")
-            append(" | Live ${onOffLabel(livePhotoEnabledByDefault())}")
-            append(" | Timer ${countdownDuration().label}")
-            append(" | Frame ${currentFrameRatio().label}")
-            append(" | Subfeatures style, frame ratio, Live default, timer, and watermark ride the shared settings spine.")
+            append("默认风格 ${style.label}")
+            append(" | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label}")
+            append(" | 水印 ${selectedWatermarkTemplate().label}")
+            append(" | 实况 ${onOffLabel(livePhotoEnabledByDefault())}")
+            append(" | 定时 ${countdownDuration().label}")
+            append(" | 画幅 ${currentFrameRatio().label}")
+            append(" | 子功能风格、画幅、实况默认、定时和水印均使用共享设置主干。")
         }
         if (!proVariantEnabled) {
             return standardSummary
@@ -467,7 +467,7 @@ private class HumanisticModeController(
 
     private fun runtimeState() = context.runtimeState()
 
-    private fun onOffLabel(enabled: Boolean): String = if (enabled) "On" else "Off"
+    private fun onOffLabel(enabled: Boolean): String = if (enabled) "开" else "关"
 
     private data class HumanisticStyle(
         val id: String,
@@ -480,31 +480,31 @@ private class HumanisticModeController(
         private val DEFAULT_HUMANISTIC_STYLES = listOf(
             HumanisticStyle(
                 id = "humanistic-original",
-                label = "Humanistic Original",
+                label = "人文-原色",
                 algorithmProfile = "photo-original",
                 renderSpec = defaultFilterRenderSpecOrNull("photo-original")
             ),
             HumanisticStyle(
                 id = "humanistic-vivid",
-                label = "Humanistic Vivid",
+                label = "人文-鲜艳",
                 algorithmProfile = "photo-vivid",
                 renderSpec = defaultFilterRenderSpecOrNull("photo-vivid")
             ),
             HumanisticStyle(
                 id = "humanistic-street",
-                label = "Humanistic Street",
+                label = "人文-街拍",
                 algorithmProfile = "photo-chasing-light",
                 renderSpec = defaultFilterRenderSpecOrNull("photo-chasing-light")
             ),
             HumanisticStyle(
                 id = "humanistic-portrait",
-                label = "Humanistic Portrait",
+                label = "人文-人像",
                 algorithmProfile = "portrait-original",
                 renderSpec = defaultFilterRenderSpecOrNull("humanistic-portrait")
             ),
             HumanisticStyle(
                 id = "humanistic-life",
-                label = "Humanistic Life",
+                label = "人文-生活",
                 algorithmProfile = "photo-rich",
                 renderSpec = defaultFilterRenderSpecOrNull("photo-rich")
             )

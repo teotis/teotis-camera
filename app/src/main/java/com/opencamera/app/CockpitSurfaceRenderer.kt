@@ -100,9 +100,9 @@ internal class CockpitSurfaceRenderer(
         slider.isInteractive = model.isEnabled
         slider.alpha = if (model.isEnabled) 1f else 0.4f
         slider.contentDescription = if (model.disabledReason != null) {
-            "Zoom slider: ${model.disabledReason}"
+            "变焦滑块: ${model.disabledReason}"
         } else {
-            "Zoom slider: ${String.format(java.util.Locale.US, "%.1fx", model.currentRatio)}"
+            "变焦滑块: ${String.format(java.util.Locale.US, "%.1fx", model.currentRatio)}"
         }
 
         slider.setPresetRatios(model.presetRatios)
@@ -153,6 +153,10 @@ internal class CockpitSurfaceRenderer(
         quickPanel.frameRatio.text = "${sheet.frameRatioRow.title} ${sheet.frameRatioRow.value}"
         quickPanel.frameRatio.isEnabled = sheet.frameRatioEnabled
 
+        quickPanel.watermark.text = quickRowLabel(sheet.watermarkRow)
+        quickPanel.watermark.isEnabled = sheet.watermarkRow.isEnabled
+        quickPanel.watermark.alpha = if (sheet.watermarkRow.isEnabled) 1f else 0.4f
+
         quickPanel.livePhoto.text = quickRowLabel(sheet.liveRow)
         quickPanel.livePhoto.isEnabled = sheet.liveRow.isEnabled
         if (sheet.liveRow.isSelected) {
@@ -176,6 +180,7 @@ internal class CockpitSurfaceRenderer(
         val buttonMap = mapOf(
             com.opencamera.core.mode.ModeId.PHOTO to modeTrack.photo,
             com.opencamera.core.mode.ModeId.HUMANISTIC to modeTrack.humanistic,
+            com.opencamera.core.mode.ModeId.FULL_CLEAR to modeTrack.fullClear,
             com.opencamera.core.mode.ModeId.PORTRAIT to modeTrack.portrait,
             com.opencamera.core.mode.ModeId.VIDEO to modeTrack.video,
             com.opencamera.core.mode.ModeId.DOCUMENT to modeTrack.document

@@ -4,6 +4,7 @@ import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.effect.PreviewEffectRenderModel
 import com.opencamera.core.effect.PreviewSceneMaskSnapshot
+import com.opencamera.core.effect.WatermarkHintSpec
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewMeteringFeedback
@@ -36,7 +37,8 @@ internal data class PreviewFrameRenderModel(
     val label: String,
     val dimOutsideFrame: Boolean,
     val bottomInsetPx: Float = 0f,
-    val zoomRatio: Float = 1f
+    val zoomRatio: Float = 1f,
+    val previewZoomRatio: Float = 1f
 )
 
 internal fun focusReticleRenderModel(
@@ -57,7 +59,8 @@ internal fun previewOverlayRenderModel(
     state: SessionState,
     effectAdapter: PreviewEffectAdapter? = null,
     maskSnapshot: PreviewSceneMaskSnapshot? = null,
-    previewContentAspect: PreviewContentAspect? = null
+    previewContentAspect: PreviewContentAspect? = null,
+    stagedWatermarkHint: WatermarkHintSpec? = null
 ): PreviewOverlayRenderModel {
     val resolvedSnapshot = maskSnapshot ?: PreviewSceneMaskSnapshot.UNAVAILABLE
     val gridMode = state.settings.persisted.common.gridMode
@@ -69,14 +72,28 @@ internal fun previewOverlayRenderModel(
             PreviewStatus.RECOVERING
         )
     val countdownLabel = state.countdownRemainingSeconds?.let { "${it}s" }
-    val effectModel = effectAdapter?.adapt(state.activeEffectSpec, resolvedSnapshot)
+    val adaptedEffectModel = effectAdapter?.adapt(state.activeEffectSpec, resolvedSnapshot)
+    val effectModel = when {
+        stagedWatermarkHint != null && adaptedEffectModel != null ->
+            adaptedEffectModel.copy(watermarkHint = stagedWatermarkHint)
+        stagedWatermarkHint != null ->
+            PreviewEffectRenderModel(
+                filterOverlay = null,
+                watermarkHint = stagedWatermarkHint,
+                frameGuideline = null,
+                compositionGrid = null
+            )
+        else -> adaptedEffectModel
+    }
     val frameRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio
     val frame = if (previewSupportsOverlay && frameRatio != null) {
         PreviewFrameRenderModel(
             ratio = frameRatio,
             label = frameRatio.label,
             dimOutsideFrame = true,
-            zoomRatio = state.activeDeviceGraph.preview.zoomRatio
+            zoomRatio = state.activeDeviceGraph.preview.zoomRatio,
+            // TODO(pkg02): replace with state.activeDeviceGraph.preview.previewZoomRatio once merged
+            previewZoomRatio = state.activeDeviceGraph.preview.zoomRatio
         )
     } else {
         null

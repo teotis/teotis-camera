@@ -432,6 +432,108 @@ class PreviewOverlayGeometryTest {
         assert(value in min..max) { "Expected $value to be in [$min, $max]" }
     }
 
+    // --- previewContentGeometry: null aspect defaults to 4:3 sensor ---
+
+    @Test
+    fun `null previewContentAspect defaults to 4_3 sensor aspect`() {
+        // Verify that null aspect produces 4:3 content by checking the underlying
+        // computeFrameRect logic (RectF is stubbed in JVM tests, so we test the math directly).
+        // 4:3 sensor in 1080x1920 portrait → content = 1080x1440
+        val content43 = computeFrameRect(1080, 1920, 4, 3)
+        assertApprox(1080f, content43.width)
+        assertApprox(1440f, content43.height)
+        // 4:3 sensor in 1920x1080 landscape → content = 1440x1080
+        val content43Land = computeFrameRect(1920, 1080, 4, 3)
+        assertApprox(1440f, content43Land.width)
+        assertApprox(1080f, content43Land.height)
+    }
+
+    @Test
+    fun `null aspect 16_9 frame in portrait view never overflows 4_3 content`() {
+        // Simulate: null aspect → 4:3 content, then 16:9 frame inside it
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val frame = computeFrameRect(content.width.toInt(), content.height.toInt(), 16, 9)
+        assertTrue(frame.width <= content.width + 1f,
+            "16:9 frame width ${frame.width} exceeds 4:3 content width ${content.width}")
+        assertTrue(frame.height <= content.height + 1f,
+            "16:9 frame height ${frame.height} exceeds 4:3 content height ${content.height}")
+        // Frame must be centered within content
+        assertApprox(content.centerX, content.left + frame.centerX, 1f)
+        assertApprox(content.centerY, content.top + frame.centerY, 1f)
+    }
+
+    @Test
+    fun `null aspect all frame ratios in portrait stay within 4_3 content`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        for ((rw, rh) in listOf(4 to 3, 16 to 9, 1 to 1)) {
+            val frame = computeFrameRect(content.width.toInt(), content.height.toInt(), rw, rh)
+            assertTrue(frame.width <= content.width + 1f,
+                "${rw}:${rh} frame width exceeds 4:3 content")
+            assertTrue(frame.height <= content.height + 1f,
+                "${rw}:${rh} frame height exceeds 4:3 content")
+        }
+    }
+
+    // --- zoom-scaled frame rect with clamping ---
+
+    @Test
+    fun `zoom scaled frame stays within content rect`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        // Simulate zoom 2x: scale = 1/2
+        val scaled = scaleFrameRect(content, 0.5f)
+        assertTrue(scaled.left >= content.left - 1f)
+        assertTrue(scaled.top >= content.top - 1f)
+        assertTrue(scaled.right <= content.right + 1f)
+        assertTrue(scaled.bottom <= content.bottom + 1f)
+    }
+
+    @Test
+    fun `zoom 3x scaled frame stays within content rect`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val scaled = scaleFrameRect(content, 1f / 3f)
+        assertTrue(scaled.left >= content.left - 1f)
+        assertTrue(scaled.top >= content.top - 1f)
+        assertTrue(scaled.right <= content.right + 1f)
+        assertTrue(scaled.bottom <= content.bottom + 1f)
+    }
+
+    @Test
+    fun `scaleFrameRect never produces negative coordinates`() {
+        val rect = FrameRect(100f, 200f, 500f, 800f)
+        val scaled = scaleFrameRect(rect, 0.1f)
+        assertTrue(scaled.left >= 0f, "scaled left ${scaled.left} < 0")
+        assertTrue(scaled.top >= 0f, "scaled top ${scaled.top} < 0")
+        assertTrue(scaled.right >= scaled.left)
+        assertTrue(scaled.bottom >= scaled.top)
+    }
+
+    // --- previewZoomRatio: frame scale = previewZoomRatio / captureZoomRatio ---
+
+    @Test
+    fun `frame scale previewZoom over captureZoom produces smaller frame`() {
+        val base = computeFrameRect(1080, 1920, 4, 3)
+        val scaled = scaleFrameRect(base, 1.0f / 2.0f)
+        assertApprox(base.width / 2f, scaled.width)
+        assertApprox(base.height / 2f, scaled.height)
+    }
+
+    @Test
+    fun `frame scale equal zoom and previewZoom produces full frame`() {
+        val base = computeFrameRect(1080, 1920, 4, 3)
+        val scaled = scaleFrameRect(base, 2.0f / 2.0f)
+        assertApprox(base.width, scaled.width)
+        assertApprox(base.height, scaled.height)
+    }
+
+    @Test
+    fun `frame scale at lens switch point resets to full frame`() {
+        val base = computeFrameRect(1080, 1920, 4, 3)
+        val scale = 2.0f / 2.0f
+        val scaled = scaleFrameRect(base, scale)
+        assertApprox(base.width, scaled.width)
+        assertApprox(base.height, scaled.height)
+    }
+
     // --- clampReticleCenter tests ---
 
     @Test

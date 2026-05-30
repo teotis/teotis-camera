@@ -117,6 +117,8 @@ internal data class QuickPanelSheetRenderModel(
     val frameRatioOptions: List<FrameRatioOptionRenderModel>,
     val frameRatioEnabled: Boolean,
     val frameRatioDisabledReason: String?,
+    val watermarkRow: QuickPanelRowRenderModel,
+    val watermarkNextTemplateId: String?,
     val liveRow: QuickPanelRowRenderModel,
     val timerRow: QuickPanelRowRenderModel,
     val hasQuickUserAdjustments: Boolean = false,
@@ -174,6 +176,9 @@ internal fun shutterDisabledReason(state: SessionState, text: AppTextResolver): 
     if (state.countdownRemainingSeconds != null) return text.disabledCountdown()
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
+        // CaptureReadiness marks the explicit user-facing readiness boundary:
+        // the frame is acquired and the shutter is safe to re-arm.
+        if (state.presentation.captureReadiness != null) return null
         return text.disabledSavingPhoto()
     }
     // Session rearm policy: ordinary still capture clears activeShot at DATA_RECEIVED,
@@ -192,6 +197,12 @@ internal fun shutterVisualState(state: SessionState): ShutterVisualState {
     if (state.countdownRemainingSeconds != null) return ShutterVisualState.COUNTDOWN
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
+        // CaptureReadiness is the explicit user-facing readiness boundary.
+        // Once readiness is signaled, the button shows "ready" even while
+        // post-processing continues in the background.
+        if (state.presentation.captureReadiness != null) {
+            return ShutterVisualState.PHOTO_READY
+        }
         return when (state.captureStatus) {
             CaptureStatus.REQUESTED -> ShutterVisualState.PHOTO_PRESSED
             else -> ShutterVisualState.SAVING
@@ -367,6 +378,27 @@ internal fun quickPanelSheetRenderModel(
 
     val resolutionEnabled = stillQualityEnabled && isStillResolutionToggleEnabled(state)
 
+    val catalog = state.settings.catalog
+    val watermarkTemplates = catalog.watermarkTemplates
+    val currentTemplateId = state.settings.persisted.photo.defaultWatermarkTemplateId
+    val currentTemplate = watermarkTemplates.firstOrNull { it.id == currentTemplateId }
+    val watermarkEnabled = stillTemplate && !stillBusy && state.activeDeviceCapabilities.supportsStillCapture && watermarkTemplates.isNotEmpty()
+    val watermarkDisabledReason = when {
+        !state.activeDeviceCapabilities.supportsStillCapture -> null
+        !stillTemplate -> null
+        stillBusy -> text.disabledSavingPhoto()
+        watermarkTemplates.isEmpty() -> text.noWatermarkTemplates()
+        else -> null
+    }
+    val nextTemplateId = if (watermarkEnabled && watermarkTemplates.size > 1) {
+        val currentIndex = watermarkTemplates.indexOfFirst { it.id == currentTemplateId }
+        val nextIndex = if (currentIndex >= 0) (currentIndex + 1) % watermarkTemplates.size else 0
+        watermarkTemplates[nextIndex].id
+    } else {
+        null
+    }
+    val watermarkLabel = currentTemplate?.label ?: currentTemplateId
+
     val currentRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio ?: FrameRatio.RATIO_4_3
     val entries = FrameRatio.entries
     val nextRatio = if (frameControl.isEnabled) {
@@ -401,6 +433,14 @@ internal fun quickPanelSheetRenderModel(
         frameRatioOptions = frameControl.options,
         frameRatioEnabled = frameControl.isEnabled,
         frameRatioDisabledReason = frameControl.disabledReason,
+        watermarkRow = QuickPanelRowRenderModel(
+            title = text.quickWatermark(),
+            value = watermarkLabel,
+            isEnabled = watermarkEnabled,
+            disabledReason = watermarkDisabledReason,
+            controlKind = QuickControlKind.CYCLE
+        ),
+        watermarkNextTemplateId = nextTemplateId,
         liveRow = QuickPanelRowRenderModel(
             title = text.quickLive(),
             value = live.value,
@@ -529,6 +569,7 @@ private val PRODUCT_MODE_ENTRY_ORDER = listOf(
     ModeId.PHOTO,
     ModeId.HUMANISTIC,
     ModeId.NIGHT,
+    ModeId.FULL_CLEAR,
     ModeId.PORTRAIT,
     ModeId.PRO,
     ModeId.VIDEO,
@@ -545,17 +586,22 @@ internal fun primaryStatusRenderModel(
     text: AppTextResolver
 ): PrimaryStatusRenderModel {
     val modeLabel = text.modeDisplayName(state.activeMode)
-    val statusText = buildString {
-        append(state.previewStatus.name.lowercase().replaceFirstChar(Char::titlecase))
-        if (state.captureStatus != CaptureStatus.IDLE) {
-            append(" · ${state.captureStatus.name.lowercase().replaceFirstChar(Char::titlecase)}")
-        }
-        state.countdownRemainingSeconds?.let { append(" · ${it}s") }
-        when (state.recordingStatus) {
-            RecordingStatus.REQUESTING -> append(" · ${text.statusRecordingStarting()}")
-            RecordingStatus.RECORDING -> append(" · ${text.statusRecordingActive()}")
-            RecordingStatus.STOPPING -> append(" · ${text.statusRecordingSaving()}")
-            RecordingStatus.IDLE -> Unit
+    val pendingPp = state.presentation.pendingPostprocess
+    val statusText = if (pendingPp != null) {
+        text.statusProcessingPhotoKeepOpen()
+    } else {
+        buildString {
+            append(state.previewStatus.name.lowercase().replaceFirstChar(Char::titlecase))
+            if (state.captureStatus != CaptureStatus.IDLE) {
+                append(" · ${state.captureStatus.name.lowercase().replaceFirstChar(Char::titlecase)}")
+            }
+            state.countdownRemainingSeconds?.let { append(" · ${it}s") }
+            when (state.recordingStatus) {
+                RecordingStatus.REQUESTING -> append(" · ${text.statusRecordingStarting()}")
+                RecordingStatus.RECORDING -> append(" · ${text.statusRecordingActive()}")
+                RecordingStatus.STOPPING -> append(" · ${text.statusRecordingSaving()}")
+                RecordingStatus.IDLE -> Unit
+            }
         }
     }
     return PrimaryStatusRenderModel(

@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 class DefaultCameraSession(
     private val registry: ModeRegistry,
     private val trace: SessionTrace,
+    linkRecorder: PerformanceLinkRecorder? = null,
     private val baseDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val defaultMode: ModeId = ModeId.PHOTO,
@@ -59,6 +60,7 @@ class DefaultCameraSession(
     private val capabilityGraphResolver: com.opencamera.core.capability.CapabilityGraphResolver? = null,
     private val capabilityRequirements: () -> List<com.opencamera.core.capability.CapabilityRequirement> = { emptyList() }
 ) : CameraSession {
+    private val linkRecorder: PerformanceLinkRecorder = linkRecorder ?: InMemoryPerformanceLinkRecorder()
     private val intentChannel = Channel<SessionIntent>(Channel.UNLIMITED)
     private val supportedModes = registry.supportedModes(baseDeviceCapabilities)
     private val initialMode = supportedModes.firstOrNull { it == defaultMode }
@@ -126,6 +128,7 @@ class DefaultCameraSession(
         state = _state,
         effects = _effects,
         trace = trace,
+        linkRecorder = this.linkRecorder,
         shotExecutor = shotExecutor,
         currentController = { currentController },
         resolvedActiveDeviceGraph = { resolvedActiveDeviceGraph() },
@@ -277,6 +280,7 @@ class DefaultCameraSession(
         state = _state,
         effects = _effects,
         trace = trace,
+        linkRecorder = this.linkRecorder,
         mutations = previewSessionMutations,
         countdownInProgress = { captureRecordingProcessor.countdownInProgress() },
         cancelPendingCountdown = { reason -> captureRecordingProcessor.cancelPendingCountdown(reason) },
@@ -284,6 +288,10 @@ class DefaultCameraSession(
         scope = scope,
         dispatch = { intent -> dispatch(intent) }
     )
+
+    fun linkEventSnapshot(): List<PerformanceLinkEvent> = linkRecorder.snapshot()
+
+    private var activeBrightnessSpan: PerformanceSpanSnapshot? = null
 
     init {
         trace.record("session.created", "defaultMode=$defaultMode,initialMode=$initialMode")
@@ -736,15 +744,26 @@ class DefaultCameraSession(
         // Lens node hysteresis: determine target node from zoom ratio thresholds
         val lensNodeMap = zoomCapability.lensNodeMap
         val currentLensNode = _state.value.activeDeviceGraph.preview.requestedLensNode
+        val previewZoomRatio = computePreviewZoomRatio(clampedRatio, lensNodeMap)
         if (lensNodeMap.isNotEmpty()) {
             val targetLensNode = evaluateLensNode(clampedRatio, currentLensNode, lensNodeMap)
             if (targetLensNode != currentLensNode) {
+                val switchReason = "Zoom ${zoomLabel(clampedRatio)} crosses threshold for ${targetLensNode.label}"
+                val lensCorrelationId = "lens-${System.nanoTime()}"
+                val lensSpan = linkRecorder.startSpan(
+                    flow = "lens",
+                    stage = "switch_node",
+                    correlationId = lensCorrelationId,
+                    detail = switchReason,
+                    source = "DefaultCameraSession"
+                )
                 _effects.emit(
                     SessionEffect.SwitchLensNode(
                         lensNode = targetLensNode,
-                        reason = "Zoom ${zoomLabel(clampedRatio)} crosses threshold for ${targetLensNode.label}"
+                        reason = switchReason
                     )
                 )
+                linkRecorder.completeSpan(lensSpan, status = LinkEventStatus.COMPLETED)
             }
             updateState(
                 activeDeviceGraph = resolveActiveDeviceGraph(
@@ -753,7 +772,10 @@ class DefaultCameraSession(
                     requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
                     requestedZoomRatio = clampedRatio
                 ).let { graph ->
-                    graph.copy(preview = graph.preview.copy(requestedLensNode = targetLensNode))
+                    graph.copy(preview = graph.preview.copy(
+                        requestedLensNode = targetLensNode,
+                        previewZoomRatio = previewZoomRatio
+                    ))
                 },
                 lastAction = "Zoom set to ${zoomLabel(clampedRatio)}, lens=${targetLensNode.tagValue}",
                 lastError = null
@@ -765,7 +787,9 @@ class DefaultCameraSession(
                     deviceCapabilities = _state.value.activeDeviceCapabilities,
                     requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
                     requestedZoomRatio = clampedRatio
-                ),
+                ).let { graph ->
+                    graph.copy(preview = graph.preview.copy(previewZoomRatio = previewZoomRatio))
+                },
                 lastAction = "Zoom set to ${zoomLabel(clampedRatio)}",
                 lastError = null
             )
@@ -814,6 +838,27 @@ class DefaultCameraSession(
             }
         }
         return target
+    }
+
+    /**
+     * Computes the discrete preview zoom ratio for a given capture zoom ratio.
+     * Returns the largest available thresholdRatio ≤ [captureZoom], or the smallest
+     * threshold if captureZoom is below all thresholds. The result is always ≤ captureZoom.
+     */
+    internal fun computePreviewZoomRatio(
+        captureZoom: Float,
+        lensNodeMap: Map<LensNode, LensNodeAvailability>
+    ): Float {
+        if (lensNodeMap.isEmpty()) return captureZoom.coerceAtLeast(1f)
+        val availableThresholds = lensNodeMap.values
+            .filter { it.available }
+            .map { it.thresholdRatio }
+            .sorted()
+        if (availableThresholds.isEmpty()) return captureZoom.coerceAtLeast(1f)
+        val maxThreshold = availableThresholds.last()
+        if (captureZoom >= maxThreshold) return maxThreshold
+        val match = availableThresholds.lastOrNull { it <= captureZoom }
+        return match ?: availableThresholds.first()
     }
 
     companion object {
@@ -1260,6 +1305,14 @@ class DefaultCameraSession(
             lastError = null
         )
         trace.record("preview.brightness.requested", "requestId=$requestId,steps=$clamped")
+        // Start brightness link span
+        activeBrightnessSpan = linkRecorder.startSpan(
+            flow = "brightness",
+            stage = "requested",
+            correlationId = requestId,
+            detail = "steps=$clamped",
+            source = "DefaultCameraSession"
+        )
         _effects.emit(
             SessionEffect.ApplyPreviewBrightness(
                 PreviewBrightnessRequest(
@@ -1275,6 +1328,19 @@ class DefaultCameraSession(
         if (currentFeedback.requestId != result.requestId) {
             trace.record("preview.brightness.stale", "expected=${currentFeedback.requestId},got=${result.requestId}")
             return
+        }
+        // Complete brightness link span
+        activeBrightnessSpan?.let { span ->
+            if (span.correlationId == result.requestId) {
+                val linkStatus = when (result.status) {
+                    PreviewBrightnessResultStatus.APPLIED -> LinkEventStatus.COMPLETED
+                    PreviewBrightnessResultStatus.DEGRADED_SAVED_ONLY -> LinkEventStatus.DEGRADED
+                    PreviewBrightnessResultStatus.FAILED -> LinkEventStatus.FAILED
+                    PreviewBrightnessResultStatus.UNSUPPORTED -> LinkEventStatus.UNAVAILABLE
+                }
+                linkRecorder.completeSpan(span, status = linkStatus, detail = result.reason)
+                activeBrightnessSpan = null
+            }
         }
         when (result.status) {
             PreviewBrightnessResultStatus.APPLIED -> {
@@ -1498,11 +1564,20 @@ class DefaultCameraSession(
     }
 
     private suspend fun requestZoomApply(zoomRatio: Float) {
+        val correlationId = "zoom-${System.nanoTime()}"
+        val span = linkRecorder.startSpan(
+            flow = "lens",
+            stage = "zoom_request",
+            correlationId = correlationId,
+            detail = "ratio=${normalizedZoomRatioValue(zoomRatio)}x",
+            source = "DefaultCameraSession"
+        )
         _effects.emit(
             SessionEffect.ApplyZoomRatio(
                 zoomRatio = normalizedZoomRatioValue(zoomRatio)
             )
         )
+        linkRecorder.completeSpan(span, status = LinkEventStatus.COMPLETED)
     }
 
     private fun resolvedActiveDeviceGraph(
@@ -1532,9 +1607,14 @@ class DefaultCameraSession(
             current = requestedZoomRatio,
             capability = deviceCapabilities.zoomRatioCapability
         )
+        val resolvedPreviewZoomRatio = computePreviewZoomRatio(
+            resolvedZoomRatio,
+            deviceCapabilities.zoomRatioCapability.lensNodeMap
+        )
         return baseGraph.copy(
             preview = baseGraph.preview.copy(
-                zoomRatio = resolvedZoomRatio
+                zoomRatio = resolvedZoomRatio,
+                previewZoomRatio = resolvedPreviewZoomRatio
             ),
             stillCapture = baseGraph.stillCapture.copy(
                 outputSize = resolvedOutputSize

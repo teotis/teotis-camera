@@ -300,6 +300,14 @@
                     android:layout_height="40dp" />
             </LinearLayout>
 
+            <!-- Watermark row -->
+            <Button
+                android:id="@+id/buttonQuickWatermark"
+                style="@style/Widget.OpenCamera.QuickBubbleButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="4dp" />
+
             <!-- Live row -->
             <Button
                 android:id="@+id/buttonQuickLivePhoto"
@@ -337,7 +345,7 @@
         android:fadeScrollbars="false"
         android:clipToPadding="false"
         android:paddingHorizontal="@dimen/space_12"
-        android:paddingVertical="@dimen/space_2"
+        android:paddingVertical="@dimen/space_1"
         app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -363,6 +371,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="@string/button_night_mode" />
+
+            <Button
+                android:id="@+id/buttonFullClearMode"
+                style="@style/Widget.OpenCamera.ModeTrackButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="@string/button_fullclear_mode" />
 
             <Button
                 android:id="@+id/buttonPortraitMode"
@@ -1487,6 +1503,15 @@
                         android:text="@string/dev_tab_error" />
 
                     <Button
+                        android:id="@+id/buttonDevTabLink"
+                        style="@style/Widget.OpenCamera.CompactButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="4dp"
+                        android:layout_weight="1"
+                        android:text="@string/dev_tab_link" />
+
+                    <Button
                         android:id="@+id/buttonDevTabAll"
                         style="@style/Widget.OpenCamera.CompactButton"
                         android:layout_width="0dp"
@@ -1574,9 +1599,9 @@
         android:background="@drawable/bg_bottom_panel"
         android:orientation="vertical"
         android:paddingStart="@dimen/bottom_cockpit_padding_horizontal"
-        android:paddingTop="@dimen/space_2"
+        android:paddingTop="@dimen/space_1"
         android:paddingEnd="@dimen/bottom_cockpit_padding_horizontal"
-        android:paddingBottom="@dimen/space_8"
+        android:paddingBottom="@dimen/space_4"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -1598,7 +1623,7 @@
             android:id="@+id/focalLengthSlider"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
+            android:layout_marginTop="@dimen/space_2"
             android:layout_marginHorizontal="@dimen/space_16"
             android:visibility="gone" />
 
@@ -1607,7 +1632,7 @@
             android:id="@+id/recordingIndicator"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
+            android:layout_marginTop="@dimen/space_2"
             android:fontFamily="monospace"
             android:gravity="center"
             android:textColor="@color/oc_accent"
@@ -1618,7 +1643,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
+            android:layout_marginTop="@dimen/space_1"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 

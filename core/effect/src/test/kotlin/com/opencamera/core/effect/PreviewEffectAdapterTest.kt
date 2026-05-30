@@ -243,7 +243,7 @@ class PreviewEffectAdapterTest {
     }
 
     @Test
-    fun `professional bottom bar watermark hint is expanded frame`() {
+    fun `professional bottom bar watermark hint is bottom bar shape`() {
         val model = adapter.adapt(
             EffectSpec(listOf(
                 WatermarkEffect(
@@ -258,7 +258,83 @@ class PreviewEffectAdapterTest {
             ))
         )
 
-        assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewShape.BOTTOM_BAR, model.watermarkHint?.shape)
+    }
+
+    @Test
+    fun `professional bottom bar populates preview labels from tokens`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "professional-bottom-bar",
+                    tokens = mapOf(
+                        "watermarkModel" to "OpenCamera",
+                        "datetime" to "2026-05-28",
+                        "camera-params" to "f/1.8 1/125 ISO400"
+                    ),
+                    style = WatermarkStyleSettings(
+                        frameBackground = WatermarkFrameBackground.DARK
+                    )
+                )
+            ))
+        )
+
+        assertNotNull(model.watermarkHint)
+        assertEquals(3, model.watermarkHint!!.previewLabels.size)
+        assertEquals("OpenCamera", model.watermarkHint!!.previewLabels[0])
+        assertEquals("2026-05-28", model.watermarkHint!!.previewLabels[1])
+        assertEquals("f/1.8 1/125 ISO400", model.watermarkHint!!.previewLabels[2])
+    }
+
+    @Test
+    fun `professional bottom bar resolves dark bar background`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "professional-bottom-bar",
+                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    style = WatermarkStyleSettings(
+                        frameBackground = WatermarkFrameBackground.DARK
+                    )
+                )
+            ))
+        )
+
+        assertEquals(0xFE000000.toInt(), model.watermarkHint?.barBackground)
+    }
+
+    @Test
+    fun `professional bottom bar resolves white bar background`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "professional-bottom-bar",
+                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    style = WatermarkStyleSettings(
+                        frameBackground = WatermarkFrameBackground.WHITE
+                    )
+                )
+            ))
+        )
+
+        assertEquals(-1, model.watermarkHint?.barBackground)
+    }
+
+    @Test
+    fun `non-bottom-bar templates have empty preview labels`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "classic-overlay",
+                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    style = WatermarkStyleSettings()
+                )
+            ))
+        )
+
+        assertNotNull(model.watermarkHint)
+        assertTrue(model.watermarkHint!!.previewLabels.isEmpty())
+        assertEquals(0, model.watermarkHint!!.barBackground)
     }
 
     @Test

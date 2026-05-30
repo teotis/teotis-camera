@@ -24,6 +24,7 @@ open class AppTextResolver(private val context: Context?) {
         ModeId.HUMANISTIC -> str(R.string.button_humanistic_mode, "Human")
         ModeId.PORTRAIT -> str(R.string.button_portrait_mode, "Port")
         ModeId.PRO -> str(R.string.button_pro_mode, "Pro")
+        ModeId.FULL_CLEAR -> str(R.string.button_fullclear_mode, "全清")
         ModeId.VIDEO -> str(R.string.button_video_mode, "Video")
     }
 
@@ -82,6 +83,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun quickBrightnessNa(): String = str(R.string.button_quick_brightness_na, "N/A")
     open fun quickLive(): String = str(R.string.button_quick_live, "Live")
     open fun quickTimer(): String = str(R.string.button_quick_timer, "Timer")
+    open fun quickWatermark(): String = str(R.string.button_quick_watermark, "Watermark")
     open fun moreControls(): String = str(R.string.button_more_controls, "More")
     open fun stopSession(): String = str(R.string.button_stop_session, "Stop Session")
     open fun restartSession(): String = str(R.string.button_restart_session, "Restart Session")
@@ -212,6 +214,8 @@ open class AppTextResolver(private val context: Context?) {
         String.format(str(R.string.dev_log_title_error, "Error Log (%d)"), count)
     open fun devLogTitleAll(count: Int): String =
         String.format(str(R.string.dev_log_title_all, "All Events (%d)"), count)
+    open fun devLogTitleLink(count: Int): String =
+        String.format(str(R.string.dev_log_title_link, "Link Flow (%d)"), count)
 
     // Filter advanced control labels
     open fun filterCtrlExposure(): String = str(R.string.filter_ctrl_exposure, "Exposure")
@@ -552,6 +556,9 @@ open class AppTextResolver(private val context: Context?) {
     open fun buttonLowLightNightPromptDisabled(): String = str(R.string.button_low_light_night_prompt_disabled, "Night assist off")
     open fun buttonLowLightNightPromptDegraded(): String = str(R.string.button_low_light_night_prompt_degraded, "Night assist (single-frame)")
     open fun lowLightNightAssistContentDescription(): String = str(R.string.low_light_night_assist_content_description, "Low-light night assist prompt")
+
+    // Processing status
+    open fun statusProcessingPhotoKeepOpen(): String = str(R.string.status_processing_photo_keep_open, "Processing photo. Please keep OpenCamera open.")
 
     // Recording status
     open fun statusRecordingStarting(): String = str(R.string.status_recording_starting, "Starting…")

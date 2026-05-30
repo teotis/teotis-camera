@@ -52,6 +52,7 @@ import com.opencamera.feature.night.NightModePlugin
 import com.opencamera.feature.photo.PhotoModePlugin
 import com.opencamera.feature.portrait.PortraitModePlugin
 import com.opencamera.feature.pro.ProModePlugin
+import com.opencamera.feature.fullclear.FullClearModePlugin
 import com.opencamera.feature.video.VideoModePlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +71,7 @@ class AppContainer(
     )
 
     val trace = InMemorySessionTrace()
+    val linkRecorder: com.opencamera.core.session.PerformanceLinkRecorder = com.opencamera.core.session.createPerformanceLinkRecorder()
     private val shotExecutor = ShotExecutor()
     private val savedMaskProvider: SavedPhotoSceneMaskProvider = try {
         MlKitSavedPhotoSceneMaskProvider()
@@ -127,6 +129,7 @@ class AppContainer(
     private val modeRegistry = ModeRegistry(
         listOf(
             DocumentModePlugin(),
+            FullClearModePlugin(),
             HumanisticModePlugin(),
             NightModePlugin(),
             PhotoModePlugin(),
@@ -166,6 +169,7 @@ class AppContainer(
     val cameraSession: CameraSession = DefaultCameraSession(
         registry = modeRegistry,
         trace = trace,
+        linkRecorder = linkRecorder,
         baseDeviceCapabilities = cameraAdapter.capabilities,
         scope = applicationScope,
         settingsSnapshot = initialSettingsSnapshot,

@@ -201,12 +201,17 @@ class PreviewOverlayView @JvmOverloads constructor(
             ratioHeight = frameRatio?.height ?: 0,
             previewContentAspect = renderModel.previewContentAspect
         )
-        val zoom = renderModel.frame?.zoomRatio ?: 1f
-        if (zoom <= 1f) return geometry
-        val scale = 1f / zoom
-        return geometry.copy(
-            activeFrameRect = scaleRectAroundCenter(geometry.activeFrameRect, scale)
+        val previewZoom = renderModel.frame?.previewZoomRatio ?: 1f
+        if (previewZoom <= 1f) return geometry
+        val scale = 1f / previewZoom
+        val scaled = scaleRectAroundCenter(geometry.activeFrameRect, scale)
+        val clamped = RectF(
+            scaled.left.coerceIn(geometry.contentRect.left, geometry.contentRect.right),
+            scaled.top.coerceIn(geometry.contentRect.top, geometry.contentRect.bottom),
+            scaled.right.coerceIn(geometry.contentRect.left, geometry.contentRect.right),
+            scaled.bottom.coerceIn(geometry.contentRect.top, geometry.contentRect.bottom)
         )
+        return geometry.copy(activeFrameRect = clamped)
     }
 
     private fun activeFrameRectOrFullView(): RectF {
@@ -299,6 +304,7 @@ class PreviewOverlayView @JvmOverloads constructor(
             WatermarkPreviewShape.TEXT_ONLY,
             WatermarkPreviewShape.BACKED_TEXT -> drawWatermarkTextHint(canvas, spec)
             WatermarkPreviewShape.EXPANDED_FRAME -> drawWatermarkExpandedFrameHint(canvas, spec)
+            WatermarkPreviewShape.BOTTOM_BAR -> drawWatermarkBottomBarHint(canvas, spec)
         }
     }
 
@@ -412,6 +418,53 @@ class PreviewOverlayView @JvmOverloads constructor(
             WatermarkTextPlacement.BOTTOM_CENTER -> borderRect.centerX()
         }
         canvas.drawText(spec.previewText, textX, textY, watermarkHintPaint)
+    }
+
+    private val bottomBarBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val bottomBarTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            10f,
+            resources.displayMetrics
+        )
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+    }
+
+    private fun drawWatermarkBottomBarHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        val rect = activeFrameRectOrFullView()
+        val barHeight = 36f * density
+        val barRect = RectF(
+            rect.left,
+            rect.bottom - barHeight,
+            rect.right,
+            rect.bottom
+        )
+        val bgColor = spec.barBackground
+        if (bgColor != 0) {
+            bottomBarBackgroundPaint.color = bgColor
+            bottomBarBackgroundPaint.alpha = (spec.opacity * 200).toInt().coerceIn(0, 200)
+            canvas.drawRect(barRect, bottomBarBackgroundPaint)
+        }
+        bottomBarTextPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
+        val padding = 10f * density
+        val textY = barRect.centerY() - (bottomBarTextPaint.ascent() + bottomBarTextPaint.descent()) / 2f
+        if (spec.previewLabels.isNotEmpty()) {
+            bottomBarTextPaint.textAlign = Paint.Align.LEFT
+            val leftX = barRect.left + padding
+            canvas.drawText(spec.previewLabels.first(), leftX, textY, bottomBarTextPaint)
+            if (spec.previewLabels.size > 1) {
+                bottomBarTextPaint.textAlign = Paint.Align.RIGHT
+                val rightX = barRect.right - padding
+                canvas.drawText(spec.previewLabels.last(), rightX, textY, bottomBarTextPaint)
+            }
+        } else {
+            bottomBarTextPaint.textAlign = Paint.Align.CENTER
+            canvas.drawText(spec.previewText, barRect.centerX(), textY, bottomBarTextPaint)
+        }
     }
 
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
@@ -584,12 +637,16 @@ internal fun clampReticleCenter(
     )
 }
 
+private const val DEFAULT_SENSOR_CONTENT_WIDTH = 4
+private const val DEFAULT_SENSOR_CONTENT_HEIGHT = 3
+
 /**
  * Build [PreviewContentGeometry] for the given view dimensions and optional frame ratio.
  *
  * When [previewContentAspect] is provided, [contentRect] is the fitCenter content area
- * within the view (e.g. a 4:3 camera preview letterboxed in a 16:9 view). Otherwise
- * [contentRect] equals the full view.
+ * within the view (e.g. a 4:3 camera preview letterboxed in a 16:9 view). When null,
+ * defaults to the sensor's native 4:3 aspect ratio so that frame overlays stay within
+ * the actual preview content bounds.
  *
  * When [ratioWidth] / [ratioHeight] are both > 0 the active frame is a centered
  * sub-rect of [contentRect] matching that ratio. Otherwise the active frame
@@ -606,12 +663,12 @@ internal fun previewContentGeometry(
     ratioHeight: Int = 0,
     previewContentAspect: PreviewContentAspect? = null
 ): PreviewContentGeometry {
-    val contentRect = if (previewContentAspect != null &&
-        previewContentAspect.width > 0 && previewContentAspect.height > 0
-    ) {
+    val effectiveAspect = previewContentAspect
+        ?: PreviewContentAspect(DEFAULT_SENSOR_CONTENT_WIDTH, DEFAULT_SENSOR_CONTENT_HEIGHT)
+    val contentRect = if (effectiveAspect.width > 0 && effectiveAspect.height > 0) {
         val fitRect = computeFrameRect(
             viewWidth, viewHeight,
-            previewContentAspect.width, previewContentAspect.height
+            effectiveAspect.width, effectiveAspect.height
         )
         RectF(fitRect.left, fitRect.top, fitRect.right, fitRect.bottom)
     } else {
@@ -629,10 +686,10 @@ internal fun previewContentGeometry(
             ratioWidth, ratioHeight
         )
         RectF(
-            contentRect.left + fr.left,
-            contentRect.top + fr.top,
-            contentRect.left + fr.right,
-            contentRect.top + fr.bottom
+            (contentRect.left + fr.left).coerceIn(contentRect.left, contentRect.right),
+            (contentRect.top + fr.top).coerceIn(contentRect.top, contentRect.bottom),
+            (contentRect.left + fr.right).coerceIn(contentRect.left, contentRect.right),
+            (contentRect.top + fr.bottom).coerceIn(contentRect.top, contentRect.bottom)
         )
     } else {
         RectF(contentRect)

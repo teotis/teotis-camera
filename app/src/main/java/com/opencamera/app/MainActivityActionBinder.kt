@@ -146,6 +146,10 @@ internal class MainActivityActionBinder(
             val nextRatio = snapshot().quickPanelSheet?.frameRatioNext ?: return@setOnClickListener
             callbacks.dispatch(SessionIntent.FrameRatioSelected(nextRatio))
         }
+        views.quickPanel.watermark.setOnClickListener {
+            val nextTemplateId = snapshot().quickPanelSheet?.watermarkNextTemplateId ?: return@setOnClickListener
+            callbacks.applySettingsAction(PersistedSettingsAction.UpdatePhotoWatermarkTemplate(nextTemplateId))
+        }
         views.quickPanel.livePhoto.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.livePhoto)
         }
@@ -322,6 +326,7 @@ internal class MainActivityActionBinder(
         views.devConsole.tabKey.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.KEY) }
         views.devConsole.tabCore.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.CORE) }
         views.devConsole.tabError.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.ERROR) }
+        views.devConsole.tabLink.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.LINK) }
         views.devConsole.tabAll.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.ALL) }
         views.devConsole.export.setOnClickListener {
             callbacks.exportDevLog()
@@ -341,6 +346,7 @@ internal class MainActivityActionBinder(
             views.modeTrack.photo to ModeId.PHOTO,
             views.modeTrack.humanistic to ModeId.HUMANISTIC,
             views.modeTrack.night to ModeId.NIGHT,
+            views.modeTrack.fullClear to ModeId.FULL_CLEAR,
             views.modeTrack.portrait to ModeId.PORTRAIT,
             views.modeTrack.pro to ModeId.PRO,
             views.modeTrack.video to ModeId.VIDEO,

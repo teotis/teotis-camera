@@ -36,6 +36,7 @@ fun ModeId.modeDirectoryDeclaration(
                 "Balanced"
             }
 
+            ModeId.FULL_CLEAR -> "Honest V1"
             ModeId.VIDEO -> settings.video.defaultVideoSpec.summaryLabel
         },
         declaredSubfeatures = when (this) {
@@ -61,6 +62,7 @@ fun ModeId.modeDirectoryDeclaration(
                 "Scenery style, Pro variant, brightening fallback, frame ratio"
             }
 
+            ModeId.FULL_CLEAR -> "Focus bracket capture, V1 focus stack fusion, best-frame fallback"
             ModeId.VIDEO -> "Resolution, fps, audio profile, filter"
         }
     )

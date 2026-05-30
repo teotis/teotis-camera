@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import com.opencamera.core.device.CaptureReadiness
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.effect.EffectSpec
@@ -26,6 +27,7 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.session.CaptureStatus
+import com.opencamera.core.session.PendingPostprocessUiState
 import com.opencamera.core.session.PermissionState
 import com.opencamera.core.session.PreviewMetrics
 import com.opencamera.core.session.PreviewStatus
@@ -50,6 +52,7 @@ import com.opencamera.core.settings.VideoSpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -725,6 +728,9 @@ class SessionCockpitRenderModelTest {
         assertEquals("Grid", sheet.gridRow.title)
         assertEquals("Size", sheet.resolutionRow.title)
         assertEquals("Frame", sheet.frameRatioRow.title)
+        assertEquals("Watermark", sheet.watermarkRow.title)
+        assertEquals("Travel Polaroid", sheet.watermarkRow.value)
+        assertTrue(sheet.watermarkRow.isEnabled)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
 
@@ -839,6 +845,7 @@ class SessionCockpitRenderModelTest {
         assertEquals(QuickControlKind.CYCLE, sheet.gridRow.controlKind)
         assertEquals(QuickControlKind.CYCLE, sheet.resolutionRow.controlKind)
         assertEquals(QuickControlKind.SEGMENTED, sheet.frameRatioRow.controlKind)
+        assertEquals(QuickControlKind.CYCLE, sheet.watermarkRow.controlKind)
         assertEquals(QuickControlKind.TOGGLE, sheet.liveRow.controlKind)
         assertEquals(QuickControlKind.CYCLE, sheet.timerRow.controlKind)
     }
@@ -881,6 +888,76 @@ class SessionCockpitRenderModelTest {
 
         assertNotNull(sheet.frameRatioRow.disabledReason)
         assertFalse(sheet.frameRatioRow.isEnabled)
+    }
+
+    @Test
+    fun `quick panel watermark row shows current template label`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("Watermark", sheet.watermarkRow.title)
+        assertEquals("Travel Polaroid", sheet.watermarkRow.value)
+        assertTrue(sheet.watermarkRow.isEnabled)
+        assertNull(sheet.watermarkRow.disabledReason)
+    }
+
+    @Test
+    fun `quick panel watermark row cycles to next template`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertNotNull(sheet.watermarkNextTemplateId)
+        assertNotEquals(state.settings.persisted.photo.defaultWatermarkTemplateId, sheet.watermarkNextTemplateId)
+    }
+
+    @Test
+    fun `quick panel watermark row wraps around to first template`() {
+        // With only one template, there is no next
+        val state = defaultSessionState(
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                defaultWatermarkTemplateId = "classic-overlay"
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        // classic-overlay is first; next should be travel-polaroid (second)
+        assertEquals("travel-polaroid", sheet.watermarkNextTemplateId)
+    }
+
+    @Test
+    fun `quick panel watermark row disabled when no templates available`() {
+        val state = defaultSessionState().copy(
+            settings = defaultSessionState().settings.copy(
+                catalog = com.opencamera.core.settings.FeatureCatalog(
+                    watermarkTemplates = emptyList()
+                )
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.watermarkRow.isEnabled)
+        assertNotNull(sheet.watermarkRow.disabledReason)
+        assertNull(sheet.watermarkNextTemplateId)
+    }
+
+    @Test
+    fun `quick panel watermark row disabled during active shot`() {
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "test-shot",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.watermarkRow.isEnabled)
+        assertNotNull(sheet.watermarkRow.disabledReason)
+        assertNull(sheet.watermarkNextTemplateId)
     }
 
     @Test
@@ -1234,6 +1311,161 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `shutter visual state is PHOTO_READY when captureReadiness set with active photo shot`() {
+        // CaptureReadiness signals the frame is acquired; visual shows ready
+        // even though activeShot is still present (post-processing continues).
+        val shot = ShotRequest(
+            shotId = "ready-1",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.REQUESTED)
+            .copy(
+                presentation = SessionPresentationState(
+                    captureReadiness = CaptureReadiness(
+                        shotId = "ready-1",
+                        mediaType = MediaType.PHOTO,
+                        source = "test"
+                    )
+                )
+            )
+        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter disabled reason returns null when captureReadiness set with active photo shot`() {
+        // Readiness re-arms the shutter even while activeShot is still present.
+        val shot = ShotRequest(
+            shotId = "ready-2",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.REQUESTED)
+            .copy(
+                presentation = SessionPresentationState(
+                    captureReadiness = CaptureReadiness(
+                        shotId = "ready-2",
+                        mediaType = MediaType.PHOTO,
+                        source = "test"
+                    )
+                )
+            )
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
+    fun `shutter enabled with captureReadiness via cockpit render model`() {
+        val shot = ShotRequest(
+            shotId = "ready-3",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.REQUESTED)
+            .copy(
+                presentation = SessionPresentationState(
+                    captureReadiness = CaptureReadiness(
+                        shotId = "ready-3",
+                        mediaType = MediaType.PHOTO,
+                        source = "test"
+                    )
+                )
+            )
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+        assertTrue(cockpit.bottomCockpit.isShutterEnabled)
+        assertNull(cockpit.bottomCockpit.disabledReason)
+        assertEquals(ShutterVisualState.PHOTO_READY, cockpit.bottomCockpit.shutterVisualState)
+    }
+
+    @Test
+    fun `shutter visual state shows SAVING when captureReadiness not set for active photo shot`() {
+        // Without captureReadiness, active photo shot stays in SAVING visual.
+        val shot = ShotRequest(
+            shotId = "no-readiness",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        // No captureReadiness set
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter disabled reason blocks when captureReadiness not set for active photo shot`() {
+        // Without captureReadiness, shutter stays blocked during active photo shot.
+        val shot = ShotRequest(
+            shotId = "no-readiness-2",
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
+    fun `shutter disabled reason blocks LIVE_PHOTO with activeShot at DATA_RECEIVED`() {
+        // Live photo is a conservative capture kind: activeShot stays set until ShotCompleted.
+        // Shutter must stay blocked even at DATA_RECEIVED — same policy as multi-frame.
+        val shot = ShotRequest(
+            shotId = "live-block-1",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter disabled reason returns null during active recording`() {
+        // During active recording, shutter functions as stop-recording control.
+        // Unlike captureDisabledReason (which blocks during recording),
+        // shutterDisabledReason keeps the shutter enabled.
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
+    fun `capture disabled reason blocks during recording but shutter stays enabled`() {
+        // captureDisabledReason is the generic capture gating function used by
+        // non-shutter controls. It blocks during recording.
+        // shutterDisabledReason is the shutter-specific gating that keeps the
+        // shutter enabled as stop-recording control.
+        val state = defaultSessionState().copy(recordingStatus = RecordingStatus.RECORDING)
+        assertNotNull(captureDisabledReason(state, TestAppTextResolver()))
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+    }
+
+    @Test
     fun `shutter enabled with BACKGROUND_SAVING via cockpit render model`() {
         // After rearm: captureStatus == SAVING, activeShot == null.
         // Visual shows BACKGROUND_SAVING; shutter is enabled for immediate next shot.
@@ -1343,6 +1575,118 @@ class SessionCockpitRenderModelTest {
                 lastError = lastError
             )
         )
+    }
+
+    // ── Pending Postprocess UI State Tests ────────────────────────────
+
+    @Test
+    fun `primary status shows processing warning when pendingPostprocess is set`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertEquals("Processing photo. Please keep OpenCamera open.", model.statusText)
+    }
+
+    @Test
+    fun `primary status does not show processing warning when pendingPostprocess is null`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(pendingPostprocess = null)
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("Data received") || model.statusText.contains("Active"))
+        assertFalse(model.statusText.contains("keep OpenCamera open"))
+    }
+
+    @Test
+    fun `primary status processing warning contains explicit do not exit language`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("keep OpenCamera open"))
+    }
+
+    @Test
+    fun `shutter remains enabled during processing warning after session rearm`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(cockpit.bottomCockpit.isShutterEnabled)
+        assertNull(cockpit.bottomCockpit.disabledReason)
+    }
+
+    @Test
+    fun `capture disabled reason blocks config while pending postprocess is active`() {
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val reason = captureDisabledReason(state, TestAppTextResolver())
+
+        assertNotNull(reason)
+        assertEquals("Saving previous photo", reason)
+    }
+
+    @Test
+    fun `conservative capture keeps shutter blocked even with pending postprocess`() {
+        // Multi-frame: activeShot still set, shutter stays blocked
+        val shot = ShotRequest(
+            shotId = "mf-block-1",
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
+        val state = defaultSessionState(activeShot = shot).copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED
+        )
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
     }
 
     @Test

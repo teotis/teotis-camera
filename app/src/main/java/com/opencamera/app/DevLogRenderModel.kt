@@ -1,6 +1,6 @@
 package com.opencamera.app
 
-internal enum class DevLogTab { KEY, CORE, ERROR, ALL }
+internal enum class DevLogTab { KEY, CORE, ERROR, LINK, ALL }
 
 internal data class DevLogRenderModel(
     val isAvailable: Boolean,
