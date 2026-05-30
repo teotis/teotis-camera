@@ -91,6 +91,32 @@ fun mapTimeoutToJobResult(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// G7: Algorithm Job Queue Depth
+// ──────────────────────────────────────────────────────────────────────────────
+
+fun queryAlgorithmQueueSnapshot(budget: CameraResourceBudget): AlgorithmQueueSnapshot {
+    return algorithmQueueTracker.toSnapshot(budget)
+}
+
+fun recordAlgorithmJobDispatched() {
+    algorithmQueueTracker.incrementActive()
+}
+
+fun recordAlgorithmJobCompleted() {
+    algorithmQueueTracker.decrementActive()
+}
+
+fun recordAlgorithmJobEnqueued() {
+    algorithmQueueTracker.incrementPending()
+}
+
+fun recordAlgorithmJobDequeued() {
+    algorithmQueueTracker.decrementPending()
+}
+
+private val algorithmQueueTracker = AlgorithmQueueTracker()
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Capture-Critical vs Optional Failure Mapping
 // ──────────────────────────────────────────────────────────────────────────────
 
