@@ -1,0 +1,5 @@
+package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
+01-language-persistence-contract	packages/01-language-persistence-contract.md	status/01-language-persistence-contract.md		status	1	agent/app-language-switch-exposure/01-language-persistence-contract	.claude/worktrees/app-language-switch-exposure-01	0	0
+02-settings-language-entry	packages/02-settings-language-entry.md	status/02-settings-language-entry.md		status	1	agent/app-language-switch-exposure/02-settings-language-entry	.claude/worktrees/app-language-switch-exposure-02	0	0
+03-language-switch-verification	packages/03-language-switch-verification.md	status/03-language-switch-verification.md	01-language-persistence-contract,02-settings-language-entry	status+code	2	agent/app-language-switch-exposure/03-language-switch-verification	.claude/worktrees/app-language-switch-exposure-03	0	0
+99-finalize	packages/99-finalize.md	status/99-finalize.md	01-language-persistence-contract,02-settings-language-entry,03-language-switch-verification	status+code	final	agent/app-language-switch-exposure/99-finalize	.claude/worktrees/app-language-switch-exposure-99	0	1

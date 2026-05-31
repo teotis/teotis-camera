@@ -13,6 +13,7 @@ These plans are in progress or scheduled. They must remain in `docs/plans/`.
 | Repo Hygiene, Session Test Split, And Plans Archive | planned | 2026-05-29 |
 | Abstraction Architect Analysis | planned | 2026-05-29 |
 | Preview Zoom Discrete Stepping | planned | 2026-05-29 |
+| App Language Switch Exposure | planned | 2026-05-31 |
 | i18n Multi-Language System | planned | 2026-05-29 |
 | Codex Document Asset Cleanup P1 | planned | 2026-05-29 |
 | Capture Readiness Sound Timing | planned | 2026-05-29 |
