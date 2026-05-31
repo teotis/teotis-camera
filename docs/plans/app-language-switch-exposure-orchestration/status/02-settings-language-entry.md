@@ -2,4 +2,4 @@
 
 ## State
 
-`pending`
+`launched`

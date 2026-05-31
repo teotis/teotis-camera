@@ -1,0 +1,5 @@
+backgrounded · 6d681ffc
+  claude agents             list sessions
+  claude attach 6d681ffc    open in this terminal
+  claude logs 6d681ffc      show recent output
+  claude stop 6d681ffc      stop this session
