@@ -3,8 +3,11 @@ package com.opencamera.app
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
@@ -85,6 +88,29 @@ class SessionPreviewRenderModelTest {
         assertTrue(blockedModel.isCountdownVisible)
         assertFalse(offGridModel.isGridVisible)
         assertFalse(offGridModel.isCountdownVisible)
+    }
+
+    @Test
+    fun `preview frame uses discrete preview zoom ratio from active device graph`() {
+        val baseline = defaultSessionState()
+        val graph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK,
+            enablePreviewSnapshots = true,
+            zoomRatio = 3f
+        ).let { spec ->
+            spec.copy(preview = spec.preview.copy(previewZoomRatio = 2f))
+        }
+
+        val model = previewOverlayRenderModel(
+            baseline.copy(
+                activeDeviceGraph = graph,
+                activeEffectSpec = EffectSpec(listOf(FrameEffect(FrameRatio.RATIO_4_3)))
+            )
+        )
+
+        assertNotNull(model.frame)
+        assertEquals(3f, model.frame!!.zoomRatio)
+        assertEquals(2f, model.frame!!.previewZoomRatio)
     }
 
     // --- focusReticleRenderModel metering status mapping ---

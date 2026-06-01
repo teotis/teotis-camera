@@ -16,6 +16,7 @@
   [`DeviceContracts.kt`](/Volumes/Extreme_SSD/project/open_camera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt)、[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt)、[`CameraSessionCoordinator.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 与 [`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 现已把 `bind/provider heuristic + CameraState` 故障收进结构化 `DeviceRuntimeIssue / PreviewRuntimeIssue`，不再只能压平成无类型 `PreviewError`；
   同一条链路现已显式记录 `preview.recovery.failed`，并阻止 `RECOVERING` 状态下的 recoverable issue 递归再次请求 recovery，避免 recovery 自己形成重试环；
   [`DeviceContracts.kt`](/Volumes/Extreme_SSD/project/open_camera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt)、[`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt)、[`CameraSessionCoordinator.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt)、[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 与 [`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 现已建立 `zoomRatioCapability + ZoomRatioToggled + ApplyZoomRatio` 主链，`切变焦` 已不再缺少 owner；
+  `2026-06-01` 针对真机反馈“变焦跨镜头节点时画幅框未随预览基准跳变”，[`SessionPreviewRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionPreviewRenderModel.kt) 已改为消费 `activeDeviceGraph.preview.previewZoomRatio`，而不是继续把连续 `zoomRatio` 当作画幅框缩放基准；[`SessionPreviewRenderModelTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/SessionPreviewRenderModelTest.kt) 新增红绿回归，锁定 `zoomRatio=3x / previewZoomRatio=2x` 时 overlay frame 使用离散预览基准；
   [`ThermalRuntimeIssueMonitor.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/ThermalRuntimeIssueMonitor.kt) 与 [`CameraSessionCoordinator.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 现已建立 `Android PowerManager -> DeviceRuntimeIssue(THERMAL_CRITICAL) -> PreviewRuntimeIssue` 的上层通用接入口；旧系统或无服务时自动退化为空实现，不把无底层支持误判成业务回归；
   [`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 与 [`SessionDiagnostics.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 现已把 `PreviewHostDetached -> PreviewHostAttached` 推进成显式 `preview.host.recovery.requested` 语义；前后台返回不再退回普通 bind，而是进入可追踪的 recovery bind；
   [`SessionDiagnostics.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 与 [`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 现已把 `lastStartReason` 进一步提升为 `PreviewStartCategory + FirstFrameBudgetSnapshot`，默认阈值化 `cold start / foreground resume / recovery / reconfigure`，不再只展示裸毫秒数；
@@ -92,6 +93,12 @@
   `CameraSessionCoordinatorTest`
   `:app:assembleDebug`
 - 本轮通过：
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionPreviewRenderModelTest`
+  `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest`
+  `rtk ./gradlew --no-daemon :app:assembleDebug`
+- 本轮未通过：
+  `rtk ./scripts/verify_stage_7_observability.sh` 在 `:core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest` 段失败，41 项集中表现为 session 文案英文期望与中文实际值不一致（例如 `Provider failure` vs `提供者故障`、`Cycle Frame` vs `切换画幅`）；最小复现 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests 'com.opencamera.core.session.DefaultCameraSessionTest.recoverable runtime issue requests recovery bind when preview host is attached'` 同样失败。该阻断位于 core/session 文案期望漂移，不在本次 app overlay 映射改动路径内。
+  历史通过记录：
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest`
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:media:test --tests com.opencamera.core.media.FrameRingBufferTest --tests com.opencamera.core.media.MotionPhotoJpegContainerTest --tests com.opencamera.core.media.LiveTemporalAssemblyPlannerTest :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest --tests com.opencamera.app.camera.live.MotionPhotoFileMaterializerTest`
@@ -115,7 +122,7 @@
 - `CameraXCaptureAdapter` 已能输出 `bind/provider heuristic + CameraState` runtime issue，并在 `provider/fatal` issue 上清理缓存 provider；但 `ProcessCameraProvider` 真正 provider death 仍没有平台级强信号，当前 `provider failure` 里依然包含基于异常文案的保守分类。
 - 第 `7` 阶段的 `recovery failure`、`切变焦`、`thermal`、`后台恢复` 与 `preview startup stall` 仓内 owner 已建立，但 `provider death` 真信号与更长时间维度的真机矩阵仍缺少可信来源，继续硬推容易只剩 contract。
 - 当前验证仍以 unit/assemble 为主；首帧超时 watchdog 已建立，但 provider death、provider restart 后真实重连成功率和更长稳的热/权限/生命周期组合仍未建立可收敛的自动化验证。
-- 本地 Gradle/Kotlin 在并行跑多个 task 时仍偶发 `.codex-build/OpenCamera/.../classes/kotlin/main/com` 缺失型瞬时错误；串行验证后本轮脚本通过，因此当前不判为业务回归。
+- 完整 Stage 7 门禁当前不再能作为通过证据：`verify_stage_7_observability.sh` 在 `DefaultCameraSessionTest` 段被 core/session 文案 locale 期望漂移阻断，单测最小复现同样失败；本次变焦/画幅框修复已用 app focused tests 与 `:app:assembleDebug` 验证，但仍需先修复该 session 测试基线后再恢复完整 Stage 7 绿灯。
 
 ## 下一步建议
 
@@ -162,6 +169,14 @@
 ---
 
 # 最近有效闭环
+
+## 2026-06-01：变焦跨镜头节点时画幅框跟随预览基准
+
+- 目标：修复真机反馈中“预览窗已经按镜头节点跳变，但画幅框大小仍未理想跟随”的交互问题，让画幅框使用真实预览基准，而不是连续 capture zoom。
+- 根因：`DefaultCameraSession` 与 `PreviewConfig` 已经有 `previewZoomRatio`，用于表达跨 `2x / 5x` 等物理镜头节点后的离散预览基准；但 [`SessionPreviewRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionPreviewRenderModel.kt) 仍把 `PreviewFrameRenderModel.previewZoomRatio` 填成连续 `zoomRatio`，导致 overlay 画幅框按总变焦缩放，而不是在镜头节点切换时同步调整。
+- 结果：`PreviewFrameRenderModel` 现在直接消费 `state.activeDeviceGraph.preview.previewZoomRatio`；[`SessionPreviewRenderModelTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/SessionPreviewRenderModelTest.kt) 新增 `zoomRatio=3f / previewZoomRatio=2f` 的回归测试，锁定画幅框使用离散预览基准。
+- 验证：先观察新增测试红灯，随后通过 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionPreviewRenderModelTest`、`rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest` 和 `rtk ./gradlew --no-daemon :app:assembleDebug`。完整 `rtk ./scripts/verify_stage_7_observability.sh` 当前失败于 `DefaultCameraSessionTest` 的英文期望 / 中文实际文案漂移，单测最小复现同样失败；该阻断不作为本次 app overlay 修复的通过证据。
+- 结论：仓内已修复“画幅框不跟随预览镜头节点基准”的渲染模型断点；仍需真机滑过 `2x / 5x` 对比录屏确认视觉跳变幅度是否符合预期。
 
 ## 2026-05-25：文档模式 V2 第二轮修复交接包
 

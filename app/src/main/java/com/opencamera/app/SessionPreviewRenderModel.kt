@@ -92,8 +92,7 @@ internal fun previewOverlayRenderModel(
             label = frameRatio.label,
             dimOutsideFrame = true,
             zoomRatio = state.activeDeviceGraph.preview.zoomRatio,
-            // TODO(pkg02): replace with state.activeDeviceGraph.preview.previewZoomRatio once merged
-            previewZoomRatio = state.activeDeviceGraph.preview.zoomRatio
+            previewZoomRatio = state.activeDeviceGraph.preview.previewZoomRatio
         )
     } else {
         null

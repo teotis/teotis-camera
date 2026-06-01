@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <external-files-path name="captures" path="." />
-    <files-path name="internal_captures" path="." />
+    <external-files-path name="captures" path="captures/" />
+    <files-path name="internal_captures" path="captures/" />
     <cache-path name="thumbnails" path="preview-thumbnails/" />
 </paths>
