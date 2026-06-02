@@ -1,0 +1,5 @@
+backgrounded · [36mf6c1fa09[39m
+[2m  claude agents             list sessions[22m
+[2m  claude attach f6c1fa09    open in this terminal[22m
+[2m  claude logs f6c1fa09      show recent output[22m
+[2m  claude stop f6c1fa09      stop this session[22m

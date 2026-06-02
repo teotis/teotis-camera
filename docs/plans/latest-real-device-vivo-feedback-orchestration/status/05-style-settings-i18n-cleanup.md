@@ -2,7 +2,7 @@
 
 ## State
 
-`pending`
+`invalid`
 
 - State: pending
 - Worktree: `/Volumes/Extreme_SSD/project/open_camera/.worktrees/latest-real-device-vivo-feedback/05-style-settings-i18n-cleanup`

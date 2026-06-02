@@ -63,6 +63,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var latestFilterLabRenderModel: FilterLabPageRenderModel? = null
     private var latestSessionState: SessionState? = null
     private var lightPaletteBaseSpec: FilterRenderSpec? = null
+    private var latestDeviceProbeSummary: String? = null
 
     // Shared scroll guard for mode track scroll-vs-tap disambiguation
     private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
@@ -337,7 +338,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             text = text,
             storageSummary = if (activePanelRoute is CockpitPanelRoute.DevConsole) {
                 runCatching { devLogExporter.storageSummary() }.getOrNull()
-            } else null
+            } else null,
+            linkEvents = container.linkRecorder.snapshot(),
+            deviceProbeSummary = latestDeviceProbeSummary
         )
         latestDevLogRenderModel = devLogModel
         devConsoleRenderer.renderVisibility(activePanelRoute)
@@ -395,7 +398,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
             text = AppTextResolver(this),
-            storageSummary = summary
+            storageSummary = summary,
+            linkEvents = container.linkRecorder.snapshot(),
+            deviceProbeSummary = latestDeviceProbeSummary
         )
         latestDevLogRenderModel = model
         devConsoleRenderer.render(model)

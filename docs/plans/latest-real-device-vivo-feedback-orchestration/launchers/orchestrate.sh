@@ -624,7 +624,7 @@ validate_permission_mode() {
 }
 
 parse_session_id() {
-  awk '
+  sed -E $'s/\x1B\\[[0-9;]*[[:alpha:]]//g' | awk '
     /backgrounded/ {
       for (i = 1; i <= NF; i++) {
         if ($i == "backgrounded" || $i == "·" || $i == "-" || $i == "•") continue
@@ -675,13 +675,13 @@ launch_package() {
       cd "$worktree" &&
         claude --bg --name "$name" --model "$CLAUDE_MODEL" --effort "$CLAUDE_EFFORT" \
           --permission-mode "$CLAUDE_PERMISSION_MODE" --setting-sources "$CLAUDE_SETTING_SOURCES" \
-          "$(cat "$prompt_file")" 2>&1
+          "$(cat "$prompt_file")" </dev/null 2>&1
     )"
   else
     launch_output="$(
       cd "$worktree" &&
         claude --bg --name "$name" --model "$CLAUDE_MODEL" --effort "$CLAUDE_EFFORT" \
-          --setting-sources "$CLAUDE_SETTING_SOURCES" "$(cat "$prompt_file")" 2>&1
+          --setting-sources "$CLAUDE_SETTING_SOURCES" "$(cat "$prompt_file")" </dev/null 2>&1
     )"
   fi
   status=$?

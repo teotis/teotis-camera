@@ -1,0 +1,5 @@
+backgrounded · [36mdf992ff1[39m
+[2m  claude agents             list sessions[22m
+[2m  claude attach df992ff1    open in this terminal[22m
+[2m  claude logs df992ff1      show recent output[22m
+[2m  claude stop df992ff1      stop this session[22m

@@ -1701,7 +1701,9 @@ internal fun devLogRenderModel(
     text: AppTextResolver,
     resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
     storageSummary: StorageSummary? = null,
-    selectedDomain: TraceEventDomain? = null
+    selectedDomain: TraceEventDomain? = null,
+    linkEvents: List<com.opencamera.core.session.PerformanceLinkEvent> = emptyList(),
+    deviceProbeSummary: String? = null
 ): DevLogRenderModel {
     if (!isDebugBuild) {
         return DevLogRenderModel(
@@ -1725,13 +1727,56 @@ internal fun devLogRenderModel(
 
     fun formatEvents(events: List<SessionTraceEvent>): String {
         return events.joinToString("\n") { event ->
-            "[${event.domain.label}] ${event.sequence}. ${event.name} -> ${event.detail}"
+            val timeStr = formatTimestamp(event.timestampMillis)
+            "[$timeStr] [${event.domain.label}] ${event.sequence}. ${event.name} -> ${event.detail}"
         }
+    }
+
+    fun formatLinkEvents(events: List<com.opencamera.core.session.PerformanceLinkEvent>): String {
+        return events.joinToString("\n") { event ->
+            val parts = mutableListOf(
+                "[Link] flow=${escapeLinkValue(event.flow)}",
+                "stage=${escapeLinkValue(event.stage)}",
+                "status=${event.status.label}"
+            )
+            if (event.correlationId.isNotBlank()) {
+                parts += "id=${escapeLinkValue(event.correlationId)}"
+            }
+            if (event.startElapsedMillis >= 0) {
+                parts += "start=${event.startElapsedMillis}"
+            }
+            if (event.endElapsedMillis != null) {
+                parts += "end=${event.endElapsedMillis}"
+            }
+            if (event.durationMillis != null) {
+                parts += "duration=${event.durationMillis}ms"
+            }
+            if (!event.detail.isNullOrBlank()) {
+                parts += "detail=${escapeLinkValue(event.detail)}"
+            }
+            parts += "source=${escapeLinkValue(event.source)}"
+            parts.joinToString(" ")
+        }
+    }
+
+    private fun escapeLinkValue(value: String): String {
+        return value.replace(" ", "_").replace("=", "_")
+    }
+
+    private fun formatTimestamp(timestampMillis: Long): String {
+        if (timestampMillis <= 0) return "??:??:??"
+        val seconds = (timestampMillis / 1000) % 60
+        val minutes = (timestampMillis / 60_000) % 60
+        val hours = (timestampMillis / 3_600_000) % 24
+        val millis = timestampMillis % 1000
+        return "%02d:%02d:%02d.%03d".format(hours, minutes, seconds, millis)
     }
 
     val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics)
     val perf = debugDump.perfSnapshot
     val recovery = debugDump.recoveryTrace
+    val resolvedProbeSummary = deviceProbeSummary
+        ?: computeDeviceProbeSummary(state.activeDeviceCapabilities)
 
     val coreSummary = buildString {
         appendLine("DebugDump: ${debugDump.lifecycle} | ${debugDump.activeMode.name} | preview=${debugDump.previewStatus} | capture=${debugDump.captureStatus} | recording=${debugDump.recordingStatus}")
@@ -1756,11 +1801,23 @@ internal fun devLogRenderModel(
     val tabContent = if (domainFiltered != null) {
         formatEvents(domainFiltered)
     } else {
-        when (selectedTab) {
+        val baseContent = when (selectedTab) {
             DevLogTab.KEY -> formatEvents(keyEvents)
             DevLogTab.CORE -> formatEvents(coreEvents)
             DevLogTab.ERROR -> formatEvents(errorEvents)
             DevLogTab.ALL -> formatEvents(allEvents)
+        }
+        if (selectedTab == DevLogTab.CORE && linkEvents.isNotEmpty()) {
+            buildString {
+                if (baseContent.isNotBlank()) {
+                    appendLine(baseContent)
+                    appendLine()
+                }
+                appendLine("--- 链路耗时 ---")
+                append(formatLinkEvents(linkEvents))
+            }
+        } else {
+            baseContent
         }
     }
 
@@ -1769,6 +1826,8 @@ internal fun devLogRenderModel(
         appendLine(formatEvents(keyEvents))
         appendLine("=== CORE EVENTS ===")
         appendLine(formatEvents(coreEvents))
+        appendLine("=== LINK EVENTS ===")
+        appendLine(formatLinkEvents(linkEvents))
         appendLine("=== ERROR EVENTS ===")
         appendLine(formatEvents(errorEvents))
         appendLine("=== ALL EVENTS ===")
@@ -1776,6 +1835,10 @@ internal fun devLogRenderModel(
         debugDump.resourceDiagnostics?.let { res ->
             appendLine("=== RESOURCE DIAGNOSTICS ===")
             res.pipelineNotes.forEach { note -> appendLine(note) }
+        }
+        if (!resolvedProbeSummary.isNullOrBlank()) {
+            appendLine("=== DEVICE PROBE ===")
+            appendLine(resolvedProbeSummary)
         }
         appendLine("=== CORE SUMMARY ===")
         append(coreSummary)
@@ -1816,6 +1879,37 @@ internal fun devLogRenderModel(
         domainTabs = domainTabs,
         selectedDomain = selectedDomain
     )
+}
+
+internal fun computeDeviceProbeSummary(capabilities: com.opencamera.core.device.DeviceCapabilities): String {
+    val camCount = capabilities.availableLensFacings.size
+    val lensNodes = capabilities.zoomRatioCapability.lensNodeMap
+    val outputSizes = capabilities.availableStillCaptureOutputSizes
+    val zoomRatios = capabilities.zoomRatioCapability.normalizedSupportedRatios
+    return buildString {
+        appendLine("cameras: $camCount | lens-facings: ${capabilities.availableLensFacings.joinToString { it.name }}")
+        if (lensNodes.isNotEmpty()) {
+            appendLine("lens-nodes: ${lensNodes.entries.joinToString { (node, avail) -> "${node.label}(id=${avail.physicalCameraId ?: "?"},threshold=${avail.thresholdRatio})" }}")
+        }
+        appendLine("zoom: ratios=${zoomRatios.joinToString()},support=${capabilities.zoomRatioCapability.support.label}")
+        if (outputSizes.isNotEmpty()) {
+            val totalPixels = outputSizes.sumOf { it.pixelCount }
+            appendLine("still-output: ${outputSizes.size} sizes, total-pixels=${totalPixels}, largest=${outputSizes.first().width}x${outputSizes.first().height}")
+        } else {
+            appendLine("still-output: none reported")
+        }
+        val facts = mutableListOf<String>()
+        if (!capabilities.supportsStillCapture) facts += "stillCapture=UNSUPPORTED"
+        if (!capabilities.supportsVideoRecording) facts += "videoRecording=UNSUPPORTED"
+        if (!capabilities.supportsAudioRecording) facts += "audio=UNSUPPORTED"
+        if (!capabilities.supportsFlashControl) facts += "flash=DEGRADED"
+        if (!capabilities.supportsManualControls) facts += "manualControls=UNSUPPORTED"
+        if (!capabilities.supportsNightMultiFrame) facts += "nightMultiFrame=DEGRADED"
+        if (!capabilities.supportsPortraitDepthEffect) facts += "portraitDepth=DEGRADED"
+        if (facts.isNotEmpty()) {
+            appendLine("facts: ${facts.joinToString()}")
+        }
+    }.trimEnd()
 }
 
 private val MANUAL_ISO_OPTIONS = listOf<Int?>(null, 100, 200, 320, 640, 800, 1600)
