@@ -3,18 +3,18 @@ package com.opencamera.core.session
 import java.util.concurrent.atomic.AtomicInteger
 
 enum class TraceEventDomain(val label: String, val prefix: String) {
-    SESSION("会话", "session."),
-    PREVIEW("预览", "preview."),
-    CAPTURE("拍照", "capture."),
-    RECORDING("录制", "recording."),
-    MODE("模式", "mode."),
-    LENS("镜头", "lens."),
-    ZOOM("变焦", "zoom."),
-    SETTINGS("设置", "settings."),
-    PHOTO_FEATURE("拍照特性", "photo."),
-    ORIENTATION("方向", "orientation."),
-    DIAGNOSTICS("诊断", ""),
-    SYSTEM("系统", "");
+    SESSION("Session", "session."),
+    PREVIEW("Preview", "preview."),
+    CAPTURE("Capture", "capture."),
+    RECORDING("Recording", "recording."),
+    MODE("Mode", "mode."),
+    LENS("Lens", "lens."),
+    ZOOM("Zoom", "zoom."),
+    SETTINGS("Settings", "settings."),
+    PHOTO_FEATURE("Photo Feature", "photo."),
+    ORIENTATION("Orientation", "orientation."),
+    DIAGNOSTICS("Diagnostics", ""),
+    SYSTEM("System", "");
 
     companion object {
         private val PREFIX_MAP = listOf(

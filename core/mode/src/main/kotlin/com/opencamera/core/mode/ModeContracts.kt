@@ -64,7 +64,7 @@ fun ModeId.catalogProfile(): ModeCatalogProfile {
         )
         ModeId.FULL_CLEAR -> ModeCatalogProfile(
             displayName = "Full Clear",
-            buttonLabel = "全清"
+            buttonLabel = "Full Clear"
         )
         ModeId.VIDEO -> ModeCatalogProfile(
             displayName = "Video",

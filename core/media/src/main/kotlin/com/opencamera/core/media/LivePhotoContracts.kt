@@ -13,10 +13,10 @@ enum class LiveWatermarkResult(
     val storageKey: String,
     val label: String
 ) {
-    STILL_ONLY("still-only", "仅静态"),
-    MOTION_METADATA_ONLY("metadata-only", "仅动态元数据"),
-    MOTION_BURNED_IN("burned-in", "动态嵌入"),
-    UNSUPPORTED("unsupported", "不支持");
+    STILL_ONLY("still-only", "Still Only"),
+    MOTION_METADATA_ONLY("metadata-only", "Metadata Only"),
+    MOTION_BURNED_IN("burned-in", "Burned In"),
+    UNSUPPORTED("unsupported", "Unsupported");
 
     companion object {
         fun fromStorageKey(value: String?): LiveWatermarkResult? =
@@ -66,10 +66,10 @@ data class LiveTemporalWindow(
 fun LiveWatermarkResult?.statusLabel(): String? {
     return this?.let { result ->
         when (result) {
-            LiveWatermarkResult.STILL_ONLY -> "水印: 仅静态"
-            LiveWatermarkResult.MOTION_METADATA_ONLY -> "水印: 仅元数据"
-            LiveWatermarkResult.MOTION_BURNED_IN -> "水印: 动态嵌入"
-            LiveWatermarkResult.UNSUPPORTED -> "水印: 不支持"
+            LiveWatermarkResult.STILL_ONLY -> "Watermark: Still Only"
+            LiveWatermarkResult.MOTION_METADATA_ONLY -> "Watermark: Metadata Only"
+            LiveWatermarkResult.MOTION_BURNED_IN -> "Watermark: Burned In"
+            LiveWatermarkResult.UNSUPPORTED -> "Watermark: Unsupported"
         }
     }
 }

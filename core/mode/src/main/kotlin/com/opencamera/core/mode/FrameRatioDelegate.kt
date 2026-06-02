@@ -35,18 +35,18 @@ class FrameRatioDelegate(
 
     suspend fun selectFrameRatio(
         ratio: FrameRatio,
-        snapshotHeadline: String = "画幅已更新",
+        snapshotHeadline: String = "Frame ratio updated",
         updateSnapshot: (headline: String) -> Unit
     ): ModeSignal {
         val nextIndex = supportedRatios.indexOf(ratio)
         if (nextIndex < 0) {
-            return ModeSignal.ShowHint("当前模式不支持 ${ratio.label} 画幅")
+            return ModeSignal.ShowHint("Current mode does not support ${ratio.label} frame ratio")
         }
         frameRatioIndex = nextIndex
         return publishSelection(
             frameRatio = ratio,
             snapshotHeadline = snapshotHeadline,
-            hintMessage = "画幅：${ratio.label}",
+            hintMessage = "Frame: ${ratio.label}",
             updateSnapshot = updateSnapshot
         )
     }

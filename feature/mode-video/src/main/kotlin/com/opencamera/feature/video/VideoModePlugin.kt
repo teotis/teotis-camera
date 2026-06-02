@@ -55,7 +55,7 @@ private class VideoModeController(
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
-            headline = "视频管线就绪"
+            headline = "Video pipeline ready"
         )
     )
 
@@ -70,9 +70,9 @@ private class VideoModeController(
         }
         mutableSnapshot.value = buildSnapshot(
             headline = if (isRecording) {
-                "录制进行中"
+                "Recording in progress"
             } else {
-                "视频模式已激活"
+                "Video mode active"
             },
             detail = if (isRecording) {
                 recordingDetail()
@@ -94,7 +94,7 @@ private class VideoModeController(
         isRecording = false
         torchEnabled = false
         mutableSnapshot.value = buildSnapshot(
-            headline = "视频模式已激活"
+            headline = "Video mode active"
         )
         context.onEffectSpecChanged(buildEffectSpec())
     }
@@ -104,8 +104,8 @@ private class VideoModeController(
         isRecording = false
         torchEnabled = false
         mutableSnapshot.value = buildSnapshot(
-            headline = "视频模式未激活",
-            detail = "将录制决策交由 Session Kernel 处理。"
+            headline = "Video mode inactive",
+            detail = "Recording decisions are delegated to Session Kernel."
         )
     }
 
@@ -114,7 +114,7 @@ private class VideoModeController(
             ModeIntent.ShutterPressed -> toggleRecording()
             ModeIntent.SecondaryActionPressed -> toggleTorch()
             ModeIntent.TertiaryActionPressed -> cycleQuality()
-            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("视频模式暂不支持画幅切换")
+            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("Video mode does not support frame ratio switching yet")
             ModeIntent.ProActionPressed -> ModeSignal.None
         }
     }
@@ -127,7 +127,7 @@ private class VideoModeController(
                 }
                 isRecording = true
                 mutableSnapshot.value = buildSnapshot(
-                    headline = "录制进行中",
+                    headline = "Recording in progress",
                     detail = recordingDetail()
                 )
             }
@@ -139,7 +139,7 @@ private class VideoModeController(
                 isRecording = false
                 torchEnabled = false
                 mutableSnapshot.value = buildSnapshot(
-                    headline = "视频已保存",
+                    headline = "Video saved",
                     detail = event.result.outputPath
                 )
             }
@@ -151,7 +151,7 @@ private class VideoModeController(
                 isRecording = false
                 torchEnabled = false
                 mutableSnapshot.value = buildSnapshot(
-                    headline = "录制失败",
+                    headline = "Recording failed",
                     detail = event.reason
                 )
             }
@@ -171,8 +171,8 @@ private class VideoModeController(
             val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
             val postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec)
             mutableSnapshot.value = buildSnapshot(
-                headline = "录制已请求",
-                detail = "等待 Session Kernel 启动 ${resolvedVideoSpec.summaryLabel} 录制任务。"
+                headline = "Recording requested",
+                detail = "Waiting for Session Kernel to start ${resolvedVideoSpec.summaryLabel} recording task."
             )
             ModeSignal.SubmitCapture(
                     CaptureStrategy.VideoRecording(
@@ -227,8 +227,8 @@ private class VideoModeController(
     private suspend fun stopRecording(): ModeSignal {
         context.eventSink("video.recording.stop.requested")
         mutableSnapshot.value = buildSnapshot(
-            headline = "停止录制",
-            detail = "Session Kernel 正在完成当前录制。"
+            headline = "Stopping recording",
+            detail = "Session Kernel is completing the current recording."
         )
         return ModeSignal.StopActiveCapture
     }
@@ -252,22 +252,22 @@ private class VideoModeController(
 
     private suspend fun toggleTorch(): ModeSignal {
         if (!currentTorchSupported()) {
-            return ModeSignal.ShowHint("此设备不支持闪光灯")
+            return ModeSignal.ShowHint("This device does not support flash")
         }
         if (isRecording) {
-            return ModeSignal.ShowHint("闪光灯只能在录制开始前更改")
+            return ModeSignal.ShowHint("Flash can only be changed before recording starts")
         }
         torchEnabled = !torchEnabled
         context.eventSink("video.torch.selected.${torchTag()}")
         mutableSnapshot.value = buildSnapshot(
-            headline = "视频闪光灯已更新"
+            headline = "Video flash updated"
         )
-        return ModeSignal.ShowHint("闪光灯: ${if (torchEnabled) "开" else "关"}")
+        return ModeSignal.ShowHint("Flash: ${if (torchEnabled) "On" else "Off"}")
     }
 
     private suspend fun cycleQuality(): ModeSignal {
         if (isRecording) {
-            return ModeSignal.ShowHint("视频画质只能在录制开始前更改")
+            return ModeSignal.ShowHint("Video quality can only be changed before recording starts")
         }
         val constraints = runtimeState().deviceCapabilities.videoSpecConstraints
         val nextSpec = constraints.nextQuickVideoSpec(
@@ -275,14 +275,14 @@ private class VideoModeController(
             preserve = requestedVideoSpec
         )
         if (nextSpec == null) {
-            return ModeSignal.ShowHint("视频画质不可用")
+            return ModeSignal.ShowHint("Video quality unavailable")
         }
         requestedVideoSpec = requestedVideoSpec.copy(resolution = nextSpec.resolution)
         context.eventSink(
             "video.quality.selected.${requestedVideoSpec.resolution.storageKey}.${requestedVideoSpec.frameRate.storageKey}"
         )
         mutableSnapshot.value = buildSnapshot(
-            headline = "视频画质已更新"
+            headline = "Video quality updated"
         )
         val activeVideoSpec = resolvedVideoSpec()
         val requestedLabel = requestedVideoSpec.quickLabel()
@@ -304,14 +304,14 @@ private class VideoModeController(
         return ModeSnapshot(
             id = ModeId.VIDEO,
             uiSpec = ModeUiSpec(
-                title = "视频",
-                shutterLabel = "开始 / 停止录制",
+                title = "Video",
+                shutterLabel = "Start / Stop Recording",
                 secondaryActionLabel = if (currentTorchSupported()) {
-                    "切换闪光灯"
+                    "Toggle Torch"
                 } else {
-                    "闪光灯不支持"
+                    "Torch Unsupported"
                 },
-                tertiaryActionLabel = "切换画质"
+                tertiaryActionLabel = "Cycle Quality"
             ),
             state = ModeState(
                 headline = headline,
@@ -325,27 +325,27 @@ private class VideoModeController(
     private fun defaultDetail(): String {
         val resolvedVideoSpec = resolvedVideoSpec()
         val torchText = if (currentTorchSupported()) {
-            "闪光灯 ${if (torchEnabled) "开" else "关"}"
+            "Torch ${if (torchEnabled) "On" else "Off"}"
         } else {
-            "此设备不支持闪光灯"
+            "Torch unavailable on this device"
         }
         val videoSpecText = if (requestedVideoSpec == resolvedVideoSpec) {
-            "当前 ${resolvedVideoSpec.quickLabel()}"
+            "Active ${resolvedVideoSpec.quickLabel()}"
         } else {
             buildString {
-                append("当前 ${resolvedVideoSpec.quickLabel()} 降级")
+                append("Active ${resolvedVideoSpec.quickLabel()} fallback")
                 buildList {
                     if (requestedVideoSpec.resolution != resolvedVideoSpec.resolution) {
-                        add("分辨率")
+                        add("resolution")
                     }
                     if (requestedVideoSpec.frameRate != resolvedVideoSpec.frameRate) {
-                        add("帧率")
+                        add("framerate")
                     }
                     if (requestedVideoSpec.dynamicFpsPolicy != resolvedVideoSpec.dynamicFpsPolicy) {
-                        add("动态帧率")
+                        add("dynamic fps")
                     }
                     if (requestedVideoSpec.audioProfile != resolvedVideoSpec.audioProfile) {
-                        add("音频场景")
+                        add("audio scene")
                     }
                 }.takeIf { it.isNotEmpty() }?.let { degradedFields ->
                     append(" (")
@@ -355,32 +355,32 @@ private class VideoModeController(
             }
         }
         return buildString {
-            append("画质 ${resolvedVideoSpec.quickLabel()}")
+            append("Quality ${resolvedVideoSpec.quickLabel()}")
             append(" | ")
-            append("默认 ${requestedVideoSpec.quickLabel()} | ")
+            append("Default ${requestedVideoSpec.quickLabel()} | ")
             append(videoSpecText)
-            append(" | 麦克风 ${requestedVideoSpec.audioProfile.label}")
-            append(" | 滤镜 ${selectedFilter().label}")
+            append(" | Mic ${requestedVideoSpec.audioProfile.label}")
+            append(" | Filter ${selectedFilter().label}")
             append(" | ")
             append(
                 if (requestedVideoSpec.dynamicFpsPolicy == DynamicVideoFpsPolicy.LOW_LIGHT_AUTO_24FPS) {
-                    "弱光自动 24fps 已就绪"
+                    "Low-light auto 24fps ready"
                 } else {
-                    "锁定帧率"
+                    "Locked fps"
                 }
             )
             append(" | ")
             append(torchText)
-            append(" | 按下快门开始或停止录制。")
+            append(" | Press shutter to start or stop recording.")
         }
     }
 
     private fun recordingDetail(): String {
         val resolvedVideoSpec = resolvedVideoSpec()
         return if (currentTorchSupported()) {
-            "统一拍摄管线启动了 ${resolvedVideoSpec.summaryLabel} 视频录制任务。闪光灯 ${if (torchEnabled) "开" else "关"}。"
+            "Unified pipeline started ${resolvedVideoSpec.summaryLabel} recording task. Torch ${if (torchEnabled) "On" else "Off"}."
         } else {
-            "统一拍摄管线启动了 ${resolvedVideoSpec.summaryLabel} 视频录制任务。此设备不支持闪光灯。"
+            "Unified pipeline started ${resolvedVideoSpec.summaryLabel} recording task. Torch unavailable on this device."
         }
     }
 

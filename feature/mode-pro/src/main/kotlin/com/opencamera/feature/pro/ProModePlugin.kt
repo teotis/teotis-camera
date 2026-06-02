@@ -66,15 +66,15 @@ private class ProModeController(
     )
 
     private val uiSpec = ModeUiSpec(
-        title = "专业",
-        shutterLabel = "专业拍摄",
-        secondaryActionLabel = "切换预设",
-        tertiaryActionLabel = "切换画幅"
+        title = "Pro",
+        shutterLabel = "Pro Capture",
+        secondaryActionLabel = "Toggle Preset",
+        tertiaryActionLabel = "Cycle Frame"
     )
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
-            headline = "专业管线就绪"
+            headline = "Pro pipeline ready"
         )
     )
 
@@ -87,9 +87,9 @@ private class ProModeController(
         presetIndex = presetIndex.coerceAtMost(currentPresets().lastIndex)
         mutableSnapshot.value = buildSnapshot(
             headline = if (manualControlsEnabled()) {
-                "专业模式已激活"
+                "Pro mode active"
             } else {
-                "专业辅助已激活"
+                "Pro assisted active"
             }
         )
     }
@@ -101,9 +101,9 @@ private class ProModeController(
     ) {
         mutableSnapshot.value = buildSnapshot(
             headline = if (manualControlsEnabled()) {
-                "专业分辨率已更新"
+                "Pro resolution updated"
             } else {
-                "辅助分辨率已更新"
+                "Assisted resolution updated"
             }
         )
     }
@@ -113,9 +113,9 @@ private class ProModeController(
     ) {
         mutableSnapshot.value = buildSnapshot(
             headline = if (manualControlsEnabled()) {
-                "专业画质已更新"
+                "Pro quality updated"
             } else {
-                "辅助画质已更新"
+                "Assisted quality updated"
             }
         )
     }
@@ -124,9 +124,9 @@ private class ProModeController(
         context.eventSink("pro.enter")
         mutableSnapshot.value = buildSnapshot(
             headline = if (manualControlsEnabled()) {
-                "专业模式已激活"
+                "Pro mode active"
             } else {
-                "专业辅助已激活"
+                "Pro assisted active"
             }
         )
         context.onEffectSpecChanged(buildEffectSpec())
@@ -135,7 +135,7 @@ private class ProModeController(
     override suspend fun onExit() {
         context.eventSink("pro.exit")
         mutableSnapshot.value = buildSnapshot(
-            headline = "专业模式未激活"
+            headline = "Pro mode inactive"
         )
     }
 
@@ -153,9 +153,9 @@ private class ProModeController(
         reduceStillShotSessionEvent(
             event = event,
             text = StillShotSessionEventText(
-                shotStartedHeadline = "专业拍摄进行中",
-                shotCompletedHeadline = "专业照片已保存",
-                shotFailedHeadline = "专业拍摄失败"
+                shotStartedHeadline = "Pro capture in progress",
+                shotCompletedHeadline = "Pro photo saved",
+                shotFailedHeadline = "Pro capture failed"
             ),
             updateSnapshot = { headline, detail ->
                 mutableSnapshot.value = if (detail == null) {
@@ -172,7 +172,7 @@ private class ProModeController(
         val flashMode = resolvedFlashMode(preset)
         context.eventSink("pro.capture.requested.${preset.id}.flash-${flashMode.name.lowercase()}")
         mutableSnapshot.value = buildSnapshot(
-            headline = "专业拍摄已请求"
+            headline = "Pro capture requested"
         )
         val effectSpec = buildEffectSpec()
         val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
@@ -252,12 +252,12 @@ private class ProModeController(
         context.eventSink("pro.preset.selected.${preset.id}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (manualControlsEnabled()) {
-                "手动预设已更新"
+                "Manual preset updated"
             } else {
-                "辅助预设已更新"
+                "Assisted preset updated"
             }
         )
-        return ModeSignal.ShowHint("预设: ${preset.label}")
+        return ModeSignal.ShowHint("Preset: ${preset.label}")
     }
 
     private fun buildSnapshot(
@@ -295,14 +295,14 @@ private class ProModeController(
 
     private fun presetSummary(preset: ProPreset): String {
         val flashSummary = if (flashSupported()) {
-            "闪光灯 ${resolvedFlashMode(preset).label}"
+            "Flash ${resolvedFlashMode(preset).label}"
         } else {
-            "此设备不支持闪光灯"
+            "Flash control unavailable"
         }
         return if (manualControlsEnabled()) {
-            "预设 ${preset.label} | 静态 ${runtimeState().stillCaptureQuality.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | ISO ${preset.iso} | ${preset.exposureTime} | 白平衡 ${preset.whiteBalanceKelvin}K | 对焦 ${preset.focusMode} | 草案 ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} | 画幅 ${currentFrameRatio().label} | $flashSummary"
+            "Preset ${preset.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | ISO ${preset.iso} | ${preset.exposureTime} | WB ${preset.whiteBalanceKelvin}K | Focus ${preset.focusMode} | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} | Frame ${currentFrameRatio().label} | $flashSummary"
         } else {
-            "预设 ${preset.label} | 静态 ${runtimeState().stillCaptureQuality.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 引导调谐已激活，因为此设备不支持手动控制。 | 草案 ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} 仅保存。 | 画幅 ${currentFrameRatio().label} | $flashSummary"
+            "Preset ${preset.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Guided tuning active (manual controls unavailable). | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} saved-only. | Frame ${currentFrameRatio().label} | $flashSummary"
         }
     }
 
@@ -317,9 +317,9 @@ private class ProModeController(
     private suspend fun cycleFrameRatio(): ModeSignal =
         frameRatioDelegate.cycleFrameRatio(
             snapshotHeadline = if (manualControlsEnabled()) {
-                "画幅已更新"
+                "Frame ratio updated"
             } else {
-                "辅助画幅已更新"
+                "Assisted frame ratio updated"
             },
             updateSnapshot = { headline ->
                 mutableSnapshot.value = buildSnapshot(headline = headline)
@@ -376,31 +376,31 @@ private class ProModeController(
         private val MANUAL_PRESETS = listOf(
             ProPreset(
                 id = "neutral",
-                label = "中性",
+                label = "Neutral",
                 iso = 100,
                 exposureTime = "1/125s",
                 whiteBalanceKelvin = 5200,
-                focusMode = "自动",
+                focusMode = "Auto",
                 flashMode = FlashMode.OFF,
                 algorithmProfile = "pro-manual-neutral"
             ),
             ProPreset(
                 id = "street",
-                label = "街拍",
+                label = "Street",
                 iso = 200,
                 exposureTime = "1/250s",
                 whiteBalanceKelvin = 5000,
-                focusMode = "连续",
+                focusMode = "Continuous",
                 flashMode = FlashMode.AUTO,
                 algorithmProfile = "pro-manual-street"
             ),
             ProPreset(
                 id = "night",
-                label = "夜景",
+                label = "Night",
                 iso = 800,
                 exposureTime = "1/15s",
                 whiteBalanceKelvin = 3600,
-                focusMode = "无限远",
+                focusMode = "Infinity",
                 flashMode = FlashMode.ON,
                 algorithmProfile = "pro-manual-night"
             )
@@ -409,19 +409,19 @@ private class ProModeController(
         private val ASSISTED_PRESETS = listOf(
             ProPreset(
                 id = "balanced",
-                label = "平衡",
+                label = "Balanced",
                 flashMode = FlashMode.OFF,
                 algorithmProfile = "pro-assisted-balanced"
             ),
             ProPreset(
                 id = "contrast",
-                label = "高对比",
+                label = "High Contrast",
                 flashMode = FlashMode.AUTO,
                 algorithmProfile = "pro-assisted-contrast"
             ),
             ProPreset(
                 id = "lowlight",
-                label = "弱光",
+                label = "Low Light",
                 flashMode = FlashMode.ON,
                 algorithmProfile = "pro-assisted-lowlight"
             )

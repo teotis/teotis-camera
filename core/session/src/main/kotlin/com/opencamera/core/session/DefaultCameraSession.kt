@@ -1035,16 +1035,16 @@ class DefaultCameraSession(
 
     private suspend fun handlePreviewRatioToggled() {
         if (captureRecordingProcessor.countdownInProgress()) {
-            updateState(lastAction = "倒计时结束后才能切换预览比例")
+            updateState(lastAction = "Wait for countdown to finish before switching preview ratio")
             trace.record("preview-ratio.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
             return
         }
         val activeShot = _state.value.activeShot
         if (activeShot != null) {
             val reason = if (activeShot.mediaType == MediaType.VIDEO) {
-                "停止录制后才能切换预览比例"
+                "Stop recording before switching preview ratio"
             } else {
-                "等待当前拍摄完成后才能切换预览比例"
+                "Wait for current capture to finish before switching preview ratio"
             }
             updateState(lastAction = reason)
             trace.record("preview-ratio.blocked", "shot=${activeShot.shotId},mediaType=${activeShot.mediaType}")
@@ -1054,7 +1054,7 @@ class DefaultCameraSession(
         sessionPreviewRatio = nextRatio
         updateState(
             previewRatio = nextRatio,
-            lastAction = "预览比例已设为 ${nextRatio.label}",
+            lastAction = "Preview ratio set to ${nextRatio.label}",
             lastError = null
         )
         trace.record("preview-ratio.updated", nextRatio.tagValue)
@@ -1104,7 +1104,7 @@ class DefaultCameraSession(
                                 "Stop recording before changing Pro variant"
 
                             is ModeIntent.FrameRatioSelected ->
-                                "停止录制后才能切换画幅"
+                                "Stop recording before changing frame ratio"
 
                             ModeIntent.ShutterPressed ->
                                 _state.value.lastAction

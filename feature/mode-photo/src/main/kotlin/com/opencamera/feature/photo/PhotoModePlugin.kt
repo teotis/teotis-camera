@@ -1,343 +1,180 @@
 package com.opencamera.feature.photo
 
 import com.opencamera.core.device.DeviceCapabilities
-import com.opencamera.core.device.DeviceGraphSpec
-import com.opencamera.core.device.LensFacing
-import com.opencamera.core.device.PhotoLowLightStrategySupport
-import com.opencamera.core.device.SceneLightState
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.effect.WatermarkEffect
+import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.CaptureStrategy
+import com.opencamera.core.media.FlashMode
+import com.opencamera.core.media.MediaMetadata
+import com.opencamera.core.media.PostProcessSpec
+import com.opencamera.core.media.SaveRequest
+import com.opencamera.core.mode.AbstractStillCaptureMode
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
 import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
-import com.opencamera.core.mode.ModeIntent
-import com.opencamera.core.mode.ModeSessionEvent
-import com.opencamera.core.mode.StillShotSessionEventText
-import com.opencamera.core.mode.reduceStillShotSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
-import com.opencamera.core.mode.FrameRatioDelegate
+import com.opencamera.core.mode.PhotoLowLightRuntimeState
+import com.opencamera.core.mode.StillShotSessionEventText
 import com.opencamera.core.mode.captureAidMetadataTags
-import com.opencamera.core.mode.stillCaptureDeviceGraph
-import com.opencamera.core.mode.label
-import com.opencamera.core.media.CaptureStrategy
-import com.opencamera.core.media.CaptureProfile
-import com.opencamera.core.media.FlashMode
-import com.opencamera.core.media.FrameRatio
-import com.opencamera.core.media.LivePhotoCaptureSpec
-
-import com.opencamera.core.media.PostProcessSpec
-import com.opencamera.core.media.SaveRequest
-import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.device.PhotoLowLightStrategySupport
+import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
-import com.opencamera.core.settings.CountdownDuration
-import com.opencamera.core.settings.WatermarkTemplate
 import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.liveWatermarkMetadataTags
 import com.opencamera.core.settings.watermarkStyleFor
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 class PhotoModePlugin : CameraModePlugin {
     override val id: ModeId = ModeId.PHOTO
-
-    override fun isSupported(deviceCapabilities: DeviceCapabilities): Boolean {
-        return deviceCapabilities.supportsStillCapture
-    }
-
-    override fun create(context: ModeContext): ModeController {
-        return PhotoModeController(context)
-    }
+    override fun isSupported(deviceCapabilities: DeviceCapabilities) =
+        deviceCapabilities.supportsStillCapture
+    override fun create(context: ModeContext): ModeController = PhotoModeController(context)
 }
 
 private class PhotoModeController(
-    private val context: ModeContext
-) : ModeController {
-    private var flashModeIndex = 0
-    private val frameRatioDelegate = FrameRatioDelegate(
-        context = context,
-        modeEventPrefix = "photo",
-        effectSpecProvider = { buildEffectSpec(currentFlashMode()) }
-    )
-    private var selectedFilter = resolvedDefaultFilter()
-
-    private val mutableSnapshot = MutableStateFlow(
-        buildSnapshot(
-            headline = "拍照管线就绪"
-        )
-    )
+    context: ModeContext
+) : AbstractStillCaptureMode(context) {
 
     override val id: ModeId = ModeId.PHOTO
-    override val snapshot: StateFlow<ModeSnapshot> = mutableSnapshot.asStateFlow()
+    private var selectedFilter = resolvedDefaultFilter()
 
-    override fun deviceGraph(): DeviceGraphSpec = currentDeviceGraph()
+    override fun modeEventPrefix() = "photo"
+    override fun initialHeadline() = "Photo pipeline ready"
 
-    override suspend fun onDeviceCapabilitiesChanged(deviceCapabilities: DeviceCapabilities) {
-        if (!currentFlashSupported()) {
-            flashModeIndex = 0
+    override fun availableFlashModes() =
+        if (flashSupported()) listOf(FlashMode.OFF, FlashMode.AUTO, FlashMode.ON)
+        else listOf(FlashMode.OFF)
+
+    override suspend fun onModeEnter() { selectedFilter = resolvedDefaultFilter() }
+
+    override fun capabilitiesChangedHeadline() = "Photo mode active"
+    override fun enterHeadline() = "Photo mode active"
+    override fun exitHeadline() = "Photo mode inactive"
+    override fun resolutionChangedHeadline() = "Photo resolution updated"
+    override fun qualityChangedHeadline() = "Photo quality updated"
+
+    override fun sessionEventText() = StillShotSessionEventText(
+        shotStartedHeadline = "Photo capture in progress",
+        shotStartedDetail = "Unified capture pipeline accepted the still save task.",
+        shotCompletedHeadline = "Photo saved",
+        shotFailedHeadline = "Photo capture failed"
+    )
+
+    override fun buildEffectSpec(): EffectSpec {
+        val flashMode = currentFlashMode()
+        val filter = selectedFilter
+        val photoSettings = context.settingsSnapshot.persisted.photo
+        val pipelineResult = renderStyleColorSpecWithRecipe(
+            profileId = filter.id, baseRenderSpec = filter.renderSpec,
+            colorLabSpec = photoSettings.colorLabSpec, styleStrength = photoSettings.styleStrength
+        )
+        val adjustedRenderSpec = pipelineResult?.finalRenderSpec
+        val recipe = pipelineResult?.recipe ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
+        val tmpl = selectedWatermarkTemplate()
+        val watermarkStyle = context.settingsSnapshot.persisted.photo.watermarkStyleFor(tmpl.id)
+        return EffectSpec(listOf(
+            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe),
+            WatermarkEffect(tmpl.id, mapOf(
+                "watermarkModel" to "OpenCamera",
+                "watermarkDatetime" to watermarkDateTime(),
+                "watermarkCameraParams" to watermarkCameraParams("Flash ${flashMode.label}")
+            ), style = watermarkStyle),
+            FrameEffect(currentFrameRatio())
+        ))
+    }
+
+    override fun buildCaptureStrategy(effectSpec: EffectSpec, countdownSeconds: Int): ModeSignal.SubmitCapture {
+        val flashMode = currentFlashMode()
+        val flashLabel = flashMode.name.lowercase().replaceFirstChar { it.titlecase() }
+        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+        val postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec).copy(watermarkText = "PHOTO $flashLabel")
+        val lowLight = context.photoLowLightRuntimeState
+
+        val strategy = when {
+            lowLight.shouldUseNightAssist -> buildLowLightStrategy(flashMode, postProcessSpec, bridgeTags, lowLight)
+            livePhotoEnabled() -> CaptureStrategy.LivePhoto(
+                saveRequest = buildSaveRequest(flashMode, "on", bridgeTags),
+                postProcessSpec = postProcessSpec, captureProfile = captureProfile(flashMode),
+                livePhotoSpec = toCaptureSpec(context.settingsSnapshot.persisted.photo.liveSaveFormat)
+            )
+            else -> CaptureStrategy.SingleFrame(
+                saveRequest = buildSaveRequest(flashMode, "off", bridgeTags),
+                postProcessSpec = postProcessSpec, captureProfile = captureProfile(flashMode)
+            )
         }
-        mutableSnapshot.value = buildSnapshot(
-            headline = "拍照模式已激活"
-        )
+        return ModeSignal.SubmitCapture(strategy, countdownSeconds = countdownSeconds)
     }
 
-    override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
-
-    override suspend fun onStillCaptureResolutionChanged(
-        stillCaptureResolutionPreset: StillCaptureResolutionPreset
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = "拍照分辨率已更新"
-        )
-    }
-
-    override suspend fun onStillCaptureQualityChanged(
-        stillCaptureQuality: com.opencamera.core.media.StillCaptureQualityPreference
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = "拍照画质已更新"
-        )
-    }
-
-    override suspend fun onEnter() {
-        context.eventSink("photo.enter")
-        selectedFilter = resolvedDefaultFilter()
-        mutableSnapshot.value = buildSnapshot(
-            headline = "拍照模式已激活"
-        )
-        context.onEffectSpecChanged(buildEffectSpec(currentFlashMode()))
-    }
-
-    override suspend fun onExit() {
-        context.eventSink("photo.exit")
-        mutableSnapshot.value = buildSnapshot(
-            headline = "拍照模式未激活",
-            detail = "切换回拍照以继续静态拍摄。"
-        )
-    }
-
-    override suspend fun handle(intent: ModeIntent): ModeSignal {
-        return when (intent) {
-            ModeIntent.ShutterPressed -> {
-                val flashMode = currentFlashMode()
-                val filter = selectedFilter
-                context.eventSink(
-                    "photo.capture.requested.${filter.id}.flash-${flashMode.name.lowercase()}"
-                )
-                mutableSnapshot.value = buildSnapshot(
-                    headline = if (countdownDuration() == CountdownDuration.OFF) {
-                        "静态拍摄已请求"
-                    } else {
-                        "倒计时已启动"
-                    }
-                )
-                val effectSpec = buildEffectSpec(flashMode)
-                val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
-                val basePostProcessSpec = EffectBridge.toPostProcessSpec(effectSpec)
-                val flashLabel = flashMode.name.lowercase().replaceFirstChar { it.titlecase() }
-                val postProcessSpec = basePostProcessSpec.copy(
-                    watermarkText = "PHOTO $flashLabel"
-                )
-                val lowLightState = context.photoLowLightRuntimeState
-                ModeSignal.SubmitCapture(
-                    if (lowLightState.shouldUseNightAssist) {
-                        buildLowLightCaptureStrategy(
-                            flashMode = flashMode,
-                            postProcessSpec = postProcessSpec,
-                            bridgeTags = bridgeTags,
-                            lowLightState = lowLightState
-                        )
-                    } else if (livePhotoEnabledByDefault()) {
-                        CaptureStrategy.LivePhoto(
-                            saveRequest = SaveRequest.photoLibrary(
-                                metadata = com.opencamera.core.media.MediaMetadata(
-                                    customTags = buildMap {
-                                        put("mode", "photo")
-                                        put("flash", flashMode.name.lowercase())
-                                        put("livePhotoDefault", "on")
-                                        put("watermarkModeName", "Photo")
-                                        put("watermarkProfileName", flashLabel)
-                                        putAll(
-                                            context.settingsSnapshot.catalog.liveMediaBundleDraft
-                                                .liveWatermarkMetadataTags()
-                                        )
-                                        put(
-                                            "stillResolution",
-                                            runtimeState().stillCaptureResolutionPreset.tagValue
-                                        )
-                                        putAll(context.captureAidMetadataTags())
-                                        putAll(bridgeTags)
-                                    }
-                                )
-                            ),
-                            postProcessSpec = postProcessSpec,
-                            captureProfile = CaptureProfile(
-                                flashMode = flashMode,
-                                stillCaptureQuality = runtimeState().stillCaptureQuality,
-                                stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
-                            ),
-                            livePhotoSpec = context.settingsSnapshot.catalog.liveMediaBundleDraft
-                                .toCaptureSpec(context.settingsSnapshot.persisted.photo.liveSaveFormat)
-                        )
-                    } else {
-                        CaptureStrategy.SingleFrame(
-                            saveRequest = SaveRequest.photoLibrary(
-                                metadata = com.opencamera.core.media.MediaMetadata(
-                                    customTags = buildMap {
-                                        put("mode", "photo")
-                                        put("flash", flashMode.name.lowercase())
-                                        put("livePhotoDefault", "off")
-                                        put("watermarkModeName", "Photo")
-                                        put("watermarkProfileName", flashLabel)
-                                        put(
-                                            "stillResolution",
-                                            runtimeState().stillCaptureResolutionPreset.tagValue
-                                        )
-                                        putAll(context.captureAidMetadataTags())
-                                        putAll(bridgeTags)
-                                    }
-                                )
-                            ),
-                            postProcessSpec = postProcessSpec,
-                            captureProfile = CaptureProfile(
-                                flashMode = flashMode,
-                                stillCaptureQuality = runtimeState().stillCaptureQuality,
-                                stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
-                            )
-                        )
-                    },
-                    countdownSeconds = countdownDuration().seconds
-                )
-            }
-
-            ModeIntent.SecondaryActionPressed -> cycleFlashMode()
-            ModeIntent.TertiaryActionPressed -> cycleFrameRatio()
-            is ModeIntent.FrameRatioSelected -> selectFrameRatio(intent.ratio)
-            ModeIntent.ProActionPressed -> ModeSignal.None
-        }
-    }
-
-    override suspend fun onSessionEvent(event: ModeSessionEvent) {
-        reduceStillShotSessionEvent(
-            event = event,
-            text = StillShotSessionEventText(
-                shotStartedHeadline = "拍照进行中",
-                shotStartedDetail = "统一拍摄管线接受了照片保存任务。",
-                shotCompletedHeadline = "照片已保存",
-                shotFailedHeadline = "拍照失败"
-            ),
-            updateSnapshot = { headline, detail ->
-                mutableSnapshot.value = if (detail == null) {
-                    buildSnapshot(headline = headline)
-                } else {
-                    buildSnapshot(headline = headline, detail = detail)
-                }
-            }
-        )
-    }
-
-    private suspend fun cycleFlashMode(): ModeSignal {
-        if (!currentFlashSupported()) {
-            return ModeSignal.ShowHint("此设备不支持闪光灯控制")
-        }
-        flashModeIndex = (flashModeIndex + 1) % currentFlashModes().size
+    override suspend fun handleSecondaryAction(): ModeSignal {
+        if (!flashSupported()) return ModeSignal.ShowHint("Flash control unavailable on this device")
+        flashModeIndex = (flashModeIndex + 1) % availableFlashModes().size
         val flashMode = currentFlashMode()
         context.eventSink("photo.flash.selected.${flashMode.name.lowercase()}")
-        mutableSnapshot.value = buildSnapshot(
-            headline = "闪光灯模式已更新"
-        )
-        context.onEffectSpecChanged(buildEffectSpec(flashMode))
-        return ModeSignal.ShowHint("闪光灯: ${flashMode.label}")
+        updateSnapshot(headline = "Flash mode updated")
+        context.onEffectSpecChanged(buildEffectSpec())
+        return ModeSignal.ShowHint("Flash: ${flashMode.label}")
     }
 
-    private fun buildSnapshot(
-        headline: String,
-        detail: String = defaultDetail()
-    ): ModeSnapshot {
-        return ModeSnapshot(
-            id = ModeId.PHOTO,
-            uiSpec = ModeUiSpec(
-                title = "拍照",
-                shutterLabel = "拍摄静态",
-                secondaryActionLabel = if (currentFlashSupported()) {
-                    "切换闪光灯"
-                } else {
-                    "闪光灯不支持"
-                },
-                tertiaryActionLabel = "切换画幅"
-            ),
-            state = ModeState(
-                headline = headline,
-                detail = detail,
-                isSecondaryActionEnabled = currentFlashSupported(),
-                isTertiaryActionEnabled = true
-            )
-        )
+    override suspend fun handleShutterPressed(): ModeSignal {
+        context.eventSink("photo.capture.requested.${selectedFilter.id}.flash-${currentFlashMode().name.lowercase()}")
+        updateSnapshot(headline = if (countdownDuration() == CountdownDuration.OFF) "Still capture requested" else "Countdown started")
+        return buildCaptureStrategy(buildEffectSpec(), countdownDuration().seconds)
     }
 
-    private fun defaultDetail(): String {
-        return if (currentFlashSupported()) {
-            "静态 ${runtimeState().stillCaptureQuality.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 滤镜 ${selectedFilter.label} | 水印 ${selectedWatermarkTemplate().label} | 实况 ${onOffLabel(livePhotoEnabledByDefault())} | 定时 ${countdownDuration().label} | 闪光灯 ${currentFlashMode().label} | 画幅 ${currentFrameRatio().label} | 按下快门以发出静态拍摄请求。"
-        } else {
-            "静态 ${runtimeState().stillCaptureQuality.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 滤镜 ${selectedFilter.label} | 水印 ${selectedWatermarkTemplate().label} | 实况 ${onOffLabel(livePhotoEnabledByDefault())} | 定时 ${countdownDuration().label} | 此设备不支持闪光灯控制。画幅 ${currentFrameRatio().label} | 按下快门以发出静态拍摄请求。"
-        }
+    override fun buildSnapshot(headline: String, detail: String?) = ModeSnapshot(
+        id = ModeId.PHOTO,
+        uiSpec = ModeUiSpec("Photo", "Capture Still",
+            secondaryActionLabel = if (flashSupported()) "Toggle Flash" else "Flash Unsupported",
+            tertiaryActionLabel = "Cycle Frame"),
+        state = ModeState(headline = headline, detail = detail ?: buildDefaultDetail(),
+            isSecondaryActionEnabled = flashSupported(), isTertiaryActionEnabled = true)
+    )
+
+    override fun buildDefaultDetail(): String {
+        val flash = if (flashSupported()) "Flash ${currentFlashMode().label}" else "Flash control unavailable."
+        return "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabled())} | Timer ${countdownDuration().label} | $flash | Frame ${currentFrameRatio().label} | Press shutter to request still capture."
     }
 
-    private fun watermarkDateTime(): String {
-        return LocalDateTime.now().format(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
-        )
-    }
+    private fun flashSupported() = runtimeState().deviceCapabilities.supportsFlashControl
 
-    private fun watermarkCameraParams(flashMode: FlashMode): String {
-        return buildString {
-            append(runtimeState().stillCaptureResolutionPreset.label)
-            append(" • ")
-            append(currentFrameRatio().label)
-            append(" • Flash ")
-            append(flashMode.label)
-        }
-    }
+    private fun buildSaveRequest(flashMode: FlashMode, liveTag: String, bridgeTags: Map<String, String>) =
+        SaveRequest.photoLibrary(metadata = MediaMetadata(customTags = buildMap {
+            put("mode", "photo"); put("flash", flashMode.name.lowercase())
+            put("livePhotoDefault", liveTag); put("watermarkModeName", "Photo")
+            put("watermarkProfileName", flashMode.name.lowercase().replaceFirstChar { it.titlecase() })
+            if (liveTag == "on") putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
+            put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
+            putAll(context.captureAidMetadataTags()); putAll(bridgeTags)
+        }))
 
-    private suspend fun buildLowLightCaptureStrategy(
-        flashMode: FlashMode,
-        postProcessSpec: PostProcessSpec,
-        bridgeTags: Map<String, String>,
-        lowLightState: com.opencamera.core.mode.PhotoLowLightRuntimeState
-    ): CaptureStrategy {
-        val signal = lowLightState.sceneSignal
-        val baseMetadata = buildMap {
-            put("mode", "photo")
-            put("flash", flashMode.name.lowercase())
+    private fun captureProfile(flashMode: FlashMode) = CaptureProfile(
+        flashMode = flashMode, stillCaptureQuality = runtimeState().stillCaptureQuality,
+        stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset)
+
+    private fun buildLowLightStrategy(flashMode: FlashMode, postProcessSpec: PostProcessSpec,
+        bridgeTags: Map<String, String>, lowLight: PhotoLowLightRuntimeState): CaptureStrategy {
+        val signal = lowLight.sceneSignal
+        val base = buildMap {
+            put("mode", "photo"); put("flash", flashMode.name.lowercase())
             put("photoLowLightNightAssist", "on")
             put("photoLowLightBrightnessScore", signal.brightnessScore?.toString() ?: "unknown")
             put("photoLowLightSignalSource", signal.source)
             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
-            putAll(context.captureAidMetadataTags())
-            putAll(bridgeTags)
+            putAll(context.captureAidMetadataTags()); putAll(bridgeTags)
         }
-        return when (lowLightState.support) {
+        return when (lowLight.support) {
             PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME -> {
-                context.eventSink("photo.low-light.capture.multi-frame")
+                val metadata = MediaMetadata(customTags = base + ("photoLowLightStrategy" to "multi-frame"))
                 CaptureStrategy.MultiFrame(
-                    saveRequest = SaveRequest.photoLibrary(
-                        metadata = com.opencamera.core.media.MediaMetadata(
-                            customTags = baseMetadata + mapOf(
-                                "photoLowLightStrategy" to "multi-frame"
-                            )
-                        )
-                    ),
+                    saveRequest = SaveRequest.photoLibrary(metadata = metadata),
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         frameCount = 6,
@@ -345,149 +182,30 @@ private class PhotoModeController(
                         requiresTripod = false,
                         flashMode = flashMode,
                         stillCaptureQuality = runtimeState().stillCaptureQuality,
-                        stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
-                    )
-                )
+                        stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset))
             }
             PhotoLowLightStrategySupport.DEGRADED_SINGLE_FRAME -> {
-                context.eventSink("photo.low-light.capture.single-frame-degraded")
+                val metadata = MediaMetadata(customTags = base + ("photoLowLightStrategy" to "single-frame-degraded"))
                 CaptureStrategy.SingleFrame(
-                    saveRequest = SaveRequest.photoLibrary(
-                        metadata = com.opencamera.core.media.MediaMetadata(
-                            customTags = baseMetadata + mapOf(
-                                "photoLowLightStrategy" to "single-frame-degraded"
-                            )
-                        )
-                    ),
-                    postProcessSpec = postProcessSpec.copy(
-                        algorithmProfile = "photo-low-light-single-frame"
-                    ),
-                    captureProfile = CaptureProfile(
-                        flashMode = flashMode,
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
-                        stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
-                    )
-                )
+                    saveRequest = SaveRequest.photoLibrary(metadata = metadata),
+                    postProcessSpec = postProcessSpec.copy(algorithmProfile = "photo-low-light-single-frame"),
+                    captureProfile = captureProfile(flashMode))
             }
             PhotoLowLightStrategySupport.UNSUPPORTED -> {
+                val metadata = MediaMetadata(customTags = base + ("photoLowLightStrategy" to "unsupported-fallback"))
                 CaptureStrategy.SingleFrame(
-                    saveRequest = SaveRequest.photoLibrary(
-                        metadata = com.opencamera.core.media.MediaMetadata(
-                            customTags = baseMetadata + mapOf(
-                                "photoLowLightStrategy" to "unsupported-fallback"
-                            )
-                        )
-                    ),
+                    saveRequest = SaveRequest.photoLibrary(metadata = metadata),
                     postProcessSpec = postProcessSpec,
-                    captureProfile = CaptureProfile(
-                        flashMode = flashMode,
-                        stillCaptureQuality = runtimeState().stillCaptureQuality,
-                        stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
-                    )
-                )
+                    captureProfile = captureProfile(flashMode))
             }
         }
     }
 
-    private fun buildEffectSpec(flashMode: FlashMode): EffectSpec {
-        val filter = selectedFilter
-        val photoSettings = context.settingsSnapshot.persisted.photo
-        val pipelineResult = renderStyleColorSpecWithRecipe(
-            profileId = filter.id,
-            baseRenderSpec = filter.renderSpec,
-            colorLabSpec = photoSettings.colorLabSpec,
-            styleStrength = photoSettings.styleStrength
-        )
-        val adjustedRenderSpec = pipelineResult?.finalRenderSpec
-        val recipe = pipelineResult?.recipe
-            ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
-        val selectedWatermarkTemplate = selectedWatermarkTemplate()
-        val watermarkStyle = context.settingsSnapshot.persisted.photo
-            .watermarkStyleFor(selectedWatermarkTemplate.id)
-        return EffectSpec(listOf(
-            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe),
-            WatermarkEffect(
-                templateId = selectedWatermarkTemplate.id,
-                tokens = mapOf(
-                    "watermarkModel" to "OpenCamera",
-                    "watermarkDatetime" to watermarkDateTime(),
-                    "watermarkCameraParams" to watermarkCameraParams(flashMode)
-                ),
-                style = watermarkStyle
-            ),
-            FrameEffect(currentFrameRatio())
-        ))
-    }
-
-    private suspend fun cycleFrameRatio(): ModeSignal =
-        frameRatioDelegate.cycleFrameRatio(
-            snapshotHeadline = "画幅已更新",
-            updateSnapshot = { headline ->
-                mutableSnapshot.value = buildSnapshot(headline = headline)
-            }
-        )
-
-    private suspend fun selectFrameRatio(ratio: FrameRatio): ModeSignal =
-        frameRatioDelegate.selectFrameRatio(
-            ratio = ratio,
-            updateSnapshot = { headline ->
-                mutableSnapshot.value = buildSnapshot(headline = headline)
-            }
-        )
-
-    private fun currentDeviceGraph(): DeviceGraphSpec =
-        stillCaptureDeviceGraph(runtimeState())
-
-    private fun currentFlashModes(): List<FlashMode> {
-        return if (currentFlashSupported()) {
-            listOf(FlashMode.OFF, FlashMode.AUTO, FlashMode.ON)
-        } else {
-            listOf(FlashMode.OFF)
-        }
-    }
-
-    private fun currentFlashSupported(): Boolean = runtimeState().deviceCapabilities.supportsFlashControl
-    private fun currentFlashMode(): FlashMode = currentFlashModes()[flashModeIndex]
-    private fun currentFrameRatio(): FrameRatio = frameRatioDelegate.currentFrameRatio()
-    private fun selectedWatermarkTemplate(): WatermarkTemplate {
-        val persistedTemplateId = context.settingsSnapshot.persisted.photo.defaultWatermarkTemplateId
-        return context.settingsSnapshot.catalog.watermarkTemplates.firstOrNull { template ->
-            template.id == persistedTemplateId
-        } ?: WatermarkTemplate(
-            id = persistedTemplateId,
-            label = persistedTemplateId
-        )
-    }
-    private fun livePhotoEnabledByDefault(): Boolean =
-        context.settingsSnapshot.persisted.photo.livePhotoEnabledByDefault
-
-    private fun com.opencamera.core.settings.LiveMediaBundle.toCaptureSpec(
-        saveFormat: com.opencamera.core.settings.LiveSaveFormat
-    ): LivePhotoCaptureSpec {
-        return LivePhotoCaptureSpec(
-            motionDurationMillis = motionDurationMillis,
-            motionMimeType = motionContainer,
-            sidecarMimeType = sidecarMimeType,
-            saveFormat = saveFormat
-        )
-    }
-    private fun countdownDuration(): CountdownDuration = context.settingsSnapshot.persisted.photo.countdownDuration
-    private fun runtimeState() = context.runtimeState()
-
-    private fun resolvedDefaultFilter(): FilterProfile {
-        return context.settingsSnapshot.catalog.filterProfileOrNull(
-            context.settingsSnapshot.persisted.photo.defaultFilterProfileId
-        ) ?: DEFAULT_PHOTO_FILTER
-    }
-
-    private fun onOffLabel(enabled: Boolean): String = if (enabled) "开" else "关"
+    private fun resolvedDefaultFilter() = context.settingsSnapshot.catalog.filterProfileOrNull(
+        context.settingsSnapshot.persisted.photo.defaultFilterProfileId) ?: DEFAULT_PHOTO_FILTER
 
     companion object {
-        private val DEFAULT_PHOTO_FILTER = FilterProfile(
-            id = "photo-vivid",
-            label = "Vivid",
-            category = FilterProfileCategory.PHOTO,
-            renderSpec = com.opencamera.core.settings.defaultFilterRenderSpecOrNull("photo-vivid")
-        )
+        private val DEFAULT_PHOTO_FILTER = FilterProfile("photo-vivid", "Vivid", FilterProfileCategory.PHOTO,
+            renderSpec = com.opencamera.core.settings.defaultFilterRenderSpecOrNull("photo-vivid"))
     }
 }

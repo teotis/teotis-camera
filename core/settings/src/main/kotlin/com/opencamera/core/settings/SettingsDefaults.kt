@@ -139,7 +139,7 @@ val DEFAULT_FILTER_PROFILES: List<FilterProfile> = listOf(
     ),
     builtInFilterProfile(
         id = "humanistic-street",
-        label = "街头 Street",
+        label = "Street",
         category = FilterProfileCategory.HUMANISTIC,
         renderSpec = renderSpec(
             brightnessShift = 9,

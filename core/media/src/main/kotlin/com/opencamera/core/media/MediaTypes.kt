@@ -21,10 +21,10 @@ enum class ThumbnailPolicy {
     USE_SAVED_MEDIA
 }
 
-enum class FlashMode {
-    OFF,
-    AUTO,
-    ON
+enum class FlashMode(val label: String) {
+    OFF("Off"),
+    AUTO("Auto"),
+    ON("On")
 }
 
 enum class StillCaptureQualityPreference(
@@ -33,11 +33,11 @@ enum class StillCaptureQualityPreference(
 ) {
     LATENCY(
         tagValue = "latency",
-        label = "快速"
+        label = "Fast"
     ),
     QUALITY(
         tagValue = "quality",
-        label = "最高"
+        label = "Max"
     );
 
     companion object {

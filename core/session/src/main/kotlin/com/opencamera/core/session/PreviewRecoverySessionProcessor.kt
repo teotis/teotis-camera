@@ -464,11 +464,11 @@ internal class PreviewRecoverySessionProcessor(
             )
             val status = resolveLowLightPromptStatus(settingEnabled, support)
             val message = when (status) {
-                PhotoLowLightPromptStatus.AVAILABLE_ENABLED -> "夜间辅助已开启"
-                PhotoLowLightPromptStatus.AVAILABLE_DISABLED -> "夜间辅助已关闭"
-                PhotoLowLightPromptStatus.DEGRADED_ENABLED -> "夜间辅助已开启（降级）"
-                PhotoLowLightPromptStatus.DEGRADED_DISABLED -> "夜间辅助已关闭（降级）"
-                PhotoLowLightPromptStatus.UNSUPPORTED -> "设备不支持夜间辅助"
+                PhotoLowLightPromptStatus.AVAILABLE_ENABLED -> "Night assist on"
+                PhotoLowLightPromptStatus.AVAILABLE_DISABLED -> "Night assist off"
+                PhotoLowLightPromptStatus.DEGRADED_ENABLED -> "Night assist on (single-frame)"
+                PhotoLowLightPromptStatus.DEGRADED_DISABLED -> "Night assist off (single-frame)"
+                PhotoLowLightPromptStatus.UNSUPPORTED -> "Device does not support night assist"
                 PhotoLowLightPromptStatus.HIDDEN -> ""
             }
             val visibleUntil = System.currentTimeMillis() + 3000L

@@ -71,7 +71,7 @@ private class NightModeController(
 
     private val mutableSnapshot = MutableStateFlow(
         buildSnapshot(
-            headline = "风景管线就绪"
+            headline = "Scenery pipeline ready"
         )
     )
 
@@ -84,9 +84,9 @@ private class NightModeController(
         profileIndex = profileIndex.coerceAtMost(currentProfiles().lastIndex)
         mutableSnapshot.value = buildSnapshot(
             headline = if (multiFrameEnabled()) {
-                "风景模式已激活"
+                "Scenery mode active"
             } else {
-                "风景提亮已激活"
+                "Scenery boost active"
             }
         )
     }
@@ -98,9 +98,9 @@ private class NightModeController(
     ) {
         mutableSnapshot.value = buildSnapshot(
             headline = if (multiFrameEnabled()) {
-                "风景分辨率已更新"
+                "Scenery resolution updated"
             } else {
-                "风景辅助分辨率已更新"
+                "Scenery assisted resolution updated"
             }
         )
     }
@@ -109,9 +109,9 @@ private class NightModeController(
         context.eventSink("night.enter")
         mutableSnapshot.value = buildSnapshot(
             headline = if (multiFrameEnabled()) {
-                "风景模式已激活"
+                "Scenery mode active"
             } else {
-                "风景提亮已激活"
+                "Scenery boost active"
             }
         )
         context.onEffectSpecChanged(buildEffectSpec())
@@ -120,7 +120,7 @@ private class NightModeController(
     override suspend fun onExit() {
         context.eventSink("night.exit")
         mutableSnapshot.value = buildSnapshot(
-            headline = "风景模式未激活"
+            headline = "Scenery mode inactive"
         )
     }
 
@@ -138,9 +138,9 @@ private class NightModeController(
         reduceStillShotSessionEvent(
             event = event,
             text = StillShotSessionEventText(
-                shotStartedHeadline = "风景拍摄进行中",
-                shotCompletedHeadline = "风景照片已保存",
-                shotFailedHeadline = "风景拍摄失败"
+                shotStartedHeadline = "Scenery capture in progress",
+                shotCompletedHeadline = "Scenery photo saved",
+                shotFailedHeadline = "Scenery capture failed"
             ),
             updateSnapshot = { headline, detail ->
                 mutableSnapshot.value = if (detail == null) {
@@ -158,9 +158,9 @@ private class NightModeController(
         context.eventSink("night.capture.requested.${profile.id}.flash-${flashMode.name.lowercase()}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (countdownDuration() == CountdownDuration.OFF) {
-                "风景拍摄已请求"
+                "Scenery capture requested"
             } else {
-                "风景倒计时已启动"
+                "Scenery countdown started"
             }
         )
         val effectSpec = buildEffectSpec()
@@ -270,12 +270,12 @@ private class NightModeController(
         context.eventSink("night.profile.selected.${profile.id}")
         mutableSnapshot.value = buildSnapshot(
             headline = if (multiFrameEnabled()) {
-                "风景配置已更新"
+                "Scenery config updated"
             } else {
-                "风景辅助配置已更新"
+                "Scenery assisted config updated"
             }
         )
-        return ModeSignal.ShowHint("风景风格: ${profile.label}")
+        return ModeSignal.ShowHint("Scenery style: ${profile.label}")
     }
 
     private suspend fun toggleProVariant(): ModeSignal {
@@ -284,14 +284,14 @@ private class NightModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = if (proVariantEnabled) {
                 if (manualControlsEnabled()) {
-                    "风景专业已激活"
+                    "Scenery Pro active"
                 } else {
-                    "风景专业辅助已激活"
+                    "Scenery Pro assisted active"
                 }
             } else if (multiFrameEnabled()) {
-                "风景模式已激活"
+                "Scenery mode active"
             } else {
-                "风景提亮已激活"
+                "Scenery boost active"
             }
         )
         return result.signal
@@ -304,10 +304,10 @@ private class NightModeController(
         return ModeSnapshot(
             id = ModeId.NIGHT,
             uiSpec = ModeUiSpec(
-                title = "风景",
-                shutterLabel = "拍摄风景",
-                secondaryActionLabel = "切换风景风格",
-                tertiaryActionLabel = "切换画幅",
+                title = "Scenery",
+                shutterLabel = "Capture Scenery",
+                secondaryActionLabel = "Toggle Scenery Style",
+                tertiaryActionLabel = "Cycle Frame",
                 proActionLabel = proVariantState.proActionLabel()
             ),
             state = ModeState(
@@ -338,14 +338,14 @@ private class NightModeController(
 
     private fun profileSummary(profile: NightProfile): String {
         val flashSummary = when {
-            !flashSupported() -> "此设备不支持闪光灯。"
-            multiFrameEnabled() -> "闪光灯 ${resolvedFlashMode(profile).label} 以保留多帧合成。"
-            else -> "闪光灯 ${resolvedFlashMode(profile).label}。"
+            !flashSupported() -> "Flash unavailable on this device."
+            multiFrameEnabled() -> "Flash ${resolvedFlashMode(profile).label} to preserve multi-frame composition."
+            else -> "Flash ${resolvedFlashMode(profile).label}."
         }
         val standardSummary = if (multiFrameEnabled()) {
-            "默认风格 ${profile.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | ${profile.frameCount} 帧 | 曝光 ${profile.longExposureMillis} ms | 三脚架 ${profile.requiresTripod} | 定时 ${countdownDuration().label} | 画幅 ${currentFrameRatio().label} | 子功能风景风格、定时、画幅和夜景融合使用当前模式配置。$flashSummary"
+            "Default style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | ${profile.frameCount} frames | Exposure ${profile.longExposureMillis} ms | Tripod ${profile.requiresTripod} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Sub-feature scenery style, timer, frame and night fusion use current mode config.$flashSummary"
         } else {
-            "默认风格 ${profile.label} | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label} | 单帧提亮降级，因为此设备不支持夜景多帧。 | 定时 ${countdownDuration().label} | 画幅 ${currentFrameRatio().label} | 子功能风景风格、定时和画幅在融合降级时仍可用。$flashSummary"
+            "Default style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Single-frame boost degraded (device does not support night multi-frame). | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Sub-feature scenery style, timer and frame still available in fusion degraded mode.$flashSummary"
         }
         if (!proVariantEnabled) {
             return standardSummary
@@ -368,9 +368,9 @@ private class NightModeController(
     private suspend fun cycleFrameRatio(): ModeSignal =
         frameRatioDelegate.cycleFrameRatio(
             snapshotHeadline = if (multiFrameEnabled()) {
-                "风景画幅已更新"
+                "Scenery frame ratio updated"
             } else {
-                "风景辅助画幅已更新"
+                "Scenery assisted frame ratio updated"
             },
             updateSnapshot = { headline ->
                 mutableSnapshot.value = buildSnapshot(headline = headline)
@@ -438,7 +438,7 @@ private class NightModeController(
         private val MULTI_FRAME_PROFILES = listOf(
             NightProfile(
                 id = "handheld",
-                label = "手持",
+                label = "Handheld",
                 frameCount = 6,
                 longExposureMillis = 450L,
                 requiresTripod = false,
@@ -447,7 +447,7 @@ private class NightModeController(
             ),
             NightProfile(
                 id = "street",
-                label = "街拍",
+                label = "Street",
                 frameCount = 8,
                 longExposureMillis = 700L,
                 requiresTripod = false,
@@ -456,7 +456,7 @@ private class NightModeController(
             ),
             NightProfile(
                 id = "tripod",
-                label = "三脚架",
+                label = "Tripod",
                 frameCount = 12,
                 longExposureMillis = 1400L,
                 requiresTripod = true,
