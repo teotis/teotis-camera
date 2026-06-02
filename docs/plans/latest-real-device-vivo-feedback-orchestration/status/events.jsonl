@@ -39,3 +39,4 @@
 {"ts":"2026-06-02T14:56:47Z","event":"launch_requested","package_id":"99-finalize","branch":"agent/latest-real-device-vivo-feedback/99-finalize","worktree":"/Volumes/Extreme_SSD/project/open_camera/.worktrees/latest-real-device-vivo-feedback/99-finalize","finalize":"1"}
 {"ts":"2026-06-02T14:56:48Z","event":"state_changed","package_id":"99-finalize","old_state":"pending","new_state":"finalizing"}
 {"ts":"2026-06-02T14:56:48Z","event":"launch_succeeded","package_id":"99-finalize","session_id":"9a927bf9","new_state":"finalizing","branch":"agent/latest-real-device-vivo-feedback/99-finalize","worktree":"/Volumes/Extreme_SSD/project/open_camera/.worktrees/latest-real-device-vivo-feedback/99-finalize"}
+{"ts":"2026-06-02T15:16:17Z","event":"state_changed","package_id":"99-finalize","old_state":"finalizing","new_state":"finalized"}
