@@ -2,7 +2,7 @@
 
 ## State
 
-`pending`
+`launched`
 
 - State: pending
 - Worktree: `/Volumes/Extreme_SSD/project/open_camera/.worktrees/latest-real-device-vivo-feedback/07-real-device-acceptance-protocol`
