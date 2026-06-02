@@ -1765,7 +1765,8 @@ internal fun devLogRenderModel(
                 parts += "duration=${event.durationMillis}ms"
             }
             if (!event.detail.isNullOrBlank()) {
-                parts += "detail=${escapeLinkValue(event.detail)}"
+                val detail = event.detail!!
+                parts += "detail=${escapeLinkValue(detail)}"
             }
             parts += "source=${escapeLinkValue(event.source)}"
             parts.joinToString(" ")
