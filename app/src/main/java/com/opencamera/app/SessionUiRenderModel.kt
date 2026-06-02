@@ -1748,6 +1748,19 @@ internal fun devLogRenderModel(
         DomainTabCount(domain = domain, count = traceEvents.count { it.domain == domain })
     }.filter { it.count > 0 }
 
+    fun escapeLinkValue(value: String): String {
+        return value.replace(" ", "_").replace("=", "_")
+    }
+
+    fun formatTimestamp(timestampMillis: Long): String {
+        if (timestampMillis <= 0) return "??:??:??"
+        val seconds = (timestampMillis / 1000) % 60
+        val minutes = (timestampMillis / 60_000) % 60
+        val hours = (timestampMillis / 3_600_000) % 24
+        val millis = timestampMillis % 1000
+        return "%02d:%02d:%02d.%03d".format(hours, minutes, seconds, millis)
+    }
+
     fun formatEvents(events: List<SessionTraceEvent>): String {
         return events.joinToString("\n") { event ->
             val timeStr = formatTimestamp(event.timestampMillis)
@@ -1775,24 +1788,12 @@ internal fun devLogRenderModel(
                 parts += "duration=${event.durationMillis}ms"
             }
             if (!event.detail.isNullOrBlank()) {
-                parts += "detail=${escapeLinkValue(event.detail)}"
+                val detail = event.detail!!
+                parts += "detail=${escapeLinkValue(detail)}"
             }
             parts += "source=${escapeLinkValue(event.source)}"
             parts.joinToString(" ")
         }
-    }
-
-    private fun escapeLinkValue(value: String): String {
-        return value.replace(" ", "_").replace("=", "_")
-    }
-
-    private fun formatTimestamp(timestampMillis: Long): String {
-        if (timestampMillis <= 0) return "??:??:??"
-        val seconds = (timestampMillis / 1000) % 60
-        val minutes = (timestampMillis / 60_000) % 60
-        val hours = (timestampMillis / 3_600_000) % 24
-        val millis = timestampMillis % 1000
-        return "%02d:%02d:%02d.%03d".format(hours, minutes, seconds, millis)
     }
 
     val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics)
