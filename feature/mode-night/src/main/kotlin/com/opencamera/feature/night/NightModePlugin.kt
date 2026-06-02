@@ -160,7 +160,7 @@ private class NightModeController(
             headline = if (countdownDuration() == CountdownDuration.OFF) {
                 "Scenery capture requested"
             } else {
-                "Scenery countdown started"
+                "Scenery countdown armed"
             }
         )
         val effectSpec = buildEffectSpec()

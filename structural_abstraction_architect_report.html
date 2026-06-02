@@ -24,945 +24,604 @@
   });
 </script>
 <style>
-:root {
-  --bg: #0d1117;
-  --surface: #161b22;
-  --surface-2: #21262d;
-  --border: #30363d;
-  --text: #e6edf3;
-  --text-muted: #8b949e;
-  --accent: #58a6ff;
-  --accent-dim: rgba(88,166,255,0.15);
-  --red: #ff7b72;
-  --red-dim: rgba(248,81,73,0.14);
-  --green: #7ee787;
-  --green-dim: rgba(126,231,135,0.14);
-  --yellow: #d29922;
-  --yellow-dim: rgba(210,153,34,0.14);
-  --purple: #d2a8ff;
-  --purple-dim: rgba(210,168,255,0.14);
-  --topo-bg: #151922;
-  --topo-current-label-bg: rgba(248,81,73,0.14);
-  --topo-current-label-color: #ff7b72;
-  --topo-current-border: rgba(248,81,73,0.32);
-  --topo-proposed-label-bg: rgba(88,166,255,0.15);
-  --topo-proposed-label-color: #79c0ff;
-  --topo-proposed-border: rgba(88,166,255,0.32);
-  --lb-backdrop: rgba(0,0,0,0.88);
-  --lb-content-bg: #151922;
-}
-
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
-.container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
-h2 { font-size: 22px; font-weight: 600; margin: 40px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-h3 { font-size: 18px; font-weight: 600; margin: 24px 0 12px; color: var(--accent); }
-h4 { font-size: 15px; font-weight: 600; margin: 16px 0 8px; }
-p { margin-bottom: 12px; }
-.subtitle { color: var(--text-muted); font-size: 14px; margin-bottom: 32px; }
-
-.badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-right: 6px; }
-.badge-red { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
-.badge-green { background: var(--green-dim); color: var(--green); border: 1px solid rgba(126,231,135,0.3); }
-.badge-yellow { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(210,153,34,0.3); }
-.badge-blue { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
-.badge-purple { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(210,168,255,0.3); }
-
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; }
-.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.card-title { font-size: 16px; font-weight: 600; }
-
-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
-th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
-th { background: var(--surface-2); font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
-tr:hover { background: rgba(88,166,255,0.04); }
-
-.metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
-.metric { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; text-align: center; }
-.metric-value { font-size: 32px; font-weight: 700; }
-.metric-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-
-.leverage-matrix { position: relative; width: 100%; height: 500px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin: 16px 0; overflow: hidden; }
-.matrix-axis-x { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--text-muted); }
-.matrix-axis-y { position: absolute; left: 30px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-size: 12px; color: var(--text-muted); }
-.matrix-dot { position: absolute; width: 14px; height: 14px; border-radius: 50%; cursor: pointer; transition: transform 0.2s; }
-.matrix-dot:hover { transform: scale(1.5); z-index: 10; }
-.matrix-dot::after { content: attr(data-label); position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 11px; color: var(--text); background: var(--surface-2); padding: 2px 6px; border-radius: 4px; display: none; pointer-events: none; }
-.matrix-dot:hover::after { display: block; }
-.matrix-grid { position: absolute; inset: 40px 20px 40px 50px; }
-.matrix-grid::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--border); }
-.matrix-grid::after { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; border-left: 1px dashed var(--border); }
-
-.topology-compare { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; }
-.topology-diagram { flex: 1; min-width: 340px; cursor: pointer; }
-.topology-diagram .mermaid { min-height: 380px; width: 100%; background: var(--topo-bg); }
-.topology-diagram .label { font-size: 14px; font-weight: 600; margin-bottom: 8px; padding: 4px 12px; border-radius: 4px; display: inline-block; }
-.topology-diagram.current .label { background: var(--topo-current-label-bg); color: var(--topo-current-label-color); }
-.topology-diagram.current .mermaid { border: 2px solid var(--topo-current-border); border-radius: 8px; padding: 16px; }
-.topology-diagram.proposed .label { background: var(--topo-proposed-label-bg); color: var(--topo-proposed-label-color); }
-.topology-diagram.proposed .mermaid { border: 2px solid var(--topo-proposed-border); border-radius: 8px; padding: 16px; }
-
-.lightbox { display: none; position: fixed; inset: 0; z-index: 9999; background: var(--lb-backdrop); cursor: pointer; }
-.lightbox.active { display: flex; align-items: center; justify-content: center; }
-.lightbox .diagram-wrapper { min-width: 700px; min-height: 500px; max-width: 92vw; max-height: 92vh; overflow: auto; background: var(--lb-content-bg); border-radius: 8px; padding: 24px; }
-
-details { margin: 8px 0; }
-details summary { cursor: pointer; color: var(--accent); font-size: 14px; padding: 4px 0; }
-details summary:hover { text-decoration: underline; }
-pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-size: 13px; overflow-x: auto; margin: 8px 0; font-family: 'SF Mono', 'Fira Code', monospace; }
-
-.review-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
-.review-textarea { width: 100%; min-height: 60px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px; font-size: 13px; resize: vertical; margin: 8px 0; }
-.review-controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
-.review-controls select { background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); padding: 4px 8px; font-size: 13px; }
-.stars { display: flex; gap: 2px; }
-.star { cursor: pointer; font-size: 20px; color: var(--border); transition: color 0.15s; }
-.star.active { color: var(--yellow); }
-.star:hover { color: var(--yellow); }
-
-.export-btn { position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: #000; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; z-index: 100; transition: opacity 0.2s; }
-.export-btn:hover { opacity: 0.85; }
-.toast { position: fixed; bottom: 80px; right: 24px; background: var(--green); color: #000; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; z-index: 100; display: none; }
-
-.section-nav { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--border); padding: 12px 0; z-index: 50; margin: 0 -24px; padding-left: 24px; padding-right: 24px; }
-.section-nav a { color: var(--text-muted); text-decoration: none; font-size: 13px; margin-right: 16px; transition: color 0.15s; }
-.section-nav a:hover { color: var(--accent); }
-
-.evidence-tag { display: inline-block; font-size: 11px; color: var(--text-muted); background: var(--surface-2); padding: 1px 6px; border-radius: 3px; margin: 1px 2px; font-family: 'SF Mono', monospace; }
-
-.classification { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-.class-validated { background: var(--green-dim); color: var(--green); border: 1px solid rgba(126,231,135,0.3); }
-.class-promising { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(210,153,34,0.3); }
-.class-false { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
-.class-pragmatic { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(210,168,255,0.3); }
+:root{--bg:#0d1117;--s1:#161b22;--s2:#21262d;--b:#30363d;--t:#e6edf3;--tm:#8b949e;--a:#58a6ff;--a2:#79c0ff;--g:#3fb950;--r:#f85149;--o:#d29922;--p:#bc8cff;--tb:#151922;--tc-bg:rgba(248,81,73,0.14);--tc-c:#ff7b72;--tc-b:rgba(248,81,73,0.32);--tp-bg:rgba(88,166,255,0.15);--tp-c:#79c0ff;--tp-b:rgba(88,166,255,0.32);--lb-b:rgba(0,0,0,0.88);--lb-c:#151922}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--t);line-height:1.6}
+.c{max-width:1200px;margin:0 auto;padding:32px 24px}
+h1{font-size:2rem;font-weight:700;margin-bottom:8px}
+h2{font-size:1.5rem;font-weight:600;margin:40px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--b)}
+h3{font-size:1.2rem;font-weight:600;margin:24px 0 12px;color:var(--a2)}
+h4{font-size:1rem;font-weight:600;margin:16px 0 8px}
+p,li{color:var(--t);margin-bottom:8px}
+ul,ol{padding-left:20px}
+code{font-family:'SF Mono','Fira Code',monospace;background:var(--s2);padding:2px 6px;border-radius:4px;font-size:0.9em}
+pre{background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:16px;overflow-x:auto;margin:12px 0}
+pre code{background:none;padding:0}
+.b{display:inline-block;padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;margin:2px 4px}
+.bg{background:rgba(63,185,80,.15);color:var(--g);border:1px solid rgba(63,185,80,.3)}
+.br{background:rgba(248,81,73,.15);color:var(--r);border:1px solid rgba(248,81,73,.3)}
+.bo{background:rgba(210,153,34,.15);color:var(--o);border:1px solid rgba(210,153,34,.3)}
+.bp{background:rgba(188,140,255,.15);color:var(--p);border:1px solid rgba(188,140,255,.3)}
+.bb{background:rgba(88,166,255,.15);color:var(--a);border:1px solid rgba(88,166,255,.3)}
+.cd{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:24px;margin:20px 0}
+.cd-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.cd-t{font-size:1.15rem;font-weight:600}
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:0.9rem}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--b)}
+th{background:var(--s2);font-weight:600}
+tr:hover td{background:rgba(88,166,255,.05)}
+.tp{display:flex;flex-wrap:wrap;gap:20px;margin-top:24px}
+.td{flex:1;min-width:340px;cursor:pointer}
+.td .mermaid{min-height:380px;width:100%;background:var(--tb)}
+.td .lb{font-size:14px;font-weight:600;margin-bottom:8px;padding:4px 12px;border-radius:4px;display:inline-block}
+.td.cur .lb{background:var(--tc-bg);color:var(--tc-c)}
+.td.cur .mermaid{border:2px solid var(--tc-b);border-radius:8px;padding:16px}
+.td.pro .lb{background:var(--tp-bg);color:var(--tp-c)}
+.td.pro .mermaid{border:2px solid var(--tp-b);border-radius:8px;padding:16px}
+.lbx{display:none;position:fixed;inset:0;z-index:9999;background:var(--lb-b);cursor:pointer}
+.lbx.a{display:flex;align-items:center;justify-content:center}
+.lbx .dw{min-width:700px;min-height:500px;max-width:92vw;max-height:92vh;overflow:auto;background:var(--lb-c);border-radius:8px;padding:24px}
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:16px 0}
+.mc{background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:16px;text-align:center}
+.mv{font-size:2rem;font-weight:700;color:var(--a)}
+.ml{font-size:0.85rem;color:var(--tm);margin-top:4px}
+.rs{margin-top:24px;padding-top:16px;border-top:1px dashed var(--b)}
+.rs textarea{width:100%;min-height:80px;background:var(--s2);border:1px solid var(--b);border-radius:6px;color:var(--t);padding:10px;font-family:inherit;resize:vertical}
+.rs select{background:var(--s2);border:1px solid var(--b);border-radius:6px;color:var(--t);padding:6px 10px;margin:8px 4px}
+.sr{display:inline-flex;gap:4px;margin:8px 4px}
+.sr .s{cursor:pointer;font-size:1.4rem;color:var(--b);transition:color .15s}
+.sr .s.a{color:var(--o)}
+.eb{position:fixed;bottom:24px;right:24px;background:var(--a);color:#fff;border:none;border-radius:8px;padding:12px 20px;font-size:.95rem;font-weight:600;cursor:pointer;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.eb:hover{opacity:.9}
+.nt{position:fixed;bottom:80px;right:24px;background:var(--g);color:#fff;padding:10px 18px;border-radius:8px;font-size:.9rem;z-index:1001;display:none}
+.tc{background:var(--s1);border:1px solid var(--b);border-radius:8px;padding:20px 28px;margin:20px 0}
+.tc a{color:var(--a);text-decoration:none}
+.tc a:hover{text-decoration:underline}
+.sb{background:linear-gradient(135deg,rgba(88,166,255,.08),rgba(188,140,255,.08));border:1px solid rgba(88,166,255,.2);border-radius:12px;padding:24px;margin:20px 0}
+details{margin:8px 0}
+details summary{cursor:pointer;color:var(--a);font-weight:600}
+.er{color:var(--tm);font-size:.85rem;font-style:italic}
+.da{color:var(--g);font-weight:700}
+.tag{display:inline-block;background:var(--s2);border:1px solid var(--b);border-radius:4px;padding:1px 8px;font-size:.8rem;margin:2px;color:var(--tm)}
 </style>
 </head>
 <body>
-
-<div class="container">
+<div class="c">
 
 <h1>OpenCamera 结构抽象分析报告</h1>
-<p class="subtitle">Structural Abstraction Architect Report &mdash; 2026-05-27 &mdash; 分析性质，不涉及代码修改</p>
+<p style="color:var(--tm);margin-bottom:24px">Structural Abstraction Architect | 2026-06-02 | main branch</p>
 
-<nav class="section-nav">
-  <a href="#exec-summary">总览</a>
-  <a href="#metrics">指标</a>
-  <a href="#evidence">证据</a>
-  <a href="#leverage">杠杆矩阵</a>
-  <a href="#pressure-map">压力图</a>
-  <a href="#proposals">提案</a>
-  <a href="#rejected">拒绝项</a>
-  <a href="#uncertainties">不确定性</a>
-</nav>
+<div class="sb">
+<h2 id="sec-exec">1. 执行摘要</h2>
+<p>OpenCamera 是一个分层架构的 Android Kotlin 相机应用，采用 <code>app</code> + 8 个 <code>core</code> 模块 + 8 个 <code>feature</code> 模块的多模块结构。整体架构方向正确（Session Kernel + Mode Plugin + Device Adapter + Media Pipeline），但经过全面分析发现了 <strong>6 个主要结构压力点</strong>，其中 3 个具有高杠杆价值。</p>
 
-<!-- ==================== EXECUTIVE SUMMARY ==================== -->
-<h2 id="exec-summary">1. 执行摘要</h2>
+<h3>最高杠杆机会</h3>
+<ul>
+<li><strong>P1: 静态拍摄模式基类提取</strong> — Photo/Night/Portrait/Humanistic 共享 ~70% 相同模式结构代码，可删除 ~1200 行重复</li>
+<li><strong>P2: CameraXCaptureAdapter 拆分</strong> — 3437 行 God Class 应拆分为 4-5 个职责明确的子组件</li>
+<li><strong>P3: 水印样式集合化</strong> — 6 个模板 × 4 个字段 = 24 个序列化键，应替换为 Map 结构</li>
+</ul>
 
-<div class="card">
-<h3>总体结构诊断</h3>
-<p>OpenCamera 拥有一个<strong>设计意图清晰的多模块插件架构</strong>：core 层定义契约，feature 层实现模式插件，app 层做 Android 适配。模块边界和依赖方向总体正确。</p>
-<p>但在快速功能迭代过程中，出现了 <strong>5 类结构性压力</strong>，每一类都代表着"用局部补丁替代全局结构"的熵增：</p>
+<h3>拒绝的候选方案</h3>
+<ul>
+<li>DeviceEvent/SessionIntent 合并 — 1:1 映射是有意的层级隔离，合并会破坏架构边界</li>
+<li>SessionState 合并 PresentationState — 分离是有意的关注点分离设计</li>
+</ul>
+</div>
+
+<div class="tc">
+<h3>目录</h3>
 <ol>
-<li><strong>效果管线的三重表示</strong>：EffectSpec（类型化）→ PostProcessSpec（有损子集）→ customTags（扁平字符串映射），同一概念在管线中被序列化-反序列化 4 次</li>
-<li><strong>Session 层累积模式专属知识</strong>：53 个 SessionIntent 子类型中有 10 个仅服务于单一模式，40 个状态字段中有模式专属字段</li>
-<li><strong>6 个静态拍照模式 40-55% 代码重复</strong>：水印、生命周期、会话事件、Pro 变体等样板代码逐字复制</li>
-<li><strong>域逻辑泄漏到 app 层</strong>：PhotoAlgorithmPostProcessor（1120 行）和 PortraitRenderPostProcessor（993 行）包含完整的像素渲染管线和 24 个滤镜配置</li>
-<li><strong>设置系统的 O(n) 触点爆炸</strong>：水印模板以命名字段硬编码，FilterRenderSpec 有 4 条独立序列化路径</li>
+<li><a href="#sec-exec">执行摘要</a></li>
+<li><a href="#sec-evidence">证据台账</a></li>
+<li><a href="#sec-matrix">结构杠杆矩阵</a></li>
+<li><a href="#sec-pressure">结构压力地图</a></li>
+<li><a href="#sec-p1">提案 P1: 静态拍摄模式基类</a></li>
+<li><a href="#sec-p2">提案 P2: CameraXCaptureAdapter 拆分</a></li>
+<li><a href="#sec-p3">提案 P3: 水印样式集合化</a></li>
+<li><a href="#sec-p4">提案 P4: PostProcessor 桥接统一</a></li>
+<li><a href="#sec-p5">提案 P5: Serializer 声明式化</a></li>
+<li><a href="#sec-p6">提案 P6: 元数据标签生成器</a></li>
+<li><a href="#sec-rejected">拒绝/推迟的抽象</a></li>
+<li><a href="#sec-handoff">过渡交接简报</a></li>
+<li><a href="#sec-uncertainties">不确定性</a></li>
+<li><a href="#sec-artifacts">可复用工件</a></li>
 </ol>
 </div>
 
-<div class="card">
-<h3>最高杠杆的已验证机会</h3>
+<h2 id="sec-evidence">2. 证据台账</h2>
+
+<h3>项目规模指标</h3>
+<div class="mg">
+<div class="mc"><div class="mv">37,623</div><div class="ml">主源码总行数</div></div>
+<div class="mc"><div class="mv">16</div><div class="ml">Gradle 模块</div></div>
+<div class="mc"><div class="mv">82</div><div class="ml">主源码文件</div></div>
+<div class="mc"><div class="mv">3,437</div><div class="ml">最大单文件行数</div></div>
+</div>
+
+<h3>关键文件清单</h3>
 <table>
-<tr><th>优先级</th><th>提案</th><th>结构杠杆</th><th>过渡负担</th></tr>
-<tr><td><span class="badge badge-red">P0</span></td><td>统一效果管线表示（EffectSpec 贯穿全程）</td><td>消除 4 层转换 + 3 重表示</td><td>中等</td></tr>
-<tr><td><span class="badge badge-red">P0</span></td><td>提取 StillCaptureMode 基础模板</td><td>消除 750-1500 行重复</td><td>低</td></tr>
-<tr><td><span class="badge badge-yellow">P1</span></td><td>模式专属 Intent 委托回插件</td><td>SessionIntent 从 53 降至 ~43</td><td>低</td></tr>
-<tr><td><span class="badge badge-yellow">P1</span></td><td>域逻辑从 app 回迁 core</td><td>~2100 行域逻辑归位</td><td>中等</td></tr>
-<tr><td><span class="badge badge-blue">P2</span></td><td>水印模板数据化</td><td>消除 O(n) 触点爆炸</td><td>低</td></tr>
+<tr><th>文件</th><th>行数</th><th>职责</th><th>结构信号</th></tr>
+<tr><td><code>CameraXCaptureAdapter.kt</code></td><td>3,437</td><td>CameraX 适配器 God Class</td><td><span class="b br">God Class</span></td></tr>
+<tr><td><code>SessionUiRenderModel.kt</code></td><td>2,314</td><td>UI 渲染模型</td><td><span class="b bo">大文件</span></td></tr>
+<tr><td><code>DefaultCameraSession.kt</code></td><td>1,876</td><td>Session Kernel 核心</td><td><span class="b bb">核心</span></td></tr>
+<tr><td><code>PhotoWatermarkPostProcessor.kt</code></td><td>1,295</td><td>水印后处理器</td><td><span class="b bo">模式重复</span></td></tr>
+<tr><td><code>PhotoAlgorithmPostProcessor.kt</code></td><td>1,120</td><td>滤镜后处理器</td><td><span class="b bo">模式重复</span></td></tr>
+<tr><td><code>PortraitRenderPostProcessor.kt</code></td><td>993</td><td>人像后处理器</td><td><span class="b bo">模式重复</span></td></tr>
+<tr><td><code>PortraitModePlugin.kt</code></td><td>623</td><td>人像模式插件</td><td><span class="b bp">模式克隆</span></td></tr>
+<tr><td><code>PhotoModePlugin.kt</code></td><td>493</td><td>拍照模式插件</td><td><span class="b bp">模式克隆</span></td></tr>
+<tr><td><code>NightModePlugin.kt</code></td><td>490</td><td>风景模式插件</td><td><span class="b bp">模式克隆</span></td></tr>
+<tr><td><code>PersistedSettingsSerializer.kt</code></td><td>289</td><td>设置序列化器</td><td><span class="b bo">样板膨胀</span></td></tr>
 </table>
-</div>
 
-<div class="card">
-<h3>最重要的拒绝/暂缓项</h3>
-<ul>
-<li><strong>合并 EffectEntry 和 AlgorithmType</strong>：它们代表用户意图 vs 执行分类两个不同概念，强制统一会抹掉有意义的区分</li>
-<li><strong>引入 DI 框架</strong>：AppContainer 仅 193 行且无域逻辑，引入 Hilt/Koin 的复杂度收益比不合理</li>
-<li><strong>统一 Video 和静态拍照模式</strong>：生命周期、设备图、会话事件模型完全不同，强制共享模板会引入脆弱的条件分支</li>
-</ul>
-</div>
-</div>
-
-<!-- ==================== METRICS ==================== -->
-<h2 id="metrics">2. 关键指标</h2>
-
-<div class="metric-grid">
-  <div class="metric"><div class="metric-value" style="color:var(--red)">53</div><div class="metric-label">SessionIntent 子类型</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--yellow)">40</div><div class="metric-label">SessionState 字段</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--accent)">3260</div><div class="metric-label">模式插件总行数</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--green)">15</div><div class="metric-label">Gradle 模块数</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--red)">4</div><div class="metric-label">效果管线转换层数</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--yellow)">3</div><div class="metric-label">效果概念并行表示</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--accent)">53</div><div class="metric-label">持久化设置键</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--purple)">23</div><div class="metric-label">SettingsAction 子类型</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--red)">4</div><div class="metric-label">FilterRenderSpec 序列化路径</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--yellow)">~4300</div><div class="metric-label">app 层域逻辑行数</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--accent)">6</div><div class="metric-label">水印模板（O(n) 硬编码）</div></div>
-  <div class="metric"><div class="metric-value" style="color:var(--green)">16</div><div class="metric-label">CapabilityRequirementKind</div></div>
-</div>
-
-<!-- ==================== EVIDENCE LEDGER ==================== -->
-<h2 id="evidence">3. 证据台账</h2>
-
-<div class="card">
-<h3>观察事实（已验证）</h3>
+<h3>架构层级</h3>
 <table>
-<tr><th>证据 ID</th><th>位置</th><th>观察</th></tr>
-<tr><td>E-01</td><td><span class="evidence-tag">core/session/SessionContracts.kt</span></td><td>SessionIntent 有 53 个子类型，其中 5 个 DocumentBatch* 仅 DOCUMENT 模式使用，5 个 Brightness* 仅 PHOTO 模式使用</td></tr>
-<tr><td>E-02</td><td><span class="evidence-tag">core/session/DefaultCameraSession.kt</span></td><td>processModeControlIntent 的 when 块有 22 个分支；updateState 有 36 个命名参数</td></tr>
-<tr><td>E-03</td><td><span class="evidence-tag">core/effect/EffectBridge.kt</span></td><td>toMetadataTags 将类型化 EffectEntry 扁平化为 Map&lt;String,String&gt;；toPostProcessSpec 仅保留 2 个字段（有损）</td></tr>
-<tr><td>E-04</td><td><span class="evidence-tag">core/media/ShotGraphBuilder.kt</span></td><td>基于 ShotKind 而非 EffectSpec 生成 MULTI_FRAME_MERGE / NIGHT_ENHANCE / LIVE_ASSEMBLE 节点</td></tr>
-<tr><td>E-05</td><td><span class="evidence-tag">app/AlgorithmProcessorBridges.kt</span></td><td>通过 canProcess() 中的字符串标签匹配重新构建已类型化的意图</td></tr>
-<tr><td>E-06</td><td><span class="evidence-tag">feature/mode-*/ 各文件</span></td><td>6 个静态拍照模式的 watermarkDateTime()、watermarkCameraParams()、selectedWatermarkTemplate() 等 6 个辅助方法逐字相同</td></tr>
-<tr><td>E-07</td><td><span class="evidence-tag">feature/mode-portrait + mode-humanistic</span></td><td>LivePhoto vs SingleFrame 的 CaptureStrategy 构建代码结构完全相同，仅元数据标签不同</td></tr>
-<tr><td>E-08</td><td><span class="evidence-tag">app/PhotoAlgorithmPostProcessor.kt</span></td><td>1120 行，包含 24 个命名滤镜配置、完整像素渲染管线（15+ 操作/像素）、mask 感知渲染</td></tr>
-<tr><td>E-09</td><td><span class="evidence-tag">app/PortraitRenderPostProcessor.kt</span></td><td>993 行，包含散景模拟、高光光斑渲染、皮肤平滑等完整图像处理算法</td></tr>
-<tr><td>E-10</td><td><span class="evidence-tag">app/Android*Editor x 6</span></td><td>readSourceBytes、writeEncodedBytes、readPreservedExif、restorePreservedExif、EXIF_TAGS_TO_PRESERVE 在 6 个编辑器中完全相同（~600-900 行重复）</td></tr>
-<tr><td>E-11</td><td><span class="evidence-tag">core/settings/PersistedSettingsSerializer.kt</span></td><td>6 个水印模板 x 4 个样式属性 = 24 个独立键；watermarkStyleFor() 和 updateWatermarkStyle() 各有 6 个 when 分支</td></tr>
-<tr><td>E-12</td><td><span class="evidence-tag">core/settings/FilterRenderSpec</span></td><td>同一 15 字段数据类有 4 条独立序列化路径：设置存储、元数据标签、分享编解码器、fromMetadataTags</td></tr>
-<tr><td>E-13</td><td><span class="evidence-tag">core/effect/RenderRecipe.kt</span></td><td>第三个并行表示，可从 EffectSpec、ShotRequest、ShotResult 三种来源构建</td></tr>
-<tr><td>E-14</td><td><span class="evidence-tag">feature/mode-portrait, mode-night, mode-humanistic</span></td><td>ProVariantState 集成（属性 + 7 个委托方法）在 3 个模式中逐字相同</td></tr>
+<tr><th>层级</th><th>模块</th><th>核心职责</th></tr>
+<tr><td>Mode Plugin</td><td><code>:feature:mode-*</code> (8个)</td><td>模式行为描述、UI 规格、拍摄策略</td></tr>
+<tr><td>Session Kernel</td><td><code>:core:session</code></td><td>状态机、Intent 处理、Effect 发射、恢复</td></tr>
+<tr><td>Device Adapter</td><td><code>:core:device</code> + <code>app/camera/</code></td><td>CameraX/Camera2 交互、硬件抽象</td></tr>
+<tr><td>Media Pipeline</td><td><code>:core:media</code></td><td>拍摄图构建、后处理链、保存事务</td></tr>
+<tr><td>Settings</td><td><code>:core:settings</code></td><td>持久化设置、Feature Catalog</td></tr>
+<tr><td>Effect</td><td><code>:core:effect</code></td><td>效果桥接、Preview 色彩变换</td></tr>
+<tr><td>Capability</td><td><code>:core:capability</code></td><td>能力图解析、降级策略</td></tr>
 </table>
-</div>
 
-<div class="card">
-<h3>推论（基于证据的结构判断）</h3>
+<h2 id="sec-matrix">3. 结构杠杆矩阵</h2>
 <table>
-<tr><th>推论</th><th>依据</th><th>置信度</th></tr>
-<tr><td>效果管线的三重表示源于预览/拍摄的架构分叉</td><td>E-03, E-04, E-05, E-13</td><td><span class="badge badge-green">高</span></td></tr>
-<tr><td>Session 层正在成为模式逻辑的隐式聚合器</td><td>E-01, E-02</td><td><span class="badge badge-green">高</span></td></tr>
-<tr><td>模式插件的重复是增量开发的自然结果，非架构意图</td><td>E-06, E-07, E-14</td><td><span class="badge badge-green">高</span></td></tr>
-<tr><td>app 层的域逻辑泄漏是先在 app 实现、后抽取 core 的遗留路径</td><td>E-08, E-09, E-10</td><td><span class="badge badge-yellow">中</span></td></tr>
-<tr><td>FilterRenderSpec 的 4 条序列化路径是不同功能需求独立演化的结果</td><td>E-12</td><td><span class="badge badge-yellow">中</span></td></tr>
+<tr><th>提案</th><th>结构简化潜力</th><th>迁移负担</th><th>风险</th><th>信心</th><th>分类</th></tr>
+<tr>
+<td><strong>P1</strong> 模式基类</td>
+<td><span class="b bg">高</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bg">高</span></td>
+<td><span class="b bg">已验证</span></td>
+</tr>
+<tr>
+<td><strong>P2</strong> Adapter 拆分</td>
+<td><span class="b bg">高</span></td>
+<td><span class="b bo">中</span></td>
+<td><span class="b bo">中</span></td>
+<td><span class="b bg">高</span></td>
+<td><span class="b bg">已验证</span></td>
+</tr>
+<tr>
+<td><strong>P3</strong> 水印集合化</td>
+<td><span class="b bb">中</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bg">高</span></td>
+<td><span class="b bg">已验证</span></td>
+</tr>
+<tr>
+<td><strong>P4</strong> 桥接统一</td>
+<td><span class="b bb">中</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bg">高</span></td>
+<td><span class="b bg">已验证</span></td>
+</tr>
+<tr>
+<td><strong>P5</strong> Serializer 声明式</td>
+<td><span class="b bb">中</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bo">中</span></td>
+<td><span class="b bb">中</span></td>
+<td><span class="b bp">有前景但未证</span></td>
+</tr>
+<tr>
+<td><strong>P6</strong> 元数据标签</td>
+<td><span class="b bb">中</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bg">低</span></td>
+<td><span class="b bg">高</span></td>
+<td><span class="b bg">已验证</span></td>
+</tr>
 </table>
-</div>
 
-<div class="card">
-<h3>未知项</h3>
-<ul>
-<li>运行时性能数据（各管线阶段的实际耗时）不可用</li>
-<li>各模式的用户使用频率分布不可用</li>
-<li>团队对 core 模块 API 稳定性的预期不可知</li>
-<li>是否有计划中的新模式（如 Astro、Cinematic）会改变模式数量假设</li>
-</ul>
-</div>
-
-<!-- ==================== LEVERAGE MATRIX ==================== -->
-<h2 id="leverage">4. 结构杠杆矩阵</h2>
-
-<div class="leverage-matrix">
-  <div class="matrix-grid">
-    <!-- P0 items (high leverage, various burden) -->
-    <div class="matrix-dot" style="left:45%;bottom:82%;background:var(--green)" data-label="统一效果管线" title="统一效果管线：高杠杆，中等负担"></div>
-    <div class="matrix-dot" style="left:20%;bottom:78%;background:var(--green)" data-label="StillCapture 模板" title="StillCapture 模板：高杠杆，低负担"></div>
-    <!-- P1 items -->
-    <div class="matrix-dot" style="left:18%;bottom:62%;background:var(--yellow)" data-label="模式 Intent 委托" title="模式 Intent 委托：中杠杆，低负担"></div>
-    <div class="matrix-dot" style="left:50%;bottom:65%;background:var(--yellow)" data-label="域逻辑回迁 core" title="域逻辑回迁 core：中杠杆，中等负担"></div>
-    <div class="matrix-dot" style="left:22%;bottom:55%;background:var(--yellow)" data-label="编辑器基类提取" title="编辑器基类提取：中杠杆，低负担"></div>
-    <!-- P2 items -->
-    <div class="matrix-dot" style="left:15%;bottom:42%;background:var(--accent)" data-label="水印模板数据化" title="水印模板数据化：低杠杆，低负担"></div>
-    <div class="matrix-dot" style="left:35%;bottom:38%;background:var(--accent)" data-label="序列化路径统一" title="序列化路径统一：低杠杆，中等负担"></div>
-    <div class="matrix-dot" style="left:25%;bottom:30%;background:var(--accent)" data-label="SettingsAction 数据化" title="SettingsAction 数据化：低杠杆，低负担"></div>
-  </div>
-  <div class="matrix-axis-x">过渡负担 →</div>
-  <div class="matrix-axis-y">结构简化潜力 →</div>
-</div>
-
-<p style="font-size:13px;color:var(--text-muted)">气泡位置反映相对估计。绿色 = P0 已验证机会，黄色 = P1 有前景但需更多证据，蓝色 = P2 低优先级。灰色虚线分隔四个象限。</p>
-
-<!-- ==================== PRESSURE MAP ==================== -->
-<h2 id="pressure-map">5. 结构压力图</h2>
-
-<div class="card">
-<h3>压力 1：效果管线的三重表示</h3>
-<p><span class="badge badge-red">高压力</span> 同一用户意图（滤镜、水印、人像、文档效果）在管线中存在 3 种表示：</p>
+<h2 id="sec-pressure">4. 结构压力地图</h2>
 <table>
-<tr><th>表示</th><th>类型</th><th>使用位置</th><th>完整性</th></tr>
-<tr><td>EffectSpec</td><td>类型化 sealed interface</td><td>预览渲染、模式定义</td><td>完整</td></tr>
-<tr><td>PostProcessSpec</td><td>data class（3 字段）</td><td>ShotGraphBuilder</td><td>有损（仅保留 algorithmProfile + watermarkText）</td></tr>
-<tr><td>MediaMetadata.customTags</td><td>Map&lt;String,String&gt;</td><td>AlgorithmProcessorBridges</td><td>完整但类型信息丢失</td></tr>
+<tr><th>压力信号</th><th>位置</th><th>严重程度</th><th>结构假说</th></tr>
+<tr><td>模式插件代码克隆</td><td><code>feature/mode-*</code></td><td><span class="b br">高</span></td><td>缺失静态拍摄模式基类</td></tr>
+<tr><td>God Class</td><td><code>CameraXCaptureAdapter.kt</code></td><td><span class="b br">高</span></td><td>缺失子组件拆分</td></tr>
+<tr><td>水印样式字段爆炸</td><td><code>PhotoSettings</code></td><td><span class="b bo">中</span></td><td>缺失 Map 结构</td></tr>
+<tr><td>PostProcessor 桥接样板</td><td><code>AlgorithmProcessorBridges.kt</code></td><td><span class="b bo">中</span></td><td>缺失统一桥接</td></tr>
+<tr><td>Serializer 样板膨胀</td><td><code>PersistedSettingsSerializer.kt</code></td><td><span class="b bb">低-中</span></td><td>缺失声明式映射</td></tr>
+<tr><td>元数据标签手写重复</td><td>所有 ModePlugin</td><td><span class="b bb">低-中</span></td><td>缺失 Builder</td></tr>
 </table>
-<p>加上 RenderRecipe（第三个并行表示），共有 <strong>4 个转换层</strong>：EffectBridge.toMetadataTags → EffectBridge.toPostProcessSpec → ShotGraphBuilder → AlgorithmProcessorBridges。</p>
-<p>核心问题：EffectSpec 在快门按下时被丢弃，下游代码必须通过字符串标签匹配来反向推断原始类型化意图。</p>
-</div>
 
-<div class="card">
-<h3>压力 2：Session 层的模式知识累积</h3>
-<p><span class="badge badge-yellow">中等压力</span> Session 层本应是模式无关的协调器，但实际上：</p>
-<ul>
-<li>5 个 DocumentBatch* Intent 仅服务于 DOCUMENT 模式，其处理逻辑（~88 行）和状态（DocumentBatchState 及 4 个枚举/数据类）嵌入 SessionContracts</li>
-<li>5 个 Brightness Intent 的处理方法硬编码 <code>activeMode != ModeId.PHOTO</code> 守卫</li>
-<li>handleSwitchMode 硬编码 <code>ModeId.DOCUMENT</code> 检查以自动创建批次</li>
-<li>processModeControlIntent 的 when 块有 22 个分支，其中 10 个是模式专属的</li>
-</ul>
-</div>
-
-<div class="card">
-<h3>压力 3：模式插件的样板代码膨胀</h3>
-<p><span class="badge badge-yellow">中等压力</span> 6 个静态拍照模式（Photo、Portrait、Night、Document、Pro、Humanistic）共享约 40-55% 的代码：</p>
-<ul>
-<li>6 个水印辅助方法在 6 个模式中逐字相同</li>
-<li>ProVariantState 集成在 3 个模式中逐字相同（~25 行 x 3）</li>
-<li>onSessionEvent 委托在 6 个模式中结构完全相同</li>
-<li>生命周期方法（onEnter、onExit 等）骨架完全相同</li>
-<li>CaptureStrategy 的 LivePhoto vs SingleFrame 分支在 Photo/Portrait/Humanistic 中结构相同</li>
-</ul>
-<p>估计可消除 <strong>750-1500 行</strong>重复代码，同时使每个模式的真正差异更加突出。</p>
-</div>
-
-<div class="card">
-<h3>压力 4：app 层的域逻辑泄漏</h3>
-<p><span class="badge badge-red">高压力</span> 两个大型 PostProcessor 包含完整的图像处理算法：</p>
+<h3>模式插件克隆分析</h3>
 <table>
-<tr><th>类</th><th>行数</th><th>泄漏的域逻辑</th></tr>
-<tr><td>PhotoAlgorithmPostProcessor</td><td>1120</td><td>24 个滤镜配置、15+ 步像素渲染管线、mask 感知渲染、皮肤检测</td></tr>
-<tr><td>PortraitRenderPostProcessor</td><td>993</td><td>散景模拟、高光光斑渲染、皮肤平滑、人像规格解析（~160 行算术）</td></tr>
-<tr><td>PhotoWatermarkPostProcessor</td><td>1295</td><td>6 个水印模板配置、文本布局逻辑（渲染本身是合法的 Android Canvas）</td></tr>
+<tr><th>功能</th><th>Photo</th><th>Portrait</th><th>Night</th><th>Humanistic</th></tr>
+<tr><td>MutableStateFlow 管理</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>buildSnapshot()</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>FrameRatioDelegate</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>countdownDuration() 代理</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>selectedWatermarkTemplate()</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>watermarkDateTime()</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>buildEffectSpec() 模式</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>EffectBridge 转换</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>SaveRequest 构建</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>reduceStillShotSessionEvent</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>toCaptureSpec() 扩展</td><td>✓</td><td>✓</td><td>✗</td><td>✓</td></tr>
+<tr><td>ProVariantState</td><td>✗</td><td>✓</td><td>✓</td><td>✓</td></tr>
+<tr><td>Flash 控制</td><td>✓</td><td>✗</td><td>✓</td><td>✗</td></tr>
 </table>
-<p>此外，6 个 Android*Editor 类共享 ~100-150 行完全相同的 I/O 和 EXIF 处理样板代码（总计 ~600-900 行重复）。</p>
+
+<!-- PROPOSAL P1 -->
+<h2 id="sec-p1">5. 提案 P1: 静态拍摄模式基类</h2>
+<div class="cd" data-p="p1">
+<div class="cd-h">
+<span class="cd-t">P1: 提取 AbstractStillCaptureMode 基类</span>
+<span class="b bg">已验证</span>
+<span class="b bb">杠杆:高</span>
+<span class="b bg">负担:低</span>
+</div>
+<div class="card-section">
+<h4>透镜</h4><p><span class="tag">Patch Pressure</span> <span class="tag">Latent Kernel</span></p>
+</div>
+<div class="card-section">
+<h4>症状</h4>
+<p class="er">PhotoModePlugin:493, PortraitModePlugin:623, NightModePlugin:490, HumanisticModePlugin:513</p>
+<ul>
+<li>4 个插件共享 MutableStateFlow、buildSnapshot、FrameRatioDelegate、watermark 工具函数、buildEffectSpec 模式、CaptureStrategy 构建模式</li>
+<li><code>toCaptureSpec()</code> 在 3 个文件逐字复制</li>
+<li><code>reduceStillShotSessionEvent</code> 调用模式完全一致</li>
+</ul>
+</div>
+<div class="card-section">
+<h4>不变量假说</h4><p>这些模式都是"静态拍摄模式"变体：接收 Intent → 构建 EffectSpec → 组装 CaptureStrategy → 处理 SessionEvent → 管理 Snapshot。差异仅在滤镜选择、额外 Effect、Flash、ProVariant。</p>
+</div>
+<div class="card-section">
+<h4>保持的差异</h4>
+<ul><li><strong>Photo</strong>: Flash、LowLight 夜景辅助</li><li><strong>Portrait</strong>: PortraitEffect、ProVariant、风格选择器</li><li><strong>Night</strong>: 多帧合成 NightProfile 系统</li><li><strong>Humanistic</strong>: 人文滤镜选择器、ProVariant</li></ul>
+</div>
+<div class="card-section">
+<h4>复杂度删除</h4>
+<table><tr><th>指标</th><th>当前</th><th>重构后</th></tr>
+<tr><td>模式总行数</td><td>~2119</td><td>~900</td></tr>
+<tr><td>watermark 工具副本</td><td>4</td><td>1</td></tr>
+<tr><td>toCaptureSpec() 副本</td><td>3</td><td>1</td></tr></table>
+</div>
+<details><summary>基类骨架草图</summary>
+<pre><code>abstract class AbstractStillCaptureMode(
+    protected val context: ModeContext
+) : ModeController {
+    abstract override val id: ModeId
+    abstract fun buildEffectSpec(): EffectSpec
+    abstract fun buildCaptureStrategy(
+        effectSpec: EffectSpec, countdown: Int
+    ): ModeSignal.SubmitCapture
+    protected open fun flashAvailable() = false
+    protected open fun proVariantState(): ProVariantState? = null
+    protected val frameRatioDelegate = FrameRatioDelegate(...)
+    protected fun selectedWatermarkTemplate() = ...
+    protected fun watermarkDateTime() = ...
+    protected fun countdownDuration() = ...
+    override suspend fun onSessionEvent(event: ModeSessionEvent) = ...
+}</code></pre>
+</details>
+<div class="card-section">
+<h4>证伪测试</h4><p>如果差异点超过 10 个且各需不同控制流，说明粒度过细。如果新增模式无法在 50 行内完成，说明模板方法设计不当。</p>
+</div>
+<div class="card-section">
+<h4>过渡接缝</h4><p>渐进式：先从 PhotoModePlugin 提取基类，测试通过后依次迁移其他模式。每个模式独立可回滚。</p>
+</div>
+<div class="rs">
+<h4>评审</h4>
+<div class="sr" data-r="0"><span class="s" data-v="1">★</span><span class="s" data-v="2">★</span><span class="s" data-v="3">★</span><span class="s" data-v="4">★</span><span class="s" data-v="5">★</span></div>
+<select><option value="">选择状态</option><option>结构上可行</option><option>需要更多证据</option><option>过于抽象</option><option>发送到过渡规划</option><option>拒绝</option></select>
+<textarea placeholder="评审备注..."></textarea>
+</div>
 </div>
 
-<div class="card">
-<h3>压力 5：设置系统的 O(n) 触点爆炸</h3>
-<p><span class="badge badge-blue">低-中压力</span></p>
-<ul>
-<li><strong>水印模板</strong>：6 个模板 x 4 个样式属性 = 24 个独立键，分散在 PhotoSettings 的命名字段中。添加第 7 个模板需要修改 5+ 个位置</li>
-<li><strong>FilterRenderSpec</strong>：同一 15 字段数据类有 4 条独立序列化路径。添加字段需要同步修改 4 处</li>
-<li><strong>PersistedSettingsAction</strong>：23 个子类型，每个新设置需要新的 Action 类 + when 分支</li>
-</ul>
-<p>能力图层（Capability）设计良好：模式以数据声明需求，解析器通用评估，新模式无需修改能力层。</p>
+<!-- PROPOSAL P2 -->
+<h2 id="sec-p2">6. 提案 P2: CameraXCaptureAdapter 拆分</h2>
+<div class="cd" data-p="p2">
+<div class="cd-h">
+<span class="cd-t">P2: CameraXCaptureAdapter 拆分为子组件</span>
+<span class="b bg">已验证</span>
+<span class="b bg">杠杆:高</span>
+<span class="b bo">负担:中</span>
 </div>
-
-<!-- ==================== PROPOSALS ==================== -->
-<h2 id="proposals">6. 详细提案卡片</h2>
-
-<!-- Proposal 1 -->
-<div class="card" id="proposal-1">
-<div class="card-header">
-  <span class="card-title">提案 1：统一效果管线表示</span>
-  <span class="classification class-validated">已验证结构机会</span>
+<div class="card-section">
+<h4>透镜</h4><p><span class="tag">God Coordinator</span> <span class="tag">Natural Boundary</span></p>
 </div>
-<div class="card-header">
-  <span class="badge badge-red">结构杠杆：高</span>
-  <span class="badge badge-yellow">过渡负担：中等</span>
-  <span class="badge badge-yellow">风险：中等</span>
-  <span class="badge badge-green">置信度：高</span>
+<div class="card-section">
+<h4>症状</h4>
+<p class="er">CameraXCaptureAdapter.kt: 3,437 行, 147 imports</p>
+<ul><li>单一文件包含：Preview 生命周期、ImageCapture 多策略、Video Recording、Camera2 手动控制、Zoom、Flash、Metering、Snapshot、Lens 切换、能力检测</li></ul>
 </div>
-
-<h4>结构透镜</h4>
-<p>结构保持转换（透镜 7）：当前 EffectSpec → PostProcessSpec → customTags 的转换链丢失了类型信息，迫使下游通过字符串匹配重建意图。</p>
-
-<h4>具体症状</h4>
-<ul>
-<li><span class="evidence-tag">EffectBridge.kt</span> toPostProcessSpec 丢弃 PortraitEffect、DocumentEffect、FrameEffect、SelfieMirrorEffect</li>
-<li><span class="evidence-tag">AlgorithmProcessorBridges.kt</span> canProcess() 通过字符串标签匹配重建已类型化的意图</li>
-<li><span class="evidence-tag">SelfieMirrorEffect</span> 映射到与 FilterEffect 相同的 FILTER_RENDER，仅靠 selfieMirrorApply 标签区分</li>
-<li><span class="evidence-tag">RenderRecipe.kt</span> 第三个并行表示，可从 3 种不同来源构建</li>
-</ul>
-
-<h4>隐藏不变量假设</h4>
-<p>EffectSpec 是用户意图的权威表示。预览路径已经证明它可以贯穿整个管线。拍摄路径不应丢弃它。</p>
-
-<h4>需保留的差异</h4>
-<ul>
-<li>ShotKind 驱动的节点（MULTI_FRAME_MERGE、NIGHT_ENHANCE、LIVE_ASSEMBLE）确实不属于 EffectEntry —— 它们是结构性的，不是用户效果</li>
-<li>预览和拍摄的执行时机不同，但表示可以相同</li>
-</ul>
-
-<h4>复杂度删除声明</h4>
-<ul>
-<li>消除 EffectBridge.toPostProcessSpec（有损转换）</li>
-<li>消除 AlgorithmProcessorBridges 中的字符串标签匹配</li>
-<li>消除 RenderRecipe 的 3 个 from() 工厂方法中的 2 个</li>
-<li>ShotGraphBuilder 可直接读取 EffectSpec 而非 PostProcessSpec</li>
-</ul>
-
-<h4>证伪测试</h4>
-<p>如果 EffectSpec 包含的某些信息在拍摄时确实不可用（例如，预览专属的效果参数在拍摄时已过期），则此抽象不成立。需要验证 EffectSpec 在快门按下时的快照是否完整。</p>
-
-<h4>过渡接缝</h4>
-<p>可分阶段：(1) ShotRequest 携带 EffectSpec + PostProcessSpec 双写；(2) ShotGraphBuilder 优先读 EffectSpec；(3) 移除 PostProcessSpec 路径。每个阶段可独立验证。</p>
-
-<div class="topology-compare">
-  <div class="topology-diagram current">
-    <div class="label">当前拓扑</div>
-    <div class="mermaid">
-flowchart TB
-    subgraph Mode["模式插件"]
-        MC["ModeController"]
-        ES["EffectSpec 类型化"]
+<div class="card-section">
+<h4>建议拆分</h4>
+<ul><li><strong>PreviewManager</strong>: 绑定/解绑、Surface、Snapshot (~800 行)</li><li><strong>StillCaptureManager</strong>: ImageCapture、多帧策略 (~600 行)</li><li><strong>VideoRecordingManager</strong>: Recorder、Recording 生命周期 (~400 行)</li><li><strong>CameraControlManager</strong>: Zoom、Flash、Metering、手动参数 (~500 行)</li><li><strong>CapabilityDetector</strong>: 能力查询、分辨率过滤 (~400 行)</li></ul>
+</div>
+<div class="tp">
+<div class="td cur"><div class="lb">当前拓扑</div>
+<div class="mermaid">flowchart TB
+    subgraph A["CameraXCaptureAdapter 3437 LOC"]
+        P["Preview"]
+        S["Still Capture"]
+        V["Video"]
+        C["Controls"]
+        D["Capability"]
     end
-    subgraph Bridge["EffectBridge"]
-        TAGS["toMetadataTags"]
-        PPS["toPostProcessSpec 有损"]
+    CO["CameraSessionCoordinator"] --> A
+    A --> CX["CameraX SDK"]
+    A --> C2["Camera2 Interop"]</div></div>
+<div class="td pro"><div class="lb">建议拓扑</div>
+<div class="mermaid">flowchart TB
+    subgraph A2["CameraXCaptureAdapter Coordinator"]
+        L["薄协调逻辑"]
     end
-    subgraph Session["Session 层"]
-        SR["ShotRequest"]
-        SGB["ShotGraphBuilder"]
-    end
-    subgraph App["app 层"]
-        APB["AlgorithmProcessorBridges"]
-        PROC["AlgorithmProcessor canProcess读标签"]
-    end
-    MC --> ES
-    ES --> TAGS
-    ES --> PPS
-    TAGS -->|"Map String String"| SR
-    PPS -->|"仅 2 字段"| SR
-    SR --> SGB
-    SGB -->|"ShotGraph"| APB
-    APB --> PROC
-    </div>
-  </div>
-  <div class="topology-diagram proposed">
-    <div class="label">提议拓扑</div>
-    <div class="mermaid">
-flowchart TB
-    subgraph Mode["模式插件"]
-        MC["ModeController"]
-        ES["EffectSpec 类型化"]
-    end
-    subgraph Session["Session 层"]
-        SR["ShotRequest 携带 EffectSpec"]
-        SGB["ShotGraphBuilder 直接读 EffectSpec"]
-    end
-    subgraph App["app 层"]
-        PROC["AlgorithmProcessor 直接读 EffectSpec"]
-    end
-    MC --> ES
-    ES -->|"完整传递"| SR
-    SR --> SGB
-    SGB -->|"ShotGraph + EffectSpec"| PROC
-    </div>
-  </div>
+    PM["PreviewManager"] --> CX2["CameraX"]
+    SC["StillCaptureMgr"] --> CX2
+    VR["VideoRecordMgr"] --> CX2
+    CC["ControlMgr"] --> C2X["Camera2"]
+    CD2["CapDetector"]
+    L --> PM
+    L --> SC
+    L --> VR
+    L --> CC
+    L --> CD2
+    CO2["Coordinator"] --> A2</div></div>
 </div>
-
-<div class="review-section">
-  <h4>审阅</h4>
-  <div class="stars" data-proposal="1">
-    <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span>
-  </div>
-  <select class="review-status">
-    <option value="">选择状态...</option>
-    <option value="sound">结构健全</option>
-    <option value="evidence">需要更多证据</option>
-    <option value="abstract">过于抽象</option>
-    <option value="transition">发送到过渡规划</option>
-    <option value="reject">拒绝</option>
-  </select>
-  <textarea class="review-textarea" placeholder="审阅意见（可选）..."></textarea>
+<div class="card-section">
+<h4>过渡接缝</h4><p>内部委托：保持 CameraDeviceAdapter 接口不变，从 Adapter 内部提取子组件。每提取一个运行完整测试。</p>
+</div>
+<div class="rs">
+<h4>评审</h4>
+<div class="sr" data-r="0"><span class="s" data-v="1">★</span><span class="s" data-v="2">★</span><span class="s" data-v="3">★</span><span class="s" data-v="4">★</span><span class="s" data-v="5">★</span></div>
+<select><option value="">选择状态</option><option>结构上可行</option><option>需要更多证据</option><option>过于抽象</option><option>发送到过渡规划</option><option>拒绝</option></select>
+<textarea placeholder="评审备注..."></textarea>
 </div>
 </div>
 
-<!-- Proposal 2 -->
-<div class="card" id="proposal-2">
-<div class="card-header">
-  <span class="card-title">提案 2：提取 StillCaptureMode 基础模板</span>
-  <span class="classification class-validated">已验证结构机会</span>
+<!-- PROPOSAL P3 -->
+<h2 id="sec-p3">7. 提案 P3: 水印样式集合化</h2>
+<div class="cd" data-p="p3">
+<div class="cd-h">
+<span class="cd-t">P3: 水印模板样式从 6 字段改为 Map</span>
+<span class="b bg">已验证</span>
+<span class="b bb">杠杆:中</span>
+<span class="b bg">负担:低</span>
 </div>
-<div class="card-header">
-  <span class="badge badge-green">结构杠杆：高</span>
-  <span class="badge badge-green">过渡负担：低</span>
-  <span class="badge badge-green">风险：低</span>
-  <span class="badge badge-green">置信度：高</span>
+<div class="card-section">
+<h4>症状</h4>
+<p class="er">PhotoSettings: 6 个 WatermarkStyleSettings 字段, Serializer: 24 个 KEY 常量</p>
+<p><code>PhotoSettings</code> 为每个水印模板存储独立的 <code>WatermarkStyleSettings</code> 字段。<code>watermarkStyleFor()</code> 和 <code>updateWatermarkStyle()</code> 使用 when 链匹配。添加新模板需要：修改 data class + 修改 when 链 + 添加 4 个 serializer KEY + 修改 toMap/fromMap。</p>
+</div>
+<div class="card-section">
+<h4>建议</h4>
+<pre><code>// 之前: 6 个字段
+data class PhotoSettings(
+    val classicOverlayWatermarkStyle: WatermarkStyleSettings = ...,
+    val travelPolaroidWatermarkStyle: WatermarkStyleSettings = ...,
+    // ... 4 more
+)
+
+// 之后: 1 个 Map
+data class PhotoSettings(
+    val watermarkStyles: Map&lt;String, WatermarkStyleSettings&gt; = DEFAULT_WATERMARK_STYLES
+) {
+    fun watermarkStyleFor(templateId: String): WatermarkStyleSettings =
+        watermarkStyles[templateId] ?: DEFAULT_WATERMARK_STYLE
+}</code></pre>
+</div>
+<div class="card-section">
+<h4>复杂度删除</h4>
+<table><tr><th>指标</th><th>当前</th><th>重构后</th></tr>
+<tr><td>PhotoSettings 水印字段</td><td>6</td><td>1 (Map)</td></tr>
+<tr><td>Serializer KEY 常量</td><td>24</td><td>1 (json blob)</td></tr>
+<tr><td>when 链</td><td>2</td><td>0</td></tr>
+<tr><td>添加新模板改动点</td><td>5 处</td><td>0 处</td></tr></table>
+</div>
+<div class="card-section">
+<h4>过渡接缝</h4><p>可双写：同时维护旧字段和新 Map，读取时优先新 Map，渐进迁移。Serializer 兼容读取旧 key。</p>
+</div>
+<div class="rs">
+<h4>评审</h4>
+<div class="sr" data-r="0"><span class="s" data-v="1">★</span><span class="s" data-v="2">★</span><span class="s" data-v="3">★</span><span class="s" data-v="4">★</span><span class="s" data-v="5">★</span></div>
+<select><option value="">选择状态</option><option>结构上可行</option><option>需要更多证据</option><option>过于抽象</option><option>发送到过渡规划</option><option>拒绝</option></select>
+<textarea placeholder="评审备注..."></textarea>
+</div>
 </div>
 
-<h4>结构透镜</h4>
-<p>局部组合为全局行为（透镜 8）：6 个静态拍照模式共享 40-55% 的代码，但每个模式的独特业务逻辑被淹没在样板代码中。</p>
+<!-- PROPOSAL P4 -->
+<h2 id="sec-p4">8. 提案 P4: PostProcessor 桥接统一</h2>
+<div class="cd" data-p="p4">
+<div class="cd-h">
+<span class="cd-t">P4: 统一 PostProcessor → AlgorithmProcessor 桥接</span>
+<span class="b bg">已验证</span>
+<span class="b bb">杠杆:中</span>
+<span class="b bg">负担:低</span>
+</div>
+<div class="card-section">
+<h4>症状</h4>
+<p class="er">AlgorithmProcessorBridges.kt:139, AlgorithmProcessorAdapters.kt:42</p>
+<p>6 个 PostProcessor 各自通过几乎相同的 <code>toAlgorithmProcessorBridge()</code> 泛型函数转换为 <code>AlgorithmProcessor</code>。每个桥接只提供 <code>AlgorithmType</code>、<code>canDecide</code> lambda 和 <code>extractNotes</code> lambda。</p>
+</div>
+<div class="card-section">
+<h4>建议</h4>
+<p>为 <code>MediaPostProcessor</code> 接口添加 <code>algorithmType</code> 和 <code>notePrefix</code> 属性，自动生成桥接。特殊 <code>canDecide</code> 逻辑通过 <code>metadata</code> key 判断，可声明式表达。</p>
+</div>
+<div class="card-section">
+<h4>复杂度删除</h4>
+<table><tr><th>指标</th><th>当前</th><th>重构后</th></tr>
+<tr><td>toAlgorithmProcessor() 扩展</td><td>7 个</td><td>1 个泛型</td></tr>
+<tr><td>桥接样板代码</td><td>~140 行</td><td>~30 行</td></tr></table>
+</div>
+<div class="rs">
+<h4>评审</h4>
+<div class="sr" data-r="0"><span class="s" data-v="1">★</span><span class="s" data-v="2">★</span><span class="s" data-v="3">★</span><span class="s" data-v="4">★</span><span class="s" data-v="5">★</span></div>
+<select><option value="">选择状态</option><option>结构上可行</option><option>需要更多证据</option><option>过于抽象</option><option>发送到过渡规划</option><option>拒绝</option></select>
+<textarea placeholder="评审备注..."></textarea>
+</div>
+</div>
 
-<h4>具体症状</h4>
+<!-- PROPOSAL P5 -->
+<h2 id="sec-p5">9. 提案 P5: Serializer 声明式化</h2>
+<div class="cd" data-p="p5">
+<div class="cd-h">
+<span class="cd-t">P5: PersistedSettingsSerializer 声明式化</span>
+<span class="b bp">有前景但未证</span>
+<span class="b bb">杠杆:中</span>
+<span class="b bg">负担:低</span>
+</div>
+<div class="card-section">
+<h4>症状</h4>
+<p class="er">PersistedSettingsSerializer.kt: 289 行, 54 个 KEY 常量</p>
+<p><code>toMap()</code> 和 <code>fromMap()</code> 各 ~100 行的手动映射代码。每个设置项需要：声明 KEY 常量、toMap 中添加条目、fromMap 中解析。P3 的水印集合化可消除 24 个 KEY。</p>
+</div>
+<div class="card-section">
+<h4>建议</h4>
+<p>P3 完成后重新评估。如果剩余 KEY 数仍超过 30，考虑引入声明式属性映射表。如果 P3 后已降至 ~30，当前样板可接受。</p>
+</div>
+<div class="card-section">
+<h4>证伪信号</h4><p>如果声明式映射引入的间接层使得自定义解析逻辑（如 ColorLabSpec 的 normalized()、布尔解析等）更难表达，则此抽象不值得。</p>
+</div>
+<div class="rs">
+<h4>评审</h4>
+<div class="sr" data-r="0"><span class="s" data-v="1">★</span><span class="s" data-v="2">★</span><span class="s" data-v="3">★</span><span class="s" data-v="4">★</span><span class="s" data-v="5">★</span></div>
+<select><option value="">选择状态</option><option>结构上可行</option><option>需要更多证据</option><option>过于抽象</option><option>发送到过渡规划</option><option>拒绝</option></select>
+<textarea placeholder="评审备注..."></textarea>
+</div>
+</div>
+
+<!-- PROPOSAL P6 -->
+<h2 id="sec-p6">10. 提案 P6: CaptureMetadataBuilder</h2>
+<div class="cd" data-p="p6">
+<div class="cd-h">
+<span class="cd-t">P6: 统一 CaptureStrategy 元数据标签生成</span>
+<span class="b bg">已验证</span>
+<span class="b bb">杠杆:中</span>
+<span class="b bg">负担:低</span>
+</div>
+<div class="card-section">
+<h4>症状</h4>
+<p>每个模式插件在 <code>handle(ShutterPressed)</code> 中手写 <code>buildMap { put("mode", ...); put("flash", ...); putAll(captureAidMetadataTags()); putAll(bridgeTags) }</code>。4 个模式中有 5-10 个共同标签重复构建。</p>
+</div>
+<div class="card-section">
+<h4>建议</h4>
+<p>在基类中提供 <code>buildBaseMetadata()</code> 方法，子类通过 <code>buildExtraMetadata()</code> 补充特有标签。这也自然融入 P1 基类方案。</p>
+</div>
+<div class="card-section">
+<h4>复杂度删除</h4>
+<table><tr><th>指标</th><th>当前</th><th>重构后</th></tr>
+<tr><td>共同标签手写副本</td><td>4</td><td>1</td></tr>
+<tr><td>captureAidMetadataTags() 调用</td><td>4</td><td>1 (基类)</td></tr></table>
+</div>
+<div class="rs">
+<h4>评审</h4>
+<div class="sr" data-r="0"><span class="s" data-v="1">★</span><span class="s" data-v="2">★</span><span class="s" data-v="3">★</span><span class="s" data-v="4">★</span><span class="s" data-v="5">★</span></div>
+<select><option value="">选择状态</option><option>结构上可行</option><option>需要更多证据</option><option>过于抽象</option><option>发送到过渡规划</option><option>拒绝</option></select>
+<textarea placeholder="评审备注..."></textarea>
+</div>
+</div>
+
+<!-- REJECTED -->
+<h2 id="sec-rejected">11. 拒绝/推迟的抽象</h2>
+
+<div class="cd">
+<div class="cd-h">
+<span class="cd-t">R1: DeviceEvent/SessionIntent 统一</span>
+<span class="b br">拒绝</span>
+</div>
+<p><strong>理由</strong>: <code>CameraSessionCoordinator</code> 的 1:1 映射是有意的层级隔离设计。DeviceEvent 来自硬件层，SessionIntent 来自应用层语义。合并会破坏架构边界，使 Session Kernel 依赖硬件实现细节。当前映射代码虽然机械但清晰、无 bug、不需维护。</p>
+</div>
+
+<div class="cd">
+<div class="cd-h">
+<span class="cd-t">R2: SessionEffect/DeviceCommand 统一</span>
+<span class="b br">拒绝</span>
+</div>
+<p><strong>理由</strong>: 同 R1。SessionEffect 携带 ModeId、DeviceGraphSpec 等会话语义，DeviceCommand 是纯硬件指令。Coordinator 的转换逻辑包含了 <code>syncActiveDeviceCapabilities</code> 等附加行为，不是纯 1:1 映射。</p>
+</div>
+
+<div class="cd">
+<div class="cd-h">
+<span class="cd-t">R3: SessionState 合并 PresentationState</span>
+<span class="b br">拒绝</span>
+</div>
+<p><strong>理由</strong>: <code>SessionPresentationState</code> 包含 UI 特有的 transient 状态（缩略图路径、倒计时秒数、预览快照代数），与 SessionState 的运行时不变量有意分离。合并会导致 Session Kernel 需要了解 UI 演示细节。</p>
+</div>
+
+<div class="cd">
+<div class="cd-h">
+<span class="cd-t">R4: Video 模式纳入静态拍摄基类</span>
+<span class="b br">误报</span>
+</div>
+<p><strong>理由</strong>: VideoModePlugin 的行为模式完全不同：不使用 SaveRequest photoLibrary、不使用 FrameRatioDelegate、不使用 WatermarkEffect、有 Recording 状态机。强行纳入基类会增加异常数量而非减少。</p>
+</div>
+
+<!-- HANDOFF -->
+<h2 id="sec-handoff">12. 过渡交接简报</h2>
+
+<h3>推荐执行顺序</h3>
+<ol>
+<li><strong>P3 水印集合化</strong>（独立、低风险、可验证）— 先做，为 P5 提供数据</li>
+<li><strong>P1 模式基类</strong>（最高杠杆、渐进迁移）— 从 PhotoModePlugin 开始</li>
+<li><strong>P6 元数据 Builder</strong>（P1 的自然延伸）</li>
+<li><strong>P4 PostProcessor 桥接统一</strong>（独立、低风险）</li>
+<li><strong>P5 Serializer</strong>（P3 后重新评估）</li>
+<li><strong>P2 Adapter 拆分</strong>（最高迁移负担，放最后）</li>
+</ol>
+
+<h3>安全约束</h3>
 <ul>
-<li><span class="evidence-tag">feature/mode-* (6 个文件)</span> watermarkDateTime()、watermarkCameraParams()、selectedWatermarkTemplate() 在 6 个模式中逐字相同</li>
-<li><span class="evidence-tag">feature/mode-portrait,mode-night,mode-humanistic</span> ProVariantState 集成（属性 + 7 个委托方法）在 3 个模式中逐字相同</li>
-<li><span class="evidence-tag">feature/mode-photo,mode-portrait,mode-humanistic</span> LivePhoto vs SingleFrame 的 CaptureStrategy 构建结构完全相同</li>
-<li><span class="evidence-tag">feature/mode-* (6 个文件)</span> onSessionEvent 委托到 reduceStillShotSessionEvent 的调用结构完全相同</li>
+<li>每个提案独立可回滚</li>
+<li>不修改公共 API 边界（CameraDeviceAdapter、CameraSession）</li>
+<li>每个迁移步骤运行 Stage 7 验证脚本</li>
+<li>P2 需要最多测试覆盖，建议在其他提案完成后执行</li>
 </ul>
 
-<h4>隐藏不变量假设</h4>
-<p>6 个静态拍照模式共享一个隐式的"静态拍照模式协议"：生命周期管理 → 效果链组装 → 快门处理 → 拍摄策略选择 → 会话事件响应。这个协议当前是通过复制粘贴隐式表达的。</p>
-
-<h4>需保留的差异</h4>
+<!-- UNCERTAINTIES -->
+<h2 id="sec-uncertainties">13. 不确定性与缺失证据</h2>
 <table>
-<tr><th>维度</th><th>Photo</th><th>Portrait</th><th>Night</th><th>Document</th><th>Pro</th><th>Humanistic</th></tr>
-<tr><td>效果链</td><td>Filter+Watermark+Frame</td><td>Filter+Portrait+Watermark+Frame</td><td>Watermark+Frame</td><td>Document+Watermark</td><td>Watermark+Frame</td><td>Filter+Watermark+Frame</td></tr>
-<tr><td>拍摄策略</td><td>3 分支</td><td>2 分支</td><td>2 分支</td><td>1 分支</td><td>1 分支</td><td>2 分支</td></tr>
-<tr><td>配置模型</td><td>滤镜配置</td><td>人像风格</td><td>夜景配置</td><td>扫描配置</td><td>预设</td><td>人文风格</td></tr>
+<tr><th>不确定性</th><th>影响</th><th>验证方法</th></tr>
+<tr><td>DefaultCameraSession 内部复杂度</td><td>P1 基类需要与 Session Kernel 的 ModeController 切换逻辑兼容</td><td>阅读 DefaultCameraSession 的 mode switch 代码</td></tr>
+<tr><td>CameraXCaptureAdapter 内部状态共享程度</td><td>决定 P2 拆分的子组件间耦合度</td><td>分析 Adapter 内部 mutable 字段的访问模式</td></tr>
+<tr><td>运行时性能影响</td><td>P2 拆分可能增加对象分配</td><td>Profile 对比测试</td></tr>
+<tr><td>测试覆盖度</td><td>迁移安全性依赖现有测试</td><td>运行 Stage 7 验证 + 各模块单元测试</td></tr>
 </table>
 
-<h4>复杂度删除声明</h4>
-<ul>
-<li>消除 6 个水印辅助方法 x 6 个模式 = 36 个重复方法</li>
-<li>消除 ProVariantState 集成 x 3 个模式 = ~75 行重复</li>
-<li>消除 onSessionEvent 骨架 x 6 个模式 = ~90 行重复</li>
-<li>消除生命周期方法骨架 x 6 个模式 = ~180-300 行重复</li>
-<li><strong>总计估计：750-1500 行</strong></li>
-</ul>
+<!-- ARTIFACTS -->
+<h2 id="sec-artifacts">14. 可复用分析工件</h2>
 
-<h4>证伪测试</h4>
-<p>如果某个静态拍照模式的生命周期行为确实需要与模板根本不同（例如，需要在 onEnter 时启动异步初始化、或 onExit 时执行清理逻辑），则模板需要扩展钩子。目前 6 个模式的 onEnter/onExit 结构完全相同，未发现此情况。</p>
-
-<h4>过渡接缝</h4>
-<p>使用组合（delegate）而非继承：每个 ModeController 持有一个 StillCaptureModeDelegate，委托样板方法。Video 模式不受影响。可逐个模式迁移，每迁移一个即可验证。</p>
-
-<div class="review-section">
-  <h4>审阅</h4>
-  <div class="stars" data-proposal="2">
-    <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span>
-  </div>
-  <select class="review-status">
-    <option value="">选择状态...</option>
-    <option value="sound">结构健全</option>
-    <option value="evidence">需要更多证据</option>
-    <option value="abstract">过于抽象</option>
-    <option value="transition">发送到过渡规划</option>
-    <option value="reject">拒绝</option>
-  </select>
-  <textarea class="review-textarea" placeholder="审阅意见（可选）..."></textarea>
-</div>
-</div>
-
-<!-- Proposal 3 -->
-<div class="card" id="proposal-3">
-<div class="card-header">
-  <span class="card-title">提案 3：模式专属 Intent 委托回插件</span>
-  <span class="classification class-validated">已验证结构机会</span>
-</div>
-<div class="card-header">
-  <span class="badge badge-yellow">结构杠杆：中</span>
-  <span class="badge badge-green">过渡负担：低</span>
-  <span class="badge badge-green">风险：低</span>
-  <span class="badge badge-green">置信度：高</span>
-</div>
-
-<h4>结构透镜</h4>
-<p>自然边界（透镜 3）：当前 Session 层承担了本应属于模式插件的职责。</p>
-
-<h4>具体症状</h4>
-<ul>
-<li>5 个 DocumentBatch* Intent 定义在 SessionContracts.kt 的共享 sealed interface 中</li>
-<li>DefaultCameraSession.handleDocumentBatch* 方法共 ~88 行，仅服务于 DOCUMENT 模式</li>
-<li>DocumentBatchState 及其 4 个枚举/数据类定义在 SessionContracts 中</li>
-<li>handleSwitchMode 硬编码 ModeId.DOCUMENT 检查</li>
-<li>handleApplyPreviewBrightness 硬编码 ModeId.PHOTO 守卫</li>
-</ul>
-
-<h4>隐藏不变量假设</h4>
-<p>模式插件接口（ModeController）已经支持通过 ModeIntent 接收用户操作。DocumentBatch 和 Brightness 操作本质上是模式专属的用户意图，应通过 ModeIntent 路由而非 SessionIntent。</p>
-
-<h4>复杂度删除声明</h4>
-<ul>
-<li>SessionIntent 从 53 降至 ~43（移除 10 个模式专属 Intent）</li>
-<li>DefaultCameraSession.processModeControlIntent 从 22 分支降至 ~12 分支</li>
-<li>DocumentBatch 逻辑完全移入 DocumentModePlugin</li>
-<li>Brightness 逻辑移入 PhotoModePlugin 或提升为真正的共享能力</li>
-</ul>
-
-<h4>证伪测试</h4>
-<p>如果 DocumentBatch 状态需要被 Session 层的其他组件（如 UI 渲染器）直接访问，而非通过 ModeSnapshot 传递，则此委托不完全成立。需要验证 ModeSnapshot 是否已承载 documentBatch 信息。</p>
-
-<div class="review-section">
-  <h4>审阅</h4>
-  <div class="stars" data-proposal="3">
-    <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span>
-  </div>
-  <select class="review-status">
-    <option value="">选择状态...</option>
-    <option value="sound">结构健全</option>
-    <option value="evidence">需要更多证据</option>
-    <option value="abstract">过于抽象</option>
-    <option value="transition">发送到过渡规划</option>
-    <option value="reject">拒绝</option>
-  </select>
-  <textarea class="review-textarea" placeholder="审阅意见（可选）..."></textarea>
-</div>
-</div>
-
-<!-- Proposal 4 -->
-<div class="card" id="proposal-4">
-<div class="card-header">
-  <span class="card-title">提案 4：域逻辑从 app 层回迁 core</span>
-  <span class="classification class-promising">有前景但未完全验证</span>
-</div>
-<div class="card-header">
-  <span class="badge badge-yellow">结构杠杆：中</span>
-  <span class="badge badge-yellow">过渡负担：中等</span>
-  <span class="badge badge-yellow">风险：中等</span>
-  <span class="badge badge-yellow">置信度：中</span>
-</div>
-
-<h4>结构透镜</h4>
-<p>API 从调用方现实推导（透镜 11）：AlgorithmProcessorBridges 的存在表明架构意图是将处理逻辑放在 core，app 层仅保留 Android I/O。</p>
-
-<h4>具体症状</h4>
-<ul>
-<li>PhotoAlgorithmPostProcessor 的 resolvePhotoAlgorithmSpec（~190 行）包含 24 个滤镜配置的硬编码参数</li>
-<li>PhotoAlgorithmPostProcessor 的 applyStyle（~113 行）是完整的像素级色彩渲染管线</li>
-<li>PortraitRenderPostProcessor 的 resolvePortraitRenderSpec（~160 行）是人像设置到渲染参数的多因子算术映射</li>
-<li>6 个 Android*Editor 共享 ~100-150 行完全相同的 I/O 和 EXIF 处理代码</li>
-</ul>
-
-<h4>需保留的差异</h4>
-<ul>
-<li>Android Bitmap 操作（Bitmap.createBitmap、Canvas、BitmapFactory）必须留在 app 层</li>
-<li>EXIF 读写依赖 Android ExifInterface，必须留在 app 层</li>
-<li>但滤镜参数、渲染规格解析、像素算法的纯计算部分可以移到 core</li>
-</ul>
-
-<h4>证伪测试</h4>
-<p>如果像素渲染管线深度依赖 Android Bitmap 的像素访问方式（getPixels/setPixels），导致纯 Kotlin 移植需要完全重写内存布局，则收益可能不足以覆盖成本。需要评估将 Bitmap 像素提取为 ByteArray/IntArray 后在 core 中处理的性能开销。</p>
-
-<h4>缺失证据</h4>
-<ul>
-<li>像素渲染的性能基准数据</li>
-<li>是否已有 core 层的图像处理基础设施</li>
-<li>团队对 core:media 模块 API 稳定性的预期</li>
-</ul>
-
-<div class="review-section">
-  <h4>审阅</h4>
-  <div class="stars" data-proposal="4">
-    <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span>
-  </div>
-  <select class="review-status">
-    <option value="">选择状态...</option>
-    <option value="sound">结构健全</option>
-    <option value="evidence">需要更多证据</option>
-    <option value="abstract">过于抽象</option>
-    <option value="transition">发送到过渡规划</option>
-    <option value="reject">拒绝</option>
-  </select>
-  <textarea class="review-textarea" placeholder="审阅意见（可选）..."></textarea>
-</div>
-</div>
-
-<!-- Proposal 5 -->
-<div class="card" id="proposal-5">
-<div class="card-header">
-  <span class="card-title">提案 5：水印模板数据化</span>
-  <span class="classification class-validated">已验证结构机会</span>
-</div>
-<div class="card-header">
-  <span class="badge badge-blue">结构杠杆：低-中</span>
-  <span class="badge badge-green">过渡负担：低</span>
-  <span class="badge badge-green">风险：低</span>
-  <span class="badge badge-green">置信度：高</span>
-</div>
-
-<h4>结构透镜</h4>
-<p>参数化环境变化（透镜 10）：6 个水印模板共享相同的 WatermarkStyleSettings 结构，但以命名字段硬编码在 PhotoSettings 中。</p>
-
-<h4>具体症状</h4>
-<ul>
-<li>PhotoSettings 有 6 x 4 = 24 个水印样式字段</li>
-<li>watermarkStyleFor() 和 updateWatermarkStyle() 各有 6 个 when 分支</li>
-<li>PersistedSettingsSerializer 的 toMap/fromMap 各有 24 行水印相关代码</li>
-<li>添加第 7 个模板需要修改 5+ 个位置</li>
-</ul>
-
-<h4>隐藏不变量假设</h4>
-<p>所有水印模板共享相同的样式属性结构（position、scale、opacity、background）。它们是同一概念的不同实例，不是不同的概念。</p>
-
-<h4>复杂度删除声明</h4>
-<ul>
-<li>PhotoSettings 从 24 个水印字段降至 1 个 Map&lt;TemplateId, WatermarkStyleSettings&gt;</li>
-<li>watermarkStyleFor/updateWatermarkStyle 从 6 分支降至 1 行 Map 查找</li>
-<li>序列化从 24 个键降至动态键生成</li>
-<li>添加新模板变为 0 行代码修改（仅数据配置）</li>
-</ul>
-
-<h4>证伪测试</h4>
-<p>如果某些模板的样式属性确实不同（例如，某个模板有额外的样式字段），则 Map 结构需要扩展为更灵活的模型。目前 6 个模板的 WatermarkStyleSettings 完全相同。</p>
-
-<div class="review-section">
-  <h4>审阅</h4>
-  <div class="stars" data-proposal="5">
-    <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span>
-  </div>
-  <select class="review-status">
-    <option value="">选择状态...</option>
-    <option value="sound">结构健全</option>
-    <option value="evidence">需要更多证据</option>
-    <option value="abstract">过于抽象</option>
-    <option value="transition">发送到过渡规划</option>
-    <option value="reject">拒绝</option>
-  </select>
-  <textarea class="review-textarea" placeholder="审阅意见（可选）..."></textarea>
-</div>
-</div>
-
-<!-- Proposal 6 -->
-<div class="card" id="proposal-6">
-<div class="card-header">
-  <span class="card-title">提案 6：Android Editor 基类提取</span>
-  <span class="classification class-validated">已验证结构机会</span>
-</div>
-<div class="card-header">
-  <span class="badge badge-yellow">结构杠杆：中</span>
-  <span class="badge badge-green">过渡负担：低</span>
-  <span class="badge badge-green">风险：低</span>
-  <span class="badge badge-green">置信度：高</span>
-</div>
-
-<h4>结构透镜</h4>
-<p>泛化删除异常（透镜 9）：6 个 Android*Editor 类共享完全相同的 I/O 和 EXIF 处理样板代码。</p>
-
-<h4>具体症状</h4>
-<ul>
-<li>readSourceBytes(target: ProcessorTarget): ByteArray? — 在 6 个类中完全相同</li>
-<li>writeEncodedBytes(target, bytes): Boolean — 在 6 个类中完全相同</li>
-<li>readPreservedExif(sourceBytes): Map&lt;String,String&gt; — 在 5/6 个类中完全相同</li>
-<li>restorePreservedExif(target, preservedExif): String? — 在 5/6 个类中完全相同</li>
-<li>EXIF_TAGS_TO_PRESERVE companion list — 在 5/6 个类中完全相同（22 个标签）</li>
-<li>JPEG compress quality 92-94 + Dispatchers.IO — 在 6 个类中完全相同</li>
-</ul>
-
-<h4>复杂度删除声明</h4>
-<ul>
-<li>提取 BaseAndroidEditor 抽象类，包含所有共享 I/O 和 EXIF 方法</li>
-<li>消除 ~600-900 行重复代码</li>
-<li>每个具体 Editor 仅保留其独特的像素处理逻辑</li>
-</ul>
-
-<h4>证伪测试</h4>
-<p>如果某个 Editor 的 I/O 行为确实不同（例如，不同的压缩质量、不同的 EXIF 标签集合），则基类需要支持覆盖。目前 5/6 个类的 EXIF 标签集合完全相同，1 个（WatermarkEditor）可能略有不同。</p>
-
-<div class="review-section">
-  <h4>审阅</h4>
-  <div class="stars" data-proposal="6">
-    <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span>
-  </div>
-  <select class="review-status">
-    <option value="">选择状态...</option>
-    <option value="sound">结构健全</option>
-    <option value="evidence">需要更多证据</option>
-    <option value="abstract">过于抽象</option>
-    <option value="transition">发送到过渡规划</option>
-    <option value="reject">拒绝</option>
-  </select>
-  <textarea class="review-textarea" placeholder="审阅意见（可选）..."></textarea>
-</div>
-</div>
-
-<!-- Proposal 7 -->
-<div class="card" id="proposal-7">
-<div class="card-header">
-  <span class="card-title">提案 7：FilterRenderSpec 序列化路径统一</span>
-  <span class="classification class-promising">有前景但未完全验证</span>
-</div>
-<div class="card-header">
-  <span class="badge badge-blue">结构杠杆：低</span>
-  <span class="badge badge-yellow">过渡负担：中等</span>
-  <span class="badge badge-green">风险：低</span>
-  <span class="badge badge-yellow">置信度：中</span>
-</div>
-
-<h4>结构透镜</h4>
-<p>结构保持转换（透镜 7）：FilterRenderSpec 的 15 个字段有 4 条独立的序列化/反序列化路径。</p>
-
-<h4>具体症状</h4>
-<ul>
-<li>PersistedSettingsSerializer — Map&lt;String,String&gt; 用于设置存储</li>
-<li>FilterRenderSpec.toMetadataTags() / parseFilterRenderSpec() — 用于拍摄文件元数据</li>
-<li>FilterProfileShareCodec — 自定义文本格式用于滤镜导入/导出</li>
-<li>FilterRenderSpec.fromMetadataTags companion — 从元数据标签重建</li>
-</ul>
-
-<h4>证伪测试</h4>
-<p>如果 4 条路径的字段集合确实不同（例如，某些路径不需要所有 15 个字段），则统一序列化可能引入不必要的耦合。需要逐路径比较字段集合。</p>
-
-<h4>缺失证据</h4>
-<ul>
-<li>4 条路径的完整字段对比</li>
-<li>各路径的版本兼容性要求</li>
-<li>是否有向后兼容性约束阻止统一</li>
-</ul>
-
-<div class="review-section">
-  <h4>审阅</h4>
-  <div class="stars" data-proposal="7">
-    <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span><span class="star" data-v="3">★</span><span class="star" data-v="4">★</span><span class="star" data-v="5">★</span>
-  </div>
-  <select class="review-status">
-    <option value="">选择状态...</option>
-    <option value="sound">结构健全</option>
-    <option value="evidence">需要更多证据</option>
-    <option value="abstract">过于抽象</option>
-    <option value="transition">发送到过渡规划</option>
-    <option value="reject">拒绝</option>
-  </select>
-  <textarea class="review-textarea" placeholder="审阅意见（可选）..."></textarea>
-</div>
-</div>
-
-<!-- ==================== REJECTED ==================== -->
-<h2 id="rejected">7. 拒绝或暂缓的抽象</h2>
-
-<div class="card">
-<div class="card-header">
-  <span class="card-title">拒绝 1：合并 EffectEntry 和 AlgorithmType</span>
-  <span class="classification class-false">虚假抽象风险</span>
-</div>
-<p><strong>表面信号</strong>：6 个 EffectEntry 子类型中的 5 个与 AlgorithmType 有 1:1 映射。</p>
-<p><strong>拒绝理由</strong>：它们代表两个不同的领域概念：</p>
-<ul>
-<li>EffectEntry = 用户意图（"我要加滤镜"）</li>
-<li>AlgorithmType = 执行分类（"这是渲染步骤"）</li>
-</ul>
-<p>3 个 AlgorithmType（MULTI_FRAME_MERGE、NIGHT_ENHANCE、LIVE_ASSEMBLE）没有对应的 EffectEntry，因为它们来自 ShotKind 的结构性需求，而非用户效果。强制合并会抹掉这个有意义的区分。</p>
-</div>
-
-<div class="card">
-<div class="card-header">
-  <span class="card-title">拒绝 2：引入 DI 框架（Hilt/Koin）</span>
-  <span class="classification class-false">虚假抽象风险</span>
-</div>
-<p><strong>表面信号</strong>：AppContainer 手动接线 18 个依赖。</p>
-<p><strong>拒绝理由</strong>：AppContainer 仅 193 行，无域逻辑，职责单一。引入 Hilt/Koin 的复杂度（注解处理器、模块定义、作用域管理）远超当前手动接线的维护成本。当前的重复（maskBitmapSource lambda）可以通过简单的提取方法解决，无需框架。</p>
-</div>
-
-<div class="card">
-<div class="card-header">
-  <span class="card-title">拒绝 3：统一 Video 和静态拍照模式的模板</span>
-  <span class="classification class-false">虚假抽象风险</span>
-</div>
-<p><strong>表面信号</strong>：Video 也是 ModeController 的实现。</p>
-<p><strong>拒绝理由</strong>：Video 在以下维度与静态拍照模式根本不同：</p>
-<ul>
-<li>生命周期：开始/停止录制 vs 单次快门</li>
-<li>设备图：videoRecording(...) vs stillCaptureDeviceGraph(...)</li>
-<li>会话事件：录制状态机 vs 拍摄生命周期</li>
-<li>没有 WatermarkEffect、FrameEffect、LivePhoto</li>
-</ul>
-<p>强制共享模板会引入大量条件分支（if isVideo then ...），反而增加复杂度。</p>
-</div>
-
-<div class="card">
-<div class="card-header">
-  <span class="card-title">拒绝 4：将 SessionIntent 从 sealed class 改为通用消息总线</span>
-  <span class="classification class-false">虚假抽象风险</span>
-</div>
-<p><strong>表面信号</strong>：53 个子类型导致大型 when 块。</p>
-<p><strong>拒绝理由</strong>：sealed class 的穷举检查是 Kotlin 类型系统的核心安全网。改为通用消息总线（如 Map&lt;String, Any&gt;）会丢失编译时安全性，将运行时错误从 0 个增加到潜在的 N 个。正确的方向是减少子类型数量（通过委托回模式），而非放弃类型安全。</p>
-</div>
-
-<!-- ==================== TRANSITION HANDOFF ==================== -->
-<h2>8. 过渡交接摘要</h2>
-
-<div class="card">
-<h3>推荐的实施优先级</h3>
+<h3>候选竞争矩阵</h3>
 <table>
-<tr><th>阶段</th><th>提案</th><th>前置条件</th><th>验证方式</th></tr>
-<tr><td><span class="badge badge-green">Phase 1</span></td><td>提案 2：StillCaptureMode 模板</td><td>无</td><td>逐模式迁移，每迁移一个运行现有测试</td></tr>
-<tr><td><span class="badge badge-green">Phase 1</span></td><td>提案 6：Editor 基类提取</td><td>无</td><td>提取后运行各 Editor 的现有测试</td></tr>
-<tr><td><span class="badge badge-green">Phase 1</span></td><td>提案 5：水印模板数据化</td><td>无</td><td>序列化/反序列化往返测试</td></tr>
-<tr><td><span class="badge badge-yellow">Phase 2</span></td><td>提案 3：模式 Intent 委托</td><td>验证 ModeSnapshot 是否已承载 documentBatch</td><td>Document 模式功能回归测试</td></tr>
-<tr><td><span class="badge badge-yellow">Phase 2</span></td><td>提案 1：统一效果管线</td><td>验证 EffectSpec 在快门按下时的完整性</td><td>全模式拍摄 + 后处理管线测试</td></tr>
-<tr><td><span class="badge badge-blue">Phase 3</span></td><td>提案 4：域逻辑回迁</td><td>性能基准数据</td><td>像素级输出对比测试</td></tr>
-<tr><td><span class="badge badge-blue">Phase 3</span></td><td>提案 7：序列化路径统一</td><td>4 条路径的字段对比</td><td>向后兼容性测试</td></tr>
+<tr><th>压力点</th><th>候选 A</th><th>候选 B</th><th>获胜</th><th>原因</th></tr>
+<tr><td>模式克隆</td><td>抽象基类</td><td>组合策略</td><td>A</td><td>变体编译时确定；基类删除更多代码</td></tr>
+<tr><td>Adapter God Class</td><td>内部委托</td><td>拆分接口</td><td>A</td><td>保持公共接口不变；迁移风险最低</td></tr>
 </table>
-<p style="margin-top:12px;font-size:13px;color:var(--text-muted)">Phase 1 的三个提案相互独立，可并行实施。Phase 2 依赖 Phase 1 的模式模板提取。Phase 3 需要额外证据。</p>
-</div>
 
-<!-- ==================== UNCERTAINTIES ==================== -->
-<h2 id="uncertainties">9. 不确定性与缺失证据</h2>
-
-<div class="card">
+<h3>复杂度删除总分卡</h3>
 <table>
-<tr><th>不确定性</th><th>影响的提案</th><th>如何获取证据</th></tr>
-<tr><td>各模式的用户使用频率分布</td><td>优先级排序</td><td>分析数据埋点（context.eventSink 已有事件）</td></tr>
-<tr><td>像素渲染管线的性能瓶颈</td><td>提案 4</td><td>在代表设备上运行基准测试</td></tr>
-<tr><td>是否有计划中的新模式</td><td>提案 2、3</td><td>产品路线图</td></tr>
-<tr><td>EffectSpec 在快门按下时的快照完整性</td><td>提案 1</td><td>在 DefaultCameraSession 的 SubmitCapture 处添加日志</td></tr>
-<tr><td>ModeSnapshot 是否已承载 documentBatch</td><td>提案 3</td><td>检查 ModeSnapshot 的 UI 消费方</td></tr>
-<tr><td>FilterRenderSpec 4 条路径的字段差异</td><td>提案 7</td><td>逐字段对比 4 个序列化/反序列化实现</td></tr>
-<tr><td>团队对 core 模块 API 稳定性的预期</td><td>提案 1、4</td><td>与团队讨论</td></tr>
+<tr><th>提案</th><th>删除行数(估)</th><th>删除副本数</th><th>删除 when/分支</th></tr>
+<tr><td>P1 模式基类</td><td>~1200</td><td>~15 个函数副本</td><td>0</td></tr>
+<tr><td>P2 Adapter 拆分</td><td>0 (重组)</td><td>0</td><td>0</td></tr>
+<tr><td>P3 水印集合化</td><td>~80</td><td>24 KEY → 1</td><td>2 when 链</td></tr>
+<tr><td>P4 桥接统一</td><td>~110</td><td>6 桥接函数</td><td>0</td></tr>
+<tr><td>P5 Serializer</td><td>~50</td><td>~30 KEY</td><td>0</td></tr>
+<tr><td>P6 元数据 Builder</td><td>~60</td><td>~4 构建副本</td><td>0</td></tr>
 </table>
-</div>
 
-<div style="margin-top:40px;padding:16px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--text-muted)">
-<strong>声明</strong>：本报告为分析性质，不涉及任何代码修改。所有提案均为假设，需通过过渡规划评估后方可实施。报告基于对源码的静态分析，未使用运行时遥测、性能数据或用户行为数据。
-</div>
+<h3>后续评估场景</h3>
+<ul>
+<li>P1 完成后: 添加"微距"模式应在 50 行内完成</li>
+<li>P2 完成后: 添加新控制类型（如 ND Filter）应只修改 CameraControlManager</li>
+<li>P3 完成后: 添加新水印模板应无需修改任何代码</li>
+</ul>
 
-</div>
-
-<button class="export-btn" id="exportBtn">导出审阅</button>
-<div class="toast" id="toast">已复制到剪贴板</div>
+<div class="lbx" id="lbx"><div class="dw" id="lbc"></div></div>
+<button class="eb" onclick="exportReview()">导出评审</button>
+<div class="nt" id="nt">已复制到剪贴板</div>
 
 <script>
-// Star rating
-document.querySelectorAll('.stars').forEach(container => {
-  container.querySelectorAll('.star').forEach(star => {
-    star.addEventListener('click', () => {
-      const val = parseInt(star.dataset.v);
-      container.querySelectorAll('.star').forEach(s => {
-        s.classList.toggle('active', parseInt(s.dataset.v) <= val);
-      });
-      container.dataset.rating = val;
-    });
-  });
-});
-
-// Lightbox
-document.querySelectorAll('.topology-diagram').forEach(diagram => {
-  diagram.addEventListener('click', () => {
-    const rendered = diagram.querySelector('.mermaid svg');
-    if (!rendered) return;
-    const lb = document.createElement('div');
-    lb.className = 'lightbox active';
-    const wrapper = document.createElement('div');
-    wrapper.className = 'diagram-wrapper';
-    wrapper.addEventListener('click', event => event.stopPropagation());
-    wrapper.appendChild(rendered.cloneNode(true));
-    lb.appendChild(wrapper);
-    document.body.appendChild(lb);
-    const close = () => lb.remove();
-    lb.addEventListener('click', close);
-    document.addEventListener('keydown', function onEsc(event) {
-      if (event.key === 'Escape') {
-        close();
-        document.removeEventListener('keydown', onEsc);
-      }
-    });
-  });
-});
-
-// Export
-document.getElementById('exportBtn').addEventListener('click', () => {
-  const cards = document.querySelectorAll('.card[id^="proposal-"]');
-  let md = '# 结构抽象分析 — 审阅导出\n\n';
-  cards.forEach(card => {
-    const title = card.querySelector('.card-title')?.textContent || '';
-    const classification = card.querySelector('.classification')?.textContent || '';
-    const stars = card.querySelector('.stars')?.dataset.rating || '未评';
-    const status = card.querySelector('.review-status')?.value || '未选';
-    const review = card.querySelector('.review-textarea')?.value || '';
-    md += `## ${title}\n`;
-    md += `- 分类: ${classification}\n`;
-    md += `- 评分: ${stars}/5\n`;
-    md += `- 状态: ${status}\n`;
-    if (review) md += `- 意见: ${review}\n`;
-    md += '\n';
-  });
-  md += `---\n\n[Next Action Directive] Treat the structural recommendations above as hypotheses that must be translated into safe engineering work. For items marked "Send to Transition Planning", evaluate transition burden, business relevance, compatibility boundaries, rollout controls, rollback strategy, ownership, and short, medium, and long-term ROI using the Pragmatic Renewal Architect approach. Do not modify code unless I explicitly authorize implementation after reviewing the proposed transition plan.\n`;
-
-  navigator.clipboard.writeText(md).then(() => {
-    const toast = document.getElementById('toast');
-    toast.style.display = 'block';
-    setTimeout(() => toast.style.display = 'none', 2000);
-  });
-});
+document.addEventListener('click',function(e){var d=e.target.closest('.td');if(d){var m=d.querySelector('.mermaid');if(m){document.getElementById('lbc').innerHTML=m.outerHTML;document.getElementById('lbx').classList.add('a')}}if(e.target.id==='lbx')document.getElementById('lbx').classList.remove('a')});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')document.getElementById('lbx').classList.remove('a')});
+document.addEventListener('click',function(e){if(e.target.classList.contains('s')){var r=parseInt(e.target.dataset.v);var c=e.target.parentElement;c.querySelectorAll('.s').forEach(function(s){s.classList.toggle('a',parseInt(s.dataset.v)<=r)});c.dataset.r=r}});
+function exportReview(){var cs=document.querySelectorAll('.cd[data-p]');var m='# 结构抽象分析评审\n\n';cs.forEach(function(c){var t=c.querySelector('.cd-t')?.textContent||'';var r=c.querySelector('.sr')?.dataset?.r||'未评';var s=c.querySelector('select')?.value||'未评';var n=c.querySelector('textarea')?.value||'';m+='## '+t+'\n- 评分: '+r+'/5\n- 状态: '+s+'\n- 备注: '+(n||'无')+'\n\n'});m+='[Next Action Directive] Treat the structural recommendations above as hypotheses that must be translated into safe engineering work. For items marked "Send to Transition Planning", evaluate transition burden, business relevance, compatibility boundaries, rollout controls, rollback strategy, ownership, and short, medium, and long-term ROI using the Pragmatic Renewal Architect approach. Do not modify code unless I explicitly authorize implementation after reviewing the proposed transition plan.\n';navigator.clipboard.writeText(m).then(function(){var n=document.getElementById('nt');n.style.display='block';setTimeout(function(){n.style.display='none'},2000)})}
 </script>
-
 </body>
 </html>

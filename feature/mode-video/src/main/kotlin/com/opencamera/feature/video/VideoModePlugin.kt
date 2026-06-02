@@ -252,7 +252,7 @@ private class VideoModeController(
 
     private suspend fun toggleTorch(): ModeSignal {
         if (!currentTorchSupported()) {
-            return ModeSignal.ShowHint("This device does not support flash")
+            return ModeSignal.ShowHint("Torch is unavailable on this device")
         }
         if (isRecording) {
             return ModeSignal.ShowHint("Flash can only be changed before recording starts")

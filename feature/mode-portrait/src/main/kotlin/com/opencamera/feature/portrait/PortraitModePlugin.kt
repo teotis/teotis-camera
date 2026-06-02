@@ -184,7 +184,7 @@ private class PortraitModeController(
             headline = if (countdownDuration() == CountdownDuration.OFF) {
                 "Portrait capture requested"
             } else {
-                "Portrait countdown started"
+                "Portrait countdown armed"
             }
         )
         val effectSpec = buildEffectSpec()
