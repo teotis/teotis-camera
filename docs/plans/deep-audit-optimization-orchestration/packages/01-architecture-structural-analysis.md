@@ -94,7 +94,7 @@ git diff --name-only HEAD | grep -v "docs/plans/deep-audit-optimization-orchestr
 - 迁移接缝识别
 - 可证伪测试建议
 
-### Secondary: CodeGraph
+### Secondary: 源码搜索与静态阅读
 - 代码结构索引
 - 符号依赖分析
 - 调用链追踪

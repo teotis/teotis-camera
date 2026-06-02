@@ -103,7 +103,7 @@ git diff --name-only HEAD | grep -v "docs/plans/deep-audit-optimization-orchestr
 - Network Profiler
 - Energy Profiler
 
-### Tertiary: CodeGraph
+### Tertiary: 源码搜索与静态阅读
 - 性能关键路径分析
 - 调用链追踪
 

@@ -5,7 +5,7 @@
 
 ## Objective
 
-使用 CodeGraph 和自定义分析工具对 OpenCamera 项目的模块依赖关系进行深度分析。识别循环依赖、过度耦合、缺失抽象等问题。
+使用 Gradle 依赖输出、rg/rg --files 和自定义分析工具对 OpenCamera 项目的模块依赖关系进行深度分析。识别循环依赖、过度耦合、缺失抽象等问题。
 
 ## Allowed Paths
 
@@ -87,7 +87,7 @@ git diff --name-only HEAD | grep -v "docs/plans/deep-audit-optimization-orchestr
 
 ## Analysis Tools
 
-### Primary: CodeGraph
+### Primary: Gradle 与源码静态分析
 - 符号索引和依赖分析
 - 调用链追踪
 - 影响范围分析

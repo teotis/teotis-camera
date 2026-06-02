@@ -102,7 +102,7 @@ git diff --name-only HEAD | grep -v "docs/plans/deep-audit-optimization-orchestr
 - 根因分析
 - 修复策略
 
-### Tertiary: CodeGraph
+### Tertiary: 源码搜索与静态阅读
 - Session 相关符号分析
 - 调用链追踪
 - 依赖分析

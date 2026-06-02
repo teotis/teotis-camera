@@ -97,7 +97,7 @@ git diff --name-only HEAD | grep -v "docs/plans/deep-audit-optimization-orchestr
 - 测试执行报告
 - 覆盖率趋势
 
-### Secondary: CodeGraph
+### Secondary: 源码搜索与静态阅读
 - 测试代码分析
 - 测试依赖分析
 - 测试调用链

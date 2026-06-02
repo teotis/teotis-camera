@@ -103,7 +103,7 @@ git diff --name-only HEAD | grep -v "docs/plans/deep-audit-optimization-orchestr
 - 复杂度计算
 - 重复检测
 
-### Secondary: CodeGraph
+### Secondary: 源码搜索与静态阅读
 - 符号分析
 - 代码结构分析
 

@@ -18,7 +18,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 这是一个纯分析任务。不要修改任何源代码文件。只读取源代码，分析架构边界违规，将发现写入 status 文件。
 
-使用 CodeGraph 工具（codegraph_context, codegraph_search, codegraph_callees, codegraph_callers, codegraph_impact）来分析代码结构和依赖关系。
+使用 rg、rg --files、Gradle 依赖输出和源码阅读来分析代码结构和依赖关系。
 
 分析维度：
 1. 检查所有 `import` 语句中的跨层依赖方向
@@ -55,7 +55,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 这是一个纯分析任务。不要修改任何源代码文件。只读取源代码，分析领域模型统一性，将发现写入 status 文件。
 
-使用 CodeGraph 工具来搜索和比较跨模块的类型定义。
+使用 rg、rg --files、Gradle 依赖输出和源码阅读来搜索和比较跨模块的类型定义。
 
 分析维度：
 1. 搜索同名或相似的 data class / sealed class / interface
@@ -90,7 +90,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 这是一个纯分析任务。不要修改任何源代码文件。只读取源代码，分析 Session Kernel 的不变量完整性，将发现写入 status 文件。
 
-使用 CodeGraph 工具来分析 session 相关的状态定义和转换。
+使用 rg、rg --files、Gradle 依赖输出和源码阅读来分析 session 相关的状态定义和转换。
 
 分析维度：
 1. 识别所有状态枚举/密封类
@@ -125,7 +125,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 这是一个纯分析任务。不要修改任何源代码文件。只读取源代码，分析横切关注点的散落耦合，将发现写入 status 文件。
 
-使用 CodeGraph 工具来搜索日志、配置、诊断相关的调用模式。
+使用 rg、rg --files、Gradle 依赖输出和源码阅读来搜索日志、配置、诊断相关的调用模式。
 
 分析维度：
 1. 搜索日志调用模式（Log.d, Log.w, Log.e, println 等）
@@ -162,7 +162,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 依赖：先读取 01-04 包的 status 文件了解已发现的边界违规和重复表示。
 
-使用 CodeGraph 工具来追踪数据流和调用链。
+使用 rg、rg --files、Gradle 依赖输出和源码阅读来追踪数据流和调用链。
 
 分析维度：
 1. 搜索 Adapter/Wrapper/Converter 类
@@ -199,7 +199,7 @@ Copy this prompt into an agent, or let `orchestrate.sh start/advance` launch it 
 
 依赖：先读取 01-04 包的 status 文件了解已发现的架构问题。
 
-使用 CodeGraph 工具来搜索设备特定代码和能力查询。
+使用 rg、rg --files、Gradle 依赖输出和源码阅读来搜索设备特定代码和能力查询。
 
 分析维度：
 1. 搜索设备特定的条件分支（Build.MODEL, Build.MANUFACTURER 等）

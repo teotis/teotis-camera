@@ -99,7 +99,7 @@ git diff --name-only HEAD | grep -v "docs/plans/deep-audit-optimization-orchestr
 - 违规模式识别
 - 修复建议
 
-### Secondary: CodeGraph
+### Secondary: 源码搜索与静态阅读
 - 依赖方向分析
 - 调用链追踪
 - 影响范围分析

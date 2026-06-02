@@ -97,7 +97,7 @@ git diff --name-only HEAD | grep -v "docs/plans/deep-audit-optimization-orchestr
 - 实施指南制定
 - 风险评估
 
-### Secondary: CodeGraph
+### Secondary: 源码搜索与静态阅读
 - 代码位置标注
 - 影响范围分析
 - 依赖关系分析
