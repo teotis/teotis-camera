@@ -738,7 +738,8 @@ private fun drawBlurFourBorderFrame(
     val bottomBorderInt = bottomBorder.toInt()
     drawContentAwareEdgeBorder(
         canvas, source, framedWidth, framedHeight,
-        sideBorderInt, topBorderInt, bottomBorderInt
+        sideBorderInt, topBorderInt, bottomBorderInt,
+        background = template.frameBackground
     )
     canvas.drawBitmap(source, sideBorder, topBorder, null)
 
@@ -933,30 +934,56 @@ private fun drawContentAwareEdgeBorder(
     framedHeight: Int,
     sideBorder: Int,
     topBorder: Int,
-    bottomBorder: Int
+    bottomBorder: Int,
+    background: WatermarkFrameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR
 ) {
-    val stripH = maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR)
-    val stripW = maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR)
+    val blurDownsample = BLUR_DOWNSAMPLE_DIVISOR
 
-    val topSrc = Bitmap.createBitmap(source, 0, 0, source.width, stripH)
-    val topScaled = Bitmap.createScaledBitmap(topSrc, framedWidth, topBorder, true)
-    canvas.drawBitmap(topScaled, 0f, 0f, null)
-    topSrc.recycle(); topScaled.recycle()
+    fun drawBlurredEdge(strip: Bitmap, dstX: Int, dstY: Int, dstW: Int, dstH: Int) {
+        val small = Bitmap.createScaledBitmap(
+            strip,
+            maxOf(1, strip.width / blurDownsample),
+            maxOf(1, strip.height / blurDownsample),
+            true
+        )
+        val scaled = Bitmap.createScaledBitmap(small, dstW, dstH, true)
+        small.recycle()
+        canvas.drawBitmap(scaled, dstX.toFloat(), dstY.toFloat(), null)
+        scaled.recycle()
+    }
 
-    val bottomSrc = Bitmap.createBitmap(source, 0, source.height - stripH, source.width, stripH)
-    val bottomScaled = Bitmap.createScaledBitmap(bottomSrc, framedWidth, bottomBorder, true)
-    canvas.drawBitmap(bottomScaled, 0f, (framedHeight - bottomBorder).toFloat(), null)
-    bottomSrc.recycle(); bottomScaled.recycle()
+    val topSrc = Bitmap.createBitmap(source, 0, 0, source.width, maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR))
+    drawBlurredEdge(topSrc, 0, 0, framedWidth, topBorder)
+    topSrc.recycle()
 
-    val leftSrc = Bitmap.createBitmap(source, 0, 0, stripW, source.height)
-    val leftScaled = Bitmap.createScaledBitmap(leftSrc, sideBorder, source.height, true)
-    canvas.drawBitmap(leftScaled, 0f, topBorder.toFloat(), null)
-    leftSrc.recycle(); leftScaled.recycle()
+    val bottomSrc = Bitmap.createBitmap(source, 0, source.height - maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR), source.width, maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR))
+    drawBlurredEdge(bottomSrc, 0, framedHeight - bottomBorder, framedWidth, bottomBorder)
+    bottomSrc.recycle()
 
-    val rightSrc = Bitmap.createBitmap(source, source.width - stripW, 0, stripW, source.height)
-    val rightScaled = Bitmap.createScaledBitmap(rightSrc, sideBorder, source.height, true)
-    canvas.drawBitmap(rightScaled, (framedWidth - sideBorder).toFloat(), topBorder.toFloat(), null)
-    rightSrc.recycle(); rightScaled.recycle()
+    val leftSrc = Bitmap.createBitmap(source, 0, 0, maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR), source.height)
+    drawBlurredEdge(leftSrc, 0, topBorder, sideBorder, source.height)
+    leftSrc.recycle()
+
+    val rightSrc = Bitmap.createBitmap(source, source.width - maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR), 0, maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR), source.height)
+    drawBlurredEdge(rightSrc, framedWidth - sideBorder, topBorder, sideBorder, source.height)
+    rightSrc.recycle()
+
+    val tintOverlay = when (background) {
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(64, 20, 20, 20)
+        WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> Color.argb(80, 255, 244, 228)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(72, 245, 210, 170)
+        else -> Color.TRANSPARENT
+    }
+    if (tintOverlay != Color.TRANSPARENT) {
+        val tintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = tintOverlay
+            style = Paint.Style.FILL
+        }
+        canvas.drawRect(0f, 0f, framedWidth.toFloat(), topBorder.toFloat(), tintPaint)
+        canvas.drawRect(0f, (framedHeight - bottomBorder).toFloat(), framedWidth.toFloat(), framedHeight.toFloat(), tintPaint)
+        canvas.drawRect(0f, topBorder.toFloat(), sideBorder.toFloat(), (framedHeight - bottomBorder).toFloat(), tintPaint)
+        canvas.drawRect((framedWidth - sideBorder).toFloat(), topBorder.toFloat(), framedWidth.toFloat(), (framedHeight - bottomBorder).toFloat(), tintPaint)
+    }
 }
 
 private fun drawFrameBackground(

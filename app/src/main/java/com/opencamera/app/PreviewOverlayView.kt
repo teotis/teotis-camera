@@ -390,6 +390,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     private fun drawWatermarkFourBorderHint(canvas: Canvas, spec: WatermarkHintSpec) {
         applyWatermarkTextScale(spec.textScale)
         val inset = 10f * density
+        val outerInset = 3f * density
         val rect = activeFrameRectOrFullView()
         val borderRect = RectF(
             rect.left + inset,
@@ -397,7 +398,19 @@ class PreviewOverlayView @JvmOverloads constructor(
             rect.right - inset,
             rect.bottom - inset
         )
-        watermarkBorderPaint.alpha = (spec.opacity * 255 * 0.7f).toInt().coerceIn(0, 255)
+
+        val blurBandAlpha = (spec.opacity * 255 * 0.12f).toInt().coerceIn(0, 255)
+        val blurBandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            alpha = blurBandAlpha
+            style = Paint.Style.FILL
+        }
+        canvas.drawRect(RectF(rect.left + outerInset, rect.top + outerInset, rect.right - outerInset, borderRect.top), blurBandPaint)
+        canvas.drawRect(RectF(rect.left + outerInset, borderRect.bottom, rect.right - outerInset, rect.bottom - outerInset), blurBandPaint)
+        canvas.drawRect(RectF(rect.left + outerInset, borderRect.top, borderRect.left, borderRect.bottom), blurBandPaint)
+        canvas.drawRect(RectF(borderRect.right, borderRect.top, rect.right - outerInset, borderRect.bottom), blurBandPaint)
+
+        watermarkBorderPaint.alpha = (spec.opacity * 255 * 0.55f).toInt().coerceIn(0, 255)
         canvas.drawRect(borderRect, watermarkBorderPaint)
 
         watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
