@@ -93,11 +93,11 @@
   `CameraSessionCoordinatorTest`
   `:app:assembleDebug`
 - 本轮通过：
+  `rtk ./scripts/verify_stage_7_observability.sh`（全部 213 项测试 + assembleDebug 通过）
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionPreviewRenderModelTest`
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest`
   `rtk ./gradlew --no-daemon :app:assembleDebug`
-- 本轮未通过：
-  `rtk ./scripts/verify_stage_7_observability.sh` 在 `:core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest` 段失败，41 项集中表现为 session 文案英文期望与中文实际值不一致（例如 `Provider failure` vs `提供者故障`、`Cycle Frame` vs `切换画幅`）；最小复现 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :core:session:test --tests 'com.opencamera.core.session.DefaultCameraSessionTest.recoverable runtime issue requests recovery bind when preview host is attached'` 同样失败。该阻断位于 core/session 文案期望漂移，不在本次 app overlay 映射改动路径内。
+- 本轮未通过：无
   历史通过记录：
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest`
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.CameraXCaptureAdapterLivePhotoTest --tests com.opencamera.app.camera.live.LivePreviewFrameSourceTest`
