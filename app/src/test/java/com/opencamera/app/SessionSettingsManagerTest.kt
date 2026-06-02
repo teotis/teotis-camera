@@ -324,11 +324,11 @@ class SessionSettingsManagerTest {
             sourceProfileId = "humanistic-street"
         )
 
-        assertEquals("custom-街头-street-1", editableId)
-        assertEquals("custom-街头-street-1", store.load().photo.defaultHumanisticFilterProfileId)
+        assertEquals("custom-street-1", editableId)
+        assertEquals("custom-street-1", store.load().photo.defaultHumanisticFilterProfileId)
         assertEquals(
-            "街头 Street Custom 1",
-            manager.loadSnapshot().catalog.filterProfileOrNull("custom-街头-street-1")?.label
+            "Street Custom 1",
+            manager.loadSnapshot().catalog.filterProfileOrNull("custom-street-1")?.label
         )
     }
 

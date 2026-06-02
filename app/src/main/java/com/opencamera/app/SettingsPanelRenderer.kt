@@ -29,6 +29,7 @@ internal class SettingsPanelRenderer(
         views.catalogFooter.isVisible = model.catalogFooter.isNotEmpty()
         views.editingHint.text = model.editingHint
         renderControl(views.gridMode, model.commonSection.gridMode, model.editingEnabled)
+        renderControl(views.appLanguage, model.commonSection.languageControl, model.editingEnabled)
         renderControl(views.shutterSound, model.commonSection.shutterSound, model.editingEnabled)
         renderControl(views.selfieMirror, model.commonSection.selfieMirror, model.editingEnabled)
         renderControl(views.photoFilter, model.photoSection.defaultFilter, model.editingEnabled)

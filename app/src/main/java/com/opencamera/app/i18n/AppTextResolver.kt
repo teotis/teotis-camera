@@ -3,6 +3,7 @@ package com.opencamera.app.i18n
 import android.content.Context
 import com.opencamera.app.R
 import com.opencamera.app.SettingsControlAvailability
+import com.opencamera.app.FilterAdvancedControl
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.settings.AppLanguage
 import com.opencamera.core.settings.CompositionGridMode
@@ -205,6 +206,12 @@ open class AppTextResolver(private val context: Context?) {
     open fun filterSignedGreenPlus(): String =
         str(R.string.filter_signed_green_plus, "Green+")
 
+    // Filter adjustment level labels
+    open fun filterAdjustmentOff(): String = str(R.string.filter_adjustment_off, "Off")
+    open fun filterAdjustmentLow(): String = str(R.string.filter_adjustment_low, "Low")
+    open fun filterAdjustmentMedium(): String = str(R.string.filter_adjustment_medium, "Medium")
+    open fun filterAdjustmentHigh(): String = str(R.string.filter_adjustment_high, "High")
+
     // Dev log title labels
     open fun devLogTitleKey(count: Int): String =
         String.format(str(R.string.dev_log_title_key, "Summary Log (%d)"), count)
@@ -230,6 +237,21 @@ open class AppTextResolver(private val context: Context?) {
     open fun filterCtrlCoolBoost(): String = str(R.string.filter_ctrl_cool_boost, "Cool Boost")
     open fun filterCtrlTempShift(): String = str(R.string.filter_ctrl_temp_shift, "Temp Shift")
     open fun filterCtrlTintShift(): String = str(R.string.filter_ctrl_tint_shift, "Tint Shift")
+
+    internal open fun filterCtrlLabel(control: FilterAdvancedControl): String = when (control) {
+        FilterAdvancedControl.EXPOSURE -> filterCtrlExposure()
+        FilterAdvancedControl.SOFT_GLOW -> filterCtrlSoftGlow()
+        FilterAdvancedControl.HALO -> filterCtrlHalo()
+        FilterAdvancedControl.GRAIN -> filterCtrlGrain()
+        FilterAdvancedControl.SHARPNESS -> filterCtrlSharpness()
+        FilterAdvancedControl.VIGNETTE -> filterCtrlVignette()
+        FilterAdvancedControl.HIGHLIGHTS -> filterCtrlHighlights()
+        FilterAdvancedControl.SHADOWS -> filterCtrlShadows()
+        FilterAdvancedControl.WARM_BOOST -> filterCtrlWarmBoost()
+        FilterAdvancedControl.COOL_BOOST -> filterCtrlCoolBoost()
+        FilterAdvancedControl.TEMPERATURE_SHIFT -> filterCtrlTempShift()
+        FilterAdvancedControl.TINT_SHIFT -> filterCtrlTintShift()
+    }
 
     // Filter family labels
     open fun filterFamilyPhoto(): String = str(R.string.filter_family_photo, "Photo")
@@ -587,9 +609,14 @@ open class AppTextResolver(private val context: Context?) {
         return "$colorLabel / $toneLabel"
     }
 
+    // Language switch
+    open fun languageLabel(): String = str(R.string.label_language_setting, "语言")
+    open fun languageRestartHint(): String = str(R.string.label_language_restart_hint, "切换后重启生效")
+    open fun languageDisplayNameZH(): String = "中文"
+    open fun languageDisplayNameEN(): String = "English"
     open fun languageDisplayName(settings: PersistedSettings): String = when (settings.common.appLanguage) {
-        AppLanguage.ZH -> str(R.string.app_name, "OpenCamera")
-        AppLanguage.EN -> "English"
+        AppLanguage.ZH -> languageDisplayNameZH()
+        AppLanguage.EN -> languageDisplayNameEN()
     }
 
     // Document batch organizer

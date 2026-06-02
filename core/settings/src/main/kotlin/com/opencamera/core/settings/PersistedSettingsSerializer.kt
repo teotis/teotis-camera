@@ -1,6 +1,7 @@
 package com.opencamera.core.settings
 
 object PersistedSettingsSerializer {
+    private const val KEY_APP_LANGUAGE = "common.appLanguage"
     private const val KEY_GRID_MODE = "common.gridMode"
     private const val KEY_SHUTTER_SOUND_ENABLED = "common.shutterSoundEnabled"
     private const val KEY_SELFIE_MIRROR_ENABLED = "common.selfieMirrorEnabled"
@@ -55,6 +56,7 @@ object PersistedSettingsSerializer {
 
     fun toMap(settings: PersistedSettings): Map<String, String> {
         return linkedMapOf(
+            KEY_APP_LANGUAGE to settings.common.appLanguage.storageKey,
             KEY_GRID_MODE to settings.common.gridMode.storageKey,
             KEY_SHUTTER_SOUND_ENABLED to settings.common.shutterSoundEnabled.toString(),
             KEY_SELFIE_MIRROR_ENABLED to settings.common.selfieMirrorEnabled.toString(),
@@ -112,6 +114,8 @@ object PersistedSettingsSerializer {
         val defaults = PersistedSettings()
         return PersistedSettings(
             common = CommonSettings(
+                appLanguage = AppLanguage.fromStorageKey(values[KEY_APP_LANGUAGE])
+                    ?: defaults.common.appLanguage,
                 gridMode = CompositionGridMode.fromStorageKey(values[KEY_GRID_MODE])
                     ?: defaults.common.gridMode,
                 shutterSoundEnabled = parseBoolean(

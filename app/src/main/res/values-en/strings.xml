@@ -556,4 +556,14 @@
     <string name="issue_camera_unavailable">Camera unavailable</string>
     <string name="issue_thermal_critical">Thermal critical</string>
     <string name="issue_runtime_error">Runtime error</string>
+
+    <!-- Language switch -->
+    <string name="label_language_setting">Language</string>
+    <string name="label_language_restart_hint">Restart app to apply</string>
+
+    <!-- Filter adjustment levels -->
+    <string name="filter_adjustment_off">Off</string>
+    <string name="filter_adjustment_low">Low</string>
+    <string name="filter_adjustment_medium">Medium</string>
+    <string name="filter_adjustment_high">High</string>
 </resources>

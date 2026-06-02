@@ -171,6 +171,9 @@ internal class MainActivityActionBinder(
         views.settingsPanel.selfieMirror.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.commonSection?.selfieMirror)
         }
+        views.settingsPanel.appLanguage.setOnClickListener {
+            callbacks.applySettingsControl(snapshot().settingsPage?.commonSection?.languageControl)
+        }
         views.settingsPanel.photoFilter.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.defaultFilter)
         }
