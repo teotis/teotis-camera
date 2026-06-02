@@ -345,7 +345,7 @@
         android:fadeScrollbars="false"
         android:clipToPadding="false"
         android:paddingHorizontal="@dimen/space_12"
-        android:paddingVertical="@dimen/space_1"
+        android:paddingVertical="@dimen/space_4"
         app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -1602,6 +1602,7 @@
         android:paddingTop="@dimen/space_1"
         android:paddingEnd="@dimen/bottom_cockpit_padding_horizontal"
         android:paddingBottom="@dimen/space_4"
+        android:layout_marginBottom="@dimen/bottom_cockpit_margin_bottom"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -1643,7 +1644,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_1"
+            android:layout_marginTop="@dimen/cockpit_control_row_margin_top"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
