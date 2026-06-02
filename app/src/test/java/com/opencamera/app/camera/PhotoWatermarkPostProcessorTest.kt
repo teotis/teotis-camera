@@ -286,6 +286,54 @@ class PhotoWatermarkPostProcessorTest {
         bmp.recycle(); source.recycle()
     }
 
+    @Test
+    fun `blur four border top edge has smoother color gradient than raw scaled strip`() {
+        val source = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
+        for (x in 0 until 200) {
+            for (y in 0 until 200) {
+                source.setPixel(x, y, if (y < 50) Color.RED else Color.rgb(40, 40, 40))
+            }
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_LIGHT_BLUR)
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+
+        val minEdge = 200f
+        val topBorder = maxOf(20f, minEdge * 0.045f).toInt()
+
+        val colorDiffs = mutableListOf<Int>()
+        var prevPixel = bmp.getPixel(bmp.width / 2, 1)
+        for (y in 2 until topBorder) {
+            val cur = bmp.getPixel(bmp.width / 2, y)
+            val diff = kotlin.math.abs(Color.red(cur) - Color.red(prevPixel)) +
+                kotlin.math.abs(Color.green(cur) - Color.green(prevPixel)) +
+                kotlin.math.abs(Color.blue(cur) - Color.blue(prevPixel))
+            colorDiffs.add(diff)
+            prevPixel = cur
+        }
+        val avgDiff = if (colorDiffs.isNotEmpty()) colorDiffs.average() else 0.0
+        assertTrue(avgDiff < 80.0, "blurred border should have smooth gradient, avg adjacent diff=$avgDiff")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    fun `blur four border solid source produces blurred not sharp border`() {
+        val source = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.argb(255, 80, 120, 60))
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_BLUR)
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+
+        val minEdge = 120f
+        val sideBorder = maxOf(20f, minEdge * 0.045f).toInt()
+        val leftPixel = bmp.getPixel(sideBorder / 2, bmp.height / 2)
+
+        assertTrue(Color.green(leftPixel) > 30, "blurred green source border should retain green tint")
+        assertTrue(Color.blue(leftPixel) < Color.green(leftPixel), "blurred green source border should be greenish")
+        bmp.recycle(); source.recycle()
+    }
+
     private fun blurFourBorderTemplate(
         background: WatermarkFrameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR
     ) = ResolvedPhotoWatermarkTemplate(
