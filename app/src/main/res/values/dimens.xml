@@ -56,4 +56,6 @@
     <dimen name="panel_padding">18dp</dimen>
     <dimen name="panel_max_height">480dp</dimen>
     <dimen name="bottom_cockpit_padding_horizontal">16dp</dimen>
+    <dimen name="bottom_cockpit_margin_bottom">8dp</dimen>
+    <dimen name="cockpit_control_row_margin_top">8dp</dimen>
 </resources>

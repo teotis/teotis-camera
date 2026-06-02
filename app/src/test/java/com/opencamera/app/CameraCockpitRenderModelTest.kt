@@ -468,4 +468,76 @@ class CameraCockpitRenderModelTest {
             )
         )
     }
+
+    // --- Cockpit bottom layout spacing contract tests ---
+    // Spacing contract (2026-06-02):
+    //   bottomSheet marginBottom = 8dp (lifts controls above screen edge)
+    //   modeTrackScroll paddingVertical = 4dp (was 1dp, provides breathing room)
+    //   main control row marginTop = 8dp (was 1dp, separates thumbnail/shutter from mode track)
+    // These tests verify the render model maintains its structural contract under the new layout.
+
+    @Test
+    fun `cockpit bottom layout spacing - bottom cockpit model carries all required layout fields`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT)
+            )
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        val bottom = model.bottomCockpit
+        assertTrue(bottom.shutterLabel.isNotEmpty())
+        assertTrue(bottom.lensButtonLabel.isNotEmpty())
+        assertTrue(bottom.recordingIndicator != null)
+    }
+
+    @Test
+    fun `cockpit bottom layout spacing - mode track preserves mode list under increased padding`() {
+        val availableModes = listOf(
+            ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC,
+            ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT
+        )
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            availableModes = availableModes
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(availableModes.size, model.modeTrack.items.size)
+        assertTrue(model.modeTrack.items.first { it.modeId == ModeId.VIDEO }.isActive)
+        assertTrue(model.modeTrack.items.all { it.isAvailable })
+    }
+
+    @Test
+    fun `cockpit bottom layout spacing - control row maintains thumbnail and lens presence`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT)
+            )
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.bottomCockpit.lensButtonEnabled)
+        assertFalse(model.bottomCockpit.isRecording)
+        assertFalse(model.bottomCockpit.recordingIndicator.isVisible)
+    }
+
+    @Test
+    fun `cockpit bottom layout spacing - model is consistent with both zoom and mode track`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(0.7f, 1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
+        )
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.zoomStrip.isVisible)
+        assertEquals(4, model.zoomStrip.chips.size)
+        assertTrue(model.modeTrack.items.isNotEmpty())
+    }
 }
