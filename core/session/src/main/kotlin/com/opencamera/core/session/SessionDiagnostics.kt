@@ -1,6 +1,7 @@
 package com.opencamera.core.session
 
 import com.opencamera.core.device.CameraOutputRotation
+import com.opencamera.core.device.LensNode
 import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.media.RuntimeMetricsSnapshot
 import com.opencamera.core.mode.ModeId
@@ -42,6 +43,15 @@ data class PerfSnapshot(
     val firstFrameBudget: FirstFrameBudgetSnapshot
 )
 
+data class ZoomDiagnosticsSnapshot(
+    val captureZoomRatio: Float,
+    val previewZoomRatio: Float,
+    val requestedLensNode: LensNode?,
+    val lensNodeMapSize: Int,
+    val zoomControlSupport: String,
+    val degradedReason: String? = null
+)
+
 data class RecoveryTraceSnapshot(
     val isRecoveryActive: Boolean,
     val recoveryCount: Int,
@@ -65,7 +75,8 @@ data class SessionDebugDump(
     val recentEvents: List<SessionTraceEvent>,
     val resourceDiagnostics: ResourceDiagnosticsSnapshot? = null,
     val runtimeMetrics: RuntimeMetricsSnapshot? = null,
-    val recentLinkEvents: List<PerformanceLinkEvent> = emptyList()
+    val recentLinkEvents: List<PerformanceLinkEvent> = emptyList(),
+    val zoomDiagnostics: ZoomDiagnosticsSnapshot? = null
 )
 
 fun SessionState.toPerfSnapshot(): PerfSnapshot {
@@ -140,7 +151,8 @@ fun buildSessionDebugDump(
         recentEvents = traceEvents.takeLast(recentEventLimit),
         resourceDiagnostics = resourceDiagnostics,
         runtimeMetrics = runtimeMetrics,
-        recentLinkEvents = linkEvents.takeLast(recentEventLimit)
+        recentLinkEvents = linkEvents.takeLast(recentEventLimit),
+        zoomDiagnostics = buildZoomDiagnostics(state)
     )
 }
 
@@ -262,3 +274,25 @@ private fun firstFrameBudgetFor(
 }
 
 private const val FIRST_FRAME_TIMEOUT_GRACE_MILLIS = 80L
+
+internal fun buildZoomDiagnostics(state: SessionState): ZoomDiagnosticsSnapshot {
+    val zoomCapability = state.activeDeviceCapabilities.zoomRatioCapability
+    val previewConfig = state.activeDeviceGraph.preview
+    val lensNodeMap = zoomCapability.lensNodeMap
+    val hasMultipleRealNodes = lensNodeMap.values.count { it.available } > 1
+    val degradedReason = if (lensNodeMap.isEmpty()) {
+        "no multi-camera nodes detected; preview uses capture zoom"
+    } else if (!hasMultipleRealNodes) {
+        "single real lens node; discrete preview baseline limited"
+    } else {
+        null
+    }
+    return ZoomDiagnosticsSnapshot(
+        captureZoomRatio = previewConfig.zoomRatio,
+        previewZoomRatio = previewConfig.previewZoomRatio,
+        requestedLensNode = previewConfig.requestedLensNode,
+        lensNodeMapSize = lensNodeMap.size,
+        zoomControlSupport = zoomCapability.support.tagValue,
+        degradedReason = degradedReason
+    )
+}

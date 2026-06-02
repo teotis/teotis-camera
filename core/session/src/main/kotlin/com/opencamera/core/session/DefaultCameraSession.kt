@@ -1627,9 +1627,11 @@ class DefaultCameraSession(
             detail = "ratio=${normalizedZoomRatioValue(zoomRatio)}x",
             source = "DefaultCameraSession"
         )
+        val currentPreviewZoom = _state.value.activeDeviceGraph.preview.previewZoomRatio
         _effects.emit(
             SessionEffect.ApplyZoomRatio(
-                zoomRatio = normalizedZoomRatioValue(zoomRatio)
+                zoomRatio = normalizedZoomRatioValue(zoomRatio),
+                previewZoomRatio = currentPreviewZoom
             )
         )
         linkRecorder.completeSpan(span, status = LinkEventStatus.COMPLETED)
