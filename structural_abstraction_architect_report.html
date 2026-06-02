@@ -256,6 +256,7 @@ details summary{cursor:pointer;color:var(--a);font-weight:600}
 <span class="b bg">已验证</span>
 <span class="b bb">杠杆:高</span>
 <span class="b bg">负担:低</span>
+<span class="b bg">实施中: PhotoModePlugin 已迁移</span>
 </div>
 <div class="card-section">
 <h4>透镜</h4><p><span class="tag">Patch Pressure</span> <span class="tag">Latent Kernel</span></p>
@@ -348,7 +349,8 @@ details summary{cursor:pointer;color:var(--a);font-weight:600}
     end
     CO["CameraSessionCoordinator"] --> A
     A --> CX["CameraX SDK"]
-    A --> C2["Camera2 Interop"]</div></div>
+    A --> C2["Camera2 Interop"]</div>
+<noscript><p><strong>当前拓扑（降级文本）:</strong> CameraXCaptureAdapter (3437行) 是单一 God Class，包含 Preview、Still Capture、Video、Controls、Capability 五个职责。CameraSessionCoordinator 调用它，它再调用 CameraX SDK 和 Camera2 Interop。</p></noscript></div>
 <div class="td pro"><div class="lb">建议拓扑</div>
 <div class="mermaid">flowchart TB
     subgraph A2["CameraXCaptureAdapter Coordinator"]
@@ -364,7 +366,8 @@ details summary{cursor:pointer;color:var(--a);font-weight:600}
     L --> VR
     L --> CC
     L --> CD2
-    CO2["Coordinator"] --> A2</div></div>
+    CO2["Coordinator"] --> A2</div>
+<noscript><p><strong>建议拓扑（降级文本）:</strong> CameraXCaptureAdapter 变为薄 Coordinator，委托给 5 个子组件：PreviewManager、StillCaptureMgr、VideoRecordMgr、ControlMgr、CapDetector。每个子组件独立调用 CameraX/Camera2。</p></noscript></div>
 </div>
 <div class="card-section">
 <h4>过渡接缝</h4><p>内部委托：保持 CameraDeviceAdapter 接口不变，从 Adapter 内部提取子组件。每提取一个运行完整测试。</p>
@@ -618,10 +621,85 @@ data class PhotoSettings(
 <div class="nt" id="nt">已复制到剪贴板</div>
 
 <script>
+// Lightbox
 document.addEventListener('click',function(e){var d=e.target.closest('.td');if(d){var m=d.querySelector('.mermaid');if(m){document.getElementById('lbc').innerHTML=m.outerHTML;document.getElementById('lbx').classList.add('a')}}if(e.target.id==='lbx')document.getElementById('lbx').classList.remove('a')});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')document.getElementById('lbx').classList.remove('a')});
-document.addEventListener('click',function(e){if(e.target.classList.contains('s')){var r=parseInt(e.target.dataset.v);var c=e.target.parentElement;c.querySelectorAll('.s').forEach(function(s){s.classList.toggle('a',parseInt(s.dataset.v)<=r)});c.dataset.r=r}});
-function exportReview(){var cs=document.querySelectorAll('.cd[data-p]');var m='# 结构抽象分析评审\n\n';cs.forEach(function(c){var t=c.querySelector('.cd-t')?.textContent||'';var r=c.querySelector('.sr')?.dataset?.r||'未评';var s=c.querySelector('select')?.value||'未评';var n=c.querySelector('textarea')?.value||'';m+='## '+t+'\n- 评分: '+r+'/5\n- 状态: '+s+'\n- 备注: '+(n||'无')+'\n\n'});m+='[Next Action Directive] Treat the structural recommendations above as hypotheses that must be translated into safe engineering work. For items marked "Send to Transition Planning", evaluate transition burden, business relevance, compatibility boundaries, rollout controls, rollback strategy, ownership, and short, medium, and long-term ROI using the Pragmatic Renewal Architect approach. Do not modify code unless I explicitly authorize implementation after reviewing the proposed transition plan.\n';navigator.clipboard.writeText(m).then(function(){var n=document.getElementById('nt');n.style.display='block';setTimeout(function(){n.style.display='none'},2000)})}
+
+// Star rating + auto-save
+document.addEventListener('click',function(e){
+  if(e.target.classList.contains('s')){
+    var r=parseInt(e.target.dataset.v);var c=e.target.parentElement;
+    c.querySelectorAll('.s').forEach(function(s){s.classList.toggle('a',parseInt(s.dataset.v)<=r)});
+    c.dataset.r=r;saveState();
+  }
+});
+
+// Auto-save on input change
+document.addEventListener('change',function(e){if(e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA')saveState()});
+document.addEventListener('input',function(e){if(e.target.tagName==='TEXTAREA')saveState()});
+
+var STORAGE_KEY='open_camera_sa_report_review';
+
+function saveState(){
+  try{
+    var state={};
+    document.querySelectorAll('.cd[data-card-id]').forEach(function(c){
+      var id=c.dataset.cardId;
+      state[id]={
+        rating:c.querySelector('.sr')?.dataset?.r||'0',
+        status:c.querySelector('select')?.value||'',
+        note:c.querySelector('textarea')?.value||''
+      };
+    });
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+  }catch(e){/* localStorage unavailable */}
+}
+
+function restoreState(){
+  try{
+    var raw=localStorage.getItem(STORAGE_KEY);
+    if(!raw)return;
+    var state=JSON.parse(raw);
+    document.querySelectorAll('.cd[data-card-id]').forEach(function(c){
+      var id=c.dataset.cardId;var s=state[id];if(!s)return;
+      var sr=c.querySelector('.sr');if(sr&&s.rating){sr.dataset.r=s.rating;
+        sr.querySelectorAll('.s').forEach(function(st){st.classList.toggle('a',parseInt(st.dataset.v)<=parseInt(s.rating))})}
+      var sel=c.querySelector('select');if(sel&&s.status)sel.value=s.status;
+      var ta=c.querySelector('textarea');if(ta&&s.note)ta.value=s.note;
+    });
+  }catch(e){/* localStorage unavailable */}
+}
+restoreState();
+
+function exportReview(){
+  var report={
+    name:'OpenCamera 结构抽象分析报告',
+    date:new Date().toISOString().split('T')[0],
+    items:[]
+  };
+  document.querySelectorAll('.cd[data-card-id]').forEach(function(c){
+    report.items.push({
+      id:c.dataset.cardId,
+      title:c.querySelector('.cd-t')?.textContent||'',
+      rating:parseInt(c.querySelector('.sr')?.dataset?.r)||0,
+      status:c.querySelector('select')?.value||'未评',
+      note:c.querySelector('textarea')?.value||''
+    });
+  });
+  var m='# '+report.name+'\n\n日期: '+report.date+'\n\n';
+  report.items.forEach(function(item){
+    m+='## '+item.title+'\n- ID: `'+item.id+'`\n- 评分: '+item.rating+'/5\n- 状态: '+item.status+'\n- 备注: '+(item.note||'无')+'\n\n';
+  });
+  m+='[Next Action Directive] Treat the structural recommendations above as hypotheses that must be translated into safe engineering work. For items marked "Send to Transition Planning", evaluate transition burden, business relevance, compatibility boundaries, rollout controls, rollback strategy, ownership, and short, medium, and long-term ROI using the Pragmatic Renewal Architect approach. Do not modify code unless I explicitly authorize implementation after reviewing the proposed transition plan.\n';
+  try{
+    navigator.clipboard.writeText(m).then(function(){
+      var n=document.getElementById('nt');n.style.display='block';setTimeout(function(){n.style.display='none'},2000);
+    });
+  }catch(e){
+    var ta=document.createElement('textarea');ta.value=m;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    var n=document.getElementById('nt');n.textContent='已复制(降级)';n.style.display='block';setTimeout(function(){n.style.display='none';n.textContent='已复制到剪贴板'},2000);
+  }
+}
 </script>
 </body>
 </html>
