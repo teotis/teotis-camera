@@ -78,7 +78,7 @@ class CameraSessionCoordinator(
                 DeviceCommand.StopActiveShot(effect.shotId)
             )
             is SessionEffect.ApplyZoomRatio -> cameraAdapter.dispatch(
-                DeviceCommand.UpdateZoomRatio(effect.zoomRatio)
+                DeviceCommand.UpdateZoomRatio(effect.zoomRatio, effect.previewZoomRatio)
             )
             is SessionEffect.SwitchLensNode -> cameraAdapter.dispatch(
                 DeviceCommand.SwitchLensNode(effect.lensNode, effect.reason)

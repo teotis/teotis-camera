@@ -409,11 +409,11 @@ class CameraSessionCoordinatorTest {
         advanceUntilIdle()
 
         session.emitEffect(
-            SessionEffect.ApplyZoomRatio(2f)
+            SessionEffect.ApplyZoomRatio(zoomRatio = 2f, previewZoomRatio = 1f)
         )
         advanceUntilIdle()
 
-        assertTrue(adapter.recordedCommands.contains(DeviceCommand.UpdateZoomRatio(2f)))
+        assertTrue(adapter.recordedCommands.contains(DeviceCommand.UpdateZoomRatio(zoomRatio = 2f, previewZoomRatio = 1f)))
         assertEquals(0, adapter.bindRequests)
     }
 

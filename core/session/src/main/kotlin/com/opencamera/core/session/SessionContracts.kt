@@ -356,7 +356,7 @@ sealed interface SessionIntent {
 sealed interface SessionEffect {
     data class ExecuteShot(val plan: ShotPlan) : SessionEffect
     data class StopActiveShot(val shotId: String) : SessionEffect
-    data class ApplyZoomRatio(val zoomRatio: Float) : SessionEffect
+    data class ApplyZoomRatio(val zoomRatio: Float, val previewZoomRatio: Float) : SessionEffect
     data class SwitchLensNode(val lensNode: LensNode, val reason: String) : SessionEffect
     data class BindPreview(
         val modeId: ModeId,

@@ -566,7 +566,7 @@ data class DeviceGraphSpec(
 sealed interface DeviceCommand {
     data class ExecuteShot(val plan: ShotPlan) : DeviceCommand
     data class StopActiveShot(val shotId: String) : DeviceCommand
-    data class UpdateZoomRatio(val zoomRatio: Float) : DeviceCommand
+    data class UpdateZoomRatio(val zoomRatio: Float, val previewZoomRatio: Float) : DeviceCommand
     data class SwitchLensNode(val lensNode: LensNode, val reason: String) : DeviceCommand
     data class ApplyPreviewMetering(val request: PreviewMeteringRequest) : DeviceCommand
     data class UpdateOutputRotation(val rotation: CameraOutputRotation) : DeviceCommand

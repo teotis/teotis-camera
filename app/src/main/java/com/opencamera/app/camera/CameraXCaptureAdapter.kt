@@ -1455,7 +1455,7 @@ class CameraXCaptureAdapter(
             }
 
             is DeviceCommand.UpdateZoomRatio -> runCatching {
-                updateZoomRatio(command.zoomRatio)
+                updateZoomRatio(command.zoomRatio, command.previewZoomRatio)
             }.onFailure { throwable ->
                 val issue = classifyPreviewBindingFailure(throwable)
                 invalidateCachedProviderState(issue)
@@ -1736,7 +1736,7 @@ class CameraXCaptureAdapter(
         }
     }
 
-    private suspend fun updateZoomRatio(zoomRatio: Float) {
+    private suspend fun updateZoomRatio(zoomRatio: Float, previewZoomRatio: Float) {
         val normalizedZoomRatio = normalizedZoomRatioValue(zoomRatio)
         val activeGraph = currentGraph ?: return
         currentGraph = activeGraph.copy(
@@ -1745,7 +1745,9 @@ class CameraXCaptureAdapter(
             )
         )
         val camera = boundCamera ?: return
-        camera.cameraControl.setZoomRatio(normalizedZoomRatio).await()
+        // Use discrete previewZoomRatio for CameraX preview stream to avoid
+        // continuous laggy preview zoom; the frame overlay shows the actual capture area.
+        camera.cameraControl.setZoomRatio(previewZoomRatio).await()
     }
 
     override fun boundGraph(): DeviceGraphSpec? = currentGraph
@@ -2970,9 +2972,9 @@ class CameraXCaptureAdapter(
         boundCamera = boundUseCaseCamera
         suppressPreviewStateEvents = false
 
-        // Apply current zoom ratio to the newly bound camera
-        val currentZoom = activeGraph.preview.zoomRatio
-        boundUseCaseCamera.cameraControl.setZoomRatio(currentZoom)
+        // Apply discrete preview zoom ratio to the newly bound camera
+        val currentPreviewZoom = activeGraph.preview.previewZoomRatio
+        boundUseCaseCamera.cameraControl.setZoomRatio(currentPreviewZoom)
     }
 
     private suspend fun ensureStillCaptureRequest(deviceRequest: DeviceShotRequest) {
@@ -3164,7 +3166,7 @@ class CameraXCaptureAdapter(
         cameraProvider = provider
         boundCamera = boundUseCaseCamera
         observeCameraState(boundUseCaseCamera)
-        boundUseCaseCamera.cameraControl.setZoomRatio(deviceGraph.preview.zoomRatio)
+        boundUseCaseCamera.cameraControl.setZoomRatio(deviceGraph.preview.previewZoomRatio)
         currentTorchEnabled = false
         currentGraph = deviceGraph
         boundLifecycleOwner = lifecycleOwner
