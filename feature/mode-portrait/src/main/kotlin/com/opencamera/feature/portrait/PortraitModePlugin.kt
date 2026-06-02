@@ -477,7 +477,7 @@ private class PortraitModeController(
         val standardSummary = if (depthEffectEnabled()) {
             "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Bokeh strength ${style.bokehStrength} | Subject tracking ${style.subjectTracking} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Portrait depth rendering active."
         } else {
-            "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Focus-priority portrait degraded (device does not support depth effect)."
+            "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Live ${onOffLabel(livePhotoEnabledByDefault())} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Focus-priority portrait degraded (depth effect is unavailable)."
         }
         if (!proVariantEnabled) {
             return standardSummary

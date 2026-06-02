@@ -266,7 +266,7 @@ abstract class AbstractStillCaptureMode(
         )
     }
 
-    protected fun onOffLabel(enabled: Boolean): String = if (enabled) "on" else "off"
+    protected fun onOffLabel(enabled: Boolean): String = if (enabled) "On" else "Off"
 
     protected suspend fun cycleFrameRatio(): ModeSignal =
         frameRatioDelegate.cycleFrameRatio(

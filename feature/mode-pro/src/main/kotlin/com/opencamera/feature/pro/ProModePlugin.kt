@@ -297,12 +297,12 @@ private class ProModeController(
         val flashSummary = if (flashSupported()) {
             "Flash ${resolvedFlashMode(preset).label}"
         } else {
-            "Flash control unavailable"
+            "Flash unavailable on this device"
         }
         return if (manualControlsEnabled()) {
             "Preset ${preset.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | ISO ${preset.iso} | ${preset.exposureTime} | WB ${preset.whiteBalanceKelvin}K | Focus ${preset.focusMode} | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} | Frame ${currentFrameRatio().label} | $flashSummary"
         } else {
-            "Preset ${preset.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Guided tuning active (manual controls unavailable). | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} saved-only. | Frame ${currentFrameRatio().label} | $flashSummary"
+            "Preset ${preset.label} | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Guided tuning active (manual controls are unavailable). | Draft ${context.settingsSnapshot.catalog.manualCaptureDraft.compactSummary()} saved only. | Frame ${currentFrameRatio().label} | $flashSummary"
         }
     }
 

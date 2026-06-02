@@ -350,7 +350,7 @@ private class HumanisticModeController(
             append(" | Live ${onOffLabel(livePhotoEnabledByDefault())}")
             append(" | Timer ${countdownDuration().label}")
             append(" | Frame ${currentFrameRatio().label}")
-            append(" | Sub-feature style, frame, live default, timer and watermark share settings.")
+            append(" | Subfeatures style, frame ratio, Live default, timer, and watermark share settings.")
         }
         if (!proVariantEnabled) {
             return standardSummary

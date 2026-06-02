@@ -172,7 +172,7 @@ private class VideoModeController(
             val postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec)
             mutableSnapshot.value = buildSnapshot(
                 headline = "Recording requested",
-                detail = "Waiting for Session Kernel to start ${resolvedVideoSpec.summaryLabel} recording task."
+                detail = "Waiting for Session Kernel to start the ${resolvedVideoSpec.summaryLabel} recording task."
             )
             ModeSignal.SubmitCapture(
                     CaptureStrategy.VideoRecording(

@@ -385,7 +385,7 @@ enum class ZoomControlSupport(
     ),
     DISCRETE_PRESET(
         tagValue = "discrete-preset",
-        label = "Preset Stepping"
+        label = "Preset steps"
     ),
     CONTINUOUS(
         tagValue = "continuous",

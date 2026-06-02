@@ -264,7 +264,7 @@ private class DocumentModeController(
         return if (enhancementEnabled()) {
             "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Auto crop ${profile.autoCrop} | Contrast ${profile.contrastLabel} | Output optimized for scanned documents."
         } else {
-            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only (device does not support document enhancement)."
+            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only (document enhancement is unavailable)."
         }
     }
 

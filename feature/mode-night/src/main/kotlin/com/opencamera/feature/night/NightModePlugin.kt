@@ -345,7 +345,7 @@ private class NightModeController(
         val standardSummary = if (multiFrameEnabled()) {
             "Default style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | ${profile.frameCount} frames | Exposure ${profile.longExposureMillis} ms | Tripod ${profile.requiresTripod} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Sub-feature scenery style, timer, frame and night fusion use current mode config.$flashSummary"
         } else {
-            "Default style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Single-frame boost degraded (device does not support night multi-frame). | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Sub-feature scenery style, timer and frame still available in fusion degraded mode.$flashSummary"
+            "Default style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Single-frame boost degraded (night multi-frame is unavailable). | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Sub-feature scenery style, timer and frame still available in fusion degraded mode.$flashSummary"
         }
         if (!proVariantEnabled) {
             return standardSummary
