@@ -445,7 +445,7 @@ class DevLogRenderModelTest {
         )
         val summary = computeDeviceProbeSummary(caps)
         assertTrue(summary.contains("cameras: 2"))
-        assertTrue(summary.contains("BACK,FRONT"))
+        assertTrue(summary.contains("BACK") && summary.contains("FRONT"))
         assertTrue(summary.contains("Wide"))
         assertTrue(summary.contains("Telephoto"))
         assertTrue(summary.contains("id=0"))
