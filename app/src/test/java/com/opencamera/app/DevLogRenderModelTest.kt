@@ -3,6 +3,11 @@ package com.opencamera.app
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.LensNode
+import com.opencamera.core.device.LensNodeAvailability
+import com.opencamera.core.device.StillCaptureOutputSize
+import com.opencamera.core.device.ZoomControlSupport
+import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.CameraPerformanceClass
 import com.opencamera.core.media.CameraThermalState
 import com.opencamera.core.media.ResourceDiagnosticsSnapshot
@@ -13,7 +18,9 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.session.CaptureStatus
+import com.opencamera.core.session.LinkEventStatus
 import com.opencamera.core.session.PermissionState
+import com.opencamera.core.session.PerformanceLinkEvent
 import com.opencamera.core.session.PreviewMetrics
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
@@ -295,6 +302,180 @@ class DevLogRenderModelTest {
             storageSummary = summary
         )
         assertFalse(model.canCleanup)
+    }
+
+    @Test
+    fun `core tab includes link events when provided`() {
+        val linkEvents = listOf(
+            PerformanceLinkEvent(
+                flow = "preview-startup",
+                stage = "bind",
+                status = LinkEventStatus.COMPLETED,
+                correlationId = "flow-1",
+                startElapsedMillis = 100,
+                endElapsedMillis = 180,
+                durationMillis = 80,
+                detail = null,
+                source = "CameraXAdapter"
+            ),
+            PerformanceLinkEvent(
+                flow = "preview-startup",
+                stage = "first-frame",
+                status = LinkEventStatus.COMPLETED,
+                correlationId = "flow-1",
+                startElapsedMillis = 180,
+                endElapsedMillis = 260,
+                durationMillis = 80,
+                detail = null,
+                source = "SessionKernel"
+            )
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.CORE,
+            text = TestAppTextResolver(),
+            linkEvents = linkEvents
+        )
+        assertTrue(model.content.contains("preview-startup"))
+        assertTrue(model.content.contains("flow-1"))
+        assertTrue(model.content.contains("bind"))
+        assertTrue(model.content.contains("duration=80ms"))
+        assertTrue(model.content.contains("--- 链路耗时 ---"))
+    }
+
+    @Test
+    fun `core tab without link events shows only trace events`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.CORE,
+            text = TestAppTextResolver(),
+            linkEvents = emptyList()
+        )
+        assertFalse(model.content.contains("--- 链路耗时 ---"))
+    }
+
+    @Test
+    fun `key tab content includes wall clock timestamps`() {
+        val events = listOf(
+            SessionTraceEvent(1, "session.created", "defaultMode=PHOTO", 1717334400000L)
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = events,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver()
+        )
+        assertTrue(model.content.contains("session.created"))
+        // Timestamp should be formatted as HH:MM:SS.mmm
+        assertTrue(model.content.matches(Regex("(?s).*\\d{2}:\\d{2}:\\d{2}\\.\\d{3}.*session\\.created.*")))
+    }
+
+    @Test
+    fun `export content includes link events section`() {
+        val linkEvents = listOf(
+            PerformanceLinkEvent(
+                flow = "capture",
+                stage = "shutter-to-device",
+                status = LinkEventStatus.COMPLETED,
+                correlationId = "shot-1",
+                startElapsedMillis = 0,
+                endElapsedMillis = 245,
+                durationMillis = 245,
+                detail = null,
+                source = "DeviceAdapter"
+            )
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            linkEvents = linkEvents
+        )
+        assertTrue(model.exportContent.contains("=== LINK EVENTS ==="))
+        assertTrue(model.exportContent.contains("capture"))
+        assertTrue(model.exportContent.contains("shutter-to-device"))
+        assertTrue(model.exportContent.contains("shot-1"))
+        assertTrue(model.exportContent.contains("duration=245ms"))
+    }
+
+    @Test
+    fun `export content includes device probe summary when provided`() {
+        val probeSummary = "cameras: 2 | lens-facings: BACK,FRONT"
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            deviceProbeSummary = probeSummary
+        )
+        assertTrue(model.exportContent.contains("=== DEVICE PROBE ==="))
+        assertTrue(model.exportContent.contains("cameras: 2"))
+    }
+
+    @Test
+    fun `computeDeviceProbeSummary includes camera count and lens facings`() {
+        val caps = DeviceCapabilities(
+            availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT),
+            zoomRatioCapability = ZoomRatioCapability(
+                support = ZoomControlSupport.CONTINUOUS,
+                supportedRatios = listOf(1f, 2f, 5f),
+                lensNodeMap = mapOf(
+                    LensNode.WIDE to LensNodeAvailability(
+                        node = LensNode.WIDE,
+                        available = true,
+                        thresholdRatio = 1f,
+                        physicalCameraId = "0"
+                    ),
+                    LensNode.TELEPHOTO to LensNodeAvailability(
+                        node = LensNode.TELEPHOTO,
+                        available = true,
+                        thresholdRatio = 2f,
+                        physicalCameraId = "1"
+                    )
+                )
+            )
+        )
+        val summary = computeDeviceProbeSummary(caps)
+        assertTrue(summary.contains("cameras: 2"))
+        assertTrue(summary.contains("BACK,FRONT"))
+        assertTrue(summary.contains("Wide"))
+        assertTrue(summary.contains("Telephoto"))
+        assertTrue(summary.contains("id=0"))
+        assertTrue(summary.contains("id=1"))
+    }
+
+    @Test
+    fun `computeDeviceProbeSummary includes output sizes`() {
+        val caps = DeviceCapabilities(
+            availableStillCaptureOutputSizes = listOf(
+                StillCaptureOutputSize(width = 4000, height = 3000),
+                StillCaptureOutputSize(width = 3264, height = 2448)
+            )
+        )
+        val summary = computeDeviceProbeSummary(caps)
+        assertTrue(summary.contains("still-output: 2 sizes"))
+        assertTrue(summary.contains("4000x3000"))
+    }
+
+    @Test
+    fun `computeDeviceProbeSummary reports degraded and unsupported facts`() {
+        val caps = DeviceCapabilities(
+            supportsFlashControl = false,
+            supportsNightMultiFrame = false,
+            supportsPortraitDepthEffect = false
+        )
+        val summary = computeDeviceProbeSummary(caps)
+        assertTrue(summary.contains("flash=DEGRADED"))
+        assertTrue(summary.contains("nightMultiFrame=DEGRADED"))
+        assertTrue(summary.contains("portraitDepth=DEGRADED"))
     }
 
 
