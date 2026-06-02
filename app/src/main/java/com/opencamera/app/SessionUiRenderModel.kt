@@ -1764,13 +1764,25 @@ internal fun devLogRenderModel(
             if (event.durationMillis != null) {
                 parts += "duration=${event.durationMillis}ms"
             }
-            val detail = event.detail
-            if (!detail.isNullOrBlank()) {
-                parts += "detail=${escapeLinkValue(detail)}"
+            if (!event.detail.isNullOrBlank()) {
+                parts += "detail=${escapeLinkValue(event.detail)}"
             }
             parts += "source=${escapeLinkValue(event.source)}"
             parts.joinToString(" ")
         }
+    }
+
+    private fun escapeLinkValue(value: String): String {
+        return value.replace(" ", "_").replace("=", "_")
+    }
+
+    private fun formatTimestamp(timestampMillis: Long): String {
+        if (timestampMillis <= 0) return "??:??:??"
+        val seconds = (timestampMillis / 1000) % 60
+        val minutes = (timestampMillis / 60_000) % 60
+        val hours = (timestampMillis / 3_600_000) % 24
+        val millis = timestampMillis % 1000
+        return "%02d:%02d:%02d.%03d".format(hours, minutes, seconds, millis)
     }
 
     val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics)
