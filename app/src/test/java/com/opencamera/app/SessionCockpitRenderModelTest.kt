@@ -961,6 +961,55 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `quick panel live row shows off by default`() {
+        val defaultState = com.opencamera.core.settings.PhotoSettings()
+        assertFalse(defaultState.livePhotoEnabledByDefault)
+
+        val state = defaultSessionState(
+            persistedPhotoSettings = defaultState
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.liveRow.isSelected)
+        assertEquals("Off", sheet.liveRow.value)
+    }
+
+    @Test
+    fun `quick panel watermark row uses localized label not raw template id`() {
+        val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        // The watermark value should be the localized label, not the raw id
+        assertNotEquals("travel-polaroid", sheet.watermarkRow.value)
+        assertEquals("Travel Polaroid", sheet.watermarkRow.value)
+    }
+
+    @Test
+    fun `quick panel watermark row uses localized label for classic overlay`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                defaultWatermarkTemplateId = "classic-overlay"
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertNotEquals("classic-overlay", sheet.watermarkRow.value)
+        assertEquals("Classic overlay", sheet.watermarkRow.value)
+    }
+
+    @Test
+    fun `quick panel watermark row falls back to raw id for unknown template`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                defaultWatermarkTemplateId = "unknown-template"
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("unknown-template", sheet.watermarkRow.value)
+    }
+
+    @Test
     fun `primary status shows recording starting`() {
         val state = defaultSessionState().copy(recordingStatus = RecordingStatus.REQUESTING)
         val model = primaryStatusRenderModel(state, TestAppTextResolver())

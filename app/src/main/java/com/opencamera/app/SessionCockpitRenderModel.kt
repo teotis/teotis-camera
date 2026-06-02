@@ -397,7 +397,7 @@ internal fun quickPanelSheetRenderModel(
     } else {
         null
     }
-    val watermarkLabel = currentTemplate?.label ?: currentTemplateId
+    val watermarkLabel = currentTemplate?.localizedLabel(text) ?: currentTemplateId
 
     val currentRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio ?: FrameRatio.RATIO_4_3
     val entries = FrameRatio.entries

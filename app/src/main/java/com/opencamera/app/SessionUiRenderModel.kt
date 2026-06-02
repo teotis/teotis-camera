@@ -368,7 +368,7 @@ internal fun sessionSettingsRenderModel(
         ?: settings.photo.defaultFilterProfileId
     val watermarkTemplateLabel = catalog.watermarkTemplateOrNull(
         settings.photo.defaultWatermarkTemplateId
-    )?.label ?: settings.photo.defaultWatermarkTemplateId
+    )?.localizedLabel(text) ?: settings.photo.defaultWatermarkTemplateId
     val videoFilterLabel = catalog.filterProfileOrNull(settings.video.defaultFilterProfileId)?.label
         ?: settings.video.defaultFilterProfileId
     val videoSpec = settings.video.defaultVideoSpec
@@ -1577,7 +1577,7 @@ private fun watermarkTemplateLabel(
     return templates.firstOrNull { it.id == templateId }?.localizedLabel(text) ?: templateId
 }
 
-private fun WatermarkTemplate.localizedLabel(text: AppTextResolver): String {
+internal fun WatermarkTemplate.localizedLabel(text: AppTextResolver): String {
     return when (id) {
         "classic-overlay" -> text.watermarkTemplateClassicOverlay()
         "travel-polaroid" -> text.watermarkTemplateTravelPolaroid()
