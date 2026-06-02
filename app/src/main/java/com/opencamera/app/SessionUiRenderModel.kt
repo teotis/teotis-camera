@@ -1759,11 +1759,11 @@ internal fun devLogRenderModel(
         }
     }
 
-    private fun escapeLinkValue(value: String): String {
+    fun escapeLinkValue(value: String): String {
         return value.replace(" ", "_").replace("=", "_")
     }
 
-    private fun formatTimestamp(timestampMillis: Long): String {
+    fun formatTimestamp(timestampMillis: Long): String {
         if (timestampMillis <= 0) return "??:??:??"
         val seconds = (timestampMillis / 1000) % 60
         val minutes = (timestampMillis / 60_000) % 60
