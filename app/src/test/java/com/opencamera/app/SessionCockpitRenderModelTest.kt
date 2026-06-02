@@ -304,7 +304,7 @@ class SessionCockpitRenderModelTest {
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
-        assertEquals("街头 Street", model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel)
+        assertEquals("Street", model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel)
     }
 
     @Test
@@ -321,7 +321,7 @@ class SessionCockpitRenderModelTest {
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
-        assertEquals("街头 Street", model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel)
+        assertEquals("Street", model.items.first { it.modeId == ModeId.HUMANISTIC }.defaultStyleLabel)
     }
 
     @Test

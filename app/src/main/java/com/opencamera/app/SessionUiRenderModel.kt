@@ -59,6 +59,7 @@ internal data class SessionSettingsRenderModel(
 
 internal data class CommonSettingsSectionRenderModel(
     val summary: String,
+    val languageControl: SettingsControlRenderModel,
     val gridMode: SettingsControlRenderModel,
     val shutterSound: SettingsControlRenderModel,
     val selfieMirror: SettingsControlRenderModel
@@ -161,13 +162,11 @@ internal data class PortraitLabPageRenderModel(
     val footer: String
 )
 
-internal enum class FilterLabFamily(
-    val label: String
-) {
-    PHOTO("Photo"),
-    HUMANISTIC("Humanistic"),
-    PORTRAIT("Portrait"),
-    VIDEO("Video")
+internal enum class FilterLabFamily {
+    PHOTO,
+    HUMANISTIC,
+    PORTRAIT,
+    VIDEO
 }
 
 internal data class FilterLabTabRenderModel(
@@ -181,21 +180,19 @@ internal enum class FilterAdjustmentMode {
     ADVANCED
 }
 
-internal enum class FilterAdvancedControl(
-    val label: String
-) {
-    EXPOSURE("Exposure"),
-    SOFT_GLOW("Soft Glow"),
-    HALO("Halo"),
-    GRAIN("Grain"),
-    SHARPNESS("Sharpness"),
-    VIGNETTE("Vignette"),
-    HIGHLIGHTS("Highlights"),
-    SHADOWS("Shadows"),
-    WARM_BOOST("Warm Boost"),
-    COOL_BOOST("Cool Boost"),
-    TEMPERATURE_SHIFT("Temp Shift"),
-    TINT_SHIFT("Tint Shift")
+internal enum class FilterAdvancedControl {
+    EXPOSURE,
+    SOFT_GLOW,
+    HALO,
+    GRAIN,
+    SHARPNESS,
+    VIGNETTE,
+    HIGHLIGHTS,
+    SHADOWS,
+    WARM_BOOST,
+    COOL_BOOST,
+    TEMPERATURE_SHIFT,
+    TINT_SHIFT
 }
 
 internal data class FilterLabFilterItemRenderModel(
@@ -463,6 +460,19 @@ internal fun sessionSettingsPageRenderModel(
         },
         commonSection = CommonSettingsSectionRenderModel(
             summary = "",
+            languageControl = SettingsControlRenderModel(
+                label = text.languageLabel(),
+                value = text.languageDisplayName(settings),
+                availability = SettingsControlAvailability.SUPPORTED,
+                availabilityLabel = text.availabilityLabel(SettingsControlAvailability.SUPPORTED),
+                supportLabel = text.languageRestartHint(),
+                nextAction = PersistedSettingsAction.UpdateAppLanguage(
+                    when (settings.common.appLanguage) {
+                        com.opencamera.core.settings.AppLanguage.ZH -> com.opencamera.core.settings.AppLanguage.EN
+                        com.opencamera.core.settings.AppLanguage.EN -> com.opencamera.core.settings.AppLanguage.ZH
+                    }
+                )
+            ),
             gridMode = SettingsControlRenderModel(
                 label = text.compositionGridLabel(),
                 value = settings.common.gridMode.label,
@@ -1042,7 +1052,7 @@ internal fun portraitLabPageRenderModel(
     }
     return PortraitLabPageRenderModel(
         headline = text.portraitLab(),
-        supportingText = "人像产品调节位于设置下一级。使用此页面调整已保存的人像配置、美颜行为和虚化效果，无需更改活跃的人像滤镜列表。",
+        supportingText = text.portraitLabSupporting(),
         heroSummary = "",
         editingEnabled = editingEnabled,
         editingHint = if (editingEnabled) {
@@ -1056,7 +1066,7 @@ internal fun portraitLabPageRenderModel(
             availability = availability,
             availabilityLabel = text.availabilityLabel(availability),
             supportLabel = if (supportsStillCapture) {
-                "${PortraitProfile.entries.size} product profiles"
+                text.productProfilesCount(PortraitProfile.entries.size)
             } else {
                 text.stillCaptureUnavailable()
             },
@@ -1491,7 +1501,7 @@ internal fun filterLabPageRenderModel(
                 FilterAdvancedControlRenderModel(
                     control = control,
                     buttonLabel = buildString {
-                        append(control.label)
+                        append(text.filterCtrlLabel(control))
                         append('\n')
                         append(currentRenderSpec.levelLabel(control, text))
                         append('\n')
@@ -1926,7 +1936,7 @@ private fun filterLabTabRenderModel(
     familyLabel: String,
     selectedFamily: FilterLabFamily
 ): FilterLabTabRenderModel {
-    val label = familyLabel.ifBlank { family.label }
+    val label = familyLabel
     return FilterLabTabRenderModel(
         family = family,
         label = label,
@@ -2051,14 +2061,13 @@ private fun FilterRenderSpec.nextLevel(
 }
 
 private enum class FilterAdjustmentLevel(
-    val label: String,
     val floatValue: Float,
     val brightnessValue: Int
 ) {
-    OFF("Off", 0f, 0),
-    LOW("Low", 0.10f, 6),
-    MEDIUM("Medium", 0.20f, 12),
-    HIGH("High", 0.30f, 18)
+    OFF(0f, 0),
+    LOW(0.10f, 6),
+    MEDIUM(0.20f, 12),
+    HIGH(0.30f, 18)
 }
 
 private fun FilterRenderSpec.currentLevel(
@@ -2085,8 +2094,15 @@ private fun FilterRenderSpec.levelLabel(control: FilterAdvancedControl, text: Ap
     return when (control) {
         FilterAdvancedControl.TEMPERATURE_SHIFT -> warmthShiftLevel(warmthShift).labelForTemperature(text)
         FilterAdvancedControl.TINT_SHIFT -> tintShiftLevel(tintShift).labelForTint(text)
-        else -> currentLevel(control).label
+        else -> currentLevel(control).resolveLabel(text)
     }
+}
+
+private fun FilterAdjustmentLevel.resolveLabel(text: AppTextResolver): String = when (this) {
+    FilterAdjustmentLevel.OFF -> text.filterAdjustmentOff()
+    FilterAdjustmentLevel.LOW -> text.filterAdjustmentLow()
+    FilterAdjustmentLevel.MEDIUM -> text.filterAdjustmentMedium()
+    FilterAdjustmentLevel.HIGH -> text.filterAdjustmentHigh()
 }
 
 private fun FilterRenderSpec.lightPaletteSummary(text: AppTextResolver): String {

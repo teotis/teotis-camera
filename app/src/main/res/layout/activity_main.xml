@@ -576,6 +576,16 @@
                         android:paddingHorizontal="16dp"
                         android:paddingVertical="12dp"
                         android:textAlignment="viewStart" />
+
+                    <Button
+                        android:id="@+id/buttonAppLanguage"
+                        style="@style/Widget.OpenCamera.SettingsButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="12dp"
+                        android:textAlignment="viewStart" />
                 </LinearLayout>
 
                 <LinearLayout

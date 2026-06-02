@@ -552,4 +552,14 @@
     <string name="issue_camera_unavailable">相机不可用</string>
     <string name="issue_thermal_critical">严重过热</string>
     <string name="issue_runtime_error">运行时错误</string>
+
+    <!-- Language switch -->
+    <string name="label_language_setting">语言</string>
+    <string name="label_language_restart_hint">切换后重启生效</string>
+
+    <!-- Filter adjustment levels -->
+    <string name="filter_adjustment_off">关闭</string>
+    <string name="filter_adjustment_low">低</string>
+    <string name="filter_adjustment_medium">中</string>
+    <string name="filter_adjustment_high">高</string>
 </resources>
