@@ -800,6 +800,18 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             }
     }
 
+    override fun triggerVendorProbe() {
+        lifecycleScope.launch {
+            runCatching {
+                val content = com.opencamera.app.camera.VendorCameraProbe.probe(this@MainActivity)
+                val file = devLogExporter.exportVendorProbe(content)
+                views.preview.captureOutput.text = getString(R.string.toast_vendor_probe_exported, file.absolutePath)
+            }.onFailure {
+                Toast.makeText(this@MainActivity, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     override fun cleanupDevLogByType(type: DevLogTab) {
         runCatching {
             val count = devLogExporter.cleanupByType(type)

@@ -333,6 +333,9 @@ internal class MainActivityActionBinder(
         views.devConsole.export.setOnClickListener {
             callbacks.exportDevLog()
         }
+        views.devConsole.vendorProbe.setOnClickListener {
+            callbacks.triggerVendorProbe()
+        }
         views.devConsole.close.setOnClickListener {
             val selectedTab = snapshot().devLog?.selectedTab ?: DevLogTab.ALL
             if (selectedTab == DevLogTab.ALL) {
