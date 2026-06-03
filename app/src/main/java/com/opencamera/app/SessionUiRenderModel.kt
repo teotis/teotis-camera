@@ -1918,12 +1918,13 @@ internal fun computeDeviceProbeSummary(capabilities: com.opencamera.core.device.
     val lensNodes = capabilities.zoomRatioCapability.lensNodeMap
     val outputSizes = capabilities.availableStillCaptureOutputSizes
     val zoomRatios = capabilities.zoomRatioCapability.normalizedSupportedRatios
+    val previewBases = capabilities.zoomRatioCapability.normalizedPreviewBaseRatios
     return buildString {
         appendLine("cameras: $camCount | lens-facings: ${capabilities.availableLensFacings.joinToString { it.name }}")
         if (lensNodes.isNotEmpty()) {
             appendLine("lens-nodes: ${lensNodes.entries.joinToString { (node, avail) -> "${node.label}(id=${avail.physicalCameraId ?: "?"},threshold=${avail.thresholdRatio})" }}")
         }
-        appendLine("zoom: ratios=${zoomRatios.joinToString()},support=${capabilities.zoomRatioCapability.support.label}")
+        appendLine("zoom: ratios=${zoomRatios.joinToString()},preview-bases=${previewBases.joinToString().ifBlank { "none" }},support=${capabilities.zoomRatioCapability.support.label}")
         if (outputSizes.isNotEmpty()) {
             val totalPixels = outputSizes.sumOf { it.pixelCount }
             appendLine("still-output: ${outputSizes.size} sizes, total-pixels=${totalPixels}, largest=${outputSizes.first().width}x${outputSizes.first().height}")

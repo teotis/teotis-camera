@@ -29,6 +29,7 @@ internal interface MainActivityActionCallbacks {
     fun exportDevLog()
     fun cleanupDevLogByType(type: DevLogTab)
     fun cleanupAllDevLogs()
+    fun triggerVendorProbe()
     fun refreshDevLogModel()
     fun selectDevLogTab(tab: DevLogTab)
     fun neutralColorLabAction(): PersistedSettingsAction

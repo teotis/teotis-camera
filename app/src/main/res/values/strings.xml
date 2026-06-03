@@ -92,6 +92,8 @@
     <string name="dev_tab_all">全部</string>
     <string name="dev_tab_link">耗时</string>
     <string name="dev_export_log">导出日志</string>
+    <string name="dev_vendor_probe">特性探测</string>
+    <string name="toast_vendor_probe_exported">特性探测已保存: %1$s</string>
     <string name="dev_cleanup_key">清理摘要</string>
     <string name="dev_cleanup_core">清理链路</string>
     <string name="dev_cleanup_error">清理错误</string>

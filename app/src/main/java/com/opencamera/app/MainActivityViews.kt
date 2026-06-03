@@ -158,6 +158,7 @@ internal data class DevConsoleViews(
     val content: TextView,
     val storageInfo: TextView,
     val export: Button,
+    val vendorProbe: Button,
     val close: Button,
     val scrollTop: Button,
     val scrollBottom: Button
@@ -363,6 +364,7 @@ internal data class MainActivityViews(
                 content = activity.findViewById(R.id.devConsoleContent),
                 storageInfo = activity.findViewById(R.id.devConsoleStorageInfo),
                 export = activity.findViewById(R.id.buttonDevExport),
+                vendorProbe = activity.findViewById(R.id.buttonDevVendorProbe),
                 close = activity.findViewById(R.id.buttonDevClose),
                 scrollTop = activity.findViewById(R.id.buttonDevScrollTop),
                 scrollBottom = activity.findViewById(R.id.buttonDevScrollBottom)

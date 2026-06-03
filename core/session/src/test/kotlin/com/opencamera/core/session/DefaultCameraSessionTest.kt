@@ -5708,7 +5708,7 @@ class DefaultCameraSessionTest {
             )
         )
         val effects = mutableListOf<SessionEffect>()
-        backgroundScope.launch {
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
             session.effects.collect { effect -> effects += effect }
         }
 
@@ -5728,6 +5728,8 @@ class DefaultCameraSessionTest {
             it.zoomRatio == 3.3f && it.previewZoomRatio == 3.0f
         })
         assertTrue(effects.none { it is SessionEffect.SwitchLensNode })
+
+        effectCollector.cancel()
     }
 
     // ── CaptureReadiness contract tests ───────────────────────────────

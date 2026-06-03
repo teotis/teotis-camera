@@ -1587,6 +1587,15 @@
                             android:text="@string/dev_export_log" />
 
                         <Button
+                            android:id="@+id/buttonDevVendorProbe"
+                            style="@style/Widget.OpenCamera.PillButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/dev_vendor_probe" />
+
+                        <Button
                             android:id="@+id/buttonDevClose"
                             style="@style/Widget.OpenCamera.PillButton"
                             android:layout_width="0dp"

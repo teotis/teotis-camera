@@ -453,12 +453,13 @@ class DevLogRenderModelTest {
     fun `computeDeviceProbeSummary includes camera count and lens facings`() {
         val caps = DeviceCapabilities(
             availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT),
-            zoomRatioCapability = ZoomRatioCapability(
-                support = ZoomControlSupport.CONTINUOUS,
-                supportedRatios = listOf(1f, 2f, 5f),
-                lensNodeMap = mapOf(
-                    LensNode.WIDE to LensNodeAvailability(
-                        node = LensNode.WIDE,
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    previewBaseRatios = listOf(1f, 3f, 5f),
+                    lensNodeMap = mapOf(
+                        LensNode.WIDE to LensNodeAvailability(
+                            node = LensNode.WIDE,
                         available = true,
                         thresholdRatio = 1f,
                         physicalCameraId = "0"
@@ -479,6 +480,7 @@ class DevLogRenderModelTest {
         assertTrue(summary.contains("Telephoto"))
         assertTrue(summary.contains("id=0"))
         assertTrue(summary.contains("id=1"))
+        assertTrue(summary.contains("preview-bases=1.0, 3.0, 5.0"))
     }
 
     @Test

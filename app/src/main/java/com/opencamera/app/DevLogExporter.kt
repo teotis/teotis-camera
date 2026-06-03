@@ -18,6 +18,18 @@ internal class DevLogExporter(private val context: Context) {
         return file
     }
 
+    fun exportVendorProbe(
+        content: String,
+        nowMillis: Long = System.currentTimeMillis()
+    ): File {
+        val dir = logDirectory()
+        if (!dir.exists()) dir.mkdirs()
+        val file = File(dir, "opencamera-vendor-probe-$nowMillis.log")
+        file.writeText(content, Charsets.UTF_8)
+        runCatching { pruneToCap(dir) }
+        return file
+    }
+
     fun storageSummary(): StorageSummary {
         val dir = logDirectory()
         if (!dir.exists()) return StorageSummary(0L, MAX_STORAGE_BYTES)

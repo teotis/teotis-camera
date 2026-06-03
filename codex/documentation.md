@@ -174,6 +174,15 @@
 
 # 最近有效闭环
 
+## 2026-06-04：变焦预览窗/画幅框契约复核修复
+
+- 目标：承接用户最新真机日志 [`opencamera-debug-1780509698023.log`](/Users/dingren/Downloads/opencamera-debug-1780509698023.log) 与旧会话专项要求，修复“只有 0.7 到 2.0 倍率有预览窗变焦行为、画幅框瘫痪”和“大幅度变焦后变焦条自行回退”。
+- 旧需求复核：此前明确的产品语义不是让 CameraX 预览流持续跟随每个连续倍率，而是“预览窗按稳定基线离散跳变，画幅框连续表达实际拍摄区域”；同一对 `captureZoomRatio / previewZoomRatio` 必须从 Session 贯穿到 RenderModel、Overlay 和 CameraX，画幅框缩放公式为 `previewZoomRatio / captureZoomRatio`。
+- 根因：最新日志显示目标机只探测到单个 `Wide(id=0,threshold=0.0)` lens node，但 zoom ratios 为 `0.7, 1.0, 2.0, 5.0, 10.0` 且为 continuous；旧主线只从 `lensNodeMap` 推导预览基线，单 Wide 时大倍率会退化成 `previewZoomRatio=1x`，overlay 又只看 `1 / previewZoomRatio`，因此 2x 之后画幅框基本失去表达能力。另一个回退现象来自 slider snap zone 按相邻倍率间距放大，`2x-5x-10x` 的大间距会制造过宽吸附区。
+- 结果：[`ZoomRatioCapability`](/Volumes/Extreme_SSD/project/open_camera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 现在支持独立 `previewBaseRatios`；[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 从 logical zoom range 推导类似 `0.7 / 1 / 3 / 5` 的预览基线并在更新 zoom 时同步保存 `zoomRatio + previewZoomRatio`；[`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 优先使用 preview bases，只有多真实 lens node 才发 `SwitchLensNode`；[`PreviewOverlayView.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/PreviewOverlayView.kt) 使用 `zoomFrameScale(capture, preview)` 连续缩放画幅框；[`FocalLengthSliderView.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/FocalLengthSliderView.kt) 用 `SNAP_THRESHOLD_MAX_RATIO_DELTA=0.08f` 限制大倍率间隔带来的吸附回退。Dev 日志 DEVICE PROBE 的 zoom 行同步输出 `preview-bases`，便于下次真机取证。
+- 验证：新增/更新 `DefaultCameraSessionTest`、`PreviewOverlayGeometryTest`、`FocalLengthSliderViewTest`、`CameraXCaptureAdapterCapabilityDetectionTest` 与 `DevLogRenderModelTest` 回归；通过 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.FocalLengthSliderViewTest --tests com.opencamera.app.camera.CameraXCaptureAdapterCapabilityDetectionTest --tests com.opencamera.app.DevLogRenderModelTest --tests com.opencamera.app.SessionPreviewRenderModelTest --tests com.opencamera.app.camera.CameraSessionCoordinatorTest :core:session:test --tests com.opencamera.core.session.DefaultCameraSessionTest --tests com.opencamera.core.session.SessionDiagnosticsTest`、`rtk ./gradlew --no-daemon :app:assembleDebug` 与 `rtk ./scripts/verify_stage_7_observability.sh`。
+- 结论：仓内已把“离散预览窗 + 连续画幅框”的变焦契约重新接通到设备能力、session、CameraX 和 overlay；最终仍需安装新 APK，在目标真机录制 0.7x 到 10x 拖动过程并导出 Dev 日志，确认 `preview-bases` 与实际预览跳变一致。
+
 ## 2026-06-04：blur-four-border 浅色模糊去白雾
 
 - 目标：修复用户反馈“模糊有种泛白效果，理想情况是色调和被模糊区域一致”，让四边框默认浅色模糊不再像在背景上额外盖一层白色。

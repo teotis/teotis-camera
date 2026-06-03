@@ -73,7 +73,7 @@ interface SessionTrace {
 }
 
 class InMemorySessionTrace(
-    private val maxEvents: Int = 200
+    private val maxEvents: Int = 1000
 ) : SessionTrace {
     private val sequence = AtomicInteger(0)
     private val events = mutableListOf<SessionTraceEvent>()
