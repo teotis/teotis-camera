@@ -89,6 +89,15 @@ class FocalLengthSliderViewTest {
     }
 
     @Test
+    fun `shouldSnap does not create huge snap zones from large zoom gaps`() {
+        val presets = listOf(0.7f, 1.0f, 2.0f, 5.0f, 10.0f)
+
+        assertFalse(FocalLengthSliderView.shouldSnap(5.3f, presets))
+        assertFalse(FocalLengthSliderView.shouldSnap(1.86f, presets))
+        assertTrue(FocalLengthSliderView.shouldSnap(9.94f, presets))
+    }
+
+    @Test
     fun `shouldSnap boundary is exclusive`() {
         val presets = listOf(1.0f, 2.0f, 3.0f)
         // Exactly at threshold: 0.15 * 1.0 = 0.15 distance
@@ -101,6 +110,11 @@ class FocalLengthSliderViewTest {
     @Test
     fun `snap threshold fraction is 15 percent`() {
         assertEquals(0.15f, FocalLengthSliderView.SNAP_THRESHOLD_FRACTION)
+    }
+
+    @Test
+    fun `snap threshold has absolute zoom delta cap`() {
+        assertEquals(0.08f, FocalLengthSliderView.SNAP_THRESHOLD_MAX_RATIO_DELTA)
     }
 
     // -- formatCompactNodeLabel --

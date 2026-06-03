@@ -246,6 +246,28 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `blur four border light blur keeps solid source tone without white tint`() {
+        val sourceColor = Color.rgb(24, 132, 42)
+        val source = Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(sourceColor)
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_LIGHT_BLUR)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+        val topBorder = maxOf(20f, 96f * 0.045f).toInt()
+        val topPixel = bmp.getPixel(bmp.width / 2, topBorder / 2)
+        val toneDrift = colorDistance(topPixel, sourceColor)
+
+        assertTrue(
+            toneDrift < 36,
+            "light blur should keep the source tone instead of adding a pale tint, drift=$toneDrift " +
+                "pixel=(${Color.red(topPixel)}, ${Color.green(topPixel)}, ${Color.blue(topPixel)})"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
     fun `blur four border top border is greenish when top edge is green`() {
         val source = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
         for (x in 0 until 200) {

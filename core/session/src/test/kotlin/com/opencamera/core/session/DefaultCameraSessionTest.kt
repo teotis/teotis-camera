@@ -5622,21 +5622,19 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `computePreviewZoomRatio returns 2 for two-node map at threshold`() = runTest {
+    fun `computePreviewZoomRatio delays switch to two-node preview baseline`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // captureZoom = 2.0 → largest threshold <= 2.0 is 2.0 (TELEPHOTO)
-        val result = session.computePreviewZoomRatio(2.0f, twoNodeMap)
-        assertEquals(2.0f, result)
+        assertEquals(1.0f, session.computePreviewZoomRatio(2.0f, twoNodeMap))
+        assertEquals(2.0f, session.computePreviewZoomRatio(2.2f, twoNodeMap))
     }
 
     @Test
-    fun `computePreviewZoomRatio returns 5 for three-node map at periscope threshold`() = runTest {
+    fun `computePreviewZoomRatio delays switch to periscope preview baseline`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // captureZoom = 5.0 → largest threshold <= 5.0 is 5.0 (PERISCOPE)
-        val result = session.computePreviewZoomRatio(5.0f, threeNodeMap)
-        assertEquals(5.0f, result)
+        assertEquals(2.0f, session.computePreviewZoomRatio(5.0f, threeNodeMap))
+        assertEquals(5.0f, session.computePreviewZoomRatio(5.5f, threeNodeMap))
     }
 
     @Test
@@ -5684,6 +5682,52 @@ class DefaultCameraSessionTest {
         )
         val result = session.computePreviewZoomRatio(3.0f, mapWithUnavailable)
         assertEquals(1.0f, result)
+    }
+
+    @Test
+    fun `logical camera preview bases drive previewZoomRatio without lens rebind`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.7f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    previewBaseRatios = listOf(0.7f, 1f, 3f, 5f),
+                    lensNodeMap = mapOf(
+                        LensNode.WIDE to LensNodeAvailability(
+                            node = LensNode.WIDE,
+                            available = true,
+                            thresholdRatio = 0.7f,
+                            physicalCameraId = "0"
+                        )
+                    )
+                )
+            )
+        )
+        val effects = mutableListOf<SessionEffect>()
+        backgroundScope.launch {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        effects.clear()
+
+        session.dispatch(SessionIntent.ApplyZoomRatio(3.2f))
+        advanceUntilIdle()
+        assertEquals(1.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+
+        session.dispatch(SessionIntent.ApplyZoomRatio(3.3f))
+        advanceUntilIdle()
+        assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        assertTrue(effects.filterIsInstance<SessionEffect.ApplyZoomRatio>().any {
+            it.zoomRatio == 3.3f && it.previewZoomRatio == 3.0f
+        })
+        assertTrue(effects.none { it is SessionEffect.SwitchLensNode })
     }
 
     // ── CaptureReadiness contract tests ───────────────────────────────

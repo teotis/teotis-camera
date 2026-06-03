@@ -15,6 +15,14 @@ import kotlin.test.assertTrue
 
 class CameraXCaptureAdapterCapabilityDetectionTest {
     @Test
+    fun `preview base ratios derive camera-like baselines from logical zoom range`() {
+        assertEquals(
+            listOf(0.7f, 1f, 3f, 5f),
+            previewBaseRatiosForZoomRange(0.7f, 10f)
+        )
+    }
+
+    @Test
     fun `back camera flash support enables flash control`() {
         val capabilities = resolveDeviceCapabilities(
             baseCapabilities = DeviceCapabilities.DEFAULT.copy(supportsFlashControl = false),

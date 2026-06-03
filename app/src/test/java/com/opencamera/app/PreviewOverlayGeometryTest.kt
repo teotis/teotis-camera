@@ -512,7 +512,7 @@ class PreviewOverlayGeometryTest {
     @Test
     fun `frame scale previewZoom over captureZoom produces smaller frame`() {
         val base = computeFrameRect(1080, 1920, 4, 3)
-        val scaled = scaleFrameRect(base, 1.0f / 2.0f)
+        val scaled = scaleFrameRect(base, zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 1.0f))
         assertApprox(base.width / 2f, scaled.width)
         assertApprox(base.height / 2f, scaled.height)
     }
@@ -520,7 +520,7 @@ class PreviewOverlayGeometryTest {
     @Test
     fun `frame scale equal zoom and previewZoom produces full frame`() {
         val base = computeFrameRect(1080, 1920, 4, 3)
-        val scaled = scaleFrameRect(base, 2.0f / 2.0f)
+        val scaled = scaleFrameRect(base, zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 2.0f))
         assertApprox(base.width, scaled.width)
         assertApprox(base.height, scaled.height)
     }
@@ -528,10 +528,20 @@ class PreviewOverlayGeometryTest {
     @Test
     fun `frame scale at lens switch point resets to full frame`() {
         val base = computeFrameRect(1080, 1920, 4, 3)
-        val scale = 2.0f / 2.0f
+        val scale = zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 2.0f)
         val scaled = scaleFrameRect(base, scale)
         assertApprox(base.width, scaled.width)
         assertApprox(base.height, scaled.height)
+    }
+
+    @Test
+    fun `frame scale grows when preview window jumps to higher baseline`() {
+        val base = computeFrameRect(1080, 1920, 4, 3)
+        val beforeSwitch = scaleFrameRect(base, zoomFrameScale(captureZoomRatio = 3.3f, previewZoomRatio = 1.0f))
+        val afterSwitch = scaleFrameRect(base, zoomFrameScale(captureZoomRatio = 3.3f, previewZoomRatio = 3.0f))
+
+        assertTrue(afterSwitch.width > beforeSwitch.width * 2f)
+        assertApprox(base.width * (3.0f / 3.3f), afterSwitch.width, 1f)
     }
 
     // --- clampReticleCenter tests ---
