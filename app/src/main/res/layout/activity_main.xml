@@ -1466,129 +1466,169 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
-        <androidx.core.widget.NestedScrollView
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:fillViewport="true"
-            android:padding="0dp">
+            android:layout_height="match_parent">
+
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/devConsoleScroll"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:fillViewport="true"
+                android:paddingBottom="@dimen/dev_console_scroll_floating_padding"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="@dimen/panel_padding">
+
+                    <!-- Tab row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/buttonDevTabKey"
+                            style="@style/Widget.OpenCamera.CompactButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="4dp"
+                            android:layout_weight="1"
+                            android:text="@string/dev_tab_key" />
+
+                        <Button
+                            android:id="@+id/buttonDevTabCore"
+                            style="@style/Widget.OpenCamera.CompactButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="4dp"
+                            android:layout_weight="1"
+                            android:text="@string/dev_tab_core" />
+
+                        <Button
+                            android:id="@+id/buttonDevTabError"
+                            style="@style/Widget.OpenCamera.CompactButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginHorizontal="4dp"
+                            android:layout_weight="1"
+                            android:text="@string/dev_tab_error" />
+
+                        <Button
+                            android:id="@+id/buttonDevTabAll"
+                            style="@style/Widget.OpenCamera.CompactButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:layout_weight="1"
+                            android:text="@string/dev_tab_all" />
+                    </LinearLayout>
+
+                    <!-- Title -->
+                    <TextView
+                        android:id="@+id/devConsoleTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textColor="@color/oc_text_primary"
+                        android:textSize="@dimen/text_size_section_title"
+                        android:textStyle="bold" />
+
+                    <!-- Summary row -->
+                    <TextView
+                        android:id="@+id/devConsoleSummary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/oc_accent"
+                        android:textSize="@dimen/text_size_status" />
+
+                    <!-- Content area -->
+                    <TextView
+                        android:id="@+id/devConsoleContent"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="monospace"
+                        android:textColor="@color/oc_text_secondary"
+                        android:textSize="@dimen/text_size_dev_log" />
+
+                    <!-- Storage info -->
+                    <TextView
+                        android:id="@+id/devConsoleStorageInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textColor="@color/oc_text_secondary"
+                        android:textSize="@dimen/text_size_status"
+                        android:visibility="gone" />
+
+                    <!-- Action row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/buttonDevExport"
+                            style="@style/Widget.OpenCamera.PillButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/dev_export_log" />
+
+                        <Button
+                            android:id="@+id/buttonDevClose"
+                            style="@style/Widget.OpenCamera.PillButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/dev_cleanup_current" />
+                    </LinearLayout>
+                </LinearLayout>
+            </androidx.core.widget.NestedScrollView>
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="@dimen/panel_padding">
+                android:layout_gravity="end|bottom"
+                android:layout_marginEnd="@dimen/space_4"
+                android:layout_marginBottom="@dimen/space_4"
+                android:orientation="vertical">
 
-                <!-- Tab row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+                <Button
+                    android:id="@+id/buttonDevScrollTop"
+                    style="@style/Widget.OpenCamera.CompactButton"
+                    android:layout_width="@dimen/dev_console_scroll_button_size"
+                    android:layout_height="@dimen/dev_console_scroll_button_size"
+                    android:contentDescription="@string/dev_scroll_top_content_description"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:padding="0dp"
+                    android:text="@string/dev_scroll_top" />
 
-                    <Button
-                        android:id="@+id/buttonDevTabKey"
-                        style="@style/Widget.OpenCamera.CompactButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_tab_key" />
-
-                    <Button
-                        android:id="@+id/buttonDevTabCore"
-                        style="@style/Widget.OpenCamera.CompactButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_tab_core" />
-
-                    <Button
-                        android:id="@+id/buttonDevTabError"
-                        style="@style/Widget.OpenCamera.CompactButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_tab_error" />
-
-                    <Button
-                        android:id="@+id/buttonDevTabAll"
-                        style="@style/Widget.OpenCamera.CompactButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="4dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_tab_all" />
-                </LinearLayout>
-
-                <!-- Title -->
-                <TextView
-                    android:id="@+id/devConsoleTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:textColor="@color/oc_text_primary"
-                    android:textSize="@dimen/text_size_section_title"
-                    android:textStyle="bold" />
-
-                <!-- Summary row -->
-                <TextView
-                    android:id="@+id/devConsoleSummary"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:fontFamily="monospace"
-                    android:textColor="@color/oc_accent"
-                    android:textSize="@dimen/text_size_status" />
-
-                <!-- Content area -->
-                <TextView
-                    android:id="@+id/devConsoleContent"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:fontFamily="monospace"
-                    android:textColor="@color/oc_text_secondary"
-                    android:textSize="@dimen/text_size_dev_log" />
-
-                <!-- Storage info -->
-                <TextView
-                    android:id="@+id/devConsoleStorageInfo"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:textColor="@color/oc_text_secondary"
-                    android:textSize="@dimen/text_size_status"
-                    android:visibility="gone" />
-
-                <!-- Action row -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:gravity="center"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/buttonDevExport"
-                        style="@style/Widget.OpenCamera.PillButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/dev_export_log" />
-
-                    <Button
-                        android:id="@+id/buttonDevClose"
-                        style="@style/Widget.OpenCamera.PillButton"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/dev_cleanup_current" />
-                </LinearLayout>
+                <Button
+                    android:id="@+id/buttonDevScrollBottom"
+                    style="@style/Widget.OpenCamera.CompactButton"
+                    android:layout_width="@dimen/dev_console_scroll_button_size"
+                    android:layout_height="@dimen/dev_console_scroll_button_size"
+                    android:layout_marginTop="@dimen/space_2"
+                    android:contentDescription="@string/dev_scroll_bottom_content_description"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:padding="0dp"
+                    android:text="@string/dev_scroll_bottom" />
             </LinearLayout>
-        </androidx.core.widget.NestedScrollView>
+        </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
 
 

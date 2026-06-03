@@ -72,12 +72,14 @@ import com.opencamera.core.device.PreviewMeteringRequest
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.PreviewStreamAspect
+import com.opencamera.core.device.PhysicalStillCaptureOutputProbe
 import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlan
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlanner
 import com.opencamera.core.device.MultiFrameOutputRole
 import com.opencamera.core.device.MultiFrameTemporaryOutputTracker
 import com.opencamera.core.device.RecordingQualityPreset
+import com.opencamera.core.device.StillCaptureCameraProbe
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.VideoSceneSignal
 import com.opencamera.core.device.ZoomControlSupport
@@ -157,6 +159,7 @@ data class CameraLensProfile(
     val videoSpecConstraints: VideoSpecConstraints = DeviceCapabilities.DEFAULT.videoSpecConstraints,
     val manualControlCapabilities: ManualControlCapabilityMatrix? = null,
     val previewBrightnessRange: PreviewBrightnessRange = PreviewBrightnessRange.CONSERVATIVE,
+    val stillCaptureCameraProbe: StillCaptureCameraProbe? = null,
     /** Hardware camera ID, used for physical camera selection in multi-camera devices. */
     val physicalCameraId: String? = null
 )
@@ -839,6 +842,8 @@ internal fun resolveDeviceCapabilities(
         .flatMap { it.availableStillCaptureOutputSizes }
         .distinctBy { it.width to it.height }
         .sortedByDescending { it.pixelCount }
+    val stillCaptureCameraProbes = prioritizedProfiles
+        .mapNotNull { it.stillCaptureCameraProbe }
     val availableStillCaptureResolutionPresets = prioritizedProfiles
         .flatMap { it.availableStillCaptureResolutionPresets }
         .toSet()
@@ -860,6 +865,8 @@ internal fun resolveDeviceCapabilities(
         previewBrightnessRange = previewBrightnessRange,
         availableStillCaptureOutputSizes = availableStillCaptureOutputSizes
             .ifEmpty { baseCapabilities.availableStillCaptureOutputSizes },
+        stillCaptureCameraProbes = stillCaptureCameraProbes
+            .ifEmpty { baseCapabilities.stillCaptureCameraProbes },
         availableStillCaptureResolutionPresets = availableStillCaptureResolutionPresets,
         manualControlCapabilities = manualControlCapabilities
             ?: baseCapabilities.manualControlCapabilities,
@@ -1274,6 +1281,28 @@ private fun collectAllJpegOutputSizes(
     return allSizes.values.toList()
 }
 
+private fun detectPhysicalStillCaptureOutputProbes(
+    cameraManager: CameraManager,
+    characteristics: CameraCharacteristics
+): Pair<Set<String>, List<PhysicalStillCaptureOutputProbe>> {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+        return emptySet<String>() to emptyList()
+    }
+    val physicalIds = characteristics.physicalCameraIds
+    val probes = physicalIds.mapNotNull { physicalId ->
+        runCatching {
+            val physicalCharacteristics = cameraManager.getCameraCharacteristics(physicalId)
+            PhysicalStillCaptureOutputProbe(
+                cameraId = physicalId,
+                outputSizes = normalizeStillCaptureOutputSizes(
+                    collectAllJpegOutputSizes(physicalCharacteristics)
+                )
+            )
+        }.getOrNull()
+    }
+    return physicalIds to probes
+}
+
 private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> {
     val cameraManager = context.getSystemService(CameraManager::class.java) ?: return emptyList()
     return runCatching {
@@ -1290,15 +1319,27 @@ private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> 
             val zoomCap = detectZoomRatioCapability(characteristics)
 
             val allJpegSizes = collectAllJpegOutputSizes(characteristics)
+            val normalizedJpegSizes = normalizeStillCaptureOutputSizes(allJpegSizes)
+            val (physicalCameraIds, physicalOutputProbes) = detectPhysicalStillCaptureOutputProbes(
+                cameraManager = cameraManager,
+                characteristics = characteristics
+            )
 
             CameraLensProfile(
                 lensFacing = lensFacing,
                 hasFlashUnit = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
                 zoomRatioCapability = zoomCap,
                 previewBrightnessRange = detectPreviewBrightnessRange(characteristics),
-                availableStillCaptureOutputSizes = normalizeStillCaptureOutputSizes(allJpegSizes),
+                availableStillCaptureOutputSizes = normalizedJpegSizes,
                 availableStillCaptureResolutionPresets = resolveAvailableStillCaptureResolutionPresets(
                     allJpegSizes
+                ),
+                stillCaptureCameraProbe = StillCaptureCameraProbe(
+                    cameraId = cameraId,
+                    lensFacing = lensFacing,
+                    physicalCameraIds = physicalCameraIds,
+                    outputSizes = normalizedJpegSizes,
+                    physicalOutputProbes = physicalOutputProbes
                 ),
                 videoSpecConstraints = detectVideoSpecConstraints(
                     cameraId = cameraId,

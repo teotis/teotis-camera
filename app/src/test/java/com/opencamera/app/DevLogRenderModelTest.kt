@@ -5,6 +5,8 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.LensNode
 import com.opencamera.core.device.LensNodeAvailability
+import com.opencamera.core.device.PhysicalStillCaptureOutputProbe
+import com.opencamera.core.device.StillCaptureCameraProbe
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.StillCaptureResolutionSource
 import com.opencamera.core.device.ZoomControlSupport
@@ -471,6 +473,39 @@ class DevLogRenderModelTest {
         assertTrue(summary.contains("48MP:8000x6000(maximum-resolution)"))
         assertTrue(summary.contains("12MP:4000x3000(standard)"))
         assertTrue(summary.contains("8MP:3264x2448(standard)"))
+    }
+
+    @Test
+    fun `computeDeviceProbeSummary includes physical camera output probe details`() {
+        val caps = DeviceCapabilities(
+            stillCaptureCameraProbes = listOf(
+                StillCaptureCameraProbe(
+                    cameraId = "0",
+                    lensFacing = LensFacing.BACK,
+                    physicalCameraIds = setOf("0", "2"),
+                    outputSizes = listOf(
+                        StillCaptureOutputSize(width = 4096, height = 3072)
+                    ),
+                    physicalOutputProbes = listOf(
+                        PhysicalStillCaptureOutputProbe(
+                            cameraId = "2",
+                            outputSizes = listOf(
+                                StillCaptureOutputSize(
+                                    width = 8000,
+                                    height = 6000,
+                                    resolutionSource = StillCaptureResolutionSource.MAXIMUM_RESOLUTION
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        val summary = computeDeviceProbeSummary(caps)
+
+        assertTrue(summary.contains("still-camera-probe: id=0,lens=BACK,physical=0|2,sizes=13MP:4096x3072(standard)"))
+        assertTrue(summary.contains("physical-still-probe: parent=0,id=2,sizes=48MP:8000x6000(maximum-resolution)"))
     }
 
     @Test

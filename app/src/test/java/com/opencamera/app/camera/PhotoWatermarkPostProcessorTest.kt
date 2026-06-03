@@ -318,6 +318,28 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `blur four border uses zoomed source background when capture crop zoom is active`() {
+        val source = Bitmap.createBitmap(160, 160, Bitmap.Config.ARGB_8888)
+        for (x in 0 until 160) {
+            for (y in 0 until 160) {
+                source.setPixel(x, y, if (y < 18) Color.GREEN else Color.MAGENTA)
+            }
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_BLUR)
+            .copy(captureCropZoom = 5f)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+        val topPixel = bmp.getPixel(bmp.width / 2, 6)
+
+        assertTrue(
+            Color.red(topPixel) > Color.green(topPixel),
+            "zoomed border should be dominated by the magnified source body, got R=${Color.red(topPixel)} G=${Color.green(topPixel)}"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
     fun `blur four border suppresses high frequency edge detail`() {
         val source = Bitmap.createBitmap(240, 240, Bitmap.Config.ARGB_8888)
         for (x in 0 until 240) {

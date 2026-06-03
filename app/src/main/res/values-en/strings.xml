@@ -99,6 +99,10 @@
     <string name="dev_close">Close</string>
     <string name="dev_cleanup_current">Clear</string>
     <string name="dev_console_content_description">Debug console overlay</string>
+    <string name="dev_scroll_top">↑</string>
+    <string name="dev_scroll_bottom">↓</string>
+    <string name="dev_scroll_top_content_description">Scroll development panel to top</string>
+    <string name="dev_scroll_bottom_content_description">Scroll development panel to bottom</string>
     <string name="button_palette_entry">Style</string>
     <string name="button_quick_launcher">Quick</string>
     <string name="quick_bubble_panel_content_description">Quick camera controls</string>

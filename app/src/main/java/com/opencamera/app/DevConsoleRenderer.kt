@@ -7,13 +7,31 @@ internal class DevConsoleRenderer(
     private val context: Context,
     private val views: DevConsoleViews
 ) {
+    init {
+        views.scrollTop.setOnClickListener {
+            views.scroll.smoothScrollTo(0, 0)
+        }
+        views.scrollBottom.setOnClickListener {
+            views.scroll.post {
+                val contentHeight = views.scroll.getChildAt(0)?.height ?: 0
+                views.scroll.smoothScrollTo(
+                    0,
+                    devConsoleBottomScrollY(
+                        viewHeight = views.scroll.height,
+                        contentHeight = contentHeight
+                    )
+                )
+            }
+        }
+    }
+
     fun renderVisibility(activePanelRoute: CockpitPanelRoute) {
         val isDevVisible = activePanelRoute is CockpitPanelRoute.DevConsole
         val wasVisible = views.panel.isVisible
         views.panel.isVisible = isDevVisible
         views.entry.alpha = if (isDevVisible) 1f else 0.86f
         if (isDevVisible && !wasVisible) {
-            (views.panel.getChildAt(0) as? androidx.core.widget.NestedScrollView)?.scrollTo(0, 0)
+            views.scroll.scrollTo(0, 0)
         }
     }
 
@@ -42,4 +60,8 @@ internal class DevConsoleRenderer(
             )
         }
     }
+}
+
+internal fun devConsoleBottomScrollY(viewHeight: Int, contentHeight: Int): Int {
+    return (contentHeight - viewHeight).coerceAtLeast(0)
 }

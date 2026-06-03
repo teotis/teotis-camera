@@ -1923,6 +1923,19 @@ internal fun computeDeviceProbeSummary(capabilities: com.opencamera.core.device.
         } else {
             appendLine("still-output: none reported")
         }
+        capabilities.stillCaptureCameraProbes.forEach { probe ->
+            val physicalIds = probe.physicalCameraIds.joinToString("|").ifBlank { "none" }
+            appendLine(
+                "still-camera-probe: id=${probe.cameraId},lens=${probe.lensFacing?.name ?: "?"}," +
+                    "physical=$physicalIds,sizes=${probe.outputSizes.probeSummaryList()}"
+            )
+            probe.physicalOutputProbes.forEach { physicalProbe ->
+                appendLine(
+                    "physical-still-probe: parent=${probe.cameraId},id=${physicalProbe.cameraId}," +
+                        "sizes=${physicalProbe.outputSizes.probeSummaryList()}"
+                )
+            }
+        }
         val facts = mutableListOf<String>()
         if (!capabilities.supportsStillCapture) facts += "stillCapture=UNSUPPORTED"
         if (!capabilities.supportsVideoRecording) facts += "videoRecording=UNSUPPORTED"
@@ -1935,6 +1948,14 @@ internal fun computeDeviceProbeSummary(capabilities: com.opencamera.core.device.
             appendLine("facts: ${facts.joinToString()}")
         }
     }.trimEnd()
+}
+
+private fun List<com.opencamera.core.device.StillCaptureOutputSize>.probeSummaryList(): String {
+    return if (isEmpty()) {
+        "none"
+    } else {
+        joinToString { it.probeSummaryLabel() }
+    }
 }
 
 private fun com.opencamera.core.device.StillCaptureOutputSize.probeSummaryLabel(): String {

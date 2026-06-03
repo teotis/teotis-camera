@@ -58,6 +58,7 @@ internal data class ResolvedPhotoWatermarkTemplate(
     val placement: WatermarkTextPlacement,
     val textScale: Float,
     val textOpacity: Float,
+    val captureCropZoom: Float = 1f,
     val warning: String? = null
 )
 
@@ -415,7 +416,6 @@ private const val MAX_TEXT_SCALE = 1.4f
 private const val MIN_PADDING_PX = 18f
 private const val MIN_CORNER_RADIUS_PX = 12f
 private const val BLUR_DOWNSAMPLE_DIVISOR = 18
-private const val EDGE_STRIP_DOWNSAMPLE_DIVISOR = 4
 
 internal fun renderPhotoWatermarkBitmap(
     bitmap: Bitmap,
@@ -739,7 +739,8 @@ private fun drawBlurFourBorderFrame(
     drawContentAwareEdgeBorder(
         canvas, source, framedWidth, framedHeight,
         sideBorderInt, topBorderInt, bottomBorderInt,
-        background = template.frameBackground
+        background = template.frameBackground,
+        captureCropZoom = template.captureCropZoom
     )
     canvas.drawBitmap(source, sideBorder, topBorder, null)
 
@@ -935,29 +936,17 @@ private fun drawContentAwareEdgeBorder(
     sideBorder: Int,
     topBorder: Int,
     bottomBorder: Int,
-    background: WatermarkFrameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR
+    background: WatermarkFrameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
+    captureCropZoom: Float = 1f
 ) {
-    fun drawBlurredEdge(strip: Bitmap, dstX: Int, dstY: Int, dstW: Int, dstH: Int) {
-        val blurred = createBlurredEdgeBitmap(strip, dstW, dstH)
-        canvas.drawBitmap(blurred, dstX.toFloat(), dstY.toFloat(), null)
-        blurred.recycle()
-    }
-
-    val topSrc = Bitmap.createBitmap(source, 0, 0, source.width, maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR))
-    drawBlurredEdge(topSrc, 0, 0, framedWidth, topBorder)
-    topSrc.recycle()
-
-    val bottomSrc = Bitmap.createBitmap(source, 0, source.height - maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR), source.width, maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR))
-    drawBlurredEdge(bottomSrc, 0, framedHeight - bottomBorder, framedWidth, bottomBorder)
-    bottomSrc.recycle()
-
-    val leftSrc = Bitmap.createBitmap(source, 0, 0, maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR), source.height)
-    drawBlurredEdge(leftSrc, 0, topBorder, sideBorder, source.height)
-    leftSrc.recycle()
-
-    val rightSrc = Bitmap.createBitmap(source, source.width - maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR), 0, maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR), source.height)
-    drawBlurredEdge(rightSrc, framedWidth - sideBorder, topBorder, sideBorder, source.height)
-    rightSrc.recycle()
+    val expandedBackground = createBlurredExpandedEdgeBitmap(
+        source = source,
+        framedWidth = framedWidth,
+        framedHeight = framedHeight,
+        captureCropZoom = captureCropZoom
+    )
+    canvas.drawBitmap(expandedBackground, 0f, 0f, null)
+    expandedBackground.recycle()
 
     val tintOverlay = when (background) {
         WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(64, 20, 20, 20)
@@ -977,21 +966,40 @@ private fun drawContentAwareEdgeBorder(
     }
 }
 
-private fun createBlurredEdgeBitmap(strip: Bitmap, dstW: Int, dstH: Int): Bitmap {
-    val scaled = Bitmap.createScaledBitmap(strip, dstW, dstH, true)
+private fun createBlurredExpandedEdgeBitmap(
+    source: Bitmap,
+    framedWidth: Int,
+    framedHeight: Int,
+    captureCropZoom: Float = 1f
+): Bitmap {
+    val backgroundSource = createCaptureCropSource(source, captureCropZoom)
+    val scaled = Bitmap.createScaledBitmap(backgroundSource, framedWidth, framedHeight, true)
+    if (backgroundSource !== source) {
+        backgroundSource.recycle()
+    }
     val mutable = scaled.copy(Bitmap.Config.ARGB_8888, true)
     if (mutable !== scaled) {
         scaled.recycle()
     }
-    val horizontalRadius = blurRadiusForLength(dstW)
-    val verticalRadius = blurRadiusForLength(dstH)
     applySeparableBoxBlur(
         bitmap = mutable,
-        horizontalRadius = horizontalRadius,
-        verticalRadius = verticalRadius,
+        horizontalRadius = blurRadiusForLength(framedWidth),
+        verticalRadius = blurRadiusForLength(framedHeight),
         passes = 2
     )
     return mutable
+}
+
+private fun createCaptureCropSource(source: Bitmap, captureCropZoom: Float): Bitmap {
+    val zoom = captureCropZoom.coerceAtLeast(1f)
+    if (zoom <= 1.01f) {
+        return source
+    }
+    val cropWidth = (source.width / zoom).toInt().coerceIn(1, source.width)
+    val cropHeight = (source.height / zoom).toInt().coerceIn(1, source.height)
+    val left = (source.width - cropWidth) / 2
+    val top = (source.height - cropHeight) / 2
+    return Bitmap.createBitmap(source, left, top, cropWidth, cropHeight)
 }
 
 private fun blurRadiusForLength(length: Int): Int {
@@ -1260,6 +1268,10 @@ internal fun resolvePhotoWatermarkTemplate(
         textOpacity = metadata.customTags[PHOTO_WATERMARK_TEXT_OPACITY_KEY]
             ?.toFloatOrNull()
             ?.coerceIn(0.35f, 1f)
+            ?: 1f,
+        captureCropZoom = metadata.customTags["captureCropZoom"]
+            ?.toFloatOrNull()
+            ?.coerceAtLeast(1f)
             ?: 1f,
         warning = warning
     )

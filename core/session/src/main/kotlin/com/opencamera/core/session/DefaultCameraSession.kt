@@ -909,8 +909,15 @@ class DefaultCameraSession(
         if (lensNodeMap.isEmpty()) return captureZoom.coerceAtLeast(1f)
         val availableThresholds = lensNodeMap.values
             .filter { it.available }
-            .map { it.thresholdRatio }
+            .map { threshold ->
+                if (threshold.thresholdRatio <= 0f) {
+                    captureZoom.coerceAtMost(1f).coerceAtLeast(MIN_NON_ZERO_PREVIEW_ZOOM_RATIO)
+                } else {
+                    threshold.thresholdRatio
+                }
+            }
             .sorted()
+            .distinct()
         if (availableThresholds.isEmpty()) return captureZoom.coerceAtLeast(1f)
         val maxThreshold = availableThresholds.last()
         if (captureZoom >= maxThreshold) return maxThreshold
@@ -921,6 +928,7 @@ class DefaultCameraSession(
     companion object {
         /** Hysteresis delta for lens node switching (zoom ratio units). */
         internal const val LENS_NODE_HYSTERESIS_DELTA = 0.1f
+        private const val MIN_NON_ZERO_PREVIEW_ZOOM_RATIO = 0.01f
     }
 
     private suspend fun handleStillCaptureQualityToggled() {

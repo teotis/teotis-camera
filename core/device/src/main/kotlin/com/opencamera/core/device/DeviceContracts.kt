@@ -98,6 +98,19 @@ data class StillCaptureOutputSize(
         get() = width.toLong() * height.toLong()
 }
 
+data class PhysicalStillCaptureOutputProbe(
+    val cameraId: String,
+    val outputSizes: List<StillCaptureOutputSize> = emptyList()
+)
+
+data class StillCaptureCameraProbe(
+    val cameraId: String,
+    val lensFacing: LensFacing? = null,
+    val physicalCameraIds: Set<String> = emptySet(),
+    val outputSizes: List<StillCaptureOutputSize> = emptyList(),
+    val physicalOutputProbes: List<PhysicalStillCaptureOutputProbe> = emptyList()
+)
+
 enum class ManualControlSupport(
     val tagValue: String
 ) {
@@ -184,6 +197,7 @@ data class DeviceCapabilities(
     val supportsFlashControl: Boolean = true,
     val availableLensFacings: Set<LensFacing> = setOf(LensFacing.BACK),
     val availableStillCaptureOutputSizes: List<StillCaptureOutputSize> = emptyList(),
+    val stillCaptureCameraProbes: List<StillCaptureCameraProbe> = emptyList(),
     val availableStillCaptureResolutionOptions: List<StillCaptureResolutionOption> = emptyList(),
     val availableStillCaptureResolutionPresets: Set<StillCaptureResolutionPreset> =
         StillCaptureResolutionPreset.entries.toSet(),

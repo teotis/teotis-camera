@@ -5614,12 +5614,11 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `computePreviewZoomRatio returns threshold for two-node map`() = runTest {
+    fun `computePreviewZoomRatio clamps zero wide threshold to camera safe 1x`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // captureZoom = 1.5 → largest threshold <= 1.5 is 0 (WIDE)
         val result = session.computePreviewZoomRatio(1.5f, twoNodeMap)
-        assertEquals(0.0f, result)
+        assertEquals(1.0f, result)
     }
 
     @Test
@@ -5664,12 +5663,11 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `computePreviewZoomRatio returns smallest threshold when captureZoom below all thresholds`() = runTest {
+    fun `computePreviewZoomRatio never returns invalid zero when captureZoom below thresholds`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // All thresholds: 0, 2, 5. captureZoom = 0.3 → largest <= 0.3 is 0
         val result = session.computePreviewZoomRatio(0.3f, threeNodeMap)
-        assertEquals(0.0f, result)
+        assertEquals(0.3f, result)
     }
 
     @Test
@@ -5684,9 +5682,8 @@ class DefaultCameraSessionTest {
                 node = LensNode.TELEPHOTO, available = false, thresholdRatio = 2.0f
             )
         )
-        // captureZoom = 3.0 → only WIDE (0) is available → returns 0
         val result = session.computePreviewZoomRatio(3.0f, mapWithUnavailable)
-        assertEquals(0.0f, result)
+        assertEquals(1.0f, result)
     }
 
     // ── CaptureReadiness contract tests ───────────────────────────────

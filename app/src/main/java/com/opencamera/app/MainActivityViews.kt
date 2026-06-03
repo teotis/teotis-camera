@@ -148,6 +148,7 @@ internal data class FilterLabViews(
 internal data class DevConsoleViews(
     val entry: Button,
     val panel: MaterialCardView,
+    val scroll: NestedScrollView,
     val tabKey: Button,
     val tabCore: Button,
     val tabError: Button,
@@ -157,7 +158,9 @@ internal data class DevConsoleViews(
     val content: TextView,
     val storageInfo: TextView,
     val export: Button,
-    val close: Button
+    val close: Button,
+    val scrollTop: Button,
+    val scrollBottom: Button
 )
 
 internal data class ModeTrackViews(
@@ -350,6 +353,7 @@ internal data class MainActivityViews(
             val devConsole = DevConsoleViews(
                 entry = activity.findViewById(R.id.buttonDevEntry),
                 panel = activity.findViewById(R.id.devConsolePanel),
+                scroll = activity.findViewById(R.id.devConsoleScroll),
                 tabKey = activity.findViewById(R.id.buttonDevTabKey),
                 tabCore = activity.findViewById(R.id.buttonDevTabCore),
                 tabError = activity.findViewById(R.id.buttonDevTabError),
@@ -359,7 +363,9 @@ internal data class MainActivityViews(
                 content = activity.findViewById(R.id.devConsoleContent),
                 storageInfo = activity.findViewById(R.id.devConsoleStorageInfo),
                 export = activity.findViewById(R.id.buttonDevExport),
-                close = activity.findViewById(R.id.buttonDevClose)
+                close = activity.findViewById(R.id.buttonDevClose),
+                scrollTop = activity.findViewById(R.id.buttonDevScrollTop),
+                scrollBottom = activity.findViewById(R.id.buttonDevScrollBottom)
             )
             val modeTrack = ModeTrackViews(
                 scroll = activity.findViewById(R.id.modeTrackScroll),
