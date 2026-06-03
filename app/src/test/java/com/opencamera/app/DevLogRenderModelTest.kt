@@ -107,6 +107,32 @@ class DevLogRenderModelTest {
     }
 
     @Test
+    fun `cleared key tab hides old key events but keeps new events visible`() {
+        val clearCutoffs = DevLogClearCutoffs().markCleared(
+            type = DevLogTab.KEY,
+            traceEvents = sampleTraceEvents,
+            linkEvents = emptyList()
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents + SessionTraceEvent(
+                11,
+                "preview.first.frame",
+                "new frame after cleanup",
+                11L
+            ),
+            isDebugBuild = true,
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver(),
+            clearCutoffs = clearCutoffs
+        )
+
+        assertFalse(model.content.contains("session.created"))
+        assertTrue(model.content.contains("new frame after cleanup"))
+        assertTrue(model.title.endsWith("(1)"))
+    }
+
+    @Test
     fun `error tab shows errors and blocked events`() {
         val model = devLogRenderModel(
             state = defaultTestSessionState(),

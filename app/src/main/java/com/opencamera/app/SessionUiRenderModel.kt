@@ -1726,7 +1726,8 @@ internal fun devLogRenderModel(
     storageSummary: StorageSummary? = null,
     selectedDomain: TraceEventDomain? = null,
     linkEvents: List<com.opencamera.core.session.PerformanceLinkEvent> = emptyList(),
-    deviceProbeSummary: String? = null
+    deviceProbeSummary: String? = null,
+    clearCutoffs: DevLogClearCutoffs = DevLogClearCutoffs()
 ): DevLogRenderModel {
     if (!isDebugBuild) {
         return DevLogRenderModel(
@@ -1739,13 +1740,20 @@ internal fun devLogRenderModel(
         )
     }
 
-    val keyEvents = traceEvents.filter { it.name in KEY_EVENT_NAMES }
-    val coreEvents = traceEvents.filter { it.name in CORE_EVENT_NAMES }
-    val errorEvents = traceEvents.filter { isErrorEvent(it.name) }
-    val allEvents = traceEvents
+    val keyEvents = traceEvents.filter {
+        it.sequence > clearCutoffs.sequenceFor(DevLogTab.KEY) && it.name in KEY_EVENT_NAMES
+    }
+    val coreEvents = traceEvents.filter {
+        it.sequence > clearCutoffs.sequenceFor(DevLogTab.CORE) && it.name in CORE_EVENT_NAMES
+    }
+    val errorEvents = traceEvents.filter {
+        it.sequence > clearCutoffs.sequenceFor(DevLogTab.ERROR) && isErrorEvent(it.name)
+    }
+    val allEvents = traceEvents.filter { it.sequence > clearCutoffs.sequenceFor(DevLogTab.ALL) }
+    val visibleLinkEvents = linkEvents.drop(clearCutoffs.linkEventCount.coerceAtMost(linkEvents.size))
 
     val domainTabs = TraceEventDomain.entries.map { domain ->
-        DomainTabCount(domain = domain, count = traceEvents.count { it.domain == domain })
+        DomainTabCount(domain = domain, count = allEvents.count { it.domain == domain })
     }.filter { it.count > 0 }
 
     fun escapeLinkValue(value: String): String {
@@ -1796,7 +1804,7 @@ internal fun devLogRenderModel(
         }
     }
 
-    val debugDump = buildSessionDebugDump(state, traceEvents, resourceDiagnostics = resourceDiagnostics)
+    val debugDump = buildSessionDebugDump(state, allEvents, resourceDiagnostics = resourceDiagnostics)
     val perf = debugDump.perfSnapshot
     val recovery = debugDump.recoveryTrace
     val resolvedProbeSummary = deviceProbeSummary
@@ -1831,14 +1839,14 @@ internal fun devLogRenderModel(
             DevLogTab.ERROR -> formatEvents(errorEvents)
             DevLogTab.ALL -> formatEvents(allEvents)
         }
-        if (selectedTab == DevLogTab.CORE && linkEvents.isNotEmpty()) {
+        if (selectedTab == DevLogTab.CORE && visibleLinkEvents.isNotEmpty()) {
             buildString {
                 if (baseContent.isNotBlank()) {
                     appendLine(baseContent)
                     appendLine()
                 }
                 appendLine("--- 链路耗时 ---")
-                append(formatLinkEvents(linkEvents))
+                append(formatLinkEvents(visibleLinkEvents))
             }
         } else {
             baseContent
@@ -1851,7 +1859,7 @@ internal fun devLogRenderModel(
         appendLine("=== CORE EVENTS ===")
         appendLine(formatEvents(coreEvents))
         appendLine("=== LINK EVENTS ===")
-        appendLine(formatLinkEvents(linkEvents))
+        appendLine(formatLinkEvents(visibleLinkEvents))
         appendLine("=== ERROR EVENTS ===")
         appendLine(formatEvents(errorEvents))
         appendLine("=== ALL EVENTS ===")

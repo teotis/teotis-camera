@@ -54,6 +54,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         get() = panelState.route
     private var selectedDevLogTab = DevLogTab.KEY
     private var latestDevLogRenderModel: DevLogRenderModel? = null
+    private var devLogClearCutoffs = DevLogClearCutoffs()
     private lateinit var devLogExporter: DevLogExporter
     private var latestQuickPanelSheetRenderModel: QuickPanelSheetRenderModel? = null
     private var latestSettingsPageRenderModel: SessionSettingsPageRenderModel? = null
@@ -340,7 +341,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 runCatching { devLogExporter.storageSummary() }.getOrNull()
             } else null,
             linkEvents = container.linkRecorder.snapshot(),
-            deviceProbeSummary = latestDeviceProbeSummary
+            deviceProbeSummary = latestDeviceProbeSummary,
+            clearCutoffs = devLogClearCutoffs
         )
         latestDevLogRenderModel = devLogModel
         devConsoleRenderer.renderVisibility(activePanelRoute)
@@ -400,7 +402,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             text = AppTextResolver(this),
             storageSummary = summary,
             linkEvents = container.linkRecorder.snapshot(),
-            deviceProbeSummary = latestDeviceProbeSummary
+            deviceProbeSummary = latestDeviceProbeSummary,
+            clearCutoffs = devLogClearCutoffs
         )
         latestDevLogRenderModel = model
         devConsoleRenderer.render(model)
@@ -800,6 +803,11 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     override fun cleanupDevLogByType(type: DevLogTab) {
         runCatching {
             val count = devLogExporter.cleanupByType(type)
+            devLogClearCutoffs = devLogClearCutoffs.markCleared(
+                type = type,
+                traceEvents = container.trace.snapshot(),
+                linkEvents = container.linkRecorder.snapshot()
+            )
             Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
             refreshDevLogModel()
         }.onFailure {
@@ -810,6 +818,11 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     override fun cleanupAllDevLogs() {
         runCatching {
             val count = devLogExporter.cleanupAll()
+            devLogClearCutoffs = devLogClearCutoffs.markCleared(
+                type = DevLogTab.ALL,
+                traceEvents = container.trace.snapshot(),
+                linkEvents = container.linkRecorder.snapshot()
+            )
             Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
             refreshDevLogModel()
         }.onFailure {

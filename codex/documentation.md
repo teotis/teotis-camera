@@ -174,6 +174,14 @@
 
 # 最近有效闭环
 
+## 2026-06-04：开发面板清理后同步清空可见日志
+
+- 目标：修复“开发”面板点击清理后，已保存日志文件被删除但面板内旧记录仍继续显示的问题，让面板呈现与清理后的记录状态一致。
+- 根因：[`DevLogExporter.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/DevLogExporter.kt) 的清理只删除 `debug-logs/*.log` 导出文件；面板内容由 [`MainActivity.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/MainActivity.kt) 从 `container.trace.snapshot()` / `linkRecorder.snapshot()` 重新生成，导致文件层已清理、内存渲染层仍保留旧事件。
+- 结果：新增 `DevLogClearCutoffs`，清理当前 tab 或全部日志时记录当前 trace/link 截止点，随后 [`devLogRenderModel()`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 只展示截止点之后的新事件；清理后旧日志立即从面板消失，后续新产生的日志仍会继续出现。
+- 验证：新增 [`DevLogRenderModelTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/DevLogRenderModelTest.kt) 回归先红后绿；随后通过 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.DevLogRenderModelTest` 与 `rtk ./gradlew --no-daemon :app:assembleDebug`。
+- 结论：仓内已修复开发面板“清理后旧记录仍显示”的状态同步断点；真机上仍建议打开 Dev 面板点一次“清理”做视觉 smoke。
+
 ## 2026-06-03：blur-four-border 四角连续模糊修复
 
 - 目标：修复用户反馈“四边框模糊水印的边框在四角方位仍然有突变，而不是均匀模糊”，把四角连续性从主观观感补成像素回归。
