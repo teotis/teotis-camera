@@ -1602,7 +1602,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="end|bottom"
                 android:layout_marginEnd="@dimen/space_4"
-                android:layout_marginBottom="@dimen/space_4"
+                android:layout_marginBottom="@dimen/dev_console_scroll_floating_bottom_margin"
                 android:orientation="vertical">
 
                 <Button

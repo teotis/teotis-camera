@@ -57,6 +57,7 @@
     <dimen name="panel_max_height">480dp</dimen>
     <dimen name="dev_console_scroll_button_size">42dp</dimen>
     <dimen name="dev_console_scroll_floating_padding">96dp</dimen>
+    <dimen name="dev_console_scroll_floating_bottom_margin">72dp</dimen>
     <dimen name="bottom_cockpit_padding_horizontal">16dp</dimen>
     <dimen name="bottom_cockpit_margin_bottom">8dp</dimen>
     <dimen name="cockpit_control_row_margin_top">8dp</dimen>

@@ -185,8 +185,8 @@
 ## 2026-06-03：开发面板顶部/底部悬浮滚动按钮
 
 - 目标：按用户反馈在“开发”面板中加入恰当的顶部/底部快捷滚动入口，方便长日志快速浏览，不改变日志筛选、导出或清理语义。
-- 结果：[`activity_main.xml`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/res/layout/activity_main.xml) 的 Dev console panel 现在在滚动内容上叠放两个右下角悬浮按钮；[`DevConsoleRenderer.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/DevConsoleRenderer.kt) 绑定 `scrollTop / scrollBottom` 点击并保留面板打开时回到顶部的既有行为；中英文资源补齐按钮文案与无障碍描述。
-- 验证：新增 [`DevConsoleRendererTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/DevConsoleRendererTest.kt) 先红后绿，锁定底部滚动目标不会出现负值；随后通过 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.DevConsoleRendererTest` 与 `rtk ./gradlew --no-daemon :app:assembleDebug`。
+- 结果：[`activity_main.xml`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/res/layout/activity_main.xml) 的 Dev console panel 现在在滚动内容上叠放两个右侧悬浮按钮，并于 `2026-06-04` 上移悬浮列，避开底部“清理”按钮；[`DevConsoleRenderer.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/DevConsoleRenderer.kt) 绑定 `scrollTop / scrollBottom` 点击并保留面板打开时回到顶部的既有行为；中英文资源补齐按钮文案与无障碍描述。
+- 验证：新增 [`DevConsoleRendererTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/DevConsoleRendererTest.kt) 先红后绿，锁定底部滚动目标不会出现负值；随后通过 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.DevConsoleRendererTest` 与 `rtk ./gradlew --no-daemon :app:assembleDebug`；`2026-06-04` 上移布局后再次通过 `rtk ./gradlew --no-daemon :app:assembleDebug`。
 - 结论：仓内已完成开发面板长日志快速跳转入口；最终悬浮位置和遮挡感仍建议在真机打开长 Dev 日志后肉眼复看。
 
 ## 2026-06-03：高像素 still capability 真机诊断增强
