@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import com.opencamera.core.device.CaptureTemplate
+import com.opencamera.core.device.EffectiveStillCaptureRecipe
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
@@ -792,6 +793,14 @@ private fun Set<LensFacing>.lensFacingSummary(): String {
         .joinToString(separator = "/") { it.label.lowercase() }
 }
 
+private fun stillResolutionQuickLabel(state: SessionState, strings: SessionUiStrings): String {
+    val recipe = EffectiveStillCaptureRecipe.build(
+        state.activeDeviceGraph,
+        state.activeDeviceCapabilities
+    )
+    return recipe.quickLabel
+}
+
 private fun Set<StillCaptureResolutionPreset>.stillResolutionPresetSummary(): String {
     return this.sortedBy { it.targetWidth * it.targetHeight }
         .joinToString(separator = "/") { it.label }
@@ -801,16 +810,3 @@ private fun List<StillCaptureOutputSize>.stillCaptureOutputSizeSummary(): String
     return this.take(4).joinToString(separator = "/") { it.label }
 }
 
-private fun stillResolutionQuickLabel(state: SessionState, strings: SessionUiStrings): String {
-    val preset = state.activeDeviceGraph.stillCapture.resolutionPreset
-    val explicit = state.activeDeviceGraph.stillCapture.outputSize
-    val native = selectedNativeStillCaptureOutputSizeOrNull(state)
-    if (native == null) return preset.label
-    if (explicit == null && preset == StillCaptureResolutionPreset.LARGE_12MP) return preset.label
-    return native.quickMegapixelLabel()
-}
-
-private fun StillCaptureOutputSize.quickMegapixelLabel(): String {
-    val megapixels = (pixelCount / 1_000_000.0).roundToInt()
-    return "${megapixels}MP"
-}

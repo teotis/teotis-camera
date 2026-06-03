@@ -1,6 +1,7 @@
 package com.opencamera.core.session
 
 import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.device.EffectiveStillCaptureRecipe
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LivePhotoBundle
@@ -768,13 +769,16 @@ internal class CaptureRecordingSessionProcessor(
             return plan
         }
 
-        val outputSize = state.value.activeDeviceGraph.stillCapture.outputSize ?: return plan
-        val outputSizeLabel = "${outputSize.width}x${outputSize.height}"
+        val recipe = EffectiveStillCaptureRecipe.build(
+            state.value.activeDeviceGraph,
+            state.value.activeDeviceCapabilities
+        )
+        val recipeTags = recipe.metadataCustomTags
+        if (recipeTags.isEmpty()) return plan
+
         val updatedSaveRequest = plan.request.saveRequest.copy(
             metadata = plan.request.saveRequest.metadata.copy(
-                customTags = plan.request.saveRequest.metadata.customTags + mapOf(
-                    "stillOutputSize" to outputSizeLabel
-                )
+                customTags = plan.request.saveRequest.metadata.customTags + recipeTags
             )
         )
         val updatedRequest = plan.request.copy(

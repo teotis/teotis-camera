@@ -4,6 +4,7 @@ import com.opencamera.core.device.CameraOutputRotation
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.device.EffectiveStillCaptureRecipe
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.LensNode
 import com.opencamera.core.device.LensNodeAvailability
@@ -1655,11 +1656,13 @@ class DefaultCameraSession(
         requestedOutputSize: StillCaptureOutputSize? = baseGraph.stillCapture.outputSize,
         requestedZoomRatio: Float? = baseGraph.preview.zoomRatio
     ): DeviceGraphSpec {
-        val resolvedOutputSize = resolvedStillCaptureOutputSizeSelection(
-            current = requestedOutputSize,
-            available = deviceCapabilities.availableStillCaptureOutputSizes,
-            fallbackPreset = sessionStillCaptureResolutionPreset
-        )
+        val graphForResolution = if (requestedOutputSize != null) {
+            baseGraph.copy(stillCapture = baseGraph.stillCapture.copy(outputSize = requestedOutputSize))
+        } else {
+            baseGraph
+        }
+        val recipe = EffectiveStillCaptureRecipe.build(graphForResolution, deviceCapabilities)
+        val resolvedOutputSize = recipe.resolvedOutputSize
         val resolvedZoomRatio = resolvedZoomRatioSelection(
             current = requestedZoomRatio,
             capability = deviceCapabilities.zoomRatioCapability

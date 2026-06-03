@@ -42,7 +42,7 @@ class SessionStateRenderTest {
     }
 
     @Test
-    fun `selected native output size falls back to current preset mapping when graph output is absent`() {
+    fun `selected native output size resolves to max available when LARGE_12MP default`() {
         val state = defaultSessionState(
             activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
                 availableStillCaptureOutputSizes = listOf(
@@ -59,7 +59,7 @@ class SessionStateRenderTest {
         )
 
         assertEquals(
-            StillCaptureOutputSize(width = 3264, height = 2448),
+            StillCaptureOutputSize(width = 6000, height = 4000),
             selectedNativeStillCaptureOutputSizeOrNull(state)
         )
     }
