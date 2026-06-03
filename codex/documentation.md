@@ -19,6 +19,7 @@
   [`DeviceContracts.kt`](/Volumes/Extreme_SSD/project/open_camera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt)、[`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt)、[`CameraSessionCoordinator.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt)、[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 与 [`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 现已建立 `zoomRatioCapability + ZoomRatioToggled + ApplyZoomRatio` 主链，`切变焦` 已不再缺少 owner；
   `2026-06-01` 针对真机反馈“变焦跨镜头节点时画幅框未随预览基准跳变”，[`SessionPreviewRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionPreviewRenderModel.kt) 已改为消费 `activeDeviceGraph.preview.previewZoomRatio`，而不是继续把连续 `zoomRatio` 当作画幅框缩放基准；[`SessionPreviewRenderModelTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/SessionPreviewRenderModelTest.kt) 新增红绿回归，锁定 `zoomRatio=3x / previewZoomRatio=2x` 时 overlay frame 使用离散预览基准；
   `2026-06-03` 针对“画质、画幅窗和预览窗专项修过但真机仍不一致”的复核，已把 `PreviewRatio` 从纯 UI/overlay 状态接入 device graph：[`DeviceContracts.kt`](/Volumes/Extreme_SSD/project/open_camera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 新增 `PreviewStreamAspect` 并纳入 `PreviewConfig.streamAspect`；[`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 在 `PreviewRatioToggled` 时同步 `activeDeviceGraph.preview.streamAspect`，活跃预览下发 `BindPreview` 触发真实 CameraX rebind；[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 的 still/video/lens-switch Preview use case 现在通过 `ResolutionSelector` 消费该 stream aspect，不再只让 overlay 变化。JVM 已验证 graph/rebind/adapter selector 契约；`1:1` 目标尺寸是否被具体设备 CameraX 接受仍需真机截图/录屏确认；
+  `2026-06-03` 针对最新真机日志 `opencamera-debug-1780476413538.log` 的高像素画质复核，已确认当前 logical BACK camera 只暴露 `13MP:4096x3072/4080x3072(standard)` 与 `12MP:4032x3024(high-resolution)`，未出现 `maximum-resolution` 50MP 候选；[`DeviceContracts.kt`](/Volumes/Extreme_SSD/project/open_camera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 现新增 `StillCaptureCameraProbe / PhysicalStillCaptureOutputProbe`，[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 会读取 logical camera 的 `physicalCameraIds` 并单独枚举物理 camera JPEG 输出，[`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 的 Dev 日志会输出 `still-camera-probe` 与 `physical-still-probe`，下一轮真机日志可直接判断 48MP/50MP 是否藏在 physical camera 能力中；
   [`ThermalRuntimeIssueMonitor.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/ThermalRuntimeIssueMonitor.kt) 与 [`CameraSessionCoordinator.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraSessionCoordinator.kt) 现已建立 `Android PowerManager -> DeviceRuntimeIssue(THERMAL_CRITICAL) -> PreviewRuntimeIssue` 的上层通用接入口；旧系统或无服务时自动退化为空实现，不把无底层支持误判成业务回归；
   [`DefaultCameraSession.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/DefaultCameraSession.kt) 与 [`SessionDiagnostics.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 现已把 `PreviewHostDetached -> PreviewHostAttached` 推进成显式 `preview.host.recovery.requested` 语义；前后台返回不再退回普通 bind，而是进入可追踪的 recovery bind；
   [`SessionDiagnostics.kt`](/Volumes/Extreme_SSD/project/open_camera/core/session/src/main/kotlin/com/opencamera/core/session/SessionDiagnostics.kt) 与 [`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 现已把 `lastStartReason` 进一步提升为 `PreviewStartCategory + FirstFrameBudgetSnapshot`，默认阈值化 `cold start / foreground resume / recovery / reconfigure`，不再只展示裸毫秒数；
@@ -95,7 +96,8 @@
   `CameraSessionCoordinatorTest`
   `:app:assembleDebug`
 - 本轮通过：
-  `rtk ./scripts/verify_stage_7_observability.sh`（全部 213 项测试 + assembleDebug 通过）
+  `rtk ./gradlew --no-daemon --rerun-tasks -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.DevLogRenderModelTest`
+  `rtk ./scripts/verify_stage_7_observability.sh`
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.SessionPreviewRenderModelTest`
   `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.PreviewOverlayGeometryTest`
   `rtk ./gradlew --no-daemon :app:assembleDebug`
@@ -124,7 +126,7 @@
 - `CameraXCaptureAdapter` 已能输出 `bind/provider heuristic + CameraState` runtime issue，并在 `provider/fatal` issue 上清理缓存 provider；但 `ProcessCameraProvider` 真正 provider death 仍没有平台级强信号，当前 `provider failure` 里依然包含基于异常文案的保守分类。
 - 第 `7` 阶段的 `recovery failure`、`切变焦`、`thermal`、`后台恢复` 与 `preview startup stall` 仓内 owner 已建立，但 `provider death` 真信号与更长时间维度的真机矩阵仍缺少可信来源，继续硬推容易只剩 contract。
 - 当前验证仍以 unit/assemble 为主；首帧超时 watchdog 已建立，但 provider death、provider restart 后真实重连成功率和更长稳的热/权限/生命周期组合仍未建立可收敛的自动化验证。
-- 完整 Stage 7 门禁当前不再能作为通过证据：`verify_stage_7_observability.sh` 在 `DefaultCameraSessionTest` 段被 core/session 文案 locale 期望漂移阻断，单测最小复现同样失败；本次变焦/画幅框修复已用 app focused tests 与 `:app:assembleDebug` 验证，但仍需先修复该 session 测试基线后再恢复完整 Stage 7 绿灯。
+- 完整 Stage 7 门禁已在本轮恢复绿灯；后续若再出现 locale/文案期望漂移，应先以最小 focused test 复现并修正测试口径，再用 `verify_stage_7_observability.sh` 恢复全链路通过证据。
 
 ## 下一步建议
 
@@ -186,6 +188,14 @@
 - 结果：[`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 的 DEVICE PROBE 现在追加 `still-output-sizes` 明细，格式为 `48MP:8000x6000(maximum-resolution), 12MP:4000x3000(standard)`；[`DevLogRenderModelTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/DevLogRenderModelTest.kt) 用 maximum-resolution 与 standard 混合列表锁定导出内容。
 - 验证：新增测试先红后绿；随后通过 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.DevLogRenderModelTest` 与 `rtk ./scripts/verify_stage_7_observability.sh`。
 - 结论：仓内已补齐下一轮高像素真机取证所需的尺寸/来源日志；真实 48MP/50MP 是否可用仍需新 APK 在目标设备上导出 Dev 日志后判断。
+
+## 2026-06-03：高像素 physical cameraId 输出探针
+
+- 目标：承接最新日志 `opencamera-debug-1780476413538.log`：logical BACK camera 的 `still-output-sizes` 仍只到 `13MP`，且 `high-resolution` 仅 `12MP`，没有 `maximum-resolution`；下一步需要确认 48MP/50MP 是否暴露在 logical camera 的 physical cameraId 上。
+- 根因：Android logical multi-camera 可能只在 logical `0` 上公开合成后的标准输出，而把高像素传感器能力放在 `physicalCameraIds` 对应的 physical camera characteristics 中；旧 Dev 日志没有导出 physical camera 的 JPEG 输出表，无法区分“厂商完全不开放”和“藏在 physical camera 但当前选择链未接入”。
+- 结果：[`DeviceContracts.kt`](/Volumes/Extreme_SSD/project/open_camera/core/device/src/main/kotlin/com/opencamera/core/device/DeviceContracts.kt) 新增 `StillCaptureCameraProbe` 与 `PhysicalStillCaptureOutputProbe`；[`CameraXCaptureAdapter.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/CameraXCaptureAdapter.kt) 在能力探测时读取 logical camera 的 `physicalCameraIds` 并枚举各 physical camera 的 JPEG 输出尺寸/来源；[`SessionUiRenderModel.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/SessionUiRenderModel.kt) 现在输出 `still-camera-probe` 与 `physical-still-probe`。
+- 验证：新增 [`DevLogRenderModelTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/DevLogRenderModelTest.kt) 测试先红后绿，锁定 `physical-still-probe: parent=0,id=2,sizes=48MP:8000x6000(maximum-resolution)`；通过 `rtk ./gradlew --no-daemon --rerun-tasks -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.DevLogRenderModelTest` 与 `rtk ./scripts/verify_stage_7_observability.sh`。
+- 结论：当前可判断上一份日志的问题不是“选错了已有 50MP”，而是 logical 能力表没有 50MP；新 APK 导出的下一份 Dev 日志如果出现 `physical-still-probe` 里的 48MP/50MP，就进入 physical camera 高像素接入设计；如果仍没有，则基本可判为该设备对第三方 Camera2/CameraX 不开放厂商 50MP 模式。
 
 ## 2026-06-03：blur-four-border 水印真实模糊修复
 
