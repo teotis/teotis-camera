@@ -174,6 +174,14 @@
 
 # 最近有效闭环
 
+## 2026-06-03：blur-four-border 四角连续模糊修复
+
+- 目标：修复用户反馈“四边框模糊水印的边框在四角方位仍然有突变，而不是均匀模糊”，把四角连续性从主观观感补成像素回归。
+- 根因：[`PhotoWatermarkPostProcessor.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/PhotoWatermarkPostProcessor.kt) 的 `blur-four-border` 在上一轮已做真实 box blur，但背景仍按边/角局部分块取样或留下透明区域参与卷积；四角与侧边不是同一张连续模糊场，容易在角块进入侧边框的位置出现颜色/亮度跳变。
+- 结果：`blur-four-border` 现在先把源图（含 `captureCropZoom` 时的中心裁切源）铺满整个 framed bitmap，再对整张背景执行同一套分离 box blur，最后把原图盖回中心；四角、上下边和左右边来自同一个连续模糊背景，不再由独立 strip 拼接。同步保留源图取色、高频压制和 zoom crop 背景语义；[`PhotoWatermarkPostProcessorTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/camera/PhotoWatermarkPostProcessorTest.kt) 新增“四角进入侧边框时相邻像素色差不能硬跳”的回归。
+- 验证：新增角落连续性测试先红后绿；随后通过 `rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoWatermarkPostProcessorTest --tests com.opencamera.app.DevConsoleRendererTest`、`rtk env OPENCAMERA_BUILD_ROOT=/private/tmp/opencamera-stage7-watermark-corners ./scripts/verify_stage_7_observability.sh` 与 `rtk env OPENCAMERA_BUILD_ROOT=/private/tmp/opencamera-watermark-corners ./scripts/verify_stage_6b3_watermark_v2.sh`。主 build root 曾因 Kotlin 增量缓存缺失/坏 jar 失败，按项目规则改用隔离 build root 后通过；水印专项首次尾段 `DefaultCameraSessionTest` 出现内联 `sortedBy` class 缺失，最小命令加 `-Pkotlin.incremental=false` 复跑通过后完整脚本复跑通过。
+- 结论：仓内已修复 `blur-four-border` 四角突变的算法断点；最终视觉强度和不同真实照片上的审美仍建议用新 APK 真机成片复看。
+
 ## 2026-06-03：开发面板顶部/底部悬浮滚动按钮
 
 - 目标：按用户反馈在“开发”面板中加入恰当的顶部/底部快捷滚动入口，方便长日志快速浏览，不改变日志筛选、导出或清理语义。

@@ -416,7 +416,6 @@ private const val MAX_TEXT_SCALE = 1.4f
 private const val MIN_PADDING_PX = 18f
 private const val MIN_CORNER_RADIUS_PX = 12f
 private const val BLUR_DOWNSAMPLE_DIVISOR = 18
-private const val EDGE_STRIP_DOWNSAMPLE_DIVISOR = 12
 
 internal fun renderPhotoWatermarkBitmap(
     bitmap: Bitmap,
@@ -944,9 +943,6 @@ private fun drawContentAwareEdgeBorder(
         source = source,
         framedWidth = framedWidth,
         framedHeight = framedHeight,
-        sideBorder = sideBorder,
-        topBorder = topBorder,
-        bottomBorder = bottomBorder,
         captureCropZoom = captureCropZoom
     )
     canvas.drawBitmap(expandedBackground, 0f, 0f, null)
@@ -974,50 +970,8 @@ private fun createBlurredExpandedEdgeBitmap(
     source: Bitmap,
     framedWidth: Int,
     framedHeight: Int,
-    sideBorder: Int,
-    topBorder: Int,
-    bottomBorder: Int,
     captureCropZoom: Float = 1f
 ): Bitmap {
-    if (captureCropZoom <= 1.01f) {
-        val mutable = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(mutable)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-            isDither = true
-        }
-        fun drawScaledStrip(strip: Bitmap, dstX: Int, dstY: Int, dstW: Int, dstH: Int) {
-            val scaled = Bitmap.createScaledBitmap(strip, dstW, dstH, true)
-            canvas.drawBitmap(scaled, dstX.toFloat(), dstY.toFloat(), paint)
-            scaled.recycle()
-        }
-
-        val stripHeight = maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR)
-        val stripWidth = maxOf(1, source.width / EDGE_STRIP_DOWNSAMPLE_DIVISOR)
-        val topStrip = Bitmap.createBitmap(source, 0, 0, source.width, stripHeight)
-        drawScaledStrip(topStrip, 0, 0, framedWidth, topBorder)
-        topStrip.recycle()
-
-        val bottomStrip = Bitmap.createBitmap(source, 0, source.height - stripHeight, source.width, stripHeight)
-        drawScaledStrip(bottomStrip, 0, framedHeight - bottomBorder, framedWidth, bottomBorder)
-        bottomStrip.recycle()
-
-        val leftStrip = Bitmap.createBitmap(source, 0, 0, stripWidth, source.height)
-        drawScaledStrip(leftStrip, 0, topBorder, sideBorder, framedHeight - topBorder - bottomBorder)
-        leftStrip.recycle()
-
-        val rightStrip = Bitmap.createBitmap(source, source.width - stripWidth, 0, stripWidth, source.height)
-        drawScaledStrip(rightStrip, framedWidth - sideBorder, topBorder, sideBorder, framedHeight - topBorder - bottomBorder)
-        rightStrip.recycle()
-
-        applySeparableBoxBlur(
-            bitmap = mutable,
-            horizontalRadius = blurRadiusForLength(framedWidth),
-            verticalRadius = blurRadiusForLength(framedHeight),
-            passes = 2
-        )
-        return mutable
-    }
-
     val backgroundSource = createCaptureCropSource(source, captureCropZoom)
     val scaled = Bitmap.createScaledBitmap(backgroundSource, framedWidth, framedHeight, true)
     if (backgroundSource !== source) {
