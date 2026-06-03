@@ -171,6 +171,14 @@
 
 # 最近有效闭环
 
+## 2026-06-03：blur-four-border 水印真实模糊修复
+
+- 目标：修复用户反馈中“模糊四边框水印并没有真正模糊”的可见问题，并把该问题从主观观感补成可回归的像素行为。
+- 根因：[`PhotoWatermarkPostProcessor.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/PhotoWatermarkPostProcessor.kt) 的 `blur-four-border` 旧实现只把边缘 strip 下采样再放大，能产生一点柔化/插值感，但没有真正执行模糊卷积；原测试主要覆盖来源取色和基本平滑，未能证明高频边缘细节被压制。
+- 结果：`blur-four-border` 的 `SOURCE_BLUR` 边缘现在先按目标边框尺寸采样，再执行两轮可确定的分离 box blur；[`PhotoWatermarkPostProcessorTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/camera/PhotoWatermarkPostProcessorTest.kt) 新增黑白高频条纹回归，用边框亮度标准差锁定模糊必须显著压制细节。
+- 验证：新增测试先红后绿；随后通过 `PhotoWatermarkPostProcessorTest`、水印/预览相关 focused app tests、`rtk ./scripts/verify_stage_6b3_watermark_v2.sh`、`rtk ./scripts/verify_reversible_watermark_archive.sh` 与 `rtk ./scripts/verify_stage_7_observability.sh`。其中两个脚本因 Gradle wrapper lock 需要授权在 sandbox 外重跑，最终均通过。
+- 结论：仓内已修复“blur-four-border 实际不模糊”的算法断点，并用像素级测试防回归；最终审美强度和 vivo / Apple 参考体验贴近度仍需新 APK 真机成片复看。
+
 ## 2026-06-01：变焦跨镜头节点时画幅框跟随预览基准
 
 - 目标：修复真机反馈中“预览窗已经按镜头节点跳变，但画幅框大小仍未理想跟随”的交互问题，让画幅框使用真实预览基准，而不是连续 capture zoom。

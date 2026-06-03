@@ -15,6 +15,7 @@ import com.opencamera.core.settings.WatermarkTextPlacement
 import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -317,6 +318,34 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `blur four border suppresses high frequency edge detail`() {
+        val source = Bitmap.createBitmap(240, 240, Bitmap.Config.ARGB_8888)
+        for (x in 0 until 240) {
+            val stripe = if ((x / 12) % 2 == 0) Color.WHITE else Color.BLACK
+            for (y in 0 until 240) {
+                source.setPixel(x, y, if (y < 60) stripe else Color.rgb(96, 96, 96))
+            }
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_BLUR)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+        val topBorder = maxOf(20f, 240f * 0.045f).toInt()
+        val borderLumaStdDev = horizontalLumaStdDev(
+            bitmap = bmp,
+            y = topBorder / 2,
+            startX = 12,
+            endXExclusive = bmp.width - 12
+        )
+
+        assertTrue(
+            borderLumaStdDev < 18.0,
+            "blurred border should strongly suppress stripe detail, stdDev=$borderLumaStdDev"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
     fun `blur four border solid source produces blurred not sharp border`() {
         val source = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.argb(255, 80, 120, 60))
@@ -346,6 +375,20 @@ class PhotoWatermarkPostProcessorTest {
         textScale = 1f,
         textOpacity = 1f
     )
+
+    private fun horizontalLumaStdDev(
+        bitmap: Bitmap,
+        y: Int,
+        startX: Int,
+        endXExclusive: Int
+    ): Double {
+        val values = (startX until endXExclusive).map { x ->
+            val pixel = bitmap.getPixel(x, y)
+            0.299 * Color.red(pixel) + 0.587 * Color.green(pixel) + 0.114 * Color.blue(pixel)
+        }
+        val mean = values.average()
+        return sqrt(values.sumOf { value -> (value - mean) * (value - mean) } / values.size)
+    }
 
     private fun photoResult(
         mediaType: MediaType = MediaType.PHOTO,

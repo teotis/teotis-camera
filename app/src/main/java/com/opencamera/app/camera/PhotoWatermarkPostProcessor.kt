@@ -937,19 +937,10 @@ private fun drawContentAwareEdgeBorder(
     bottomBorder: Int,
     background: WatermarkFrameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR
 ) {
-    val blurDownsample = BLUR_DOWNSAMPLE_DIVISOR
-
     fun drawBlurredEdge(strip: Bitmap, dstX: Int, dstY: Int, dstW: Int, dstH: Int) {
-        val small = Bitmap.createScaledBitmap(
-            strip,
-            maxOf(1, strip.width / blurDownsample),
-            maxOf(1, strip.height / blurDownsample),
-            true
-        )
-        val scaled = Bitmap.createScaledBitmap(small, dstW, dstH, true)
-        small.recycle()
-        canvas.drawBitmap(scaled, dstX.toFloat(), dstY.toFloat(), null)
-        scaled.recycle()
+        val blurred = createBlurredEdgeBitmap(strip, dstW, dstH)
+        canvas.drawBitmap(blurred, dstX.toFloat(), dstY.toFloat(), null)
+        blurred.recycle()
     }
 
     val topSrc = Bitmap.createBitmap(source, 0, 0, source.width, maxOf(1, source.height / EDGE_STRIP_DOWNSAMPLE_DIVISOR))
@@ -983,6 +974,123 @@ private fun drawContentAwareEdgeBorder(
         canvas.drawRect(0f, (framedHeight - bottomBorder).toFloat(), framedWidth.toFloat(), framedHeight.toFloat(), tintPaint)
         canvas.drawRect(0f, topBorder.toFloat(), sideBorder.toFloat(), (framedHeight - bottomBorder).toFloat(), tintPaint)
         canvas.drawRect((framedWidth - sideBorder).toFloat(), topBorder.toFloat(), framedWidth.toFloat(), (framedHeight - bottomBorder).toFloat(), tintPaint)
+    }
+}
+
+private fun createBlurredEdgeBitmap(strip: Bitmap, dstW: Int, dstH: Int): Bitmap {
+    val scaled = Bitmap.createScaledBitmap(strip, dstW, dstH, true)
+    val mutable = scaled.copy(Bitmap.Config.ARGB_8888, true)
+    if (mutable !== scaled) {
+        scaled.recycle()
+    }
+    val horizontalRadius = blurRadiusForLength(dstW)
+    val verticalRadius = blurRadiusForLength(dstH)
+    applySeparableBoxBlur(
+        bitmap = mutable,
+        horizontalRadius = horizontalRadius,
+        verticalRadius = verticalRadius,
+        passes = 2
+    )
+    return mutable
+}
+
+private fun blurRadiusForLength(length: Int): Int {
+    return maxOf(14, minOf(64, length / 28))
+}
+
+private fun applySeparableBoxBlur(
+    bitmap: Bitmap,
+    horizontalRadius: Int,
+    verticalRadius: Int,
+    passes: Int
+) {
+    val width = bitmap.width
+    val height = bitmap.height
+    if (width <= 1 || height <= 1) return
+
+    var input = IntArray(width * height)
+    var output = IntArray(width * height)
+    bitmap.getPixels(input, 0, width, 0, 0, width, height)
+
+    repeat(passes) {
+        boxBlurHorizontal(input, output, width, height, horizontalRadius.coerceAtLeast(1))
+        boxBlurVertical(output, input, width, height, verticalRadius.coerceAtLeast(1))
+    }
+    bitmap.setPixels(input, 0, width, 0, 0, width, height)
+}
+
+private fun boxBlurHorizontal(
+    input: IntArray,
+    output: IntArray,
+    width: Int,
+    height: Int,
+    radius: Int
+) {
+    val windowSize = radius * 2 + 1
+    for (y in 0 until height) {
+        val rowOffset = y * width
+        var alphaSum = 0
+        var redSum = 0
+        var greenSum = 0
+        var blueSum = 0
+        for (offset in -radius..radius) {
+            val pixel = input[rowOffset + offset.coerceIn(0, width - 1)]
+            alphaSum += Color.alpha(pixel)
+            redSum += Color.red(pixel)
+            greenSum += Color.green(pixel)
+            blueSum += Color.blue(pixel)
+        }
+        for (x in 0 until width) {
+            output[rowOffset + x] = Color.argb(
+                alphaSum / windowSize,
+                redSum / windowSize,
+                greenSum / windowSize,
+                blueSum / windowSize
+            )
+            val removePixel = input[rowOffset + (x - radius).coerceIn(0, width - 1)]
+            val addPixel = input[rowOffset + (x + radius + 1).coerceIn(0, width - 1)]
+            alphaSum += Color.alpha(addPixel) - Color.alpha(removePixel)
+            redSum += Color.red(addPixel) - Color.red(removePixel)
+            greenSum += Color.green(addPixel) - Color.green(removePixel)
+            blueSum += Color.blue(addPixel) - Color.blue(removePixel)
+        }
+    }
+}
+
+private fun boxBlurVertical(
+    input: IntArray,
+    output: IntArray,
+    width: Int,
+    height: Int,
+    radius: Int
+) {
+    val windowSize = radius * 2 + 1
+    for (x in 0 until width) {
+        var alphaSum = 0
+        var redSum = 0
+        var greenSum = 0
+        var blueSum = 0
+        for (offset in -radius..radius) {
+            val pixel = input[offset.coerceIn(0, height - 1) * width + x]
+            alphaSum += Color.alpha(pixel)
+            redSum += Color.red(pixel)
+            greenSum += Color.green(pixel)
+            blueSum += Color.blue(pixel)
+        }
+        for (y in 0 until height) {
+            output[y * width + x] = Color.argb(
+                alphaSum / windowSize,
+                redSum / windowSize,
+                greenSum / windowSize,
+                blueSum / windowSize
+            )
+            val removePixel = input[(y - radius).coerceIn(0, height - 1) * width + x]
+            val addPixel = input[(y + radius + 1).coerceIn(0, height - 1) * width + x]
+            alphaSum += Color.alpha(addPixel) - Color.alpha(removePixel)
+            redSum += Color.red(addPixel) - Color.red(removePixel)
+            greenSum += Color.green(addPixel) - Color.green(removePixel)
+            blueSum += Color.blue(addPixel) - Color.blue(removePixel)
+        }
     }
 }
 
