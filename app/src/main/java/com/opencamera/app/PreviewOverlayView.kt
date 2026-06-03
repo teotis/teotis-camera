@@ -201,9 +201,12 @@ class PreviewOverlayView @JvmOverloads constructor(
             ratioHeight = frameRatio?.height ?: 0,
             previewContentAspect = renderModel.previewContentAspect
         )
-        val previewZoom = renderModel.frame?.previewZoomRatio ?: 1f
-        if (previewZoom <= 1f) return geometry
-        val scale = 1f / previewZoom
+        val frame = renderModel.frame ?: return geometry
+        val scale = zoomFrameScale(
+            captureZoomRatio = frame.zoomRatio,
+            previewZoomRatio = frame.previewZoomRatio
+        )
+        if (scale >= 0.999f) return geometry
         val scaled = scaleRectAroundCenter(geometry.activeFrameRect, scale)
         val clamped = RectF(
             scaled.left.coerceIn(geometry.contentRect.left, geometry.contentRect.right),
@@ -724,6 +727,12 @@ internal fun scaleFrameRect(rect: FrameRect, scale: Float): FrameRect {
         right = rect.centerX + halfW,
         bottom = rect.centerY + halfH
     )
+}
+
+internal fun zoomFrameScale(captureZoomRatio: Float, previewZoomRatio: Float): Float {
+    val capture = captureZoomRatio.coerceAtLeast(0.01f)
+    val preview = previewZoomRatio.coerceAtLeast(0.01f)
+    return (preview / capture).coerceIn(0.01f, 1f)
 }
 
 internal fun scaleRectAroundCenter(rect: RectF, scale: Float): RectF {

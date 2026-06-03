@@ -948,12 +948,7 @@ private fun drawContentAwareEdgeBorder(
     canvas.drawBitmap(expandedBackground, 0f, 0f, null)
     expandedBackground.recycle()
 
-    val tintOverlay = when (background) {
-        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(64, 20, 20, 20)
-        WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> Color.argb(80, 255, 244, 228)
-        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(72, 245, 210, 170)
-        else -> Color.TRANSPARENT
-    }
+    val tintOverlay = contentAwareEdgeTintOverlay(background)
     if (tintOverlay != Color.TRANSPARENT) {
         val tintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = tintOverlay
@@ -963,6 +958,14 @@ private fun drawContentAwareEdgeBorder(
         canvas.drawRect(0f, (framedHeight - bottomBorder).toFloat(), framedWidth.toFloat(), framedHeight.toFloat(), tintPaint)
         canvas.drawRect(0f, topBorder.toFloat(), sideBorder.toFloat(), (framedHeight - bottomBorder).toFloat(), tintPaint)
         canvas.drawRect((framedWidth - sideBorder).toFloat(), topBorder.toFloat(), framedWidth.toFloat(), (framedHeight - bottomBorder).toFloat(), tintPaint)
+    }
+}
+
+internal fun contentAwareEdgeTintOverlay(background: WatermarkFrameBackground): Int {
+    return when (background) {
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(64, 20, 20, 20)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(72, 245, 210, 170)
+        else -> Color.TRANSPARENT
     }
 }
 

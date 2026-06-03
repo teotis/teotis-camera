@@ -17,6 +17,7 @@ import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
+import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.device.nextZoomRatio
 import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.device.resolvedZoomRatioSelection
@@ -798,11 +799,14 @@ class DefaultCameraSession(
             return
         }
 
-        // Lens node hysteresis: determine target node from zoom ratio thresholds
+        // Lens node hysteresis: determine target node from zoom ratio thresholds.
+        // Logical-only camera ranges can still expose preview baselines; those must not
+        // force a physical lens rebind when there is only one real lens node.
         val lensNodeMap = zoomCapability.lensNodeMap
+        val hasMultipleLensNodes = lensNodeMap.values.count { it.available } > 1
         val currentLensNode = _state.value.activeDeviceGraph.preview.requestedLensNode
-        val previewZoomRatio = computePreviewZoomRatio(clampedRatio, lensNodeMap)
-        if (lensNodeMap.isNotEmpty()) {
+        val previewZoomRatio = computePreviewZoomRatio(clampedRatio, zoomCapability)
+        if (hasMultipleLensNodes) {
             val targetLensNode = evaluateLensNode(clampedRatio, currentLensNode, lensNodeMap)
             if (targetLensNode != currentLensNode) {
                 val switchReason = "Zoom ${zoomLabel(clampedRatio)} crosses threshold for ${targetLensNode.label}"
@@ -899,15 +903,40 @@ class DefaultCameraSession(
 
     /**
      * Computes the discrete preview zoom ratio for a given capture zoom ratio.
-     * Returns the largest available thresholdRatio ≤ [captureZoom], or the smallest
-     * threshold if captureZoom is below all thresholds. The result is always ≤ captureZoom.
+     *
+     * When hardware exposes logical zoom only, [ZoomRatioCapability.previewBaseRatios] gives
+     * us the stable preview baselines. Physical lens thresholds remain the fallback for older
+     * multi-camera probes. Each baseline switches after a short delay, so the frame overlay
+     * shows the changing capture area before the preview stream jumps.
+     */
+    internal fun computePreviewZoomRatio(
+        captureZoom: Float,
+        capability: ZoomRatioCapability
+    ): Float {
+        val previewBases = capability.normalizedPreviewBaseRatios
+            .ifEmpty { previewBaseRatiosFromLensNodeMap(captureZoom, capability.lensNodeMap) }
+        if (previewBases.isEmpty()) return normalizedZoomRatioValue(captureZoom).coerceAtLeast(1f)
+        return computePreviewZoomRatioFromBases(captureZoom, previewBases)
+    }
+
+    /**
+     * Computes preview baselines from physical lens thresholds.
      */
     internal fun computePreviewZoomRatio(
         captureZoom: Float,
         lensNodeMap: Map<LensNode, LensNodeAvailability>
     ): Float {
-        if (lensNodeMap.isEmpty()) return captureZoom.coerceAtLeast(1f)
-        val availableThresholds = lensNodeMap.values
+        val previewBases = previewBaseRatiosFromLensNodeMap(captureZoom, lensNodeMap)
+        if (previewBases.isEmpty()) return normalizedZoomRatioValue(captureZoom).coerceAtLeast(1f)
+        return computePreviewZoomRatioFromBases(captureZoom, previewBases)
+    }
+
+    private fun previewBaseRatiosFromLensNodeMap(
+        captureZoom: Float,
+        lensNodeMap: Map<LensNode, LensNodeAvailability>
+    ): List<Float> {
+        if (lensNodeMap.isEmpty()) return emptyList()
+        return lensNodeMap.values
             .filter { it.available }
             .map { threshold ->
                 if (threshold.thresholdRatio <= 0f) {
@@ -916,18 +945,42 @@ class DefaultCameraSession(
                     threshold.thresholdRatio
                 }
             }
-            .sorted()
+            .map(::normalizedZoomRatioValue)
+            .filter { it > 0f }
             .distinct()
-        if (availableThresholds.isEmpty()) return captureZoom.coerceAtLeast(1f)
-        val maxThreshold = availableThresholds.last()
-        if (captureZoom >= maxThreshold) return maxThreshold
-        val match = availableThresholds.lastOrNull { it <= captureZoom }
-        return match ?: availableThresholds.first()
+            .sorted()
+    }
+
+    private fun computePreviewZoomRatioFromBases(
+        captureZoom: Float,
+        previewBases: List<Float>
+    ): Float {
+        val normalizedCaptureZoom = normalizedZoomRatioValue(captureZoom)
+        val bases = previewBases
+            .map(::normalizedZoomRatioValue)
+            .filter { it > 0f }
+            .distinct()
+            .sorted()
+        if (bases.isEmpty()) return normalizedCaptureZoom.coerceAtLeast(1f)
+
+        var selected = bases.first()
+        for (index in 1 until bases.size) {
+            val nextBase = bases[index]
+            val switchAt = normalizedZoomRatioValue(nextBase * PREVIEW_BASE_SWITCH_DELAY_FACTOR)
+            if (normalizedCaptureZoom + PREVIEW_BASE_SWITCH_EPSILON >= switchAt) {
+                selected = nextBase
+            } else {
+                break
+            }
+        }
+        return selected.coerceAtMost(normalizedCaptureZoom)
     }
 
     companion object {
         /** Hysteresis delta for lens node switching (zoom ratio units). */
         internal const val LENS_NODE_HYSTERESIS_DELTA = 0.1f
+        private const val PREVIEW_BASE_SWITCH_DELAY_FACTOR = 1.1f
+        private const val PREVIEW_BASE_SWITCH_EPSILON = 0.0001f
         private const val MIN_NON_ZERO_PREVIEW_ZOOM_RATIO = 0.01f
     }
 
@@ -1699,7 +1752,7 @@ class DefaultCameraSession(
         )
         val resolvedPreviewZoomRatio = computePreviewZoomRatio(
             resolvedZoomRatio,
-            deviceCapabilities.zoomRatioCapability.lensNodeMap
+            deviceCapabilities.zoomRatioCapability
         )
         return baseGraph.copy(
             preview = baseGraph.preview.copy(

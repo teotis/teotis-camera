@@ -22,6 +22,7 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     companion object {
         /** Fraction of distance to nearest neighbor; within this, release snaps to preset. */
         internal const val SNAP_THRESHOLD_FRACTION = 0.15f
+        internal const val SNAP_THRESHOLD_MAX_RATIO_DELTA = 0.08f
         /** Max px movement from ACTION_DOWN to count as a tap (quick-jump). */
         internal const val TAP_SLOP_PX = 24f
         /** Max px distance from a preset dot center to count as a tap on that dot. */
@@ -51,7 +52,8 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
             val nearest = sortedPresets.minByOrNull { kotlin.math.abs(it - ratio) } ?: return false
             val second = sortedPresets.sortedBy { kotlin.math.abs(it - ratio) }.getOrNull(1) ?: return true
             val neighborDist = kotlin.math.abs(second - nearest)
-            return kotlin.math.abs(ratio - nearest) + 1e-6f < neighborDist * SNAP_THRESHOLD_FRACTION
+            val threshold = minOf(neighborDist * SNAP_THRESHOLD_FRACTION, SNAP_THRESHOLD_MAX_RATIO_DELTA)
+            return kotlin.math.abs(ratio - nearest) + 1e-6f < threshold
         }
     }
 

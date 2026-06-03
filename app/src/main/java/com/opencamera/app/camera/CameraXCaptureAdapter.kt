@@ -894,12 +894,18 @@ internal fun mergeZoomRatioCapability(
         .map(::normalizedZoomRatioValue)
         .distinct()
         .sorted()
+    val mergedPreviewBaseRatios = explicitCapabilities
+        .flatMap(ZoomRatioCapability::normalizedPreviewBaseRatios)
+        .map(::normalizedZoomRatioValue)
+        .distinct()
+        .sorted()
     val mergedSupport = explicitCapabilities.maxValueOf { it.support }
     val lensNodeMap = detectLensNodeMap(cameraProfiles)
     return ZoomRatioCapability(
         support = mergedSupport,
         supportedRatios = mergedRatios,
         defaultRatio = mergedRatios.firstOrNull { it == 1f } ?: mergedRatios.first(),
+        previewBaseRatios = mergedPreviewBaseRatios,
         lensNodeMap = lensNodeMap
     )
 }
@@ -1184,8 +1190,14 @@ internal fun detectZoomRatioCapability(
     fallback: ZoomRatioCapability = DeviceCapabilities.DEFAULT.zoomRatioCapability
 ): ZoomRatioCapability {
     val supportedRatios = linkedSetOf<Float>()
+    var minRatioForPreviewBases = 1f
+    var maxRatioForPreviewBases = 1f
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val zoomRange = characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
+        if (zoomRange != null) {
+            minRatioForPreviewBases = zoomRange.lower
+            maxRatioForPreviewBases = zoomRange.upper
+        }
         zoomRange?.lower
             ?.takeIf { it > 0f && kotlin.math.abs(it - 1f) > 0.05f }
             ?.let { supportedRatios += normalizedZoomRatioValue(it) }
@@ -1205,6 +1217,7 @@ internal fun detectZoomRatioCapability(
         supportedRatios += 1f
         val maxDigitalZoom = characteristics.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM)
             ?: 1f
+        maxRatioForPreviewBases = maxDigitalZoom
         if (maxDigitalZoom > 1.05f) {
             if (maxDigitalZoom >= 2f) {
                 supportedRatios += 2f
@@ -1222,8 +1235,21 @@ internal fun detectZoomRatioCapability(
     return ZoomRatioCapability(
         support = ZoomControlSupport.CONTINUOUS,
         supportedRatios = normalizedRatios,
-        defaultRatio = normalizedRatios.firstOrNull { it == 1f } ?: normalizedRatios.first()
+        defaultRatio = normalizedRatios.firstOrNull { it == 1f } ?: normalizedRatios.first(),
+        previewBaseRatios = previewBaseRatiosForZoomRange(
+            minRatio = minRatioForPreviewBases,
+            maxRatio = maxRatioForPreviewBases
+        )
     )
+}
+
+internal fun previewBaseRatiosForZoomRange(minRatio: Float, maxRatio: Float): List<Float> {
+    val min = normalizedZoomRatioValue(minRatio.coerceAtLeast(0.1f))
+    val max = normalizedZoomRatioValue(maxRatio.coerceAtLeast(min))
+    return listOf(min, 1f, 3f, 5f)
+        .filter { ratio -> ratio in min..max }
+        .distinct()
+        .sorted()
 }
 
 internal fun detectPreviewBrightnessRange(
@@ -1852,16 +1878,18 @@ class CameraXCaptureAdapter(
 
     private suspend fun updateZoomRatio(zoomRatio: Float, previewZoomRatio: Float) {
         val normalizedZoomRatio = normalizedZoomRatioValue(zoomRatio)
+        val normalizedPreviewZoomRatio = normalizedZoomRatioValue(previewZoomRatio)
         val activeGraph = currentGraph ?: return
         currentGraph = activeGraph.copy(
             preview = activeGraph.preview.copy(
-                zoomRatio = normalizedZoomRatio
+                zoomRatio = normalizedZoomRatio,
+                previewZoomRatio = normalizedPreviewZoomRatio
             )
         )
         val camera = boundCamera ?: return
         // Use discrete previewZoomRatio for CameraX preview stream to avoid
         // continuous laggy preview zoom; the frame overlay shows the actual capture area.
-        camera.cameraControl.setZoomRatio(previewZoomRatio).await()
+        camera.cameraControl.setZoomRatio(normalizedPreviewZoomRatio).await()
     }
 
     override fun boundGraph(): DeviceGraphSpec? = currentGraph

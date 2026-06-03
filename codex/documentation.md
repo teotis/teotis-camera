@@ -174,6 +174,14 @@
 
 # 最近有效闭环
 
+## 2026-06-04：blur-four-border 浅色模糊去白雾
+
+- 目标：修复用户反馈“模糊有种泛白效果，理想情况是色调和被模糊区域一致”，让四边框默认浅色模糊不再像在背景上额外盖一层白色。
+- 根因：[`PhotoWatermarkPostProcessor.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/PhotoWatermarkPostProcessor.kt) 的 `drawContentAwareEdgeBorder()` 在连续模糊背景之后，对 `SOURCE_LIGHT_BLUR` 额外叠加 `Color.argb(80, 255, 244, 228)` 暖白 tint；真实设备视觉上会把源图色调往浅白方向抬，和“只模糊被采样区域”的预期不一致。
+- 结果：新增 `contentAwareEdgeTintOverlay()` 并让四边框路径通过它取 tint；`SOURCE_LIGHT_BLUR` 现在返回透明，不再加白色覆盖层，边框色调只来自整张连续模糊背景本身。`SOURCE_BLUR` 与 `SOURCE_VIVID_BLUR` 的既有暗化/暖色风格暂时保留。为解除 app test 编译挡板，同步补回已有测试期望的 `SNAP_THRESHOLD_MAX_RATIO_DELTA`、`zoomFrameScale()` 和 `previewBaseRatiosForZoomRange()` 纯 helper。
+- 验证：新增 [`PhotoWatermarkPostProcessorTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/camera/PhotoWatermarkPostProcessorTest.kt) 回归，锁定 `SOURCE_LIGHT_BLUR` 不再返回白色 tint overlay；先红于 `contentAwareEdgeTintOverlay` 未实现，后绿。通过 `rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.PhotoWatermarkPostProcessorTest --tests com.opencamera.app.FocalLengthSliderViewTest --tests com.opencamera.app.PreviewOverlayGeometryTest --tests com.opencamera.app.camera.CameraXCaptureAdapterCapabilityDetectionTest` 与 `rtk ./scripts/run_isolated_gradle.sh -Pkotlin.incremental=false :app:assembleDebug`。尝试运行 `rtk env OPENCAMERA_BUILD_ROOT=/private/tmp/opencamera-watermark-tint ./scripts/verify_stage_6b3_watermark_v2.sh` 时被 Gradle wrapper `~/.gradle` 锁文件沙箱权限阻断；提权重跑请求又被平台额度限制拒绝，因此本轮未取得完整 stage script 结果。
+- 结论：仓内已移除 `blur-four-border` 默认浅色模糊的白色覆盖来源；最终观感仍建议用新 APK 对真实照片成片复看，尤其确认深色照片下文字可读性是否仍符合预期。
+
 ## 2026-06-04：开发面板清理后同步清空可见日志
 
 - 目标：修复“开发”面板点击清理后，已保存日志文件被删除但面板内旧记录仍继续显示的问题，让面板呈现与清理后的记录状态一致。

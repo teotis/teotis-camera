@@ -430,6 +430,8 @@ data class ZoomRatioCapability(
     val support: ZoomControlSupport = ZoomControlSupport.UNSUPPORTED,
     val supportedRatios: List<Float> = listOf(1f),
     val defaultRatio: Float = 1f,
+    /** Discrete preview stream baselines used while capture zoom remains continuous. */
+    val previewBaseRatios: List<Float> = emptyList(),
     /** Maps lens nodes to their availability and threshold ratios. Empty when device has no multi-camera. */
     val lensNodeMap: Map<LensNode, LensNodeAvailability> = emptyMap()
 ) {
@@ -440,6 +442,13 @@ data class ZoomRatioCapability(
             .distinct()
             .sorted()
             .ifEmpty { listOf(1f) }
+
+    val normalizedPreviewBaseRatios: List<Float>
+        get() = previewBaseRatios
+            .map(::normalizedZoomRatioValue)
+            .filter { it > 0f }
+            .distinct()
+            .sorted()
 
     val resolvedDefaultRatio: Float
         get() {

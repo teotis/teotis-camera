@@ -268,6 +268,14 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `blur four border light blur does not add white tint overlay`() {
+        assertEquals(
+            Color.TRANSPARENT,
+            contentAwareEdgeTintOverlay(WatermarkFrameBackground.SOURCE_LIGHT_BLUR)
+        )
+    }
+
+    @Test
     fun `blur four border top border is greenish when top edge is green`() {
         val source = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888)
         for (x in 0 until 200) {
