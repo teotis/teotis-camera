@@ -24,6 +24,7 @@ import android.util.Size
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraState
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
@@ -71,6 +72,7 @@ import com.opencamera.core.device.PreviewMeteringMode
 import com.opencamera.core.device.PreviewMeteringRequest
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
+import com.opencamera.core.device.PreviewStreamAspect
 import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlan
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlanner
@@ -778,6 +780,37 @@ internal fun targetSizeForStillCaptureOutputSize(
     outputSize: StillCaptureOutputSize
 ): Size {
     return Size(outputSize.width, outputSize.height)
+}
+
+internal fun targetSizeForPreviewStreamAspect(
+    aspect: PreviewStreamAspect
+): Size {
+    return when (aspect) {
+        PreviewStreamAspect.FULL,
+        PreviewStreamAspect.RATIO_4_3 -> Size(1440, 1080)
+        PreviewStreamAspect.RATIO_16_9 -> Size(1920, 1080)
+        PreviewStreamAspect.RATIO_1_1 -> Size(1080, 1080)
+    }
+}
+
+internal fun previewResolutionSelectorForAspect(
+    aspect: PreviewStreamAspect
+): ResolutionSelector {
+    val aspectStrategy = when (aspect) {
+        PreviewStreamAspect.FULL,
+        PreviewStreamAspect.RATIO_4_3,
+        PreviewStreamAspect.RATIO_1_1 -> AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
+        PreviewStreamAspect.RATIO_16_9 -> AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY
+    }
+    return ResolutionSelector.Builder()
+        .setAspectRatioStrategy(aspectStrategy)
+        .setResolutionStrategy(
+            ResolutionStrategy(
+                targetSizeForPreviewStreamAspect(aspect),
+                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+            )
+        )
+        .build()
 }
 
 internal fun resolveDeviceCapabilities(
@@ -2951,7 +2984,10 @@ class CameraXCaptureAdapter(
         provider.unbindAll()
 
         val selector = cameraSelectorForLensNode(lensNode, physicalCameraId)
-        val preview = Preview.Builder().build().also { useCase ->
+        val preview = Preview.Builder()
+            .setResolutionSelector(previewResolutionSelectorForAspect(activeGraph.preview.streamAspect))
+            .build()
+            .also { useCase ->
             useCase.setSurfaceProvider(previewView.surfaceProvider)
         }
 
@@ -3106,7 +3142,10 @@ class CameraXCaptureAdapter(
         }
         removeCameraStateObserver()
 
-        val preview = Preview.Builder().build().also { useCase ->
+        val preview = Preview.Builder()
+            .setResolutionSelector(previewResolutionSelectorForAspect(deviceGraph.preview.streamAspect))
+            .build()
+            .also { useCase ->
             useCase.setSurfaceProvider(previewView.surfaceProvider)
         }
 

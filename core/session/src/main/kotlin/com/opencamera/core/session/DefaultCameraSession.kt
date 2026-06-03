@@ -8,6 +8,7 @@ import com.opencamera.core.device.EffectiveStillCaptureRecipe
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.LensNode
 import com.opencamera.core.device.LensNodeAvailability
+import com.opencamera.core.device.PreviewStreamAspect
 import com.opencamera.core.device.PreviewBrightnessRequest
 import com.opencamera.core.device.PreviewBrightnessResult
 import com.opencamera.core.device.PreviewBrightnessResultStatus
@@ -1053,11 +1054,31 @@ class DefaultCameraSession(
         }
         val nextRatio = nextPreviewRatio(sessionPreviewRatio)
         sessionPreviewRatio = nextRatio
+        val activeGraph = resolveActiveDeviceGraph(
+            requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
+            requestedZoomRatio = _state.value.activeDeviceGraph.preview.zoomRatio,
+            requestedPreviewStreamAspect = nextRatio.toPreviewStreamAspect()
+        )
         updateState(
             previewRatio = nextRatio,
+            activeDeviceGraph = activeGraph,
             lastAction = "Preview ratio set to ${nextRatio.label}",
             lastError = null
         )
+        if (
+            _state.value.permissionState.cameraGranted &&
+            _state.value.previewHostAvailable &&
+            _state.value.previewStatus in setOf(PreviewStatus.STARTING, PreviewStatus.ACTIVE, PreviewStatus.RECOVERING)
+        ) {
+            _effects.emit(
+                SessionEffect.BindPreview(
+                    modeId = currentController.id,
+                    deviceGraph = activeGraph,
+                    reason = "preview ratio changed to ${nextRatio.label}",
+                    isRecovery = false
+                )
+            )
+        }
         trace.record("preview-ratio.updated", nextRatio.tagValue)
     }
 
@@ -1654,7 +1675,8 @@ class DefaultCameraSession(
         baseGraph: DeviceGraphSpec = currentController.deviceGraph(),
         deviceCapabilities: DeviceCapabilities = _state.value.activeDeviceCapabilities,
         requestedOutputSize: StillCaptureOutputSize? = baseGraph.stillCapture.outputSize,
-        requestedZoomRatio: Float? = baseGraph.preview.zoomRatio
+        requestedZoomRatio: Float? = baseGraph.preview.zoomRatio,
+        requestedPreviewStreamAspect: PreviewStreamAspect = sessionPreviewRatio.toPreviewStreamAspect()
     ): DeviceGraphSpec {
         val graphForResolution = if (requestedOutputSize != null) {
             baseGraph.copy(stillCapture = baseGraph.stillCapture.copy(outputSize = requestedOutputSize))
@@ -1674,7 +1696,8 @@ class DefaultCameraSession(
         return baseGraph.copy(
             preview = baseGraph.preview.copy(
                 zoomRatio = resolvedZoomRatio,
-                previewZoomRatio = resolvedPreviewZoomRatio
+                previewZoomRatio = resolvedPreviewZoomRatio,
+                streamAspect = requestedPreviewStreamAspect
             ),
             stillCapture = baseGraph.stillCapture.copy(
                 outputSize = resolvedOutputSize
@@ -1767,6 +1790,13 @@ class DefaultCameraSession(
         val ordered = PreviewRatio.entries
         val currentIndex = ordered.indexOf(current)
         return ordered[(currentIndex + 1) % ordered.size]
+    }
+
+    private fun PreviewRatio.toPreviewStreamAspect(): PreviewStreamAspect = when (this) {
+        PreviewRatio.FULL -> PreviewStreamAspect.FULL
+        PreviewRatio.RATIO_4_3 -> PreviewStreamAspect.RATIO_4_3
+        PreviewRatio.RATIO_16_9 -> PreviewStreamAspect.RATIO_16_9
+        PreviewRatio.RATIO_1_1 -> PreviewStreamAspect.RATIO_1_1
     }
 
     private fun clampStillCaptureResolutionPreset(

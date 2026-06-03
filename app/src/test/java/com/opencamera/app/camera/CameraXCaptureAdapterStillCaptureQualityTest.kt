@@ -2,6 +2,7 @@ package com.opencamera.app.camera
 
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.device.PreviewStreamAspect
 import com.opencamera.core.device.StillCaptureConfig
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.StillCaptureResolutionSource
@@ -102,5 +103,16 @@ class CameraXCaptureAdapterStillCaptureQualityTest {
             StillCaptureQualityPreference.QUALITY,
             graph.stillCapture.qualityPreference
         )
+    }
+
+    @Test
+    fun `preview stream aspect maps to camera x target dimensions`() {
+        val sixteenNine = targetSizeForPreviewStreamAspect(PreviewStreamAspect.RATIO_16_9)
+        assertEquals(1920, sixteenNine.width)
+        assertEquals(1080, sixteenNine.height)
+
+        val square = targetSizeForPreviewStreamAspect(PreviewStreamAspect.RATIO_1_1)
+        assertEquals(1080, square.width)
+        assertEquals(1080, square.height)
     }
 }

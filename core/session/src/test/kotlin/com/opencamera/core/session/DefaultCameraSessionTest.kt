@@ -10,6 +10,7 @@ import com.opencamera.core.device.LensNode
 import com.opencamera.core.device.LensNodeAvailability
 import com.opencamera.core.device.PhotoLowLightStrategySupport
 import com.opencamera.core.device.PhotoSceneSignal
+import com.opencamera.core.device.PreviewStreamAspect
 import com.opencamera.core.device.RecordingQualityPreset
 import com.opencamera.core.device.SceneLightState
 import com.opencamera.core.device.StillCaptureOutputSize
@@ -3244,6 +3245,61 @@ class DefaultCameraSessionTest {
             shot.saveRequest.metadata.customTags["stillOutputSize"]
         )
         assertEquals("8mp", shot.saveRequest.metadata.customTags["stillResolution"])
+    }
+
+    @Test
+    fun `preview ratio toggle updates active device graph preview stream aspect`() = runTest {
+        val session = createSession(InMemorySessionTrace(), this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        assertEquals(PreviewRatio.FULL, session.state.value.previewRatio)
+        assertEquals(
+            PreviewStreamAspect.FULL,
+            session.state.value.activeDeviceGraph.preview.streamAspect
+        )
+
+        session.dispatch(SessionIntent.PreviewRatioToggled)
+        advanceUntilIdle()
+
+        assertEquals(PreviewRatio.RATIO_4_3, session.state.value.previewRatio)
+        assertEquals(
+            PreviewStreamAspect.RATIO_4_3,
+            session.state.value.activeDeviceGraph.preview.streamAspect
+        )
+        assertEquals("Preview ratio set to 4:3", session.state.value.lastAction)
+    }
+
+    @Test
+    fun `preview ratio toggle rebinds active preview with updated stream aspect`() = runTest {
+        val session = createSession(InMemorySessionTrace(), this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effects += it }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(12))
+        advanceUntilIdle()
+
+        effects.clear()
+        session.dispatch(SessionIntent.PreviewRatioToggled)
+        advanceUntilIdle()
+
+        val bindEffect = effects.filterIsInstance<SessionEffect.BindPreview>().lastOrNull()
+        assertNotNull(bindEffect)
+        assertFalse(bindEffect.isRecovery)
+        assertEquals("preview ratio changed to 4:3", bindEffect.reason)
+        assertEquals(
+            PreviewStreamAspect.RATIO_4_3,
+            bindEffect.deviceGraph.preview.streamAspect
+        )
+
+        effectCollector.cancel()
     }
 
     @Test

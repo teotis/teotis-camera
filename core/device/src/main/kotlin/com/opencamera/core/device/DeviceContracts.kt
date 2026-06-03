@@ -373,13 +373,25 @@ data class PreviewMeteringResult(
     val reason: String? = null
 )
 
+enum class PreviewStreamAspect(
+    val tagValue: String,
+    val width: Int,
+    val height: Int
+) {
+    FULL("full", 0, 0),
+    RATIO_4_3("4:3", 4, 3),
+    RATIO_16_9("16:9", 16, 9),
+    RATIO_1_1("1:1", 1, 1)
+}
+
 data class PreviewConfig(
     val snapshotsEnabled: Boolean = true,
     val zoomRatio: Float = 1f,
     /** Discrete preview base zoom ratio, always ≤ zoomRatio, jumps at physical lens switch points. */
     val previewZoomRatio: Float = 1f,
     /** The physical lens node requested for the current zoom level. null = not tracked / wide default. */
-    val requestedLensNode: LensNode? = null
+    val requestedLensNode: LensNode? = null,
+    val streamAspect: PreviewStreamAspect = PreviewStreamAspect.FULL
 )
 
 enum class ZoomControlSupport(
