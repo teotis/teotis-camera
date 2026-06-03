@@ -346,6 +346,41 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `blur four border corners transition smoothly into side borders`() {
+        val source = Bitmap.createBitmap(240, 240, Bitmap.Config.ARGB_8888)
+        for (x in 0 until 240) {
+            for (y in 0 until 240) {
+                source.setPixel(
+                    x,
+                    y,
+                    if (x < 24) {
+                        val channel = (255 * y / 239f).toInt()
+                        Color.rgb(channel, 24, 255 - channel)
+                    } else {
+                        Color.rgb(96, 96, 96)
+                    }
+                )
+            }
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_BLUR)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+        val sideBorder = maxOf(20f, 240f * 0.045f).toInt()
+        val topBorder = maxOf(20f, 240f * 0.045f).toInt()
+        val seamDiff = colorDistance(
+            bmp.getPixel(sideBorder / 2, topBorder - 1),
+            bmp.getPixel(sideBorder / 2, topBorder + 1)
+        )
+
+        assertTrue(
+            seamDiff < 70,
+            "corner blur should flow into side border without a hard seam, diff=$seamDiff"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
     fun `blur four border solid source produces blurred not sharp border`() {
         val source = Bitmap.createBitmap(120, 120, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.argb(255, 80, 120, 60))
@@ -388,6 +423,12 @@ class PhotoWatermarkPostProcessorTest {
         }
         val mean = values.average()
         return sqrt(values.sumOf { value -> (value - mean) * (value - mean) } / values.size)
+    }
+
+    private fun colorDistance(first: Int, second: Int): Int {
+        return kotlin.math.abs(Color.red(first) - Color.red(second)) +
+            kotlin.math.abs(Color.green(first) - Color.green(second)) +
+            kotlin.math.abs(Color.blue(first) - Color.blue(second))
     }
 
     private fun photoResult(
