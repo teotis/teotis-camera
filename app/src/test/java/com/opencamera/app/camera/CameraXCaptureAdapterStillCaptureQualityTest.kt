@@ -4,6 +4,8 @@ import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.StillCaptureConfig
 import com.opencamera.core.device.StillCaptureOutputSize
+import com.opencamera.core.device.StillCaptureResolutionSource
+import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,5 +49,58 @@ class CameraXCaptureAdapterStillCaptureQualityTest {
 
         assertEquals(3264, outputSize.width)
         assertEquals(2448, outputSize.height)
+    }
+
+    @Test
+    fun `LARGE_12MP selects maximum available output size`() {
+        val outputSize = resolveStillCaptureOutputSize(
+            preset = StillCaptureResolutionPreset.LARGE_12MP,
+            availableOutputSizes = listOf(
+                StillCaptureOutputSize(width = 4000, height = 3000),
+                StillCaptureOutputSize(width = 8000, height = 6000),
+                StillCaptureOutputSize(width = 1600, height = 1200),
+                StillCaptureOutputSize(width = 3264, height = 2448)
+            )
+        )
+
+        assertEquals(8000, outputSize.width)
+        assertEquals(6000, outputSize.height)
+    }
+
+    @Test
+    fun `normalizeStillCaptureOutputSizes preserves resolution source metadata`() {
+        val normalized = normalizeStillCaptureOutputSizes(
+            availableOutputSizes = listOf(
+                StillCaptureTargetResolution(
+                    width = 8000, height = 6000,
+                    resolutionSource = StillCaptureResolutionSource.MAXIMUM_RESOLUTION
+                ),
+                StillCaptureTargetResolution(
+                    width = 4000, height = 3000,
+                    resolutionSource = StillCaptureResolutionSource.HIGH_RESOLUTION
+                ),
+                StillCaptureTargetResolution(
+                    width = 3264, height = 2448,
+                    resolutionSource = StillCaptureResolutionSource.STANDARD
+                )
+            )
+        )
+
+        assertEquals(3, normalized.size)
+        val maxRes = normalized.firstOrNull { it.width == 8000 }
+        assertEquals(StillCaptureResolutionSource.MAXIMUM_RESOLUTION, maxRes?.resolutionSource)
+        val highResSize = normalized.firstOrNull { it.width == 4000 }
+        assertEquals(StillCaptureResolutionSource.HIGH_RESOLUTION, highResSize?.resolutionSource)
+        val stdSize = normalized.firstOrNull { it.width == 3264 }
+        assertEquals(StillCaptureResolutionSource.STANDARD, stdSize?.resolutionSource)
+    }
+
+    @Test
+    fun `default still capture quality is QUALITY`() {
+        val graph = DeviceGraphSpec.stillCapture()
+        assertEquals(
+            StillCaptureQualityPreference.QUALITY,
+            graph.stillCapture.qualityPreference
+        )
     }
 }

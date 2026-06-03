@@ -83,9 +83,16 @@ enum class CaptureTemplate {
     VIDEO_RECORDING
 }
 
+enum class StillCaptureResolutionSource(val tagValue: String) {
+    STANDARD("standard"),
+    HIGH_RESOLUTION("high-resolution"),
+    MAXIMUM_RESOLUTION("maximum-resolution")
+}
+
 data class StillCaptureOutputSize(
     val width: Int,
-    val height: Int
+    val height: Int,
+    val resolutionSource: StillCaptureResolutionSource = StillCaptureResolutionSource.STANDARD
 ) {
     val pixelCount: Long
         get() = width.toLong() * height.toLong()
@@ -460,7 +467,7 @@ fun nextZoomRatio(
 data class StillCaptureConfig(
     val resolutionOption: StillCaptureResolutionOption? = null,
     val outputSize: StillCaptureOutputSize? = null,
-    val qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference = com.opencamera.core.media.StillCaptureQualityPreference.LATENCY,
+    val qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference = com.opencamera.core.media.StillCaptureQualityPreference.QUALITY,
     val resolutionPreset: com.opencamera.core.media.StillCaptureResolutionPreset = com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP
 )
 
@@ -508,7 +515,7 @@ data class DeviceGraphSpec(
             resolutionOption: StillCaptureResolutionOption? = null,
             outputSize: StillCaptureOutputSize? = null,
             qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference =
-                com.opencamera.core.media.StillCaptureQualityPreference.LATENCY,
+                com.opencamera.core.media.StillCaptureQualityPreference.QUALITY,
             resolutionPreset: com.opencamera.core.media.StillCaptureResolutionPreset =
                 com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP
         ): DeviceGraphSpec {

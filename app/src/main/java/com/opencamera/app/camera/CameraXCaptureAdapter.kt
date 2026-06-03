@@ -162,7 +162,8 @@ data class CameraLensProfile(
 
 internal data class StillCaptureTargetResolution(
     val width: Int,
-    val height: Int
+    val height: Int,
+    val resolutionSource: com.opencamera.core.device.StillCaptureResolutionSource = com.opencamera.core.device.StillCaptureResolutionSource.STANDARD
 )
 
 private const val FOUR_THIRDS_RATIO = 4.0 / 3.0
@@ -757,9 +758,7 @@ internal fun resolveStillCaptureOutputSize(
     val desiredPixels = preset.targetWidth.toLong() * preset.targetHeight.toLong()
     val sortedByPixels = availableOutputSizes.sortedBy { it.pixelCount }
     return when (preset) {
-        StillCaptureResolutionPreset.LARGE_12MP -> sortedByPixels
-            .firstOrNull { it.pixelCount >= desiredPixels }
-            ?: sortedByPixels.last()
+        StillCaptureResolutionPreset.LARGE_12MP -> sortedByPixels.last()
 
         StillCaptureResolutionPreset.MEDIUM_8MP,
         StillCaptureResolutionPreset.SMALL_2MP -> sortedByPixels
@@ -943,7 +942,11 @@ internal fun normalizeStillCaptureOutputSizes(
 
     val normalized = availableOutputSizes
         .map { size ->
-            StillCaptureOutputSize(width = size.width, height = size.height)
+            StillCaptureOutputSize(
+                width = size.width,
+                height = size.height,
+                resolutionSource = size.resolutionSource
+            )
         }
         .distinctBy { it.width to it.height }
     val fourThirdsSizes = normalized.filter { size ->
@@ -1188,6 +1191,50 @@ internal fun detectPreviewBrightnessRange(
     return PreviewBrightnessRange(minSteps = range.lower, maxSteps = range.upper)
 }
 
+private fun collectAllJpegOutputSizes(
+    characteristics: CameraCharacteristics
+): List<StillCaptureTargetResolution> {
+    val streamConfigMap = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+    val allSizes = linkedMapOf<Pair<Int, Int>, StillCaptureTargetResolution>()
+
+    // Maximum-resolution stream map (API 31+) — highest priority, add first so distinctBy keeps it
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val maxResStreamMap = characteristics
+            .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP_MAXIMUM_RESOLUTION)
+        maxResStreamMap?.getOutputSizes(ImageFormat.JPEG)?.forEach { size ->
+            allSizes[size.width to size.height] = StillCaptureTargetResolution(
+                width = size.width,
+                height = size.height,
+                resolutionSource = com.opencamera.core.device.StillCaptureResolutionSource.MAXIMUM_RESOLUTION
+            )
+        }
+    }
+
+    // High-resolution output sizes (API 23+) — medium priority
+    streamConfigMap?.getHighResolutionOutputSizes(ImageFormat.JPEG)?.forEach { size ->
+        if (size.width to size.height !in allSizes) {
+            allSizes[size.width to size.height] = StillCaptureTargetResolution(
+                width = size.width,
+                height = size.height,
+                resolutionSource = com.opencamera.core.device.StillCaptureResolutionSource.HIGH_RESOLUTION
+            )
+        }
+    }
+
+    // Standard output sizes — lowest priority
+    streamConfigMap?.getOutputSizes(ImageFormat.JPEG)?.forEach { size ->
+        if (size.width to size.height !in allSizes) {
+            allSizes[size.width to size.height] = StillCaptureTargetResolution(
+                width = size.width,
+                height = size.height,
+                resolutionSource = com.opencamera.core.device.StillCaptureResolutionSource.STANDARD
+            )
+        }
+    }
+
+    return allSizes.values.toList()
+}
+
 private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> {
     val cameraManager = context.getSystemService(CameraManager::class.java) ?: return emptyList()
     return runCatching {
@@ -1203,29 +1250,16 @@ private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> 
 
             val zoomCap = detectZoomRatioCapability(characteristics)
 
+            val allJpegSizes = collectAllJpegOutputSizes(characteristics)
+
             CameraLensProfile(
                 lensFacing = lensFacing,
                 hasFlashUnit = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
                 zoomRatioCapability = zoomCap,
                 previewBrightnessRange = detectPreviewBrightnessRange(characteristics),
-                availableStillCaptureOutputSizes = normalizeStillCaptureOutputSizes(
-                    characteristics
-                        .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-                        ?.getOutputSizes(ImageFormat.JPEG)
-                        ?.map { size ->
-                            StillCaptureTargetResolution(
-                                width = size.width,
-                                height = size.height
-                            )
-                        }
-                        .orEmpty()
-                ),
-                availableStillCaptureResolutionPresets = resolveAvailableStillCaptureResolutionPresetsFromSizes(
-                    characteristics
-                        .get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
-                        ?.getOutputSizes(ImageFormat.JPEG)
-                        ?.toList()
-                        .orEmpty()
+                availableStillCaptureOutputSizes = normalizeStillCaptureOutputSizes(allJpegSizes),
+                availableStillCaptureResolutionPresets = resolveAvailableStillCaptureResolutionPresets(
+                    allJpegSizes
                 ),
                 videoSpecConstraints = detectVideoSpecConstraints(
                     cameraId = cameraId,

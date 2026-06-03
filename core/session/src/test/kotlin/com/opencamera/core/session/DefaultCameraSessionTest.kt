@@ -3034,7 +3034,7 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         assertEquals(
-            StillCaptureQualityPreference.LATENCY,
+            StillCaptureQualityPreference.QUALITY,
             session.state.value.activeDeviceGraph.stillCapture.qualityPreference
         )
 
@@ -3042,28 +3042,28 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         assertEquals(
-            StillCaptureQualityPreference.QUALITY,
+            StillCaptureQualityPreference.LATENCY,
             session.state.value.activeDeviceGraph.stillCapture.qualityPreference
         )
-        assertEquals("Still quality set to Max", session.state.value.lastAction)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Still Max"))
+        assertEquals("Still quality set to Fast", session.state.value.lastAction)
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Still Fast"))
 
         session.dispatch(SessionIntent.SwitchMode(ModeId.PRO))
         advanceUntilIdle()
 
         assertEquals(ModeId.PRO, session.state.value.activeMode)
         assertEquals(
-            StillCaptureQualityPreference.QUALITY,
+            StillCaptureQualityPreference.LATENCY,
             session.state.value.activeDeviceGraph.stillCapture.qualityPreference
         )
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Still Max"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Still Fast"))
 
         session.dispatch(SessionIntent.ShutterPressed)
         advanceUntilIdle()
 
         val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(StillCaptureQualityPreference.QUALITY, shot.captureProfile.stillCaptureQuality)
-        assertEquals("quality", shot.saveRequest.metadata.customTags["stillQuality"])
+        assertEquals(StillCaptureQualityPreference.LATENCY, shot.captureProfile.stillCaptureQuality)
+        assertEquals("latency", shot.saveRequest.metadata.customTags["stillQuality"])
     }
 
     @Test
