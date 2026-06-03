@@ -6,6 +6,7 @@ import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.LensNode
 import com.opencamera.core.device.LensNodeAvailability
 import com.opencamera.core.device.StillCaptureOutputSize
+import com.opencamera.core.device.StillCaptureResolutionSource
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.CameraPerformanceClass
@@ -456,13 +457,20 @@ class DevLogRenderModelTest {
     fun `computeDeviceProbeSummary includes output sizes`() {
         val caps = DeviceCapabilities(
             availableStillCaptureOutputSizes = listOf(
+                StillCaptureOutputSize(
+                    width = 8000,
+                    height = 6000,
+                    resolutionSource = StillCaptureResolutionSource.MAXIMUM_RESOLUTION
+                ),
                 StillCaptureOutputSize(width = 4000, height = 3000),
                 StillCaptureOutputSize(width = 3264, height = 2448)
             )
         )
         val summary = computeDeviceProbeSummary(caps)
-        assertTrue(summary.contains("still-output: 2 sizes"))
-        assertTrue(summary.contains("4000x3000"))
+        assertTrue(summary.contains("still-output: 3 sizes"))
+        assertTrue(summary.contains("48MP:8000x6000(maximum-resolution)"))
+        assertTrue(summary.contains("12MP:4000x3000(standard)"))
+        assertTrue(summary.contains("8MP:3264x2448(standard)"))
     }
 
     @Test

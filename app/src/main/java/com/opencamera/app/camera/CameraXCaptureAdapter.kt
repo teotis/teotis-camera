@@ -782,15 +782,22 @@ internal fun targetSizeForStillCaptureOutputSize(
     return Size(outputSize.width, outputSize.height)
 }
 
+internal fun targetDimensionsForPreviewStreamAspect(
+    aspect: PreviewStreamAspect
+): StillCaptureTargetResolution {
+    return when (aspect) {
+        PreviewStreamAspect.FULL,
+        PreviewStreamAspect.RATIO_4_3 -> StillCaptureTargetResolution(1440, 1080)
+        PreviewStreamAspect.RATIO_16_9 -> StillCaptureTargetResolution(1920, 1080)
+        PreviewStreamAspect.RATIO_1_1 -> StillCaptureTargetResolution(1080, 1080)
+    }
+}
+
 internal fun targetSizeForPreviewStreamAspect(
     aspect: PreviewStreamAspect
 ): Size {
-    return when (aspect) {
-        PreviewStreamAspect.FULL,
-        PreviewStreamAspect.RATIO_4_3 -> Size(1440, 1080)
-        PreviewStreamAspect.RATIO_16_9 -> Size(1920, 1080)
-        PreviewStreamAspect.RATIO_1_1 -> Size(1080, 1080)
-    }
+    val target = targetDimensionsForPreviewStreamAspect(aspect)
+    return Size(target.width, target.height)
 }
 
 internal fun previewResolutionSelectorForAspect(

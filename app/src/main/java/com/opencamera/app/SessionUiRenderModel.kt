@@ -1919,6 +1919,7 @@ internal fun computeDeviceProbeSummary(capabilities: com.opencamera.core.device.
         if (outputSizes.isNotEmpty()) {
             val totalPixels = outputSizes.sumOf { it.pixelCount }
             appendLine("still-output: ${outputSizes.size} sizes, total-pixels=${totalPixels}, largest=${outputSizes.first().width}x${outputSizes.first().height}")
+            appendLine("still-output-sizes: ${outputSizes.joinToString { it.probeSummaryLabel() }}")
         } else {
             appendLine("still-output: none reported")
         }
@@ -1934,6 +1935,11 @@ internal fun computeDeviceProbeSummary(capabilities: com.opencamera.core.device.
             appendLine("facts: ${facts.joinToString()}")
         }
     }.trimEnd()
+}
+
+private fun com.opencamera.core.device.StillCaptureOutputSize.probeSummaryLabel(): String {
+    val megapixels = kotlin.math.round(pixelCount / 1_000_000.0).toInt()
+    return "${megapixels}MP:${width}x${height}(${resolutionSource.tagValue})"
 }
 
 private val MANUAL_ISO_OPTIONS = listOf<Int?>(null, 100, 200, 320, 640, 800, 1600)
