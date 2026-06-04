@@ -67,7 +67,10 @@ internal data class PhotoWatermarkBitmapRenderResult(
     val warning: String? = null
 )
 
-internal data class PhotoWatermarkApplied(val warning: String? = null) : ProcessorEditorResult
+internal data class PhotoWatermarkApplied(
+    val warning: String? = null,
+    val timingNote: String? = null
+) : ProcessorEditorResult
 
 internal interface PhotoWatermarkEditor {
     suspend fun apply(
@@ -132,6 +135,7 @@ internal class PhotoWatermarkPostProcessor(
                             *buildList {
                                 add("watermark:rendered:${work.templateId}")
                                 renderResult.warning?.let { add("watermark:warning:$it") }
+                                renderResult.timingNote?.let { add(it) }
                             }.toTypedArray()
                         )
                     }
@@ -165,6 +169,7 @@ internal class AndroidPhotoWatermarkEditor(
         watermarkText: String,
         templateId: String
     ): ProcessorEditorResult = withContext(Dispatchers.IO) {
+        val t0 = System.currentTimeMillis()
         val sourceBytes = readSourceBytes(target)
             ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
@@ -172,8 +177,15 @@ internal class AndroidPhotoWatermarkEditor(
         }
 
         val preservedExif = readPreservedExif(sourceBytes)
-        val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-            ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
+        val decoded = try {
+            BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+                ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
+        } catch (e: OutOfMemoryError) {
+            return@withContext ProcessorEditorResult.Failed("decode-oom")
+        } catch (_: Throwable) {
+            return@withContext ProcessorEditorResult.Failed("decode-exception")
+        }
+        val t1 = System.currentTimeMillis()
 
         val originalWidth = decoded.width
         val originalHeight = decoded.height
@@ -195,20 +207,30 @@ internal class AndroidPhotoWatermarkEditor(
                 template = resolvedTemplate
             )
             renderedBitmap = renderResult.bitmap
-            val encodedBytes = ByteArrayOutputStream().use { output ->
-                check(renderResult.bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
-                    "Watermark JPEG compression failed"
+            val t2 = System.currentTimeMillis()
+            val encodedBytes = try {
+                ByteArrayOutputStream().use { output ->
+                    check(renderResult.bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
+                        "Watermark JPEG compression failed"
+                    }
+                    output.toByteArray()
                 }
-                output.toByteArray()
+            } catch (e: OutOfMemoryError) {
+                return@withContext ProcessorEditorResult.Failed("encode-oom")
+            } catch (_: Throwable) {
+                return@withContext ProcessorEditorResult.Failed("encode-failed")
             }
+            val t3 = System.currentTimeMillis()
             if (!writeEncodedBytes(target, encodedBytes)) {
                 return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
+            val t4 = System.currentTimeMillis()
 
             val exifWarning = restorePreservedExif(
                 target = target,
                 preservedExif = preservedExif
             )
+            val t5 = System.currentTimeMillis()
 
             val visibleBytesAfterExif = readSourceBytes(target)
             val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
@@ -223,10 +245,18 @@ internal class AndroidPhotoWatermarkEditor(
             } else {
                 null
             }
+            val t6 = System.currentTimeMillis()
+
+            val timingNote = "watermark:timing:$templateId size=${originalWidth}x${originalHeight} " +
+                "decode=${t1 - t0}ms render=${t2 - t1}ms encode=${t3 - t2}ms " +
+                "write=${t4 - t3}ms exif=${t5 - t4}ms archive=${t6 - t5}ms total=${t6 - t0}ms"
 
             PhotoWatermarkApplied(
-                warning = mergeWarnings(renderResult.warning, exifWarning, archiveWarning, archiveWriteWarning)
+                warning = mergeWarnings(renderResult.warning, exifWarning, archiveWarning, archiveWriteWarning),
+                timingNote = timingNote
             )
+        } catch (e: OutOfMemoryError) {
+            ProcessorEditorResult.Failed("render-oom")
         } catch (_: Throwable) {
             ProcessorEditorResult.Failed("render-exception")
         } finally {
@@ -416,6 +446,7 @@ private const val MAX_TEXT_SCALE = 1.4f
 private const val MIN_PADDING_PX = 18f
 private const val MIN_CORNER_RADIUS_PX = 12f
 private const val BLUR_DOWNSAMPLE_DIVISOR = 18
+private const val BLUR_EDGE_DOWNSAMPLE_DIVISOR = 8
 
 internal fun renderPhotoWatermarkBitmap(
     bitmap: Bitmap,
@@ -976,21 +1007,36 @@ private fun createBlurredExpandedEdgeBitmap(
     captureCropZoom: Float = 1f
 ): Bitmap {
     val backgroundSource = createCaptureCropSource(source, captureCropZoom)
-    val scaled = Bitmap.createScaledBitmap(backgroundSource, framedWidth, framedHeight, true)
+    val minFramedEdge = minOf(framedWidth, framedHeight)
+    val divisor = if (minFramedEdge < 600) {
+        1
+    } else {
+        BLUR_EDGE_DOWNSAMPLE_DIVISOR
+    }
+    val dsWidth = maxOf(1, framedWidth / divisor)
+    val dsHeight = maxOf(1, framedHeight / divisor)
+    val downsampled = Bitmap.createScaledBitmap(backgroundSource, dsWidth, dsHeight, true)
     if (backgroundSource !== source) {
         backgroundSource.recycle()
     }
-    val mutable = scaled.copy(Bitmap.Config.ARGB_8888, true)
-    if (mutable !== scaled) {
-        scaled.recycle()
+    val mutable = downsampled.copy(Bitmap.Config.ARGB_8888, true)
+    if (mutable !== downsampled) {
+        downsampled.recycle()
     }
     applySeparableBoxBlur(
         bitmap = mutable,
-        horizontalRadius = blurRadiusForLength(framedWidth),
-        verticalRadius = blurRadiusForLength(framedHeight),
+        horizontalRadius = maxOf(4, blurRadiusForLength(framedWidth) / divisor),
+        verticalRadius = maxOf(4, blurRadiusForLength(framedHeight) / divisor),
         passes = 2
     )
-    return mutable
+    val result = if (divisor > 1) {
+        val upscaled = Bitmap.createScaledBitmap(mutable, framedWidth, framedHeight, true)
+        mutable.recycle()
+        upscaled
+    } else {
+        mutable
+    }
+    return result
 }
 
 private fun createCaptureCropSource(source: Bitmap, captureCropZoom: Float): Bitmap {

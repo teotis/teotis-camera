@@ -126,7 +126,7 @@ class PhotoAlgorithmPostProcessorTest {
             )
         )
 
-        assertTrue(result.pipelineNotes.contains("algorithm-render:failed:render-exception"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:failed:oom"))
     }
 
     @Test

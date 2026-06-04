@@ -64,7 +64,10 @@ internal data class PhotoAlgorithmSpec(
     val recipe: PerceptualColorRecipe = PerceptualColorRecipe.NEUTRAL
 )
 
-internal data class PhotoAlgorithmApplied(val warning: String? = null) : ProcessorEditorResult
+internal data class PhotoAlgorithmApplied(
+    val warning: String? = null,
+    val timingNote: String? = null
+) : ProcessorEditorResult
 
 internal interface PhotoAlgorithmEditor {
     suspend fun apply(
@@ -100,11 +103,36 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
             }
         }
         ?: return ProcessorWork.None
+
+    if (isKnownNearNeutralProfile(spec)) {
+        return ProcessorWork.DiagnosticSkip("near-neutral:${spec.profile}")
+    }
+
     val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
 
     return ProcessorWork.Execute(PhotoAlgorithmPayload(target, spec))
 }
+
+private fun isKnownNearNeutralProfile(spec: PhotoAlgorithmSpec): Boolean {
+    return spec.profile in NEAR_NEUTRAL_PROFILES &&
+        spec.brightnessShift == 0 &&
+        spec.warmthShift == 0 &&
+        spec.tintShift == 0 &&
+        spec.monochromeMix == 0f &&
+        spec.vignetteStrength == 0f &&
+        spec.softGlowStrength == 0f &&
+        spec.haloStrength == 0f &&
+        spec.grainStrength == 0f &&
+        spec.sharpnessBoost == 0f &&
+        spec.highlightCompression == 0f &&
+        spec.shadowLift == 0f &&
+        spec.warmBoost == 0f &&
+        spec.coolBoost == 0f &&
+        spec.recipe.isNeutral
+}
+
+private val NEAR_NEUTRAL_PROFILES = setOf("photo-original", "pro-manual-neutral")
 
 private fun FilterRenderSpec.toPhotoAlgorithmSpec(
     profile: String,
@@ -200,6 +228,8 @@ internal class PhotoAlgorithmPostProcessor(
                             ) { acc, note -> acc.addPipelineNotes(note) }
                         }
                     }
+                } catch (e: OutOfMemoryError) {
+                    result.addPipelineNotes("algorithm-render:failed:oom")
                 } catch (_: Throwable) {
                     result.addPipelineNotes("algorithm-render:failed:render-exception")
                 } finally {
@@ -278,16 +308,11 @@ internal class PhotoAlgorithmPostProcessor(
     ): ShotResult {
         return when (renderResult) {
             is PhotoAlgorithmApplied -> {
-                if (renderResult.warning == null) {
-                    result.addPipelineNotes(
-                        "algorithm-render:applied:${payload.spec.profile}"
-                    )
-                } else {
-                    result.addPipelineNotes(
-                        "algorithm-render:applied:${payload.spec.profile}",
-                        "algorithm-render:warning:${renderResult.warning}"
-                    )
-                }
+                val notes = mutableListOf<String>()
+                notes.add("algorithm-render:applied:${payload.spec.profile}")
+                renderResult.warning?.let { notes.add("algorithm-render:warning:$it") }
+                renderResult.timingNote?.let { notes.add(it) }
+                result.addPipelineNotes(*notes.toTypedArray())
             }
 
             is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
@@ -313,6 +338,7 @@ internal class AndroidPhotoAlgorithmEditor(
         target: ProcessorTarget,
         spec: PhotoAlgorithmSpec
     ): ProcessorEditorResult = withContext(Dispatchers.IO) {
+        val t0 = System.currentTimeMillis()
         val sourceBytes = readSourceBytes(target)
             ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
@@ -329,24 +355,47 @@ internal class AndroidPhotoAlgorithmEditor(
             if (mutableBitmap !== decoded) {
                 decoded.recycle()
             }
+        } catch (e: OutOfMemoryError) {
+            return@withContext ProcessorEditorResult.Failed("decode-oom")
         } catch (_: Throwable) {
-            return@withContext ProcessorEditorResult.Failed("render-exception")
+            return@withContext ProcessorEditorResult.Failed("decode-exception")
         }
+        val t1 = System.currentTimeMillis()
 
         try {
             applyStyle(
                 bitmap = mutableBitmap,
                 spec = spec
             )
-            val encodedBytes = encodeJpeg(mutableBitmap)
+            val t2 = System.currentTimeMillis()
+            val encodedBytes = try {
+                encodeJpeg(mutableBitmap)
+            } catch (e: OutOfMemoryError) {
+                return@withContext ProcessorEditorResult.Failed("encode-oom")
+            } catch (_: Throwable) {
+                return@withContext ProcessorEditorResult.Failed("encode-failed")
+            }
+            val t3 = System.currentTimeMillis()
             if (!writeEncodedBytes(target, encodedBytes)) {
                 return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
+            val t4 = System.currentTimeMillis()
 
             val exifWarning = restorePreservedExif(target, preservedExif)
-            PhotoAlgorithmApplied(exifWarning)
+            val timingNote = buildAlgorithmTimingNote(
+                profile = spec.profile,
+                size = "${mutableBitmap.width}x${mutableBitmap.height}",
+                decodeMs = t1 - t0,
+                styleMs = t2 - t1,
+                encodeMs = t3 - t2,
+                writeMs = t4 - t3,
+                totalMs = t4 - t0
+            )
+            PhotoAlgorithmApplied(exifWarning, timingNote)
+        } catch (e: OutOfMemoryError) {
+            ProcessorEditorResult.Failed("style-oom")
         } catch (_: Throwable) {
-            ProcessorEditorResult.Failed("render-exception")
+            ProcessorEditorResult.Failed("style-exception")
         } finally {
             mutableBitmap.recycle()
         }
@@ -358,25 +407,75 @@ internal class AndroidPhotoAlgorithmEditor(
         spec: PhotoAlgorithmSpec,
         mask: SavedPhotoMaskPixels
     ): Pair<ProcessorEditorResult, List<String>> {
+        val t0 = System.currentTimeMillis()
         val sourceBytes = readSourceBytes(target)
         val preservedExif: Map<String, String> = if (sourceBytes != null && sourceBytes.isNotEmpty()) {
             readPreservedExif(sourceBytes)
         } else {
             emptyMap()
         }
-        val styleNotes = applyStyleWithMask(bitmap, spec, mask)
-        val encodedBytes = encodeJpeg(bitmap)
+        val t1 = System.currentTimeMillis()
+        val styleNotes = try {
+            applyStyleWithMask(bitmap, spec, mask)
+        } catch (e: OutOfMemoryError) {
+            return Pair(
+                ProcessorEditorResult.Failed("style-oom"),
+                listOf(
+                    SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                    SceneMaskPipelineNotes.reason("style-oom")
+                )
+            )
+        } catch (_: Throwable) {
+            return Pair(
+                ProcessorEditorResult.Failed("style-exception"),
+                listOf(
+                    SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                    SceneMaskPipelineNotes.reason("style-exception")
+                )
+            )
+        }
+        val t2 = System.currentTimeMillis()
+        val encodedBytes = try {
+            encodeJpeg(bitmap)
+        } catch (e: OutOfMemoryError) {
+            return Pair(
+                ProcessorEditorResult.Failed("encode-oom"),
+                styleNotes + listOf(
+                    SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                    SceneMaskPipelineNotes.reason("encode-oom")
+                )
+            )
+        } catch (_: Throwable) {
+            return Pair(
+                ProcessorEditorResult.Failed("encode-failed"),
+                styleNotes + listOf(
+                    SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                    SceneMaskPipelineNotes.reason("encode-failed")
+                )
+            )
+        }
+        val t3 = System.currentTimeMillis()
         if (!writeEncodedBytes(target, encodedBytes)) {
             return Pair(
                 ProcessorEditorResult.Failed("output-unavailable"),
-                listOf(
+                styleNotes + listOf(
                     SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
                     SceneMaskPipelineNotes.reason("output-unavailable")
                 )
             )
         }
+        val t4 = System.currentTimeMillis()
         val exifWarning = restorePreservedExif(target, preservedExif)
-        return Pair(PhotoAlgorithmApplied(exifWarning), styleNotes)
+        val timingNote = buildAlgorithmTimingNote(
+            profile = spec.profile,
+            size = "${bitmap.width}x${bitmap.height}",
+            decodeMs = t1 - t0,
+            styleMs = t2 - t1,
+            encodeMs = t3 - t2,
+            writeMs = t4 - t3,
+            totalMs = t4 - t0
+        )
+        return Pair(PhotoAlgorithmApplied(exifWarning, timingNote), styleNotes)
     }
 
     private fun applyStyle(
@@ -387,7 +486,8 @@ internal class AndroidPhotoAlgorithmEditor(
         val height = bitmap.height
         val pixels = IntArray(width * height)
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        val originalPixels = pixels.copyOf()
+        val needsBlur = spec.softGlowStrength > 0f || spec.haloStrength > 0f || spec.sharpnessBoost > 0f
+        val originalPixels = if (needsBlur) pixels.copyOf() else pixels
 
         val centerX = width / 2f
         val centerY = height / 2f
@@ -402,9 +502,9 @@ internal class AndroidPhotoAlgorithmEditor(
                 val originalRed = color ushr 16 and 0xFF
                 val originalGreen = color ushr 8 and 0xFF
                 val originalBlue = color and 0xFF
-                val blurredRed = averagedChannel(originalPixels, x, y, width, height, 16)
-                val blurredGreen = averagedChannel(originalPixels, x, y, width, height, 8)
-                val blurredBlue = averagedChannel(originalPixels, x, y, width, height, 0)
+                val blurredRed = if (needsBlur) averagedChannel(originalPixels, x, y, width, height, 16) else 0f
+                val blurredGreen = if (needsBlur) averagedChannel(originalPixels, x, y, width, height, 8) else 0f
+                val blurredBlue = if (needsBlur) averagedChannel(originalPixels, x, y, width, height, 0) else 0f
 
                 val grayscale = originalRed * 0.299f + originalGreen * 0.587f + originalBlue * 0.114f
                 var red = grayscale + (originalRed - grayscale) * spec.saturation
@@ -503,7 +603,8 @@ internal class AndroidPhotoAlgorithmEditor(
         val height = bitmap.height
         val pixels = IntArray(width * height)
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        val originalPixels = pixels.copyOf()
+        val needsBlur = spec.softGlowStrength > 0f || spec.haloStrength > 0f || spec.sharpnessBoost > 0f
+        val originalPixels = if (needsBlur) pixels.copyOf() else pixels
 
         val transform = SceneMaskCoordinateMapper(
             maskWidth = mask.maskWidth,
@@ -525,9 +626,9 @@ internal class AndroidPhotoAlgorithmEditor(
                 val originalRed = color ushr 16 and 0xFF
                 val originalGreen = color ushr 8 and 0xFF
                 val originalBlue = color and 0xFF
-                val blurredRed = averagedChannel(originalPixels, x, y, width, height, 16)
-                val blurredGreen = averagedChannel(originalPixels, x, y, width, height, 8)
-                val blurredBlue = averagedChannel(originalPixels, x, y, width, height, 0)
+                val blurredRed = if (needsBlur) averagedChannel(originalPixels, x, y, width, height, 16) else 0f
+                val blurredGreen = if (needsBlur) averagedChannel(originalPixels, x, y, width, height, 8) else 0f
+                val blurredBlue = if (needsBlur) averagedChannel(originalPixels, x, y, width, height, 0) else 0f
 
                 val mx = transform.maskX(x)
                 val my = transform.maskY(y)
@@ -1098,6 +1199,19 @@ private fun averagedChannel(
         }
     }
     return total / count
+}
+
+private fun buildAlgorithmTimingNote(
+    profile: String,
+    size: String,
+    decodeMs: Long,
+    styleMs: Long,
+    encodeMs: Long,
+    writeMs: Long,
+    totalMs: Long
+): String {
+    return "algorithm-render:timing:$profile size=$size " +
+        "decode=${decodeMs}ms style=${styleMs}ms encode=${encodeMs}ms write=${writeMs}ms total=${totalMs}ms"
 }
 
 private fun clampChannel(channel: Float): Float {
