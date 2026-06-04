@@ -1,5 +1,0 @@
-backgrounded · 7e7492fc
-  claude agents             list sessions
-  claude attach 7e7492fc    open in this terminal
-  claude logs 7e7492fc      show recent output
-  claude stop 7e7492fc      stop this session

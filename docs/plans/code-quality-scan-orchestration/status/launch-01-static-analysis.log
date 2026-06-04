@@ -1,5 +1,0 @@
-backgrounded · 30ff27f4
-  claude agents             list sessions
-  claude attach 30ff27f4    open in this terminal
-  claude logs 30ff27f4      show recent output
-  claude stop 30ff27f4      stop this session

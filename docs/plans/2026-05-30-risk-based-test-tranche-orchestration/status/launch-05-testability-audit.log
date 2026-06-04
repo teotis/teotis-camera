@@ -1,5 +1,0 @@
-backgrounded · fe655272
-  claude agents             list sessions
-  claude attach fe655272    open in this terminal
-  claude logs fe655272      show recent output
-  claude stop fe655272      stop this session

@@ -1,5 +1,0 @@
-backgrounded · 4ea41839
-  claude agents             list sessions
-  claude attach 4ea41839    open in this terminal
-  claude logs 4ea41839      show recent output
-  claude stop 4ea41839      stop this session

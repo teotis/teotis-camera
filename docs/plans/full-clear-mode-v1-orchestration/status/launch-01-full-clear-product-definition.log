@@ -1,5 +1,0 @@
-backgrounded · 48518c07
-  claude agents             list sessions
-  claude attach 48518c07    open in this terminal
-  claude logs 48518c07      show recent output
-  claude stop 48518c07      stop this session

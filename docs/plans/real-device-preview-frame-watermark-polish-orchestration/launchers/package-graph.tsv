@@ -1,4 +1,0 @@
-package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-preview-frame-contract	packages/01-preview-frame-contract.md	status/01-preview-frame-contract.md		status	1	agent/real-device-preview-frame-watermark-polish/01-preview-frame-contract		0	0
-02-natural-blur-border-rendering	packages/02-natural-blur-border-rendering.md	status/02-natural-blur-border-rendering.md		status	1	agent/real-device-preview-frame-watermark-polish/02-natural-blur-border-rendering		0	0
-99-finalize	packages/99-finalize.md	status/99-finalize.md	01-preview-frame-contract,02-natural-blur-border-rendering	status+code	final	agent/real-device-preview-frame-watermark-polish/99-finalize		0	1

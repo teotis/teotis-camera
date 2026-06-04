@@ -1,7 +1,0 @@
-package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-settings-codecs-tests	packages/01-settings-codecs-tests.md	status/01-settings-codecs-tests.md		status	1	agent/test-tranche/01-settings-codecs-tests	.claude/worktrees/test-tranche/01-settings-codecs-tests	0	0
-02-device-media-pure-tests	packages/02-device-media-pure-tests.md	status/02-device-media-pure-tests.md		status	1	agent/test-tranche/02-device-media-pure-tests	.claude/worktrees/test-tranche/02-device-media-pure-tests	0	0
-03-app-logic-tests	packages/03-app-logic-tests.md	status/03-app-logic-tests.md		status	1	agent/test-tranche/03-app-logic-tests	.claude/worktrees/test-tranche/03-app-logic-tests	0	0
-04-app-mixed-tests	packages/04-app-mixed-tests.md	status/04-app-mixed-tests.md		status	1	agent/test-tranche/04-app-mixed-tests	.claude/worktrees/test-tranche/04-app-mixed-tests	0	0
-05-testability-audit	packages/05-testability-audit.md	status/05-testability-audit.md		status	1	agent/test-tranche/05-testability-audit	.claude/worktrees/test-tranche/05-testability-audit	0	0
-99-finalize	packages/99-finalize.md	status/99-finalize.md	01-settings-codecs-tests,02-device-media-pure-tests,03-app-logic-tests,04-app-mixed-tests,05-testability-audit	status+code	final	agent/test-tranche/99-finalize	.claude/worktrees/test-tranche/99-finalize	0	1

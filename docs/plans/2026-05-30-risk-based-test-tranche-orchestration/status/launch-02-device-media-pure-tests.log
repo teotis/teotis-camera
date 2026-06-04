@@ -1,5 +1,0 @@
-backgrounded · 65c29504
-  claude agents             list sessions
-  claude attach 65c29504    open in this terminal
-  claude logs 65c29504      show recent output
-  claude stop 65c29504      stop this session

@@ -1,5 +1,0 @@
-backgrounded · e03bd8ed
-  claude agents             list sessions
-  claude attach e03bd8ed    open in this terminal
-  claude logs e03bd8ed      show recent output
-  claude stop e03bd8ed      stop this session

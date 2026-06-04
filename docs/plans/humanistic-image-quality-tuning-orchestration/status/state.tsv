@@ -1,7 +1,0 @@
-package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-01-current-iq-gap-audit	completed	2026-05-26T16:40:32Z	2026-05-27T10:00:00Z	agent-01-current-iq-gap-audit	-	-	-	-	pass	self-cert-only	-	-
-02-style-target-scorecard	completed
-03-feasible-rendering-pipeline-design	completed	2026-05-26T16:52:56Z	2026-05-27T12:00:00Z	agent-03-feasible-rendering-pipeline-design	worktree-pkg-03-rendering-pipeline	.claude/worktrees/pkg-03-rendering-pipeline	-	ebb5482	pass	self-cert-only	-	-
-04-real-device-capture-protocol	pending
-05-implementation-roadmap	pending
-99-finalize	pending

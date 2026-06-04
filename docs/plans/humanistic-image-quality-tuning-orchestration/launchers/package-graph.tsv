@@ -1,7 +1,0 @@
-package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-current-iq-gap-audit	packages/01-current-iq-gap-audit.md	status/01-current-iq-gap-audit.md		status	1	agent/humanistic-iq-tuning/01-current-iq-gap-audit		0	0
-02-style-target-scorecard	packages/02-style-target-scorecard.md	status/02-style-target-scorecard.md		status	1	agent/humanistic-iq-tuning/02-style-target-scorecard		0	0
-03-feasible-rendering-pipeline-design	packages/03-feasible-rendering-pipeline-design.md	status/03-feasible-rendering-pipeline-design.md	01-current-iq-gap-audit,02-style-target-scorecard	status	2	agent/humanistic-iq-tuning/03-feasible-rendering-pipeline-design		0	0
-04-real-device-capture-protocol	packages/04-real-device-capture-protocol.md	status/04-real-device-capture-protocol.md	03-feasible-rendering-pipeline-design	status	3	agent/humanistic-iq-tuning/04-real-device-capture-protocol		0	0
-05-implementation-roadmap	packages/05-implementation-roadmap.md	status/05-implementation-roadmap.md	04-real-device-capture-protocol	status	4	agent/humanistic-iq-tuning/05-implementation-roadmap		0	0
-99-finalize	packages/99-finalize.md	status/99-finalize.md	01-current-iq-gap-audit,02-style-target-scorecard,03-feasible-rendering-pipeline-design,04-real-device-capture-protocol,05-implementation-roadmap	status+code	final	agent/humanistic-iq-tuning/99-finalize		0	1

@@ -1,5 +1,0 @@
-backgrounded · d4555840
-  claude agents             list sessions
-  claude attach d4555840    open in this terminal
-  claude logs d4555840      show recent output
-  claude stop d4555840      stop this session

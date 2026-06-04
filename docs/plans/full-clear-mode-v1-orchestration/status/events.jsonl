@@ -1,5 +1,0 @@
-{"ts":"2026-05-29T00:00:00Z","event":"kit_created","package_id":"","plan":"full-clear-mode-v1-orchestration"}
-{"ts":"2026-05-29T03:58:29Z","event":"launch_requested","package_id":"01-full-clear-product-definition","branch":"agent/full-clear-mode-v1/01-full-clear-product-definition","worktree":"/Volumes/Extreme_SSD/project/open_camera/.worktrees/full-clear-mode-v1/01-full-clear-product-definition","finalize":"0"}
-{"ts":"2026-05-29T03:58:30Z","event":"state_changed","package_id":"01-full-clear-product-definition","old_state":"pending","new_state":"launched"}
-{"ts":"2026-05-29T03:58:30Z","event":"launch_succeeded","package_id":"01-full-clear-product-definition","session_id":"48518c07","new_state":"launched","branch":"agent/full-clear-mode-v1/01-full-clear-product-definition","worktree":"/Volumes/Extreme_SSD/project/open_camera/.worktrees/full-clear-mode-v1/01-full-clear-product-definition"}
-{"ts":"2026-05-29T04:18:25Z","event":"state_changed","package_id":"01-full-clear-product-definition","old_state":"launched","new_state":"completed"}

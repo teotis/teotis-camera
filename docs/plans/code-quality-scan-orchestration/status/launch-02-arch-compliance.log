@@ -1,5 +1,0 @@
-backgrounded · e62784eb
-  claude agents             list sessions
-  claude attach e62784eb    open in this terminal
-  claude logs e62784eb      show recent output
-  claude stop e62784eb      stop this session

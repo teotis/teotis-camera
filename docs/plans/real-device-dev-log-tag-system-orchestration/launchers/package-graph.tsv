@@ -1,3 +1,0 @@
-package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-dev-log-tag-system	packages/01-dev-log-tag-system.md	status/01-dev-log-tag-system.md		status	1	agent/dev-log-tag-system/01-dev-log-tag-system	/Volumes/Extreme_SSD/project/open_camera/.worktrees/dev-log-tag-system/01-dev-log-tag-system	0	0
-99-finalize	packages/99-finalize.md	status/99-finalize.md	01-dev-log-tag-system	status+code	final	agent/dev-log-tag-system/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.worktrees/dev-log-tag-system/99-finalize	0	1

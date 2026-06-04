@@ -1,3 +1,0 @@
-package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-session-test-hang-diagnosis-and-repair	packages/01-session-test-hang-diagnosis-and-repair.md	status/01-session-test-hang-diagnosis-and-repair.md		status	1	agent/stage7-session-test-hang/01-session-test-hang-diagnosis-and-repair	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/stage7-session-test-hang-01-session-test-hang-diagnosis-and-repair	0	0
-99-finalize	packages/99-finalize.md	status/99-finalize.md	01-session-test-hang-diagnosis-and-repair	status+code	final	agent/stage7-session-test-hang/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/stage7-session-test-hang-99-finalize	0	1

@@ -1,6 +1,0 @@
-package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-zoom-state-arbitration-audit	packages/01-zoom-state-arbitration-audit.md	status/01-zoom-state-arbitration-audit.md		status	1	agent/zoom-brightness-arbitration/01-zoom-state-arbitration-audit		0	0
-02-brightness-state-arbitration-audit	packages/02-brightness-state-arbitration-audit.md	status/02-brightness-state-arbitration-audit.md		status	1	agent/zoom-brightness-arbitration/02-brightness-state-arbitration-audit		0	0
-03-shared-control-state-strategy	packages/03-shared-control-state-strategy.md	status/03-shared-control-state-strategy.md	01-zoom-state-arbitration-audit,02-brightness-state-arbitration-audit	status	2	agent/zoom-brightness-arbitration/03-shared-control-state-strategy		0	0
-04-verification-real-device-protocol	packages/04-verification-real-device-protocol.md	status/04-verification-real-device-protocol.md	03-shared-control-state-strategy	status	3	agent/zoom-brightness-arbitration/04-verification-real-device-protocol		0	0
-99-finalize	packages/99-finalize.md	status/99-finalize.md	01-zoom-state-arbitration-audit,02-brightness-state-arbitration-audit,03-shared-control-state-strategy,04-verification-real-device-protocol	status+code	final	agent/zoom-brightness-arbitration/99-finalize		0	1

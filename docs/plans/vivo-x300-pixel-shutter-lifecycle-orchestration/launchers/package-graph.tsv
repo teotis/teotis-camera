@@ -1,6 +1,0 @@
-package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-pixel-capability-enumeration	packages/01-pixel-capability-enumeration.md	status/01-pixel-capability-enumeration.md		status	1	agent/vivo-x300/01-pixel-capability-enumeration		0	0
-03-shutter-lifecycle-contract	packages/03-shutter-lifecycle-contract.md	status/03-shutter-lifecycle-contract.md		status	1	agent/vivo-x300/03-shutter-lifecycle-contract		0	0
-02-quick-pixel-surface-design	packages/02-quick-pixel-surface-design.md	status/02-quick-pixel-surface-design.md	01-pixel-capability-enumeration	status	2	agent/vivo-x300/02-quick-pixel-surface-design		0	0
-04-real-device-verification-protocol	packages/04-real-device-verification-protocol.md	status/04-real-device-verification-protocol.md	01-pixel-capability-enumeration,02-quick-pixel-surface-design,03-shutter-lifecycle-contract	status	3	agent/vivo-x300/04-real-device-verification-protocol		0	0
-99-finalize	packages/99-finalize.md	status/99-finalize.md	01-pixel-capability-enumeration,02-quick-pixel-surface-design,03-shutter-lifecycle-contract,04-real-device-verification-protocol	status+code	final	agent/vivo-x300/99-finalize		0	1

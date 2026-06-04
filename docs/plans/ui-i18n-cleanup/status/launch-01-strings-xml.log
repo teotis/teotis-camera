@@ -1,6 +1,0 @@
-Starting background service…
-backgrounded · 971a9855
-  claude agents             list sessions
-  claude attach 971a9855    open in this terminal
-  claude logs 971a9855      show recent output
-  claude stop 971a9855      stop this session

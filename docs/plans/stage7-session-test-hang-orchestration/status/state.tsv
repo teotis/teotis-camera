@@ -1,3 +1,0 @@
-package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-01-session-test-hang-diagnosis-and-repair	completed	2026-05-26T16:02:24Z	2026-05-27	stage7-session-hang-01	agent/stage7-session-test-hang/01-session-test-hang-diagnosis-and-repair	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/stage7-session-test-hang-01-session-test-hang-diagnosis-and-repair	98d88da	dc52229	pass
-99-finalize	finalized	2026-05-26T17:47:27Z	2026-05-27	stage7-session-hang-99-finalize	agent/stage7-session-test-hang/99-finalize	/Volumes/Extreme_SSD/project/open_camera/.claude/worktrees/stage7-session-test-hang-99-finalize	e987eb76	5d67455	pass	pass	done

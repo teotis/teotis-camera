@@ -1,5 +1,0 @@
-package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error	failed_command	conflict_files	log_summary	recovery_hint
-01-i18n-core-infrastructure	launched	2026-05-29T08:50:16Z	pending	ee210c68	agent/i18n/01-i18n-core-infrastructure	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
-02-translation-audit-completeness	completed	2026-05-29T09:37:40Z	2026-05-29T09:45:53Z	d4555840	agent/i18n/02-translation-audit-completeness	pending	pending	4c728e1c	python3 scripts/i18n_audit.py: ALL LOCALES COMPLETE; python3 scripts/i18n_audit.py --check en: 100.0% coverage; python3 scripts/i18n_audit.py --format json: all_complete=true; ./gradlew assembleDebug: BUILD SUCCESSFUL	pending	pending					
-03-i18n-developer-workflow	pending	pending	pending	pending	agent/i18n/03-i18n-developer-workflow	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending
-99-finalize	pending	pending	pending	pending	agent/i18n/99-finalize	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending	pending

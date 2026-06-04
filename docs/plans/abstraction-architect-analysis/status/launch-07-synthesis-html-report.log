@@ -1,5 +1,0 @@
-backgrounded · 5c2b2227
-  claude agents             list sessions
-  claude attach 5c2b2227    open in this terminal
-  claude logs 5c2b2227      show recent output
-  claude stop 5c2b2227      stop this session

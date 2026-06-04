@@ -1,5 +1,0 @@
-backgrounded · 8cf70cfb
-  claude agents             list sessions
-  claude attach 8cf70cfb    open in this terminal
-  claude logs 8cf70cfb      show recent output
-  claude stop 8cf70cfb      stop this session

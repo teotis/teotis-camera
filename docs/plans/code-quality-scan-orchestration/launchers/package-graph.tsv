@@ -1,5 +1,0 @@
-package_id	package_doc	status_file	dependencies	dependency_type	wave	branch	worktree	manual	finalize
-01-static-analysis	packages/01-static-analysis.md	status/01-static-analysis.md		status	1	agent/quality-scan/01-static-analysis	docs/plans/code-quality-scan-orchestration/scratch/01-static-analysis/worktree	0	0
-02-arch-compliance	packages/02-arch-compliance.md	status/02-arch-compliance.md		status	1	agent/quality-scan/02-arch-compliance	docs/plans/code-quality-scan-orchestration/scratch/02-arch-compliance/worktree	0	0
-03-test-coverage	packages/03-test-coverage.md	status/03-test-coverage.md		status	1	agent/quality-scan/03-test-coverage	docs/plans/code-quality-scan-orchestration/scratch/03-test-coverage/worktree	0	0
-99-finalize	packages/99-finalize.md	status/99-finalize.md	01-static-analysis,02-arch-compliance,03-test-coverage	status+code	final	agent/quality-scan/99-finalize	docs/plans/code-quality-scan-orchestration/scratch/99-finalize/worktree	0	1

@@ -1,7 +1,0 @@
-package_id	state	launched_at	completed_at	agent	branch	worktree	base_commit	commit_hash	verification	integration	cleanup	last_error
-01-backend-capability-matrix	pending		-		agent/scene-mask-foundation-research/01-backend-capability-matrix	/private/tmp/open_camera-orchestration/scene-mask-foundation-research/01-backend-capability-matrix	-	-	-	-	-	-
-02-current-implementation-audit	pending		-		agent/scene-mask-foundation-research/02-current-implementation-audit	/private/tmp/open_camera-orchestration/scene-mask-foundation-research/02-current-implementation-audit	-	-	-	-	-	-
-03-product-architecture-design	completed	2026-05-27	2026-05-27	agent/scene-mask-foundation-research/03-product-architecture-design	agent/scene-mask-foundation-research/03-product-architecture-design	-	research-status-only	-	verified	-	-
-04-verification-real-device-protocol	pending		-		agent/scene-mask-foundation-research/04-verification-real-device-protocol	/private/tmp/open_camera-orchestration/scene-mask-foundation-research/04-verification-real-device-protocol	-	-	-	-	-	-
-99-finalize	pending		-		agent/scene-mask-foundation-research/integration	/private/tmp/open_camera-orchestration/scene-mask-foundation-research/99-finalize	-	-	-	-	-	-
-
