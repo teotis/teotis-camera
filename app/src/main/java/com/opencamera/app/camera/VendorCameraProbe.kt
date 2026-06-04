@@ -10,6 +10,26 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+internal fun appendProbeSection(
+    sb: StringBuilder,
+    label: String,
+    block: () -> Unit
+): Boolean {
+    return runCatching {
+        block()
+        true
+    }.getOrElse { error ->
+        sb.appendLine("  [$label] ERROR: ${probeErrorMessage(error)}")
+        false
+    }
+}
+
+internal fun probeErrorMessage(error: Throwable): String {
+    return error.message
+        ?.takeIf { it.isNotBlank() }
+        ?: error::class.java.simpleName
+}
+
 object VendorCameraProbe {
 
     private val knownVendorKeyClasses = listOf(
@@ -35,8 +55,9 @@ object VendorCameraProbe {
     )
 
     fun probe(context: Context): String {
-        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
-        val cameraIds = cameraManager.cameraIdList
+        val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+        val cameraIds = runCatching { cameraManager?.cameraIdList ?: emptyArray() }
+            .getOrDefault(emptyArray())
         val sb = StringBuilder()
 
         sb.appendLine("===== VENDOR CAMERA PROBE =====")
@@ -44,6 +65,12 @@ object VendorCameraProbe {
         sb.appendLine("device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} (SDK ${android.os.Build.VERSION.SDK_INT})")
         sb.appendLine("camera-count: ${cameraIds.size}")
         sb.appendLine()
+
+        if (cameraManager == null) {
+            sb.appendLine("[camera-service] ERROR: CameraManager unavailable")
+            sb.appendLine("===== PROBE COMPLETE =====")
+            return sb.toString()
+        }
 
         for (cameraId in cameraIds) {
             appendCameraProbe(sb, cameraManager, cameraId)
@@ -58,28 +85,37 @@ object VendorCameraProbe {
         cameraManager: CameraManager,
         cameraId: String
     ) {
-        val chars = cameraManager.getCameraCharacteristics(cameraId)
-
         sb.appendLine("=== cameraId=$cameraId ===")
-        sb.appendLine("  lens-facing: ${lensFacingLabel(chars.get(CameraCharacteristics.LENS_FACING))}")
-        sb.appendLine("  hardware-level: ${hardwareLevelLabel(chars.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL))}")
-        sb.appendLine("  logical: ${isLogical(chars)}")
+        val chars = runCatching { cameraManager.getCameraCharacteristics(cameraId) }
+            .getOrElse { error ->
+                sb.appendLine("  [camera-characteristics] ERROR: ${probeErrorMessage(error)}")
+                return
+            }
 
         @Suppress("DEPRECATION")
-        val physicalIds = chars.getPhysicalCameraIds()
-        if (physicalIds.isNotEmpty()) {
-            sb.appendLine("  physical-camera-ids: ${physicalIds.joinToString(", ")}")
+        val physicalIds = runCatching { chars.getPhysicalCameraIds() }
+            .getOrElse { error ->
+                sb.appendLine("  [physical-camera-ids] ERROR: ${probeErrorMessage(error)}")
+                emptySet()
+            }
+
+        appendProbeSection(sb, "camera-basics") {
+            sb.appendLine("  lens-facing: ${lensFacingLabel(chars.get(CameraCharacteristics.LENS_FACING))}")
+            sb.appendLine("  hardware-level: ${hardwareLevelLabel(chars.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL))}")
+            sb.appendLine("  logical: ${isLogical(chars)}")
+            if (physicalIds.isNotEmpty()) {
+                sb.appendLine("  physical-camera-ids: ${physicalIds.joinToString(", ")}")
+            }
+            val capabilities = chars.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: intArrayOf()
+            sb.appendLine("  capabilities: ${capabilities.map { capabilityLabel(it) }.joinToString(", ")}")
         }
 
-        val capabilities = chars.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES) ?: intArrayOf()
-        sb.appendLine("  capabilities: ${capabilities.map { capabilityLabel(it) }.joinToString(", ")}")
-
-        appendSensorInfo(sb, chars)
-        appendLensInfo(sb, chars)
-        appendRawCapability(sb, chars)
-        appendAllCharacteristicsKeys(sb, chars)
-        appendVendorKeysViaReflection(sb, chars)
-        appendAvailableKeys(sb, chars)
+        appendProbeSection(sb, "sensor-info") { appendSensorInfo(sb, chars) }
+        appendProbeSection(sb, "lens-info") { appendLensInfo(sb, chars) }
+        appendProbeSection(sb, "raw-capability") { appendRawCapability(sb, chars) }
+        appendProbeSection(sb, "characteristics-keys") { appendAllCharacteristicsKeys(sb, chars) }
+        appendProbeSection(sb, "hidden-via-reflection") { appendVendorKeysViaReflection(sb, chars) }
+        appendProbeSection(sb, "available-keys") { appendAvailableKeys(sb, chars) }
 
         sb.appendLine()
 
@@ -94,23 +130,23 @@ object VendorCameraProbe {
         parentCameraId: String,
         physicalCameraId: String
     ) {
-        val chars = try {
-            cameraManager.getCameraCharacteristics(physicalCameraId)
-        } catch (_: Exception) {
-            sb.appendLine("--- physical-camera (ERROR: cannot access $physicalCameraId) ---")
-            return
-        }
-
         sb.appendLine("--- physical-camera id=$physicalCameraId (parent=$parentCameraId) ---")
-        sb.appendLine("  lens-facing: ${lensFacingLabel(chars.get(CameraCharacteristics.LENS_FACING))}")
-        sb.appendLine("  hardware-level: ${hardwareLevelLabel(chars.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL))}")
+        val chars = runCatching { cameraManager.getCameraCharacteristics(physicalCameraId) }
+            .getOrElse { error ->
+                sb.appendLine("  [camera-characteristics] ERROR: ${probeErrorMessage(error)}")
+                return
+            }
 
-        appendSensorInfo(sb, chars)
-        appendLensInfo(sb, chars)
-        appendRawCapability(sb, chars)
-        appendAllCharacteristicsKeys(sb, chars)
-        appendVendorKeysViaReflection(sb, chars)
-        appendAvailableKeys(sb, chars)
+        appendProbeSection(sb, "physical-camera-basics") {
+            sb.appendLine("  lens-facing: ${lensFacingLabel(chars.get(CameraCharacteristics.LENS_FACING))}")
+            sb.appendLine("  hardware-level: ${hardwareLevelLabel(chars.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL))}")
+        }
+        appendProbeSection(sb, "physical-sensor-info") { appendSensorInfo(sb, chars) }
+        appendProbeSection(sb, "physical-lens-info") { appendLensInfo(sb, chars) }
+        appendProbeSection(sb, "physical-raw-capability") { appendRawCapability(sb, chars) }
+        appendProbeSection(sb, "physical-characteristics-keys") { appendAllCharacteristicsKeys(sb, chars) }
+        appendProbeSection(sb, "physical-hidden-via-reflection") { appendVendorKeysViaReflection(sb, chars) }
+        appendProbeSection(sb, "physical-available-keys") { appendAvailableKeys(sb, chars) }
         sb.appendLine()
     }
 

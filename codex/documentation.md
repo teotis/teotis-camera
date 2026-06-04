@@ -174,6 +174,16 @@
 
 # 最近有效闭环
 
+## 2026-06-04：特性探测导出容错与最新真机日志复核
+
+- 目标：承接最新真机日志 [`opencamera-debug-1780568112924.log`](/Users/dingren/Downloads/opencamera-debug-1780568112924.log) 与用户反馈“特性探测失败”，确认高像素能力探测结论并排查同份日志中是否还有其他高价值问题。
+- 日志结论：普通 Dev 导出的 `DEVICE PROBE` 已成功读取 standard / high-resolution / maximum-resolution 与 physical camera probe；当前目标机仍只暴露 `13MP:4096x3072/4080x3072(standard)`、`12MP:4032x3024(high-resolution)`，physical id `2/3/4` 也未出现 48MP/50MP 或 `maximum-resolution` JPEG 候选。由此可判定标准公开 Camera2/CameraX 能力表没有 50MP；是否存在厂商私有 remosaic 模式仍需 `特性探测` 的 vendor probe 文件进一步确认。
+- 根因：[`VendorCameraProbe.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/main/java/com/opencamera/app/camera/VendorCameraProbe.kt) 的 `特性探测` 路径比普通 Dev 日志更激进，会读取全部 characteristics key、available keys、hidden vendor key 与 StreamConfigurationMap 反射方法；旧实现只在少数反射小块内吞异常，任一 camera / physical camera / key 段抛错都会让按钮整体走 `toast_export_failed`，导致拿不到部分可用证据。
+- 结果：`VendorCameraProbe` 新增 `appendProbeSection()` / `probeErrorMessage()`，并把 logical / physical camera 的 basics、sensor、lens、raw、characteristics keys、hidden reflection、available keys 分段容错；失败段会写入 `  [section] ERROR: ...`，探测文件继续导出。`CameraManager` 不可用或单个 camera characteristics 读取失败时也会输出明确错误行，而不是让整个 probe 失败。
+- 其他问题确认：同份日志没有 CameraX bind failure、preview stall、thermal、permission 或 recovery failure；模式切换首帧约 `455-570ms`，前后台返回触发 host recovery 语义正常。需要另列为问题的是两次拍照都出现 `algorithm-render:failed:render-exception`，且后处理耗时很高：文档模式 `postprocess=9271ms,total=10573ms`，拍照模式 `postprocess=8412ms,total=9571ms`；这会影响保存等待与最终滤镜/文档算法效果，后续应优先把 `PhotoAlgorithmPostProcessor` 的异常原因从笼统 `render-exception` 细化到 OOM / decode / write / style-pass，并评估 12MP 全图逐像素处理的降采样或分块策略。
+- 验证：新增 [`VendorCameraProbeTest.kt`](/Volumes/Extreme_SSD/project/open_camera/app/src/test/java/com/opencamera/app/camera/VendorCameraProbeTest.kt) 红绿回归，锁定探测段异常会写入报告而不是抛出；通过 `rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.VendorCameraProbeTest`、`rtk ./gradlew --no-daemon -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.opencamera.app.camera.VendorCameraProbeTest :app:assembleDebug` 与 `rtk ./scripts/verify_stage_7_observability.sh`。
+- 结论：本轮已修复“特性探测按钮因单段厂商能力读取异常而整体失败”的容错断点；最新普通日志同时基本排除标准公开 50MP 能力，剩余高像素判断需要重新点击 `特性探测` 导出 `opencamera-vendor-probe-*.log`。当前同份日志里更实际的产品问题是算法后处理失败且耗时过长。
+
 ## 2026-06-04：变焦预览窗/画幅框契约复核修复
 
 - 目标：承接用户最新真机日志 [`opencamera-debug-1780509698023.log`](/Users/dingren/Downloads/opencamera-debug-1780509698023.log) 与旧会话专项要求，修复“只有 0.7 到 2.0 倍率有预览窗变焦行为、画幅框瘫痪”和“大幅度变焦后变焦条自行回退”。
