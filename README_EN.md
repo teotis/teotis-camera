@@ -1,4 +1,4 @@
-# Teotis Camera
+# Open Camera (Teotis Camera)
 
 A modern Android camera application with layered architecture design, supporting multiple shooting modes and professional-grade features.
 
