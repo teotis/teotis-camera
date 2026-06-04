@@ -10,3 +10,30 @@ __pycache__/
 # Git worktrees
 .worktrees/
 .claude/worktrees/
+
+# IDE
+.idea/
+
+# Agent instructions
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+
+# Internal dev docs
+codex/
+docs/plans/
+docs/evidence/
+docs/superpowers/
+docs/ui-design-candidates/
+docs/ui-reference/
+docs/code-quality-scan-report.*
+
+# Reports
+reports/
+
+# Session runs
+runs/
+
+# Build artifacts
+OpenCamera-latest-debug.apk
+public/
