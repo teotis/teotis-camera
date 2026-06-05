@@ -1,6 +1,6 @@
 # Open Camera (Teotis Camera)
 
-A modern Android camera application with layered architecture design, supporting multiple shooting modes and professional-grade features.
+A modern Android camera application with layered architecture design, focused on real-device photo, check-in, humanistic creation, video, and document capture experiences.
 
 [中文版本](README.md)
 
@@ -17,7 +17,7 @@ A modern Android camera application with layered architecture design, supporting
 ## Implementation Highlights
 
 - **State-driven preview UI**: `SessionUiRenderModel` combines session state, settings, capability degradation, and mode metadata into render models. The Activity renders those models and dispatches intents instead of driving camera runtime behavior directly.
-- **Independent mode plugins**: Photo, video, document, portrait, night, humanistic, and pro modes declare capture strategy, defaults, and capability requirements through `feature:mode-*` plugins, while the session kernel performs the runtime orchestration.
+- **Independent mode plugins**: The latest development line consolidates product modes into Photo, Check-in, Humanistic, Video, and Document. Portrait, night, full-clear, and professional capabilities are kept as compatibility capabilities inside the Check-in and Humanistic experiences.
 - **Real-time color pipeline**: Color Lab separates color selection, style configuration, and preview overlay through `ColorLabSpec`, `StyleColorPipeline`, and `PreviewColorTransform`, making live preview and reusable style persistence part of the same flow.
 - **Composable media post-processing**: Watermark, aspect ratio, portrait rendering, document crop, and algorithm processors are modeled as media pipeline processors, so preview hints and saved output share the same settings and effect contracts.
 - **Document batch model**: Document mode models multi-page capture, crop state, and the thumbnail rail through `DocumentBatch*` state, enabling collection, preview, and later organization of scanned pages.
@@ -69,12 +69,12 @@ The project adopts a **four-layer architecture + cross-cutting concerns** design
 | Module | Feature | Status |
 |--------|---------|--------|
 | `feature:mode-photo` | Standard photo mode | ✅ |
+| `feature:mode-checkin` | Check-in mode: region-aware static capture for portraits, people-place, object-place, and clarity scenes | Completed in active development |
+| `feature:mode-humanistic` | Humanistic mode: creator-focused still capture driven by style recipes and professional parameters | ✅ |
 | `feature:mode-video` | Video recording mode | ✅ |
-| `feature:mode-night` | Night mode | ✅ |
-| `feature:mode-portrait` | Portrait mode | ✅ |
 | `feature:mode-document` | Document scanning mode | ✅ |
-| `feature:mode-humanistic` | Humanistic mode | ✅ |
-| `feature:mode-pro` | Professional mode | ✅ |
+
+> Legacy portrait, night, full-clear, and pro modes remain as compatibility implementations. The public source may lag behind the full private development line.
 
 ### Core Capabilities
 
@@ -127,12 +127,11 @@ teotis-camera/
 │   └── effect/                   # Effect processing
 ├── feature/                      # Feature mode plugins
 │   ├── mode-photo/
+│   ├── mode-checkin/             # latest development line
 │   ├── mode-video/
-│   ├── mode-night/
-│   ├── mode-portrait/
 │   ├── mode-document/
 │   ├── mode-humanistic/
-│   └── mode-pro/
+│   └── ...                       # compatibility mode plugins
 ├── build.gradle.kts              # Root build config
 ├── settings.gradle.kts           # Module declarations
 └── gradle.properties             # Gradle configuration

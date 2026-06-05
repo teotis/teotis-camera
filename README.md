@@ -1,6 +1,6 @@
 # Open Camera（Teotis Camera）
 
-一个现代化的 Android 相机应用，采用分层架构设计，支持多种拍摄模式和专业级功能。
+一个现代化的 Android 相机应用，采用分层架构设计，面向真实设备上的拍照、打卡、人文创作、视频和文档扫描体验。
 
 [English Version](README_EN.md)
 
@@ -17,7 +17,7 @@
 ## 实现与原理亮点
 
 - **状态驱动的取景 UI**：`SessionUiRenderModel` 将会话状态、设置、能力降级和模式信息汇总为可渲染模型，Activity 只负责渲染与分发用户意图，避免 UI 直接驱动相机运行时。
-- **独立的模式插件**：拍照、视频、文档、人像、夜景、人文和专业模式通过 `feature:mode-*` 插件声明拍摄策略、默认设置和能力需求，再由会话内核统一调度。
+- **独立的模式插件**：最新开发线将产品模式收敛为拍照、打卡、人文、视频和文档；人像、夜景、全清和专业能力作为兼容能力并入打卡/人文体验，再由会话内核统一调度。
 - **实时色彩管线**：Color Lab 使用 `ColorLabSpec`、`StyleColorPipeline` 和 `PreviewColorTransform` 将色彩选择、风格配置和预览叠加拆开，既能实时预览，也能把配置保存为可复用风格。
 - **可组合媒体后处理**：水印、画幅、人像、文档裁切、算法处理等能力以媒体管线后处理器组合，预览提示和最终成片共享同一批设置与效果契约。
 - **文档批处理模型**：Document 模式把连续拍摄、裁切状态和缩略图轨道建模为 `DocumentBatch*` 状态，支持多页文档的收集、预览和后续整理。
@@ -67,12 +67,12 @@
 | 模块 | 功能 | 状态 |
 |------|------|------|
 | `feature:mode-photo` | 标准拍照模式 | ✅ |
+| `feature:mode-checkin` | 打卡模式：区域感知静态拍摄，覆盖人像、人景、物景和清晰场景 | 开发线已完成 |
+| `feature:mode-humanistic` | 人文模式：风格配方与专业参数共同驱动的创作者静态模式 | ✅ |
 | `feature:mode-video` | 视频录制模式 | ✅ |
-| `feature:mode-night` | 夜景模式 | ✅ |
-| `feature:mode-portrait` | 人像模式 | ✅ |
 | `feature:mode-document` | 文档扫描模式 | ✅ |
-| `feature:mode-humanistic` | 人文模式 | ✅ |
-| `feature:mode-pro` | 专业模式 | ✅ |
+
+> 旧的人像、夜景、全清和专业模式仍作为兼容实现保留；公开源码可能暂未包含私有开发线的全部最新提交。
 
 ### 核心能力
 
@@ -125,12 +125,11 @@ teotis-camera/
 │   └── effect/                   # 效果处理
 ├── feature/                      # 功能模式插件
 │   ├── mode-photo/
+│   ├── mode-checkin/             # 最新开发线
 │   ├── mode-video/
-│   ├── mode-night/
-│   ├── mode-portrait/
 │   ├── mode-document/
 │   ├── mode-humanistic/
-│   └── mode-pro/
+│   └── ...                       # 兼容模式插件
 ├── build.gradle.kts              # 根构建配置
 ├── settings.gradle.kts           # 模块声明
 └── gradle.properties             # Gradle 配置
