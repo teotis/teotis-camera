@@ -46,9 +46,20 @@ class GestureRouter(
         override fun onDown(e: MotionEvent): Boolean = true
     })
 
+    private var pinchSessionId = 0L
+    private var beginSpan = 0f
+
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            pinchSessionId++
+            beginSpan = detector.currentSpan
+            onGesture(GestureEvent.PinchBegin(detector.focusX, detector.focusY))
+            return true
+        }
+
         override fun onScale(detector: ScaleGestureDetector): Boolean {
-            onGesture(GestureEvent.PinchZoom(detector.scaleFactor, detector.focusX, detector.focusY))
+            val spanRatio = detector.currentSpan / beginSpan
+            onGesture(GestureEvent.PinchZoom(spanRatio, detector.focusX, detector.focusY, pinchSessionId))
             return true
         }
 

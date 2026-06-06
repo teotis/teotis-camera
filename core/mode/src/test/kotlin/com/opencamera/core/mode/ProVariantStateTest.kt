@@ -33,12 +33,12 @@ class ProVariantStateTest {
 
         assertTrue(result.enabled)
         assertEquals("entered", result.eventSuffix)
-        assertEquals(ModeSignal.ShowHint("Portrait Pro on"), result.signal)
+        assertEquals(ModeSignal.ShowHint("Portrait Professional on"), result.signal)
         assertEquals("pro", state.modeVariantTag())
         assertEquals("manual", state.resolvedControlMode())
         assertEquals("metadata-draft", state.manualDraftState())
         assertEquals("photo-original-pro", state.resolvedAlgorithmProfile("photo-original"))
-        assertEquals("Exit Pro", state.proActionLabel())
+        assertEquals("Professional on", state.proActionLabel())
     }
 
     @Test
@@ -50,7 +50,7 @@ class ProVariantStateTest {
 
         assertFalse(result.enabled)
         assertEquals("exited", result.eventSuffix)
-        assertEquals(ModeSignal.ShowHint("Scenery Pro off"), result.signal)
+        assertEquals(ModeSignal.ShowHint("Scenery Professional off"), result.signal)
         assertEquals("standard", state.modeVariantTag())
     }
 
@@ -69,8 +69,8 @@ class ProVariantStateTest {
         assertEquals("assisted", state.resolvedControlMode())
         assertEquals("unsupported", state.manualDraftState())
         assertEquals("photo-original-pro-assist", state.resolvedAlgorithmProfile("photo-original"))
-        assertEquals("Exit Pro Assist", state.proActionLabel())
-        assertEquals("Pro Assist", state.variantExifLabel())
+        assertEquals("Professional assist on", state.proActionLabel())
+        assertEquals("Professional assist", state.variantExifLabel())
         assertTrue(
             state.summaryText("humanistic").contains(
                 "saved-only draft because manual controls are unavailable"

@@ -6,6 +6,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.params.StreamConfigurationMap
 import android.util.Size
+import android.util.SizeF
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -164,21 +165,14 @@ object VendorCameraProbe {
 
         sb.appendLine("  [sensor-info]")
         if (physicalSize != null) {
-            val diagInches = Math.sqrt(
-                physicalSize.width.toDouble() * physicalSize.width +
-                    physicalSize.height.toDouble() * physicalSize.height
-            ) / 1000.0
-            val inchNotation = diagToInchNotation(diagInches)
-            sb.appendLine("    physical-size: ${physicalSize.width}μm × ${physicalSize.height}μm (~$inchNotation)")
+            sb.appendLine("    ${formatPhysicalSensorSize(physicalSize)}")
         }
         if (pixelArraySize != null) {
             val pixelCount = pixelArraySize.width.toLong() * pixelArraySize.height
             val mpLabel = "%.1fMP".format(pixelCount / 1_000_000.0)
             sb.appendLine("    pixel-array: ${pixelArraySize.width}×${pixelArraySize.height} ($mpLabel)")
             if (physicalSize != null) {
-                val pixelWidth = physicalSize.width.toDouble() / pixelArraySize.width
-                val pixelHeight = physicalSize.height.toDouble() / pixelArraySize.height
-                sb.appendLine("    pixel-size: %.2fμm × %.2fμm".format(pixelWidth, pixelHeight))
+                sb.appendLine("    ${formatSensorPixelSize(physicalSize, pixelArraySize)}")
             }
         }
         if (whiteLevel != null) sb.appendLine("    white-level: $whiteLevel")
@@ -373,8 +367,17 @@ object VendorCameraProbe {
 
     // ── Available keys ───────────────────────────────────────
 
+    /**
+     * Safe accessor: some vendors (e.g. vivo/MTK) return null from these
+     * properties despite the SDK declaring them @NonNull. The compiler warns
+     * about elvis on "non-null" types — this helper bypasses that via try/catch.
+     */
+    private fun <T> CameraCharacteristics.safeList(
+        getter: CameraCharacteristics.() -> List<T>
+    ): List<T> = try { getter() } catch (_: Exception) { emptyList() }
+
     private fun appendAvailableKeys(sb: StringBuilder, chars: CameraCharacteristics) {
-        val captureRequestKeys = chars.availableCaptureRequestKeys
+        val captureRequestKeys = chars.safeList { availableCaptureRequestKeys }
         if (captureRequestKeys.isNotEmpty()) {
             sb.appendLine("  [available-capture-request-keys] (${captureRequestKeys.size})")
             val vendor = captureRequestKeys.filter { it.name.contains("vendor") || it.name.startsWith("org.") || it.name.startsWith("com.") }
@@ -386,7 +389,7 @@ object VendorCameraProbe {
             }
         }
 
-        val resultKeys = chars.availableCaptureResultKeys
+        val resultKeys = chars.safeList { availableCaptureResultKeys }
         if (resultKeys.isNotEmpty()) {
             sb.appendLine("  [available-capture-result-keys] (${resultKeys.size})")
             val vendor = resultKeys.filter { it.name.contains("vendor") || it.name.startsWith("org.") || it.name.startsWith("com.") }
@@ -398,7 +401,7 @@ object VendorCameraProbe {
             }
         }
 
-        val sessionKeys = chars.availableSessionKeys
+        val sessionKeys = chars.safeList { availableSessionKeys }
         if (sessionKeys.isNotEmpty()) {
             sb.appendLine("  [available-session-keys] (${sessionKeys.size})")
             val vendor = sessionKeys.filter { it.name.contains("vendor") || it.name.startsWith("org.") || it.name.startsWith("com.") }
@@ -410,7 +413,7 @@ object VendorCameraProbe {
             }
         }
 
-        val physicalRequestKeys = chars.availablePhysicalCameraRequestKeys
+        val physicalRequestKeys = chars.safeList { availablePhysicalCameraRequestKeys }
         if (physicalRequestKeys.isNotEmpty()) {
             sb.appendLine("  [available-physical-camera-request-keys] (${physicalRequestKeys.size})")
             physicalRequestKeys.forEach { sb.appendLine("    ${it.name}") }
@@ -552,20 +555,42 @@ object VendorCameraProbe {
 
     // ── Sensor math ──────────────────────────────────────────
 
-    private fun diagToInchNotation(diagMm: Double): String {
-        val inches = diagMm / 25.4
-        return when {
-            inches >= 1.0 -> "1/${"%.2f".format(1.0 / inches)}\""
-            else -> "%.2f\"".format(inches)
-        }
-    }
-
     private fun focalLengthCropFactor(chars: CameraCharacteristics): Float {
         val physicalSize = chars.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return 1f
-        val diagMm = Math.sqrt(
-            physicalSize.width.toDouble() * physicalSize.width +
-                physicalSize.height.toDouble() * physicalSize.height
-        ) / 1000.0
-        return (43.27f / diagMm).toFloat()
+        return focalLengthCropFactor(physicalSize)
+    }
+}
+
+internal fun formatPhysicalSensorSize(physicalSize: SizeF): String {
+    val diagMm = Math.sqrt(
+        physicalSize.width.toDouble() * physicalSize.width +
+            physicalSize.height.toDouble() * physicalSize.height
+    )
+    val inchNotation = diagToInchNotation(diagMm)
+    return "physical-size: ${physicalSize.width}mm × ${physicalSize.height}mm (~$inchNotation)"
+}
+
+internal fun formatSensorPixelSize(
+    physicalSize: SizeF,
+    pixelArraySize: Size
+): String {
+    val pixelWidth = physicalSize.width.toDouble() * 1000.0 / pixelArraySize.width
+    val pixelHeight = physicalSize.height.toDouble() * 1000.0 / pixelArraySize.height
+    return "pixel-size: %.2fμm × %.2fμm".format(pixelWidth, pixelHeight)
+}
+
+internal fun focalLengthCropFactor(physicalSize: SizeF): Float {
+    val diagMm = Math.sqrt(
+        physicalSize.width.toDouble() * physicalSize.width +
+            physicalSize.height.toDouble() * physicalSize.height
+    )
+    return (43.27f / diagMm).toFloat()
+}
+
+private fun diagToInchNotation(diagMm: Double): String {
+    val inches = diagMm / 25.4
+    return when {
+        inches >= 1.0 -> "1/${"%.2f".format(1.0 / inches)}\""
+        else -> "%.2f\"".format(inches)
     }
 }

@@ -62,7 +62,7 @@ class FrameRatioDelegateTest {
 
         assertEquals(FrameRatio.RATIO_1_1, delegate.currentFrameRatio())
         assertEquals(listOf("night.frame-ratio.selected.1x1"), events)
-        assertEquals(ModeSignal.ShowHint("画幅：1:1"), signal)
+        assertEquals(ModeSignal.ShowHint("Frame: 1:1"), signal)
     }
 
     @Test
@@ -87,6 +87,6 @@ class FrameRatioDelegateTest {
         assertEquals(FrameRatio.RATIO_4_3, delegate.currentFrameRatio())
         assertTrue(events.isEmpty())
         assertEquals(0, effectCount)
-        assertEquals(ModeSignal.ShowHint("当前模式不支持 16:9 画幅"), signal)
+        assertEquals(ModeSignal.ShowHint("Current mode does not support 16:9 frame ratio"), signal)
     }
 }

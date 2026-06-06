@@ -350,9 +350,9 @@ class SessionUiRenderModelTest {
     fun `runtime pro controls render model exposes editable controls for active pro variant`() {
         val baseline = defaultSessionState()
         val state = baseline.copy(
-            activeMode = ModeId.NIGHT,
+            activeMode = ModeId.HUMANISTIC,
             modeSnapshot = baseline.modeSnapshot.copy(
-                id = ModeId.NIGHT,
+                id = ModeId.HUMANISTIC,
                 state = baseline.modeSnapshot.state.copy(
                     isProVariantActive = true
                 )
@@ -372,7 +372,7 @@ class SessionUiRenderModelTest {
         val model = runtimeProControlsRenderModel(state, TestAppTextResolver())
 
         assertTrue(model.isVisible)
-        assertEquals("Scenery Pro Controls", model.headline)
+        assertEquals("Humanistic Professional Controls", model.headline)
         assertEquals(SettingsControlAvailability.DEGRADED, model.rawControl.availability)
         assertEquals(SettingsControlAvailability.SUPPORTED, model.isoControl.availability)
         assertEquals("320", model.isoControl.value)
@@ -425,9 +425,9 @@ class SessionUiRenderModelTest {
             )
         )
         val state = baseline.copy(
-            activeMode = ModeId.PORTRAIT,
+            activeMode = ModeId.CHECK_IN,
             modeSnapshot = baseline.modeSnapshot.copy(
-                id = ModeId.PORTRAIT,
+                id = ModeId.CHECK_IN,
                 state = baseline.modeSnapshot.state.copy(
                     isProVariantActive = true
                 )
@@ -927,13 +927,13 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `filter lab render model follows active portrait mode and cycles portrait defaults`() {
+    fun `filter lab render model follows active check-in mode and cycles photo defaults`() {
         val model = filterLabPageRenderModel(
             defaultSessionState(
-                activeMode = ModeId.PORTRAIT,
-                availableModes = listOf(ModeId.PHOTO, ModeId.PORTRAIT, ModeId.HUMANISTIC, ModeId.VIDEO),
+                activeMode = ModeId.CHECK_IN,
+                availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
                 modeSnapshot = ModeSnapshot(
-                    id = ModeId.PORTRAIT,
+                    id = ModeId.CHECK_IN,
                     uiSpec = ModeUiSpec(
                         title = "Portrait",
                         shutterLabel = "Capture Portrait"
@@ -949,15 +949,15 @@ class SessionUiRenderModelTest {
 
         assertEquals("Style", model.headline)
         assertEquals("", model.heroSummary)
-        assertTrue(model.portraitTab.isSelected)
-        assertFalse(model.photoTab.isSelected)
+        assertTrue(model.photoTab.isSelected)
+        assertFalse(model.portraitTab.isSelected)
         assertEquals(
-            PersistedSettingsAction.UpdatePortraitFilter("portrait-chasing-light"),
+            PersistedSettingsAction.UpdatePhotoFilter("portrait-ccd"),
             model.cycleControl.nextAction
         )
-        assertTrue(model.currentFilterSummary.contains("Current default Portrait Original"))
+        assertTrue(model.currentFilterSummary.contains("Current default Portrait Retro"))
         assertTrue(model.saveCustomControl.isEnabled)
-        assertEquals("portrait-original", model.saveCustomControl.sourceProfileId)
+        assertEquals("portrait-retro", model.saveCustomControl.sourceProfileId)
         assertTrue(model.footer.contains("Independent Tone Lab prioritized"))
     }
 
@@ -1009,7 +1009,7 @@ class SessionUiRenderModelTest {
                     )
                 )
             ),
-            activeMode = ModeId.PORTRAIT
+            activeMode = ModeId.CHECK_IN
         )
 
         val model = filterLabPageRenderModel(
@@ -1035,7 +1035,7 @@ class SessionUiRenderModelTest {
     @Test
     fun `filter lab render model exposes advanced adjustment controls for selected portrait filter`() {
         val model = filterLabPageRenderModel(
-            state = defaultSessionState(activeMode = ModeId.PORTRAIT),
+            state = defaultSessionState(activeMode = ModeId.CHECK_IN),
             text = TestAppTextResolver(),
             selectedFamily = FilterLabFamily.PORTRAIT,
             showAdjustmentPanel = true,
@@ -1092,20 +1092,20 @@ class SessionUiRenderModelTest {
     fun `mode summary reflects current mode snapshot`() {
         val state = defaultSessionState().copy(
             modeSnapshot = ModeSnapshot(
-                id = ModeId.NIGHT,
+                id = ModeId.CHECK_IN,
                 uiSpec = ModeUiSpec(
-                    title = "Scenery",
-                    shutterLabel = "Capture Scenery"
+                    title = "Check-in",
+                    shutterLabel = "Capture Check-in"
                 ),
                 state = ModeState(
-                    headline = "Scenery mode active",
-                    detail = "Tripod multi-frame available"
+                    headline = "Check-in mode active",
+                    detail = "Multi-frame available"
                 )
             )
         )
 
         assertEquals(
-            "Mode: Scenery\nScenery mode active\nTripod multi-frame available",
+            "Mode: Check-in\nCheck-in mode active\nMulti-frame available",
             modeSummaryText(state)
         )
     }
@@ -1116,11 +1116,11 @@ class SessionUiRenderModelTest {
             activeMode = ModeId.VIDEO,
             availableModes = listOf(
                 ModeId.PHOTO,
+                ModeId.CHECK_IN,
                 ModeId.DOCUMENT,
-                ModeId.NIGHT,
+                ModeId.CHECK_IN,
                 ModeId.HUMANISTIC,
-                ModeId.PORTRAIT,
-                ModeId.PRO,
+                ModeId.CHECK_IN,
                 ModeId.VIDEO
             ),
             modeSnapshot = ModeSnapshot(
@@ -1139,11 +1139,11 @@ class SessionUiRenderModelTest {
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Humanistic", "Scenery", "Port", "Pro", "Video", "Doc"),
+            listOf("Photo", "Check-in", "Humanistic", "Video"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
         )
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
     }
@@ -1160,9 +1160,9 @@ class SessionUiRenderModelTest {
 
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
-        assertEquals(3, model.items.size)
+        assertEquals(2, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.VIDEO),
             model.items.map { it.modeId }
         )
     }
@@ -1185,7 +1185,7 @@ class SessionUiRenderModelTest {
         activeMode: ModeId = ModeId.PHOTO,
         availableModes: List<ModeId> = listOf(
             ModeId.PHOTO,
-            ModeId.NIGHT,
+            ModeId.CHECK_IN,
             ModeId.HUMANISTIC,
             ModeId.VIDEO
         ),
@@ -1352,8 +1352,8 @@ class SessionUiRenderModelTest {
     @Test
     fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
-            ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.CHECK_IN,
+            ModeId.HUMANISTIC, ModeId.VIDEO
         )
         val state = defaultSessionState(
             activeMode = ModeId.HUMANISTIC,
@@ -1361,12 +1361,14 @@ class SessionUiRenderModelTest {
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(7, model.items.size)
+        assertEquals(4, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
             model.items.map { it.modeId }
         )
+        assertTrue(model.items.any { it.modeId == ModeId.CHECK_IN })
         assertTrue(model.items.any { it.modeId == ModeId.HUMANISTIC })
+        assertFalse(model.items.any { it.modeId == ModeId.DOCUMENT })
         assertTrue(model.items.first { it.modeId == ModeId.HUMANISTIC }.isActive)
         assertFalse(model.items.first { it.modeId == ModeId.PHOTO }.isActive)
         assertTrue(model.items.all { it.isAvailable })
@@ -1388,8 +1390,8 @@ class SessionUiRenderModelTest {
     @Test
     fun `mode track labels are short and stable`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.NIGHT,
-            ModeId.HUMANISTIC, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.CHECK_IN, ModeId.CHECK_IN,
+            ModeId.HUMANISTIC, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO
         )
         val state = defaultSessionState(availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
@@ -1412,7 +1414,7 @@ class SessionUiRenderModelTest {
     fun `active mode track item has distinct visual state`() {
         val state = defaultSessionState(
             activeMode = ModeId.VIDEO,
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.VIDEO)
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
@@ -1431,7 +1433,7 @@ class SessionUiRenderModelTest {
             override fun saveAsCustom(): String = "保存为自定义"
         }
         val model = filterLabPageRenderModel(
-            state = defaultSessionState(activeMode = ModeId.PORTRAIT),
+            state = defaultSessionState(activeMode = ModeId.CHECK_IN),
             text = customResolver,
             selectedFamily = FilterLabFamily.PORTRAIT
         )
@@ -1543,7 +1545,7 @@ class SessionUiRenderModelTest {
     @Test
     fun `built-in filter shows auto-prepare hint on palette`() {
         val model = filterLabPageRenderModel(
-            state = defaultSessionState(activeMode = ModeId.PORTRAIT),
+            state = defaultSessionState(activeMode = ModeId.CHECK_IN),
             text = TestAppTextResolver(),
             selectedFamily = FilterLabFamily.PORTRAIT
         )
@@ -1572,7 +1574,7 @@ class SessionUiRenderModelTest {
                     )
                 )
             ),
-            activeMode = ModeId.PORTRAIT
+            activeMode = ModeId.CHECK_IN
         )
 
         val model = filterLabPageRenderModel(
@@ -1589,7 +1591,7 @@ class SessionUiRenderModelTest {
     @Test
     fun `advanced mode shows 12 controls`() {
         val model = filterLabPageRenderModel(
-            state = defaultSessionState(activeMode = ModeId.PORTRAIT),
+            state = defaultSessionState(activeMode = ModeId.CHECK_IN),
             text = TestAppTextResolver(),
             selectedFamily = FilterLabFamily.PORTRAIT,
             adjustmentMode = FilterAdjustmentMode.ADVANCED
@@ -1624,7 +1626,7 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `style lab shows filter items and family tabs but not adjustment panel`() {
+    fun `style lab shows active mode filter items without family tabs or adjustment panel`() {
         val state = defaultSessionState()
         val model = filterLabPageRenderModel(
             state = state,
@@ -1633,7 +1635,7 @@ class SessionUiRenderModelTest {
         )
 
         assertEquals(StyleAndColorLabRole.STYLE, model.panelRole)
-        assertTrue(model.showFamilyTabs)
+        assertFalse(model.showFamilyTabs)
         assertTrue(model.showFilterItems)
         assertFalse(model.showAdjustmentPanel)
         assertEquals("Style", model.headline)
@@ -1982,7 +1984,7 @@ class SessionUiRenderModelTest {
         )
 
         assertFalse(model.showAdvancedControls)
-        assertTrue(model.showFamilyTabs)
+        assertFalse(model.showFamilyTabs)
         assertTrue(model.showFilterItems)
     }
 
@@ -2203,6 +2205,95 @@ class SessionUiRenderModelTest {
 
         assertFalse(model.hasStyleUserAdjustments)
         assertEquals(null, model.resetStyleAction)
+    }
+
+    // --- StyleSurfaceRole selection tests ---
+
+    @Test
+    fun `styleSurfaceRole returns PANEL for PHOTO mode`() {
+        assertEquals(StyleSurfaceRole.PANEL, styleSurfaceRole(ModeId.PHOTO))
+    }
+
+    @Test
+    fun `styleSurfaceRole returns PANEL for CHECK_IN mode`() {
+        assertEquals(StyleSurfaceRole.PANEL, styleSurfaceRole(ModeId.CHECK_IN))
+    }
+
+    @Test
+    fun `styleSurfaceRole returns PANEL for HUMANISTIC mode`() {
+        assertEquals(StyleSurfaceRole.PANEL, styleSurfaceRole(ModeId.HUMANISTIC))
+    }
+
+    @Test
+    fun `styleSurfaceRole returns FILTER_STRIP for VIDEO mode`() {
+        assertEquals(StyleSurfaceRole.FILTER_STRIP, styleSurfaceRole(ModeId.VIDEO))
+    }
+
+    @Test
+    fun `styleSurfaceRole returns FILTER_STRIP for DOCUMENT mode`() {
+        assertEquals(StyleSurfaceRole.FILTER_STRIP, styleSurfaceRole(ModeId.DOCUMENT))
+    }
+
+    // --- FilterStripRenderModel tests ---
+
+    @Test
+    fun `filterStripRenderModel produces items for PHOTO mode`() {
+        val state = defaultSessionState(activeMode = ModeId.PHOTO)
+        val model = filterStripRenderModel(state, TestAppTextResolver())
+        assertTrue(model.isVisible)
+        assertTrue(model.items.isNotEmpty())
+        assertEquals("Style", model.headline)
+    }
+
+    @Test
+    fun `filterStripRenderModel marks selected item for current filter`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.PHOTO,
+            persistedPhotoSettings = PhotoSettings(
+                defaultFilterProfileId = "portrait-retro"
+            )
+        )
+        val model = filterStripRenderModel(state, TestAppTextResolver())
+        val selected = model.items.filter { it.isSelected }
+        assertEquals(1, selected.size)
+        assertEquals("portrait-retro", selected.first().filterProfileId)
+        assertNull(selected.first().selectAction)
+    }
+
+    @Test
+    fun `filterStripRenderModel non-selected items have select actions`() {
+        val state = defaultSessionState(activeMode = ModeId.PHOTO)
+        val model = filterStripRenderModel(state, TestAppTextResolver())
+        val unselected = model.items.filter { !it.isSelected }
+        for (item in unselected) {
+            assertTrue(item.selectAction != null, "Item ${item.filterProfileId} should have selectAction")
+        }
+    }
+
+    @Test
+    fun `filterStripRenderModel returns items for VIDEO mode with video family`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            availableModes = listOf(ModeId.PHOTO, ModeId.VIDEO, ModeId.HUMANISTIC),
+            modeSnapshot = ModeSnapshot(
+                id = ModeId.VIDEO,
+                uiSpec = ModeUiSpec(title = "VIDEO", shutterLabel = "Record"),
+                state = ModeState(headline = "VIDEO", detail = "Ready")
+            )
+        )
+        val model = filterStripRenderModel(state, TestAppTextResolver())
+        // Video mode uses video filter family from catalog; items may exist even if
+        // video recording is unsupported on this device (catalog is device-independent).
+        assertTrue(model.items.isNotEmpty())
+    }
+
+    @Test
+    fun `filterStripRenderModel ellipsize long filter names inherits from label`() {
+        val state = defaultSessionState(activeMode = ModeId.PHOTO)
+        val model = filterStripRenderModel(state, TestAppTextResolver())
+        for (item in model.items) {
+            assertTrue(item.title.isNotBlank(), "Filter strip item title should not be blank")
+        }
     }
 
     private class ChineseUiTextResolver : TestAppTextResolver() {

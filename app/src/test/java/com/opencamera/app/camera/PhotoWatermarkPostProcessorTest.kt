@@ -187,6 +187,54 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `travel polaroid output uses a warmer wider paper frame`() {
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(80, 130, 180))
+        }
+        val template = ResolvedPhotoWatermarkTemplate(
+            templateId = "travel-polaroid",
+            title = "Go see the sky",
+            supportingLines = listOf("2026-06-05"),
+            frameBackground = WatermarkFrameBackground.WHITE,
+            usesExpandedFrame = true,
+            placement = WatermarkTextPlacement.BOTTOM_LEFT,
+            textScale = 1f,
+            textOpacity = 1f
+        )
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+
+        assertTrue(bmp.width >= 432, "travel polaroid should have a more visible side paper frame")
+        assertTrue(bmp.height >= 410, "travel polaroid should have a more generous bottom paper band")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    fun `professional bottom bar output gives metadata more breathing room`() {
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(70, 72, 78))
+        }
+        val template = ResolvedPhotoWatermarkTemplate(
+            templateId = "professional-bottom-bar",
+            title = "OpenCamera Pro",
+            supportingLines = listOf("24mm 1/120 ISO100"),
+            frameBackground = WatermarkFrameBackground.DARK,
+            usesExpandedFrame = true,
+            placement = WatermarkTextPlacement.BOTTOM_CENTER,
+            textScale = 1f,
+            textOpacity = 1f
+        )
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+
+        assertEquals(400, bmp.width)
+        assertTrue(bmp.height >= 391, "professional bottom bar should be taller than the old compact strip")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
     fun `non photo result is ignored`() = runTest {
         val editor = FakePhotoWatermarkEditor(
             result = PhotoWatermarkApplied()
@@ -222,6 +270,21 @@ class PhotoWatermarkPostProcessorTest {
 
         assertTrue(Color.red(topPixel) > 150, "top border should be reddish from source edge")
         assertTrue(Color.red(leftPixel) > 150, "left border should be reddish from source edge")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    fun `blur four border uses brand paper proportions`() {
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(92, 140, 188))
+        }
+        val template = blurFourBorderTemplate(WatermarkFrameBackground.SOURCE_LIGHT_BLUR)
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+
+        assertTrue(bmp.width >= 448, "four-border card should have a more visible side paper frame")
+        assertTrue(bmp.height >= 396, "four-border card should reserve a generous brand/info band")
         bmp.recycle(); source.recycle()
     }
 

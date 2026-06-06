@@ -9,13 +9,10 @@ import com.opencamera.core.settings.PersistedSettings
 open class TestAppTextResolver : AppTextResolver(null) {
     override fun modeDisplayName(modeId: ModeId): String = when (modeId) {
         ModeId.PHOTO -> "Photo"
+        ModeId.CHECK_IN -> "Check-in"
         ModeId.DOCUMENT -> "Doc"
-        ModeId.NIGHT -> "Scenery"
         ModeId.HUMANISTIC -> "Humanistic"
-        ModeId.PORTRAIT -> "Port"
-        ModeId.PRO -> "Pro"
         ModeId.VIDEO -> "Video"
-        ModeId.FULL_CLEAR -> "Full Clear"
     }
 
     override fun modeTrackLabel(modeId: ModeId): String = modeDisplayName(modeId)
@@ -156,10 +153,8 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun filterFamilyHumanistic(): String = "Humanistic"
     override fun filterFamilyPortrait(): String = "Portrait"
     override fun filterFamilyVideo(): String = "Video"
-    override fun proControlsScenery(): String = "Scenery Pro Controls"
-    override fun proControlsPortrait(): String = "Portrait Pro Controls"
-    override fun proControlsHumanistic(): String = "Humanistic Pro Controls"
-    override fun proControlsDefault(): String = "Pro Controls"
+    override fun proControlsHumanistic(): String = "Humanistic Professional Controls"
+    override fun proControlsDefault(): String = "Professional Controls"
     override fun compositionGridLabel(): String = "Composition grid"
     override fun shutterToneLabel(): String = "Shutter tone"
     override fun selfieMirrorLabel(): String = "Selfie mirror"
@@ -280,7 +275,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun settingsSummaryFilters(): String = "filters"
     override fun settingsSummaryWatermarkTemplates(): String = "watermark templates"
     override fun settingsSummaryMsBundle(): String = "ms bundle"
-    override fun settingsSummaryProManualDraft(): String = "Pro manual draft"
+    override fun settingsSummaryProManualDraft(): String = "Humanistic manual draft"
 
     // Settings joiners
     override fun settingsJoinerGrid(): String = "Grid "
@@ -306,7 +301,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun videoFilterSeedCountLabel(count: Int): String = "Saved filter seed; $count looks staged"
     override fun catalogFooterStillWatermark(): String = "Still watermark templates now flow into metadata and photo rendering."
     override fun catalogFooterManualStaged(): String = "Manual drafts and Live/video defaults remain staged in the same settings spine."
-    override fun catalogFooterProManualPrefix(): String = " | Pro manual draft "
+    override fun catalogFooterProManualPrefix(): String = " | Humanistic manual draft "
 
     // Watermark selector
     override fun watermarkSelectorSupporting(): String = "Watermark selection sits one level below Settings. Pick the active template here, then enter the template-specific style page to edit."

@@ -145,8 +145,7 @@ class CameraCockpitRenderModelTest {
     @Test
     fun `mode track preserves available mode order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC,
-            ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO
+            ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO
         )
         val state = defaultSessionState(
             activeMode = ModeId.VIDEO,
@@ -155,8 +154,7 @@ class CameraCockpitRenderModelTest {
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         val modeIds = model.modeTrack.items.map { it.modeId }
-        assertTrue(modeIds.contains(ModeId.PHOTO))
-        assertTrue(modeIds.contains(ModeId.VIDEO))
+        assertEquals(listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO), modeIds)
         assertTrue(model.modeTrack.items.first { it.modeId == ModeId.VIDEO }.isActive)
     }
 
@@ -340,7 +338,7 @@ class CameraCockpitRenderModelTest {
                     defaultRatio = 1f
                 )
             ),
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.VIDEO)
         )
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
@@ -415,7 +413,7 @@ class CameraCockpitRenderModelTest {
 
     private fun defaultSessionState(
         activeMode: ModeId = ModeId.PHOTO,
-        availableModes: List<ModeId> = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),
+        availableModes: List<ModeId> = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
             preferredLensFacing = LensFacing.BACK,
@@ -494,8 +492,8 @@ class CameraCockpitRenderModelTest {
     @Test
     fun `cockpit bottom layout spacing - mode track preserves mode list under increased padding`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC,
-            ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT
+            ModeId.PHOTO, ModeId.CHECK_IN, ModeId.CHECK_IN, ModeId.HUMANISTIC,
+            ModeId.CHECK_IN, ModeId.VIDEO, ModeId.DOCUMENT
         )
         val state = defaultSessionState(
             activeMode = ModeId.VIDEO,
@@ -503,7 +501,10 @@ class CameraCockpitRenderModelTest {
         )
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
-        assertEquals(availableModes.size, model.modeTrack.items.size)
+        assertEquals(
+            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
+            model.modeTrack.items.map { it.modeId }
+        )
         assertTrue(model.modeTrack.items.first { it.modeId == ModeId.VIDEO }.isActive)
         assertTrue(model.modeTrack.items.all { it.isAvailable })
     }
@@ -532,7 +533,7 @@ class CameraCockpitRenderModelTest {
                     defaultRatio = 1f
                 )
             ),
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO)
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.VIDEO)
         )
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 

@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import android.content.Context
+import android.view.HapticFeedbackConstants
 import androidx.core.view.isVisible
 
 internal class DevConsoleRenderer(
@@ -9,9 +10,11 @@ internal class DevConsoleRenderer(
 ) {
     init {
         views.scrollTop.setOnClickListener {
+            views.scrollTop.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             views.scroll.smoothScrollTo(0, 0)
         }
         views.scrollBottom.setOnClickListener {
+            views.scrollBottom.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             views.scroll.post {
                 val contentHeight = views.scroll.getChildAt(0)?.height ?: 0
                 views.scroll.smoothScrollTo(
@@ -41,10 +44,10 @@ internal class DevConsoleRenderer(
         views.summary.text = model.summaryText
         views.summary.isVisible = model.summaryText.isNotBlank()
         views.content.text = model.content
-        views.tabKey.isEnabled = model.selectedTab != DevLogTab.KEY
-        views.tabCore.isEnabled = model.selectedTab != DevLogTab.CORE
-        views.tabError.isEnabled = model.selectedTab != DevLogTab.ERROR
-        views.tabAll.isEnabled = model.selectedTab != DevLogTab.ALL
+        views.tabKey.isEnabled = true
+        views.tabCore.isEnabled = true
+        views.tabError.isEnabled = true
+        views.tabAll.isEnabled = true
         val activeAlpha = 1f
         val inactiveAlpha = 0.84f
         views.tabKey.alpha = if (model.selectedTab == DevLogTab.KEY) activeAlpha else inactiveAlpha

@@ -40,8 +40,9 @@ internal class MainActivityRenderer(
             views.filterLab.panel.overScrollMode = android.view.View.OVER_SCROLL_ALWAYS
         }
         views.documentBatchOrganizer.panel.isVisible = route is CockpitPanelRoute.DocumentBatchOrganizer
+        views.filterStrip.scroll.isVisible = route is CockpitPanelRoute.StyleStrip
         views.quickPanel.panel.isVisible = route is CockpitPanelRoute.QuickBubble
-        views.panelDismissScrim.isVisible = route.isAnyPanelOpen
+        views.panelDismissScrim.isVisible = route.isAnyPanelOpen && route !is CockpitPanelRoute.StyleStrip
 
         // Reset panel transforms to final state so cancelled animations don't leak.
         if (route.isAnyPanelOpen) {
@@ -94,6 +95,7 @@ internal class MainActivityRenderer(
         is CockpitPanelRoute.DocumentBatchOrganizer -> views.documentBatchOrganizer.panel
         is CockpitPanelRoute.QuickBubble -> views.quickPanel.panel
         is CockpitPanelRoute.DevConsole -> views.devConsole.panel
+        is CockpitPanelRoute.StyleStrip,
         is CockpitPanelRoute.None -> null
     }
 }

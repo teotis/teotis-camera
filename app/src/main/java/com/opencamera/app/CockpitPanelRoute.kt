@@ -13,6 +13,7 @@ sealed class CockpitPanelRoute {
     data object DevConsole : CockpitPanelRoute()
     data class Settings(val subpage: SettingsSubpage = SettingsSubpage.ROOT) : CockpitPanelRoute()
     data object StyleLab : CockpitPanelRoute()
+    data object StyleStrip : CockpitPanelRoute()
     data object ColorLab : CockpitPanelRoute()
     data object DocumentBatchOrganizer : CockpitPanelRoute()
 }

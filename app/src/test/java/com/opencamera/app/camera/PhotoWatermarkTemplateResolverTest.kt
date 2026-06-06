@@ -69,6 +69,56 @@ class PhotoWatermarkTemplateResolverTest {
     }
 
     @Test
+    fun `check in structured tags render new product name and style detail`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "blur-four-border",
+            watermarkText = "Check-in 人景 Portrait Retro",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Check-in",
+                    "watermarkProfileName" to "人景 Portrait Retro",
+                    "watermarkDatetime" to "2026-06-06 09:30",
+                    "watermarkCameraParams" to "12MP • 3:4",
+                    "checkInScenario" to "people-place",
+                    "compatMode" to "portrait"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "OpenCamera DevKit"
+            )
+        )
+
+        assertEquals("OpenCamera DevKit · Check-in 人景 Portrait Retro", resolved.title)
+        assertTrue(resolved.supportingLines.any { it.contains("人景 Portrait Retro") })
+        assertTrue(resolved.supportingLines.any { it.contains("12MP") })
+    }
+
+    @Test
+    fun `humanistic professional variant does not render standalone pro mode name`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "professional-bottom-bar",
+            watermarkText = "Humanistic Professional",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModel" to "X300 Ultra",
+                    "watermarkModeName" to "Humanistic",
+                    "watermarkProfileName" to "Professional Street",
+                    "watermarkDatetime" to "2026-06-06 18:20",
+                    "watermarkCameraParams" to "1/250s • f/2.0 • ISO 100",
+                    "mode" to "humanistic",
+                    "modeVariant" to "pro",
+                    "controlMode" to "manual"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("X300 Ultra · Humanistic Professional Street", resolved.title)
+        assertFalse(resolved.title.contains("· Pro "))
+        assertTrue(resolved.supportingLines.any { it.contains("ISO 100") })
+    }
+
+    @Test
     fun `travel polaroid resolver uses default slogan and degrades without location`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "travel-polaroid",

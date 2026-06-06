@@ -239,13 +239,13 @@ class HumanisticModePluginTest {
     }
 
     @Test
-    fun `pro variant watermark text includes Pro label`(): Unit = runBlocking {
+    fun `pro variant watermark text includes Professional label`(): Unit = runBlocking {
         val controller = createController()
 
         controller.handle(ModeIntent.ProActionPressed)
         val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
 
-        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Pro"))
+        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Professional"))
     }
 
     @Test

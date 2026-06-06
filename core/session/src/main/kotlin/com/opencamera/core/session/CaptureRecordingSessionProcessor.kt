@@ -20,10 +20,9 @@ import com.opencamera.core.media.postProcessFailureSummary
 import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeSessionEvent
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,7 +57,8 @@ internal class CaptureRecordingSessionProcessor(
     private val currentController: () -> ModeController,
     private val resolvedActiveDeviceGraph: () -> DeviceGraphSpec,
     private val updateState: SessionStateUpdater,
-    private val dispatch: suspend (SessionIntent) -> Unit
+    private val dispatch: suspend (SessionIntent) -> Unit,
+    private val recordingTimerDispatcher: CoroutineDispatcher? = null
 ) {
     private var pendingCountdownJob: Job? = null
     private var pendingCountdownStrategy: CaptureStrategy? = null
@@ -98,7 +98,7 @@ internal class CaptureRecordingSessionProcessor(
 
     fun startRecordingWatchdog(expectedStatus: RecordingStatus, timeoutMillis: Long) {
         recordingWatchdogJob?.cancel()
-        recordingWatchdogJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
+        recordingWatchdogJob = launchRecordingTimer {
             delay(timeoutMillis)
             if (state.value.recordingStatus == expectedStatus) {
                 trace.record("recording.watchdog.timeout", "status=$expectedStatus, timeout=${timeoutMillis}ms")
@@ -276,7 +276,7 @@ internal class CaptureRecordingSessionProcessor(
         }
         if (shot.mediaType == MediaType.VIDEO) {
             val shotId = shot.shotId
-            recordingElapsedJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
+            recordingElapsedJob = launchRecordingTimer {
                 while (state.value.activeShot?.shotId == shotId &&
                     state.value.recordingStatus == RecordingStatus.RECORDING
                 ) {
@@ -811,6 +811,14 @@ internal class CaptureRecordingSessionProcessor(
         val updatedRequest = plan.request.copy(saveRequest = updatedSaveRequest)
         val updatedSaveTask = plan.saveTask.copy(saveRequest = updatedSaveRequest)
         return plan.copy(request = updatedRequest, saveTask = updatedSaveTask)
+    }
+
+    private fun launchRecordingTimer(block: suspend CoroutineScope.() -> Unit): Job {
+        return if (recordingTimerDispatcher != null) {
+            scope.launch(recordingTimerDispatcher, block = block)
+        } else {
+            scope.launch(block = block)
+        }
     }
 }
 

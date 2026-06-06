@@ -4,10 +4,12 @@ import android.content.Context
 import android.graphics.Typeface
 import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import com.opencamera.core.session.SessionState
+import com.opencamera.core.settings.PersistedSettingsAction
 
 internal data class CockpitCallbacks(
     val onZoomRatioSelected: (Float) -> Unit,
@@ -21,6 +23,7 @@ internal class CockpitSurfaceRenderer(
     private val floatingUtility: FloatingUtilityViews,
     private val bottomCockpit: BottomCockpitViews,
     private val modeTrack: ModeTrackViews,
+    private val filterStrip: FilterStripViews,
     private val preview: PreviewViews,
     private val callbacks: CockpitCallbacks,
     private val isModeTrackScrolling: () -> Boolean = { false }
@@ -159,13 +162,7 @@ internal class CockpitSurfaceRenderer(
 
         quickPanel.livePhoto.text = quickRowLabel(sheet.liveRow)
         quickPanel.livePhoto.isEnabled = sheet.liveRow.isEnabled
-        if (sheet.liveRow.isSelected) {
-            quickPanel.livePhoto.alpha = 1f
-            quickPanel.livePhoto.setBackgroundResource(R.drawable.bg_quick_chip_selected)
-        } else {
-            quickPanel.livePhoto.alpha = if (sheet.liveRow.isEnabled) 0.85f else 0.4f
-            quickPanel.livePhoto.setBackgroundResource(R.drawable.bg_quick_chip)
-        }
+        quickPanel.livePhoto.alpha = if (sheet.liveRow.isEnabled) 1f else 0.4f
 
         quickPanel.timer.text = quickRowLabel(sheet.timerRow)
         quickPanel.timer.isEnabled = sheet.timerRow.isEnabled
@@ -179,14 +176,11 @@ internal class CockpitSurfaceRenderer(
     fun renderModeTrack(model: ModeTrackRenderModel) {
         val buttonMap = mapOf(
             com.opencamera.core.mode.ModeId.PHOTO to modeTrack.photo,
+            com.opencamera.core.mode.ModeId.CHECK_IN to modeTrack.checkIn,
             com.opencamera.core.mode.ModeId.HUMANISTIC to modeTrack.humanistic,
-            com.opencamera.core.mode.ModeId.FULL_CLEAR to modeTrack.fullClear,
-            com.opencamera.core.mode.ModeId.PORTRAIT to modeTrack.portrait,
             com.opencamera.core.mode.ModeId.VIDEO to modeTrack.video,
             com.opencamera.core.mode.ModeId.DOCUMENT to modeTrack.document
         )
-        modeTrack.night.visibility = View.GONE
-        modeTrack.pro.visibility = View.GONE
         buttonMap.values.forEach { it.visibility = View.GONE }
         model.items.forEach { item ->
             val button = buttonMap[item.modeId] ?: return@forEach
@@ -218,6 +212,47 @@ internal class CockpitSurfaceRenderer(
                     modeTrack.scroll.smoothScrollTo(scrollX, 0)
                 }
             }
+        }
+    }
+
+    private var lastFilterStripModel: FilterStripRenderModel? = null
+
+    fun renderFilterStrip(model: FilterStripRenderModel, onSelectFilter: (PersistedSettingsAction) -> Unit) {
+        if (model == lastFilterStripModel) return
+        lastFilterStripModel = model
+
+        val chips = filterStrip.chips
+        chips.removeAllViews()
+
+        model.items.forEach { item ->
+            val chip = Button(context, null, 0, R.style.Widget_OpenCamera_CompactButton).apply {
+                text = item.title
+                isAllCaps = false
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                isEnabled = item.selectAction != null || item.isSelected
+                alpha = if (item.isSelected) 1f else 0.78f
+                setTextColor(
+                    if (item.isSelected) {
+                        ContextCompat.getColor(context, R.color.oc_accent)
+                    } else {
+                        ContextCompat.getColor(context, R.color.oc_text_primary)
+                    }
+                )
+                if (item.isSelected) {
+                    setTypeface(null, Typeface.BOLD)
+                }
+                setOnClickListener {
+                    item.selectAction?.let(onSelectFilter)
+                }
+            }
+            val params = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginEnd = 8.dp
+            }
+            chips.addView(chip, params)
         }
     }
 

@@ -71,12 +71,6 @@ internal suspend fun queryLatestGalleryMedia(context: Context): LatestGalleryMed
         )
         if (candidates.isEmpty()) return@withContext null
 
-        val (mediaColumns, dateColumn) = arrayOf(
-            MediaStore.Images.Media._ID,
-            MediaStore.Images.Media.DATA,
-            MediaStore.Images.Media.DATE_ADDED
-        ) to MediaStore.Images.Media.DATE_ADDED
-
         // Both queries already sort by DATE_ADDED DESC and return the first row,
         // so each candidate is the newest of its type. Compare timestamps.
         // We re-query to get the actual date for comparison.

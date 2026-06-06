@@ -2,6 +2,7 @@ package com.opencamera.core.settings
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -109,5 +110,19 @@ class FilterProfileShareCodecTest {
         val decoded = ImportedFilterProfilesSerializer.deserialize(serialized)
 
         assertEquals(profiles, decoded)
+    }
+
+    @Test
+    fun `share codec rejects missing required fields with argument error`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            FilterProfileShareCodec.import(
+                """
+                OPEN_CAMERA_FILTER_PROFILE_V1
+                category=CUSTOM
+                """.trimIndent()
+            )
+        }
+
+        assertEquals("Missing required filter profile field: id", error.message)
     }
 }

@@ -118,7 +118,7 @@ private class HumanisticModeController(
         context.eventSink("humanistic.exit")
         mutableSnapshot.value = buildSnapshot(
             headline = "Humanistic mode inactive",
-            detail = "Switch back to humanistic mode to continue street photography."
+            detail = "Switch back to Humanistic mode to continue street photography."
         )
     }
 
@@ -291,9 +291,9 @@ private class HumanisticModeController(
         mutableSnapshot.value = buildSnapshot(
             headline = if (proVariantEnabled) {
                 if (manualControlsEnabled()) {
-                    "Humanistic Pro active"
+                    "Professional controls active"
                 } else {
-                    "Humanistic Pro assisted active"
+                    "Professional assist active"
                 }
             } else {
                 "人文模式已激活"
@@ -327,7 +327,7 @@ private class HumanisticModeController(
             uiSpec = ModeUiSpec(
                 title = "Humanistic",
                 shutterLabel = "Capture Humanistic",
-                secondaryActionLabel = "Toggle Humanistic Style",
+                secondaryActionLabel = "Cycle Humanistic Style",
                 tertiaryActionLabel = "Cycle Frame",
                 proActionLabel = proVariantState.proActionLabel()
             ),
@@ -406,9 +406,9 @@ private class HumanisticModeController(
         return if (!proVariantEnabled) {
             "Humanistic ${style.label}"
         } else if (manualControlsEnabled()) {
-            "Humanistic Pro ${style.label}"
+            "Humanistic Professional ${style.label}"
         } else {
-            "Humanistic Pro Assist ${style.label}"
+            "Humanistic Professional Assist ${style.label}"
         }
     }
 

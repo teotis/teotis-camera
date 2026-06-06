@@ -70,6 +70,7 @@ class LowLightPromptExpiryTest {
 
         // Now advance past the 3000ms to trigger expiry
         advanceTimeBy(3000)
+        runCurrent()
 
         val promptAfter = session.state.value.presentation.photoLowLightPrompt
         assertNotNull(promptAfter)

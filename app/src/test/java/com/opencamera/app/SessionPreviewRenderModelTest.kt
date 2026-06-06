@@ -113,6 +113,23 @@ class SessionPreviewRenderModelTest {
         assertEquals(2f, model.frame!!.previewZoomRatio)
     }
 
+    @Test
+    fun `preview frame remains visible when preview status is unavailable`() {
+        val baseline = defaultSessionState()
+
+        val model = previewOverlayRenderModel(
+            baseline.copy(
+                previewStatus = PreviewStatus.ERROR,
+                activeEffectSpec = EffectSpec(listOf(FrameEffect(FrameRatio.RATIO_16_9)))
+            )
+        )
+
+        val frame = assertNotNull(model.frame)
+        assertFalse(model.isGridVisible)
+        assertEquals(FrameRatio.RATIO_16_9, frame.ratio)
+        assertTrue(model.isVisible)
+    }
+
     // --- focusReticleRenderModel metering status mapping ---
 
     @Test
@@ -167,7 +184,7 @@ class SessionPreviewRenderModelTest {
             previewStatus = PreviewStatus.ACTIVE,
             previewStatusDetail = null,
             activeMode = ModeId.PHOTO,
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
             captureStatus = CaptureStatus.IDLE,
             recordingStatus = RecordingStatus.IDLE,
             activeShot = null,

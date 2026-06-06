@@ -12,6 +12,7 @@ internal interface MainActivityActionCallbacks {
     fun renderAfterPanelChange()
     fun renderLatestSettingsSurfaces()
     fun renderLatestFilterLab()
+    fun renderLatestFilterStrip()
     fun maybeAutoPrepareFilter()
     fun saveCurrentFilterAsCustom(control: FilterLabSaveCustomRenderModel?)
     fun openSelectedFilterAdjustment(control: FilterLabAdjustRenderModel?)

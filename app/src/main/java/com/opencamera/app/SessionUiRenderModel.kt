@@ -239,6 +239,56 @@ internal enum class StyleAndColorLabRole {
     COLOR_LAB
 }
 
+internal enum class StyleSurfaceRole {
+    FILTER_STRIP,
+    PANEL
+}
+
+internal fun styleSurfaceRole(activeMode: ModeId): StyleSurfaceRole {
+    return when (activeMode) {
+        ModeId.PHOTO,
+        ModeId.CHECK_IN,
+        ModeId.HUMANISTIC -> StyleSurfaceRole.PANEL
+        else -> StyleSurfaceRole.FILTER_STRIP
+    }
+}
+
+internal data class FilterStripItemRenderModel(
+    val filterProfileId: String,
+    val title: String,
+    val isSelected: Boolean,
+    val selectAction: PersistedSettingsAction?
+)
+
+internal data class FilterStripRenderModel(
+    val headline: String,
+    val items: List<FilterStripItemRenderModel>,
+    val isVisible: Boolean
+)
+
+internal fun filterStripRenderModel(
+    state: SessionState,
+    text: AppTextResolver
+): FilterStripRenderModel {
+    val activeMode = state.activeMode
+    val family = defaultFilterLabFamily(activeMode)
+    val familyState = filterLabFamilyState(state, text, family)
+    val items = familyState.filters.map { profile ->
+        val isSelected = profile.id == familyState.currentFilterId
+        FilterStripItemRenderModel(
+            filterProfileId = profile.id,
+            title = profile.localizedLabel(text),
+            isSelected = isSelected,
+            selectAction = if (!isSelected) familyState.updateAction(profile.id) else null
+        )
+    }
+    return FilterStripRenderModel(
+        headline = text.stylePanelTitle(),
+        items = items,
+        isVisible = items.isNotEmpty()
+    )
+}
+
 internal data class ColorLabPanelRenderModel(
     val title: String,
     val colorAxis: Float,
@@ -432,7 +482,6 @@ internal fun sessionSettingsPageRenderModel(
 ): SessionSettingsPageRenderModel {
     val settings = state.settings.persisted
     val catalog = state.settings.catalog
-    val renderModel = sessionSettingsRenderModel(state, text)
     val editingEnabled = state.activeShot == null && state.countdownRemainingSeconds == null
     val photoFilters = catalog.photoSettingsFilterProfiles()
     val videoFilters = catalog.videoSettingsFilterProfiles()
@@ -846,15 +895,9 @@ internal fun runtimeProControlsRenderModel(
     text: AppTextResolver
 ): RuntimeProControlsRenderModel {
     val isEditableMode = state.activeMode in setOf(
-        ModeId.NIGHT,
-        ModeId.PORTRAIT,
-        ModeId.HUMANISTIC,
-        ModeId.PRO
+        ModeId.HUMANISTIC
     )
-    val isVisible = isEditableMode && (
-        state.activeMode == ModeId.PRO ||
-            state.modeSnapshot.state.isProVariantActive
-    )
+    val isVisible = isEditableMode && state.modeSnapshot.state.isProVariantActive
     val draft = state.settings.catalog.manualCaptureDraft
     val manualCapabilities = state.activeDeviceCapabilities.resolvedManualControlCapabilities
     val hasAppliedManualControls = state.activeDeviceCapabilities.supportsAppliedManualControls
@@ -863,10 +906,7 @@ internal fun runtimeProControlsRenderModel(
     return RuntimeProControlsRenderModel(
         isVisible = isVisible,
         headline = when (state.activeMode) {
-            ModeId.NIGHT -> text.proControlsScenery()
-            ModeId.PORTRAIT -> text.proControlsPortrait()
             ModeId.HUMANISTIC -> text.proControlsHumanistic()
-            ModeId.PRO -> text.proControlsDefault()
             else -> text.proControlsDefault()
         },
         supportingText = if (hasAppliedManualControls) {
@@ -1416,7 +1456,7 @@ internal fun filterLabPageRenderModel(
             text.filterLabEditingDisabled()
         },
         panelRole = panelRole,
-        showFamilyTabs = panelRole == StyleAndColorLabRole.STYLE,
+        showFamilyTabs = false,
         showFilterItems = panelRole == StyleAndColorLabRole.STYLE,
         showAdjustmentPanel = panelRole == StyleAndColorLabRole.COLOR_LAB,
         showAdvancedControls = false,
@@ -1634,13 +1674,10 @@ private fun Set<String>.prettyWatermarkTokens(text: AppTextResolver): String {
 internal fun defaultFilterLabFamily(activeMode: ModeId): FilterLabFamily {
     return when (activeMode) {
         ModeId.HUMANISTIC -> FilterLabFamily.HUMANISTIC
-        ModeId.PORTRAIT -> FilterLabFamily.PORTRAIT
         ModeId.VIDEO -> FilterLabFamily.VIDEO
         ModeId.PHOTO,
-        ModeId.DOCUMENT,
-        ModeId.NIGHT,
-        ModeId.PRO,
-        ModeId.FULL_CLEAR -> FilterLabFamily.PHOTO
+        ModeId.CHECK_IN,
+        ModeId.DOCUMENT -> FilterLabFamily.PHOTO
     }
 }
 
@@ -1697,10 +1734,8 @@ private val ERROR_EVENT_NAMES = setOf(
     "still-quality.blocked", "still-resolution.blocked", "settings.update.blocked"
 )
 
-private val ERROR_SUFFIXES = listOf(".unavailable", ".skipped")
-
 private fun isErrorEvent(name: String): Boolean {
-    return name in ERROR_EVENT_NAMES || ERROR_SUFFIXES.any { name.endsWith(it) }
+    return name in ERROR_EVENT_NAMES
 }
 
 private fun escapeLinkValue(value: String): String {
@@ -1774,6 +1809,16 @@ internal fun devLogRenderModel(
             val timeStr = formatTimestamp(event.timestampMillis)
             "[$timeStr] [${event.domain.label}] ${event.sequence}. ${event.name} -> ${event.detail}"
         }
+    }
+
+    fun timingTotalMillis(event: SessionTraceEvent): Long? {
+        if (!event.name.endsWith(".timing")) return null
+        val marker = "total="
+        val start = event.detail.indexOf(marker)
+        if (start < 0) return null
+        val valueStart = start + marker.length
+        val valueEnd = event.detail.indexOf("ms", valueStart).takeIf { it >= 0 } ?: event.detail.length
+        return event.detail.substring(valueStart, valueEnd).trim().toLongOrNull()
     }
 
     fun formatLinkEvents(events: List<com.opencamera.core.session.PerformanceLinkEvent>): String {
@@ -1877,6 +1922,8 @@ internal fun devLogRenderModel(
     }
 
     val lastTiming = traceEvents.lastOrNull { it.name.endsWith(".timing") }
+    val slowestTiming = traceEvents.maxByOrNull { timingTotalMillis(it) ?: Long.MIN_VALUE }
+        ?.takeIf { timingTotalMillis(it) != null }
     val lastIssue = errorEvents.lastOrNull()
     val summaryText = buildString {
         append("状态: ${debugDump.previewStatus} | ")
@@ -1885,6 +1932,9 @@ internal fun devLogRenderModel(
         append("录制: ${debugDump.recordingStatus}")
         if (lastTiming != null) {
             append(" | 最后耗时: ${lastTiming.detail}")
+        }
+        if (slowestTiming != null && slowestTiming != lastTiming) {
+            append(" | 最慢耗时: ${slowestTiming.detail}")
         }
         if (lastIssue != null) {
             append(" | 最近问题: ${lastIssue.name}")

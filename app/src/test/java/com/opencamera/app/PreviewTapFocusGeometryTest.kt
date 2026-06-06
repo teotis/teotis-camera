@@ -62,6 +62,44 @@ class PreviewTapFocusGeometryTest {
     }
 
     @Test
+    fun `active frame tap normalizes relative to frame bounds`() {
+        val result = normalizedPreviewTapOrNull(
+            tapX = 300f,
+            tapY = 250f,
+            viewWidth = 1000,
+            viewHeight = 800,
+            activeFrameBounds = PreviewTapFrameBounds(
+                left = 100f,
+                top = 50f,
+                right = 900f,
+                bottom = 650f
+            )
+        )
+
+        assertNotNull(result)
+        assertEquals(0.25f, result.x)
+        assertEquals(1f / 3f, result.y)
+    }
+
+    @Test
+    fun `active frame tap outside frame returns null`() {
+        assertNull(
+            normalizedPreviewTapOrNull(
+                tapX = 50f,
+                tapY = 250f,
+                viewWidth = 1000,
+                viewHeight = 800,
+                activeFrameBounds = PreviewTapFrameBounds(
+                    left = 100f,
+                    top = 50f,
+                    right = 900f,
+                    bottom = 650f
+                )
+            )
+        )
+    }
+
+    @Test
     fun `non-null activeFrameRect with stub RectF rejects taps`() {
         // RectF stub has all fields = 0, so contains() returns false for any point.
         // This verifies the null-check branch is taken.

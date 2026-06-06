@@ -3,6 +3,9 @@ package com.opencamera.app.gesture
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.normalizedZoomRatioValue
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.ln
 
 data class ZoomDragResult(
     val targetRatio: Float,
@@ -26,11 +29,13 @@ class ZoomScaleMapper(
         } else 0f
 
         return if (isContinuous) {
-            val ratio = normalizedZoomRatioValue(minRatio + fraction * (maxRatio - minRatio))
+            val logRatio = ln(minRatio) + fraction * (ln(maxRatio) - ln(minRatio))
+            val ratio = normalizedZoomRatioValue(exp(logRatio))
             ZoomDragResult(targetRatio = ratio, snappedToPreset = false)
         } else {
-            val index = (fraction * (presets.size - 1)).toInt().coerceIn(0, presets.size - 1)
-            ZoomDragResult(targetRatio = presets[index], snappedToPreset = true)
+            val logRatio = ln(minRatio) + fraction * (ln(maxRatio) - ln(minRatio))
+            val nearest = presets.minByOrNull { abs(ln(it) - logRatio) } ?: presets.first()
+            ZoomDragResult(targetRatio = nearest, snappedToPreset = true)
         }
     }
 }

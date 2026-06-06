@@ -10,24 +10,24 @@ import kotlin.test.assertTrue
 class ModeCapabilityDegradationTest {
 
     @Test
-    fun `night declaration describes multi-frame to single-frame degradation`() {
-        val declaration = ModeId.NIGHT.modeProductDeclaration()
+    fun `checkin declaration describes multi-frame to best-frame degradation`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
         val req = declaration.requirements.first { it.kind == CapabilityRequirementKind.MULTI_FRAME_CAPTURE }
 
         assertTrue(req.degradationDescription.contains("single-frame", ignoreCase = true))
-        assertEquals("night-single-frame", req.fallbackId)
+        assertEquals("checkin-best-frame", req.fallbackId)
 
         val fallbackVariant = declaration.strategyVariants.first { it.id == req.fallbackId }
         assertEquals(ModeStrategyType.SINGLE_FRAME, fallbackVariant.type)
     }
 
     @Test
-    fun `portrait declaration describes depth to focus degradation`() {
-        val declaration = ModeId.PORTRAIT.modeProductDeclaration()
+    fun `checkin declaration describes depth segmentation to focus degradation`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
         val req = declaration.requirements.first { it.kind == CapabilityRequirementKind.PORTRAIT_SEGMENTATION }
 
         assertTrue(req.degradationDescription.contains("focus", ignoreCase = true))
-        assertEquals("portrait-focus", req.fallbackId)
+        assertEquals("checkin-focus", req.fallbackId)
 
         val fallbackVariant = declaration.strategyVariants.first { it.id == req.fallbackId }
         assertEquals(ModeStrategyType.SINGLE_FRAME, fallbackVariant.type)
@@ -46,12 +46,12 @@ class ModeCapabilityDegradationTest {
     }
 
     @Test
-    fun `pro declaration describes manual to assisted degradation`() {
-        val declaration = ModeId.PRO.modeProductDeclaration()
+    fun `humanistic declaration describes manual to auto degradation`() {
+        val declaration = ModeId.HUMANISTIC.modeProductDeclaration()
         val req = declaration.requirements.first { it.kind == CapabilityRequirementKind.MANUAL_CONTROL }
 
         assertTrue(req.degradationDescription.contains("assisted", ignoreCase = true))
-        assertEquals("pro-assisted", req.fallbackId)
+        assertEquals("humanistic-auto", req.fallbackId)
 
         val fallbackVariant = declaration.strategyVariants.first { it.id == req.fallbackId }
         assertEquals(ModeStrategyType.SINGLE_FRAME, fallbackVariant.type)
@@ -98,5 +98,15 @@ class ModeCapabilityDegradationTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `checkin focus stack degradation describes honest best-frame fallback`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
+        val stackReq = declaration.requirements.firstOrNull { it.id == "checkin-focus-stack" }
+
+        assertNotNull(stackReq)
+        assertTrue(stackReq.isOptional)
+        assertEquals("checkin-best-frame", stackReq.fallbackId)
     }
 }

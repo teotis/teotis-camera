@@ -131,12 +131,47 @@ object OcwmJpegContainer {
 
         if (ocwmChunks.isEmpty()) return null
 
-        // Group by totalPayloadLength + chunkCount (consistent across all chunks)
-        val groups = ocwmChunks.groupBy { "${it.totalPayloadLength}-${it.chunkCount}" }
-        require(groups.size == 1) { "ocwm-chunk-missing" }
-        val chunks = groups.values.first()
+        return extractNewestArchive(ocwmChunks)
+    }
+
+    private fun extractNewestArchive(ocwmChunks: List<OcwmChunk>): EmbeddedArchive {
+        val archiveGroups = splitArchiveGroups(ocwmChunks)
+        require(archiveGroups.isNotEmpty()) { "ocwm-chunk-missing" }
+        var latestFailure: IllegalArgumentException? = null
+        for (chunks in archiveGroups.asReversed()) {
+            try {
+                return extractArchiveFromChunks(chunks)
+            } catch (e: IllegalArgumentException) {
+                latestFailure = e
+                break
+            }
+        }
+        throw latestFailure ?: IllegalArgumentException("ocwm-chunk-missing")
+    }
+
+    private fun splitArchiveGroups(ocwmChunks: List<OcwmChunk>): List<List<OcwmChunk>> {
+        val groups = mutableListOf<MutableList<OcwmChunk>>()
+        for (chunk in ocwmChunks) {
+            if (chunk.chunkIndex == 0 && chunk.manifestUtf8 != null) {
+                groups.add(mutableListOf(chunk))
+            } else {
+                groups.lastOrNull()?.add(chunk)
+            }
+        }
+        return groups
+    }
+
+    private fun extractArchiveFromChunks(chunks: List<OcwmChunk>): EmbeddedArchive {
+        require(chunks.isNotEmpty()) { "ocwm-chunk-missing" }
+        require(chunks.first().chunkIndex == 0 && chunks.first().manifestUtf8 != null) {
+            "ocwm-chunk-missing"
+        }
 
         val chunkCount = chunks.first().chunkCount
+        val totalPayloadLength = chunks.first().totalPayloadLength
+        require(chunks.all { it.chunkCount == chunkCount && it.totalPayloadLength == totalPayloadLength }) {
+            "ocwm-chunk-missing"
+        }
         require(chunks.size == chunkCount) { "ocwm-chunk-missing" }
 
         val sorted = sortedByChunkIndex(chunks)
@@ -148,14 +183,14 @@ object OcwmJpegContainer {
         require(sorted.first().formatVersion == 1) { "ocwm-version-unsupported" }
 
         // Reassemble payload
-        val totalPayloadLength = sorted.first().totalPayloadLength.toInt()
-        val payload = ByteArray(totalPayloadLength)
+        require(totalPayloadLength in 0..Int.MAX_VALUE.toLong()) { "ocwm-payload-length-invalid" }
+        val payload = ByteArray(totalPayloadLength.toInt())
         var offset = 0
         for (chunk in sorted) {
             chunk.payloadSlice.copyInto(payload, offset)
             offset += chunk.payloadSlice.size
         }
-        require(offset == totalPayloadLength) { "ocwm-chunk-missing" }
+        require(offset == totalPayloadLength.toInt()) { "ocwm-chunk-missing" }
 
         // Parse manifest from chunk 0
         val manifestJson = sorted.first().manifestUtf8

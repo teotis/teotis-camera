@@ -523,19 +523,33 @@ class CaptureRecordingSessionProcessorTest {
         assertTrue(harness.trace.snapshot().any { it.name == "shot.plan.failed" })
     }
 
-    // ── Recording Watchdog Tests ────────────────────────────────────────
-    // NOTE: The watchdog currently launches on Dispatchers.Default (not the
-    // injected scope), so timeout-based tests with StandardTestDispatcher
-    // cannot control its timing. Full timeout tests should be added after
-    // P6 fix moves watchdog to the injected scope.
+    @Test
+    fun `startRecordingWatchdog times out with injected virtual time`() = runTest {
+        val harness = Harness(runningState().copy(
+            activeShot = testShotRequest("shot-video", MediaType.VIDEO),
+            recordingStatus = RecordingStatus.REQUESTING
+        ))
+        harness.processor.startRecordingWatchdog(RecordingStatus.REQUESTING, timeoutMillis = 5_000L)
+
+        harness.testDispatcher.scheduler.advanceTimeBy(5_000L)
+        harness.testDispatcher.scheduler.runCurrent()
+
+        assertEquals(RecordingStatus.IDLE, harness.state.value.recordingStatus)
+        assertNull(harness.state.value.activeShot)
+        assertEquals("Recording state REQUESTING timed out", harness.state.value.presentation.lastError)
+        assertTrue(harness.trace.snapshot().any { it.name == "recording.watchdog.timeout" })
+    }
 
     @Test
-    fun `startRecordingWatchdog starts without error`() = runTest {
+    fun `startRecordingWatchdog leaves state unchanged before timeout`() = runTest {
         val harness = Harness(runningState().copy(
             recordingStatus = RecordingStatus.REQUESTING
         ))
         harness.processor.startRecordingWatchdog(RecordingStatus.REQUESTING, timeoutMillis = 5_000L)
-        // Watchdog started successfully — state is unchanged until timeout
+
+        harness.testDispatcher.scheduler.advanceTimeBy(4_999L)
+        harness.testDispatcher.scheduler.runCurrent()
+
         assertEquals(RecordingStatus.REQUESTING, harness.state.value.recordingStatus)
     }
 

@@ -45,7 +45,7 @@
         android:layout_height="0dp"
         android:background="#26000000"
         android:clickable="true"
-        android:elevation="4dp"
+        android:elevation="7dp"
         android:focusable="true"
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -221,6 +221,7 @@
         android:clipToPadding="false"
         android:elevation="8dp"
         android:fadeScrollbars="false"
+        android:fillViewport="true"
         android:scrollbars="none"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
@@ -228,8 +229,11 @@
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
         <LinearLayout
+            android:id="@+id/quickPanelContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
             android:orientation="vertical"
             android:padding="8dp">
 
@@ -257,7 +261,7 @@
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:paddingHorizontal="6dp"
-                android:background="@drawable/bg_panel_row">
+                android:background="@drawable/bg_quick_chip">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -290,8 +294,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
                 android:orientation="horizontal"
-                android:gravity="center"
-                android:background="@drawable/bg_panel_row">
+                android:gravity="center">
 
                 <Button
                     android:id="@+id/buttonQuickFrameRatio"
@@ -335,9 +338,9 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Mode track: horizontal scrolling strip (positioned above zoom chips) -->
+    <!-- Filter strip: horizontal scrolling chips for filter-only modes (above mode track) -->
     <HorizontalScrollView
-        android:id="@+id/modeTrackScroll"
+        android:id="@+id/filterStripScroll"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginBottom="0dp"
@@ -345,7 +348,32 @@
         android:fadeScrollbars="false"
         android:clipToPadding="false"
         android:paddingHorizontal="@dimen/space_12"
-        android:paddingVertical="@dimen/space_4"
+        android:paddingVertical="@dimen/space_8"
+        android:visibility="gone"
+        android:background="@color/oc_root_background"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <LinearLayout
+            android:id="@+id/filterStripChips"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <!-- Mode track: horizontal scrolling strip (positioned above zoom chips) -->
+    <HorizontalScrollView
+        android:id="@+id/modeTrackScroll"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/mode_track_height"
+        android:layout_marginBottom="0dp"
+        android:scrollbars="none"
+        android:fadeScrollbars="false"
+        android:clipToPadding="false"
+        android:paddingHorizontal="@dimen/space_12"
+        android:paddingVertical="@dimen/space_2"
         app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
@@ -365,36 +393,12 @@
                 android:text="@string/button_photo_mode" />
 
             <Button
-                android:id="@+id/buttonNightMode"
+                android:id="@+id/buttonCheckInMode"
                 style="@style/Widget.OpenCamera.ModeTrackButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
-                android:text="@string/button_night_mode" />
-
-            <Button
-                android:id="@+id/buttonFullClearMode"
-                style="@style/Widget.OpenCamera.ModeTrackButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/button_fullclear_mode" />
-
-            <Button
-                android:id="@+id/buttonPortraitMode"
-                style="@style/Widget.OpenCamera.ModeTrackButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/button_portrait_mode" />
-
-            <Button
-                android:id="@+id/buttonProMode"
-                style="@style/Widget.OpenCamera.ModeTrackButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/button_pro_mode" />
+                android:text="@string/button_checkin_mode" />
 
             <Button
                 android:id="@+id/buttonVideoMode"
@@ -1454,13 +1458,14 @@
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/devConsolePanel"
         android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:layout_height="wrap_content"
         android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
         android:layout_marginTop="14dp"
         android:visibility="gone"
         app:cardBackgroundColor="@color/oc_surface_panel"
         app:cardCornerRadius="@dimen/radius_panel_shell"
         app:cardElevation="10dp"
+        app:layout_constrainedHeight="true"
         app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -1475,8 +1480,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:fillViewport="true"
+                android:fillViewport="false"
                 android:paddingBottom="@dimen/dev_console_scroll_floating_padding"
+                android:paddingTop="@dimen/dev_console_scroll_floating_padding"
                 android:scrollbars="none">
 
                 <LinearLayout
@@ -1485,10 +1491,45 @@
                     android:orientation="vertical"
                     android:padding="@dimen/panel_padding">
 
+                    <!-- Action row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/buttonDevExport"
+                            style="@style/Widget.OpenCamera.PillButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/dev_export_log" />
+
+                        <Button
+                            android:id="@+id/buttonDevVendorProbe"
+                            style="@style/Widget.OpenCamera.PillButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:text="@string/dev_vendor_probe" />
+
+                        <Button
+                            android:id="@+id/buttonDevClose"
+                            style="@style/Widget.OpenCamera.PillButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/dev_cleanup_current" />
+                    </LinearLayout>
+
                     <!-- Tab row -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
                         android:gravity="center"
                         android:orientation="horizontal">
 
@@ -1568,41 +1609,6 @@
                         android:textColor="@color/oc_text_secondary"
                         android:textSize="@dimen/text_size_status"
                         android:visibility="gone" />
-
-                    <!-- Action row -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:gravity="center"
-                        android:orientation="horizontal">
-
-                        <Button
-                            android:id="@+id/buttonDevExport"
-                            style="@style/Widget.OpenCamera.PillButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="8dp"
-                            android:layout_weight="1"
-                            android:text="@string/dev_export_log" />
-
-                        <Button
-                            android:id="@+id/buttonDevVendorProbe"
-                            style="@style/Widget.OpenCamera.PillButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginEnd="8dp"
-                            android:layout_weight="1"
-                            android:text="@string/dev_vendor_probe" />
-
-                        <Button
-                            android:id="@+id/buttonDevClose"
-                            style="@style/Widget.OpenCamera.PillButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/dev_cleanup_current" />
-                    </LinearLayout>
                 </LinearLayout>
             </androidx.core.widget.NestedScrollView>
 
@@ -1610,8 +1616,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="end|bottom"
+                android:layout_marginBottom="@dimen/panel_padding"
                 android:layout_marginEnd="@dimen/space_4"
-                android:layout_marginBottom="@dimen/dev_console_scroll_floating_bottom_margin"
                 android:orientation="vertical">
 
                 <Button
@@ -1690,13 +1696,13 @@
             android:textSize="@dimen/text_size_status"
             android:visibility="gone" />
 
-        <!-- Main control row: Thumbnail | Shutter | Lens/Zoom -->
-        <LinearLayout
+        <!-- Main control row: thumbnail and lens flank a screen-centered shutter. -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/bottomControlRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/cockpit_control_row_margin_top"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:minHeight="@dimen/touch_target_shutter">
 
             <!-- Left: Thumbnail -->
             <ImageView
@@ -1706,52 +1712,51 @@
                 android:background="@drawable/bg_thumbnail"
                 android:contentDescription="@string/preview_thumbnail_content_description"
                 android:padding="2dp"
-                android:scaleType="centerCrop" />
+                android:scaleType="centerCrop"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/buttonShutter"
+                app:layout_constraintHorizontal_bias="0"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
             <!-- Center: Shutter (round) -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <Button
-                    android:id="@+id/buttonShutter"
-                    android:layout_width="@dimen/touch_target_shutter"
-                    android:layout_height="@dimen/touch_target_shutter"
-                    android:background="@drawable/bg_shutter_selector"
-                    app:backgroundTint="@null"
-                    android:includeFontPadding="false"
-                    android:insetLeft="0dp"
-                    android:insetTop="0dp"
-                    android:insetRight="0dp"
-                    android:insetBottom="0dp"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:minWidth="@dimen/touch_target_shutter"
-                    android:minHeight="@dimen/touch_target_shutter"
-                    android:text=""
-                    android:textAllCaps="false"
-                    android:textColor="@android:color/transparent"
-                    android:textSize="@dimen/text_size_control_value" />
-            </LinearLayout>
+            <Button
+                android:id="@+id/buttonShutter"
+                android:layout_width="@dimen/touch_target_shutter"
+                android:layout_height="@dimen/touch_target_shutter"
+                android:background="@drawable/bg_shutter_selector"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:maxLines="1"
+                android:minWidth="@dimen/touch_target_shutter"
+                android:minHeight="@dimen/touch_target_shutter"
+                android:text=""
+                android:textAllCaps="false"
+                android:textColor="@android:color/transparent"
+                android:textSize="@dimen/text_size_control_value"
+                app:backgroundTint="@null"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
             <!-- Right: Lens -->
-            <LinearLayout
+            <Button
+                android:id="@+id/buttonLensFacing"
+                style="@style/Widget.OpenCamera.QuickSettingButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="vertical">
-
-                <Button
-                    android:id="@+id/buttonLensFacing"
-                    style="@style/Widget.OpenCamera.QuickSettingButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/button_switch_lens" />
-            </LinearLayout>
-        </LinearLayout>
+                android:text="@string/button_switch_lens"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintHorizontal_bias="1"
+                app:layout_constraintStart_toEndOf="@id/buttonShutter"
+                app:layout_constraintTop_toTopOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

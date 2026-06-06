@@ -143,8 +143,46 @@ class DevLogRenderModelTest {
         )
         assertTrue(model.content.contains("preview.error"))
         assertTrue(model.content.contains("zoom.switch.blocked"))
-        assertTrue(model.content.contains("lens.switch.skipped"))
+        assertFalse(model.content.contains("lens.switch.skipped"))
         assertFalse(model.content.contains("session.created"))
+    }
+
+    @Test
+    fun `error tab excludes normal unavailable and skipped events`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents + listOf(
+                SessionTraceEvent(11, "zoom.switch.unavailable", "single camera", 11L),
+                SessionTraceEvent(12, "still-quality.unavailable", "mode unsupported", 12L),
+                SessionTraceEvent(13, "settings.update.skipped", "no change", 13L),
+                SessionTraceEvent(14, "preview.surface.lost", "surface destroyed", 14L)
+            ),
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ERROR,
+            text = TestAppTextResolver()
+        )
+
+        assertFalse(model.content.contains("zoom.switch.unavailable"))
+        assertFalse(model.content.contains("still-quality.unavailable"))
+        assertFalse(model.content.contains("settings.update.skipped"))
+        assertTrue(model.content.contains("preview.surface.lost"))
+    }
+
+    @Test
+    fun `error tab excludes high frequency zoom apply skipped events`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents + listOf(
+                SessionTraceEvent(11, "zoom.apply.skipped", "2.6x", 11L),
+                SessionTraceEvent(12, "preview.error", "camera error", 12L)
+            ),
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ERROR,
+            text = TestAppTextResolver()
+        )
+
+        assertFalse(model.content.contains("zoom.apply.skipped"))
+        assertTrue(model.content.contains("preview.error"))
     }
 
     @Test
@@ -232,6 +270,25 @@ class DevLogRenderModelTest {
         assertTrue(model.content.contains("recording.timing"))
         assertTrue(model.content.contains("device=245ms"))
         assertTrue(model.content.contains("total=263ms"))
+    }
+
+    @Test
+    fun `summary highlights slowest timing event`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents + listOf(
+                SessionTraceEvent(11, "capture.timing", "shot=shot-1,device=245ms,postprocess=18ms,total=263ms", 11L),
+                SessionTraceEvent(12, "capture.timing", "shot=shot-2,device=827ms,postprocess=4510ms,total=5386ms", 12L),
+                SessionTraceEvent(13, "capture.timing", "shot=shot-3,device=200ms,postprocess=10ms,total=230ms", 13L)
+            ),
+            isDebugBuild = true,
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver()
+        )
+
+        assertTrue(model.summaryText.contains("最慢耗时"))
+        assertTrue(model.summaryText.contains("shot=shot-2"))
+        assertTrue(model.summaryText.contains("total=5386ms"))
     }
 
     @Test
@@ -558,7 +615,7 @@ class DevLogRenderModelTest {
             previewStatus = PreviewStatus.ACTIVE,
             previewStatusDetail = null,
             activeMode = ModeId.PHOTO,
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
             captureStatus = CaptureStatus.IDLE,
             recordingStatus = RecordingStatus.IDLE,
             activeShot = null,

@@ -19,9 +19,9 @@ class ProVariantState(
         isEnabled = !isEnabled
         val eventSuffix = if (isEnabled) "entered" else "exited"
         val hint = when {
-            isEnabled && manualControlsEnabled() -> "$modeDisplayName Pro on"
-            isEnabled -> "$modeDisplayName Pro assist on"
-            else -> "$modeDisplayName Pro off"
+            isEnabled && manualControlsEnabled() -> "$modeDisplayName Professional on"
+            isEnabled -> "$modeDisplayName Professional assist on"
+            else -> "$modeDisplayName Professional off"
         }
         return ProVariantToggleResult(
             enabled = isEnabled,
@@ -60,16 +60,16 @@ class ProVariantState(
 
     fun proActionLabel(): String {
         return if (isEnabled) {
-            if (manualControlsEnabled()) "Exit Pro" else "Exit Pro Assist"
+            if (manualControlsEnabled()) "Professional on" else "Professional assist on"
         } else if (manualControlsEnabled()) {
-            "Enter Pro"
+            "Professional"
         } else {
-            "Enter Pro Assist"
+            "Professional assist"
         }
     }
 
     fun variantExifLabel(): String =
-        if (manualControlsEnabled()) "Pro" else "Pro Assist"
+        if (manualControlsEnabled()) "Professional" else "Professional assist"
 
     fun metadataTags(): Map<String, String> {
         if (!isEnabled) return emptyMap()
@@ -82,9 +82,9 @@ class ProVariantState(
 
     fun summaryText(requestName: String): String {
         return if (manualControlsEnabled()) {
-            "Pro draft ${currentManualDraft().compactSummary()} is attached to the $requestName request."
+            "Professional draft ${currentManualDraft().compactSummary()} is attached to the $requestName request."
         } else {
-            "Pro assist keeps ${currentManualDraft().compactSummary()} as saved-only draft because manual controls are unavailable on this device."
+            "Professional assist keeps ${currentManualDraft().compactSummary()} as saved-only draft because manual controls are unavailable on this device."
         }
     }
 }

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class ModeProductDeclarationTest {
 
     @Test
-    fun `all seven modes have product declarations`() {
+    fun `all nine mode ids have product declarations`() {
         ModeId.entries.forEach { modeId ->
             val declaration = modeId.modeProductDeclaration()
             assertEquals(modeId, declaration.modeId)
@@ -26,26 +26,14 @@ class ModeProductDeclarationTest {
     }
 
     @Test
-    fun `night declaration gates on still capture`() {
-        val declaration = ModeId.NIGHT.modeProductDeclaration()
-        assertEquals(CapabilityRequirementKind.STILL_CAPTURE, declaration.primaryGate.kind)
-    }
-
-    @Test
-    fun `portrait declaration gates on still capture`() {
-        val declaration = ModeId.PORTRAIT.modeProductDeclaration()
+    fun `checkin declaration gates on still capture`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
         assertEquals(CapabilityRequirementKind.STILL_CAPTURE, declaration.primaryGate.kind)
     }
 
     @Test
     fun `humanistic declaration gates on still capture`() {
         val declaration = ModeId.HUMANISTIC.modeProductDeclaration()
-        assertEquals(CapabilityRequirementKind.STILL_CAPTURE, declaration.primaryGate.kind)
-    }
-
-    @Test
-    fun `pro declaration gates on still capture`() {
-        val declaration = ModeId.PRO.modeProductDeclaration()
         assertEquals(CapabilityRequirementKind.STILL_CAPTURE, declaration.primaryGate.kind)
     }
 
@@ -62,19 +50,19 @@ class ModeProductDeclarationTest {
     }
 
     @Test
-    fun `night declaration requires multi-frame capture with single-frame fallback`() {
-        val declaration = ModeId.NIGHT.modeProductDeclaration()
+    fun `checkin declaration requires multi-frame capture with best-frame fallback`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
         val multiFrameReq = declaration.requirements.first { it.kind == CapabilityRequirementKind.MULTI_FRAME_CAPTURE }
         assertFalse(multiFrameReq.isOptional)
-        assertEquals("night-single-frame", multiFrameReq.fallbackId)
+        assertEquals("checkin-best-frame", multiFrameReq.fallbackId)
     }
 
     @Test
-    fun `portrait declaration requires portrait segmentation with focus fallback`() {
-        val declaration = ModeId.PORTRAIT.modeProductDeclaration()
+    fun `checkin declaration requires portrait segmentation with focus fallback`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
         val segReq = declaration.requirements.first { it.kind == CapabilityRequirementKind.PORTRAIT_SEGMENTATION }
         assertFalse(segReq.isOptional)
-        assertEquals("portrait-focus", segReq.fallbackId)
+        assertEquals("checkin-focus", segReq.fallbackId)
     }
 
     @Test
@@ -86,11 +74,11 @@ class ModeProductDeclarationTest {
     }
 
     @Test
-    fun `pro declaration requires manual control with assisted fallback`() {
-        val declaration = ModeId.PRO.modeProductDeclaration()
+    fun `humanistic declaration requires manual control with auto fallback`() {
+        val declaration = ModeId.HUMANISTIC.modeProductDeclaration()
         val manualReq = declaration.requirements.first { it.kind == CapabilityRequirementKind.MANUAL_CONTROL }
         assertFalse(manualReq.isOptional)
-        assertEquals("pro-assisted", manualReq.fallbackId)
+        assertEquals("humanistic-auto", manualReq.fallbackId)
     }
 
     @Test
@@ -102,19 +90,19 @@ class ModeProductDeclarationTest {
     }
 
     @Test
-    fun `night declaration includes both multi-frame and single-frame variants`() {
-        val declaration = ModeId.NIGHT.modeProductDeclaration()
-        assertEquals(2, declaration.strategyVariants.size)
+    fun `checkin declaration includes multi-frame and single-frame variants`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
         assertTrue(declaration.strategyVariants.any { it.type == ModeStrategyType.MULTI_FRAME })
         assertTrue(declaration.strategyVariants.any { it.type == ModeStrategyType.SINGLE_FRAME })
     }
 
     @Test
-    fun `portrait declaration effect profile includes portrait effect`() {
-        val declaration = ModeId.PORTRAIT.modeProductDeclaration()
+    fun `checkin declaration effect profile includes portrait and frame effects`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
         assertTrue(declaration.effectProfile.usesPortraitEffect)
         assertTrue(declaration.effectProfile.usesFilter)
         assertTrue(declaration.effectProfile.usesFrameEffect)
+        assertTrue(declaration.effectProfile.usesWatermark)
     }
 
     @Test
@@ -126,7 +114,7 @@ class ModeProductDeclarationTest {
     }
 
     @Test
-    fun `humanistic declaration effect profile includes filter but not portrait`() {
+    fun `humanistic declaration effect profile includes filter and frame but not portrait`() {
         val declaration = ModeId.HUMANISTIC.modeProductDeclaration()
         assertTrue(declaration.effectProfile.usesFilter)
         assertFalse(declaration.effectProfile.usesPortraitEffect)
@@ -150,9 +138,19 @@ class ModeProductDeclarationTest {
     }
 
     @Test
-    fun `night multi-frame requirement is not optional`() {
-        val declaration = ModeId.NIGHT.modeProductDeclaration()
+    fun `checkin multi-frame requirement is not optional`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
         val multiFrameReq = declaration.requirements.first { it.kind == CapabilityRequirementKind.MULTI_FRAME_CAPTURE }
         assertFalse(multiFrameReq.isOptional)
+    }
+
+    @Test
+    fun `mode ids only include canonical product modes`() {
+        val canonicalModes = ModeId.entries
+        assertEquals(5, canonicalModes.size)
+        assertEquals(
+            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.DOCUMENT, ModeId.HUMANISTIC, ModeId.VIDEO),
+            canonicalModes
+        )
     }
 }

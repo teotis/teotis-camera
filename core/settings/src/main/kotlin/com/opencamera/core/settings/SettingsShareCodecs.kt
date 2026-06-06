@@ -44,12 +44,13 @@ object FilterProfileShareCodec {
             }
             line.substring(0, separatorIndex) to line.substring(separatorIndex + 1)
         }
+        val categoryValue = values.requireFilterProfileField("category")
         return FilterProfile(
-            id = values.getValue("id"),
-            label = values.getValue("label"),
+            id = values.requireFilterProfileField("id"),
+            label = values.requireFilterProfileField("label"),
             category = runCatching {
-                FilterProfileCategory.valueOf(values.getValue("category"))
-            }.getOrElse { error("Unknown filter profile category: ${values["category"]}") },
+                FilterProfileCategory.valueOf(categoryValue)
+            }.getOrElse { throw IllegalArgumentException("Unknown filter profile category: $categoryValue", it) },
             builtIn = values["builtIn"]?.toBooleanStrictOrNull() ?: false,
             renderSpec = FilterRenderSpec(
                 brightnessShift = values["brightnessShift"]?.toIntOrNull() ?: 0,
@@ -70,6 +71,9 @@ object FilterProfileShareCodec {
             )
         )
     }
+
+    private fun Map<String, String>.requireFilterProfileField(key: String): String =
+        this[key] ?: throw IllegalArgumentException("Missing required filter profile field: $key")
 }
 
 object ImportedFilterProfilesSerializer {

@@ -122,7 +122,7 @@ class SessionStateRenderTest {
             previewStatus = PreviewStatus.ACTIVE,
             previewStatusDetail = null,
             activeMode = ModeId.PHOTO,
-            availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO),
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.VIDEO),
             captureStatus = CaptureStatus.IDLE,
             recordingStatus = RecordingStatus.IDLE,
             activeShot = null,

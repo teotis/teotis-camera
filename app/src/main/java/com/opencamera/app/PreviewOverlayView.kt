@@ -191,6 +191,10 @@ class PreviewOverlayView @JvmOverloads constructor(
         drawFocusReticle(canvas)
     }
 
+    internal fun drawOverlayForTest(canvas: Canvas) {
+        renderModel.effectModel?.watermarkHint?.let { drawWatermarkHint(canvas, it) }
+    }
+
     private fun activeContentGeometry(): PreviewContentGeometry {
         val frameRatio = renderModel.frame?.ratio
             ?: renderModel.effectModel?.frameGuideline?.ratio
@@ -322,41 +326,6 @@ class PreviewOverlayView @JvmOverloads constructor(
     private fun drawWatermarkTextHint(canvas: Canvas, spec: WatermarkHintSpec) {
         applyWatermarkTextScale(spec.textScale)
         watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
-        val padding = 16f * density
-        val x: Float
-        val y: Float
-        watermarkHintPaint.textAlign = Paint.Align.LEFT
-        when (spec.placement) {
-            WatermarkTextPlacement.TOP_LEFT -> {
-                x = padding
-                y = padding + watermarkHintPaint.textSize
-            }
-            WatermarkTextPlacement.TOP_RIGHT -> {
-                x = width.toFloat() - padding
-                y = padding + watermarkHintPaint.textSize
-                watermarkHintPaint.textAlign = Paint.Align.RIGHT
-            }
-            WatermarkTextPlacement.BOTTOM_LEFT -> {
-                x = padding
-                y = height.toFloat() - padding
-            }
-            WatermarkTextPlacement.BOTTOM_RIGHT -> {
-                x = width.toFloat() - padding
-                y = height.toFloat() - padding
-                watermarkHintPaint.textAlign = Paint.Align.RIGHT
-            }
-            WatermarkTextPlacement.BOTTOM_CENTER -> {
-                x = width / 2f
-                y = height.toFloat() - padding
-                watermarkHintPaint.textAlign = Paint.Align.CENTER
-            }
-        }
-        canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
-    }
-
-    private fun drawWatermarkExpandedFrameHint(canvas: Canvas, spec: WatermarkHintSpec) {
-        applyWatermarkTextScale(spec.textScale)
-        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
         val rect = activeFrameRectOrFullView()
         val padding = 16f * density
         val x: Float
@@ -390,35 +359,112 @@ class PreviewOverlayView @JvmOverloads constructor(
         canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
     }
 
+    private fun drawWatermarkExpandedFrameHint(canvas: Canvas, spec: WatermarkHintSpec) {
+        applyWatermarkTextScale(spec.textScale)
+        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
+        val rect = activeFrameRectOrFullView()
+        val paperPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (spec.templateId == "retro-frame") {
+                Color.argb((spec.opacity * 190).toInt().coerceIn(0, 190), 54, 39, 30)
+            } else {
+                Color.argb((spec.opacity * 214).toInt().coerceIn(0, 214), 252, 246, 229)
+            }
+            style = Paint.Style.FILL
+        }
+        val hairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (spec.templateId == "retro-frame") {
+                Color.argb((spec.opacity * 112).toInt().coerceIn(0, 112), 246, 214, 168)
+            } else {
+                Color.argb((spec.opacity * 72).toInt().coerceIn(0, 72), 96, 68, 42)
+            }
+            style = Paint.Style.STROKE
+            strokeWidth = 1f * density
+        }
+        val sideBand = (rect.width() * 0.035f).coerceIn(10f * density, 28f * density)
+        val topBand = (rect.height() * 0.035f).coerceIn(8f * density, 24f * density)
+        val leftBand = sideBand.coerceAtMost(rect.left)
+        val rightBand = sideBand.coerceAtMost(width - rect.right)
+        val topFrameBand = topBand.coerceAtMost(rect.top)
+        if (leftBand > 0f) {
+            canvas.drawRect(rect.left - leftBand, rect.top, rect.left, rect.bottom, paperPaint)
+        }
+        if (rightBand > 0f) {
+            canvas.drawRect(rect.right, rect.top, rect.right + rightBand, rect.bottom, paperPaint)
+        }
+        if (topFrameBand > 0f) {
+            canvas.drawRect(rect.left - leftBand, rect.top - topFrameBand, rect.right + rightBand, rect.top, paperPaint)
+        }
+        val bottomRect = expandedFrameBottomBandRect(rect, height, density)
+        if (bottomRect != null) {
+            canvas.drawRect(
+                bottomRect.left - leftBand,
+                bottomRect.top,
+                bottomRect.right + rightBand,
+                bottomRect.bottom,
+                paperPaint
+            )
+        }
+        canvas.drawRect(rect, hairlinePaint)
+
+        val padding = 16f * density
+        val textTop = if ((bottomRect?.height() ?: 0f) > watermarkHintPaint.textSize + padding) {
+            rect.bottom + padding + watermarkHintPaint.textSize
+        } else {
+            rect.bottom - padding
+        }
+        val x: Float
+        val y: Float
+        watermarkHintPaint.textAlign = Paint.Align.LEFT
+        when (spec.placement) {
+            WatermarkTextPlacement.TOP_LEFT -> {
+                x = rect.left + padding
+                y = rect.top + padding + watermarkHintPaint.textSize
+            }
+            WatermarkTextPlacement.TOP_RIGHT -> {
+                x = rect.right - padding
+                y = rect.top + padding + watermarkHintPaint.textSize
+                watermarkHintPaint.textAlign = Paint.Align.RIGHT
+            }
+            WatermarkTextPlacement.BOTTOM_LEFT -> {
+                x = rect.left + padding
+                y = textTop
+            }
+            WatermarkTextPlacement.BOTTOM_RIGHT -> {
+                x = rect.right - padding
+                y = textTop
+                watermarkHintPaint.textAlign = Paint.Align.RIGHT
+            }
+            WatermarkTextPlacement.BOTTOM_CENTER -> {
+                x = rect.centerX()
+                y = textTop
+                watermarkHintPaint.textAlign = Paint.Align.CENTER
+            }
+        }
+        canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
+    }
+
     private fun drawWatermarkFourBorderHint(canvas: Canvas, spec: WatermarkHintSpec) {
         applyWatermarkTextScale(spec.textScale)
-        val inset = 10f * density
-        val outerInset = 3f * density
         val rect = activeFrameRectOrFullView()
-        val borderRect = RectF(
-            rect.left + inset,
-            rect.top + inset,
-            rect.right - inset,
-            rect.bottom - inset
-        )
-
+        val band = fourBorderPreviewBandWidth(rect, density)
+        val bottomBand = (min(rect.width(), rect.height()) * 0.09f).coerceIn(34f * density, 86f * density)
         val blurBandAlpha = (spec.opacity * 255 * 0.12f).toInt().coerceIn(0, 255)
         val blurBandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             alpha = blurBandAlpha
             style = Paint.Style.FILL
         }
-        canvas.drawRect(RectF(rect.left + outerInset, rect.top + outerInset, rect.right - outerInset, borderRect.top), blurBandPaint)
-        canvas.drawRect(RectF(rect.left + outerInset, borderRect.bottom, rect.right - outerInset, rect.bottom - outerInset), blurBandPaint)
-        canvas.drawRect(RectF(rect.left + outerInset, borderRect.top, borderRect.left, borderRect.bottom), blurBandPaint)
-        canvas.drawRect(RectF(borderRect.right, borderRect.top, rect.right - outerInset, borderRect.bottom), blurBandPaint)
+        canvas.drawRect(RectF(rect.left, rect.top, rect.right, rect.top + band), blurBandPaint)
+        canvas.drawRect(RectF(rect.left, rect.bottom - bottomBand, rect.right, rect.bottom), blurBandPaint)
+        canvas.drawRect(RectF(rect.left, rect.top + band, rect.left + band, rect.bottom - bottomBand), blurBandPaint)
+        canvas.drawRect(RectF(rect.right - band, rect.top + band, rect.right, rect.bottom - bottomBand), blurBandPaint)
 
         watermarkBorderPaint.alpha = (spec.opacity * 255 * 0.55f).toInt().coerceIn(0, 255)
-        canvas.drawRect(borderRect, watermarkBorderPaint)
+        canvas.drawRect(rect, watermarkBorderPaint)
 
         watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
         val padding = 16f * density
-        val textY = borderRect.bottom - padding
+        val textY = rect.bottom - padding
         watermarkHintPaint.textAlign = when (spec.placement) {
             WatermarkTextPlacement.TOP_LEFT,
             WatermarkTextPlacement.BOTTOM_LEFT -> Paint.Align.LEFT
@@ -428,10 +474,10 @@ class PreviewOverlayView @JvmOverloads constructor(
         }
         val textX = when (spec.placement) {
             WatermarkTextPlacement.TOP_LEFT,
-            WatermarkTextPlacement.BOTTOM_LEFT -> borderRect.left + padding
+            WatermarkTextPlacement.BOTTOM_LEFT -> rect.left + band + padding
             WatermarkTextPlacement.TOP_RIGHT,
-            WatermarkTextPlacement.BOTTOM_RIGHT -> borderRect.right - padding
-            WatermarkTextPlacement.BOTTOM_CENTER -> borderRect.centerX()
+            WatermarkTextPlacement.BOTTOM_RIGHT -> rect.right - band - padding
+            WatermarkTextPlacement.BOTTOM_CENTER -> rect.centerX()
         }
         canvas.drawText(spec.previewText, textX, textY, watermarkHintPaint)
     }
@@ -452,13 +498,7 @@ class PreviewOverlayView @JvmOverloads constructor(
 
     private fun drawWatermarkBottomBarHint(canvas: Canvas, spec: WatermarkHintSpec) {
         val rect = activeFrameRectOrFullView()
-        val barHeight = 36f * density
-        val barRect = RectF(
-            rect.left,
-            rect.bottom - barHeight,
-            rect.right,
-            rect.bottom
-        )
+        val barRect = bottomBarPreviewRect(rect, height, density)
         val bgColor = spec.barBackground
         if (bgColor != 0) {
             bottomBarBackgroundPaint.color = bgColor
@@ -765,6 +805,34 @@ internal fun orientedFrameRatio(
         )
     }
 }
+
+internal fun expandedFrameBottomBandRect(
+    rect: RectF,
+    viewHeight: Int,
+    density: Float
+): RectF? {
+    val bottomBand = (rect.height() * 0.15f).coerceIn(56f * density, 150f * density)
+    val bottomFrameBand = bottomBand.coerceAtMost(viewHeight - rect.bottom)
+    if (bottomFrameBand <= 0f) return null
+    return RectF(rect.left, rect.bottom, rect.right, rect.bottom + bottomFrameBand)
+}
+
+internal fun bottomBarPreviewRect(
+    rect: RectF,
+    viewHeight: Int,
+    density: Float
+): RectF {
+    val desiredBarHeight = (rect.height() * 0.12f).coerceIn(48f * density, 112f * density)
+    val outsideHeight = (viewHeight - rect.bottom).coerceAtLeast(0f)
+    val barHeight = desiredBarHeight.coerceAtMost(if (outsideHeight > 0f) outsideHeight else desiredBarHeight)
+    val barTop = if (outsideHeight > 0f) rect.bottom else rect.bottom - barHeight
+    return RectF(rect.left, barTop, rect.right, barTop + barHeight)
+}
+
+internal fun fourBorderPreviewBandWidth(
+    rect: RectF,
+    density: Float
+): Float = (min(rect.width(), rect.height()) * 0.055f).coerceIn(24f * density, 64f * density)
 
 internal data class FrameRect(
     val left: Float,

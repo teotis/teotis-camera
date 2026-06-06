@@ -1,14 +1,13 @@
 package com.opencamera.app
 
 import android.content.Context
-import android.graphics.BitmapFactory
-import android.net.Uri
 import com.opencamera.app.camera.AndroidDocumentAutoCropEditor
 import com.opencamera.app.camera.AndroidPhotoFrameRatioEditor
 import com.opencamera.app.camera.AndroidPhotoSelfieMirrorEditor
 import com.opencamera.app.camera.AndroidPortraitRenderEditor
 import com.opencamera.app.camera.AndroidPhotoWatermarkEditor
 import com.opencamera.app.camera.AndroidPhotoAlgorithmEditor
+import com.opencamera.app.camera.BoundedMaskBitmapDecoder
 import com.opencamera.app.camera.MlKitSelfiePreviewSceneMaskSource
 import com.opencamera.app.camera.NoOpPreviewSceneMaskSource
 import com.opencamera.app.camera.MlKitSavedPhotoSceneMaskProvider
@@ -27,8 +26,7 @@ import com.opencamera.app.camera.DocumentAutoCropPostProcessor
 import com.opencamera.app.camera.PhotoFrameRatioPostProcessor
 import com.opencamera.app.camera.PhotoSelfieMirrorPostProcessor
 import com.opencamera.app.camera.PortraitRenderPostProcessor
-import com.opencamera.app.camera.PhotoAlgorithmPostProcessor
-import com.opencamera.app.camera.PhotoWatermarkPostProcessor
+import com.opencamera.app.camera.PhotoAlgorithmWatermarkPostProcessor
 import com.opencamera.app.camera.PreviewStartupRuntimeIssueMonitor
 import com.opencamera.app.camera.device.CameraDeviceAdapter
 import com.opencamera.core.capability.CapabilityGraphResolver
@@ -48,13 +46,10 @@ import com.opencamera.core.session.PerformanceLinkEvent
 import com.opencamera.core.session.CameraSession
 import com.opencamera.core.session.DefaultCameraSession
 import com.opencamera.core.session.InMemorySessionTrace
+import com.opencamera.feature.checkin.CheckInModePlugin
 import com.opencamera.feature.document.DocumentModePlugin
 import com.opencamera.feature.humanistic.HumanisticModePlugin
-import com.opencamera.feature.night.NightModePlugin
 import com.opencamera.feature.photo.PhotoModePlugin
-import com.opencamera.feature.portrait.PortraitModePlugin
-import com.opencamera.feature.pro.ProModePlugin
-import com.opencamera.feature.fullclear.FullClearModePlugin
 import com.opencamera.feature.video.VideoModePlugin
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -94,32 +89,16 @@ class AppContainer(
                 AndroidPortraitRenderEditor(appContext),
                 savedMaskProvider,
                 maskBitmapSource = { target ->
-                    when (target) {
-                        is com.opencamera.core.media.ProcessorTarget.FilePath ->
-                            BitmapFactory.decodeFile(target.path)
-                        is com.opencamera.core.media.ProcessorTarget.ContentUri ->
-                            appContext.contentResolver.openInputStream(Uri.parse(target.value))?.use {
-                                BitmapFactory.decodeStream(it)
-                            }
-                    }
+                    BoundedMaskBitmapDecoder.decode(target, appContext.contentResolver)
                 }
             ),
-            PhotoAlgorithmPostProcessor(
+            PhotoAlgorithmWatermarkPostProcessor(
                 AndroidPhotoAlgorithmEditor(appContext),
+                AndroidPhotoWatermarkEditor(appContext),
                 savedMaskProvider,
                 maskBitmapSource = { target ->
-                    when (target) {
-                        is com.opencamera.core.media.ProcessorTarget.FilePath ->
-                            BitmapFactory.decodeFile(target.path)
-                        is com.opencamera.core.media.ProcessorTarget.ContentUri ->
-                            appContext.contentResolver.openInputStream(Uri.parse(target.value))?.use {
-                                BitmapFactory.decodeStream(it)
-                            }
-                    }
+                    BoundedMaskBitmapDecoder.decode(target, appContext.contentResolver)
                 }
-            ),
-            PhotoWatermarkPostProcessor(
-                AndroidPhotoWatermarkEditor(appContext)
             ),
             PhotoSelfieMirrorPostProcessor(
                 AndroidPhotoSelfieMirrorEditor(appContext)
@@ -143,13 +122,10 @@ class AppContainer(
 
     private val modeRegistry = ModeRegistry(
         listOf(
+            CheckInModePlugin(),
             DocumentModePlugin(),
-            FullClearModePlugin(),
             HumanisticModePlugin(),
-            NightModePlugin(),
             PhotoModePlugin(),
-            PortraitModePlugin(),
-            ProModePlugin(),
             VideoModePlugin()
         )
     )

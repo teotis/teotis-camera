@@ -222,6 +222,8 @@ class PhotoAlgorithmPostProcessorTest {
         val portrait = resolvePhotoAlgorithmSpec("portrait-depth-studio")
         val night = resolvePhotoAlgorithmSpec("night-fallback-warm")
         val pro = resolvePhotoAlgorithmSpec("pro-assisted-contrast")
+        val checkInClarity = resolvePhotoAlgorithmSpec("checkin-clarity-best-frame-v1")
+        val humanisticProfessional = resolvePhotoAlgorithmSpec("photo-vivid-pro")
 
         assertNotNull(photo)
         assertNotNull(photoRich)
@@ -229,6 +231,12 @@ class PhotoAlgorithmPostProcessorTest {
         assertNotNull(portrait)
         assertNotNull(night)
         assertNotNull(pro)
+        assertNotNull(checkInClarity)
+        assertNotNull(humanisticProfessional)
+        assertEquals("checkin-clarity-best-frame-v1", checkInClarity.profile)
+        assertEquals("photo-vivid-pro", humanisticProfessional.profile)
+        assertTrue(checkInClarity.sharpnessBoost > 0f)
+        assertTrue(humanisticProfessional.saturation > 1f)
     }
 
     @Test

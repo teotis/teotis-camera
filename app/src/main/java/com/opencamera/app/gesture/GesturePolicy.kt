@@ -15,18 +15,18 @@ sealed interface GestureAction {
 class GesturePolicy(
     private val nowMillis: () -> Long = System::currentTimeMillis
 ) {
-    private var localZoomRatio = 1.0f
+    private var pinchSessionBaseZoom = 1.0f
     private var lastPinchTimestamp = 0L
     private var isDraggingZoom = false
     private var lastDragTimestamp = 0L
 
     fun resetZoomAccumulation() {
-        localZoomRatio = 1.0f
+        pinchSessionBaseZoom = 1.0f
         lastPinchTimestamp = 0L
     }
 
     fun syncZoomRatio(ratio: Float) {
-        localZoomRatio = ratio
+        pinchSessionBaseZoom = ratio
     }
 
     fun cancelDrag() {
@@ -38,12 +38,16 @@ class GesturePolicy(
         return when (event) {
             is GestureEvent.Tap -> GestureAction.FocusAt(event.x, event.y)
             is GestureEvent.DoubleTap -> GestureAction.DispatchSession(SessionIntent.LensFacingToggled)
+            is GestureEvent.PinchBegin -> {
+                pinchSessionBaseZoom = currentZoomRatio
+                GestureAction.Ignore
+            }
             is GestureEvent.PinchZoom -> {
-                localZoomRatio = (localZoomRatio * event.scaleFactor).coerceIn(0.5f, 10.0f)
+                val targetZoom = (pinchSessionBaseZoom * event.spanRatio).coerceIn(0.5f, 10.0f)
                 val now = nowMillis()
                 if (now - lastPinchTimestamp > 16) {
                     lastPinchTimestamp = now
-                    GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(localZoomRatio))
+                    GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(targetZoom))
                 } else {
                     GestureAction.Ignore
                 }
@@ -59,7 +63,7 @@ class GesturePolicy(
             }
             is GestureEvent.DragMove -> {
                 if (!isDraggingZoom) return GestureAction.Ignore
-                val now = System.currentTimeMillis()
+                val now = nowMillis()
                 if (now - lastDragTimestamp > 50) {
                     lastDragTimestamp = now
                     GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(currentZoomRatio))
@@ -89,7 +93,7 @@ class GesturePolicy(
     ): GestureAction {
         if (!isDraggingZoom) return GestureAction.Ignore
         val result = mapper.mapPositionToRatio(x)
-        val now = System.currentTimeMillis()
+        val now = nowMillis()
         if (now - lastDragTimestamp > 50) {
             lastDragTimestamp = now
             return GestureAction.DispatchSession(SessionIntent.ApplyZoomRatio(result.targetRatio))

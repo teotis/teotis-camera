@@ -266,14 +266,14 @@ class SessionCockpitRenderModelTest {
     fun `mode summary reflects current mode snapshot`() {
         val state = defaultSessionState().copy(
             modeSnapshot = ModeSnapshot(
-                id = ModeId.NIGHT,
-                uiSpec = ModeUiSpec(title = "Scenery", shutterLabel = "Capture Scenery"),
-                state = ModeState(headline = "Scenery mode active", detail = "Tripod multi-frame available")
+                id = ModeId.CHECK_IN,
+                uiSpec = ModeUiSpec(title = "Check-in", shutterLabel = "Capture Check-in"),
+                state = ModeState(headline = "Check-in mode active", detail = "Multi-frame available")
             )
         )
 
         assertEquals(
-            "Mode: Scenery\nScenery mode active\nTripod multi-frame available",
+            "Mode: Check-in\nCheck-in mode active\nMulti-frame available",
             modeSummaryText(state)
         )
     }
@@ -283,8 +283,8 @@ class SessionCockpitRenderModelTest {
         val state = defaultSessionState(
             activeMode = ModeId.HUMANISTIC,
             availableModes = listOf(
-                ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
-                ModeId.VIDEO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO
+                ModeId.PHOTO, ModeId.CHECK_IN, ModeId.DOCUMENT, ModeId.HUMANISTIC,
+                ModeId.VIDEO, ModeId.CHECK_IN, ModeId.CHECK_IN
             ),
             modeSnapshot = ModeSnapshot(
                 id = ModeId.HUMANISTIC,
@@ -296,11 +296,11 @@ class SessionCockpitRenderModelTest {
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Humanistic", "Scenery", "Port", "Pro", "Video", "Doc"),
+            listOf("Photo", "Check-in", "Humanistic", "Video"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
         )
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
@@ -310,14 +310,14 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `mode directory render model shows humanistic with street-life subfeatures`() {
         val state = defaultSessionState(
-            availableModes = listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO)
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO)
         )
 
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
-        assertEquals(3, model.items.size)
+        assertEquals(4, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO),
+            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
@@ -666,25 +666,27 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `mode track render model includes humanistic entry and uses product order`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.HUMANISTIC,
-            ModeId.VIDEO, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO
+            ModeId.PHOTO, ModeId.DOCUMENT, ModeId.CHECK_IN, ModeId.HUMANISTIC,
+            ModeId.VIDEO
         )
         val state = defaultSessionState(activeMode = ModeId.HUMANISTIC, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(7, model.items.size)
+        assertEquals(4, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.NIGHT, ModeId.PORTRAIT, ModeId.PRO, ModeId.VIDEO, ModeId.DOCUMENT),
+            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
             model.items.map { it.modeId }
         )
+        assertTrue(model.items.any { it.modeId == ModeId.CHECK_IN })
         assertTrue(model.items.any { it.modeId == ModeId.HUMANISTIC })
+        assertFalse(model.items.any { it.modeId == ModeId.DOCUMENT })
         assertTrue(model.items.first { it.modeId == ModeId.HUMANISTIC }.isActive)
     }
 
     @Test
     fun `mode track labels are short and stable`() {
         val availableModes = listOf(
-            ModeId.PHOTO, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT
+            ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.HUMANISTIC, ModeId.VIDEO, ModeId.DOCUMENT
         )
         val state = defaultSessionState(activeMode = ModeId.PHOTO, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
@@ -1565,7 +1567,7 @@ class SessionCockpitRenderModelTest {
         latestPipelineNotes: List<String> = emptyList(),
         lastError: String? = null,
         activeMode: ModeId = ModeId.PHOTO,
-        availableModes: List<ModeId> = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.HUMANISTIC, ModeId.VIDEO),
+        availableModes: List<ModeId> = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
         modeSnapshot: ModeSnapshot = ModeSnapshot(
             id = ModeId.PHOTO,
             uiSpec = ModeUiSpec(title = "PHOTO", shutterLabel = "Capture PHOTO"),

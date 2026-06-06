@@ -86,7 +86,7 @@ internal fun previewOverlayRenderModel(
         else -> adaptedEffectModel
     }
     val frameRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio
-    val frame = if (previewSupportsOverlay && frameRatio != null) {
+    val frame = if (frameRatio != null) {
         PreviewFrameRenderModel(
             ratio = frameRatio,
             label = frameRatio.label,

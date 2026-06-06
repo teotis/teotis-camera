@@ -100,7 +100,7 @@ internal fun PortraitRenderPostProcessor.toAlgorithmProcessor(): AlgorithmProces
     return toAlgorithmProcessorBridge(
         algorithmType = AlgorithmType.PORTRAIT_RENDER,
         canDecide = { req ->
-            req.metadata.customTags["mode"] == "portrait"
+            supportsPortraitRenderMetadata(req.metadata.customTags)
         },
         extractNotes = { result, _ -> extractNotesWithPrefix(result, "portrait-render:") }
     )

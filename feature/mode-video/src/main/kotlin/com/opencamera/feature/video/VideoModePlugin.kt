@@ -114,7 +114,7 @@ private class VideoModeController(
             ModeIntent.ShutterPressed -> toggleRecording()
             ModeIntent.SecondaryActionPressed -> toggleTorch()
             ModeIntent.TertiaryActionPressed -> cycleQuality()
-            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("Video mode does not support frame ratio switching yet")
+            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("视频模式暂不支持画幅切换")
             ModeIntent.ProActionPressed -> ModeSignal.None
         }
     }
@@ -255,14 +255,14 @@ private class VideoModeController(
             return ModeSignal.ShowHint("Torch is unavailable on this device")
         }
         if (isRecording) {
-            return ModeSignal.ShowHint("Flash can only be changed before recording starts")
+            return ModeSignal.ShowHint("Torch can only be changed before recording starts")
         }
         torchEnabled = !torchEnabled
         context.eventSink("video.torch.selected.${torchTag()}")
         mutableSnapshot.value = buildSnapshot(
-            headline = "Video flash updated"
+            headline = "Video torch updated"
         )
-        return ModeSignal.ShowHint("Flash: ${if (torchEnabled) "On" else "Off"}")
+        return ModeSignal.ShowHint("Torch: ${if (torchEnabled) "On" else "Off"}")
     }
 
     private suspend fun cycleQuality(): ModeSignal {
@@ -294,7 +294,7 @@ private class VideoModeController(
         } else {
             ""
         }
-        return ModeSignal.ShowHint("视频画质: $requestedLabel$suffix")
+        return ModeSignal.ShowHint("Video quality: $requestedLabel$suffix")
     }
 
     private fun buildSnapshot(

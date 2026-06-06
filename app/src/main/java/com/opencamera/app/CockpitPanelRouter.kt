@@ -6,7 +6,8 @@ internal data class CockpitPanelUiState(
     val selectedWatermarkDetailTemplateId: String? = null,
     val selectedFilterLabFamilyOverride: FilterLabFamily? = null,
     val isFilterAdjustmentVisible: Boolean = false,
-    val filterAdjustmentMode: FilterAdjustmentMode = FilterAdjustmentMode.LIGHT
+    val filterAdjustmentMode: FilterAdjustmentMode = FilterAdjustmentMode.LIGHT,
+    val isDocumentBatchOrganizerDismissed: Boolean = false
 )
 
 internal sealed class CockpitPanelCommand {
@@ -26,8 +27,10 @@ internal sealed class CockpitPanelCommand {
     data class OpenWatermarkDetail(val templateId: String) : CockpitPanelCommand()
     data class SelectFilterFamily(val family: FilterLabFamily) : CockpitPanelCommand()
     data object ToggleFilterAdjustmentMode : CockpitPanelCommand()
+    data object ToggleStyleStrip : CockpitPanelCommand()
     data object ToggleDocumentBatchOrganizer : CockpitPanelCommand()
     data object CloseDocumentBatchOrganizer : CockpitPanelCommand()
+    data object DocumentBatchCaptureTriggered : CockpitPanelCommand()
     data object AndroidBack : CockpitPanelCommand()
 }
 
@@ -49,7 +52,10 @@ internal fun nextState(
 ): CockpitPanelUiState {
     val defaultState = CockpitPanelUiState()
     return when (command) {
-        is CockpitPanelCommand.DismissAll -> defaultState
+        is CockpitPanelCommand.DismissAll -> defaultState.copy(
+            isDocumentBatchOrganizerDismissed = current.route is CockpitPanelRoute.DocumentBatchOrganizer ||
+                current.isDocumentBatchOrganizerDismissed
+        )
 
         is CockpitPanelCommand.ToggleColorLab -> {
             if (current.route is CockpitPanelRoute.ColorLab) {
@@ -186,9 +192,22 @@ internal fun nextState(
             )
         }
 
+        is CockpitPanelCommand.ToggleStyleStrip -> {
+            if (current.route is CockpitPanelRoute.StyleStrip) {
+                current.copy(route = CockpitPanelRoute.None)
+            } else {
+                current.copy(route = CockpitPanelRoute.StyleStrip)
+            }
+        }
+
         is CockpitPanelCommand.ToggleDocumentBatchOrganizer -> {
             if (current.route is CockpitPanelRoute.DocumentBatchOrganizer) {
-                current.copy(route = CockpitPanelRoute.None)
+                current.copy(
+                    route = CockpitPanelRoute.None,
+                    isDocumentBatchOrganizerDismissed = true
+                )
+            } else if (current.isDocumentBatchOrganizerDismissed) {
+                current
             } else {
                 current.copy(route = CockpitPanelRoute.DocumentBatchOrganizer)
             }
@@ -196,10 +215,17 @@ internal fun nextState(
 
         is CockpitPanelCommand.CloseDocumentBatchOrganizer -> {
             if (current.route is CockpitPanelRoute.DocumentBatchOrganizer) {
-                current.copy(route = CockpitPanelRoute.None)
+                current.copy(
+                    route = CockpitPanelRoute.None,
+                    isDocumentBatchOrganizerDismissed = true
+                )
             } else {
                 current
             }
+        }
+
+        is CockpitPanelCommand.DocumentBatchCaptureTriggered -> {
+            current.copy(isDocumentBatchOrganizerDismissed = false)
         }
 
         is CockpitPanelCommand.AndroidBack -> {
@@ -234,10 +260,15 @@ internal fun nextState(
                         filterAdjustmentMode = FilterAdjustmentMode.LIGHT
                     )
                 }
+                is CockpitPanelRoute.StyleStrip,
                 is CockpitPanelRoute.DevConsole,
                 is CockpitPanelRoute.QuickBubble,
                 is CockpitPanelRoute.DocumentBatchOrganizer -> {
-                    current.copy(route = CockpitPanelRoute.None)
+                    current.copy(
+                        route = CockpitPanelRoute.None,
+                        isDocumentBatchOrganizerDismissed = current.route is CockpitPanelRoute.DocumentBatchOrganizer ||
+                            current.isDocumentBatchOrganizerDismissed
+                    )
                 }
             }
         }

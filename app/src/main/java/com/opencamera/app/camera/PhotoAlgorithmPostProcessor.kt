@@ -89,13 +89,16 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
 
     val recipe = parseRecipeFromTags(result.metadata.customTags)
 
-    val spec = FilterRenderSpec.fromMetadataTags(result.metadata.customTags)?.toPhotoAlgorithmSpec(
+    val filterRenderSpec = FilterRenderSpec.fromMetadataTags(result.metadata.customTags)?.toPhotoAlgorithmSpec(
         profile = result.metadata.customTags["filterProfile"]
             ?: profile
             ?: "shared-filter",
         recipe = recipe
-    ) ?: profile?.let { resolvePhotoAlgorithmSpec(it, recipe) }
-        ?: RenderRecipe.from(result).let { renderRecipe ->
+    )
+    val spec = filterRenderSpec ?: if (profile != null) {
+        resolvePhotoAlgorithmSpec(profile, recipe) ?: return ProcessorWork.None
+    } else {
+        RenderRecipe.from(result).let { renderRecipe ->
             if (renderRecipe.requiresFinalOutputPostprocess) {
                 renderRecipe.toPhotoAlgorithmSpec()
             } else {
@@ -103,6 +106,7 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
             }
         }
         ?: return ProcessorWork.None
+    }
 
     if (isKnownNearNeutralProfile(spec)) {
         return ProcessorWork.DiagnosticSkip("near-neutral:${spec.profile}")
@@ -115,8 +119,10 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
 }
 
 private fun isKnownNearNeutralProfile(spec: PhotoAlgorithmSpec): Boolean {
-    return spec.profile in NEAR_NEUTRAL_PROFILES &&
+    return canonicalPhotoAlgorithmProfile(spec.profile) in NEAR_NEUTRAL_PROFILES &&
         spec.brightnessShift == 0 &&
+        spec.contrast == 1f &&
+        spec.saturation == 1f &&
         spec.warmthShift == 0 &&
         spec.tintShift == 0 &&
         spec.monochromeMix == 0f &&
@@ -478,7 +484,7 @@ internal class AndroidPhotoAlgorithmEditor(
         return Pair(PhotoAlgorithmApplied(exifWarning, timingNote), styleNotes)
     }
 
-    private fun applyStyle(
+    internal fun applyStyle(
         bitmap: Bitmap,
         spec: PhotoAlgorithmSpec
     ) {
@@ -493,6 +499,7 @@ internal class AndroidPhotoAlgorithmEditor(
         val centerY = height / 2f
         val maxDistance = max(1f, sqrt(centerX * centerX + centerY * centerY))
         val hasVignette = spec.vignetteStrength > 0f
+        val perceptualScratch = FloatArray(3)
 
         for (y in 0 until height) {
             for (x in 0 until width) {
@@ -559,12 +566,10 @@ internal class AndroidPhotoAlgorithmEditor(
                 }
 
                 if (!spec.recipe.isNeutral) {
-                    val result = applyPerceptualAdjustments(
-                        red, green, blue, spec.recipe
-                    )
-                    red = result[0]
-                    green = result[1]
-                    blue = result[2]
+                    applyPerceptualAdjustments(red, green, blue, spec.recipe, perceptualScratch)
+                    red = perceptualScratch[0]
+                    green = perceptualScratch[1]
+                    blue = perceptualScratch[2]
                 }
 
                 if (spec.grainStrength > 0f) {
@@ -594,7 +599,7 @@ internal class AndroidPhotoAlgorithmEditor(
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
     }
 
-    private fun applyStyleWithMask(
+    internal fun applyStyleWithMask(
         bitmap: Bitmap,
         spec: PhotoAlgorithmSpec,
         mask: SavedPhotoMaskPixels
@@ -617,6 +622,7 @@ internal class AndroidPhotoAlgorithmEditor(
         val centerY = height / 2f
         val maxDistance = max(1f, sqrt(centerX * centerX + centerY * centerY))
         val hasVignette = spec.vignetteStrength > 0f
+        val perceptualScratch = FloatArray(3)
 
         for (y in 0 until height) {
             for (x in 0 until width) {
@@ -693,12 +699,12 @@ internal class AndroidPhotoAlgorithmEditor(
                 }
 
                 if (!spec.recipe.isNeutral) {
-                    val result = applyPerceptualAdjustmentsMaskAware(
-                        red, green, blue, spec.recipe, subjectWeight
+                    applyPerceptualAdjustmentsMaskAware(
+                        red, green, blue, spec.recipe, subjectWeight, perceptualScratch
                     )
-                    red = result[0]
-                    green = result[1]
-                    blue = result[2]
+                    red = perceptualScratch[0]
+                    green = perceptualScratch[1]
+                    blue = perceptualScratch[2]
                 }
 
                 if (spec.grainStrength > 0f) {
@@ -735,8 +741,9 @@ internal class AndroidPhotoAlgorithmEditor(
         gIn: Float,
         bIn: Float,
         recipe: PerceptualColorRecipe,
-        subjectWeight: Float
-    ): FloatArray {
+        subjectWeight: Float,
+        out: FloatArray
+    ) {
         val luma = rIn * 0.2126f + gIn * 0.7152f + bIn * 0.0722f
         val lumaNorm = (luma / 255f).coerceIn(0f, 1f)
 
@@ -777,10 +784,12 @@ internal class AndroidPhotoAlgorithmEditor(
         val tintAmount = recipe.tintBias * 8f * (1f - combinedSkinProtect * 0.5f)
         g -= tintAmount
 
-        return floatArrayOf(r, g, b)
+        out[0] = r
+        out[1] = g
+        out[2] = b
     }
 
-    private fun encodeJpeg(bitmap: Bitmap): ByteArray {
+    internal fun encodeJpeg(bitmap: Bitmap): ByteArray {
         return ByteArrayOutputStream().use { output ->
             check(bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
                 "Algorithm JPEG compression failed"
@@ -789,7 +798,7 @@ internal class AndroidPhotoAlgorithmEditor(
         }
     }
 
-    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
+    internal fun readSourceBytes(target: ProcessorTarget): ByteArray? {
         return when (target) {
             is ProcessorTarget.FilePath -> {
                 val file = File(target.path)
@@ -806,7 +815,7 @@ internal class AndroidPhotoAlgorithmEditor(
         }
     }
 
-    private fun writeEncodedBytes(
+    internal fun writeEncodedBytes(
         target: ProcessorTarget,
         encodedBytes: ByteArray
     ): Boolean {
@@ -823,7 +832,7 @@ internal class AndroidPhotoAlgorithmEditor(
         }
     }
 
-    private fun readPreservedExif(sourceBytes: ByteArray): Map<String, String> {
+    internal fun readPreservedExif(sourceBytes: ByteArray): Map<String, String> {
         return runCatching {
             ByteArrayInputStream(sourceBytes).use { input ->
                 val exif = ExifInterface(input)
@@ -834,7 +843,7 @@ internal class AndroidPhotoAlgorithmEditor(
         }.getOrDefault(emptyMap())
     }
 
-    private fun restorePreservedExif(
+    internal fun restorePreservedExif(
         target: ProcessorTarget,
         preservedExif: Map<String, String>
     ): String? {
@@ -872,8 +881,9 @@ internal class AndroidPhotoAlgorithmEditor(
         rIn: Float,
         gIn: Float,
         bIn: Float,
-        recipe: PerceptualColorRecipe
-    ): FloatArray {
+        recipe: PerceptualColorRecipe,
+        out: FloatArray
+    ) {
         val luma = rIn * 0.2126f + gIn * 0.7152f + bIn * 0.0722f
         val lumaNorm = (luma / 255f).coerceIn(0f, 1f)
 
@@ -913,7 +923,9 @@ internal class AndroidPhotoAlgorithmEditor(
         val tintAmount = recipe.tintBias * 8f * (1f - skinProtect * 0.5f)
         g -= tintAmount
 
-        return floatArrayOf(r, g, b)
+        out[0] = r
+        out[1] = g
+        out[2] = b
     }
 
     private fun detectSkinMask(r: Float, g: Float, b: Float): Float {
@@ -969,6 +981,12 @@ internal fun resolvePhotoAlgorithmSpec(
     profile: String,
     recipe: PerceptualColorRecipe = PerceptualColorRecipe.NEUTRAL
 ): PhotoAlgorithmSpec? {
+    val canonicalProfile = canonicalPhotoAlgorithmProfile(profile)
+    if (canonicalProfile != profile) {
+        return resolvePhotoAlgorithmSpec(canonicalProfile, recipe)
+            ?.copy(profile = profile)
+    }
+
     return when (profile) {
         "photo-default" -> PhotoAlgorithmSpec(
             profile = profile,
@@ -1114,6 +1132,15 @@ internal fun resolvePhotoAlgorithmSpec(
             warmthShift = 10
         )
 
+        "fullclear-best-frame-v1" -> PhotoAlgorithmSpec(
+            profile = profile,
+            contrast = 1.08f,
+            saturation = 1.03f,
+            sharpnessBoost = 0.18f,
+            highlightCompression = 0.08f,
+            shadowLift = 0.04f
+        )
+
         "pro-manual-neutral" -> PhotoAlgorithmSpec(
             profile = profile,
             contrast = 1.01f,
@@ -1155,6 +1182,17 @@ internal fun resolvePhotoAlgorithmSpec(
 
         else -> null
     }?.let { if (recipe.isNeutral) it else it.copy(recipe = recipe) }
+}
+
+private fun canonicalPhotoAlgorithmProfile(profile: String): String {
+    val variantBase = profile
+        .removeSuffix("-pro-assist")
+        .removeSuffix("-pro")
+    return when {
+        variantBase == "checkin-clarity-best-frame-v1" -> "fullclear-best-frame-v1"
+        variantBase.startsWith("checkin-") -> variantBase.removePrefix("checkin-")
+        else -> variantBase
+    }
 }
 
 private fun applyContrast(channel: Float, contrast: Float): Float {
@@ -1231,4 +1269,258 @@ private fun smoothstep(edge0: Float, edge1: Float, value: Float): Float {
     if (edge0 == edge1) return if (value >= edge1) 1f else 0f
     val t = ((value - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
     return t * t * (3f - 2f * t)
+}
+
+internal class PhotoAlgorithmWatermarkPostProcessor(
+    private val algorithmEditor: AndroidPhotoAlgorithmEditor,
+    private val watermarkEditor: AndroidPhotoWatermarkEditor,
+    private val maskProvider: SavedPhotoSceneMaskProvider? = null,
+    private val maskBitmapSource: ((ProcessorTarget) -> Bitmap?)? = null
+) : MediaPostProcessor {
+    override suspend fun process(result: ShotResult): ShotResult {
+        val algorithmWork = decidePhotoAlgorithmWork(result)
+        val watermarkWork = decidePhotoWatermarkWork(result)
+
+        if (algorithmWork is ProcessorWork.Execute && watermarkWork is PhotoWatermarkWork.Render) {
+            return processCombined(result, algorithmWork.payload, watermarkWork)
+        }
+
+        if (algorithmWork is ProcessorWork.Execute) {
+            return processAlgorithmOnly(result, algorithmWork.payload)
+        }
+
+        if (watermarkWork is PhotoWatermarkWork.Render) {
+            return when (val r = watermarkEditor.apply(
+                watermarkWork.target, watermarkWork.metadata,
+                watermarkWork.watermarkText, watermarkWork.templateId
+            )) {
+                is PhotoWatermarkApplied -> result.addPipelineNotes(
+                    "watermark:rendered:${watermarkWork.templateId}",
+                    r.timingNote ?: "watermark:timing:unavailable"
+                )
+                is ProcessorEditorResult.Skipped -> result.addPipelineNotes("watermark:skipped:${r.reason}")
+                is ProcessorEditorResult.Failed -> result.addPipelineNotes("watermark:failed:${r.reason}")
+                else -> result
+            }
+        }
+
+        val notes = mutableListOf<String>()
+        if (algorithmWork is ProcessorWork.DiagnosticSkip) notes.add("algorithm-render:skipped:${algorithmWork.reason}")
+        if (watermarkWork is PhotoWatermarkWork.DiagnosticSkip) notes.add("watermark:skipped:${watermarkWork.reason}")
+        return if (notes.isEmpty()) result else result.addPipelineNotes(*notes.toTypedArray())
+    }
+
+    private suspend fun processCombined(
+        result: ShotResult,
+        algorithmPayload: PhotoAlgorithmPayload,
+        watermarkWork: PhotoWatermarkWork.Render
+    ): ShotResult = withContext(Dispatchers.IO) {
+        val target = algorithmPayload.target
+        val t0 = System.currentTimeMillis()
+
+        val sourceBytes = algorithmEditor.readSourceBytes(target)
+            ?: return@withContext result.addPipelineNotes(
+                "combined-render:skipped:input-unavailable"
+            )
+        if (sourceBytes.isEmpty()) {
+            return@withContext result.addPipelineNotes(
+                "combined-render:skipped:empty-source"
+            )
+        }
+
+        val preservedExif = algorithmEditor.readPreservedExif(sourceBytes)
+        val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+            ?: return@withContext result.addPipelineNotes(
+                "combined-render:failed:decode-failed"
+            )
+
+        val workingBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
+        if (workingBitmap !== decoded) decoded.recycle()
+        val t1 = System.currentTimeMillis()
+
+        var maskResolve: MaskResolveResult? = null
+        var finalBitmap: Bitmap? = null
+        try {
+            val template = resolvePhotoWatermarkTemplate(
+                templateId = watermarkWork.templateId,
+                watermarkText = watermarkWork.watermarkText,
+                metadata = watermarkWork.metadata,
+                preservedExif = preservedExif
+            )
+
+            maskResolve = resolveMask(result)
+            when (maskResolve) {
+                is MaskResolveResult.Available -> {
+                    algorithmEditor.applyStyleWithMask(
+                        workingBitmap, algorithmPayload.spec, maskResolve.mask
+                    )
+                }
+                is MaskResolveResult.Fallback -> {
+                    algorithmEditor.applyStyle(workingBitmap, algorithmPayload.spec)
+                }
+                null -> {
+                    algorithmEditor.applyStyle(workingBitmap, algorithmPayload.spec)
+                }
+            }
+
+            val t2 = System.currentTimeMillis()
+
+            val renderResult = renderPhotoWatermarkBitmap(workingBitmap, template)
+            finalBitmap = renderResult.bitmap
+            val t3 = System.currentTimeMillis()
+
+            val encodedBytes = algorithmEditor.encodeJpeg(finalBitmap)
+            val t4 = System.currentTimeMillis()
+
+            if (!algorithmEditor.writeEncodedBytes(target, encodedBytes)) {
+                return@withContext result.addPipelineNotes(
+                    "combined-render:failed:output-unavailable"
+                )
+            }
+
+            val exifWarning = algorithmEditor.restorePreservedExif(target, preservedExif)
+            val t5 = System.currentTimeMillis()
+
+            val visibleBytesAfterExif = algorithmEditor.readSourceBytes(target)
+            val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
+                originalBytes = sourceBytes,
+                visibleBytesAfterExifRestore = visibleBytesAfterExif,
+                templateId = watermarkWork.templateId,
+                originalWidth = decoded.width,
+                originalHeight = decoded.height
+            )
+            if (archiveBytes != null) {
+                algorithmEditor.writeEncodedBytes(target, archiveBytes)
+            }
+            val t6 = System.currentTimeMillis()
+
+            val timingNote = "combined-render:timing:${algorithmPayload.spec.profile}+${watermarkWork.templateId} " +
+                "size=${decoded.width}x${decoded.height} " +
+                "decode=${t1 - t0}ms style=${t2 - t1}ms watermark=${t3 - t2}ms " +
+                "encode=${t4 - t3}ms write=${t5 - t4}ms exif=${t5 - t5}ms archive=${t6 - t5}ms total=${t6 - t0}ms"
+
+            val warnings = listOfNotNull(exifWarning, archiveWarning)
+                .takeIf { it.isNotEmpty() }
+                ?.joinToString(",")
+
+            val baseNotes = listOfNotNull(
+                "combined-render:applied:${algorithmPayload.spec.profile}+${watermarkWork.templateId}",
+                timingNote,
+                warnings?.let { "combined-render:warning:$it" }
+            )
+            result.addPipelineNotes(*baseNotes.toTypedArray())
+        } catch (e: OutOfMemoryError) {
+            result.addPipelineNotes("combined-render:failed:oom")
+        } catch (_: Throwable) {
+            result.addPipelineNotes("combined-render:failed:render-exception")
+        } finally {
+            if (finalBitmap != null && finalBitmap !== workingBitmap) finalBitmap.recycle()
+            workingBitmap.recycle()
+            (maskResolve as? MaskResolveResult.Available)?.bitmap?.recycle()
+        }
+    }
+
+    private suspend fun processAlgorithmOnly(
+        result: ShotResult,
+        payload: PhotoAlgorithmPayload
+    ): ShotResult {
+        var maskResolve: MaskResolveResult? = null
+        return try {
+            val resolvedMask = resolveMask(result).also { maskResolve = it }
+            when (resolvedMask) {
+                is MaskResolveResult.Available -> {
+                    val (editorResult, maskNotes) = algorithmEditor.applyWithMask(
+                        payload.target, resolvedMask.bitmap, payload.spec, resolvedMask.mask
+                    )
+                    val baseResult = when (editorResult) {
+                        is PhotoAlgorithmApplied -> result.addPipelineNotes(
+                            "algorithm-render:applied:${payload.spec.profile}",
+                            editorResult.timingNote ?: "algorithm-render:timing:unavailable"
+                        )
+                        is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
+                            "algorithm-render:skipped:${editorResult.reason}"
+                        )
+                        is ProcessorEditorResult.Failed -> result.addPipelineNotes(
+                            "algorithm-render:failed:${editorResult.reason}"
+                        )
+                        else -> result
+                    }
+                    maskNotes.fold(baseResult) { acc, note -> acc.addPipelineNotes(note) }
+                }
+                is MaskResolveResult.Fallback -> {
+                    when (val r = algorithmEditor.apply(payload.target, payload.spec)) {
+                        is PhotoAlgorithmApplied -> result.addPipelineNotes(
+                            "algorithm-render:applied:${payload.spec.profile}",
+                            r.timingNote ?: "algorithm-render:timing:unavailable"
+                        )
+                        is ProcessorEditorResult.Skipped -> result.addPipelineNotes("algorithm-render:skipped:${r.reason}")
+                        is ProcessorEditorResult.Failed -> result.addPipelineNotes("algorithm-render:failed:${r.reason}")
+                        else -> result
+                    }
+                }
+                null -> {
+                    when (val r = algorithmEditor.apply(payload.target, payload.spec)) {
+                        is PhotoAlgorithmApplied -> result.addPipelineNotes(
+                            "algorithm-render:applied:${payload.spec.profile}",
+                            r.timingNote ?: "algorithm-render:timing:unavailable"
+                        )
+                        is ProcessorEditorResult.Skipped -> result.addPipelineNotes("algorithm-render:skipped:${r.reason}")
+                        is ProcessorEditorResult.Failed -> result.addPipelineNotes("algorithm-render:failed:${r.reason}")
+                        else -> result
+                    }
+                }
+            }
+        } catch (e: OutOfMemoryError) {
+            result.addPipelineNotes("algorithm-render:failed:oom")
+        } catch (_: Throwable) {
+            result.addPipelineNotes("algorithm-render:failed:render-exception")
+        } finally {
+            (maskResolve as? MaskResolveResult.Available)?.bitmap?.recycle()
+        }
+    }
+
+    private suspend fun resolveMask(result: ShotResult): MaskResolveResult? {
+        maskProvider ?: return null
+        val target = result.outputHandle.toProcessorTargetOrNull() ?: return null
+        val decoded = if (maskBitmapSource != null) {
+            maskBitmapSource.invoke(target) ?: return null
+        } else {
+            val sourceBytes = algorithmEditor.readSourceBytes(target) ?: return null
+            if (sourceBytes.isEmpty()) return null
+            BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size) ?: return null
+        }
+        return try {
+            val maskRequest = SavedPhotoSceneMaskRequest(
+                shotId = result.shotId,
+                outputHandleTag = result.outputHandle.displayPath
+            )
+            when (val maskResult = maskProvider.createSubjectMask(decoded, maskRequest)) {
+                is SceneMaskResult.Available -> MaskResolveResult.Available(
+                    bitmap = decoded,
+                    mask = maskResult.mask,
+                    extraNotes = emptyList()
+                )
+                is SceneMaskResult.Unavailable -> {
+                    decoded.recycle()
+                    MaskResolveResult.Fallback(listOf(
+                        SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),
+                        SceneMaskPipelineNotes.reason(maskResult.reason)
+                    ))
+                }
+                is SceneMaskResult.Failed -> {
+                    decoded.recycle()
+                    MaskResolveResult.Fallback(listOf(
+                        SceneMaskPipelineNotes.saved(SceneMaskSupport.DEGRADED),
+                        SceneMaskPipelineNotes.reason(maskResult.reason)
+                    ))
+                }
+            }
+        } catch (_: Throwable) {
+            decoded.recycle()
+            MaskResolveResult.Fallback(listOf(
+                SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),
+                SceneMaskPipelineNotes.reason("mask-resolve-exception")
+            ))
+        }
+    }
 }

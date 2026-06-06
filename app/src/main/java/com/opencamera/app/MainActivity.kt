@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var latestWatermarkLabSelectorRenderModel: WatermarkLabSelectorRenderModel? = null
     private var latestWatermarkLabDetailRenderModel: WatermarkLabDetailRenderModel? = null
     private var latestFilterLabRenderModel: FilterLabPageRenderModel? = null
+    private var latestFilterStripRenderModel: FilterStripRenderModel? = null
     private var latestSessionState: SessionState? = null
     private var lightPaletteBaseSpec: FilterRenderSpec? = null
     private var latestDeviceProbeSummary: String? = null
@@ -69,6 +70,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     // Shared scroll guard for mode track scroll-vs-tap disambiguation
     private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
     private lateinit var orientationMonitor: CameraOrientationMonitor
+    private val sessionLifecycleDispatcher = MainActivityLifecycleDispatcher()
 
     // Renderers (initialized in onCreate after views)
     private lateinit var cockpitRenderer: CockpitSurfaceRenderer
@@ -111,9 +113,23 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             insets
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.bottomSheet)) { v, insets ->
+        val bottomSheet = findViewById<View>(R.id.bottomSheet)
+        val bottomSheetBasePaddingBottom = bottomSheet.paddingBottom
+        val bottomSheetMaxNavigationPadding = resources.getDimensionPixelSize(
+            R.dimen.bottom_cockpit_navigation_padding_max
+        )
+        ViewCompat.setOnApplyWindowInsetsListener(bottomSheet) { v, insets ->
             val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
-            v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, navBars.bottom)
+            v.setPadding(
+                v.paddingLeft,
+                v.paddingTop,
+                v.paddingRight,
+                BottomCockpitInsetPolicy.resolveBottomPadding(
+                    layoutPaddingBottomPx = bottomSheetBasePaddingBottom,
+                    navigationBarsBottomPx = navBars.bottom,
+                    maxNavigationPaddingPx = bottomSheetMaxNavigationPadding
+                )
+            )
             insets
         }
 
@@ -142,6 +158,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             floatingUtility = views.floatingUtility,
             bottomCockpit = views.bottomCockpit,
             modeTrack = views.modeTrack,
+            filterStrip = views.filterStrip,
             preview = views.preview,
             callbacks = CockpitCallbacks(
                 onZoomRatioSelected = { ratio -> dispatch(SessionIntent.ApplyZoomRatio(ratio)) },
@@ -212,10 +229,19 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         orientationMonitor.enable()
         container.cameraCoordinator.attachPreviewHost(this, views.preview.previewView)
         syncPermissionState()
-        dispatch(SessionIntent.Boot)
-        dispatch(SessionIntent.PreviewHostAttached)
+        sessionLifecycleDispatcher.onStart(::dispatch)
         requestCameraPermissionIfNeeded()
         loadLatestGalleryMedia()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        sessionLifecycleDispatcher.onResume(::dispatch)
+    }
+
+    override fun onPause() {
+        sessionLifecycleDispatcher.onPause(::dispatch)
+        super.onPause()
     }
 
     private fun loadLatestGalleryMedia() {
@@ -235,7 +261,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     override fun onStop() {
         super.onStop()
         orientationMonitor.disable()
-        dispatch(SessionIntent.PreviewHostDetached("Activity moved to background"))
+        sessionLifecycleDispatcher.onStop(::dispatch)
     }
 
     private fun applyLocale(settings: com.opencamera.core.settings.PersistedSettings) {
@@ -302,6 +328,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         settingsRenderer.renderWatermarkSelectorPage(watermarkSelectorPage)
         settingsRenderer.renderWatermarkDetailPage(watermarkDetailPage)
         filterLabRenderer.renderPage(filterLabPage)
+        if (activePanelRoute is CockpitPanelRoute.StyleStrip) {
+            renderLatestFilterStrip()
+        }
         mainRenderer.renderPanelVisibility(activePanelRoute)
         views.preview.overlayView.render(
             previewOverlayRenderModel(
@@ -389,6 +418,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     override fun selectDevLogTab(tab: DevLogTab) {
         selectedDevLogTab = tab
         refreshDevLogModel()
+        latestDevLogRenderModel?.let {
+            Toast.makeText(this, it.title, Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun refreshDevLogModel() {
@@ -494,6 +526,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 
     override fun onDestroy() {
+        sessionLifecycleDispatcher.onDestroy(::dispatch)
         shutterClickSound.release()
         super.onDestroy()
     }
@@ -541,7 +574,20 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             Toast.makeText(this, text.settingsActionUnsupported(), Toast.LENGTH_SHORT).show()
             return
         }
+        val targetValue = settingsActionTargetValue(action, text) ?: control.value
+        Toast.makeText(this, "${control.label}: $targetValue", Toast.LENGTH_SHORT).show()
         applySettingsAction(action)
+    }
+
+    private fun settingsActionTargetValue(
+        action: PersistedSettingsAction,
+        text: AppTextResolver
+    ): String? {
+        return when (action) {
+            is PersistedSettingsAction.UpdateLivePhotoDefault -> text.onOff(action.enabled)
+            is PersistedSettingsAction.UpdateLiveSaveFormat -> action.format.label
+            else -> null
+        }
     }
 
     override fun openPortraitLab() {
@@ -606,6 +652,17 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             lightPaletteBaseSpec = model.adjustmentPanel.renderSpec
         }
         filterLabRenderer.renderPage(model)
+    }
+
+    override fun renderLatestFilterStrip() {
+        val state = latestSessionState ?: return
+        val text = AppTextResolver(this)
+        val model = filterStripRenderModel(state, text)
+        latestFilterStripRenderModel = model
+        cockpitRenderer.renderFilterStrip(model) { action ->
+            applySettingsAction(action)
+            renderLatestFilterStrip()
+        }
     }
 
     override fun renderLatestSettingsSurfaces() {
@@ -755,6 +812,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         } else {
             renderLatestFilterLab()
         }
+        if (activePanelRoute is CockpitPanelRoute.StyleStrip) {
+            renderLatestFilterStrip()
+        }
         mainRenderer.renderPanelVisibility(activePanelRoute)
         devConsoleRenderer.renderVisibility(activePanelRoute)
         if (activePanelRoute.isSettingsOpen) {
@@ -794,6 +854,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 val model = latestDevLogRenderModel ?: return
                 val file = devLogExporter.export(model.exportContent, type = selectedDevLogTab)
                 views.preview.captureOutput.text = getString(R.string.toast_debug_log_exported, file.absolutePath)
+                Toast.makeText(this, R.string.dev_export_log, Toast.LENGTH_SHORT).show()
             }
             .onFailure {
                 Toast.makeText(this, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
@@ -801,6 +862,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 
     override fun triggerVendorProbe() {
+        Toast.makeText(this, R.string.dev_vendor_probe, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             runCatching {
                 val content = com.opencamera.app.camera.VendorCameraProbe.probe(this@MainActivity)

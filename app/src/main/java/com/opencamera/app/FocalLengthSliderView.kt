@@ -12,6 +12,8 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.ln
 
 internal class FocalLengthSliderView @JvmOverloads constructor(
     context: Context,
@@ -42,6 +44,35 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
 
         /** Returns true if external setCurrentRatio should be suppressed (active drag). */
         internal fun shouldSuppressExternalUpdate(isDragging: Boolean): Boolean = isDragging
+
+        /** Log-space fraction [0,1] for a given ratio within [minRatio]..[maxRatio]. */
+        internal fun ratioToFraction(ratio: Float, minRatio: Float, maxRatio: Float): Float {
+            if (maxRatio <= minRatio) return 0f
+            val logRange = ln(maxRatio) - ln(minRatio)
+            if (logRange == 0f) return 0f
+            return ((ln(ratio) - ln(minRatio)) / logRange).coerceIn(0f, 1f)
+        }
+
+        internal fun nearestPresetNearTap(
+            tapX: Float,
+            presets: List<Float>,
+            trackLeft: Float,
+            trackWidth: Float,
+            minRatio: Float,
+            maxRatio: Float,
+            dotTapRadiusPx: Float
+        ): Float? {
+            if (trackWidth <= 0f) return null
+            return presets
+                .map { preset ->
+                    val fraction = ratioToFraction(preset, minRatio, maxRatio)
+                    val x = trackLeft + fraction * trackWidth
+                    preset to abs(tapX - x)
+                }
+                .filter { (_, distance) -> distance < dotTapRadiusPx }
+                .minByOrNull { (_, distance) -> distance }
+                ?.first
+        }
 
         /**
          * Pure logic: returns true if [ratio] is within [SNAP_THRESHOLD_FRACTION]
@@ -138,16 +169,27 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     internal val currentRatioValue: Float get() = currentRatio
 
     // Layout constants
-    private val verticalOffset = thumbRadius + labelBottomMargin + 13f * scaledDensity + labelPaddingV * 2
+    private val floatingLabelReserve = thumbRadius + labelBottomMargin + 13f * scaledDensity + labelPaddingV * 2
+    private val compactHeight = 40f * density
 
-    private val trackTop get() = height / 2f + verticalOffset / 2 - thumbRadius
+    private val isFloatingLabelVisible get() = showLabel || labelAlpha > 0 || isDragging
+    private val trackTop: Float
+        get() {
+            return if (isFloatingLabelVisible) {
+                height / 2f + floatingLabelReserve / 2 - thumbRadius
+            } else {
+                val nodeLabelHeight = nodeLabelPaint.textSize + nodeLabelMarginTop
+                ((height - nodeLabelHeight) / 2f).coerceAtLeast(thumbRadius)
+            }
+        }
     private val trackLeft get() = thumbRadius + paddingLeft.toFloat()
     private val trackRight get() = width - thumbRadius - paddingRight.toFloat()
     private val trackWidth get() = (trackRight - trackLeft).coerceAtLeast(0f)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val nodeLabelHeight = nodeLabelPaint.textSize + nodeLabelMarginTop
-        val desiredHeight = (verticalOffset + thumbRadius * 2 + 8f * density + nodeLabelHeight).toInt()
+        val expandedHeight = floatingLabelReserve + thumbRadius * 2 + 8f * density + nodeLabelHeight
+        val desiredHeight = (if (isFloatingLabelVisible) expandedHeight else compactHeight).toInt()
         val height = resolveSize(desiredHeight, heightMeasureSpec)
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), height)
     }
@@ -246,6 +288,7 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
                     showLabel = true
                     labelAlpha = 255
                     labelAnimator?.cancel()
+                    requestLayout()
                     updateRatioFromX(x)
                     parent?.requestDisallowInterceptTouchEvent(true)
                     return true
@@ -328,21 +371,23 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     private fun updateRatioFromX(x: Float) {
         if (trackWidth <= 0) return
         val fraction = ((x - trackLeft) / trackWidth).coerceIn(0f, 1f)
-        currentRatio = minRatio + fraction * (maxRatio - minRatio)
+        val logRatio = ln(minRatio) + fraction * (ln(maxRatio) - ln(minRatio))
+        currentRatio = exp(logRatio)
         onRatioChanged?.invoke(currentRatio)
         invalidate()
     }
 
     private fun ratioToX(ratio: Float): Float {
         if (maxRatio <= minRatio) return trackLeft
-        val fraction = ((ratio - minRatio) / (maxRatio - minRatio)).coerceIn(0f, 1f)
+        val fraction = ratioToFraction(ratio, minRatio, maxRatio)
         return trackLeft + fraction * trackWidth
     }
 
     private fun xToRatio(x: Float): Float {
         if (trackWidth <= 0) return minRatio
         val fraction = ((x - trackLeft) / trackWidth).coerceIn(0f, 1f)
-        return minRatio + fraction * (maxRatio - minRatio)
+        val logRatio = ln(minRatio) + fraction * (ln(maxRatio) - ln(minRatio))
+        return exp(logRatio)
     }
 
     private fun findNearestPreset(ratio: Float): Float? {
@@ -355,13 +400,15 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
 
     /** If ACTION_DOWN+UP is a tap and lands near a preset dot, return that preset. */
     private fun findPresetNearX(x: Float): Float? {
-        val ratio = xToRatio(x)
-        // Check pixel distance from each preset dot center
-        for (p in presetRatios) {
-            val dotX = ratioToX(p)
-            if (abs(x - dotX) < DOT_TAP_RADIUS_PX * density) return p
-        }
-        return null
+        return nearestPresetNearTap(
+            tapX = x,
+            presets = presetRatios,
+            trackLeft = trackLeft,
+            trackWidth = trackWidth,
+            minRatio = minRatio,
+            maxRatio = maxRatio,
+            dotTapRadiusPx = DOT_TAP_RADIUS_PX * density
+        )
     }
 
     private fun formatRatio(ratio: Float): String = Companion.formatRatio(ratio)
@@ -373,8 +420,12 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
             startDelay = 300
             interpolator = DecelerateInterpolator()
             addUpdateListener { anim ->
+                val wasShowing = showLabel
                 labelAlpha = anim.animatedValue as Int
                 showLabel = labelAlpha > 0
+                if (wasShowing != showLabel) {
+                    requestLayout()
+                }
                 invalidate()
             }
             start()

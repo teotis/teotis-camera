@@ -183,7 +183,7 @@ class CameraSessionCoordinatorTest {
 
         session.emitEffect(
             SessionEffect.BindPreview(
-                modeId = ModeId.NIGHT,
+                modeId = ModeId.CHECK_IN,
                 deviceGraph = nightGraph,
                 reason = "mode switched to night",
                 isRecovery = false
@@ -465,7 +465,7 @@ class CameraSessionCoordinatorTest {
 
         session.emitEffect(
             SessionEffect.BindPreview(
-                modeId = ModeId.NIGHT,
+                modeId = ModeId.CHECK_IN,
                 deviceGraph = nightGraph,
                 reason = "retry after failure",
                 isRecovery = false
@@ -704,7 +704,7 @@ class CameraSessionCoordinatorTest {
 
         session.emitEffect(
             SessionEffect.BindPreview(
-                modeId = ModeId.NIGHT,
+                modeId = ModeId.CHECK_IN,
                 deviceGraph = frontGraph,
                 reason = "lens switched to front",
                 isRecovery = false
@@ -798,7 +798,7 @@ class CameraSessionCoordinatorTest {
 
         session.emitEffect(
             SessionEffect.BindPreview(
-                modeId = ModeId.NIGHT,
+                modeId = ModeId.CHECK_IN,
                 deviceGraph = nightGraph,
                 reason = "mode switched to night",
                 isRecovery = false
@@ -1065,8 +1065,8 @@ class CameraSessionCoordinatorTest {
         }
 
         private fun defaultSessionState(
-            activeMode: ModeId = ModeId.NIGHT,
-            modeId: ModeId = ModeId.NIGHT,
+            activeMode: ModeId = ModeId.CHECK_IN,
+            modeId: ModeId = ModeId.CHECK_IN,
             deviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(
                 preferredLensFacing = LensFacing.BACK,
                 enablePreviewSnapshots = true
@@ -1081,7 +1081,7 @@ class CameraSessionCoordinatorTest {
                 previewStatus = PreviewStatus.ACTIVE,
                 previewStatusDetail = null,
                 activeMode = activeMode,
-                availableModes = listOf(ModeId.PHOTO, ModeId.NIGHT, ModeId.VIDEO),
+                availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.VIDEO),
                 captureStatus = CaptureStatus.IDLE,
                 recordingStatus = recordingStatus,
                 activeShot = null,

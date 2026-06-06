@@ -140,7 +140,8 @@ class DefaultCameraSession(
         updateState = SessionStateUpdater { transform ->
             _state.value = transform(_state.value)
         },
-        dispatch = { intent -> dispatch(intent) }
+        dispatch = { intent -> dispatch(intent) },
+        recordingTimerDispatcher = Dispatchers.Default
     )
 
     private val previewSessionMutations = object : PreviewSessionMutations {
@@ -862,7 +863,7 @@ class DefaultCameraSession(
     /**
      * Determines the target [LensNode] for the given [ratio] using hysteresis around
      * node thresholds. When [currentNode] is non-null, switching requires crossing
-     * the threshold by [LENS_NODE_HYSTERESIS_DELTA] to prevent jitter.
+     * the threshold by [LENS_NODE_HYSTERESIS_RATIO] * ratio to prevent jitter.
      *
      * Returns [LensNode.WIDE] as the fallback when no multi-camera is available.
      */
@@ -891,11 +892,13 @@ class DefaultCameraSession(
             val currentThreshold = lensNodeMap[currentNode]?.thresholdRatio ?: return target
             val targetThreshold = lensNodeMap[target]?.thresholdRatio ?: return target
             return if (currentThreshold > targetThreshold) {
-                // Switching to lower-zoom node: only if at or below current threshold minus hysteresis
-                if (ratio <= currentThreshold - LENS_NODE_HYSTERESIS_DELTA) target else currentNode
+                // Switching to lower-zoom node: reference is the higher threshold (current node)
+                val actualDelta = maxOf(0.05f, currentThreshold * LENS_NODE_HYSTERESIS_RATIO)
+                if (ratio <= currentThreshold - actualDelta) target else currentNode
             } else {
-                // Switching to higher-zoom node: only if above or at target threshold plus hysteresis
-                if (ratio >= targetThreshold + LENS_NODE_HYSTERESIS_DELTA) target else currentNode
+                // Switching to higher-zoom node: reference is the higher threshold (target)
+                val actualDelta = maxOf(0.05f, targetThreshold * LENS_NODE_HYSTERESIS_RATIO)
+                if (ratio >= targetThreshold + actualDelta) target else currentNode
             }
         }
         return target
@@ -962,11 +965,22 @@ class DefaultCameraSession(
             .distinct()
             .sorted()
         if (bases.isEmpty()) return normalizedCaptureZoom.coerceAtLeast(1f)
+        val hasUltrawideBase = bases.first() < 1f
+        if (normalizedCaptureZoom in bases && !hasUltrawideBase) return normalizedCaptureZoom
 
         var selected = bases.first()
         for (index in 1 until bases.size) {
+            val currentBase = bases[index - 1]
             val nextBase = bases[index]
-            val switchAt = normalizedZoomRatioValue(nextBase * PREVIEW_BASE_SWITCH_DELAY_FACTOR)
+            val switchAt = when {
+                hasUltrawideBase && nextBase == 1f -> 2f
+                else -> {
+                    // Switch when the frame box would shrink below MIN_PREVIEW_FRAME_SCALE
+                    // of the preview window, ensuring WYSIWYG fidelity during zoom.
+                    val frameBasedThreshold = currentBase / MIN_PREVIEW_FRAME_SCALE
+                    minOf(frameBasedThreshold, nextBase)
+                }
+            }
             if (normalizedCaptureZoom + PREVIEW_BASE_SWITCH_EPSILON >= switchAt) {
                 selected = nextBase
             } else {
@@ -977,9 +991,14 @@ class DefaultCameraSession(
     }
 
     companion object {
-        /** Hysteresis delta for lens node switching (zoom ratio units). */
-        internal const val LENS_NODE_HYSTERESIS_DELTA = 0.1f
-        private const val PREVIEW_BASE_SWITCH_DELAY_FACTOR = 1.1f
+        /** Relative hysteresis ratio for lens node switching (5% of current ratio). */
+        internal const val LENS_NODE_HYSTERESIS_RATIO = 0.05f
+        /**
+         * Minimum ratio of frame box size to preview window size before
+         * the preview baseline switches to the next zoom level.
+         * E.g. 0.7f means switch when frame < 70% of preview.
+         */
+        private const val MIN_PREVIEW_FRAME_SCALE = 0.7f
         private const val PREVIEW_BASE_SWITCH_EPSILON = 0.0001f
         private const val MIN_NON_ZERO_PREVIEW_ZOOM_RATIO = 0.01f
     }

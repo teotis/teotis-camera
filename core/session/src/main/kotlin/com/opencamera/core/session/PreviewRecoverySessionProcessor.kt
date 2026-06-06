@@ -11,9 +11,7 @@ import com.opencamera.core.device.recoveryReason
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.outputPathOrNull
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -427,7 +425,7 @@ internal class PreviewRecoverySessionProcessor(
     }
 
     private fun scheduleMeteringFeedbackExpiry(requestId: String, delayMs: Long) {
-        CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
+        scope.launch {
             delay(delayMs)
             dispatch(SessionIntent.PreviewMeteringFeedbackExpired(requestId))
         }
@@ -487,7 +485,7 @@ internal class PreviewRecoverySessionProcessor(
                 "untilElapsedMillis=$visibleUntil"
             )
             promptExpiryJob?.cancel()
-            promptExpiryJob = CoroutineScope(Dispatchers.Default + SupervisorJob()).launch {
+            promptExpiryJob = scope.launch {
                 delay(3000L)
                 dispatch(SessionIntent.PhotoLowLightPromptExpired)
             }

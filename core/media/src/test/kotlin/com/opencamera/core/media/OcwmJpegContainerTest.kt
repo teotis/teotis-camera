@@ -244,6 +244,30 @@ class OcwmJpegContainerTest {
     }
 
     @Test
+    fun decoderExtractsNewestArchiveWhenJpegContainsMultipleArchives() {
+        val visible = minimalVisibleJpeg()
+        val firstArchive = makeArchive(100)
+        val secondPayload = ByteArray(140000) { ((it * 7) and 0xFF).toByte() }
+        val secondArchive = OcwmJpegContainer.EmbeddedArchive(
+            ReversibleWatermarkArchiveManifest(
+                watermarkTemplateId = "professional-bottom-bar",
+                visibleImageSha256 = sha256Hex(visible),
+                payloadSha256 = sha256Hex(secondPayload),
+                payloadLength = secondPayload.size.toLong()
+            ),
+            secondPayload
+        )
+
+        val withFirstArchive = OcwmJpegContainer.embedArchive(visible, firstArchive)
+        val withSecondArchive = OcwmJpegContainer.embedArchive(withFirstArchive, secondArchive)
+        val extracted = OcwmJpegContainer.extractArchive(withSecondArchive)
+
+        assertNotNull(extracted)
+        assertEquals(secondArchive.manifest, extracted.manifest)
+        assertTrue(secondPayload.contentEquals(extracted.payload))
+    }
+
+    @Test
     fun decoderReturnsNullForJpegWithoutArchive() {
         val visible = minimalVisibleJpeg()
         assertNull(OcwmJpegContainer.extractArchive(visible))

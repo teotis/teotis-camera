@@ -22,12 +22,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 enum class ModeId {
     PHOTO,
+    CHECK_IN,
     DOCUMENT,
     HUMANISTIC,
-    PORTRAIT,
-    PRO,
-    NIGHT,
-    FULL_CLEAR,
     VIDEO
 }
 
@@ -42,6 +39,10 @@ fun ModeId.catalogProfile(): ModeCatalogProfile {
             displayName = "Photo",
             buttonLabel = "Photo"
         )
+        ModeId.CHECK_IN -> ModeCatalogProfile(
+            displayName = "Check-in",
+            buttonLabel = "Check-in"
+        )
         ModeId.DOCUMENT -> ModeCatalogProfile(
             displayName = "Document",
             buttonLabel = "Doc"
@@ -49,22 +50,6 @@ fun ModeId.catalogProfile(): ModeCatalogProfile {
         ModeId.HUMANISTIC -> ModeCatalogProfile(
             displayName = "Humanistic",
             buttonLabel = "Human"
-        )
-        ModeId.PORTRAIT -> ModeCatalogProfile(
-            displayName = "Portrait",
-            buttonLabel = "Portrait"
-        )
-        ModeId.PRO -> ModeCatalogProfile(
-            displayName = "Pro",
-            buttonLabel = "Pro"
-        )
-        ModeId.NIGHT -> ModeCatalogProfile(
-            displayName = "Scenery",
-            buttonLabel = "Scenery"
-        )
-        ModeId.FULL_CLEAR -> ModeCatalogProfile(
-            displayName = "Full Clear",
-            buttonLabel = "Full Clear"
         )
         ModeId.VIDEO -> ModeCatalogProfile(
             displayName = "Video",
@@ -236,7 +221,8 @@ interface CameraModePlugin {
 class ModeRegistry(plugins: List<CameraModePlugin>) {
     private val pluginsById = plugins.associateBy { it.id }
 
-    val availableModes: List<ModeId> = pluginsById.keys.sortedBy { it.ordinal }
+    val availableModes: List<ModeId> = pluginsById.keys
+        .sortedBy { it.ordinal }
 
     fun supportedModes(
         deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT

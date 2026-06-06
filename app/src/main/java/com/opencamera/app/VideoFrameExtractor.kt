@@ -29,10 +29,13 @@ internal object VideoFrameExtractor {
             try {
                 if (sourceUri.startsWith("content://")) {
                     retriever.setDataSource(context, uri)
+                } else if (sourceUri.startsWith("file://")) {
+                    retriever.setDataSource(uri.path)
                 } else {
                     retriever.setDataSource(sourceUri)
                 }
-                val frame = retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                val frame = retriever.getFrameAtTime(1_000_000, MediaMetadataRetriever.OPTION_CLOSEST)
+                    ?: retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
                     ?: return null
                 val scaled = scaleDown(frame)
                 FileOutputStream(cachedFile).use { out ->

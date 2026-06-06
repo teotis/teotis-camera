@@ -1,10 +1,15 @@
 package com.opencamera.app
 
+import android.view.View.MeasureSpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
+@RunWith(RobolectricTestRunner::class)
 class FocalLengthSliderViewTest {
 
     // -- formatRatio --
@@ -21,6 +26,21 @@ class FocalLengthSliderViewTest {
     fun `formatRatio rounds to one decimal`() {
         assertEquals("1.2x", FocalLengthSliderView.formatRatio(1.24f))
         assertEquals("1.3x", FocalLengthSliderView.formatRatio(1.25f))
+    }
+
+    @Test
+    fun `resting slider measures compactly without reserving floating label space`() {
+        val view = FocalLengthSliderView(RuntimeEnvironment.getApplication())
+        view.setPresetRatios(listOf(0.7f, 1.0f, 2.0f, 5.0f))
+        view.setCurrentRatio(1.0f)
+
+        view.measure(
+            MeasureSpec.makeMeasureSpec(360, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        )
+
+        val heightDp = view.measuredHeight / view.resources.displayMetrics.density
+        assertTrue(heightDp in 36f..44f, "heightDp=$heightDp")
     }
 
     // -- shouldSnap --
@@ -151,5 +171,23 @@ class FocalLengthSliderViewTest {
     @Test
     fun `shouldSuppressExternalUpdate returns false when not dragging`() {
         assertFalse(FocalLengthSliderView.shouldSuppressExternalUpdate(false))
+    }
+
+    @Test
+    fun `nearestPresetNearTap chooses closest dot when 07 and 10 preset hit zones overlap`() {
+        val presets = listOf(0.7f, 1.0f, 2.0f, 5.0f, 10.0f)
+        val targetX = 10f
+        val dotTapRadius = 32f
+        val resolved = FocalLengthSliderView.nearestPresetNearTap(
+            tapX = targetX,
+            presets = presets,
+            trackLeft = 0f,
+            trackWidth = 100f,
+            minRatio = 0.7f,
+            maxRatio = 10.0f,
+            dotTapRadiusPx = dotTapRadius
+        )
+
+        assertEquals(1.0f, resolved)
     }
 }

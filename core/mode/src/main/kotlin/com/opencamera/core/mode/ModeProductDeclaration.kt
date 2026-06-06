@@ -101,77 +101,80 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
             )
         )
 
-        ModeId.NIGHT -> ModeProductDeclaration(
+        ModeId.CHECK_IN -> ModeProductDeclaration(
             modeId = this,
-            displayName = "Scenery",
+            displayName = "Check-in",
             primaryGate = PrimaryCapabilityGate(
                 kind = CapabilityRequirementKind.STILL_CAPTURE,
-                unsupportedMessage = "Scenery mode requires still capture support"
+                unsupportedMessage = "Check-in mode requires still capture support"
             ),
             requirements = listOf(
                 ModeCapabilityRequirement(
-                    id = "night-multiframe",
-                    kind = CapabilityRequirementKind.MULTI_FRAME_CAPTURE,
-                    isOptional = false,
-                    degradationDescription = "Multi-frame capture unavailable; degrades to single-frame brightening fallback",
-                    fallbackId = "night-single-frame"
-                )
-            ),
-            strategyVariants = listOf(
-                ModeStrategyVariant(
-                    id = "night-multiframe",
-                    type = ModeStrategyType.MULTI_FRAME,
-                    conditionDescription = "Multi-frame merge when device supports night multi-frame capture",
-                    requiredCapabilityIds = listOf("night-multiframe")
-                ),
-                ModeStrategyVariant(
-                    id = "night-single-frame",
-                    type = ModeStrategyType.SINGLE_FRAME,
-                    conditionDescription = "Single-frame brightening fallback when multi-frame is unavailable"
-                )
-            ),
-            effectProfile = ModeEffectProfile(
-                usesFrameEffect = true
-            )
-        )
-
-        ModeId.PORTRAIT -> ModeProductDeclaration(
-            modeId = this,
-            displayName = "Portrait",
-            primaryGate = PrimaryCapabilityGate(
-                kind = CapabilityRequirementKind.STILL_CAPTURE,
-                unsupportedMessage = "Portrait mode requires still capture support"
-            ),
-            requirements = listOf(
-                ModeCapabilityRequirement(
-                    id = "portrait-segmentation",
+                    id = "checkin-portrait-segmentation",
                     kind = CapabilityRequirementKind.PORTRAIT_SEGMENTATION,
                     isOptional = false,
                     degradationDescription = "Depth segmentation unavailable; degrades to focus-priority fallback",
-                    fallbackId = "portrait-focus"
+                    fallbackId = "checkin-focus"
                 ),
                 ModeCapabilityRequirement(
-                    id = "portrait-filter",
+                    id = "checkin-multiframe",
+                    kind = CapabilityRequirementKind.MULTI_FRAME_CAPTURE,
+                    isOptional = false,
+                    degradationDescription = "Multi-frame capture unavailable; degrades to single-frame best-effort capture",
+                    fallbackId = "checkin-best-frame"
+                ),
+                ModeCapabilityRequirement(
+                    id = "checkin-filter",
                     kind = CapabilityRequirementKind.FILTER_CAPTURE_RENDER,
                     isOptional = true,
-                    degradationDescription = "Filter render unavailable; portrait capture proceeds without filter"
+                    degradationDescription = "Filter render unavailable; capture proceeds without filter effect"
+                ),
+                ModeCapabilityRequirement(
+                    id = "checkin-watermark",
+                    kind = CapabilityRequirementKind.WATERMARK_RENDER,
+                    isOptional = true,
+                    degradationDescription = "Watermark render unavailable; capture proceeds without watermark"
+                ),
+                ModeCapabilityRequirement(
+                    id = "checkin-focus-stack",
+                    kind = CapabilityRequirementKind.MULTI_FRAME_CAPTURE,
+                    isOptional = true,
+                    degradationDescription = "Focus stack fusion unavailable; degrades to honest best-frame selection",
+                    fallbackId = "checkin-best-frame"
                 )
             ),
             strategyVariants = listOf(
                 ModeStrategyVariant(
-                    id = "portrait-depth",
+                    id = "checkin-portrait-depth",
                     type = ModeStrategyType.SINGLE_FRAME,
                     conditionDescription = "Portrait with depth effect when segmentation is supported",
-                    requiredCapabilityIds = listOf("portrait-segmentation")
+                    requiredCapabilityIds = listOf("checkin-portrait-segmentation")
                 ),
                 ModeStrategyVariant(
-                    id = "portrait-focus",
+                    id = "checkin-focus",
                     type = ModeStrategyType.SINGLE_FRAME,
                     conditionDescription = "Focus-priority fallback when depth segmentation is unavailable"
+                ),
+                ModeStrategyVariant(
+                    id = "checkin-multiframe",
+                    type = ModeStrategyType.MULTI_FRAME,
+                    conditionDescription = "Multi-frame merge for focus-bracket and low-light scenes when device supports multi-frame capture",
+                    requiredCapabilityIds = listOf("checkin-multiframe")
+                ),
+                ModeStrategyVariant(
+                    id = "checkin-best-frame",
+                    type = ModeStrategyType.SINGLE_FRAME,
+                    conditionDescription = "Single-frame best-effort capture when multi-frame is unavailable"
+                ),
+                ModeStrategyVariant(
+                    id = "checkin-static-scene",
+                    type = ModeStrategyType.SINGLE_FRAME,
+                    conditionDescription = "Static-scene low-light fallback when multi-frame merge is unavailable and scene is static"
                 )
             ),
             effectProfile = ModeEffectProfile(
                 usesFilter = true,
+                usesWatermark = true,
                 usesPortraitEffect = true,
                 usesFrameEffect = true
             )
@@ -192,6 +195,13 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
                     degradationDescription = "Filter render unavailable; capture proceeds without tone effect"
                 ),
                 ModeCapabilityRequirement(
+                    id = "humanistic-manual-control",
+                    kind = CapabilityRequirementKind.MANUAL_CONTROL,
+                    isOptional = false,
+                    degradationDescription = "Manual controls unavailable; degrades to assisted preset mode",
+                    fallbackId = "humanistic-auto"
+                ),
+                ModeCapabilityRequirement(
                     id = "humanistic-live-motion",
                     kind = CapabilityRequirementKind.TEMPORAL_RING_BUFFER,
                     isOptional = true,
@@ -206,6 +216,17 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
             ),
             strategyVariants = listOf(
                 ModeStrategyVariant(
+                    id = "humanistic-manual",
+                    type = ModeStrategyType.SINGLE_FRAME,
+                    conditionDescription = "Manual control with ISO, shutter speed, white balance, and focus",
+                    requiredCapabilityIds = listOf("humanistic-manual-control")
+                ),
+                ModeStrategyVariant(
+                    id = "humanistic-auto",
+                    type = ModeStrategyType.SINGLE_FRAME,
+                    conditionDescription = "Assisted preset when manual controls are unavailable"
+                ),
+                ModeStrategyVariant(
                     id = "humanistic-standard",
                     type = ModeStrategyType.SINGLE_FRAME,
                     conditionDescription = "Standard humanistic capture with filter and frame ratio"
@@ -219,40 +240,6 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
             ),
             effectProfile = ModeEffectProfile(
                 usesFilter = true,
-                usesFrameEffect = true
-            )
-        )
-
-        ModeId.PRO -> ModeProductDeclaration(
-            modeId = this,
-            displayName = "Pro",
-            primaryGate = PrimaryCapabilityGate(
-                kind = CapabilityRequirementKind.STILL_CAPTURE,
-                unsupportedMessage = "Pro mode requires still capture support"
-            ),
-            requirements = listOf(
-                ModeCapabilityRequirement(
-                    id = "pro-manual-control",
-                    kind = CapabilityRequirementKind.MANUAL_CONTROL,
-                    isOptional = false,
-                    degradationDescription = "Manual controls unavailable; degrades to assisted preset mode",
-                    fallbackId = "pro-assisted"
-                )
-            ),
-            strategyVariants = listOf(
-                ModeStrategyVariant(
-                    id = "pro-manual",
-                    type = ModeStrategyType.SINGLE_FRAME,
-                    conditionDescription = "Manual control with ISO, shutter speed, white balance, and focus",
-                    requiredCapabilityIds = listOf("pro-manual-control")
-                ),
-                ModeStrategyVariant(
-                    id = "pro-assisted",
-                    type = ModeStrategyType.SINGLE_FRAME,
-                    conditionDescription = "Assisted preset when manual controls are unavailable"
-                )
-            ),
-            effectProfile = ModeEffectProfile(
                 usesFrameEffect = true
             )
         )
@@ -291,47 +278,6 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
             )
         )
 
-        ModeId.FULL_CLEAR -> ModeProductDeclaration(
-            modeId = this,
-            displayName = "Full Clear",
-            primaryGate = PrimaryCapabilityGate(
-                kind = CapabilityRequirementKind.STILL_CAPTURE,
-                unsupportedMessage = "Full Clear mode requires still capture support"
-            ),
-            requirements = listOf(
-                ModeCapabilityRequirement(
-                    id = "fullclear-focus-bracket",
-                    kind = CapabilityRequirementKind.MULTI_FRAME_CAPTURE,
-                    isOptional = true,
-                    degradationDescription = "Multi-focus bracket capture unavailable; degrades to single-frame best-effort capture",
-                    fallbackId = "fullclear-single-frame"
-                ),
-                ModeCapabilityRequirement(
-                    id = "fullclear-focus-stack",
-                    kind = CapabilityRequirementKind.FILTER_CAPTURE_RENDER,
-                    isOptional = true,
-                    degradationDescription = "Focus stack fusion unavailable; degrades to honest best-frame selection with degradation notes",
-                    fallbackId = "fullclear-best-frame"
-                )
-            ),
-            strategyVariants = listOf(
-                ModeStrategyVariant(
-                    id = "fullclear-bracket",
-                    type = ModeStrategyType.MULTI_FRAME,
-                    conditionDescription = "Multi-focus bracket capture with V1 focus-stack fusion when device supports multi-frame capture",
-                    requiredCapabilityIds = listOf("fullclear-focus-bracket")
-                ),
-                ModeStrategyVariant(
-                    id = "fullclear-single-frame",
-                    type = ModeStrategyType.SINGLE_FRAME,
-                    conditionDescription = "Single-frame best-effort capture when focus bracket is unavailable"
-                )
-            ),
-            effectProfile = ModeEffectProfile(
-                usesFrameEffect = true
-            )
-        )
-
         ModeId.VIDEO -> ModeProductDeclaration(
             modeId = this,
             displayName = "Video",
@@ -358,5 +304,6 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
                 usesFilter = true
             )
         )
+
     }
 }

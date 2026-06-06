@@ -482,11 +482,11 @@ internal fun renderPhotoWatermarkBitmap(
             titleTextSize = titleTextSize,
             detailTextSize = detailTextSize,
             padding = padding,
-            sideBorderScale = 0.75f,
-            topBorderScale = 0.7f,
-            bottomBandScale = 3.6f,
-            titleColor = Color.argb(255, 44, 48, 58),
-            detailColor = Color.argb(255, 112, 98, 80),
+            sideBorderScale = 1.0f,
+            topBorderScale = 0.9f,
+            bottomBandScale = 4.6f,
+            titleColor = Color.argb(255, 74, 54, 38),
+            detailColor = Color.argb(255, 132, 103, 72),
             centered = false
         )
 
@@ -509,11 +509,11 @@ internal fun renderPhotoWatermarkBitmap(
             titleTextSize = titleTextSize * 0.96f,
             detailTextSize = detailTextSize,
             padding = padding,
-            sideBorderScale = 0.9f,
-            topBorderScale = 0.8f,
-            bottomBandScale = 3.9f,
-            titleColor = Color.argb(255, 235, 220, 194),
-            detailColor = Color.argb(255, 199, 176, 146),
+            sideBorderScale = 1.05f,
+            topBorderScale = 0.92f,
+            bottomBandScale = 4.2f,
+            titleColor = Color.argb(255, 255, 238, 205),
+            detailColor = Color.argb(255, 224, 196, 154),
             centered = true
         )
 
@@ -757,9 +757,13 @@ private fun drawBlurFourBorderFrame(
     padding: Float
 ): PhotoWatermarkBitmapRenderResult {
     val minEdge = minOf(source.width, source.height).toFloat()
-    val sideBorder = maxOf(20f, minEdge * 0.045f)
-    val topBorder = maxOf(20f, minEdge * 0.045f)
-    val bottomBorder = maxOf(titleTextSize * 2.35f, minEdge * 0.09f)
+    val metrics = blurFourBorderFrameMetrics(
+        minEdge = minEdge,
+        titleTextSize = titleTextSize
+    )
+    val sideBorder = metrics.sideBorder
+    val topBorder = metrics.topBorder
+    val bottomBorder = metrics.bottomBorder
     val framedWidth = (source.width + sideBorder * 2f).toInt()
     val framedHeight = (source.height + topBorder + bottomBorder).toInt()
     val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
@@ -775,21 +779,16 @@ private fun drawBlurFourBorderFrame(
     )
     canvas.drawBitmap(source, sideBorder, topBorder, null)
 
-    val hairlineColor = when (template.frameBackground) {
-        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb((24 * 255 / 100), 0, 0, 0)
-        else -> Color.argb((28 * 255 / 100), 255, 255, 255)
-    }
-    val hairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = hairlineColor
-        style = Paint.Style.STROKE
-        strokeWidth = 1f
-    }
-    canvas.drawRect(
-        sideBorder - 0.5f,
-        topBorder - 0.5f,
-        sideBorder + source.width + 0.5f,
-        topBorder + source.height + 0.5f,
-        hairlinePaint
+    drawFourBorderCardAccents(
+        canvas = canvas,
+        background = template.frameBackground,
+        framedWidth = framedWidth,
+        framedHeight = framedHeight,
+        sideBorder = sideBorder,
+        topBorder = topBorder,
+        bottomBorder = bottomBorder,
+        sourceWidth = source.width,
+        sourceHeight = source.height
     )
 
     val titleColor = when (template.frameBackground) {
@@ -859,6 +858,77 @@ private fun drawBlurFourBorderFrame(
     )
 }
 
+internal data class BlurFourBorderFrameMetrics(
+    val sideBorder: Float,
+    val topBorder: Float,
+    val bottomBorder: Float
+)
+
+internal fun blurFourBorderFrameMetrics(
+    minEdge: Float,
+    titleTextSize: Float
+): BlurFourBorderFrameMetrics {
+    return BlurFourBorderFrameMetrics(
+        sideBorder = maxOf(24f, minEdge * 0.06f),
+        topBorder = maxOf(24f, minEdge * 0.055f),
+        bottomBorder = maxOf(titleTextSize * 3.15f, minEdge * 0.16f)
+    )
+}
+
+private fun drawFourBorderCardAccents(
+    canvas: Canvas,
+    background: WatermarkFrameBackground,
+    framedWidth: Int,
+    framedHeight: Int,
+    sideBorder: Float,
+    topBorder: Float,
+    bottomBorder: Float,
+    sourceWidth: Int,
+    sourceHeight: Int
+) {
+    val accentColor = when (background) {
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(178, 245, 202, 126)
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(132, 245, 238, 220)
+        else -> Color.argb(150, 220, 248, 246)
+    }
+    val innerColor = when (background) {
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(118, 42, 28, 18)
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(136, 255, 255, 255)
+        else -> Color.argb(148, 255, 255, 255)
+    }
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = accentColor
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+    }
+    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerColor
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f
+    }
+    canvas.drawRect(
+        1f,
+        1f,
+        framedWidth - 1f,
+        framedHeight - 1f,
+        accentPaint
+    )
+    canvas.drawRect(
+        sideBorder - 0.5f,
+        topBorder - 0.5f,
+        sideBorder + sourceWidth + 0.5f,
+        topBorder + sourceHeight + 0.5f,
+        innerPaint
+    )
+    canvas.drawLine(
+        sideBorder,
+        framedHeight - bottomBorder,
+        framedWidth - sideBorder,
+        framedHeight - bottomBorder,
+        accentPaint
+    )
+}
+
 private fun drawProfessionalBottomBar(
     source: Bitmap,
     template: ResolvedPhotoWatermarkTemplate,
@@ -866,7 +936,7 @@ private fun drawProfessionalBottomBar(
     detailTextSize: Float,
     padding: Float
 ): PhotoWatermarkBitmapRenderResult {
-    val bottomBandHeight = maxOf(titleTextSize * 3.2f, source.height * 0.13f)
+    val bottomBandHeight = maxOf(titleTextSize * 3.8f, source.height * 0.15f)
     val framedWidth = source.width
     val framedHeight = (source.height + bottomBandHeight).toInt()
     val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
@@ -883,7 +953,7 @@ private fun drawProfessionalBottomBar(
     val hairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = hairlineColor
         style = Paint.Style.STROKE
-        strokeWidth = 1f
+        strokeWidth = 1.5f
     }
     canvas.drawLine(
         0f,
@@ -901,7 +971,7 @@ private fun drawProfessionalBottomBar(
     }
     val detailColor = when (template.frameBackground) {
         WatermarkFrameBackground.DARK,
-        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(220, 172, 177, 188)
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(226, 190, 194, 204)
         WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(230, 235, 228, 210)
         else -> Color.argb(220, 120, 118, 112)
     }
@@ -1163,7 +1233,7 @@ private fun drawFrameBackground(
         }
 
         WatermarkFrameBackground.WHITE -> {
-            canvas.drawColor(Color.argb(236, 250, 246, 238))
+            canvas.drawColor(Color.argb(244, 255, 247, 224))
         }
 
         WatermarkFrameBackground.SOURCE_BLUR,
@@ -1191,7 +1261,7 @@ private fun drawFrameBackground(
             val overlayColor = when (background) {
                 WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(88, 20, 20, 20)
                 WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> Color.argb(124, 255, 244, 228)
-                WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(92, 245, 210, 170)
+                WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(104, 246, 198, 138)
                 else -> Color.TRANSPARENT
             }
             canvas.drawRect(destination, Paint(Paint.ANTI_ALIAS_FLAG).apply {

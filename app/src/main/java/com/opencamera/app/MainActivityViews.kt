@@ -28,6 +28,7 @@ internal data class TopBarViews(
 
 internal data class QuickPanelViews(
     val panel: NestedScrollView,
+    val content: LinearLayout,
     val grid: Button,
     val resolution: Button,
     val brightnessSlider: SeekBar,
@@ -167,10 +168,7 @@ internal data class DevConsoleViews(
 internal data class ModeTrackViews(
     val scroll: android.widget.HorizontalScrollView,
     val photo: Button,
-    val night: Button,
-    val fullClear: Button,
-    val portrait: Button,
-    val pro: Button,
+    val checkIn: Button,
     val video: Button,
     val document: Button,
     val humanistic: Button
@@ -185,6 +183,11 @@ internal data class DocumentBatchRailViews(
     val rail: LinearLayout,
     val header: Button,
     val list: LinearLayout
+)
+
+internal data class FilterStripViews(
+    val scroll: android.widget.HorizontalScrollView,
+    val chips: LinearLayout
 )
 
 internal data class DocumentBatchOrganizerViews(
@@ -209,6 +212,7 @@ internal data class MainActivityViews(
     val floatingUtility: FloatingUtilityViews,
     val documentBatchRail: DocumentBatchRailViews,
     val documentBatchOrganizer: DocumentBatchOrganizerViews,
+    val filterStrip: FilterStripViews,
     val settingsPanel: SettingsPanelViews,
     val filterLab: FilterLabViews,
     val devConsole: DevConsoleViews,
@@ -233,6 +237,7 @@ internal data class MainActivityViews(
             )
             val quickPanel = QuickPanelViews(
                 panel = activity.findViewById(R.id.quickBubblePanel),
+                content = activity.findViewById(R.id.quickPanelContent),
                 grid = activity.findViewById(R.id.buttonQuickGrid),
                 resolution = activity.findViewById(R.id.buttonQuickResolution),
                 brightnessSlider = activity.findViewById(R.id.brightnessSlider),
@@ -372,10 +377,7 @@ internal data class MainActivityViews(
             val modeTrack = ModeTrackViews(
                 scroll = activity.findViewById(R.id.modeTrackScroll),
                 photo = activity.findViewById(R.id.buttonPhotoMode),
-                night = activity.findViewById(R.id.buttonNightMode),
-                fullClear = activity.findViewById(R.id.buttonFullClearMode),
-                portrait = activity.findViewById(R.id.buttonPortraitMode),
-                pro = activity.findViewById(R.id.buttonProMode),
+                checkIn = activity.findViewById(R.id.buttonCheckInMode),
                 video = activity.findViewById(R.id.buttonVideoMode),
                 document = activity.findViewById(R.id.buttonDocumentMode),
                 humanistic = activity.findViewById(R.id.buttonHumanisticMode)
@@ -392,6 +394,10 @@ internal data class MainActivityViews(
                 itemList = activity.findViewById(R.id.documentBatchOrganizerItemList),
                 close = activity.findViewById(R.id.buttonCloseDocumentBatchOrganizer)
             )
+            val filterStrip = FilterStripViews(
+                scroll = activity.findViewById(R.id.filterStripScroll),
+                chips = activity.findViewById(R.id.filterStripChips)
+            )
             val bottomCockpit = BottomCockpitViews(
                 shutter = activity.findViewById(R.id.buttonShutter),
                 lensFacing = activity.findViewById(R.id.buttonLensFacing),
@@ -405,6 +411,7 @@ internal data class MainActivityViews(
                 floatingUtility = floatingUtility,
                 documentBatchRail = documentBatchRail,
                 documentBatchOrganizer = documentBatchOrganizer,
+                filterStrip = filterStrip,
                 settingsPanel = settingsPanel,
                 filterLab = filterLab,
                 devConsole = devConsole,

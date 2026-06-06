@@ -208,9 +208,9 @@ class OcwmExtractorCompatibilityTest {
 
     private fun findPythonExtractor(): String? {
         val candidates = listOf(
-            "scripts/extract_ocwm_original.py",
-            "../scripts/extract_ocwm_original.py",
-            "../../scripts/extract_ocwm_original.py"
+            "tool/extract_ocwm_original.py",
+            "../tool/extract_ocwm_original.py",
+            "../../tool/extract_ocwm_original.py"
         )
         for (c in candidates) {
             val f = File(c).canonicalFile

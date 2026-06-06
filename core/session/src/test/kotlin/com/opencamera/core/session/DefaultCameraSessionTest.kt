@@ -64,10 +64,7 @@ import com.opencamera.core.settings.WatermarkTextOpacity
 import com.opencamera.core.settings.WatermarkTextPlacement
 import com.opencamera.core.settings.WatermarkTextScale
 import com.opencamera.feature.humanistic.HumanisticModePlugin
-import com.opencamera.feature.night.NightModePlugin
 import com.opencamera.feature.photo.PhotoModePlugin
-import com.opencamera.feature.portrait.PortraitModePlugin
-import com.opencamera.feature.pro.ProModePlugin
 import com.opencamera.feature.video.VideoModePlugin
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -95,7 +92,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
         session.dispatch(SessionIntent.PreviewHostAttached)
         session.dispatch(SessionIntent.Boot)
-        advanceUntilIdle()
+        runCurrent()
 
         assertTrue(session.state.value.previewHostAvailable)
         assertEquals(SessionLifecycle.RUNNING, session.state.value.lifecycle)
@@ -113,12 +110,12 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
         session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
+        runCurrent()
 
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot, session.state.value.toString())
         session.dispatch(SessionIntent.ShotStarted(shot))
         session.dispatch(SessionIntent.PreviewSurfaceLost("surface lost while recording"))
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewStatus.ERROR, session.state.value.previewStatus)
         assertEquals(
@@ -143,10 +140,10 @@ class DefaultCameraSessionTest {
             )
         )
         session.dispatch(SessionIntent.PreviewFirstFrameAvailable(90))
-        advanceUntilIdle()
+        runCurrent()
 
         session.dispatch(SessionIntent.PreviewError("camera provider restarted"))
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewStatus.ERROR, session.state.value.previewStatus)
         assertEquals("Preview error, attempting recovery", session.state.value.lastAction)
@@ -164,7 +161,7 @@ class DefaultCameraSessionTest {
             )
         )
         session.dispatch(SessionIntent.PreviewFirstFrameAvailable(108))
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewStatus.ACTIVE, session.state.value.previewStatus)
         assertEquals(2, session.state.value.previewMetrics.bindCount)
@@ -184,7 +181,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.ShutterPressed)
         advanceUntilIdle()
 
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot, session.state.value.toString())
         session.dispatch(SessionIntent.ShotStarted(shot))
         session.dispatch(SessionIntent.PreviewError("encoder pipeline unstable"))
         advanceUntilIdle()
@@ -211,7 +208,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewStatus.ERROR, session.state.value.previewStatus)
         assertEquals(
@@ -253,7 +250,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewStatus.ERROR, session.state.value.previewStatus)
         assertEquals(
@@ -290,7 +287,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewStatus.ERROR, session.state.value.previewStatus)
         assertEquals(
@@ -327,7 +324,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewStatus.ERROR, session.state.value.previewStatus)
         assertEquals("Preview recovery failed", session.state.value.lastAction)
@@ -511,7 +508,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(CaptureStatus.COMPLETED, session.state.value.captureStatus)
         assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
@@ -535,7 +532,7 @@ class DefaultCameraSessionTest {
                 ThumbnailSource.PreviewSnapshot("/tmp/preview-a.jpg")
             )
         )
-        advanceUntilIdle()
+        runCurrent()
         assertEquals("/tmp/preview-a.jpg", session.state.value.previewThumbnailPath)
 
         session.dispatch(SessionIntent.ShutterPressed)
@@ -557,7 +554,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
         assertEquals("Pictures/OpenCamera/photo-a.jpg", session.state.value.previewThumbnailPath)
 
         session.dispatch(
@@ -565,7 +562,7 @@ class DefaultCameraSessionTest {
                 ThumbnailSource.PreviewSnapshot("/tmp/preview-b.jpg")
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals("Pictures/OpenCamera/photo-a.jpg", session.state.value.previewThumbnailPath)
         assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.SavedMedia)
@@ -877,7 +874,7 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `apply zoom ratio with lens node map sets discrete previewZoomRatio`() = runTest {
+    fun `apply zoom ratio with lens node map tracks previewZoomRatio to captureZoom via frame-scale switch`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
             trace = trace,
@@ -896,16 +893,19 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         advanceUntilIdle()
 
-        // captureZoom = 3.0 → previewZoom = 2.0 (largest threshold ≤ 3.0)
+        // captureZoom = 3.0 → bases [1.0, 2.0, 5.0]
+        // 1.0→2.0 switchAt=1.0/0.7≈1.43 → selected=2.0
+        // 2.0→5.0 switchAt=2.0/0.7≈2.86 → selected=5.0
+        // previewZoom = min(5.0, 3.0) = 3.0 (WYSIWYG)
         session.dispatch(SessionIntent.ApplyZoomRatio(3.0f))
         advanceUntilIdle()
 
         assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.zoomRatio)
-        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
     }
 
     @Test
-    fun `previewZoomRatio stays discrete when captureZoom changes within same lens range`() = runTest {
+    fun `previewZoomRatio tracks captureZoom with frame-scale based switching`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
             trace = trace,
@@ -924,19 +924,24 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         advanceUntilIdle()
 
-        // captureZoom = 2.5 → previewZoom = 2.0
+        // captureZoom = 2.5 → bases [1.0, 2.0, 5.0]
+        // 1.0→2.0 switchAt=1.43, 2.5 >= 1.43 → selected=2.0
+        // 2.0→5.0 switchAt=2.86, 2.5 < 2.86 → break
+        // previewZoom = min(2.0, 2.5) = 2.0
         session.dispatch(SessionIntent.ApplyZoomRatio(2.5f))
         advanceUntilIdle()
         assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
 
-        // captureZoom = 3.5 → still previewZoom = 2.0 (same lens range)
+        // captureZoom = 3.5 → bases [1.0, 2.0, 5.0]
+        // 2.0→5.0 switchAt=2.86, 3.5 >= 2.86 → selected=5.0
+        // previewZoom = min(5.0, 3.5) = 3.5 (WYSIWYG)
         session.dispatch(SessionIntent.ApplyZoomRatio(3.5f))
         advanceUntilIdle()
-        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        assertEquals(3.5f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
     }
 
     @Test
-    fun `previewZoomRatio jumps when captureZoom crosses lens threshold`() = runTest {
+    fun `previewZoomRatio tracks captureZoom with WYSIWYG frame when crossing lens thresholds`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
             trace = trace,
@@ -955,12 +960,14 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         advanceUntilIdle()
 
-        // captureZoom = 4.5 → previewZoom = 2.0 (TELEPHOTO range)
+        // captureZoom = 4.5 → bases [1.0, 2.0, 5.0]
+        // 2.0→5.0 switchAt=2.86, 4.5 >= 2.86 → selected=5.0
+        // previewZoom = min(5.0, 4.5) = 4.5 (WYSIWYG)
         session.dispatch(SessionIntent.ApplyZoomRatio(4.5f))
         advanceUntilIdle()
-        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        assertEquals(4.5f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
 
-        // captureZoom = 6.0 → previewZoom = 5.0 (PERISCOPE range)
+        // captureZoom = 6.0 → previewZoom = min(5.0, 6.0) = 5.0
         session.dispatch(SessionIntent.ApplyZoomRatio(6.0f))
         advanceUntilIdle()
         assertEquals(5.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
@@ -1085,7 +1092,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.ShutterPressed)
         advanceUntilIdle()
 
-        val shot = assertNotNull(session.state.value.activeShot)
+        val shot = assertNotNull(session.state.value.activeShot, session.state.value.toString())
         assertEquals("on", shot.saveRequest.metadata.customTags["torch"])
         assertEquals(true, shot.captureProfile.torchEnabled)
         session.dispatch(SessionIntent.ShotStarted(shot))
@@ -1115,7 +1122,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
         assertTrue(trace.snapshot().any { it.name == "recording.started" })
@@ -1200,7 +1207,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
         assertNull(session.state.value.recordingStartedAtElapsedMillis)
@@ -1928,123 +1935,6 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `pro mode cycles manual presets and annotates capture request`() = runTest {
-        val session = createSession(
-            InMemorySessionTrace(),
-            this,
-            settingsSnapshot = SessionSettingsSnapshot(
-                catalog = FeatureCatalog(
-                    manualCaptureDraft = ManualCaptureParams(
-                        rawEnabled = true,
-                        iso = 320,
-                        shutterSpeedMillis = 33L,
-                        exposureCompensationSteps = 1,
-                        focusDistanceDiopters = 2.5f,
-                        apertureFNumber = 1.8f,
-                        whiteBalanceKelvin = 4800
-                    )
-                )
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PRO))
-        session.dispatch(SessionIntent.SecondaryActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ModeId.PRO, session.state.value.activeMode)
-        assertEquals("street", shot.saveRequest.metadata.customTags["preset"])
-        assertEquals("manual", shot.saveRequest.metadata.customTags["controlMode"])
-        assertEquals("metadata-draft", shot.saveRequest.metadata.customTags["manualDraftState"])
-        assertEquals("on", shot.saveRequest.metadata.customTags["manualDraftRaw"])
-        assertEquals("320", shot.saveRequest.metadata.customTags["manualDraftIso"])
-        assertEquals("33", shot.saveRequest.metadata.customTags["manualDraftShutterSpeedMillis"])
-        assertEquals("4800", shot.saveRequest.metadata.customTags["manualDraftWhiteBalanceKelvin"])
-        assertEquals(true, shot.captureProfile.manualCaptureParams?.rawEnabled)
-        assertEquals(320, shot.captureProfile.manualCaptureParams?.iso)
-        assertEquals(33L, shot.captureProfile.manualCaptureParams?.shutterSpeedMillis)
-        assertEquals(1, shot.captureProfile.manualCaptureParams?.exposureCompensationSteps)
-        assertEquals(2.5f, shot.captureProfile.manualCaptureParams?.focusDistanceDiopters)
-        assertEquals(1.8f, shot.captureProfile.manualCaptureParams?.apertureFNumber)
-        assertEquals(4800, shot.captureProfile.manualCaptureParams?.whiteBalanceKelvin)
-        assertEquals("auto", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals("Pictures/OpenCamera/Pro", shot.saveRequest.relativePath)
-        assertEquals(FlashMode.AUTO, shot.captureProfile.flashMode)
-        assertEquals("pro-manual-street", shot.postProcessSpec.algorithmProfile)
-        assertEquals("1/250s", shot.postProcessSpec.exifOverrides["ExposureTime"])
-        assertEquals("Photo capture requested", session.state.value.lastAction)
-        assertEquals("Pro capture requested", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Street"))
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "Draft RAW On | ISO 320 | S 33ms | WB 4800K"
-            )
-        )
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Flash Auto"))
-    }
-
-    @Test
-    fun `pro mode keeps preset flow while applying tertiary frame ratio`() = runTest {
-        val session = createSession(InMemorySessionTrace(), this)
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PRO))
-        session.dispatch(SessionIntent.TertiaryActionPressed)
-        session.dispatch(SessionIntent.SecondaryActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals("street", shot.saveRequest.metadata.customTags["preset"])
-        assertEquals("16:9", shot.saveRequest.metadata.customTags["frameRatio"])
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Frame 16:9"))
-        assertEquals("Pro capture requested", session.state.value.modeSnapshot.state.headline)
-    }
-
-    @Test
-    fun `pro mode falls back to flash off when flash control is unsupported`() = runTest {
-        val session = createSession(
-            trace = InMemorySessionTrace(),
-            testScope = this,
-            deviceCapabilities = DeviceCapabilities(
-                supportsStillCapture = true,
-                supportsVideoRecording = true,
-                supportsPreviewSnapshots = true,
-                supportsAudioRecording = true,
-                supportsManualControls = true,
-                supportsDocumentScanEnhancement = true,
-                supportsPortraitDepthEffect = true,
-                supportsNightMultiFrame = true,
-                supportsFlashControl = false
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PRO))
-        session.dispatch(SessionIntent.SecondaryActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ModeId.PRO, session.state.value.activeMode)
-        assertEquals("street", shot.saveRequest.metadata.customTags["preset"])
-        assertEquals("metadata-draft", shot.saveRequest.metadata.customTags["manualDraftState"])
-        assertEquals("off", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals(FlashMode.OFF, shot.captureProfile.flashMode)
-        assertEquals("pro-manual-street", shot.postProcessSpec.algorithmProfile)
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "Flash unavailable on this device"
-            )
-        )
-    }
-
-    @Test
     fun `document mode cycles scan profiles and routes saves to document library`() = runTest {
         val session = createSession(InMemorySessionTrace(), this)
 
@@ -2066,197 +1956,6 @@ class DefaultCameraSessionTest {
         assertEquals("Photo capture requested", session.state.value.lastAction)
         assertEquals("Document capture requested", session.state.value.modeSnapshot.state.headline)
         assertTrue(session.state.value.modeSnapshot.state.detail.contains("Whiteboard"))
-    }
-
-    @Test
-    fun `portrait mode cycles styles and annotates portrait depth capture`() = runTest {
-        val session = createSession(InMemorySessionTrace(), this)
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
-        session.dispatch(SessionIntent.SecondaryActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ModeId.PORTRAIT, session.state.value.activeMode)
-        assertEquals("portrait-chasing-light", shot.saveRequest.metadata.customTags["style"])
-        assertEquals("portrait-chasing-light", shot.saveRequest.metadata.customTags["filterProfile"])
-        assertEquals("depth", shot.saveRequest.metadata.customTags["renderPath"])
-        assertEquals("Pictures/OpenCamera/Portrait", shot.saveRequest.relativePath)
-        assertEquals("OpenCamera_PORTRAIT", shot.saveRequest.fileNamePrefix)
-        assertEquals("portrait-chasing-light", shot.postProcessSpec.algorithmProfile)
-        assertEquals("Portrait", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
-        assertEquals("simulated-bokeh", shot.postProcessSpec.exifOverrides["DepthEffect"])
-        assertEquals("Photo capture requested", session.state.value.lastAction)
-        assertEquals("Portrait capture requested", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Portrait Chasing Light"))
-    }
-
-    @Test
-    fun `portrait mode uses live photo shot kind when live default is enabled`() = runTest {
-        val session = createSession(
-            trace = InMemorySessionTrace(),
-            testScope = this,
-            settingsSnapshot = SessionSettingsSnapshot(
-                persisted = PersistedSettings(
-                    photo = PhotoSettings(
-                        livePhotoEnabledByDefault = true
-                    )
-                )
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ShotKind.LIVE_PHOTO, shot.shotKind)
-        assertEquals("on", shot.saveRequest.metadata.customTags["livePhotoDefault"])
-        assertEquals(
-            "follow-frame-luma-and-motion",
-            shot.saveRequest.metadata.customTags["liveWatermarkBehavior"]
-        )
-    }
-
-    @Test
-    fun `portrait mode uses shared photo countdown before creating shot plan`() = runTest {
-        val session = createSession(
-            trace = InMemorySessionTrace(),
-            testScope = this,
-            settingsSnapshot = SessionSettingsSnapshot(
-                persisted = PersistedSettings(
-                    photo = PhotoSettings(
-                        countdownDuration = CountdownDuration.SECONDS_3
-                    )
-                )
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
-        session.dispatch(SessionIntent.ShutterPressed)
-        runCurrent()
-
-        assertEquals(ModeId.PORTRAIT, session.state.value.activeMode)
-        assertEquals(3, session.state.value.countdownRemainingSeconds)
-        assertEquals(null, session.state.value.activeShot)
-        assertEquals("Portrait countdown armed", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Timer 3s"))
-
-        advanceTimeBy(3_000)
-        runCurrent()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals("portrait-original", shot.saveRequest.metadata.customTags["style"])
-    }
-
-    @Test
-    fun `portrait mode carries profile beauty and bokeh metadata into shot plan`() = runTest {
-        val session = createSession(
-            trace = InMemorySessionTrace(),
-            testScope = this,
-            settingsSnapshot = SessionSettingsSnapshot(
-                persisted = PersistedSettings(
-                    photo = PhotoSettings(
-                        defaultPortraitFilterProfileId = "portrait-rich",
-                        portraitProfile = PortraitProfile.LUMINOUS,
-                        portraitBeautyPreset = PortraitBeautyPreset.RADIANT,
-                        portraitBeautyStrength = PortraitBeautyStrength.ELEVATED,
-                        portraitBokehEffect = PortraitBokehEffect.DREAMY
-                    )
-                )
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals("portrait-rich", shot.saveRequest.metadata.customTags["style"])
-        assertEquals("luminous", shot.saveRequest.metadata.customTags["portraitProfile"])
-        assertEquals("radiant", shot.saveRequest.metadata.customTags["portraitBeautyPreset"])
-        assertEquals("elevated", shot.saveRequest.metadata.customTags["portraitBeautyStrength"])
-        assertEquals("dreamy", shot.saveRequest.metadata.customTags["portraitBokehEffect"])
-        assertEquals("Luminous Portrait", shot.postProcessSpec.exifOverrides["PortraitProfile"])
-        assertEquals("Radiant", shot.postProcessSpec.exifOverrides["PortraitBeautyPreset"])
-        assertEquals("Elevated", shot.postProcessSpec.exifOverrides["PortraitBeautyStrength"])
-        assertEquals("Dreamy", shot.postProcessSpec.exifOverrides["PortraitBokehEffect"])
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Profile Luminous Portrait"))
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Bokeh Dreamy"))
-    }
-
-    @Test
-    fun `portrait mode keeps render metadata while applying tertiary frame ratio`() = runTest {
-        val session = createSession(InMemorySessionTrace(), this)
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
-        session.dispatch(SessionIntent.TertiaryActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals("portrait-original", shot.saveRequest.metadata.customTags["style"])
-        assertEquals("depth", shot.saveRequest.metadata.customTags["renderPath"])
-        assertEquals("16:9", shot.saveRequest.metadata.customTags["frameRatio"])
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Frame 16:9"))
-    }
-
-    @Test
-    fun `portrait mode pro variant carries manual draft into portrait capture`() = runTest {
-        val session = createSession(
-            trace = InMemorySessionTrace(),
-            testScope = this,
-            settingsSnapshot = SessionSettingsSnapshot(
-                catalog = FeatureCatalog(
-                    manualCaptureDraft = ManualCaptureParams(
-                        rawEnabled = true,
-                        iso = 200,
-                        shutterSpeedMillis = 20L,
-                        whiteBalanceKelvin = 4300
-                    )
-                )
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
-        advanceUntilIdle()
-
-        assertEquals("Enter Pro", session.state.value.modeSnapshot.uiSpec.proActionLabel)
-        assertEquals(true, session.state.value.modeSnapshot.state.isProActionEnabled)
-
-        session.dispatch(SessionIntent.ProActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals("pro", shot.saveRequest.metadata.customTags["modeVariant"])
-        assertEquals("manual", shot.saveRequest.metadata.customTags["controlMode"])
-        assertEquals("metadata-draft", shot.saveRequest.metadata.customTags["manualDraftState"])
-        assertEquals("on", shot.saveRequest.metadata.customTags["manualDraftRaw"])
-        assertEquals(200, shot.captureProfile.manualCaptureParams?.iso)
-        assertEquals(20L, shot.captureProfile.manualCaptureParams?.shutterSpeedMillis)
-        assertEquals(4300, shot.captureProfile.manualCaptureParams?.whiteBalanceKelvin)
-        assertEquals("portrait-original-pro", shot.postProcessSpec.algorithmProfile)
-        assertEquals("Pro", shot.postProcessSpec.exifOverrides["PortraitVariant"])
-        assertEquals("Exit Pro", session.state.value.modeSnapshot.uiSpec.proActionLabel)
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "Pro draft RAW On | ISO 200 | S 20ms | WB 4300K"
-            )
-        )
     }
 
     @Test
@@ -2348,7 +2047,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.SwitchMode(ModeId.HUMANISTIC))
         advanceUntilIdle()
 
-        assertEquals("Enter Pro Assist", session.state.value.modeSnapshot.uiSpec.proActionLabel)
+        assertEquals("Professional assist", session.state.value.modeSnapshot.uiSpec.proActionLabel)
 
         session.dispatch(SessionIntent.ProActionPressed)
         session.dispatch(SessionIntent.ShutterPressed)
@@ -2360,191 +2059,11 @@ class DefaultCameraSessionTest {
         assertEquals("unsupported", shot.saveRequest.metadata.customTags["manualDraftState"])
         assertEquals(true, shot.captureProfile.manualCaptureParams?.rawEnabled)
         assertEquals("photo-original-pro-assist", shot.postProcessSpec.algorithmProfile)
-        assertEquals("Pro Assist", shot.postProcessSpec.exifOverrides["HumanisticVariant"])
-        assertEquals("Exit Pro Assist", session.state.value.modeSnapshot.uiSpec.proActionLabel)
+        assertEquals("Professional assist", shot.postProcessSpec.exifOverrides["HumanisticVariant"])
+        assertEquals("Professional assist on", session.state.value.modeSnapshot.uiSpec.proActionLabel)
         assertTrue(
             session.state.value.modeSnapshot.state.detail.contains(
                 "saved-only draft because manual controls are unavailable"
-            )
-        )
-    }
-
-    @Test
-    fun `night mode cycles profiles and emits multi frame shot plan`() = runTest {
-        val session = createSession(
-            InMemorySessionTrace(),
-            this,
-            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        session.dispatch(SessionIntent.SecondaryActionPressed)
-        session.dispatch(SessionIntent.SecondaryActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ModeId.NIGHT, session.state.value.activeMode)
-        assertEquals(ShotKind.MULTI_FRAME_CAPTURE, shot.shotKind)
-        assertEquals("tripod", shot.saveRequest.metadata.customTags["profile"])
-        assertEquals("multi-frame", shot.saveRequest.metadata.customTags["capturePath"])
-        assertEquals("off", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals("Pictures/OpenCamera/Night", shot.saveRequest.relativePath)
-        assertEquals(12, shot.captureProfile.frameCount)
-        assertEquals(1400L, shot.captureProfile.longExposureMillis)
-        assertTrue(shot.captureProfile.requiresTripod)
-        assertEquals(FlashMode.OFF, shot.captureProfile.flashMode)
-        assertEquals("night-multiframe-tripod", shot.postProcessSpec.algorithmProfile)
-        assertEquals("Night", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
-        assertEquals("Photo capture requested", session.state.value.lastAction)
-        assertEquals("Scenery capture requested", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Tripod"))
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Flash Off"))
-    }
-
-    @Test
-    fun `night mode uses shared photo countdown before multi frame capture`() = runTest {
-        val session = createSession(
-            trace = InMemorySessionTrace(),
-            testScope = this,
-            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true),
-            settingsSnapshot = SessionSettingsSnapshot(
-                persisted = PersistedSettings(
-                    photo = PhotoSettings(
-                        countdownDuration = CountdownDuration.SECONDS_3
-                    )
-                )
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        session.dispatch(SessionIntent.ShutterPressed)
-        runCurrent()
-
-        assertEquals(ModeId.NIGHT, session.state.value.activeMode)
-        assertEquals(3, session.state.value.countdownRemainingSeconds)
-        assertEquals(null, session.state.value.activeShot)
-        assertEquals("Scenery countdown armed", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Timer 3s"))
-
-        advanceTimeBy(3_000)
-        runCurrent()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ShotKind.MULTI_FRAME_CAPTURE, shot.shotKind)
-        assertEquals("handheld", shot.saveRequest.metadata.customTags["profile"])
-    }
-
-    @Test
-    fun `night mode keeps multi frame plan while applying tertiary frame ratio`() = runTest {
-        val session = createSession(
-            InMemorySessionTrace(),
-            this,
-            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        session.dispatch(SessionIntent.TertiaryActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ShotKind.MULTI_FRAME_CAPTURE, shot.shotKind)
-        assertEquals("16:9", shot.saveRequest.metadata.customTags["frameRatio"])
-        assertEquals("handheld", shot.saveRequest.metadata.customTags["profile"])
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Frame 16:9"))
-    }
-
-    @Test
-    fun `night mode pro variant carries manual draft into multi frame capture`() = runTest {
-        val session = createSession(
-            trace = InMemorySessionTrace(),
-            testScope = this,
-            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true),
-            settingsSnapshot = SessionSettingsSnapshot(
-                catalog = FeatureCatalog(
-                    manualCaptureDraft = ManualCaptureParams(
-                        rawEnabled = true,
-                        iso = 250,
-                        shutterSpeedMillis = 80L,
-                        whiteBalanceKelvin = 3900
-                    )
-                )
-            )
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        advanceUntilIdle()
-
-        assertEquals("Enter Pro", session.state.value.modeSnapshot.uiSpec.proActionLabel)
-
-        session.dispatch(SessionIntent.ProActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ShotKind.MULTI_FRAME_CAPTURE, shot.shotKind)
-        assertEquals("pro", shot.saveRequest.metadata.customTags["modeVariant"])
-        assertEquals("manual", shot.saveRequest.metadata.customTags["controlMode"])
-        assertEquals("metadata-draft", shot.saveRequest.metadata.customTags["manualDraftState"])
-        assertEquals(250, shot.captureProfile.manualCaptureParams?.iso)
-        assertEquals(80L, shot.captureProfile.manualCaptureParams?.shutterSpeedMillis)
-        assertEquals("night-multiframe-handheld-pro", shot.postProcessSpec.algorithmProfile)
-        assertEquals("Pro", shot.postProcessSpec.exifOverrides["NightVariant"])
-        assertEquals("Exit Pro", session.state.value.modeSnapshot.uiSpec.proActionLabel)
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "Pro draft RAW On | ISO 250 | S 80ms | WB 3900K"
-            )
-        )
-    }
-
-    @Test
-    fun `pro mode degrades to assisted presets when manual controls are unavailable`() = runTest {
-        val session = DefaultCameraSession(
-            registry = ModeRegistry(
-                testModePlugins()
-            ),
-            trace = InMemorySessionTrace(),
-            baseDeviceCapabilities = DeviceCapabilities(
-                supportsStillCapture = true,
-                supportsVideoRecording = true,
-                supportsPreviewSnapshots = true,
-                supportsAudioRecording = true,
-                supportsManualControls = false
-            ),
-            scope = TestScope(StandardTestDispatcher(testScheduler))
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PRO))
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ModeId.PRO, session.state.value.activeMode)
-        assertEquals("assisted", shot.saveRequest.metadata.customTags["controlMode"])
-        assertEquals("unsupported", shot.saveRequest.metadata.customTags["manualDraftState"])
-        assertEquals("off", shot.saveRequest.metadata.customTags["manualDraftRaw"])
-        assertEquals(emptyMap(), shot.postProcessSpec.exifOverrides)
-        assertEquals("pro-assisted-balanced", shot.postProcessSpec.algorithmProfile)
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "manual controls are unavailable"
-            )
-        )
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "Draft RAW Off | ISO Auto | S Auto | WB Auto saved only."
             )
         )
     }
@@ -2581,128 +2100,6 @@ class DefaultCameraSessionTest {
         assertTrue(
             session.state.value.modeSnapshot.state.detail.contains(
                 "document enhancement is unavailable"
-            )
-        )
-    }
-
-    @Test
-    fun `portrait mode degrades to focus priority styles when depth effect is unavailable`() = runTest {
-        val session = DefaultCameraSession(
-            registry = ModeRegistry(
-                testModePlugins()
-            ),
-            trace = InMemorySessionTrace(),
-            baseDeviceCapabilities = DeviceCapabilities(
-                supportsStillCapture = true,
-                supportsVideoRecording = true,
-                supportsPreviewSnapshots = true,
-                supportsAudioRecording = true,
-                supportsManualControls = true,
-                supportsDocumentScanEnhancement = true,
-                supportsPortraitDepthEffect = false
-            ),
-            scope = TestScope(StandardTestDispatcher(testScheduler))
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ModeId.PORTRAIT, session.state.value.activeMode)
-        assertEquals("focus", shot.saveRequest.metadata.customTags["renderPath"])
-        assertEquals("portrait-original", shot.postProcessSpec.algorithmProfile)
-        assertEquals("focus-priority", shot.postProcessSpec.exifOverrides["DepthEffect"])
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "depth effect is unavailable"
-            )
-        )
-    }
-
-    @Test
-    fun `night mode degrades to single frame brightening when multi frame is unavailable`() = runTest {
-        val session = DefaultCameraSession(
-            registry = ModeRegistry(
-                testModePlugins()
-            ),
-            trace = InMemorySessionTrace(),
-            baseDeviceCapabilities = DeviceCapabilities(
-                supportsStillCapture = true,
-                supportsVideoRecording = true,
-                supportsPreviewSnapshots = true,
-                supportsAudioRecording = true,
-                supportsManualControls = true,
-                supportsDocumentScanEnhancement = true,
-                supportsPortraitDepthEffect = true,
-                supportsNightMultiFrame = false
-            ),
-            scope = TestScope(StandardTestDispatcher(testScheduler))
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ModeId.NIGHT, session.state.value.activeMode)
-        assertEquals(ShotKind.STILL_CAPTURE, shot.shotKind)
-        assertEquals("single-frame-fallback", shot.saveRequest.metadata.customTags["capturePath"])
-        assertEquals("auto", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals(1, shot.captureProfile.frameCount)
-        assertEquals(null, shot.captureProfile.longExposureMillis)
-        assertEquals(FlashMode.AUTO, shot.captureProfile.flashMode)
-        assertEquals("night-fallback-balanced", shot.postProcessSpec.algorithmProfile)
-        assertEquals("bright-single-frame", shot.postProcessSpec.exifOverrides["MergeStrategy"])
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "night multi-frame is unavailable"
-            )
-        )
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Flash Auto"))
-    }
-
-    @Test
-    fun `night fallback flash degrades to off when flash control is unsupported`() = runTest {
-        val session = DefaultCameraSession(
-            registry = ModeRegistry(
-                testModePlugins()
-            ),
-            trace = InMemorySessionTrace(),
-            baseDeviceCapabilities = DeviceCapabilities(
-                supportsStillCapture = true,
-                supportsVideoRecording = true,
-                supportsPreviewSnapshots = true,
-                supportsAudioRecording = true,
-                supportsManualControls = true,
-                supportsDocumentScanEnhancement = true,
-                supportsPortraitDepthEffect = true,
-                supportsNightMultiFrame = false,
-                supportsFlashControl = false
-            ),
-            scope = TestScope(StandardTestDispatcher(testScheduler))
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        session.dispatch(SessionIntent.SecondaryActionPressed)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ModeId.NIGHT, session.state.value.activeMode)
-        assertEquals("warm", shot.saveRequest.metadata.customTags["profile"])
-        assertEquals("off", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals(FlashMode.OFF, shot.captureProfile.flashMode)
-        assertEquals("night-fallback-warm", shot.postProcessSpec.algorithmProfile)
-        assertTrue(
-            session.state.value.modeSnapshot.state.detail.contains(
-                "Flash unavailable on this device"
             )
         )
     }
@@ -2907,54 +2304,6 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `multi frame capture does not rearm on DataReceived keeps activeShot until ShotCompleted`() = runTest {
-        val trace = InMemorySessionTrace()
-        val session = createSession(
-            trace = trace,
-            testScope = this,
-            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val shot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ShotKind.MULTI_FRAME_CAPTURE, shot.shotKind)
-
-        session.dispatch(SessionIntent.ShotStarted(shot))
-        runCurrent()
-        assertEquals(CaptureStatus.SAVING, session.state.value.captureStatus)
-
-        session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
-        runCurrent()
-        assertEquals(CaptureStatus.DATA_RECEIVED, session.state.value.captureStatus)
-        // Conservative capture: activeShot stays set, shutter remains blocked
-        assertNotNull(session.state.value.activeShot)
-        assertEquals(shot.shotId, session.state.value.activeShot?.shotId)
-
-        // ShotCompleted clears activeShot
-        session.dispatch(
-            SessionIntent.ShotCompleted(
-                ShotResult(
-                    shotId = shot.shotId,
-                    mediaType = MediaType.PHOTO,
-                    outputPath = "Pictures/OpenCamera/night.jpg",
-                    saveRequest = SaveRequest.photoLibrary(
-                        metadata = MediaMetadata(customTags = mapOf("profile" to "tripod"))
-                    ),
-                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/night.jpg"),
-                    metadata = MediaMetadata(customTags = mapOf("profile" to "tripod"))
-                )
-            )
-        )
-        advanceUntilIdle()
-        assertNull(session.state.value.activeShot)
-    }
-
-    @Test
     fun `session state exposes independent active device graph for active mode`() = runTest {
         val session = createSession(InMemorySessionTrace(), this)
 
@@ -3049,16 +2398,14 @@ class DefaultCameraSessionTest {
         assertEquals("Still quality set to Fast", session.state.value.lastAction)
         assertTrue(session.state.value.modeSnapshot.state.detail.contains("Still Fast"))
 
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PRO))
+        session.dispatch(SessionIntent.SwitchMode(ModeId.HUMANISTIC))
         advanceUntilIdle()
 
-        assertEquals(ModeId.PRO, session.state.value.activeMode)
+        assertEquals(ModeId.HUMANISTIC, session.state.value.activeMode)
         assertEquals(
             StillCaptureQualityPreference.LATENCY,
             session.state.value.activeDeviceGraph.stillCapture.qualityPreference
         )
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Still Fast"))
-
         session.dispatch(SessionIntent.ShutterPressed)
         advanceUntilIdle()
 
@@ -3112,10 +2459,10 @@ class DefaultCameraSessionTest {
         assertEquals("Still resolution set to 8MP", session.state.value.lastAction)
         assertTrue(session.state.value.modeSnapshot.state.detail.contains("Size 8MP"))
 
-        session.dispatch(SessionIntent.SwitchMode(ModeId.PORTRAIT))
+        session.dispatch(SessionIntent.SwitchMode(ModeId.HUMANISTIC))
         advanceUntilIdle()
 
-        assertEquals(ModeId.PORTRAIT, session.state.value.activeMode)
+        assertEquals(ModeId.HUMANISTIC, session.state.value.activeMode)
         assertEquals(
             StillCaptureResolutionPreset.MEDIUM_8MP,
             session.state.value.activeDeviceGraph.stillCapture.resolutionPreset
@@ -3444,62 +2791,6 @@ class DefaultCameraSessionTest {
             trace.snapshot().any { event ->
                 event.name == "capture.failed" &&
                     event.detail == "${shot.shotId}:Camera permission missing"
-            }
-        )
-    }
-
-    @Test
-    fun `night multi frame permission loss clears stale diagnostics and records capture failure trace`() = runTest {
-        val trace = InMemorySessionTrace()
-        val session = createSession(
-            trace,
-            this,
-            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(supportsNightMultiFrame = true)
-        )
-
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
-        session.dispatch(SessionIntent.Boot)
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val seedShot = assertNotNull(session.state.value.activeShot)
-        session.dispatch(SessionIntent.ShotStarted(seedShot))
-        session.dispatch(
-            SessionIntent.ShotCompleted(
-                ShotResult(
-                    shotId = seedShot.shotId,
-                    mediaType = MediaType.PHOTO,
-                    outputPath = "Pictures/OpenCamera/seed.jpg",
-                    saveRequest = SaveRequest.photoLibrary(),
-                    thumbnailSource = ThumbnailSource.SavedMedia("Pictures/OpenCamera/seed.jpg"),
-                    metadata = SaveRequest.photoLibrary().metadata,
-                    pipelineNotes = listOf("algorithm:seed-photo", "merge:placeholder")
-                )
-            )
-        )
-        advanceUntilIdle()
-
-        session.dispatch(SessionIntent.SwitchMode(ModeId.NIGHT))
-        session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
-
-        val nightShot = assertNotNull(session.state.value.activeShot)
-        assertEquals(ShotKind.MULTI_FRAME_CAPTURE, nightShot.shotKind)
-        session.dispatch(SessionIntent.ShotStarted(nightShot))
-        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = false, microphoneGranted = true))
-        advanceUntilIdle()
-
-        assertEquals(ModeId.NIGHT, session.state.value.activeMode)
-        assertEquals(PreviewStatus.BLOCKED, session.state.value.previewStatus)
-        assertEquals(CaptureStatus.IDLE, session.state.value.captureStatus)
-        assertEquals("Scenery capture failed", session.state.value.modeSnapshot.state.headline)
-        assertEquals("Camera permission missing", session.state.value.modeSnapshot.state.detail)
-        assertEquals(emptyList(), session.state.value.latestPipelineNotes)
-        assertEquals(null, session.state.value.activeShot)
-        assertTrue(
-            trace.snapshot().any { event ->
-                event.name == "capture.failed" &&
-                    event.detail == "${nightShot.shotId}:Camera permission missing"
             }
         )
     }
@@ -4103,7 +3394,7 @@ class DefaultCameraSessionTest {
 
         effects.clear()
         session.dispatch(SessionIntent.PreviewTapToFocus(0.5f, 0.4f))
-        advanceUntilIdle()
+        runCurrent()
 
         val meteringEffect = effects.filterIsInstance<SessionEffect.ApplyPreviewMetering>().singleOrNull()
         assertNotNull(meteringEffect)
@@ -4134,7 +3425,7 @@ class DefaultCameraSessionTest {
 
         effects.clear()
         session.dispatch(SessionIntent.PreviewTapToFocus(-0.1f, 1.5f))
-        advanceUntilIdle()
+        runCurrent()
 
         val meteringEffect = effects.filterIsInstance<SessionEffect.ApplyPreviewMetering>().singleOrNull()
         assertNotNull(meteringEffect)
@@ -4215,7 +3506,7 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         session.dispatch(SessionIntent.PreviewTapToFocus(0.5f, 0.4f))
-        advanceUntilIdle()
+        runCurrent()
 
         session.dispatch(
             SessionIntent.PreviewMeteringCompleted(
@@ -4226,7 +3517,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewMeteringFeedbackStatus.SUCCEEDED, session.state.value.presentation.previewMeteringFeedback?.status)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.succeeded" })
@@ -4251,9 +3542,9 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         session.dispatch(SessionIntent.PreviewTapToFocus(0.3f, 0.3f))
-        advanceUntilIdle()
+        runCurrent()
         session.dispatch(SessionIntent.PreviewTapToFocus(0.6f, 0.6f))
-        advanceUntilIdle()
+        runCurrent()
 
         session.dispatch(
             SessionIntent.PreviewMeteringCompleted(
@@ -4264,7 +3555,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewMeteringFeedbackStatus.REQUESTED, session.state.value.presentation.previewMeteringFeedback?.status)
         assertEquals("meter-2", session.state.value.presentation.previewMeteringFeedback?.requestId)
@@ -4290,7 +3581,7 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         session.dispatch(SessionIntent.PreviewTapToFocus(0.5f, 0.5f))
-        advanceUntilIdle()
+        runCurrent()
 
         session.dispatch(
             SessionIntent.PreviewMeteringCompleted(
@@ -4302,7 +3593,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(PreviewMeteringFeedbackStatus.UNSUPPORTED, session.state.value.presentation.previewMeteringFeedback?.status)
         assertEquals("AF not available", session.state.value.presentation.previewMeteringFeedback?.reason)
@@ -4644,9 +3935,6 @@ class DefaultCameraSessionTest {
         PhotoModePlugin(),
         DocumentModePlugin(),
         HumanisticModePlugin(),
-        NightModePlugin(),
-        PortraitModePlugin(),
-        ProModePlugin(),
         VideoModePlugin()
     )
 
@@ -4744,7 +4032,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         val prompt = session.state.value.presentation.photoLowLightPrompt
         assertNotNull(prompt)
@@ -4809,7 +4097,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         val prompt = session.state.value.presentation.photoLowLightPrompt
         assertNotNull(prompt)
@@ -4841,7 +4129,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         val prompt = session.state.value.presentation.photoLowLightPrompt
         assertNotNull(prompt)
@@ -4873,7 +4161,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         val prompt = session.state.value.presentation.photoLowLightPrompt
         assertNotNull(prompt)
@@ -4905,7 +4193,7 @@ class DefaultCameraSessionTest {
                 )
             )
         )
-        advanceUntilIdle()
+        runCurrent()
 
         val prompt = session.state.value.presentation.photoLowLightPrompt
         assertNotNull(prompt)
@@ -5521,8 +4809,8 @@ class DefaultCameraSessionTest {
     fun `evaluateLensNode switches to TELEPHOTO when crossing threshold with hysteresis`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // 2.1 > 2.0 + 0.1 → TELEPHOTO
-        val result = session.evaluateLensNode(2.1f, LensNode.WIDE, twoNodeMap)
+        // 2.15 > 2.0 + 0.105 (5% of 2.15) → TELEPHOTO
+        val result = session.evaluateLensNode(2.15f, LensNode.WIDE, twoNodeMap)
         assertEquals(LensNode.TELEPHOTO, result)
     }
 
@@ -5530,8 +4818,8 @@ class DefaultCameraSessionTest {
     fun `evaluateLensNode switches back to WIDE when dropping below threshold minus hysteresis`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // 1.9 < 2.0 - 0.1 → WIDE
-        val result = session.evaluateLensNode(1.9f, LensNode.TELEPHOTO, twoNodeMap)
+        // 1.8 < 2.0 - 0.105 (5% of 2.1 threshold) → WIDE
+        val result = session.evaluateLensNode(1.8f, LensNode.TELEPHOTO, twoNodeMap)
         assertEquals(LensNode.WIDE, result)
     }
 
@@ -5539,7 +4827,8 @@ class DefaultCameraSessionTest {
     fun `evaluateLensNode blocks switch back when ratio within hysteresis band going down`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // 1.95 is between 1.9 and 2.0 → stays TELEPHOTO
+        // 1.95: actualDelta = max(0.05, 1.95 * 0.05) = 0.0975
+        // 1.95 <= 2.0 - 0.0975 = 1.9025? NO → stays TELEPHOTO
         val result = session.evaluateLensNode(1.95f, LensNode.TELEPHOTO, twoNodeMap)
         assertEquals(LensNode.TELEPHOTO, result)
     }
@@ -5556,8 +4845,8 @@ class DefaultCameraSessionTest {
     fun `evaluateLensNode drops to TELEPHOTO when leaving PERISCOPE range`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // 4.9 < 5.0 + 0.1 → TELEPHOTO (below periscope threshold + hysteresis)
-        val result = session.evaluateLensNode(4.9f, LensNode.PERISCOPE, threeNodeMap)
+        // 4.7 <= 5.0 - 0.25 (5% of 5.0) → switches to TELEPHOTO
+        val result = session.evaluateLensNode(4.7f, LensNode.PERISCOPE, threeNodeMap)
         assertEquals(LensNode.TELEPHOTO, result)
     }
 
@@ -5614,27 +4903,63 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `computePreviewZoomRatio clamps zero wide threshold to camera safe 1x`() = runTest {
+    fun `computePreviewZoomRatio clamps zero wide threshold and applies frame-scale switch`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        val result = session.computePreviewZoomRatio(1.5f, twoNodeMap)
-        assertEquals(1.0f, result)
+        // twoNodeMap: WIDE(0f)→base=1.0, TELE(2.0f)→base=2.0 → bases [1.0, 2.0]
+        // 1.0→2.0 switchAt = 1.0/0.7 ≈ 1.43
+        // At 1.4f (< 1.43): stays at base 1.0, previewZoom = min(1.0, 1.4) = 1.0
+        assertEquals(1.0f, session.computePreviewZoomRatio(1.0f, twoNodeMap))
+        assertEquals(1.0f, session.computePreviewZoomRatio(1.4f, twoNodeMap))
+        // At 1.5f (>= 1.43): switches to base 2.0, previewZoom = min(2.0, 1.5) = 1.5 (WYSIWYG)
+        assertEquals(1.5f, session.computePreviewZoomRatio(1.5f, twoNodeMap))
     }
 
     @Test
-    fun `computePreviewZoomRatio delays switch to two-node preview baseline`() = runTest {
+    fun `computePreviewZoomRatio switches to next preview base when frame scale drops below threshold`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        assertEquals(1.0f, session.computePreviewZoomRatio(2.0f, twoNodeMap))
-        assertEquals(2.0f, session.computePreviewZoomRatio(2.2f, twoNodeMap))
+        // twoNodeMap gives bases [1.0, 2.0]; switchAt = 1.0/0.7 ≈ 1.43
+        // Below threshold: frameScale at 1.4 = 1.0/1.4 ≈ 71% (>= 70%)
+        assertEquals(1.0f, session.computePreviewZoomRatio(1.4f, twoNodeMap))
+        // Above threshold: WYSIWYG previewZoom = captureZoom = 1.5
+        assertEquals(1.5f, session.computePreviewZoomRatio(1.5f, twoNodeMap))
+        // At base value: early return
+        assertEquals(2.0f, session.computePreviewZoomRatio(2.0f, twoNodeMap))
     }
 
     @Test
-    fun `computePreviewZoomRatio delays switch to periscope preview baseline`() = runTest {
+    fun `computePreviewZoomRatio keeps ultrawide preview through 1x capture range then frame-scale switch`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        assertEquals(2.0f, session.computePreviewZoomRatio(5.0f, threeNodeMap))
-        assertEquals(5.0f, session.computePreviewZoomRatio(5.5f, threeNodeMap))
+        val capability = ZoomRatioCapability(
+            support = ZoomControlSupport.CONTINUOUS,
+            supportedRatios = listOf(0.7f, 1.0f, 2.0f, 5.0f),
+            previewBaseRatios = listOf(0.7f, 1.0f, 3.0f, 5.0f)
+        )
+
+        assertEquals(0.7f, session.computePreviewZoomRatio(0.7f, capability))
+        assertEquals(0.7f, session.computePreviewZoomRatio(0.9f, capability))
+        assertEquals(0.7f, session.computePreviewZoomRatio(1.0f, capability))
+        assertEquals(0.7f, session.computePreviewZoomRatio(1.5f, capability))
+        // At 2.0f: UW→W special case triggers, then frame-scale immediately advances to 3.0 base
+        // → previewZoom = min(3.0, 2.0) = 2.0
+        assertEquals(2.0f, session.computePreviewZoomRatio(2.0f, capability))
+    }
+
+    @Test
+    fun `computePreviewZoomRatio switches to periscope preview base based on frame scale`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // threeNodeMap gives bases [1.0, 2.0, 5.0]
+        // 1.0→2.0 switchAt = 1.0/0.7 ≈ 1.43
+        // 2.0→5.0 switchAt = 2.0/0.7 ≈ 2.86
+        // At 2.5: 2.0 base selected but 2.0→5.0 switch not yet; previewZoom = min(2.0, 2.5) = 2.0
+        assertEquals(2.0f, session.computePreviewZoomRatio(2.5f, threeNodeMap))
+        // At 3.0: 2.0→5.0 switch triggered; previewZoom = min(5.0, 3.0) = 3.0 (WYSIWYG)
+        assertEquals(3.0f, session.computePreviewZoomRatio(3.0f, threeNodeMap))
+        // At 5.0: early return (in bases list)
+        assertEquals(5.0f, session.computePreviewZoomRatio(5.0f, threeNodeMap))
     }
 
     @Test
@@ -5717,10 +5042,14 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
         effects.clear()
 
-        session.dispatch(SessionIntent.ApplyZoomRatio(3.2f))
+        // At 1.5f: UW→W special case (switchAt=2f) keeps preview at 0.7 base
+        // previewZoom = min(0.7, 1.5) = 0.7 (below UW special case threshold)
+        session.dispatch(SessionIntent.ApplyZoomRatio(1.5f))
         advanceUntilIdle()
-        assertEquals(1.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        assertEquals(0.7f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
 
+        // At 3.3f: UW→W triggers at 2f, then frame-scale 1.0→3.0 at 1.43 triggers
+        // selected=3.0, previewZoom = min(3.0, 3.3) = 3.0
         session.dispatch(SessionIntent.ApplyZoomRatio(3.3f))
         advanceUntilIdle()
         assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)

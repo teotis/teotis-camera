@@ -666,4 +666,70 @@ class PersistedSettingsSerializerTest {
         assertTrue(modified.hasUserAdjustments(ResetTarget.QUICK))
         assertFalse(modified.hasUserAdjustments(ResetTarget.SETTINGS))
     }
+
+    @Test
+    fun `legacy settings without humanistic and portrait filter keys load with safe defaults`() {
+        // Simulate loading settings from a pre-Check-in-era persisted map
+        // that only has the original photo.defaultFilterProfileId key
+        val legacyMap = mapOf(
+            "common.gridMode" to "rule-of-thirds",
+            "photo.defaultFilterProfileId" to "photo-rich",
+            "video.defaultVideoResolution" to "4k"
+        )
+        val decoded = PersistedSettingsSerializer.fromMap(legacyMap)
+
+        assertEquals("photo-rich", decoded.photo.defaultFilterProfileId)
+        assertEquals("humanistic-original", decoded.photo.defaultHumanisticFilterProfileId)
+        assertEquals("portrait-original", decoded.photo.defaultPortraitFilterProfileId)
+        assertEquals(PortraitProfile.NATIVE, decoded.photo.portraitProfile)
+        assertEquals(CompositionGridMode.RULE_OF_THIRDS, decoded.common.gridMode)
+    }
+
+    @Test
+    fun `round trip preserves check-in related portrait and humanistic settings`() {
+        val settings = PersistedSettings(
+            photo = PhotoSettings(
+                defaultFilterProfileId = "photo-vivid",
+                defaultHumanisticFilterProfileId = "humanistic-street",
+                defaultPortraitFilterProfileId = "portrait-ccd",
+                portraitProfile = PortraitProfile.LUMINOUS,
+                portraitBeautyPreset = PortraitBeautyPreset.CLEAR,
+                portraitBeautyStrength = PortraitBeautyStrength.BALANCED,
+                portraitBokehEffect = PortraitBokehEffect.DREAMY,
+                portraitDepthStrength = 80
+            )
+        )
+
+        val serialized = PersistedSettingsSerializer.toMap(settings)
+        val decoded = PersistedSettingsSerializer.fromMap(serialized)
+
+        assertEquals(settings, decoded)
+        assertEquals("humanistic-street", decoded.photo.defaultHumanisticFilterProfileId)
+        assertEquals("portrait-ccd", decoded.photo.defaultPortraitFilterProfileId)
+        assertEquals(PortraitProfile.LUMINOUS, decoded.photo.portraitProfile)
+        assertEquals(80, decoded.photo.portraitDepthStrength)
+        assertEquals("luminous", serialized["photo.portrait.profile"])
+    }
+
+    @Test
+    fun `legacy portrait filter key preserved for check-in portrait scenario`() {
+        val legacyMap = mapOf(
+            "photo.defaultPortraitFilterProfileId" to "portrait-vivid",
+            "photo.portrait.profile" to "native",
+            "photo.portrait.beautyPreset" to "authentic",
+            "photo.portrait.beautyStrength" to "soft",
+            "photo.portrait.bokehEffect" to "natural",
+            "photo.portrait.depthStrength" to "50"
+        )
+        val decoded = PersistedSettingsSerializer.fromMap(legacyMap)
+
+        assertEquals("portrait-vivid", decoded.photo.defaultPortraitFilterProfileId)
+        assertEquals(PortraitProfile.NATIVE, decoded.photo.portraitProfile)
+        assertEquals(PortraitBeautyPreset.AUTHENTIC, decoded.photo.portraitBeautyPreset)
+        assertEquals(PortraitBeautyStrength.SOFT, decoded.photo.portraitBeautyStrength)
+        assertEquals(PortraitBokehEffect.NATURAL, decoded.photo.portraitBokehEffect)
+        assertEquals(50, decoded.photo.portraitDepthStrength)
+        // Default photo filter should remain at default when not in map
+        assertEquals("photo-original", decoded.photo.defaultFilterProfileId)
+    }
 }

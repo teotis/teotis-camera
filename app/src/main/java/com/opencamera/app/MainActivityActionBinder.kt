@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import android.Manifest
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.SeekBar
 import com.opencamera.app.gesture.GestureAction
@@ -54,11 +55,20 @@ internal class MainActivityActionBinder(
             callbacks.renderAfterPanelChange()
         }
         views.topBar.filterEntry.setOnClickListener {
-            callbacks.reducePanel(CockpitPanelCommand.ToggleStyleLab)
+            val activeMode = snapshot().sessionState?.activeMode
+            val role = if (activeMode != null) styleSurfaceRole(activeMode) else StyleSurfaceRole.PANEL
+            when (role) {
+                StyleSurfaceRole.FILTER_STRIP -> callbacks.reducePanel(CockpitPanelCommand.ToggleStyleStrip)
+                StyleSurfaceRole.PANEL -> callbacks.reducePanel(CockpitPanelCommand.ToggleStyleLab)
+            }
             callbacks.renderAfterPanelChange()
         }
         views.quickPanel.launcher.setOnClickListener {
             callbacks.reducePanel(CockpitPanelCommand.ToggleQuickBubble)
+            callbacks.renderAfterPanelChange()
+        }
+        views.quickPanel.content.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.DismissAll)
             callbacks.renderAfterPanelChange()
         }
         views.floatingUtility.lowLightNightPrompt.setOnClickListener {
@@ -87,6 +97,7 @@ internal class MainActivityActionBinder(
                 callbacks.showDisabledReason(disabledReason)
                 return@setOnClickListener
             }
+            callbacks.reducePanel(CockpitPanelCommand.DocumentBatchCaptureTriggered)
             callbacks.dispatch(SessionIntent.ShutterPressed)
         }
         views.bottomCockpit.lensFacing.setOnClickListener {
@@ -150,7 +161,7 @@ internal class MainActivityActionBinder(
             val nextTemplateId = snapshot().quickPanelSheet?.watermarkNextTemplateId ?: return@setOnClickListener
             callbacks.applySettingsAction(PersistedSettingsAction.UpdatePhotoWatermarkTemplate(nextTemplateId))
         }
-        views.quickPanel.livePhoto.setOnClickListener {
+        views.quickPanel.livePhoto.setOnHapticClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.livePhoto)
         }
         views.quickPanel.timer.setOnClickListener {
@@ -183,8 +194,11 @@ internal class MainActivityActionBinder(
         views.settingsPanel.photoWatermark.setOnClickListener {
             callbacks.openWatermarkLabSelector()
         }
-        views.settingsPanel.photoLive.setOnClickListener {
+        views.settingsPanel.photoLive.setOnHapticClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.livePhoto)
+        }
+        views.settingsPanel.photoLiveSaveFormat.setOnHapticClickListener {
+            callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.liveSaveFormat)
         }
         views.settingsPanel.photoTimer.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.countdown)
@@ -322,21 +336,21 @@ internal class MainActivityActionBinder(
     }
 
     private fun bindDevConsoleActions() {
-        views.devConsole.entry.setOnClickListener {
+        views.devConsole.entry.setOnHapticClickListener {
             callbacks.reducePanel(CockpitPanelCommand.ToggleDevConsole)
             callbacks.renderAfterPanelChange()
         }
-        views.devConsole.tabKey.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.KEY) }
-        views.devConsole.tabCore.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.CORE) }
-        views.devConsole.tabError.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.ERROR) }
-        views.devConsole.tabAll.setOnClickListener { callbacks.selectDevLogTab(DevLogTab.ALL) }
-        views.devConsole.export.setOnClickListener {
+        views.devConsole.tabKey.setOnHapticClickListener { callbacks.selectDevLogTab(DevLogTab.KEY) }
+        views.devConsole.tabCore.setOnHapticClickListener { callbacks.selectDevLogTab(DevLogTab.CORE) }
+        views.devConsole.tabError.setOnHapticClickListener { callbacks.selectDevLogTab(DevLogTab.ERROR) }
+        views.devConsole.tabAll.setOnHapticClickListener { callbacks.selectDevLogTab(DevLogTab.ALL) }
+        views.devConsole.export.setOnHapticClickListener {
             callbacks.exportDevLog()
         }
-        views.devConsole.vendorProbe.setOnClickListener {
+        views.devConsole.vendorProbe.setOnHapticClickListener {
             callbacks.triggerVendorProbe()
         }
-        views.devConsole.close.setOnClickListener {
+        views.devConsole.close.setOnHapticClickListener {
             val selectedTab = snapshot().devLog?.selectedTab ?: DevLogTab.ALL
             if (selectedTab == DevLogTab.ALL) {
                 callbacks.cleanupAllDevLogs()
@@ -349,11 +363,8 @@ internal class MainActivityActionBinder(
     private fun bindModeTrack() {
         val buttons = listOf(
             views.modeTrack.photo to ModeId.PHOTO,
+            views.modeTrack.checkIn to ModeId.CHECK_IN,
             views.modeTrack.humanistic to ModeId.HUMANISTIC,
-            views.modeTrack.night to ModeId.NIGHT,
-            views.modeTrack.fullClear to ModeId.FULL_CLEAR,
-            views.modeTrack.portrait to ModeId.PORTRAIT,
-            views.modeTrack.pro to ModeId.PRO,
             views.modeTrack.video to ModeId.VIDEO,
             views.modeTrack.document to ModeId.DOCUMENT
         )
@@ -394,7 +405,7 @@ internal class MainActivityActionBinder(
             }
             val activeMode = snap.sessionState?.activeMode ?: return@GestureRouter
             val currentZoom = snap.sessionState?.activeDeviceGraph?.preview?.zoomRatio ?: 1.0f
-            if (event !is GestureEvent.PinchZoom) {
+            if (event !is GestureEvent.PinchZoom && event !is GestureEvent.PinchBegin) {
                 gesturePolicy.syncZoomRatio(currentZoom)
             }
             when (val action = gesturePolicy.map(event, activeMode, currentZoom)) {
@@ -444,4 +455,11 @@ internal class MainActivityActionBinder(
     }
 
     val isModeTrackScrolling: Boolean get() = modeTrackScrollGuard.isScrolling
+}
+
+private fun View.setOnHapticClickListener(onClick: (View) -> Unit) {
+    setOnClickListener { view ->
+        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        onClick(view)
+    }
 }

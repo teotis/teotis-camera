@@ -62,6 +62,35 @@ class PortraitRenderPostProcessorTest {
     }
 
     @Test
+    fun `check in portrait compatible metadata is rendered`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                mode = "check-in",
+                saveRequest = portraitSaveRequest(
+                    "mode" to "check-in",
+                    "checkInScenario" to "people-place",
+                    "compatMode" to "portrait",
+                    "renderPath" to "focus",
+                    "subjectTracking" to "true",
+                    "portraitProfile" to PortraitProfile.LUMINOUS.storageKey,
+                    "portraitBeautyPreset" to PortraitBeautyPreset.CLEAR.storageKey,
+                    "portraitBeautyStrength" to PortraitBeautyStrength.BALANCED.storageKey,
+                    "portraitBokehEffect" to PortraitBokehEffect.CREAMY.storageKey
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        assertEquals(PortraitRenderMode.FOCUS, editor.invocations.single().spec.mode)
+        assertEquals(PortraitProfile.LUMINOUS, editor.invocations.single().spec.portraitProfile)
+        assertTrue(result.pipelineNotes.contains("portrait-render:applied:focus"))
+    }
+
+    @Test
     fun `missing editable handle records diagnostic skip`() = runTest {
         val editor = FakePortraitRenderEditor(
             result = PortraitRenderApplied()
@@ -624,6 +653,14 @@ class PortraitRenderPostProcessorTest {
                 renderUri = outputHandle.contentUri
             ),
             metadata = saveRequest.metadata
+        )
+    }
+
+    private fun portraitSaveRequest(vararg tags: Pair<String, String>): SaveRequest {
+        return SaveRequest.photoLibrary(
+            metadata = MediaMetadata(
+                customTags = tags.toMap()
+            )
         )
     }
 

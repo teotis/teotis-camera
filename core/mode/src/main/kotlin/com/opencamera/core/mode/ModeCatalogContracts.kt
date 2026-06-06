@@ -16,55 +16,37 @@ fun ModeId.modeDirectoryDeclaration(
 ): ModeDirectoryDeclaration {
     val settings = settingsSnapshot.persisted
     val catalog = settingsSnapshot.catalog
+    val defaultStyleLabel = when (this) {
+        ModeId.PHOTO -> catalog.filterLabelOrId(settings.photo.defaultFilterProfileId)
+        ModeId.CHECK_IN -> "Check-in Original"
+        ModeId.DOCUMENT -> "Receipt Scan"
+        ModeId.HUMANISTIC -> catalog.filterLabelOrId(
+            settings.photo.defaultHumanisticFilterProfileId
+        )
+        ModeId.VIDEO -> settings.video.defaultVideoSpec.summaryLabel
+    }
+
+    val declaredSubfeatures = when (this) {
+        ModeId.PHOTO -> if (deviceCapabilities.supportsFlashControl) {
+            "Flash, frame ratio, Live default, watermark"
+        } else {
+            "Frame ratio, Live default, watermark"
+        }
+        ModeId.CHECK_IN -> if (deviceCapabilities.supportsPortraitDepthEffect) {
+            "Portrait depth, multi-frame focus bracket, filter, watermark, frame ratio"
+        } else {
+            "Focus fallback, multi-frame focus bracket, filter, watermark, frame ratio"
+        }
+        ModeId.DOCUMENT -> "Auto crop, cleanup, watermark"
+        ModeId.HUMANISTIC ->
+            "Street styles, manual controls, frame ratio, Live default, timer, watermark"
+        ModeId.VIDEO -> "Resolution, fps, audio profile, filter"
+    }
+
     return ModeDirectoryDeclaration(
         catalogProfile = catalogProfile(),
-        defaultStyleLabel = when (this) {
-            ModeId.PHOTO -> catalog.filterLabelOrId(settings.photo.defaultFilterProfileId)
-
-            ModeId.DOCUMENT -> "Receipt Scan"
-            ModeId.HUMANISTIC -> catalog.filterLabelOrId(
-                settings.photo.defaultHumanisticFilterProfileId
-            )
-            ModeId.PORTRAIT -> catalog.filterLabelOrId(
-                settings.photo.defaultPortraitFilterProfileId
-            )
-
-            ModeId.PRO -> "Neutral"
-            ModeId.NIGHT -> if (deviceCapabilities.supportsNightMultiFrame) {
-                "Handheld"
-            } else {
-                "Balanced"
-            }
-
-            ModeId.FULL_CLEAR -> "Honest V1"
-            ModeId.VIDEO -> settings.video.defaultVideoSpec.summaryLabel
-        },
-        declaredSubfeatures = when (this) {
-            ModeId.PHOTO -> if (deviceCapabilities.supportsFlashControl) {
-                "Flash, frame ratio, Live default, watermark"
-            } else {
-                "Frame ratio, Live default, watermark"
-            }
-
-            ModeId.DOCUMENT -> "Auto crop, cleanup, watermark"
-            ModeId.HUMANISTIC ->
-                "Street styles, Pro variant, frame ratio, Live default, timer, watermark"
-            ModeId.PORTRAIT -> if (deviceCapabilities.supportsPortraitDepthEffect) {
-                "Portrait style, Pro variant, depth render, frame ratio"
-            } else {
-                "Portrait style, Pro variant, focus fallback, frame ratio"
-            }
-
-            ModeId.PRO -> "Manual draft, frame ratio, still tuning"
-            ModeId.NIGHT -> if (deviceCapabilities.supportsNightMultiFrame) {
-                "Scenery style, Pro variant, night fusion, frame ratio"
-            } else {
-                "Scenery style, Pro variant, brightening fallback, frame ratio"
-            }
-
-            ModeId.FULL_CLEAR -> "Focus bracket capture, V1 focus stack fusion, best-frame fallback"
-            ModeId.VIDEO -> "Resolution, fps, audio profile, filter"
-        }
+        defaultStyleLabel = defaultStyleLabel,
+        declaredSubfeatures = declaredSubfeatures
     )
 }
 

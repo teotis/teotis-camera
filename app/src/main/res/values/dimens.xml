@@ -14,6 +14,7 @@
     <dimen name="touch_target_shutter">72dp</dimen>
     <dimen name="mode_chip_min_width">64dp</dimen>
     <dimen name="mode_chip_min_height">28dp</dimen>
+    <dimen name="mode_track_height">32dp</dimen>
     <dimen name="zoom_chip_min_width">36dp</dimen>
     <dimen name="zoom_chip_min_height">26dp</dimen>
 
@@ -59,6 +60,7 @@
     <dimen name="dev_console_scroll_floating_padding">96dp</dimen>
     <dimen name="dev_console_scroll_floating_bottom_margin">72dp</dimen>
     <dimen name="bottom_cockpit_padding_horizontal">16dp</dimen>
-    <dimen name="bottom_cockpit_margin_bottom">8dp</dimen>
-    <dimen name="cockpit_control_row_margin_top">8dp</dimen>
+    <dimen name="bottom_cockpit_margin_bottom">14dp</dimen>
+    <dimen name="bottom_cockpit_navigation_padding_max">16dp</dimen>
+    <dimen name="cockpit_control_row_margin_top">2dp</dimen>
 </resources>

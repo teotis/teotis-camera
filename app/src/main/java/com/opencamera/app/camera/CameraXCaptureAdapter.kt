@@ -14,6 +14,7 @@ import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.StreamConfigurationMap
 import android.media.CamcorderProfile
 import android.media.MediaRecorder
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.view.Surface
@@ -174,6 +175,7 @@ private const val FOUR_THIRDS_RATIO = 4.0 / 3.0
 private const val ASPECT_RATIO_TOLERANCE = 0.05
 private const val PREVIEW_METERING_POINT_SIZE = 0.15f
 private const val MIN_PREVIEW_METERING_AUTO_CANCEL_MILLIS = 1L
+private const val VIDEO_COVER_THUMBNAIL_SIZE = 512
 
 internal fun classifyPreviewBindingFailure(
     throwable: Throwable
@@ -2796,13 +2798,22 @@ class CameraXCaptureAdapter(
                             }
                         } else if (!wasLifecycleInterrupted) {
                             adapterScope.launch {
+                                val outputHandle = request.resolveOutputHandle(
+                                    event.outputResults.outputUri
+                                )
+                                val thumbnailDiagnostics = withContext(Dispatchers.IO) {
+                                    warmVideoThumbnailForGallery(
+                                        outputHandle = outputHandle,
+                                        mimeType = plan.saveTask.saveRequest.mimeType
+                                    )
+                                }
                                 emitShotCompleted(
                                     plan = plan,
                                     outputPath = request.outputPath,
-                                    outputHandle = request.resolveOutputHandle(
-                                        event.outputResults.outputUri
-                                    ),
-                                    deviceDiagnostics = deviceRequest.diagnostics + runtimeDiagnostics,
+                                    outputHandle = outputHandle,
+                                    deviceDiagnostics = deviceRequest.diagnostics +
+                                        runtimeDiagnostics +
+                                        thumbnailDiagnostics,
                                     requestedAtElapsedMillis = requestedAt
                                 )
                             }
@@ -2811,6 +2822,42 @@ class CameraXCaptureAdapter(
                 }
             }
         }
+    }
+
+    private fun warmVideoThumbnailForGallery(
+        outputHandle: MediaOutputHandle,
+        mimeType: String
+    ): List<String> {
+        val diagnostics = mutableListOf<String>()
+        val contentUri = outputHandle.contentUri?.takeUnless { it.isBlank() }
+        if (contentUri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val warmed = runCatching {
+                context.contentResolver.loadThumbnail(
+                    Uri.parse(contentUri),
+                    Size(VIDEO_COVER_THUMBNAIL_SIZE, VIDEO_COVER_THUMBNAIL_SIZE),
+                    null
+                ).recycle()
+            }
+            diagnostics += warmed.fold(
+                onSuccess = { "video-thumbnail:media-store-warmed" },
+                onFailure = { throwable ->
+                    val reason = throwable.message ?: throwable::class.java.simpleName
+                    "video-thumbnail:media-store-warm-failed:$reason"
+                }
+            )
+        }
+
+        val filePath = outputHandle.filePath?.takeUnless { it.isBlank() }
+        if (filePath != null) {
+            MediaScannerConnection.scanFile(
+                context,
+                arrayOf(filePath),
+                arrayOf(mimeType),
+                null
+            )
+            diagnostics += "video-thumbnail:media-scan-requested"
+        }
+        return diagnostics.ifEmpty { listOf("video-thumbnail:no-warmup-target") }
     }
 
     private suspend fun stopActiveShot(shotId: String) {

@@ -453,6 +453,26 @@ class CockpitPanelRouterTest {
         val result = nextState(initial, CockpitPanelCommand.CloseDocumentBatchOrganizer)
 
         assertEquals(CockpitPanelRoute.None, result.route)
+        assertTrue(result.isDocumentBatchOrganizerDismissed)
+    }
+
+    @Test
+    fun `ToggleDocumentBatchOrganizer stays closed after explicit dismiss`() {
+        val initial = CockpitPanelUiState(isDocumentBatchOrganizerDismissed = true)
+        val result = nextState(initial, CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+        assertTrue(result.isDocumentBatchOrganizerDismissed)
+    }
+
+    @Test
+    fun `DocumentBatchCaptureTriggered allows organizer after next shutter action`() {
+        val initial = CockpitPanelUiState(isDocumentBatchOrganizerDismissed = true)
+        val armed = nextState(initial, CockpitPanelCommand.DocumentBatchCaptureTriggered)
+        val result = nextState(armed, CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+
+        assertFalse(armed.isDocumentBatchOrganizerDismissed)
+        assertEquals(CockpitPanelRoute.DocumentBatchOrganizer, result.route)
     }
 
     @Test
@@ -469,5 +489,47 @@ class CockpitPanelRouterTest {
         val result = nextState(initial, CockpitPanelCommand.CloseDocumentBatchOrganizer)
 
         assertEquals(CockpitPanelRoute.Settings(), result.route)
+    }
+
+    // --- StyleStrip routing tests ---
+
+    @Test
+    fun `ToggleStyleStrip opens from None`() {
+        val initial = CockpitPanelUiState()
+        val result = nextState(initial, CockpitPanelCommand.ToggleStyleStrip)
+
+        assertEquals(CockpitPanelRoute.StyleStrip, result.route)
+    }
+
+    @Test
+    fun `ToggleStyleStrip closes from StyleStrip`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.StyleStrip)
+        val result = nextState(initial, CockpitPanelCommand.ToggleStyleStrip)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `ToggleStyleStrip closes when switching from another panel`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        val result = nextState(initial, CockpitPanelCommand.ToggleStyleStrip)
+
+        assertEquals(CockpitPanelRoute.StyleStrip, result.route)
+    }
+
+    @Test
+    fun `AndroidBack closes StyleStrip`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.StyleStrip)
+        val result = nextState(initial, CockpitPanelCommand.AndroidBack)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `DismissAll closes StyleStrip`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.StyleStrip)
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
     }
 }

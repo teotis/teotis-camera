@@ -257,10 +257,8 @@ internal fun sessionControlsRenderModel(
 
 private val stillModesWithFrameRatio = setOf(
     ModeId.PHOTO,
-    ModeId.NIGHT,
-    ModeId.PORTRAIT,
-    ModeId.HUMANISTIC,
-    ModeId.PRO
+    ModeId.CHECK_IN,
+    ModeId.HUMANISTIC
 )
 
 internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): QuickBrightnessRenderModel {
@@ -568,13 +566,9 @@ internal fun modeTrackRenderModel(
 
 private val PRODUCT_MODE_ENTRY_ORDER = listOf(
     ModeId.PHOTO,
+    ModeId.CHECK_IN,
     ModeId.HUMANISTIC,
-    ModeId.NIGHT,
-    ModeId.FULL_CLEAR,
-    ModeId.PORTRAIT,
-    ModeId.PRO,
-    ModeId.VIDEO,
-    ModeId.DOCUMENT
+    ModeId.VIDEO
 )
 
 private fun visibleModeEntryOrder(availableModes: List<ModeId>): List<ModeId> {
@@ -809,4 +803,3 @@ private fun Set<StillCaptureResolutionPreset>.stillResolutionPresetSummary(): St
 private fun List<StillCaptureOutputSize>.stillCaptureOutputSizeSummary(): String {
     return this.take(4).joinToString(separator = "/") { it.label }
 }
-

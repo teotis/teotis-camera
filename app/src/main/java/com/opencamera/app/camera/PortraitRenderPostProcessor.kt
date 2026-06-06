@@ -76,6 +76,15 @@ internal interface PortraitRenderEditor {
     ): ProcessorEditorResult
 }
 
+internal fun supportsPortraitRenderMetadata(tags: Map<String, String>): Boolean {
+    return tags["mode"] == "portrait" ||
+        tags["compatMode"] == "portrait" ||
+        (
+            tags["mode"] == "check-in" &&
+                tags["checkInScenario"] in setOf("portrait", "people-place", "object-place")
+            )
+}
+
 internal fun decidePortraitRenderWork(result: ShotResult): ProcessorWork<PortraitRenderPayload> {
     if (result.mediaType != MediaType.PHOTO) {
         return ProcessorWork.None
@@ -85,7 +94,7 @@ internal fun decidePortraitRenderWork(result: ShotResult): ProcessorWork<Portrai
     }
 
     val tags = result.metadata.customTags
-    if (tags["mode"] != "portrait") {
+    if (!supportsPortraitRenderMetadata(tags)) {
         return ProcessorWork.None
     }
 

@@ -285,6 +285,21 @@ class AlgorithmProcessorBridgesTest {
     }
 
     @Test
+    fun `portrait canProcess true with check in portrait compatibility tags`() {
+        val processor = RecordingPortraitEditor().let {
+            PortraitRenderPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertTrue(processor.canProcess(sampleRequest(
+            customTags = mapOf(
+                "mode" to "check-in",
+                "checkInScenario" to "object-place",
+                "compatMode" to "portrait",
+                "renderPath" to "depth"
+            )
+        )))
+    }
+
+    @Test
     fun `portrait canProcess false without portrait mode`() {
         val processor = RecordingPortraitEditor().let {
             PortraitRenderPostProcessor(it).toAlgorithmProcessor()

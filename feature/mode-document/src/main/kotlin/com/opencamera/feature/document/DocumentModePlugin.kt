@@ -56,7 +56,7 @@ private class DocumentModeController(
     private val uiSpec = ModeUiSpec(
         title = "Document",
         shutterLabel = "Scan Document",
-        secondaryActionLabel = "Toggle Scan Style"
+        secondaryActionLabel = "Cycle Scan Style"
     )
 
     private val mutableSnapshot = MutableStateFlow(
@@ -119,7 +119,7 @@ private class DocumentModeController(
             ModeIntent.ShutterPressed -> submitCurrentProfile()
             ModeIntent.SecondaryActionPressed -> cycleProfile()
             ModeIntent.TertiaryActionPressed -> ModeSignal.None
-            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("Document mode uses auto crop, not regular frame ratio")
+            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("文档模式使用自动裁边，无需选择画幅比例")
             ModeIntent.ProActionPressed -> ModeSignal.None
         }
     }

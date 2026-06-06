@@ -218,6 +218,29 @@ class GesturePolicyTest {
     }
 
     @Test
+    fun `mapDragToRatio throttles with injected clock`() {
+        var now = 1_000L
+        val policy = GesturePolicy(nowMillis = { now })
+        val capability = ZoomRatioCapability(
+            support = ZoomControlSupport.DISCRETE_PRESET,
+            supportedRatios = listOf(1f, 2f, 5f),
+            defaultRatio = 1f
+        )
+        val mapper = ZoomScaleMapper(capability, 0f, 100f)
+
+        policy.map(GestureEvent.DragStart(10f, 0f), ModeId.PHOTO)
+        val first = policy.mapDragToRatio(50f, mapper, capability)
+        now += 20
+        val second = policy.mapDragToRatio(100f, mapper, capability)
+        now += 31
+        val third = policy.mapDragToRatio(100f, mapper, capability)
+
+        assertTrue(first is GestureAction.DispatchSession)
+        assertEquals(GestureAction.Ignore, second)
+        assertTrue(third is GestureAction.DispatchSession)
+    }
+
+    @Test
     fun `mapDragToRatio ignores when not dragging`() {
         val capability = ZoomRatioCapability(
             support = ZoomControlSupport.DISCRETE_PRESET,

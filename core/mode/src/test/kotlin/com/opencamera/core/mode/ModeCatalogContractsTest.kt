@@ -34,6 +34,10 @@ class ModeCatalogContractsTest {
             deviceCapabilities = DeviceCapabilities.DEFAULT,
             settingsSnapshot = settingsSnapshot
         )
+        val checkinDeclaration = ModeId.CHECK_IN.modeDirectoryDeclaration(
+            deviceCapabilities = DeviceCapabilities.DEFAULT,
+            settingsSnapshot = settingsSnapshot
+        )
         val videoDeclaration = ModeId.VIDEO.modeDirectoryDeclaration(
             deviceCapabilities = DeviceCapabilities.DEFAULT,
             settingsSnapshot = settingsSnapshot
@@ -47,38 +51,44 @@ class ModeCatalogContractsTest {
         )
         assertEquals("Humanistic Original", humanisticDeclaration.defaultStyleLabel)
         assertEquals(
-            "Street styles, Pro variant, frame ratio, Live default, timer, watermark",
+            "Street styles, manual controls, frame ratio, Live default, timer, watermark",
             humanisticDeclaration.declaredSubfeatures
+        )
+        assertEquals("Check-in Original", checkinDeclaration.defaultStyleLabel)
+        assertEquals(
+            "Portrait depth, multi-frame focus bracket, filter, watermark, frame ratio",
+            checkinDeclaration.declaredSubfeatures
         )
         assertEquals("4K 25fps", videoDeclaration.defaultStyleLabel)
     }
 
     @Test
-    fun `mode directory declaration degrades scenery and portrait subfeatures with capabilities`() {
+    fun `checkin declaration degrades portrait and multi-frame subfeatures with capabilities`() {
         val settingsSnapshot = SessionSettingsSnapshot()
         val degradedCapabilities = DeviceCapabilities.DEFAULT.copy(
             supportsNightMultiFrame = false,
             supportsPortraitDepthEffect = false
         )
 
-        val sceneryDeclaration = ModeId.NIGHT.modeDirectoryDeclaration(
-            deviceCapabilities = degradedCapabilities,
-            settingsSnapshot = settingsSnapshot
-        )
-        val portraitDeclaration = ModeId.PORTRAIT.modeDirectoryDeclaration(
+        val checkinDeclaration = ModeId.CHECK_IN.modeDirectoryDeclaration(
             deviceCapabilities = degradedCapabilities,
             settingsSnapshot = settingsSnapshot
         )
 
-        assertEquals("Balanced", sceneryDeclaration.defaultStyleLabel)
+        assertEquals("Check-in Original", checkinDeclaration.defaultStyleLabel)
         assertEquals(
-            "Scenery style, Pro variant, brightening fallback, frame ratio",
-            sceneryDeclaration.declaredSubfeatures
+            "Focus fallback, multi-frame focus bracket, filter, watermark, frame ratio",
+            checkinDeclaration.declaredSubfeatures
         )
-        assertEquals("Portrait Original", portraitDeclaration.defaultStyleLabel)
+    }
+
+    @Test
+    fun `canonical visible modes are photo checkin humanistic document video`() {
+        val visibleIds = ModeId.entries
+        assertEquals(5, visibleIds.size)
         assertEquals(
-            "Portrait style, Pro variant, focus fallback, frame ratio",
-            portraitDeclaration.declaredSubfeatures
+            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.DOCUMENT, ModeId.HUMANISTIC, ModeId.VIDEO),
+            visibleIds.sortedBy { it.ordinal }
         )
     }
 }

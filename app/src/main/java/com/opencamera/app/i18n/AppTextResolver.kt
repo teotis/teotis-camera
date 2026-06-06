@@ -20,12 +20,9 @@ open class AppTextResolver(private val context: Context?) {
 
     open fun modeDisplayName(modeId: ModeId): String = when (modeId) {
         ModeId.PHOTO -> str(R.string.button_photo_mode, "Photo")
+        ModeId.CHECK_IN -> str(R.string.button_checkin_mode, "Check-in")
         ModeId.DOCUMENT -> str(R.string.button_document_mode, "Doc")
-        ModeId.NIGHT -> str(R.string.button_night_mode, "Scenery")
         ModeId.HUMANISTIC -> str(R.string.button_humanistic_mode, "Human")
-        ModeId.PORTRAIT -> str(R.string.button_portrait_mode, "Port")
-        ModeId.PRO -> str(R.string.button_pro_mode, "Pro")
-        ModeId.FULL_CLEAR -> str(R.string.button_fullclear_mode, "全清")
         ModeId.VIDEO -> str(R.string.button_video_mode, "Video")
     }
 
@@ -156,7 +153,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun filterLabSupportingText(): String =
         str(R.string.filter_lab_supporting_text, "Independent filter panel for mode defaults. Import and export stay deferred in this closure; selected looks can be adjusted or saved as custom.")
     open fun filterLabHeroSummary(familyLabel: String, filterLabel: String, count: Int): String =
-        String.format(str(R.string.filter_lab_hero_summary, "%s default %s • %d looks staged"), familyLabel, filterLabel, count)
+        String.format(str(R.string.filter_lab_hero_summary, "%1\$s default %2\$s • %3\$d looks staged"), familyLabel, filterLabel, count)
     open fun filterLabCurrentDefault(filterLabel: String): String =
         String.format(str(R.string.filter_lab_current_default, "Current default %s"), filterLabel)
     open fun filterLabSelectedDefault(): String =
@@ -260,10 +257,8 @@ open class AppTextResolver(private val context: Context?) {
     open fun filterFamilyVideo(): String = str(R.string.filter_family_video, "Video")
 
     // Pro controls headings
-    open fun proControlsScenery(): String = str(R.string.pro_controls_scenery, "Scenery Pro Controls")
-    open fun proControlsPortrait(): String = str(R.string.pro_controls_portrait, "Portrait Pro Controls")
-    open fun proControlsHumanistic(): String = str(R.string.pro_controls_humanistic, "Humanistic Pro Controls")
-    open fun proControlsDefault(): String = str(R.string.pro_controls_default, "Pro Controls")
+    open fun proControlsHumanistic(): String = str(R.string.pro_controls_humanistic, "Humanistic Professional Controls")
+    open fun proControlsDefault(): String = str(R.string.pro_controls_default, "Professional Controls")
 
     // Settings section labels
     open fun compositionGridLabel(): String = str(R.string.label_composition_grid, "Composition grid")
@@ -365,7 +360,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun zoomRatioLabel(ratio: Float): String = String.format(str(R.string.format_zoom_ratio, "%sx"), ratio)
     open fun countdownSeconds(seconds: Int): String = String.format(str(R.string.format_countdown_seconds, "%ss"), seconds)
     open fun outputSizeLabel(width: Int, height: Int): String =
-        String.format(str(R.string.format_output_size, "%sx%s"), width, height)
+        String.format(str(R.string.format_output_size, "%1\$sx%2\$s"), width, height)
     open fun kelvinLabel(k: Int): String = String.format(str(R.string.format_kelvin, "%sK"), k)
     open fun shutterSpeedMs(ms: Int): String = String.format(str(R.string.format_shutter_ms, "%sms"), ms)
     open fun focusDistanceDiopters(d: Float): String =
@@ -432,7 +427,7 @@ open class AppTextResolver(private val context: Context?) {
     open fun settingsSummaryFilters(): String = str(R.string.settings_summary_filters, "filters")
     open fun settingsSummaryWatermarkTemplates(): String = str(R.string.settings_summary_watermark_templates, "watermark templates")
     open fun settingsSummaryMsBundle(): String = str(R.string.settings_summary_ms_bundle, "ms bundle")
-    open fun settingsSummaryProManualDraft(): String = str(R.string.settings_summary_pro_manual_draft, "Pro manual draft")
+    open fun settingsSummaryProManualDraft(): String = str(R.string.settings_summary_pro_manual_draft, "Humanistic manual draft")
 
     // Settings joiners for sessionSettingsRenderModel
     open fun settingsJoinerGrid(): String = str(R.string.settings_joiner_grid, "Grid ")
@@ -450,15 +445,15 @@ open class AppTextResolver(private val context: Context?) {
     open fun gridSupportLabel(count: Int): String = String.format(str(R.string.settings_page_grid_support, "Cycle %d layouts"), count)
     open fun portraitTuningLabel(): String = str(R.string.settings_page_portrait_support, "Open profile, beauty, and bokeh tuning")
     open fun watermarkTuningLabel(count: Int): String = String.format(str(R.string.settings_page_watermark_support, "Open selector + per-template tuning; %d templates"), count)
-    open fun liveSupportLabel(durationMs: Int, watermarkBehavior: String): String = String.format(str(R.string.settings_page_live_support, "Saved default only; %d ms bundle | dynamic watermark %s"), durationMs, watermarkBehavior)
-    open fun degradedResolutionLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_resolution, "Saved as %s, active graph uses %s"), saved, active)
-    open fun degradedFramerateLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_framerate, "Saved as %s, active graph uses %s"), saved, active)
-    open fun degradedDynamicFpsLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_dynamic_fps, "Saved as %s, active graph uses %s"), saved, active)
-    open fun degradedAudioLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_audio, "Saved as %s, active graph uses %s"), saved, active)
+    open fun liveSupportLabel(durationMs: Int, watermarkBehavior: String): String = String.format(str(R.string.settings_page_live_support, "Saved default only; %1\$d ms bundle | dynamic watermark %2\$s"), durationMs, watermarkBehavior)
+    open fun degradedResolutionLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_resolution, "Saved as %1\$s, active graph uses %2\$s"), saved, active)
+    open fun degradedFramerateLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_framerate, "Saved as %1\$s, active graph uses %2\$s"), saved, active)
+    open fun degradedDynamicFpsLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_dynamic_fps, "Saved as %1\$s, active graph uses %2\$s"), saved, active)
+    open fun degradedAudioLabel(saved: String, active: String): String = String.format(str(R.string.settings_page_degraded_audio, "Saved as %1\$s, active graph uses %2\$s"), saved, active)
     open fun videoFilterSeedCountLabel(count: Int): String = String.format(str(R.string.settings_page_video_filter_seed, "Saved filter seed; %d looks staged"), count)
     open fun catalogFooterStillWatermark(): String = str(R.string.settings_page_catalog_footer_1, "Still watermark templates now flow into metadata and photo rendering.")
     open fun catalogFooterManualStaged(): String = str(R.string.settings_page_catalog_footer_2, "Manual drafts and Live/video defaults remain staged in the same settings spine.")
-    open fun catalogFooterProManualPrefix(): String = str(R.string.settings_page_pro_manual_prefix, " | Pro manual draft ")
+    open fun catalogFooterProManualPrefix(): String = str(R.string.settings_page_pro_manual_prefix, " | Humanistic manual draft ")
 
     // Watermark selector
     open fun watermarkSelectorSupporting(): String = str(R.string.watermark_selector_supporting, "Watermark selection sits one level below Settings. Pick the active template here, then enter the template-specific style page to edit.")

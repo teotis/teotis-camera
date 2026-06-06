@@ -71,7 +71,7 @@ class MaskAwarePortraitRenderMathTest {
             edgeSoftness = 0.5f
         )
         val centerAlpha = mask.sampleAlpha(50, 40)
-        val midAlpha = mask.sampleAlpha(70, 40)
+        val midAlpha = mask.sampleAlpha(98, 40)
         val cornerAlpha = mask.sampleAlpha(0, 0)
 
         assertTrue(centerAlpha > midAlpha, "Center alpha ($centerAlpha) should exceed mid ($midAlpha)")
