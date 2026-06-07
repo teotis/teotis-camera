@@ -6,13 +6,13 @@ A modern Android camera application with layered architecture design, focused on
 
 ## Real-device UI
 
-| Preview | Quick Controls | Color Lab |
+| Preview | Settings | Color Lab |
 |---|---|---|
-| <img src="docs/assets/preview-main.jpg" width="220" alt="Teotis Camera preview UI"> | <img src="docs/assets/quick-controls.jpg" width="220" alt="Quick camera controls"> | <img src="docs/assets/color-lab.jpg" width="220" alt="Color Lab panel"> |
+| <img src="docs/assets/preview-main.jpg" width="220" alt="Teotis Camera preview UI"> | <img src="docs/assets/settings-panel.jpg" width="220" alt="Settings panel"> | <img src="docs/assets/color-lab.jpg" width="220" alt="Color Lab panel"> |
 
-| Document Batch | Watermark Lab | Captured Output |
+| Developer Diagnostics | Watermark Lab | Captured Output |
 |---|---|---|
-| <img src="docs/assets/document-batch.jpg" width="220" alt="Document batch rail"> | <img src="docs/assets/watermark-lab.jpg" width="220" alt="Watermark template editor"> | <img src="docs/assets/watermark-output.jpg" width="220" alt="Watermarked photo output"> |
+| <img src="docs/assets/dev-console.jpg" width="220" alt="Developer diagnostics panel"> | <img src="docs/assets/watermark-lab.jpg" width="220" alt="Watermark template editor"> | <img src="docs/assets/watermark-output.jpg" width="220" alt="Watermarked photo output"> |
 
 ## Implementation Highlights
 
