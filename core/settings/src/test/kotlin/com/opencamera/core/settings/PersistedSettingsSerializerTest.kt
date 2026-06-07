@@ -198,6 +198,8 @@ class PersistedSettingsSerializerTest {
         )
         assertEquals(VideoResolution.HD_720P, reduced.video.defaultVideoSpec.resolution)
         assertEquals(VideoFrameRate.FPS_60, reduced.video.defaultVideoSpec.frameRate)
+        assertEquals(DynamicVideoFpsPolicy.LOCKED, reduced.video.defaultVideoSpec.dynamicFpsPolicy)
+        assertEquals(AudioProfile.STANDARD, reduced.video.defaultVideoSpec.audioProfile)
         assertEquals(CountdownDuration.SECONDS_10, reduced.photo.countdownDuration)
         assertTrue(reduced.common.shutterSoundEnabled)
         assertEquals(initial.photo.defaultFilterProfileId, reduced.photo.defaultFilterProfileId)

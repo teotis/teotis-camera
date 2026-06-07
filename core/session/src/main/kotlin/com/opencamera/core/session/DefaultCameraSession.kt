@@ -38,6 +38,7 @@ import com.opencamera.core.mode.ModeRuntimeState
 import com.opencamera.core.mode.ModeRegistry
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.settings.SessionSettingsSnapshot
+import com.opencamera.core.settings.reduce
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -1208,6 +1209,9 @@ class DefaultCameraSession(
                             is ModeIntent.FrameRatioSelected ->
                                 "Stop recording before changing frame ratio"
 
+                            is ModeIntent.ScenarioSelected ->
+                                "Stop recording before changing scenario"
+
                             ModeIntent.ShutterPressed ->
                                 _state.value.lastAction
                         }
@@ -1838,6 +1842,12 @@ class DefaultCameraSession(
                             updateState(activeCapabilityReport = graphReport)
                         }
                     }
+                },
+                settingsActionSink = { action ->
+                    val updatedPersisted = sessionSettingsSnapshot.persisted.reduce(action)
+                    handleSettingsUpdated(
+                        sessionSettingsSnapshot.copy(persisted = updatedPersisted)
+                    )
                 },
                 settingsSnapshotProvider = { sessionSettingsSnapshot }
             )

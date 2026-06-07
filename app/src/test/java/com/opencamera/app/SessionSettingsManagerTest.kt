@@ -471,11 +471,10 @@ class SessionSettingsManagerTest {
 
         // Verify the render spec is present in the settings snapshot
         val snapshot = manager.loadSnapshot()
-        val profile = snapshot.catalog.filterProfileOrNull("custom-photo-1")
-        assertNotNull(profile)
-        assertEquals(10, profile?.renderSpec?.brightnessShift)
-        assertEquals(-3, profile?.renderSpec?.tintShift)
-        assertEquals(0.15f, profile?.renderSpec?.warmBoost)
+        val profile = assertNotNull(snapshot.catalog.filterProfileOrNull("custom-photo-1"))
+        assertEquals(10, profile.renderSpec?.brightnessShift)
+        assertEquals(-3, profile.renderSpec?.tintShift)
+        assertEquals(0.15f, profile.renderSpec?.warmBoost)
     }
 
     @Test

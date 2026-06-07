@@ -17,6 +17,7 @@ import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import kotlinx.coroutines.flow.StateFlow
 
@@ -72,6 +73,7 @@ data class ModeContext(
     },
     val eventSink: suspend (String) -> Unit = {},
     val onEffectSpecChanged: suspend (EffectSpec) -> Unit = {},
+    val settingsActionSink: suspend (PersistedSettingsAction) -> Unit = {},
     private val settingsSnapshotProvider: () -> SessionSettingsSnapshot = { SessionSettingsSnapshot() },
     val photoLowLightRuntimeStateProvider: () -> PhotoLowLightRuntimeState = {
         val snapshot = settingsSnapshotProvider()
@@ -161,6 +163,7 @@ sealed interface ModeIntent {
     data object TertiaryActionPressed : ModeIntent
     data object ProActionPressed : ModeIntent
     data class FrameRatioSelected(val ratio: FrameRatio) : ModeIntent
+    data class ScenarioSelected(val scenarioId: String) : ModeIntent
 }
 
 sealed interface ModeSessionEvent {

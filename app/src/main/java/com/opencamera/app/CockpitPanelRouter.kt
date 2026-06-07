@@ -28,6 +28,9 @@ internal sealed class CockpitPanelCommand {
     data class SelectFilterFamily(val family: FilterLabFamily) : CockpitPanelCommand()
     data object ToggleFilterAdjustmentMode : CockpitPanelCommand()
     data object ToggleStyleStrip : CockpitPanelCommand()
+    data object ToggleCheckInStylePanel : CockpitPanelCommand()
+    data class SelectCheckInScenario(val scenarioId: String) : CockpitPanelCommand()
+    data class SelectCheckInStyle(val styleId: String) : CockpitPanelCommand()
     data object ToggleDocumentBatchOrganizer : CockpitPanelCommand()
     data object CloseDocumentBatchOrganizer : CockpitPanelCommand()
     data object DocumentBatchCaptureTriggered : CockpitPanelCommand()
@@ -200,6 +203,25 @@ internal fun nextState(
             }
         }
 
+        is CockpitPanelCommand.ToggleCheckInStylePanel -> {
+            if (current.route is CockpitPanelRoute.CheckInStylePanel) {
+                defaultState
+            } else {
+                current.copy(
+                    route = CockpitPanelRoute.CheckInStylePanel,
+                    selectedFilterLabFamilyOverride = null
+                )
+            }
+        }
+
+        is CockpitPanelCommand.SelectCheckInScenario -> {
+            current
+        }
+
+        is CockpitPanelCommand.SelectCheckInStyle -> {
+            current
+        }
+
         is CockpitPanelCommand.ToggleDocumentBatchOrganizer -> {
             if (current.route is CockpitPanelRoute.DocumentBatchOrganizer) {
                 current.copy(
@@ -260,6 +282,7 @@ internal fun nextState(
                         filterAdjustmentMode = FilterAdjustmentMode.LIGHT
                     )
                 }
+                is CockpitPanelRoute.CheckInStylePanel,
                 is CockpitPanelRoute.StyleStrip,
                 is CockpitPanelRoute.DevConsole,
                 is CockpitPanelRoute.QuickBubble,

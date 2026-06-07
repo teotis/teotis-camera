@@ -47,7 +47,7 @@ class MultiFrameTemporaryOutputTrackerTest {
             tracker.cleanup()
 
             assertTrue(missing.exists().not())
-            assertEquals(listOf(missing.absolutePath), tracker.outputPaths())
+            assertEquals(emptyList(), tracker.outputPaths())
         } finally {
             tempDir.deleteRecursively()
         }

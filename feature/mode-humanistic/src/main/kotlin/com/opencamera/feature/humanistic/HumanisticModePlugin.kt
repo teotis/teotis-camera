@@ -129,6 +129,7 @@ private class HumanisticModeController(
             ModeIntent.TertiaryActionPressed -> cycleFrameRatio()
             is ModeIntent.FrameRatioSelected -> selectFrameRatio(intent.ratio)
             ModeIntent.ProActionPressed -> toggleProVariant()
+            is ModeIntent.ScenarioSelected -> ModeSignal.None
         }
     }
 

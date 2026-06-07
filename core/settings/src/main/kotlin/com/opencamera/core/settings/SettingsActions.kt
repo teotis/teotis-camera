@@ -8,6 +8,7 @@ sealed interface PersistedSettingsAction {
     data class UpdatePhotoFilter(val filterProfileId: String) : PersistedSettingsAction
     data class UpdateHumanisticFilter(val filterProfileId: String) : PersistedSettingsAction
     data class UpdatePortraitFilter(val filterProfileId: String) : PersistedSettingsAction
+    data class UpdateCheckInScenario(val scenarioId: String) : PersistedSettingsAction
     data class UpdatePortraitProfile(val profile: PortraitProfile) : PersistedSettingsAction
     data class UpdatePortraitBeautyPreset(
         val preset: PortraitBeautyPreset
@@ -77,6 +78,10 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
 
         is PersistedSettingsAction.UpdatePortraitFilter -> copy(
             photo = photo.copy(defaultPortraitFilterProfileId = action.filterProfileId)
+        )
+
+        is PersistedSettingsAction.UpdateCheckInScenario -> copy(
+            photo = photo.copy(defaultCheckInScenario = action.scenarioId)
         )
 
         is PersistedSettingsAction.UpdatePortraitProfile -> copy(
@@ -168,6 +173,7 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
                         defaultFilterProfileId = defaults.photo.defaultFilterProfileId,
                         defaultHumanisticFilterProfileId = defaults.photo.defaultHumanisticFilterProfileId,
                         defaultPortraitFilterProfileId = defaults.photo.defaultPortraitFilterProfileId,
+                        defaultCheckInScenario = defaults.photo.defaultCheckInScenario,
                         styleStrength = defaults.photo.styleStrength,
                         colorLabSpec = defaults.photo.colorLabSpec
                     )

@@ -532,4 +532,80 @@ class CockpitPanelRouterTest {
 
         assertEquals(CockpitPanelRoute.None, result.route)
     }
+
+    // --- CheckInStylePanel routing tests ---
+
+    @Test
+    fun `ToggleCheckInStylePanel opens from None`() {
+        val initial = CockpitPanelUiState()
+        val result = nextState(initial, CockpitPanelCommand.ToggleCheckInStylePanel)
+
+        assertEquals(CockpitPanelRoute.CheckInStylePanel, result.route)
+        assertNull(result.selectedFilterLabFamilyOverride)
+    }
+
+    @Test
+    fun `ToggleCheckInStylePanel closes from CheckInStylePanel`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.CheckInStylePanel)
+        val result = nextState(initial, CockpitPanelCommand.ToggleCheckInStylePanel)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `ToggleCheckInStylePanel replaces StyleLab`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        val result = nextState(initial, CockpitPanelCommand.ToggleCheckInStylePanel)
+
+        assertEquals(CockpitPanelRoute.CheckInStylePanel, result.route)
+    }
+
+    @Test
+    fun `SelectCheckInScenario is no-op for state`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.CheckInStylePanel)
+        val result = nextState(initial, CockpitPanelCommand.SelectCheckInScenario("clarity"))
+
+        assertEquals(initial, result)
+    }
+
+    @Test
+    fun `SelectCheckInStyle is no-op for state`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.CheckInStylePanel)
+        val result = nextState(initial, CockpitPanelCommand.SelectCheckInStyle("portrait-blue"))
+
+        assertEquals(initial, result)
+    }
+
+    @Test
+    fun `AndroidBack from CheckInStylePanel closes`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.CheckInStylePanel)
+        val result = nextState(initial, CockpitPanelCommand.AndroidBack)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `DismissAll from CheckInStylePanel closes`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.CheckInStylePanel)
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+    }
+
+    @Test
+    fun `opening CheckInStylePanel while Settings is open replaces route`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.Settings())
+        val result = nextState(initial, CockpitPanelCommand.ToggleCheckInStylePanel)
+
+        assertEquals(CockpitPanelRoute.CheckInStylePanel, result.route)
+    }
+
+    @Test
+    fun `mode switch from CheckInStylePanel closes panel via DismissAll`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.CheckInStylePanel)
+        val result = nextState(initial, CockpitPanelCommand.DismissAll)
+
+        assertEquals(CockpitPanelRoute.None, result.route)
+        assertFalse(result.route.isAnyPanelOpen)
+    }
 }

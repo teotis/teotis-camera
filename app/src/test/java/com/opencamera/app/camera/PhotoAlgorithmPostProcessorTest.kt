@@ -240,6 +240,41 @@ class PhotoAlgorithmPostProcessorTest {
     }
 
     @Test
+    fun `checkin clarity profile is not near neutral and is applied`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(
+            result = PhotoAlgorithmApplied()
+        )
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "checkin-clarity-best-frame-v1",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/checkin-clarity.jpg",
+                    filePath = "/tmp/checkin-clarity.jpg"
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        assertEquals("checkin-clarity-best-frame-v1", editor.invocations.single().spec.profile)
+        assertTrue(editor.invocations.single().spec.sharpnessBoost > 0f)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:checkin-clarity-best-frame-v1"))
+    }
+
+    @Test
+    fun `unknown checkin profile is safely ignored without crash`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(
+            result = PhotoAlgorithmApplied()
+        )
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val input = photoResult(algorithmProfile = "checkin-custom-effect")
+        val result = processor.process(input)
+
+        assertEquals(0, editor.invocations.size)
+        assertEquals(input, result)
+    }
+
+    @Test
     fun `custom vivid metadata from capture log is rendered`() = runTest {
         val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
         val processor = PhotoAlgorithmPostProcessor(editor)

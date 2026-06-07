@@ -215,6 +215,27 @@ internal class CockpitSurfaceRenderer(
         }
     }
 
+    fun renderModeAction(model: ModeActionRenderModel) {
+        val button = modeTrack.modeAction
+        if (!model.isVisible) {
+            button.visibility = View.GONE
+            return
+        }
+        button.visibility = View.VISIBLE
+        button.text = model.label
+        if (model.isActive) {
+            button.setTextColor(ContextCompat.getColor(context, R.color.oc_accent))
+            button.setTypeface(null, Typeface.BOLD)
+            button.setBackgroundResource(R.drawable.bg_mode_track_active_chip)
+            button.alpha = 1f
+        } else {
+            button.setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+            button.setTypeface(null, Typeface.NORMAL)
+            button.background = null
+            button.alpha = 0.78f
+        }
+    }
+
     private var lastFilterStripModel: FilterStripRenderModel? = null
 
     fun renderFilterStrip(model: FilterStripRenderModel, onSelectFilter: (PersistedSettingsAction) -> Unit) {

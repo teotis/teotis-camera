@@ -113,6 +113,22 @@ internal data class RuntimeProControlsRenderModel(
     val whiteBalanceControl: FeatureCatalogControlRenderModel
 )
 
+internal data class ModeActionRenderModel(
+    val isVisible: Boolean,
+    val label: String,
+    val isActive: Boolean
+)
+
+internal fun modeActionRenderModel(state: SessionState): ModeActionRenderModel {
+    val snapshot = state.modeSnapshot
+    val isEnabled = snapshot.state.isProActionEnabled
+    return ModeActionRenderModel(
+        isVisible = isEnabled,
+        label = snapshot.uiSpec.proActionLabel ?: "",
+        isActive = snapshot.state.isProVariantActive
+    )
+}
+
 internal data class WatermarkLabTemplateItemRenderModel(
     val templateId: String,
     val title: String,
@@ -266,6 +282,34 @@ internal data class FilterStripRenderModel(
     val isVisible: Boolean
 )
 
+internal data class CheckInScenarioCardRenderModel(
+    val scenarioId: String,
+    val label: String,
+    val description: String,
+    val isActive: Boolean,
+    val isDegraded: Boolean = false,
+    val degradedLabel: String? = null,
+    val selectAction: PersistedSettingsAction?
+)
+
+internal data class CheckInStyleItemRenderModel(
+    val filterProfileId: String,
+    val title: String,
+    val isSelected: Boolean,
+    val bokehLabel: String? = null,
+    val selectAction: PersistedSettingsAction?
+)
+
+internal data class CheckInStylePanelRenderModel(
+    val headline: String,
+    val scenarioSummary: String,
+    val scenarioCards: List<CheckInScenarioCardRenderModel>,
+    val styleItems: List<CheckInStyleItemRenderModel>,
+    val compositionGuidance: String,
+    val degradationLabel: String?,
+    val editingEnabled: Boolean
+)
+
 internal fun filterStripRenderModel(
     state: SessionState,
     text: AppTextResolver
@@ -288,6 +332,92 @@ internal fun filterStripRenderModel(
         isVisible = items.isNotEmpty()
     )
 }
+
+private val CHECK_IN_SCENARIOS = listOf(
+    CheckInScenarioDef("portrait", "人像", "人像特写，突出人物表情与姿态"),
+    CheckInScenarioDef("people-place", "人景", "人物与环境结合，记录场景氛围"),
+    CheckInScenarioDef("object-place", "物景", "物品与环境，记录细节与空间"),
+    CheckInScenarioDef("clarity", "超清", "多帧合成，提升画面清晰度")
+)
+
+internal fun checkInStylePanelRenderModel(
+    state: SessionState,
+    text: AppTextResolver
+): CheckInStylePanelRenderModel {
+    val settings = state.settings.persisted
+    val catalog = state.settings.catalog
+    val activeScenarioId = settings.photo.defaultCheckInScenario
+    val activeStyleId = settings.photo.defaultPortraitFilterProfileId
+    val depthSupported = state.activeDeviceCapabilities.supportsPortraitDepthEffect
+    val editingEnabled = state.activeShot == null && state.countdownRemainingSeconds == null
+
+    val scenarioCards = CHECK_IN_SCENARIOS.map { scenario ->
+        val isActive = scenario.id == activeScenarioId
+        val isClarity = scenario.id == "clarity"
+        val isDegraded = isClarity && !state.activeDeviceCapabilities.supportsNightMultiFrame
+        CheckInScenarioCardRenderModel(
+            scenarioId = scenario.id,
+            label = scenario.label,
+            description = scenario.description,
+            isActive = isActive,
+            isDegraded = isDegraded,
+            degradedLabel = if (isDegraded) "设备不支持多帧合成" else null,
+            selectAction = if (editingEnabled && !isActive) PersistedSettingsAction.UpdateCheckInScenario(scenario.id) else null
+        )
+    }
+
+    val activeScenario = CHECK_IN_SCENARIOS.firstOrNull { it.id == activeScenarioId }
+        ?: CHECK_IN_SCENARIOS.first()
+
+    val portraitFilters = catalog.filterProfilesFor(FilterProfileCategory.PORTRAIT)
+    val styleItems = portraitFilters.map { profile ->
+        val isSelected = profile.id == activeStyleId
+        CheckInStyleItemRenderModel(
+            filterProfileId = profile.id,
+            title = profile.localizedLabel(text),
+            isSelected = isSelected,
+            bokehLabel = if (depthSupported) null else "Focus",
+            selectAction = if (editingEnabled && !isSelected) PersistedSettingsAction.UpdatePortraitFilter(profile.id) else null
+        )
+    }
+
+    val scenarioSummary = buildString {
+        append("场景: ${activeScenario.label}")
+        if (!depthSupported) append(" | Focus 模式")
+    }
+
+    val compositionGuidance = when (activeScenarioId) {
+        "portrait" -> "建议: 保持人物在画面中心，利用景深突出主体"
+        "people-place" -> "建议: 兼顾人物与环境，适当留白展现空间"
+        "object-place" -> "建议: 对准物品细节，利用环境光线增强质感"
+        "clarity" -> "建议: 保持稳定，多帧合成将提升细节清晰度"
+        else -> ""
+    }
+
+    val degradationLabel = if (!depthSupported) {
+        "深度效果不可用，使用 Focus 优先模式"
+    } else if (activeScenarioId == "clarity" && !state.activeDeviceCapabilities.supportsNightMultiFrame) {
+        "多帧合成不可用，使用单帧最佳效果"
+    } else {
+        null
+    }
+
+    return CheckInStylePanelRenderModel(
+        headline = "打卡风格",
+        scenarioSummary = scenarioSummary,
+        scenarioCards = scenarioCards,
+        styleItems = styleItems,
+        compositionGuidance = compositionGuidance,
+        degradationLabel = degradationLabel,
+        editingEnabled = editingEnabled
+    )
+}
+
+private data class CheckInScenarioDef(
+    val id: String,
+    val label: String,
+    val description: String
+)
 
 internal data class ColorLabPanelRenderModel(
     val title: String,

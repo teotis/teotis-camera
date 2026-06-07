@@ -39,6 +39,18 @@ val hasReleaseSigning =
         releaseKeyPassword,
     ).all { !it.isNullOrBlank() }
 
+// Version management
+val versionPropertiesFile = rootProject.file("version.properties")
+val versionProperties = Properties()
+if (versionPropertiesFile.isFile) {
+    versionPropertiesFile.inputStream().use(versionProperties::load)
+}
+val versionMajor = versionProperties.getProperty("VERSION_MAJOR", "2").toInt()
+val versionMinor = versionProperties.getProperty("VERSION_MINOR", "0").toInt()
+val versionPatch = versionProperties.getProperty("VERSION_PATCH", "0").toInt()
+val computedVersionName = "$versionMajor.$versionMinor.$versionPatch"
+val computedVersionCode = versionMajor * 400 + versionMinor * 20 + versionPatch + 1
+
 android {
     namespace = "com.opencamera.app"
     compileSdk = 35
@@ -47,8 +59,8 @@ android {
         applicationId = "com.opencamera.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = computedVersionCode
+        versionName = computedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -161,10 +173,7 @@ tasks.register("archiveDebugApk") {
         val archiveDir = rootProject.layout.projectDirectory.dir("work/outputs/apks/debug").asFile
         archiveDir.mkdirs()
 
-        val versionPart =
-            android.defaultConfig.versionName
-                ?.replace(Regex("[^A-Za-z0-9._-]"), "-")
-                ?: "unknown"
+        val versionPart = computedVersionName.replace(Regex("[^A-Za-z0-9._-]"), "-")
         val timestamp = SimpleDateFormat("yyyyMMdd-HHmmss").format(Date())
         val archiveApk = archiveDir.resolve("OpenCamera-$versionPart-$timestamp-debug.apk")
         val latestArchiveApk = archiveDir.resolve("OpenCamera-latest-debug.apk")
@@ -177,5 +186,19 @@ tasks.register("archiveDebugApk") {
         println("Archived debug APK: ${archiveApk.relativeTo(rootProject.projectDir)}")
         println("Updated latest APK: ${latestArchiveApk.relativeTo(rootProject.projectDir)}")
         println("Updated root latest APK: ${latestRootApk.relativeTo(rootProject.projectDir)}")
+
+        // Increment version on every archive build
+        var nextPatch = versionPatch + 1
+        var nextMinor = versionMinor
+        if (nextPatch > 19) {
+            nextPatch = 0
+            nextMinor += 1
+            check(nextMinor <= 19) { "Minor version overflow: $nextMinor > 19" }
+        }
+        versionProperties.setProperty("VERSION_MAJOR", versionMajor.toString())
+        versionProperties.setProperty("VERSION_MINOR", nextMinor.toString())
+        versionProperties.setProperty("VERSION_PATCH", nextPatch.toString())
+        versionPropertiesFile.outputStream().use { versionProperties.store(it, "Auto-incremented by build") }
+        println("Version incremented to: $versionMajor.$nextMinor.$nextPatch")
     }
 }

@@ -81,7 +81,7 @@ class VideoModePluginTest {
         val snap = controller.snapshot.value
         assertEquals("Video", snap.uiSpec.title)
         assertEquals("Start / Stop Recording", snap.uiSpec.shutterLabel)
-        assertEquals("Toggle Torch", snap.uiSpec.secondaryActionLabel)
+        assertEquals("Cycle Torch", snap.uiSpec.secondaryActionLabel)
         assertEquals("Cycle Quality", snap.uiSpec.tertiaryActionLabel)
     }
 

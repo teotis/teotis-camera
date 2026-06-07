@@ -363,6 +363,18 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
+    <!-- Mode action button: Pro toggle (Humanistic) / 氛围-全清 toggle (Check-in) -->
+    <Button
+        android:id="@+id/buttonModeAction"
+        style="@style/Widget.OpenCamera.ModeTrackButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="2dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
     <!-- Mode track: horizontal scrolling strip (positioned above zoom chips) -->
     <HorizontalScrollView
         android:id="@+id/modeTrackScroll"

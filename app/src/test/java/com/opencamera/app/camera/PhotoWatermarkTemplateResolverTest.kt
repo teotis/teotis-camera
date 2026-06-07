@@ -259,6 +259,98 @@ class PhotoWatermarkTemplateResolverTest {
     }
 
     @Test
+    fun `check in object place scenario renders product name and style in title`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "blur-four-border",
+            watermarkText = "Check-in 物景 Vintage",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Check-in",
+                    "watermarkProfileName" to "物景 Vintage",
+                    "watermarkDatetime" to "2026-06-07 10:00",
+                    "watermarkCameraParams" to "8MP • 1:1",
+                    "checkInScenario" to "object-place",
+                    "compatMode" to "portrait"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "OpenCamera DevKit"
+            )
+        )
+
+        assertEquals("OpenCamera DevKit · Check-in 物景 Vintage", resolved.title)
+        assertTrue(resolved.supportingLines.any { it.contains("物景 Vintage") })
+        assertTrue(resolved.supportingLines.any { it.contains("8MP") })
+    }
+
+    @Test
+    fun `check in clarity scenario renders product name and clarity detail`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "professional-bottom-bar",
+            watermarkText = "Check-in 超清 Best Frame",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Check-in",
+                    "watermarkProfileName" to "超清 Best Frame",
+                    "watermarkDatetime" to "2026-06-07 14:30",
+                    "watermarkCameraParams" to "12MP • 4:3",
+                    "checkInScenario" to "clarity",
+                    "compatMode" to "fullclear"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "OpenCamera DevKit"
+            )
+        )
+
+        assertEquals("OpenCamera DevKit · Check-in 超清 Best Frame", resolved.title)
+        assertTrue(resolved.supportingLines.any { it.contains("2026-06-07 14:30") })
+        assertTrue(resolved.supportingLines.any { it.contains("12MP") })
+    }
+
+    @Test
+    fun `check in portrait scenario renders product name and portrait style`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "classic-overlay",
+            watermarkText = "Check-in 人像 Luminous",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Check-in",
+                    "watermarkProfileName" to "人像 Luminous",
+                    "watermarkDatetime" to "2026-06-07 08:00",
+                    "checkInScenario" to "portrait",
+                    "compatMode" to "portrait"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "OpenCamera DevKit"
+            )
+        )
+
+        assertEquals("OpenCamera DevKit · Check-in 人像 Luminous", resolved.title)
+        assertTrue(resolved.supportingLines.any { it.contains("2026-06-07 08:00") })
+    }
+
+    @Test
+    fun `legacy portrait mode renders title from watermarkText without crash`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "classic-overlay",
+            watermarkText = "Portrait Depth Natural",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "mode" to "portrait"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "Legacy Device"
+            )
+        )
+
+        assertEquals("Portrait Depth Natural", resolved.title)
+        assertFalse(resolved.title.isBlank())
+    }
+
+    @Test
     fun `unknown template falls back to classic overlay and formats gps camera params`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "unsupported-template",

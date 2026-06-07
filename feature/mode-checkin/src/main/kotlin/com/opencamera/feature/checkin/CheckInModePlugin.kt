@@ -38,6 +38,7 @@ import com.opencamera.core.settings.FilterProfile
 import com.opencamera.core.settings.FilterProfileCategory
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PhotoSettings
+import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.WatermarkTemplate
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.filterProfilesFor
@@ -121,13 +122,7 @@ private class CheckInModeController(
 
     override suspend fun onDeviceCapabilitiesChanged(deviceCapabilities: DeviceCapabilities) {
         styleIndex = styleIndex.coerceAtMost(currentStyles().lastIndex)
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (depthEffectEnabled()) {
-                "Check-in ${currentScenario().label} active"
-            } else {
-                "Check-in ${currentScenario().label} focus active"
-            }
-        )
+        mutableSnapshot.value = buildSnapshot(headline = resolvedEnterHeadline())
     }
 
     override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
@@ -153,13 +148,7 @@ private class CheckInModeController(
         scenarioIndex = resolvedDefaultScenarioIndex()
             .coerceAtMost(CheckInScenario.entries.size - 1)
         styleIndex = resolvedDefaultStyleIndex().coerceAtMost(currentStyles().lastIndex)
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (depthEffectEnabled()) {
-                "Check-in ${currentScenario().label} active"
-            } else {
-                "Check-in ${currentScenario().label} focus active"
-            }
-        )
+        mutableSnapshot.value = buildSnapshot(headline = resolvedEnterHeadline())
         context.onEffectSpecChanged(buildEffectSpec())
     }
 
@@ -176,30 +165,32 @@ private class CheckInModeController(
             ModeIntent.SecondaryActionPressed -> cycleStyle()
             ModeIntent.TertiaryActionPressed -> cycleFrameRatio()
             is ModeIntent.FrameRatioSelected -> selectFrameRatio(intent.ratio)
-            else -> ModeSignal.None
+            ModeIntent.ProActionPressed -> toggleScenario()
+            is ModeIntent.ScenarioSelected -> selectScenario(intent.scenarioId)
         }
     }
 
     override suspend fun onSessionEvent(event: ModeSessionEvent) {
+        val scenarioLabel = currentScenario().label
         when (event) {
             is ModeSessionEvent.ShotStarted -> {
                 if (event.shot.mediaType == MediaType.PHOTO) {
                     mutableSnapshot.value = buildSnapshot(
-                        headline = "Check-in capture in progress"
+                        headline = "Check-in ${scenarioLabel} capture in progress"
                     )
                 }
             }
             is ModeSessionEvent.ShotCompleted -> {
                 if (event.result.mediaType == MediaType.PHOTO) {
                     mutableSnapshot.value = buildSnapshot(
-                        headline = "Check-in saved"
+                        headline = "Check-in ${scenarioLabel} saved"
                     )
                 }
             }
             is ModeSessionEvent.ShotFailed -> {
                 if (event.mediaType == MediaType.PHOTO) {
                     mutableSnapshot.value = buildSnapshot(
-                        headline = "Check-in capture failed"
+                        headline = "Check-in ${scenarioLabel} capture failed"
                     )
                 }
             }
@@ -218,6 +209,9 @@ private class CheckInModeController(
 
     private suspend fun submitClarityCapture(scenario: CheckInScenario): ModeSignal {
         context.eventSink("checkin.clarity.shutter.pressed")
+        if (!supportsMultiFrameCapture()) {
+            return submitClarityDegradedFallback(scenario)
+        }
         val metadataTags = buildMap {
             put("mode", "check-in")
             put("checkInScenario", scenario.id)
@@ -248,6 +242,39 @@ private class CheckInModeController(
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 ),
                 thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA
+            )
+        )
+    }
+
+    private fun submitClarityDegradedFallback(scenario: CheckInScenario): ModeSignal {
+        val metadataTags = buildMap {
+            put("mode", "check-in")
+            put("checkInScenario", scenario.id)
+            put("compatMode", "fullclear")
+            put("captureStrategyFallback", "single-frame")
+            put("degradationReason", "multi-frame-unsupported")
+            put("degradation-policy", "single-frame-best-frame")
+            putAll(context.captureAidMetadataTags())
+        }
+        return ModeSignal.SubmitCapture(
+            CaptureStrategy.SingleFrame(
+                saveRequest = SaveRequest.photoLibrary(
+                    relativePath = "Pictures/OpenCamera/Check-in",
+                    fileNamePrefix = "OpenCamera_CHECKIN",
+                    metadata = MediaMetadata(customTags = metadataTags)
+                ),
+                postProcessSpec = PostProcessSpec(
+                    algorithmProfile = "checkin-clarity-best-frame-v1",
+                    exifOverrides = mapOf(
+                        "SceneCaptureType" to "Check-in Clarity",
+                        "CheckInScenario" to scenario.label,
+                        "CompatSceneCaptureType" to "Full Clear"
+                    )
+                ),
+                captureProfile = CaptureProfile(
+                    stillCaptureQuality = runtimeState().stillCaptureQuality,
+                    stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
+                )
             )
         )
     }
@@ -383,6 +410,37 @@ private class CheckInModeController(
         return ModeSignal.ShowHint("Check-in ${scenario.label} style: ${style.label}")
     }
 
+    private suspend fun toggleScenario(): ModeSignal {
+        val wasClarity = currentScenario().captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME
+        scenarioIndex = if (wasClarity) 0 else CheckInScenario.entries.indexOfFirst {
+            it.captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME
+        }
+        val scenario = currentScenario()
+        context.settingsActionSink(
+            PersistedSettingsAction.UpdateCheckInScenario(scenario.id)
+        )
+        context.eventSink("checkin.scenario.toggled.${scenario.id}")
+        mutableSnapshot.value = buildSnapshot(headline = resolvedEnterHeadline())
+        context.onEffectSpecChanged(buildEffectSpec())
+        val label = if (scenario.captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) "全清" else "氛围"
+        return ModeSignal.ShowHint("打卡: $label")
+    }
+
+    private suspend fun selectScenario(scenarioId: String): ModeSignal {
+        val index = CheckInScenario.entries.indexOfFirst { it.id == scenarioId }
+            .takeIf { it >= 0 }
+            ?: scenarioIndex
+        scenarioIndex = index
+        val scenario = currentScenario()
+        context.settingsActionSink(
+            PersistedSettingsAction.UpdateCheckInScenario(scenario.id)
+        )
+        context.eventSink("checkin.scenario.selected.${scenario.id}")
+        mutableSnapshot.value = buildSnapshot(headline = resolvedEnterHeadline())
+        context.onEffectSpecChanged(buildEffectSpec())
+        return ModeSignal.ShowHint("打卡: ${scenario.label}")
+    }
+
     private suspend fun cycleFrameRatio(): ModeSignal =
         frameRatioDelegate.cycleFrameRatio(
             snapshotHeadline = "Check-in frame ratio updated",
@@ -410,8 +468,9 @@ private class CheckInModeController(
             uiSpec = ModeUiSpec(
                 title = "打卡",
                 shutterLabel = "Check-in Capture",
-                secondaryActionLabel = "Toggle Check-in Style",
-                tertiaryActionLabel = "Cycle Frame"
+                secondaryActionLabel = "Cycle Check-in Style",
+                tertiaryActionLabel = "Cycle Frame",
+                proActionLabel = if (currentScenario().captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) "全清" else "氛围"
             ),
             state = ModeState(
                 headline = headline,
@@ -419,8 +478,8 @@ private class CheckInModeController(
                 isShutterEnabled = true,
                 isSecondaryActionEnabled = true,
                 isTertiaryActionEnabled = true,
-                isProActionEnabled = false,
-                isProVariantActive = false
+                isProActionEnabled = true,
+                isProVariantActive = currentScenario().captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME
             )
         )
     }
@@ -428,7 +487,12 @@ private class CheckInModeController(
     private fun currentScenario(): CheckInScenario =
         CheckInScenario.entries[scenarioIndex]
 
-    private fun resolvedDefaultScenarioIndex(): Int = 0
+    private fun resolvedDefaultScenarioIndex(): Int {
+        val persistedId = context.settingsSnapshot.persisted.photo.defaultCheckInScenario
+        return CheckInScenario.entries.indexOfFirst { it.id == persistedId }
+            .takeIf { it >= 0 }
+            ?: 0
+    }
 
     private fun resolvedDefaultStyleIndex(): Int {
         val defaultId = context.settingsSnapshot.persisted.photo.defaultPortraitFilterProfileId
@@ -484,6 +548,9 @@ private class CheckInModeController(
         val portraitSettings = portraitSettings()
         val commonSummary = buildString {
             append("场景 ${scenario.label}")
+            if (scenario.captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME && !supportsMultiFrameCapture()) {
+                append(" [降级: 设备不支持多帧, 已切换为单帧]")
+            }
             append(" | Profile ${portraitSettings.portraitProfile.label}")
             append(" | Beauty ${portraitSettings.portraitBeautyPreset.label}")
             append(" ${portraitSettings.portraitBeautyStrength.label}")
@@ -498,6 +565,20 @@ private class CheckInModeController(
 
     private fun depthEffectEnabled(): Boolean =
         runtimeState().deviceCapabilities.supportsPortraitDepthEffect
+
+    private fun supportsMultiFrameCapture(): Boolean =
+        runtimeState().deviceCapabilities.supportsNightMultiFrame
+
+    private fun resolvedEnterHeadline(): String {
+        val scenario = currentScenario()
+        return when {
+            scenario.captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME &&
+                !supportsMultiFrameCapture() ->
+                "Check-in ${scenario.label} active (single-frame fallback)"
+            depthEffectEnabled() -> "Check-in ${scenario.label} active"
+            else -> "Check-in ${scenario.label} focus active"
+        }
+    }
 
     private fun runtimeState() = context.runtimeState()
 

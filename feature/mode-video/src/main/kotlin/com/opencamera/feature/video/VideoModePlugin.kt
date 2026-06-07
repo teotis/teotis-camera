@@ -116,6 +116,7 @@ private class VideoModeController(
             ModeIntent.TertiaryActionPressed -> cycleQuality()
             is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("视频模式暂不支持画幅切换")
             ModeIntent.ProActionPressed -> ModeSignal.None
+            is ModeIntent.ScenarioSelected -> ModeSignal.None
         }
     }
 
@@ -307,7 +308,7 @@ private class VideoModeController(
                 title = "Video",
                 shutterLabel = "Start / Stop Recording",
                 secondaryActionLabel = if (currentTorchSupported()) {
-                    "Toggle Torch"
+                    "Cycle Torch"
                 } else {
                     "Torch Unsupported"
                 },

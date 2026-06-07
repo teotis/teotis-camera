@@ -39,7 +39,7 @@ class GesturePolicyTest {
 
     @Test
     fun pinchZoom_mapsToApplyZoomRatio() {
-        val action = policy.map(GestureEvent.PinchZoom(1.5f, 200f, 300f), ModeId.PHOTO)
+        val action = policy.map(GestureEvent.PinchZoom(1.5f, 200f, 300f, 1L), ModeId.PHOTO)
         assertTrue(action is GestureAction.DispatchSession)
         val dispatch = action as GestureAction.DispatchSession
         assertTrue(dispatch.intent is SessionIntent.ApplyZoomRatio)
@@ -76,7 +76,8 @@ class GesturePolicyTest {
     @Test
     fun `pinchZoom with scale above maximum clamps to 10x`() {
         policy.resetZoomAccumulation()
-        val action = policy.map(GestureEvent.PinchZoom(12f, 200f, 300f), ModeId.PHOTO)
+        policy.map(GestureEvent.PinchBegin(200f, 300f), ModeId.PHOTO)
+        val action = policy.map(GestureEvent.PinchZoom(12f, 200f, 300f, 1L), ModeId.PHOTO)
         assertTrue(action is GestureAction.DispatchSession)
         val dispatch = action as GestureAction.DispatchSession
         assertTrue(dispatch.intent is SessionIntent.ApplyZoomRatio)
@@ -87,7 +88,8 @@ class GesturePolicyTest {
     @Test
     fun `pinchZoom with scale below minimum clamps to 0_5x`() {
         policy.resetZoomAccumulation()
-        val action = policy.map(GestureEvent.PinchZoom(0.1f, 200f, 300f), ModeId.PHOTO)
+        policy.map(GestureEvent.PinchBegin(200f, 300f), ModeId.PHOTO)
+        val action = policy.map(GestureEvent.PinchZoom(0.1f, 200f, 300f, 1L), ModeId.PHOTO)
         assertTrue(action is GestureAction.DispatchSession)
         val dispatch = action as GestureAction.DispatchSession
         assertTrue(dispatch.intent is SessionIntent.ApplyZoomRatio)
@@ -97,7 +99,9 @@ class GesturePolicyTest {
 
     @Test
     fun `scaleEnd preserves zoom basis for next pinch`() {
-        val action1 = policy.map(GestureEvent.PinchZoom(2.0f, 200f, 300f), ModeId.PHOTO, 1.0f)
+        // Gesture 1: begin at 1.0, spanRatio 2.0 → targetZoom 2.0
+        policy.map(GestureEvent.PinchBegin(200f, 300f), ModeId.PHOTO, 1.0f)
+        val action1 = policy.map(GestureEvent.PinchZoom(2.0f, 200f, 300f, 1L), ModeId.PHOTO, 1.0f)
         assertTrue(action1 is GestureAction.DispatchSession)
         val ratio1 = (action1 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
         assertEquals(2.0f, ratio1.ratio)
@@ -105,25 +109,33 @@ class GesturePolicyTest {
         val endAction = policy.map(GestureEvent.ScaleEnd, ModeId.PHOTO)
         assertEquals(GestureAction.Ignore, endAction)
 
-        val action2 = policy.map(GestureEvent.PinchZoom(1.1f, 200f, 300f), ModeId.PHOTO, 2.0f)
+        // Gesture 2: PinchBegin snapshots currentZoom=2.0 as new baseZoom, spanRatio 1.5 → 3.0
+        policy.map(GestureEvent.PinchBegin(200f, 300f), ModeId.PHOTO, 2.0f)
+        val action2 = policy.map(GestureEvent.PinchZoom(1.5f, 200f, 300f, 2L), ModeId.PHOTO, 2.0f)
         assertTrue(action2 is GestureAction.DispatchSession)
         val ratio2 = (action2 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
-        assertEquals(2.2f, ratio2.ratio, 0.01f)
+        assertEquals(3.0f, ratio2.ratio, 0.01f)
     }
 
     @Test
     fun `consecutive pinches separated by ScaleEnd maintain zoom continuity`() {
-        policy.map(GestureEvent.PinchZoom(3.0f, 100f, 100f), ModeId.PHOTO, 1.0f)
+        // Gesture 1: begin at 1.0, spanRatio 3.0 → 3.0
+        policy.map(GestureEvent.PinchBegin(100f, 100f), ModeId.PHOTO, 1.0f)
+        policy.map(GestureEvent.PinchZoom(3.0f, 100f, 100f, 1L), ModeId.PHOTO, 1.0f)
         policy.map(GestureEvent.ScaleEnd, ModeId.PHOTO)
 
-        val action2 = policy.map(GestureEvent.PinchZoom(1.5f, 100f, 100f), ModeId.PHOTO, 3.0f)
+        // Gesture 2: PinchBegin snapshots currentZoom=3.0, spanRatio 1.5 → 4.5
+        policy.map(GestureEvent.PinchBegin(100f, 100f), ModeId.PHOTO, 3.0f)
+        val action2 = policy.map(GestureEvent.PinchZoom(1.5f, 100f, 100f, 2L), ModeId.PHOTO, 3.0f)
         assertTrue(action2 is GestureAction.DispatchSession)
         val ratio2 = (action2 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
         assertEquals(4.5f, ratio2.ratio, 0.01f)
 
         policy.map(GestureEvent.ScaleEnd, ModeId.PHOTO)
 
-        val action3 = policy.map(GestureEvent.PinchZoom(0.8f, 100f, 100f), ModeId.PHOTO, 4.5f)
+        // Gesture 3: PinchBegin snapshots currentZoom=4.5, spanRatio 0.8 → 3.6
+        policy.map(GestureEvent.PinchBegin(100f, 100f), ModeId.PHOTO, 4.5f)
+        val action3 = policy.map(GestureEvent.PinchZoom(0.8f, 100f, 100f, 3L), ModeId.PHOTO, 4.5f)
         assertTrue(action3 is GestureAction.DispatchSession)
         val ratio3 = (action3 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
         assertEquals(3.6f, ratio3.ratio, 0.01f)
@@ -134,17 +146,22 @@ class GesturePolicyTest {
         var now = 17L
         val policy = GesturePolicy { now }
 
-        policy.map(GestureEvent.PinchZoom(1.5f, 100f, 100f), ModeId.PHOTO, 1.0f)
+        // PinchBegin snapshots baseZoom=1.0
+        policy.map(GestureEvent.PinchBegin(100f, 100f), ModeId.PHOTO, 1.0f)
+        // spanRatio 1.5 → targetZoom 1.5, dispatched
+        policy.map(GestureEvent.PinchZoom(1.5f, 100f, 100f, 1L), ModeId.PHOTO, 1.0f)
         now += 8L
-        val action2 = policy.map(GestureEvent.PinchZoom(1.2f, 100f, 100f), ModeId.PHOTO, 1.0f)
+        // spanRatio 1.2 → targetZoom 1.2, throttled (< 16ms)
+        val action2 = policy.map(GestureEvent.PinchZoom(1.2f, 100f, 100f, 1L), ModeId.PHOTO, 1.0f)
         assertEquals(GestureAction.Ignore, action2)
 
         now += 17L
-        val action3 = policy.map(GestureEvent.PinchZoom(1.0f, 100f, 100f), ModeId.PHOTO, 1.0f)
+        // spanRatio 1.0 → targetZoom 1.0, dispatched (>= 16ms)
+        val action3 = policy.map(GestureEvent.PinchZoom(1.0f, 100f, 100f, 1L), ModeId.PHOTO, 1.0f)
         assertTrue(action3 is GestureAction.DispatchSession)
         val ratio = (action3 as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
-        // 1.0 * 1.5 * 1.2 * 1.0 = 1.8
-        assertEquals(1.8f, ratio.ratio, 0.01f)
+        // session-scoped: baseZoom(1.0) * spanRatio(1.0) = 1.0
+        assertEquals(1.0f, ratio.ratio, 0.01f)
     }
 
     @Test
@@ -154,11 +171,26 @@ class GesturePolicyTest {
     }
 
     @Test
+    fun `pinchBegin snapshots currentZoom as baseZoom`() {
+        // PinchBegin at zoom 3.0 should set baseZoom to 3.0
+        policy.map(GestureEvent.PinchBegin(100f, 100f), ModeId.PHOTO, 3.0f)
+        // spanRatio 2.0 → targetZoom = 3.0 * 2.0 = 6.0
+        val action = policy.map(GestureEvent.PinchZoom(2.0f, 100f, 100f, 1L), ModeId.PHOTO, 3.0f)
+        assertTrue(action is GestureAction.DispatchSession)
+        val ratio = (action as GestureAction.DispatchSession).intent as SessionIntent.ApplyZoomRatio
+        assertEquals(6.0f, ratio.ratio, 0.01f)
+    }
+
+    @Test
     fun `scaleEnd preserves zoom accumulation for next pinch`() {
         policy.resetZoomAccumulation()
-        policy.map(GestureEvent.PinchZoom(2f, 200f, 300f), ModeId.PHOTO)
+        // Gesture 1: begin at 1.0, spanRatio 2.0 → 2.0
+        policy.map(GestureEvent.PinchBegin(200f, 300f), ModeId.PHOTO)
+        policy.map(GestureEvent.PinchZoom(2f, 200f, 300f, 1L), ModeId.PHOTO)
         policy.map(GestureEvent.ScaleEnd, ModeId.PHOTO)
-        val action = policy.map(GestureEvent.PinchZoom(2f, 200f, 300f), ModeId.PHOTO)
+        // Gesture 2: PinchBegin snapshots currentZoom=2.0, spanRatio 2.0 → 4.0
+        policy.map(GestureEvent.PinchBegin(200f, 300f), ModeId.PHOTO, 2.0f)
+        val action = policy.map(GestureEvent.PinchZoom(2f, 200f, 300f, 2L), ModeId.PHOTO, 2.0f)
         assertTrue(action is GestureAction.DispatchSession)
         val dispatch = action as GestureAction.DispatchSession
         val ratio = (dispatch.intent as SessionIntent.ApplyZoomRatio).ratio

@@ -166,6 +166,7 @@ abstract class AbstractStillCaptureMode(
             ModeIntent.TertiaryActionPressed -> handleTertiaryAction()
             is ModeIntent.FrameRatioSelected -> handleFrameRatioSelected(intent.ratio)
             ModeIntent.ProActionPressed -> handleProAction()
+            is ModeIntent.ScenarioSelected -> ModeSignal.None
         }
     }
 

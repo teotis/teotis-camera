@@ -23,7 +23,7 @@ class CompositeMediaPostProcessorTest {
 
     @Test
     fun `throwing processor preserves output path and handle`() = runTest {
-        val throwing = ThrowingProcessor(OutOfMemoryError("bitmap too large"))
+        val throwing = ThrowingProcessor(RuntimeException("bitmap too large"))
         val composite = CompositeMediaPostProcessor(listOf(throwing))
 
         val input = baseResult()

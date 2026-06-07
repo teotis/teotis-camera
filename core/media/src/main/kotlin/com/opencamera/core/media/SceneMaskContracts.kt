@@ -49,7 +49,7 @@ data class SceneMaskDescriptor(
             "${transform.sourceWidth}x${transform.sourceHeight}>" +
             "${transform.maskWidth}x${transform.maskHeight}" +
             ":rot${transform.rotationDegrees}" +
-            if (transform.mirrorHorizontally) ":mirror" else "" +
+            (if (transform.mirrorHorizontally) ":mirror" else "") +
             ":crop(${transform.cropLeft},${transform.cropTop},${transform.cropRight},${transform.cropBottom})"
         )
         if (diagnostics.isNotEmpty()) {

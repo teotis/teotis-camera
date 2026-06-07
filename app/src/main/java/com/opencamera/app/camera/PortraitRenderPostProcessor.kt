@@ -462,11 +462,11 @@ internal class AndroidPortraitRenderEditor(
                 }
                 output.toByteArray()
             }
-            if (!writeEncodedBytes(target, encodedBytes)) {
+            if (!contentResolver.writeEncodedBytes(target, encodedBytes)) {
                 return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
 
-            val exifWarning = restorePreservedExif(target, preservedExif)
+            val exifWarning = contentResolver.restorePreservedExif(target, preservedExif)
             PortraitRenderApplied(exifWarning, lightSpotNotes)
         } catch (_: Throwable) {
             ProcessorEditorResult.Failed("render-exception")
@@ -498,14 +498,14 @@ internal class AndroidPortraitRenderEditor(
                     }
                     output.toByteArray()
                 }
-                if (!writeEncodedBytes(target, encodedBytes)) {
+                if (!contentResolver.writeEncodedBytes(target, encodedBytes)) {
                     return@withContext Pair(
                         ProcessorEditorResult.Failed("output-unavailable"),
                         listOf("portrait-render:fallback-focus")
                     )
                 }
                 val preservedExif = readPreservedExif(encodedBytes)
-                val exifWarning = restorePreservedExif(target, preservedExif)
+                val exifWarning = contentResolver.restorePreservedExif(target, preservedExif)
                 val notes = mutableListOf(
                     "portrait-mask:saved=applied",
                     "portrait-render:subject-mask"
@@ -897,93 +897,9 @@ internal class AndroidPortraitRenderEditor(
         }
     }
 
-    private fun writeEncodedBytes(
-        target: ProcessorTarget,
-        encodedBytes: ByteArray
-    ): Boolean {
-        return when (target) {
-            is ProcessorTarget.FilePath -> runCatching {
-                File(target.path).outputStream().use { it.write(encodedBytes) }
-            }.isSuccess
-
-            is ProcessorTarget.ContentUri -> {
-                contentResolver.openOutputStream(Uri.parse(target.value), "rwt")?.use {
-                    it.write(encodedBytes)
-                } != null
-            }
-        }
-    }
-
-    private fun readPreservedExif(sourceBytes: ByteArray): Map<String, String> {
-        return runCatching {
-            ByteArrayInputStream(sourceBytes).use { input ->
-                val exif = ExifInterface(input)
-                EXIF_TAGS_TO_PRESERVE.mapNotNull { tag ->
-                    exif.getAttribute(tag)?.let { value -> tag to value }
-                }.toMap()
-            }
-        }.getOrDefault(emptyMap())
-    }
-
-    private fun restorePreservedExif(
-        target: ProcessorTarget,
-        preservedExif: Map<String, String>
-    ): String? {
-        if (preservedExif.isEmpty()) {
-            return null
-        }
-
-        val restored = runCatching {
-            when (target) {
-                is ProcessorTarget.FilePath -> {
-                    ExifInterface(target.path).apply {
-                        preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
-                        saveAttributes()
-                    }
-                }
-
-                is ProcessorTarget.ContentUri -> {
-                    contentResolver.openFileDescriptor(Uri.parse(target.value), "rw")?.use { descriptor ->
-                        ExifInterface(descriptor.fileDescriptor).apply {
-                            preservedExif.forEach { (tag, value) -> setAttribute(tag, value) }
-                            saveAttributes()
-                        }
-                    } ?: error("file-descriptor-unavailable")
-                }
-            }
-        }
-        return if (restored.isSuccess) null else "exif-restore-failed"
-    }
-
     companion object {
         private const val JPEG_QUALITY = 92
         private const val HIGHLIGHT_LUMA_THRESHOLD = 195f
-
-        private val EXIF_TAGS_TO_PRESERVE = listOf(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.TAG_MAKE,
-            ExifInterface.TAG_MODEL,
-            ExifInterface.TAG_DATETIME,
-            ExifInterface.TAG_DATETIME_ORIGINAL,
-            ExifInterface.TAG_DATETIME_DIGITIZED,
-            ExifInterface.TAG_SUBSEC_TIME,
-            ExifInterface.TAG_SUBSEC_TIME_ORIGINAL,
-            ExifInterface.TAG_SUBSEC_TIME_DIGITIZED,
-            ExifInterface.TAG_F_NUMBER,
-            ExifInterface.TAG_EXPOSURE_TIME,
-            ExifInterface.TAG_FOCAL_LENGTH,
-            ExifInterface.TAG_FLASH,
-            ExifInterface.TAG_WHITE_BALANCE,
-            ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
-            ExifInterface.TAG_GPS_LATITUDE,
-            ExifInterface.TAG_GPS_LATITUDE_REF,
-            ExifInterface.TAG_GPS_LONGITUDE,
-            ExifInterface.TAG_GPS_LONGITUDE_REF,
-            ExifInterface.TAG_GPS_ALTITUDE,
-            ExifInterface.TAG_GPS_ALTITUDE_REF,
-            ExifInterface.TAG_GPS_TIMESTAMP,
-            ExifInterface.TAG_GPS_DATESTAMP
-        )
     }
 }
 

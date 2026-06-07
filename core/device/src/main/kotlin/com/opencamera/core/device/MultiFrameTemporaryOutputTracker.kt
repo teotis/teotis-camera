@@ -19,5 +19,6 @@ class MultiFrameTemporaryOutputTracker {
                 file.delete()
             }
         }
+        temporaryOutputs.clear()
     }
 }

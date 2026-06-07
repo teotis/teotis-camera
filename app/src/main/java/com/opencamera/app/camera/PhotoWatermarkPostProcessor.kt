@@ -221,12 +221,12 @@ internal class AndroidPhotoWatermarkEditor(
                 return@withContext ProcessorEditorResult.Failed("encode-failed")
             }
             val t3 = System.currentTimeMillis()
-            if (!writeEncodedBytes(target, encodedBytes)) {
+            if (!contentResolver.writeEncodedBytes(target, encodedBytes)) {
                 return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
             val t4 = System.currentTimeMillis()
 
-            val exifWarning = restorePreservedExif(
+            val exifWarning = contentResolver.restorePreservedExif(
                 target = target,
                 preservedExif = preservedExif
             )
@@ -240,7 +240,7 @@ internal class AndroidPhotoWatermarkEditor(
                 originalWidth = originalWidth,
                 originalHeight = originalHeight
             )
-            val archiveWriteWarning = if (archiveBytes != null && !writeEncodedBytes(target, archiveBytes)) {
+            val archiveWriteWarning = if (archiveBytes != null && !contentResolver.writeEncodedBytes(target, archiveBytes)) {
                 "archive-write-failed"
             } else {
                 null
@@ -284,74 +284,6 @@ internal class AndroidPhotoWatermarkEditor(
         }
     }
 
-    private fun writeEncodedBytes(
-        target: ProcessorTarget,
-        encodedBytes: ByteArray
-    ): Boolean {
-        return when (target) {
-            is ProcessorTarget.FilePath -> runCatching {
-                File(target.path).outputStream().use { it.write(encodedBytes) }
-            }.isSuccess
-
-            is ProcessorTarget.ContentUri -> {
-                contentResolver.openOutputStream(Uri.parse(target.value), "rwt")?.use {
-                    it.write(encodedBytes)
-                } != null
-            }
-        }
-    }
-
-    private fun readPreservedExif(sourceBytes: ByteArray): Map<String, String> {
-        return runCatching {
-            ByteArrayInputStream(sourceBytes).use { input ->
-                val exif = ExifInterface(input)
-                EXIF_TAGS_TO_PRESERVE.mapNotNull { tag ->
-                    exif.getAttribute(tag)?.let { value -> tag to value }
-                }.toMap()
-            }
-        }.getOrDefault(emptyMap())
-    }
-
-    private fun restorePreservedExif(
-        target: ProcessorTarget,
-        preservedExif: Map<String, String>
-    ): String? {
-        if (preservedExif.isEmpty()) {
-            return null
-        }
-
-        val restored = runCatching {
-            when (target) {
-                is ProcessorTarget.FilePath -> {
-                    ExifInterface(target.path).apply {
-                        applyPreservedExif(preservedExif)
-                        saveAttributes()
-                    }
-                }
-
-                is ProcessorTarget.ContentUri -> {
-                    contentResolver.openFileDescriptor(Uri.parse(target.value), "rw")?.use { descriptor ->
-                        ExifInterface(descriptor.fileDescriptor).apply {
-                            applyPreservedExif(preservedExif)
-                            saveAttributes()
-                        }
-                    } ?: error("file-descriptor-unavailable")
-                }
-            }
-        }
-        return if (restored.isSuccess) {
-            null
-        } else {
-            "exif-restore-failed"
-        }
-    }
-
-    private fun ExifInterface.applyPreservedExif(preservedExif: Map<String, String>) {
-        preservedExif.forEach { (tag, value) ->
-            setAttribute(tag, value)
-        }
-    }
-
     private fun mergeWarnings(
         templateWarning: String?,
         exifWarning: String?,
@@ -365,32 +297,6 @@ internal class AndroidPhotoWatermarkEditor(
 
     companion object {
         private const val JPEG_QUALITY = 92
-
-        private val EXIF_TAGS_TO_PRESERVE = listOf(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.TAG_MAKE,
-            ExifInterface.TAG_MODEL,
-            ExifInterface.TAG_DATETIME,
-            ExifInterface.TAG_DATETIME_ORIGINAL,
-            ExifInterface.TAG_DATETIME_DIGITIZED,
-            ExifInterface.TAG_SUBSEC_TIME,
-            ExifInterface.TAG_SUBSEC_TIME_ORIGINAL,
-            ExifInterface.TAG_SUBSEC_TIME_DIGITIZED,
-            ExifInterface.TAG_F_NUMBER,
-            ExifInterface.TAG_EXPOSURE_TIME,
-            ExifInterface.TAG_FOCAL_LENGTH,
-            ExifInterface.TAG_FLASH,
-            ExifInterface.TAG_WHITE_BALANCE,
-            ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
-            ExifInterface.TAG_GPS_LATITUDE,
-            ExifInterface.TAG_GPS_LATITUDE_REF,
-            ExifInterface.TAG_GPS_LONGITUDE,
-            ExifInterface.TAG_GPS_LONGITUDE_REF,
-            ExifInterface.TAG_GPS_ALTITUDE,
-            ExifInterface.TAG_GPS_ALTITUDE_REF,
-            ExifInterface.TAG_GPS_TIMESTAMP,
-            ExifInterface.TAG_GPS_DATESTAMP
-        )
     }
 }
 

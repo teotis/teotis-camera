@@ -1,5 +1,7 @@
 package com.opencamera.core.media
 
+import java.util.concurrent.atomic.AtomicInteger
+
 // ──────────────────────────────────────────────────────────────────────────────
 // G6: Preview FPS / Frame Drop Rate
 // ──────────────────────────────────────────────────────────────────────────────
@@ -57,10 +59,6 @@ class PreviewFpsTracker(private val windowSize: Int = 30) {
     )
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// G7: Algorithm Job Queue Depth
-// ──────────────────────────────────────────────────────────────────────────────
-
 data class AlgorithmQueueSnapshot(
     val pendingJobCount: Int,
     val activeJobCount: Int,
@@ -78,16 +76,16 @@ data class AlgorithmQueueSnapshot(
 }
 
 class AlgorithmQueueTracker {
-    @Volatile var pendingJobCount: Int = 0
-        private set
+    private val _pendingJobCount = AtomicInteger(0)
+    private val _activeJobCount = AtomicInteger(0)
 
-    @Volatile var activeJobCount: Int = 0
-        private set
+    val pendingJobCount: Int get() = _pendingJobCount.get()
+    val activeJobCount: Int get() = _activeJobCount.get()
 
-    fun incrementPending() { pendingJobCount++ }
-    fun decrementPending() { if (pendingJobCount > 0) pendingJobCount-- }
-    fun incrementActive() { activeJobCount++; decrementPending() }
-    fun decrementActive() { if (activeJobCount > 0) activeJobCount-- }
+    fun incrementPending() { _pendingJobCount.incrementAndGet() }
+    fun decrementPending() { _pendingJobCount.updateAndGet { maxOf(0, it - 1) } }
+    fun incrementActive() { _activeJobCount.incrementAndGet(); decrementPending() }
+    fun decrementActive() { _activeJobCount.updateAndGet { maxOf(0, it - 1) } }
 
     fun toSnapshot(budget: CameraResourceBudget): AlgorithmQueueSnapshot =
         AlgorithmQueueSnapshot(

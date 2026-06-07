@@ -4,12 +4,13 @@ import com.opencamera.core.capability.CapabilityRequirementKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ModeProductDeclarationTest {
 
     @Test
-    fun `all nine mode ids have product declarations`() {
+    fun `all five mode ids have product declarations`() {
         ModeId.entries.forEach { modeId ->
             val declaration = modeId.modeProductDeclaration()
             assertEquals(modeId, declaration.modeId)
@@ -84,8 +85,7 @@ class ModeProductDeclarationTest {
     @Test
     fun `photo declaration includes live photo strategy variant`() {
         val declaration = ModeId.PHOTO.modeProductDeclaration()
-        val liveVariant = declaration.strategyVariants.firstOrNull { it.type == ModeStrategyType.LIVE_PHOTO }
-        assertTrue(liveVariant != null)
+        val liveVariant = assertNotNull(declaration.strategyVariants.firstOrNull { it.type == ModeStrategyType.LIVE_PHOTO })
         assertEquals("photo-live", liveVariant.id)
     }
 

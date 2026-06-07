@@ -171,7 +171,8 @@ internal data class ModeTrackViews(
     val checkIn: Button,
     val video: Button,
     val document: Button,
-    val humanistic: Button
+    val humanistic: Button,
+    val modeAction: Button
 )
 
 internal data class FloatingUtilityViews(
@@ -380,7 +381,8 @@ internal data class MainActivityViews(
                 checkIn = activity.findViewById(R.id.buttonCheckInMode),
                 video = activity.findViewById(R.id.buttonVideoMode),
                 document = activity.findViewById(R.id.buttonDocumentMode),
-                humanistic = activity.findViewById(R.id.buttonHumanisticMode)
+                humanistic = activity.findViewById(R.id.buttonHumanisticMode),
+                modeAction = activity.findViewById(R.id.buttonModeAction)
             )
             val documentBatchRail = DocumentBatchRailViews(
                 rail = activity.findViewById(R.id.documentBatchRail),

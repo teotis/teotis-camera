@@ -13,6 +13,8 @@ class CompositeMediaPostProcessor(
             val startNanos = System.nanoTime()
             current = try {
                 processor.process(current)
+            } catch (e: Error) {
+                throw e
             } catch (_: Throwable) {
                 val name = processor.diagnosticName()
                 current.addPipelineNotes("postprocess:failed:$name")

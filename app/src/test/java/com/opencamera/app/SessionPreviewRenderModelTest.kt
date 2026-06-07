@@ -108,9 +108,9 @@ class SessionPreviewRenderModelTest {
             )
         )
 
-        assertNotNull(model.frame)
-        assertEquals(3f, model.frame!!.zoomRatio)
-        assertEquals(2f, model.frame!!.previewZoomRatio)
+        val frame = assertNotNull(model.frame)
+        assertEquals(3f, frame.zoomRatio)
+        assertEquals(2f, frame.previewZoomRatio)
     }
 
     @Test
@@ -252,11 +252,11 @@ class SessionPreviewRenderModelTest {
             stagedWatermarkHint = stagedHint
         )
 
-        assertNotNull(model.effectModel?.watermarkHint)
-        assertEquals("professional-bottom-bar", model.effectModel!!.watermarkHint!!.templateId)
-        assertEquals(WatermarkPreviewShape.BOTTOM_BAR, model.effectModel!!.watermarkHint!!.shape)
-        assertEquals(2, model.effectModel!!.watermarkHint!!.previewLabels.size)
-        assertEquals("OpenCamera", model.effectModel!!.watermarkHint!!.previewLabels[0])
+        val hint = assertNotNull(model.effectModel?.watermarkHint)
+        assertEquals("professional-bottom-bar", hint.templateId)
+        assertEquals(WatermarkPreviewShape.BOTTOM_BAR, hint.shape)
+        assertEquals(2, hint.previewLabels.size)
+        assertEquals("OpenCamera", hint.previewLabels[0])
     }
 
     @Test

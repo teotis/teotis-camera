@@ -31,7 +31,9 @@ internal class MainActivityRenderer(
 
         // Set final visibility deterministically for all panels.
         views.settingsPanel.panel.isVisible = route.isSettingsOpen
-        views.filterLab.panel.isVisible = route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.ColorLab
+        views.filterLab.panel.isVisible = route is CockpitPanelRoute.StyleLab ||
+            route is CockpitPanelRoute.ColorLab ||
+            route is CockpitPanelRoute.CheckInStylePanel
         if (route is CockpitPanelRoute.ColorLab) {
             views.filterLab.panel.isNestedScrollingEnabled = false
             views.filterLab.panel.overScrollMode = android.view.View.OVER_SCROLL_NEVER
@@ -80,7 +82,7 @@ internal class MainActivityRenderer(
 
         views.topBar.colorLabEntry.alpha = if (route is CockpitPanelRoute.ColorLab) 1f else 0.92f
         views.topBar.settingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
-        views.topBar.filterEntry.alpha = if (route is CockpitPanelRoute.StyleLab) 1f else 0.92f
+        views.topBar.filterEntry.alpha = if (route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.CheckInStylePanel) 1f else 0.92f
         views.quickPanel.launcher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
     }
 
@@ -91,7 +93,8 @@ internal class MainActivityRenderer(
     private fun activePanelView(route: CockpitPanelRoute): View? = when (route) {
         is CockpitPanelRoute.Settings -> views.settingsPanel.panel
         is CockpitPanelRoute.StyleLab,
-        is CockpitPanelRoute.ColorLab -> views.filterLab.panel
+        is CockpitPanelRoute.ColorLab,
+        is CockpitPanelRoute.CheckInStylePanel -> views.filterLab.panel
         is CockpitPanelRoute.DocumentBatchOrganizer -> views.documentBatchOrganizer.panel
         is CockpitPanelRoute.QuickBubble -> views.quickPanel.panel
         is CockpitPanelRoute.DevConsole -> views.devConsole.panel

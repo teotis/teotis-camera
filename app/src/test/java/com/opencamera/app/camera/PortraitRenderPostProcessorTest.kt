@@ -91,6 +91,58 @@ class PortraitRenderPostProcessorTest {
     }
 
     @Test
+    fun `check in object place scenario triggers portrait render`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                mode = "check-in",
+                saveRequest = portraitSaveRequest(
+                    "mode" to "check-in",
+                    "checkInScenario" to "object-place",
+                    "compatMode" to "portrait",
+                    "renderPath" to "depth",
+                    "subjectTracking" to "false",
+                    "portraitProfile" to PortraitProfile.NATIVE.storageKey,
+                    "portraitBeautyPreset" to PortraitBeautyPreset.AUTHENTIC.storageKey,
+                    "portraitBeautyStrength" to PortraitBeautyStrength.SOFT.storageKey,
+                    "portraitBokehEffect" to PortraitBokehEffect.NATURAL.storageKey,
+                    "bokehStrength" to "1.8"
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        assertEquals(PortraitRenderMode.DEPTH, editor.invocations.single().spec.mode)
+        assertTrue(result.pipelineNotes.contains("portrait-render:applied:depth"))
+    }
+
+    @Test
+    fun `legacy portrait mode is rendered without crash`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                mode = "portrait",
+                renderPath = "depth",
+                bokehStrength = 2.0f,
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/legacy-portrait.jpg",
+                    filePath = "/tmp/legacy-portrait.jpg"
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        assertEquals(PortraitRenderMode.DEPTH, editor.invocations.single().spec.mode)
+        assertTrue(result.pipelineNotes.contains("portrait-render:applied:depth"))
+    }
+
+    @Test
     fun `missing editable handle records diagnostic skip`() = runTest {
         val editor = FakePortraitRenderEditor(
             result = PortraitRenderApplied()

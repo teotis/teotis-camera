@@ -1582,7 +1582,7 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
         advanceUntilIdle()
 
-        assertEquals("Toggle Torch", session.state.value.modeSnapshot.uiSpec.secondaryActionLabel)
+        assertEquals("Cycle Torch", session.state.value.modeSnapshot.uiSpec.secondaryActionLabel)
         assertTrue(session.state.value.activeDeviceGraph.recording.audioEnabledWhenPermitted)
 
         session.dispatch(
@@ -4625,8 +4625,8 @@ class DefaultCameraSessionTest {
         val thumbAfterClear = session.state.value.presentation.latestThumbnailSource
         assertTrue(thumbAfterClear is ThumbnailSource.SavedMedia)
         assertEquals(
-            (thumbBeforeClear as ThumbnailSource.SavedMedia).outputPath,
-            (thumbAfterClear as ThumbnailSource.SavedMedia).outputPath
+            thumbBeforeClear.outputPath,
+            thumbAfterClear.outputPath
         )
     }
 

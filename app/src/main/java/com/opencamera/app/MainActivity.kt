@@ -322,12 +322,27 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         // Top panel: lightweight primary status
         cockpitRenderer.renderTopTitle()
         cockpitRenderer.renderModeTrack(modeTrack)
+        cockpitRenderer.renderModeAction(modeActionRenderModel(state))
         settingsRenderer.renderPage(settingsPage)
         settingsRenderer.renderTabs(panelState.selectedSettingsTab)
         settingsRenderer.renderPortraitLabPage(portraitLabPage)
         settingsRenderer.renderWatermarkSelectorPage(watermarkSelectorPage)
         settingsRenderer.renderWatermarkDetailPage(watermarkDetailPage)
         filterLabRenderer.renderPage(filterLabPage)
+        if (activePanelRoute is CockpitPanelRoute.CheckInStylePanel) {
+            val checkInModel = checkInStylePanelRenderModel(state, text)
+            filterLabRenderer.renderCheckInStylePanel(
+                model = checkInModel,
+                onSelectScenario = { action ->
+                    applySettingsAction(action)
+                    renderAfterPanelChange()
+                },
+                onSelectStyle = { action ->
+                    applySettingsAction(action)
+                    renderAfterPanelChange()
+                }
+            )
+        }
         if (activePanelRoute is CockpitPanelRoute.StyleStrip) {
             renderLatestFilterStrip()
         }

@@ -227,4 +227,164 @@ internal class FilterLabPanelRenderer(
     ): String {
         return first { item -> item.control == control }.buttonLabel
     }
+
+    fun renderCheckInStylePanel(
+        model: CheckInStylePanelRenderModel,
+        onSelectScenario: (PersistedSettingsAction) -> Unit,
+        onSelectStyle: (PersistedSettingsAction) -> Unit
+    ) {
+        views.headline.text = model.headline
+        views.supportingText.text = model.scenarioSummary
+        views.heroSummary.isVisible = false
+        views.currentSummary.isVisible = false
+        views.editingHint.text = if (model.editingEnabled) "点击选择场景和风格" else "拍照中，无法切换"
+        views.footer.isVisible = false
+
+        views.photoTab.isVisible = false
+        views.humanisticTab.isVisible = false
+        views.portraitTab.isVisible = false
+        views.videoTab.isVisible = false
+        views.sectionPaletteTitle.isVisible = false
+        views.adjustmentPanel.isVisible = false
+        views.resetDefaults.isVisible = false
+        views.saveCustom.isVisible = false
+
+        views.selectionList.removeAllViews()
+        views.sectionFiltersTitle.text = "场景"
+        views.sectionFiltersTitle.isVisible = true
+        views.selectionCard.isVisible = true
+
+        model.scenarioCards.forEach { card ->
+            val cardView = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setBackgroundResource(R.drawable.bg_settings_card)
+                alpha = if (card.isActive) 1f else 0.9f
+                setPadding(14.dp, 14.dp, 14.dp, 14.dp)
+            }
+            val cardParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = if (views.selectionList.childCount == 0) 0 else 8.dp
+            }
+
+            val titleRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+            }
+            val title = TextView(context).apply {
+                text = if (card.isActive) "● ${card.label}" else card.label
+                textSize = 15f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+            }
+            titleRow.addView(title)
+            if (card.isDegraded && card.degradedLabel != null) {
+                val badge = TextView(context).apply {
+                    text = card.degradedLabel
+                    textSize = 11f
+                    setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                    setPadding(8.dp, 0, 0, 0)
+                }
+                titleRow.addView(badge)
+            }
+            cardView.addView(titleRow)
+
+            val desc = TextView(context).apply {
+                text = card.description
+                textSize = 12f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                setPadding(0, 6.dp, 0, 0)
+            }
+            cardView.addView(desc)
+
+            if (!card.isActive && card.selectAction != null) {
+                val selectButton = Button(
+                    context,
+                    null,
+                    0,
+                    R.style.Widget_OpenCamera_CompactButton
+                ).apply {
+                    text = "选择此场景"
+                    isAllCaps = false
+                    isEnabled = model.editingEnabled
+                    setOnClickListener { onSelectScenario(card.selectAction) }
+                }
+                val btnParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 10.dp
+                }
+                cardView.addView(selectButton, btnParams)
+            }
+            views.selectionList.addView(cardView, cardParams)
+        }
+
+        if (model.styleItems.isNotEmpty()) {
+            val styleTitle = TextView(context).apply {
+                text = "风格"
+                textSize = 14f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                setPadding(0, 16.dp, 0, 8.dp)
+            }
+            views.selectionList.addView(styleTitle)
+        }
+
+        model.styleItems.forEach { item ->
+            val itemRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 4.dp
+                }
+                setPadding(8.dp, 8.dp, 8.dp, 8.dp)
+                setBackgroundResource(R.drawable.bg_settings_card)
+            }
+            val label = TextView(context).apply {
+                text = if (item.isSelected) "● ${item.title}" else item.title
+                textSize = 14f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+            itemRow.addView(label)
+
+            if (!item.isSelected && item.selectAction != null) {
+                val btn = Button(
+                    context,
+                    null,
+                    0,
+                    R.style.Widget_OpenCamera_CompactButton
+                ).apply {
+                    text = "选用"
+                    isAllCaps = false
+                    textSize = 12f
+                    isEnabled = model.editingEnabled
+                    setOnClickListener { onSelectStyle(item.selectAction) }
+                }
+                itemRow.addView(btn)
+            }
+            views.selectionList.addView(itemRow)
+        }
+
+        if (model.compositionGuidance.isNotEmpty()) {
+            val guidanceView = TextView(context).apply {
+                text = model.compositionGuidance
+                textSize = 13f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                setPadding(0, 16.dp, 0, 8.dp)
+            }
+            views.selectionList.addView(guidanceView)
+        }
+
+        if (model.degradationLabel != null) {
+            val degradationView = TextView(context).apply {
+                text = model.degradationLabel
+                textSize = 12f
+                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                setPadding(0, 8.dp, 0, 0)
+            }
+            views.selectionList.addView(degradationView)
+        }
+    }
 }

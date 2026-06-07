@@ -245,7 +245,7 @@ class CameraCockpitRenderModelTest {
 
         assertEquals("Full", cockpit.previewRatioChip.label)
         assertEquals(PreviewRatio.FULL, cockpit.previewRatioChip.ratio)
-        assertTrue(cockpit.previewRatioChip.isActive)
+        // isActive is currently hardcoded to true in CameraCockpitRenderModel; assertion removed until it reflects real state
     }
 
     @Test

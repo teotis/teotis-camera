@@ -121,6 +121,7 @@ private class DocumentModeController(
             ModeIntent.TertiaryActionPressed -> ModeSignal.None
             is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("文档模式使用自动裁边，无需选择画幅比例")
             ModeIntent.ProActionPressed -> ModeSignal.None
+            is ModeIntent.ScenarioSelected -> ModeSignal.None
         }
     }
 

@@ -146,6 +146,7 @@ data class PhotoSettings(
     val defaultFilterProfileId: String = "photo-original",
     val defaultHumanisticFilterProfileId: String = "humanistic-original",
     val defaultPortraitFilterProfileId: String = "portrait-original",
+    val defaultCheckInScenario: String = "portrait",
     val portraitProfile: PortraitProfile = PortraitProfile.NATIVE,
     val portraitBeautyPreset: PortraitBeautyPreset = PortraitBeautyPreset.AUTHENTIC,
     val portraitBeautyStrength: PortraitBeautyStrength = PortraitBeautyStrength.SOFT,
@@ -243,6 +244,7 @@ fun PersistedSettings.hasUserAdjustments(target: ResetTarget): Boolean {
         ResetTarget.STYLE -> photo.defaultFilterProfileId != defaults.photo.defaultFilterProfileId ||
             photo.defaultHumanisticFilterProfileId != defaults.photo.defaultHumanisticFilterProfileId ||
             photo.defaultPortraitFilterProfileId != defaults.photo.defaultPortraitFilterProfileId ||
+            photo.defaultCheckInScenario != defaults.photo.defaultCheckInScenario ||
             photo.styleStrength != defaults.photo.styleStrength ||
             photo.colorLabSpec != defaults.photo.colorLabSpec
         ResetTarget.COLOR_LAB -> photo.colorLabSpec != defaults.photo.colorLabSpec

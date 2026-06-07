@@ -11,6 +11,7 @@ import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.CameraPerformanceClass
 import com.opencamera.core.media.CameraThermalState
 import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaMetadata
@@ -836,17 +837,15 @@ class SessionUiRenderModelTest {
             text = TestAppTextResolver()
         )
 
-        val action = model.frameBackgroundControl?.nextAction
-        assertNotNull(action)
+        val action = assertNotNull(model.frameBackgroundControl?.nextAction)
         assertTrue(action is PersistedSettingsAction.UpdateWatermarkFrameBackground)
-        val bgAction = action as PersistedSettingsAction.UpdateWatermarkFrameBackground
         assertTrue(
-            bgAction.background in setOf(
+            action.background in setOf(
                 WatermarkFrameBackground.SOURCE_BLUR,
                 WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
                 WatermarkFrameBackground.SOURCE_VIVID_BLUR
             ),
-            "Expected blur-family background but got ${bgAction.background}"
+            "Expected blur-family background but got ${action.background}"
         )
     }
 
@@ -858,17 +857,15 @@ class SessionUiRenderModelTest {
             text = TestAppTextResolver()
         )
 
-        val action = model.placementControl.nextAction
-        assertNotNull(action)
+        val action = assertNotNull(model.placementControl.nextAction)
         assertTrue(action is PersistedSettingsAction.UpdateWatermarkTextPlacement)
-        val placementAction = action as PersistedSettingsAction.UpdateWatermarkTextPlacement
         assertTrue(
-            placementAction.placement in setOf(
+            action.placement in setOf(
                 WatermarkTextPlacement.BOTTOM_LEFT,
                 WatermarkTextPlacement.BOTTOM_CENTER,
                 WatermarkTextPlacement.BOTTOM_RIGHT
             ),
-            "Expected bottom-only placement but got ${placementAction.placement}"
+            "Expected bottom-only placement but got ${action.placement}"
         )
     }
 
@@ -916,13 +913,10 @@ class SessionUiRenderModelTest {
         )
 
         assertNotNull(model.frameBackgroundControl)
-        val placementAction = model.placementControl.nextAction
-        assertNotNull(placementAction)
+        val placementAction = assertNotNull(model.placementControl.nextAction)
         assertTrue(placementAction is PersistedSettingsAction.UpdateWatermarkTextPlacement)
-        val pa = placementAction as PersistedSettingsAction.UpdateWatermarkTextPlacement
-        assertEquals("professional-bottom-bar", pa.templateId)
-        val backgroundAction = model.frameBackgroundControl?.nextAction
-        assertNotNull(backgroundAction)
+        assertEquals("professional-bottom-bar", placementAction.templateId)
+        val backgroundAction = assertNotNull(model.frameBackgroundControl?.nextAction)
         assertTrue(backgroundAction is PersistedSettingsAction.UpdateWatermarkFrameBackground)
     }
 
@@ -1715,12 +1709,11 @@ class SessionUiRenderModelTest {
             panelRole = StyleAndColorLabRole.STYLE
         )
 
-        val selectedItem = model.filterItems.firstOrNull { it.isSelected }
-        assertNotNull(selectedItem)
-        assertTrue(selectedItem!!.supportingText.contains("Photo"),
-            "Selected item should contain family label: ${selectedItem!!.supportingText}")
-        assertTrue(selectedItem!!.supportingText.contains("Selected default"),
-            "Selected item should contain selected badge: ${selectedItem!!.supportingText}")
+        val selectedItem = assertNotNull(model.filterItems.firstOrNull { it.isSelected })
+        assertTrue(selectedItem.supportingText.contains("Photo"),
+            "Selected item should contain family label: ${selectedItem.supportingText}")
+        assertTrue(selectedItem.supportingText.contains("Selected default"),
+            "Selected item should contain selected badge: ${selectedItem.supportingText}")
     }
 
     @Test
@@ -2294,6 +2287,191 @@ class SessionUiRenderModelTest {
         for (item in model.items) {
             assertTrue(item.title.isNotBlank(), "Filter strip item title should not be blank")
         }
+    }
+
+    // --- CheckInStylePanelRenderModel tests ---
+
+    @Test
+    fun `checkInStylePanelRenderModel produces all four scenario cards`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            modeSnapshot = ModeSnapshot(
+                id = ModeId.CHECK_IN,
+                uiSpec = ModeUiSpec(title = "Check-in", shutterLabel = "Capture"),
+                state = ModeState(headline = "Check-in ready", detail = "Ready")
+            ),
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "portrait",
+                defaultFilterProfileId = "portrait-original",
+                defaultPortraitFilterProfileId = "portrait-original"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        assertEquals(4, model.scenarioCards.size)
+        val ids = model.scenarioCards.map { it.scenarioId }
+        assertTrue(ids.containsAll(listOf("portrait", "people-place", "object-place", "clarity")))
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel marks active scenario`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "clarity",
+                defaultPortraitFilterProfileId = "portrait-blue"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        val activeCards = model.scenarioCards.filter { it.isActive }
+        assertEquals(1, activeCards.size)
+        assertEquals("clarity", activeCards.first().scenarioId)
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel active scenario has no selectAction`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "portrait"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        val activeCard = model.scenarioCards.first { it.isActive }
+        assertNull(activeCard.selectAction)
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel non-active scenarios have selectActions`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "portrait"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        val inactiveCards = model.scenarioCards.filter { !it.isActive }
+        for (card in inactiveCards) {
+            assertNotNull(card.selectAction, "Inactive scenario ${card.scenarioId} should have selectAction")
+        }
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel shows style items from portrait catalog`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "portrait",
+                defaultPortraitFilterProfileId = "portrait-original"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.styleItems.isNotEmpty())
+        val selectedStyles = model.styleItems.filter { it.isSelected }
+        assertEquals(1, selectedStyles.size)
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel shows degradation when depth unsupported`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                supportsPortraitDepthEffect = false
+            ),
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "portrait"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        assertNotNull(model.degradationLabel)
+        assertTrue(model.degradationLabel!!.contains("Focus"))
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel no degradation when depth supported and not clarity`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                supportsPortraitDepthEffect = true,
+                supportsNightMultiFrame = true
+            ),
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "portrait"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        assertNull(model.degradationLabel)
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel shows composition guidance`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "portrait"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.compositionGuidance.isNotEmpty())
+        assertTrue(model.compositionGuidance.contains("人物"))
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel headline is Check-in specific`() {
+        val state = defaultSessionState(activeMode = ModeId.CHECK_IN)
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        assertEquals("打卡风格", model.headline)
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel disabled during active shot`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            activeShot = ShotRequest(
+                shotId = "test",
+                mediaType = MediaType.PHOTO,
+                shotKind = ShotKind.STILL_CAPTURE,
+                saveRequest = SaveRequest.photoLibrary(
+                    relativePath = "Pictures/test",
+                    fileNamePrefix = "test"
+                ),
+                thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.editingEnabled)
+        // Active scenario should still have no selectAction even when editing disabled
+        val activeCard = model.scenarioCards.first { it.isActive }
+        assertNull(activeCard.selectAction)
+    }
+
+    @Test
+    fun `checkInStylePanelRenderModel clarity degraded when night multi-frame unsupported`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                supportsNightMultiFrame = false
+            ),
+            persistedPhotoSettings = PhotoSettings(
+                defaultCheckInScenario = "clarity"
+            )
+        )
+        val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+        val clarityCard = model.scenarioCards.first { it.scenarioId == "clarity" }
+        assertTrue(clarityCard.isDegraded)
+        assertNotNull(clarityCard.degradedLabel)
     }
 
     private class ChineseUiTextResolver : TestAppTextResolver() {

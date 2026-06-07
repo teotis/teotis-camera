@@ -143,7 +143,7 @@ object OcwmJpegContainer {
                 return extractArchiveFromChunks(chunks)
             } catch (e: IllegalArgumentException) {
                 latestFailure = e
-                break
+                continue
             }
         }
         throw latestFailure ?: IllegalArgumentException("ocwm-chunk-missing")

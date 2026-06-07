@@ -76,6 +76,7 @@ internal data class CameraCockpitRenderModel(
     val rightRail: RightRailRenderModel,
     val zoomStrip: ZoomStripRenderModel,
     val modeTrack: ModeTrackRenderModel,
+    val modeAction: ModeActionRenderModel,
     val bottomCockpit: BottomCockpitRenderModel,
     val previewRatioChip: PreviewRatioChipRenderModel,
     val activePanelRoute: CockpitPanelRoute = CockpitPanelRoute.None,
@@ -133,6 +134,7 @@ internal fun cameraCockpitRenderModel(
             isVisible = controls.isZoomCapsuleRowVisible
         ),
         modeTrack = modeTrack,
+        modeAction = modeActionRenderModel(state),
         bottomCockpit = BottomCockpitRenderModel(
             captureOutputText = captureOutput,
             shutterLabel = text.shutterShort(),

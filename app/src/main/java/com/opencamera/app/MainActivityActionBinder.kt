@@ -59,7 +59,13 @@ internal class MainActivityActionBinder(
             val role = if (activeMode != null) styleSurfaceRole(activeMode) else StyleSurfaceRole.PANEL
             when (role) {
                 StyleSurfaceRole.FILTER_STRIP -> callbacks.reducePanel(CockpitPanelCommand.ToggleStyleStrip)
-                StyleSurfaceRole.PANEL -> callbacks.reducePanel(CockpitPanelCommand.ToggleStyleLab)
+                StyleSurfaceRole.PANEL -> {
+                    if (activeMode == ModeId.CHECK_IN) {
+                        callbacks.reducePanel(CockpitPanelCommand.ToggleCheckInStylePanel)
+                    } else {
+                        callbacks.reducePanel(CockpitPanelCommand.ToggleStyleLab)
+                    }
+                }
             }
             callbacks.renderAfterPanelChange()
         }
@@ -383,8 +389,15 @@ internal class MainActivityActionBinder(
                 if (modeId == ModeId.VIDEO && !hasPermission(Manifest.permission.RECORD_AUDIO)) {
                     callbacks.requestMicrophonePermission()
                 }
+                if (snapshot().activePanelRoute is CockpitPanelRoute.CheckInStylePanel) {
+                    callbacks.reducePanel(CockpitPanelCommand.DismissAll)
+                    callbacks.renderAfterPanelChange()
+                }
                 callbacks.dispatch(SessionIntent.SwitchMode(modeId))
             }
+        }
+        views.modeTrack.modeAction.setOnClickListener {
+            callbacks.dispatch(SessionIntent.ProActionPressed)
         }
     }
 
