@@ -147,7 +147,7 @@ teotis-camera/
 
 ```bash
 # 克隆仓库
-git clone git@github.com:teotis/teotis-camera.git
+git clone https://github.com/teotis/teotis-camera.git
 cd teotis-camera
 
 # 构建 Debug APK
