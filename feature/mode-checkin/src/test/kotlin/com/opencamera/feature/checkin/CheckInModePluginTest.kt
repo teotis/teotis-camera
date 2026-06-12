@@ -35,6 +35,8 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class CheckInModePluginTest {
@@ -284,7 +286,7 @@ class CheckInModePluginTest {
 
         val signal = controller.handle(ModeIntent.ProActionPressed)
         assertIs<ModeSignal.ShowHint>(signal)
-        assertTrue(signal.message.contains("全清"), "Should toggle to clarity scenario")
+        assertTrue(signal.message.contains("超清"), "Should toggle to clarity scenario")
 
         val signal2 = controller.handle(ModeIntent.ProActionPressed)
         assertIs<ModeSignal.ShowHint>(signal2)
@@ -313,7 +315,7 @@ class CheckInModePluginTest {
         assertIs<CaptureStrategy.MultiFrame>(signal.strategy)
         val metadata = signal.strategy.saveRequest.metadata.customTags
         assertEquals("clarity", metadata["checkInScenario"])
-        assertEquals("fullclear", metadata["compatMode"])
+        assertEquals("clarity-assist", metadata["compatMode"])
     }
 
     @Test
@@ -393,7 +395,7 @@ class CheckInModePluginTest {
         assertIs<CaptureStrategy.MultiFrame>(signal.strategy)
         val metadata = signal.strategy.saveRequest.metadata.customTags
         assertEquals("clarity", metadata["checkInScenario"])
-        assertEquals("fullclear", metadata["compatMode"])
+        assertEquals("clarity-assist", metadata["compatMode"])
     }
 
     @Test
@@ -488,7 +490,7 @@ class CheckInModePluginTest {
         assertIs<ModeSignal.SubmitCapture>(signal)
         assertIs<CaptureStrategy.MultiFrame>(signal.strategy)
         val metadata = signal.strategy.saveRequest.metadata.customTags
-        assertEquals("fullclear", metadata["compatMode"])
+        assertEquals("clarity-assist", metadata["compatMode"])
         assertEquals("clarity", metadata["checkInScenario"])
         assertEquals(3, signal.strategy.captureProfile.frameCount)
     }
@@ -505,14 +507,14 @@ class CheckInModePluginTest {
         assertIs<ModeSignal.SubmitCapture>(signal)
         assertIs<CaptureStrategy.SingleFrame>(signal.strategy)
         val metadata = signal.strategy.saveRequest.metadata.customTags
-        assertEquals("fullclear", metadata["compatMode"])
+        assertEquals("clarity-assist", metadata["compatMode"])
         assertEquals("clarity", metadata["checkInScenario"])
         assertEquals("single-frame", metadata["captureStrategyFallback"])
         assertEquals("multi-frame-unsupported", metadata["degradationReason"])
     }
 
     @Test
-    fun `clarity degradation fallback preserves fullclear compatMode`(): Unit = runBlocking {
+    fun `clarity degradation fallback preserves clarity-assist compatMode`(): Unit = runBlocking {
         val controller = createController(
             initialScenarioId = "clarity",
             supportsNightMultiFrame = false
@@ -520,7 +522,7 @@ class CheckInModePluginTest {
 
         val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
 
-        assertEquals("fullclear", signal.strategy.saveRequest.metadata.customTags["compatMode"])
+        assertEquals("clarity-assist", signal.strategy.saveRequest.metadata.customTags["compatMode"])
     }
 
     @Test
@@ -677,5 +679,130 @@ class CheckInModePluginTest {
             }
         )
         return CheckInModePlugin().create(context)
+    }
+
+    // ── Characterization: exact metadata maps ────────────────────────────
+
+    @Test
+    fun `char clarity multi frame exact metadata keys`(): Unit = runBlocking {
+        val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = true)
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("check-in", metadata["mode"])
+        assertEquals("clarity", metadata["checkInScenario"])
+        assertEquals("clarity-assist", metadata["compatMode"])
+        assertEquals("V1", metadata["focus-bracket-capture"])
+        assertEquals("V1", metadata["best-frame-clarity-assist"])
+        assertFalse(metadata.containsKey("focus-stack-fusion"), "Must not claim focus-stack-fusion — true fusion is not implemented")
+        assertEquals("multi-frame-best-frame", metadata["degradation-policy"])
+        assertEquals("Pictures/OpenCamera/Check-in",
+            (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+                .strategy.saveRequest.relativePath)
+    }
+
+    @Test
+    fun `char clarity degraded fallback exact metadata keys`(): Unit = runBlocking {
+        val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = false)
+        val strategy = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture).strategy
+        assertIs<CaptureStrategy.SingleFrame>(strategy)
+        val metadata = strategy.saveRequest.metadata.customTags
+        assertEquals("check-in", metadata["mode"])
+        assertEquals("clarity", metadata["checkInScenario"])
+        assertEquals("clarity-assist", metadata["compatMode"])
+        assertEquals("single-frame", metadata["captureStrategyFallback"])
+        assertEquals("multi-frame-unsupported", metadata["degradationReason"])
+        assertEquals("single-frame-best-frame", metadata["degradation-policy"])
+    }
+
+    @Test
+    fun `char clarity degraded fallback preserves quality and algorithm profile`(): Unit = runBlocking {
+        val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = false)
+        val strategy = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture).strategy
+        assertEquals("checkin-clarity-best-frame-v1", strategy.postProcessSpec.algorithmProfile)
+        assertEquals("Check-in Clarity", strategy.postProcessSpec.exifOverrides["SceneCaptureType"])
+    }
+
+    @Test
+    fun `char people place scenario exact metadata keys`(): Unit = runBlocking {
+        val controller = createController()
+        controller.handle(ModeIntent.ScenarioSelected("people-place"))
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("check-in", metadata["mode"])
+        assertEquals("people-place", metadata["checkInScenario"])
+        assertEquals("portrait", metadata["compatMode"])
+        assertEquals("Check-in", metadata["watermarkModeName"])
+        assertTrue(metadata.containsKey("stillResolution"))
+        assertTrue(metadata.containsKey("bokehStrength"))
+    }
+
+    @Test
+    fun `char clarity multi frame capture profile`(): Unit = runBlocking {
+        val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = true)
+        val captureProfile = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.captureProfile
+        assertEquals(3, captureProfile.frameCount)
+    }
+
+    @Test
+    fun `char clarity multi frame post process exif`(): Unit = runBlocking {
+        val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = true)
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertEquals("checkin-clarity-best-frame-v1", postProcess.algorithmProfile)
+        assertEquals("Check-in Clarity", postProcess.exifOverrides["SceneCaptureType"])
+        assertEquals("Clarity Assist", postProcess.exifOverrides["CompatSceneCaptureType"])
+    }
+
+    @Test
+    fun `char checkin has capture aid tags`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("back", metadata["captureLensFacing"])
+        assertEquals("false", metadata["selfieMirrorApply"])
+        assertTrue(metadata.containsKey("stillQuality"))
+    }
+
+    @Test
+    fun `char checkin single frame mode collision - mode key not portrait from effect bridge`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("check-in", metadata["mode"])
+        assertEquals("portrait", metadata["compatMode"])
+    }
+
+    // ── Honesty guard: must never claim true focus-stack fusion ──
+
+    @Test
+    fun `guard clarity multi frame must not contain focus-stack-fusion`(): Unit = runBlocking {
+        val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = true)
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertFalse(
+            metadata.containsKey("focus-stack-fusion"),
+            "Clarity multi-frame path must not emit focus-stack-fusion=true — real fusion is not implemented"
+        )
+    }
+
+    @Test
+    fun `guard clarity single frame fallback must not contain focus-stack-fusion`(): Unit = runBlocking {
+        val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = false)
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertFalse(
+            metadata.containsKey("focus-stack-fusion"),
+            "Clarity single-frame fallback must not emit focus-stack-fusion=true — real fusion is not implemented"
+        )
+    }
+
+    @Test
+    fun `guard clarity compatMode must not be fullclear`(): Unit = runBlocking {
+        val controller = createController(initialScenarioId = "clarity")
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertNotEquals("fullclear", metadata["compatMode"],
+            "compatMode must not be fullclear — use clarity-assist to avoid overpromising")
     }
 }

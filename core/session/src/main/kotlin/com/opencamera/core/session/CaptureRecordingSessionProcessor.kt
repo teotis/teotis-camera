@@ -58,7 +58,8 @@ internal class CaptureRecordingSessionProcessor(
     private val resolvedActiveDeviceGraph: () -> DeviceGraphSpec,
     private val updateState: SessionStateUpdater,
     private val dispatch: suspend (SessionIntent) -> Unit,
-    private val recordingTimerDispatcher: CoroutineDispatcher? = null
+    private val recordingTimerDispatcher: CoroutineDispatcher? = null,
+    private val elapsedRealtimeMillis: () -> Long = { System.nanoTime() / 1_000_000L }
 ) {
     private var pendingCountdownJob: Job? = null
     private var pendingCountdownStrategy: CaptureStrategy? = null
@@ -224,7 +225,7 @@ internal class CaptureRecordingSessionProcessor(
         recordingElapsedJob?.cancel()
         recordingElapsedJob = null
         val startedAt = if (shot.mediaType == MediaType.VIDEO) {
-            System.nanoTime() / 1_000_000L
+            elapsedRealtimeMillis()
         } else {
             null
         }
@@ -285,7 +286,7 @@ internal class CaptureRecordingSessionProcessor(
                     if (current.activeShot?.shotId != shotId ||
                         current.recordingStatus != RecordingStatus.RECORDING
                     ) break
-                    val elapsed = startedAt?.let { System.nanoTime() / 1_000_000L - it } ?: 0L
+                    val elapsed = startedAt?.let { elapsedRealtimeMillis() - it } ?: 0L
                     updateState.update { s ->
                         s.copy(
                             presentation = s.presentation.copy(

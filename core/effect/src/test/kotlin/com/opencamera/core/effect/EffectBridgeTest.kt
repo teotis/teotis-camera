@@ -10,6 +10,7 @@ import com.opencamera.core.settings.WatermarkTextPlacement
 import com.opencamera.core.settings.WatermarkTextScale
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -274,5 +275,91 @@ class EffectBridgeTest {
         assertEquals(WatermarkTextScale.LARGE.multiplier.toString(), tags["watermarkTextScale"])
         assertEquals(WatermarkFrameBackground.SOURCE_VIVID_BLUR.storageKey, tags["watermarkFrameBackground"])
         assertEquals("4:3", tags["frameRatio"])
+    }
+
+    // ── Characterization: collision semantics ────────────────────────────
+
+    @Test
+    fun `char portrait effect sets mode to portrait - collision with mode plugin downstream`() {
+        val portrait = PortraitEffect(
+            profileId = "luminous", renderPath = "depth",
+            beautyPreset = "clear", beautyStrength = "balanced",
+            bokehEffect = "smooth"
+        )
+        val tags = EffectBridge.toMetadataTags(EffectSpec(listOf(portrait)))
+        assertEquals("portrait", tags["mode"])
+    }
+
+    @Test
+    fun `char document effect sets mode to document - collision with mode plugin downstream`() {
+        val doc = DocumentEffect(autoCrop = true, contrastProfile = "high")
+        val tags = EffectBridge.toMetadataTags(EffectSpec(listOf(doc)))
+        assertEquals("document", tags["mode"])
+    }
+
+    @Test
+    fun `char checkin mode plugin overrides portrait effect mode tag`() {
+        val portrait = PortraitEffect(
+            profileId = "luminous", renderPath = "depth",
+            beautyPreset = "clear", beautyStrength = "balanced",
+            bokehEffect = "smooth"
+        )
+        val bridgeTags = EffectBridge.toMetadataTags(EffectSpec(listOf(portrait)))
+        val finalMetadata = buildMap {
+            putAll(bridgeTags)
+            put("mode", "check-in")
+        }
+        assertEquals("check-in", finalMetadata["mode"])
+        assertEquals("luminous", finalMetadata["portraitProfile"])
+    }
+
+    @Test
+    fun `char photo mode does not use portrait effect so mode key comes only from buildSaveRequest`() {
+        val filter = FilterEffect(profileId = "photo-vivid", renderSpec = null)
+        val bridgeTags = EffectBridge.toMetadataTags(EffectSpec(listOf(filter)))
+        assertFalse(bridgeTags.containsKey("mode"))
+        val finalMetadata = buildMap {
+            putAll(bridgeTags)
+            put("mode", "photo")
+        }
+        assertEquals("photo", finalMetadata["mode"])
+    }
+
+    @Test
+    fun `char watermark tokens - datetime format and model semantics`() {
+        val watermark = WatermarkEffect(
+            templateId = "default",
+            tokens = mapOf(
+                "watermarkModel" to "OpenCamera",
+                "watermarkDatetime" to "2026-06-10 14:30",
+                "watermarkCameraParams" to "12MP • 4:3"
+            ),
+            style = WatermarkStyleSettings()
+        )
+        val tags = EffectBridge.toMetadataTags(EffectSpec(listOf(watermark)))
+        assertEquals("default", tags["watermarkTemplate"])
+        assertEquals("OpenCamera", tags["watermarkModel"])
+        assertEquals("2026-06-10 14:30", tags["watermarkDatetime"])
+        assertEquals("12MP • 4:3", tags["watermarkCameraParams"])
+    }
+
+    @Test
+    fun `char selfie mirror effect sets selfieMirrorApply to true`() {
+        val tags = EffectBridge.toMetadataTags(EffectSpec(listOf(SelfieMirrorEffect())))
+        assertEquals("true", tags["selfieMirrorApply"])
+    }
+
+    @Test
+    fun `char selfie mirror absent from non-mirror effect`() {
+        val filter = FilterEffect(profileId = "vivid", renderSpec = null)
+        val tags = EffectBridge.toMetadataTags(EffectSpec(listOf(filter)))
+        assertFalse(tags.containsKey("selfieMirrorApply"))
+    }
+
+    @Test
+    fun `char stillResolution not from effect bridge - only from mode plugins`() {
+        val filter = FilterEffect(profileId = "photo-vivid", renderSpec = null)
+        val tags = EffectBridge.toMetadataTags(EffectSpec(listOf(filter)))
+        assertFalse(tags.containsKey("stillResolution"))
     }
 }

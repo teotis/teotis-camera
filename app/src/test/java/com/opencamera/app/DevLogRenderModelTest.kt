@@ -286,7 +286,7 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver()
         )
 
-        assertTrue(model.summaryText.contains("最慢耗时"))
+        assertTrue(model.summaryText.contains("Slowest timing"))
         assertTrue(model.summaryText.contains("shot=shot-2"))
         assertTrue(model.summaryText.contains("total=5386ms"))
     }
@@ -428,7 +428,7 @@ class DevLogRenderModelTest {
         assertTrue(model.content.contains("flow-1"))
         assertTrue(model.content.contains("bind"))
         assertTrue(model.content.contains("duration=80ms"))
-        assertTrue(model.content.contains("--- 链路耗时 ---"))
+        assertTrue(model.content.contains("--- Link Timing ---"))
     }
 
     @Test
@@ -504,6 +504,54 @@ class DevLogRenderModelTest {
         )
         assertTrue(model.exportContent.contains("=== DEVICE PROBE ==="))
         assertTrue(model.exportContent.contains("cameras: 2"))
+    }
+
+    @Test
+    fun `export content includes camera extension probe summary when provided`() {
+        val probeSummary =
+            "extensions: BACK night=supported hdr=unsupported bokeh=unsupported auto=unsupported face-retouch=unsupported"
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            deviceProbeSummary = probeSummary
+        )
+
+        assertTrue(model.exportContent.contains("=== DEVICE PROBE ==="))
+        assertTrue(model.exportContent.contains("extensions: BACK night=supported"))
+    }
+
+    @Test
+    fun `core tab content includes camera extension probe summary when provided`() {
+        val probeSummary =
+            "extensions: BACK night=supported hdr=unsupported bokeh=unsupported auto=unsupported face-retouch=unsupported"
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.CORE,
+            text = TestAppTextResolver(),
+            deviceProbeSummary = probeSummary
+        )
+
+        assertTrue(model.content.contains("=== DEVICE PROBE ==="))
+        assertTrue(model.content.contains("extensions: BACK night=supported"))
+    }
+
+    @Test
+    fun `release build does not export device probe summary`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = false,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            deviceProbeSummary = "extensions: BACK night=supported"
+        )
+
+        assertFalse(model.exportContent.contains("extensions:"))
     }
 
     @Test
@@ -604,6 +652,88 @@ class DevLogRenderModelTest {
         assertTrue(summary.contains("flash=DEGRADED"))
         assertTrue(summary.contains("nightMultiFrame=DEGRADED"))
         assertTrue(summary.contains("portraitDepth=DEGRADED"))
+    }
+
+    @Test
+    fun `all tab shows photo routing trace events`() {
+        val routingEvents = listOf(
+            SessionTraceEvent(11, "photo.routing.blue_hour.ext-hdr", "scene=blue_hour,ext-preferred=hdr", 11L),
+            SessionTraceEvent(12, "photo.routing.normal.ext-none", "scene=normal,ext-preferred=none", 12L)
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents + routingEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver()
+        )
+        assertTrue(model.content.contains("photo.routing.blue_hour.ext-hdr"))
+        assertTrue(model.content.contains("photo.routing.normal.ext-none"))
+        assertTrue(model.content.contains("ext-preferred=hdr"))
+    }
+
+    @Test
+    fun `dev log export includes shot pipeline notes when provided`() {
+        val pipelineNotes = listOf(
+            "extension:auto=available",
+            "resource:class=high",
+            "algorithm:photo-default"
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            latestPipelineNotes = pipelineNotes
+        )
+        assertTrue(model.exportContent.contains("=== SHOT PIPELINE ==="))
+        assertTrue(model.exportContent.contains("extension:auto=available"))
+        assertTrue(model.exportContent.contains("algorithm:photo-default"))
+    }
+
+    @Test
+    fun `all tab content shows pipeline notes when present`() {
+        val pipelineNotes = listOf("extension:auto=available", "algorithm:photo-default")
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            latestPipelineNotes = pipelineNotes
+        )
+        assertTrue(model.content.contains("--- Pipeline Notes ---"))
+        assertTrue(model.content.contains("extension:auto=available"))
+        assertTrue(model.content.contains("algorithm:photo-default"))
+    }
+
+    @Test
+    fun `all tab without pipeline notes does not show pipeline header`() {
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            latestPipelineNotes = emptyList()
+        )
+        assertFalse(model.content.contains("--- Pipeline Notes ---"))
+    }
+
+    @Test
+    fun `release build does not export shot pipeline notes`() {
+        val pipelineNotes = listOf("extension:auto=available")
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = false,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            latestPipelineNotes = pipelineNotes
+        )
+        assertFalse(model.exportContent.contains("=== SHOT PIPELINE ==="))
+        assertFalse(model.exportContent.contains("extension:auto=available"))
     }
 
 

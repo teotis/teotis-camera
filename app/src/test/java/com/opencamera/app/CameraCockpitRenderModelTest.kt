@@ -502,7 +502,13 @@ class CameraCockpitRenderModelTest {
         val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
+            listOf(
+                ModeId.PHOTO,
+                ModeId.CHECK_IN,
+                ModeId.HUMANISTIC,
+                ModeId.DOCUMENT,
+                ModeId.VIDEO
+            ),
             model.modeTrack.items.map { it.modeId }
         )
         assertTrue(model.modeTrack.items.first { it.modeId == ModeId.VIDEO }.isActive)

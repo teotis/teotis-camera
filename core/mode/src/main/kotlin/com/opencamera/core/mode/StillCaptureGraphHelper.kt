@@ -1,9 +1,13 @@
 package com.opencamera.core.mode
 
 import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.device.ExtensionCaptureStrategy
 import com.opencamera.core.media.StillCaptureResolutionOption
 
-fun stillCaptureDeviceGraph(runtimeState: ModeRuntimeState): DeviceGraphSpec {
+fun stillCaptureDeviceGraph(
+    runtimeState: ModeRuntimeState,
+    extensionStrategy: ExtensionCaptureStrategy = ExtensionCaptureStrategy()
+): DeviceGraphSpec {
     val preset = runtimeState.stillCaptureResolutionPreset
     val resolutionOption = StillCaptureResolutionOption(
         tagValue = preset.tagValue,
@@ -16,6 +20,7 @@ fun stillCaptureDeviceGraph(runtimeState: ModeRuntimeState): DeviceGraphSpec {
         enablePreviewSnapshots = runtimeState.deviceCapabilities.supportsPreviewSnapshots,
         resolutionOption = resolutionOption,
         qualityPreference = runtimeState.stillCaptureQuality,
-        resolutionPreset = preset
+        resolutionPreset = preset,
+        extensionStrategy = extensionStrategy
     )
 }

@@ -1,6 +1,6 @@
 package com.opencamera.core.media
 
-fun MultiFrameMergePlaceholderPostProcessor.toAlgorithmProcessor(): AlgorithmProcessor {
+fun MultiFrameFusionProcessor.toAlgorithmProcessor(): AlgorithmProcessor {
     val delegate = this
     return object : AlgorithmProcessor {
         override val type: AlgorithmType = AlgorithmType.MULTI_FRAME_MERGE
@@ -13,6 +13,21 @@ fun MultiFrameMergePlaceholderPostProcessor.toAlgorithmProcessor(): AlgorithmPro
         override suspend fun process(request: AlgorithmRequest): AlgorithmResult {
             val frameCount = request.metadata.customTags["frameCount"]?.toIntOrNull() ?: 0
             val inputPaths = request.inputs.map { it.path }
+
+            val frameBundle = if (inputPaths.isNotEmpty()) {
+                FrameBundle(
+                    shotId = request.node.id,
+                    frames = inputPaths.mapIndexed { index, path ->
+                        FrameBundleFrame(
+                            frameIndex = index,
+                            pixelReference = PixelReference.File(path),
+                            frameRole = if (index == inputPaths.lastIndex) FrameRole.FUSION_ANCHOR
+                            else FrameRole.FUSION_SUPPLEMENT
+                        )
+                    }
+                )
+            } else null
+
             val syntheticResult = ShotResult(
                 shotId = request.node.id,
                 mediaType = MediaType.PHOTO,
@@ -21,19 +36,24 @@ fun MultiFrameMergePlaceholderPostProcessor.toAlgorithmProcessor(): AlgorithmPro
                 thumbnailSource = ThumbnailSource.None,
                 captureProfile = CaptureProfile(frameCount = frameCount),
                 metadata = request.metadata,
-                intermediateOutputPaths = inputPaths
+                frameBundle = frameBundle,
+                intermediateOutputPaths = inputPaths.dropLast(1)
             )
             val processed = delegate.process(syntheticResult)
             val mergeNotes = processed.pipelineNotes.filter { it.startsWith("merge:") }
-            return if (mergeNotes.isNotEmpty()) {
+            return if (processed.pipelineNotes.any { it == "merge:applied=true" }) {
                 AlgorithmResult.Applied(
                     output = MediaOutputHandle(displayPath = processed.outputPath),
                     notes = mergeNotes
                 )
             } else {
+                val reason = processed.pipelineNotes
+                    .firstOrNull { it.startsWith("merge:skipped=") }
+                    ?.removePrefix("merge:skipped=")
+                    ?: "single-frame-or-no-intermediates"
                 AlgorithmResult.Skipped(
-                    reason = "single-frame-or-no-intermediates",
-                    notes = emptyList()
+                    reason = reason,
+                    notes = mergeNotes
                 )
             }
         }

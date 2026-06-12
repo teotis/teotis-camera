@@ -98,6 +98,18 @@ class PreviewOverlayView @JvmOverloads constructor(
         strokeWidth = 2f * density
     }
 
+    private val watermarkPaperPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val watermarkHairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f * density
+    }
+    private val watermarkBlurBandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
+    }
+    private val outsideFramePath = android.graphics.Path()
+    private val drawReusableRect = RectF()
+
     private var vignetteGradient: android.graphics.RadialGradient? = null
     private var vignetteOverlayRect: RectF? = null
     private var lastVignetteKey: Float = -1f
@@ -363,36 +375,31 @@ class PreviewOverlayView @JvmOverloads constructor(
         applyWatermarkTextScale(spec.textScale)
         watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
         val rect = activeFrameRectOrFullView()
-        val paperPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (spec.templateId == "retro-frame") {
-                Color.argb((spec.opacity * 190).toInt().coerceIn(0, 190), 54, 39, 30)
-            } else {
-                Color.argb((spec.opacity * 214).toInt().coerceIn(0, 214), 252, 246, 229)
-            }
-            style = Paint.Style.FILL
+        watermarkPaperPaint.color = if (spec.templateId == "retro-frame") {
+            Color.argb((spec.opacity * 190).toInt().coerceIn(0, 190), 54, 39, 30)
+        } else {
+            Color.argb((spec.opacity * 214).toInt().coerceIn(0, 214), 252, 246, 229)
         }
-        val hairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (spec.templateId == "retro-frame") {
-                Color.argb((spec.opacity * 112).toInt().coerceIn(0, 112), 246, 214, 168)
-            } else {
-                Color.argb((spec.opacity * 72).toInt().coerceIn(0, 72), 96, 68, 42)
-            }
-            style = Paint.Style.STROKE
-            strokeWidth = 1f * density
+        watermarkPaperPaint.alpha = 255
+        watermarkHairlinePaint.color = if (spec.templateId == "retro-frame") {
+            Color.argb((spec.opacity * 112).toInt().coerceIn(0, 112), 246, 214, 168)
+        } else {
+            Color.argb((spec.opacity * 72).toInt().coerceIn(0, 72), 96, 68, 42)
         }
+        watermarkHairlinePaint.alpha = 255
         val sideBand = (rect.width() * 0.035f).coerceIn(10f * density, 28f * density)
         val topBand = (rect.height() * 0.035f).coerceIn(8f * density, 24f * density)
         val leftBand = sideBand.coerceAtMost(rect.left)
         val rightBand = sideBand.coerceAtMost(width - rect.right)
         val topFrameBand = topBand.coerceAtMost(rect.top)
         if (leftBand > 0f) {
-            canvas.drawRect(rect.left - leftBand, rect.top, rect.left, rect.bottom, paperPaint)
+            canvas.drawRect(rect.left - leftBand, rect.top, rect.left, rect.bottom, watermarkPaperPaint)
         }
         if (rightBand > 0f) {
-            canvas.drawRect(rect.right, rect.top, rect.right + rightBand, rect.bottom, paperPaint)
+            canvas.drawRect(rect.right, rect.top, rect.right + rightBand, rect.bottom, watermarkPaperPaint)
         }
         if (topFrameBand > 0f) {
-            canvas.drawRect(rect.left - leftBand, rect.top - topFrameBand, rect.right + rightBand, rect.top, paperPaint)
+            canvas.drawRect(rect.left - leftBand, rect.top - topFrameBand, rect.right + rightBand, rect.top, watermarkPaperPaint)
         }
         val bottomRect = expandedFrameBottomBandRect(rect, height, density)
         if (bottomRect != null) {
@@ -401,10 +408,10 @@ class PreviewOverlayView @JvmOverloads constructor(
                 bottomRect.top,
                 bottomRect.right + rightBand,
                 bottomRect.bottom,
-                paperPaint
+                watermarkPaperPaint
             )
         }
-        canvas.drawRect(rect, hairlinePaint)
+        canvas.drawRect(rect, watermarkHairlinePaint)
 
         val padding = 16f * density
         val textTop = if ((bottomRect?.height() ?: 0f) > watermarkHintPaint.textSize + padding) {
@@ -449,15 +456,11 @@ class PreviewOverlayView @JvmOverloads constructor(
         val band = fourBorderPreviewBandWidth(rect, density)
         val bottomBand = (min(rect.width(), rect.height()) * 0.09f).coerceIn(34f * density, 86f * density)
         val blurBandAlpha = (spec.opacity * 255 * 0.12f).toInt().coerceIn(0, 255)
-        val blurBandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            alpha = blurBandAlpha
-            style = Paint.Style.FILL
-        }
-        canvas.drawRect(RectF(rect.left, rect.top, rect.right, rect.top + band), blurBandPaint)
-        canvas.drawRect(RectF(rect.left, rect.bottom - bottomBand, rect.right, rect.bottom), blurBandPaint)
-        canvas.drawRect(RectF(rect.left, rect.top + band, rect.left + band, rect.bottom - bottomBand), blurBandPaint)
-        canvas.drawRect(RectF(rect.right - band, rect.top + band, rect.right, rect.bottom - bottomBand), blurBandPaint)
+        watermarkBlurBandPaint.alpha = blurBandAlpha
+        canvas.drawRect(rect.left, rect.top, rect.right, rect.top + band, watermarkBlurBandPaint)
+        canvas.drawRect(rect.left, rect.bottom - bottomBand, rect.right, rect.bottom, watermarkBlurBandPaint)
+        canvas.drawRect(rect.left, rect.top + band, rect.left + band, rect.bottom - bottomBand, watermarkBlurBandPaint)
+        canvas.drawRect(rect.right - band, rect.top + band, rect.right, rect.bottom - bottomBand, watermarkBlurBandPaint)
 
         watermarkBorderPaint.alpha = (spec.opacity * 255 * 0.55f).toInt().coerceIn(0, 255)
         canvas.drawRect(rect, watermarkBorderPaint)
@@ -526,12 +529,11 @@ class PreviewOverlayView @JvmOverloads constructor(
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
         val rect = activeContentGeometry().activeFrameRect
         if (frame.dimOutsideFrame) {
-            val outsidePath = android.graphics.Path().apply {
-                fillType = android.graphics.Path.FillType.EVEN_ODD
-                addRect(0f, 0f, width.toFloat(), height.toFloat(), android.graphics.Path.Direction.CW)
-                addRect(rect, android.graphics.Path.Direction.CW)
-            }
-            canvas.drawPath(outsidePath, frameScrimPaint)
+            outsideFramePath.reset()
+            outsideFramePath.fillType = android.graphics.Path.FillType.EVEN_ODD
+            outsideFramePath.addRect(0f, 0f, width.toFloat(), height.toFloat(), android.graphics.Path.Direction.CW)
+            outsideFramePath.addRect(rect, android.graphics.Path.Direction.CW)
+            canvas.drawPath(outsideFramePath, frameScrimPaint)
         }
         canvas.drawRect(rect, frameGuidelinePaint)
     }
@@ -699,8 +701,8 @@ private const val DEFAULT_SENSOR_CONTENT_HEIGHT = 3
 /**
  * Build [PreviewContentGeometry] for the given view dimensions and optional frame ratio.
  *
- * When [previewContentAspect] is provided, [contentRect] is the fitCenter content area
- * within the view (e.g. a 4:3 camera preview letterboxed in a 16:9 view). When null,
+ * When [previewContentAspect] is provided, [contentRect] is the fitEnd content area
+ * within the view (e.g. a 4:3 camera preview bottom-aligned in a 16:9 view). When null,
  * defaults to the sensor's native 4:3 aspect ratio so that frame overlays stay within
  * the actual preview content bounds.
  *
@@ -722,7 +724,7 @@ internal fun previewContentGeometry(
     val effectiveAspect = previewContentAspect
         ?: PreviewContentAspect(DEFAULT_SENSOR_CONTENT_WIDTH, DEFAULT_SENSOR_CONTENT_HEIGHT)
     val contentRect = if (effectiveAspect.width > 0 && effectiveAspect.height > 0) {
-        val fitRect = computeFrameRect(
+        val fitRect = computeEndAlignedFrameRect(
             viewWidth, viewHeight,
             effectiveAspect.width, effectiveAspect.height
         )
@@ -877,6 +879,23 @@ internal fun computeFrameRect(
         val left = availableLeft + (availableWidth - w) / 2f
         FrameRect(left, availableTop, left + w, availableBottom)
     }
+}
+
+internal fun computeEndAlignedFrameRect(
+    viewWidth: Int,
+    viewHeight: Int,
+    ratioWidth: Int,
+    ratioHeight: Int
+): FrameRect {
+    val centered = computeFrameRect(viewWidth, viewHeight, ratioWidth, ratioHeight)
+    val offsetX = viewWidth - centered.right
+    val offsetY = viewHeight - centered.bottom
+    return FrameRect(
+        left = centered.left + offsetX,
+        top = centered.top + offsetY,
+        right = centered.right + offsetX,
+        bottom = centered.bottom + offsetY
+    )
 }
 
 internal fun computePreviewFrameRect(

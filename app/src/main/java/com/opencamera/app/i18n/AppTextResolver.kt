@@ -480,8 +480,8 @@ open class AppTextResolver(private val context: Context?) {
     open fun watermarkAttrBackgroundPrefix(): String = str(R.string.watermark_attr_background_prefix, "Background ")
     open fun watermarkTemplateExpandedFrame(): String = str(R.string.watermark_template_expanded_frame, "Expanded frame")
     open fun watermarkTemplateClassicOverlay(): String = str(R.string.watermark_template_classic_overlay, "Classic overlay")
-    open fun watermarkTemplatePureText(): String = str(R.string.watermark_template_pure_text, "纯文字")
-    open fun watermarkTemplateBlurFourBorder(): String = str(R.string.watermark_template_blur_four_border, "模糊四边框")
+    open fun watermarkTemplatePureText(): String = str(R.string.watermark_template_pure_text, "Pure Text")
+    open fun watermarkTemplateBlurFourBorder(): String = str(R.string.watermark_template_blur_four_border, "Blur Four Border")
     open fun watermarkTemplateTravelPolaroid(): String = str(R.string.watermark_template_travel_polaroid, "Travel Polaroid")
     open fun watermarkTemplateRetroFrame(): String = str(R.string.watermark_template_retro_frame, "Retro Frame")
     open fun watermarkTemplateProfessionalBottomBar(): String =
@@ -605,8 +605,8 @@ open class AppTextResolver(private val context: Context?) {
     }
 
     // Language switch
-    open fun languageLabel(): String = str(R.string.label_language_setting, "语言")
-    open fun languageRestartHint(): String = str(R.string.label_language_restart_hint, "切换后重启生效")
+    open fun languageLabel(): String = str(R.string.label_language_setting, "Language")
+    open fun languageRestartHint(): String = str(R.string.label_language_restart_hint, "Restart app to apply")
     open fun languageDisplayNameZH(): String = "中文"
     open fun languageDisplayNameEN(): String = "English"
     open fun languageDisplayName(settings: PersistedSettings): String = when (settings.common.appLanguage) {
@@ -615,14 +615,14 @@ open class AppTextResolver(private val context: Context?) {
     }
 
     // Document batch organizer
-    open fun documentBatchOrganizerTitle(): String = str(R.string.document_batch_organizer_title, "整理本轮")
-    open fun documentBatchPageCount(count: Int): String = String.format(str(R.string.document_batch_page_count, "%d 页"), count)
-    open fun documentBatchRemoveLabel(): String = str(R.string.document_batch_remove, "移出本轮")
-    open fun documentBatchMoveUpLabel(): String = str(R.string.document_batch_move_up, "上移")
-    open fun documentBatchMoveDownLabel(): String = str(R.string.document_batch_move_down, "下移")
-    open fun documentBatchCropApplied(): String = str(R.string.document_batch_crop_applied, "已裁边")
-    open fun documentBatchCropSkipped(): String = str(R.string.document_batch_crop_skipped, "未裁边")
-    open fun documentBatchCropFailed(): String = str(R.string.document_batch_crop_failed, "裁边失败")
+    open fun documentBatchOrganizerTitle(): String = str(R.string.document_batch_organizer_title, "Organize Batch")
+    open fun documentBatchPageCount(count: Int): String = String.format(str(R.string.document_batch_page_count, "%d pages"), count)
+    open fun documentBatchRemoveLabel(): String = str(R.string.document_batch_remove, "Remove from batch")
+    open fun documentBatchMoveUpLabel(): String = str(R.string.document_batch_move_up, "Move up")
+    open fun documentBatchMoveDownLabel(): String = str(R.string.document_batch_move_down, "Move down")
+    open fun documentBatchCropApplied(): String = str(R.string.document_batch_crop_applied, "Cropped")
+    open fun documentBatchCropSkipped(): String = str(R.string.document_batch_crop_skipped, "Not cropped")
+    open fun documentBatchCropFailed(): String = str(R.string.document_batch_crop_failed, "Crop failed")
 
     internal open fun sessionUiStrings(): com.opencamera.app.SessionUiStrings {
         return com.opencamera.app.SessionUiStrings(
@@ -646,4 +646,65 @@ open class AppTextResolver(private val context: Context?) {
             outputWaiting = str(R.string.output_waiting, "No photo captured yet.")
         )
     }
+
+    // Zoom slider
+    open fun zoomSliderDescription(ratio: Float, disabledReason: String?): String =
+        if (disabledReason != null) {
+            String.format(str(R.string.zoom_slider_desc_reason, "Zoom: %s"), disabledReason)
+        } else {
+            String.format(str(R.string.zoom_slider_desc_ratio, "Zoom: %.1fx"), ratio)
+        }
+
+    // Check-in style panel
+    open fun checkInEditingHint(enabled: Boolean): String =
+        if (enabled) str(R.string.checkin_editing_hint, "Tap to select scene and style")
+        else str(R.string.checkin_editing_disabled, "Capturing, cannot switch")
+
+    open fun checkInSceneTitle(): String = str(R.string.checkin_scene_title, "Scene")
+    open fun checkInStyleTitle(): String = str(R.string.checkin_style_title, "Style")
+    open fun checkInSelectScene(): String = str(R.string.checkin_select_scene, "Select")
+    open fun checkInUseStyle(): String = str(R.string.checkin_use_style, "Use")
+    open fun checkInHeadline(): String = str(R.string.checkin_headline, "Check-in Style")
+
+    open fun checkInScenarioPortrait(): String = str(R.string.checkin_scenario_portrait, "Portrait")
+    open fun checkInScenarioPeoplePlace(): String = str(R.string.checkin_scenario_people_place, "People & Place")
+    open fun checkInScenarioObjectPlace(): String = str(R.string.checkin_scenario_object_place, "Object & Place")
+    open fun checkInScenarioClarity(): String = str(R.string.checkin_scenario_clarity, "Clarity")
+
+    open fun checkInScenarioDescPortrait(): String =
+        str(R.string.checkin_scenario_desc_portrait, "Close-up portrait highlighting expression and posture")
+    open fun checkInScenarioDescPeoplePlace(): String =
+        str(R.string.checkin_scenario_desc_people_place, "People combined with environment to capture atmosphere")
+    open fun checkInScenarioDescObjectPlace(): String =
+        str(R.string.checkin_scenario_desc_object_place, "Objects with environment, capturing detail and space")
+    open fun checkInScenarioDescClarity(): String =
+        str(R.string.checkin_scenario_desc_clarity, "Multi-frame synthesis for sharper detail")
+
+    open fun checkInScenePrefix(): String = str(R.string.checkin_scene_prefix, "Scene: ")
+    open fun checkInFocusMode(): String = str(R.string.checkin_focus_mode, " | Focus mode")
+
+    open fun checkInGuidancePortrait(): String =
+        str(R.string.checkin_guidance_portrait, "Tip: keep the subject centered, use depth of field to highlight the focus")
+    open fun checkInGuidancePeoplePlace(): String =
+        str(R.string.checkin_guidance_people_place, "Tip: balance the person and environment, leave space for ambiance")
+    open fun checkInGuidanceObjectPlace(): String =
+        str(R.string.checkin_guidance_object_place, "Tip: focus on details, use ambient light to enhance texture")
+    open fun checkInGuidanceClarity(): String =
+        str(R.string.checkin_guidance_clarity, "Tip: stay steady, multi-frame synthesis will enhance detail")
+
+    open fun checkInDegradedBadge(): String = str(R.string.checkin_degraded_badge, "Multi-frame unavailable")
+    open fun checkInDegradedDepth(): String =
+        str(R.string.checkin_degraded_depth, "Depth effect unavailable, using Focus mode")
+    open fun checkInDegradedMultiframe(): String =
+        str(R.string.checkin_degraded_multiframe, "Multi-frame unavailable, using best single-frame")
+
+    // Debug summary labels
+    open fun devLinkTimingHeader(): String = str(R.string.dev_link_timing_header, "--- Link Timing ---")
+    open fun devStatusPrefix(): String = str(R.string.dev_status_prefix, "Status: ")
+    open fun devModePrefix(): String = str(R.string.dev_mode_prefix, "Mode: ")
+    open fun devCapturePrefix(): String = str(R.string.dev_capture_prefix, "Capture: ")
+    open fun devRecordingPrefix(): String = str(R.string.dev_recording_prefix, "Recording: ")
+    open fun devLastTimingPrefix(): String = str(R.string.dev_last_timing_prefix, " | Last timing: ")
+    open fun devSlowestTimingPrefix(): String = str(R.string.dev_slowest_timing_prefix, " | Slowest timing: ")
+    open fun devLastIssuePrefix(): String = str(R.string.dev_last_issue_prefix, " | Last issue: ")
 }

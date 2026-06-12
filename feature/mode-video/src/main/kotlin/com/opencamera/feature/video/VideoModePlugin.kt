@@ -10,7 +10,9 @@ import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
+import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
 import com.opencamera.core.mode.ModeController
@@ -21,6 +23,7 @@ import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
+import com.opencamera.core.mode.CaptureMetadataLayers
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaType
@@ -169,54 +172,33 @@ private class VideoModeController(
             val resolvedVideoSpec = resolvedVideoSpec()
             val activeGraph = currentDeviceGraph()
             val effectSpec = buildEffectSpec()
-            val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
-            val postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec)
             mutableSnapshot.value = buildSnapshot(
                 headline = "Recording requested",
                 detail = "Waiting for Session Kernel to start the ${resolvedVideoSpec.summaryLabel} recording task."
             )
+            val modeTags = mapOf(
+                "mode" to "video",
+                "torch" to torchTag(),
+                "videoQuality" to activeGraph.recording.qualityPreset.tagValue,
+                "defaultVideoResolution" to requestedVideoSpec.resolution.storageKey,
+                "defaultVideoFrameRate" to requestedVideoSpec.frameRate.storageKey,
+                "dynamicFpsPolicy" to requestedVideoSpec.dynamicFpsPolicy.storageKey,
+                "audioProfile" to requestedVideoSpec.audioProfile.storageKey,
+                "resolvedVideoResolution" to resolvedVideoSpec.resolution.storageKey,
+                "resolvedVideoFrameRate" to resolvedVideoSpec.frameRate.storageKey,
+                "resolvedDynamicFpsPolicy" to resolvedVideoSpec.dynamicFpsPolicy.storageKey,
+                "resolvedAudioProfile" to resolvedVideoSpec.audioProfile.storageKey
+            )
+            val composedTags = CaptureMetadataLayers(
+                effectTags = EffectBridge.toMetadataTags(effectSpec),
+                modeTags = modeTags
+            ).compose()
             ModeSignal.SubmitCapture(
                     CaptureStrategy.VideoRecording(
                         saveRequest = SaveRequest.videoLibrary(
-                            metadata = MediaMetadata(
-                                customTags = buildMap {
-                                    put("mode", "video")
-                                    put("torch", torchTag())
-                                    put("videoQuality", activeGraph.recording.qualityPreset.tagValue)
-                                    put(
-                                        "defaultVideoResolution",
-                                        requestedVideoSpec.resolution.storageKey
-                                    )
-                                    put(
-                                        "defaultVideoFrameRate",
-                                        requestedVideoSpec.frameRate.storageKey
-                                    )
-                                    put(
-                                        "dynamicFpsPolicy",
-                                        requestedVideoSpec.dynamicFpsPolicy.storageKey
-                                    )
-                                    put("audioProfile", requestedVideoSpec.audioProfile.storageKey)
-                                    put(
-                                        "resolvedVideoResolution",
-                                        resolvedVideoSpec.resolution.storageKey
-                                    )
-                                    put(
-                                        "resolvedVideoFrameRate",
-                                        resolvedVideoSpec.frameRate.storageKey
-                                    )
-                                    put(
-                                        "resolvedDynamicFpsPolicy",
-                                        resolvedVideoSpec.dynamicFpsPolicy.storageKey
-                                    )
-                                    put(
-                                        "resolvedAudioProfile",
-                                        resolvedVideoSpec.audioProfile.storageKey
-                                    )
-                                    putAll(bridgeTags)
-                                }
-                            )
+                            metadata = MediaMetadata(customTags = composedTags)
                         ),
-                    postProcessSpec = postProcessSpec,
+                    postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec),
                     captureProfile = CaptureProfile(
                         torchEnabled = torchEnabled
                     )
@@ -247,7 +229,8 @@ private class VideoModeController(
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
-            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe)
+            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe),
+            FrameEffect(FrameRatio.RATIO_16_9)
         ))
     }
 

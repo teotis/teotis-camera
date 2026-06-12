@@ -3,6 +3,7 @@ package com.opencamera.app.camera
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
@@ -110,6 +111,8 @@ internal fun decidePhotoWatermarkWork(result: ShotResult): PhotoWatermarkWork {
     )
 }
 
+private const val TAG = "PhotoWatermarkPP"
+
 internal class PhotoWatermarkPostProcessor(
     private val editor: PhotoWatermarkEditor
 ) : MediaPostProcessor {
@@ -170,7 +173,7 @@ internal class AndroidPhotoWatermarkEditor(
         templateId: String
     ): ProcessorEditorResult = withContext(Dispatchers.IO) {
         val t0 = System.currentTimeMillis()
-        val sourceBytes = readSourceBytes(target)
+        val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
             ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
             return@withContext ProcessorEditorResult.Skipped("empty-source")
@@ -182,7 +185,8 @@ internal class AndroidPhotoWatermarkEditor(
                 ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
         } catch (e: OutOfMemoryError) {
             return@withContext ProcessorEditorResult.Failed("decode-oom")
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "watermark postprocess failed", e)
             return@withContext ProcessorEditorResult.Failed("decode-exception")
         }
         val t1 = System.currentTimeMillis()
@@ -217,7 +221,8 @@ internal class AndroidPhotoWatermarkEditor(
                 }
             } catch (e: OutOfMemoryError) {
                 return@withContext ProcessorEditorResult.Failed("encode-oom")
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
+            Log.w(TAG, "watermark postprocess failed", e)
                 return@withContext ProcessorEditorResult.Failed("encode-failed")
             }
             val t3 = System.currentTimeMillis()
@@ -232,7 +237,7 @@ internal class AndroidPhotoWatermarkEditor(
             )
             val t5 = System.currentTimeMillis()
 
-            val visibleBytesAfterExif = readSourceBytes(target)
+            val visibleBytesAfterExif = ProcessorIOUtils.readSourceBytes(target, contentResolver)
             val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
                 originalBytes = sourceBytes,
                 visibleBytesAfterExifRestore = visibleBytesAfterExif,
@@ -257,30 +262,14 @@ internal class AndroidPhotoWatermarkEditor(
             )
         } catch (e: OutOfMemoryError) {
             ProcessorEditorResult.Failed("render-oom")
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "watermark postprocess failed", e)
             ProcessorEditorResult.Failed("render-exception")
         } finally {
             if (renderedBitmap != null && renderedBitmap !== mutableBitmap) {
                 renderedBitmap.recycle()
             }
             mutableBitmap.recycle()
-        }
-    }
-
-    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
-        return when (target) {
-            is ProcessorTarget.FilePath -> {
-                val file = File(target.path)
-                if (!file.exists()) {
-                    null
-                } else {
-                    file.readBytes()
-                }
-            }
-
-            is ProcessorTarget.ContentUri -> {
-                contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
-            }
         }
     }
 
@@ -337,7 +326,8 @@ internal fun embedArchiveAfterVisibleWrite(
     ) ?: return null to "archive-embed-failed"
     return try {
         OcwmJpegContainer.embedArchive(visibleBytesAfterExifRestore, archive) to null
-    } catch (_: Throwable) {
+    } catch (e: Throwable) {
+        Log.w(TAG, "watermark postprocess failed", e)
         null to "archive-embed-failed"
     }
 }
@@ -418,9 +408,10 @@ internal fun renderPhotoWatermarkBitmap(
             sideBorderScale = 1.05f,
             topBorderScale = 0.92f,
             bottomBandScale = 4.2f,
-            titleColor = Color.argb(255, 255, 238, 205),
-            detailColor = Color.argb(255, 224, 196, 154),
-            centered = true
+            titleColor = Color.argb(255, 62, 74, 64),
+            detailColor = Color.argb(255, 98, 112, 92),
+            centered = true,
+            ornamentalBorder = true
         )
 
         TEMPLATE_BLUR_FOUR_BORDER -> drawBlurFourBorderFrame(
@@ -588,7 +579,8 @@ private fun drawExpandedFrame(
     bottomBandScale: Float,
     titleColor: Int,
     detailColor: Int,
-    centered: Boolean
+    centered: Boolean,
+    ornamentalBorder: Boolean = false
 ): PhotoWatermarkBitmapRenderResult {
     val sideBorder = (padding * sideBorderScale).coerceAtLeast(MIN_PADDING_PX * 0.7f)
     val topBorder = (padding * topBorderScale).coerceAtLeast(MIN_PADDING_PX * 0.65f)
@@ -649,6 +641,20 @@ private fun drawExpandedFrame(
             detailPaint
         )
     }
+
+    if (ornamentalBorder) {
+        drawOrnamentalBorder(
+            canvas = canvas,
+            framedWidth = framedWidth,
+            framedHeight = framedHeight,
+            sideBorder = sideBorder,
+            topBorder = topBorder,
+            bottomBandHeight = bottomBandHeight,
+            sourceWidth = source.width,
+            sourceHeight = source.height
+        )
+    }
+
     return PhotoWatermarkBitmapRenderResult(
         bitmap = framedBitmap,
         warning = template.warning
@@ -793,44 +799,20 @@ private fun drawFourBorderCardAccents(
     sourceHeight: Int
 ) {
     val accentColor = when (background) {
-        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(178, 245, 202, 126)
-        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(132, 245, 238, 220)
-        else -> Color.argb(150, 220, 248, 246)
-    }
-    val innerColor = when (background) {
-        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(118, 42, 28, 18)
-        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(136, 255, 255, 255)
-        else -> Color.argb(148, 255, 255, 255)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(60, 245, 202, 126)
+        WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(50, 245, 238, 220)
+        else -> Color.argb(55, 220, 248, 246)
     }
     val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
         style = Paint.Style.STROKE
-        strokeWidth = 2f
-    }
-    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = innerColor
-        style = Paint.Style.STROKE
-        strokeWidth = 1.2f
+        strokeWidth = 1.0f
     }
     canvas.drawRect(
         1f,
         1f,
         framedWidth - 1f,
         framedHeight - 1f,
-        accentPaint
-    )
-    canvas.drawRect(
-        sideBorder - 0.5f,
-        topBorder - 0.5f,
-        sideBorder + sourceWidth + 0.5f,
-        topBorder + sourceHeight + 0.5f,
-        innerPaint
-    )
-    canvas.drawLine(
-        sideBorder,
-        framedHeight - bottomBorder,
-        framedWidth - sideBorder,
-        framedHeight - bottomBorder,
         accentPaint
     )
 }
@@ -1176,6 +1158,48 @@ private fun drawFrameBackground(
             })
         }
     }
+}
+
+private fun drawOrnamentalBorder(
+    canvas: Canvas,
+    framedWidth: Int,
+    framedHeight: Int,
+    sideBorder: Float,
+    topBorder: Float,
+    bottomBandHeight: Float,
+    sourceWidth: Int,
+    sourceHeight: Int
+) {
+    val frameColor = Color.argb(180, 62, 74, 64)
+    val innerColor = Color.argb(90, 62, 74, 64)
+    val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = frameColor
+        style = Paint.Style.STROKE
+        strokeWidth = 1.8f
+    }
+    val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = innerColor
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f
+    }
+    // Outer frame border around the full card
+    canvas.drawRect(4f, 4f, framedWidth - 4f, framedHeight - 4f, outerPaint)
+    // Inner ornamental line inset slightly from the source image boundary
+    val inset = 5f
+    canvas.drawRect(
+        sideBorder - inset, topBorder - inset,
+        sideBorder + sourceWidth + inset, topBorder + sourceHeight + inset,
+        innerPaint
+    )
+    // Small horizontal accent line separating the photo from the text band
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(70, 62, 74, 64)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.0f
+    }
+    val lineY = topBorder + sourceHeight + inset + 3f
+    val lineMargin = sideBorder + 8f
+    canvas.drawLine(lineMargin, lineY, framedWidth - lineMargin, lineY, accentPaint)
 }
 
 private fun fitText(

@@ -263,9 +263,10 @@ private val stillModesWithFrameRatio = setOf(
 
 internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): QuickBrightnessRenderModel {
     val isPhotoMode = state.activeMode == ModeId.PHOTO
+    val isBrightnessCapableMode = state.activeMode in BRIGHTNESS_CAPABLE_MODES
     val isPreviewActive = state.previewStatus == PreviewStatus.ACTIVE
     val isBusy = state.activeShot != null || state.countdownRemainingSeconds != null
-    val isVisible = isPhotoMode
+    val isVisible = isBrightnessCapableMode
     val range = state.activeDeviceCapabilities.previewBrightnessRange
     val isUnsupported = range == com.opencamera.core.device.PreviewBrightnessRange.UNSUPPORTED
     val feedback = state.presentation.previewBrightnessFeedback
@@ -274,7 +275,7 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
     } else {
         state.presentation.previewBrightnessSteps
     }
-    val canInteract = isPhotoMode && isPreviewActive && !isBusy && !isUnsupported
+    val canInteract = isBrightnessCapableMode && isPreviewActive && !isBusy && !isUnsupported
 
     val valueLabel = if (isUnsupported) {
         text.quickBrightnessNa()
@@ -283,7 +284,7 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
     }
 
     val disabledReason = when {
-        !isPhotoMode -> null
+        !isBrightnessCapableMode -> null
         isUnsupported -> text.disabledBrightnessUnsupported()
         isBusy -> text.disabledBrightnessActiveShot()
         else -> null
@@ -300,6 +301,12 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
         disabledReason = disabledReason
     )
 }
+
+private val BRIGHTNESS_CAPABLE_MODES = setOf(
+    ModeId.PHOTO,
+    ModeId.HUMANISTIC,
+    ModeId.CHECK_IN
+)
 
 private fun brightnessValueLabel(steps: Int): String {
     return if (steps >= 0) "+$steps" else "$steps"
@@ -568,6 +575,7 @@ private val PRODUCT_MODE_ENTRY_ORDER = listOf(
     ModeId.PHOTO,
     ModeId.CHECK_IN,
     ModeId.HUMANISTIC,
+    ModeId.DOCUMENT,
     ModeId.VIDEO
 )
 
@@ -596,6 +604,9 @@ internal fun primaryStatusRenderModel(
                 RecordingStatus.RECORDING -> append(" · ${text.statusRecordingActive()}")
                 RecordingStatus.STOPPING -> append(" · ${text.statusRecordingSaving()}")
                 RecordingStatus.IDLE -> Unit
+            }
+            if (state.modeSnapshot.state.isProVariantActive) {
+                append(" · Pro active")
             }
         }
     }

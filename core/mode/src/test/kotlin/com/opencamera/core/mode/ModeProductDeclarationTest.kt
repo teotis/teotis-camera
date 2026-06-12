@@ -33,6 +33,13 @@ class ModeProductDeclarationTest {
     }
 
     @Test
+    fun `checkin declaration display name remains product formatted`() {
+        val declaration = ModeId.CHECK_IN.modeProductDeclaration()
+        assertEquals("Check-in", declaration.displayName)
+        assertFalse(declaration.displayName.contains("_"))
+    }
+
+    @Test
     fun `humanistic declaration gates on still capture`() {
         val declaration = ModeId.HUMANISTIC.modeProductDeclaration()
         assertEquals(CapabilityRequirementKind.STILL_CAPTURE, declaration.primaryGate.kind)

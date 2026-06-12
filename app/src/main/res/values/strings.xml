@@ -338,7 +338,7 @@
     <string name="detail_humanistic_inactive">切换回人文模式以继续街拍生活摄影。</string>
     <string name="detail_photo_inactive">切换回拍照以继续静态拍摄。</string>
     <string name="detail_video_inactive">将录制决策交由 Session Kernel 处理。</string>
-    <string name="detail_fullclear_pipeline_ready">全清拍摄管线就绪。</string>
+    <string name="detail_fullclear_pipeline_ready">超清增强拍摄管线就绪。当前为多帧最佳帧选择，非远近全域合焦。对准远处和近处可对焦区域可辅助清晰度。</string>
     <string name="detail_humanistic_capture_progress">街拍静态请求已被统一拍摄管线接受。</string>
     <string name="detail_recording_requested">等待 Session Kernel 启动 %s 录制任务。</string>
     <string name="detail_video_saved">视频已保存</string>
@@ -554,4 +554,44 @@
     <string name="filter_adjustment_low">低</string>
     <string name="filter_adjustment_medium">中</string>
     <string name="filter_adjustment_high">高</string>
+
+    <!-- Zoom slider -->
+    <string name="zoom_slider_desc_ratio">变焦: %.1fx</string>
+    <string name="zoom_slider_desc_reason">变焦: %s</string>
+
+    <!-- Check-in style panel -->
+    <string name="checkin_editing_hint">点击选择场景和风格</string>
+    <string name="checkin_editing_disabled">拍照中，无法切换</string>
+    <string name="checkin_scene_title">场景</string>
+    <string name="checkin_style_title">风格</string>
+    <string name="checkin_select_scene">选择此场景</string>
+    <string name="checkin_use_style">选用</string>
+    <string name="checkin_headline">打卡风格</string>
+    <string name="checkin_scenario_portrait">人像</string>
+    <string name="checkin_scenario_people_place">人景</string>
+    <string name="checkin_scenario_object_place">物景</string>
+    <string name="checkin_scenario_clarity">超清</string>
+    <string name="checkin_scenario_desc_portrait">人像特写，突出人物表情与姿态</string>
+    <string name="checkin_scenario_desc_people_place">人物与环境结合，记录场景氛围</string>
+    <string name="checkin_scenario_desc_object_place">物品与环境，记录细节与空间</string>
+    <string name="checkin_scenario_desc_clarity">多帧合成，提升画面清晰度</string>
+    <string name="checkin_scene_prefix">场景: </string>
+    <string name="checkin_focus_mode"> | Focus 模式</string>
+    <string name="checkin_guidance_portrait">建议: 保持人物在画面中心，利用景深突出主体</string>
+    <string name="checkin_guidance_people_place">建议: 兼顾人物与环境，适当留白展现空间</string>
+    <string name="checkin_guidance_object_place">建议: 对准物品细节，利用环境光线增强质感</string>
+    <string name="checkin_guidance_clarity">建议: 保持稳定，多帧合成将提升细节清晰度</string>
+    <string name="checkin_degraded_badge">设备不支持多帧合成</string>
+    <string name="checkin_degraded_depth">深度效果不可用，使用 Focus 优先模式</string>
+    <string name="checkin_degraded_multiframe">多帧合成不可用，使用单帧最佳效果</string>
+
+    <!-- Debug summary labels -->
+    <string name="dev_link_timing_header">--- 链路耗时 ---</string>
+    <string name="dev_status_prefix">状态: </string>
+    <string name="dev_mode_prefix">模式: </string>
+    <string name="dev_capture_prefix">拍摄: </string>
+    <string name="dev_recording_prefix">录制: </string>
+    <string name="dev_last_timing_prefix"> | 最后耗时: </string>
+    <string name="dev_slowest_timing_prefix"> | 最慢耗时: </string>
+    <string name="dev_last_issue_prefix"> | 最近问题: </string>
 </resources>

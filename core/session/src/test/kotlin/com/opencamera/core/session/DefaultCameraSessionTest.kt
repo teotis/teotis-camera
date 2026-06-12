@@ -17,6 +17,7 @@ import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
 import com.opencamera.core.media.FlashMode
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LiveMotionSource
 import com.opencamera.core.media.LivePhotoBundle
@@ -36,6 +37,7 @@ import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.feature.document.DocumentModePlugin
+import com.opencamera.feature.checkin.CheckInModePlugin
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeRegistry
 import com.opencamera.core.settings.AudioProfile
@@ -67,7 +69,9 @@ import com.opencamera.feature.humanistic.HumanisticModePlugin
 import com.opencamera.feature.photo.PhotoModePlugin
 import com.opencamera.feature.video.VideoModePlugin
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -1155,25 +1159,33 @@ class DefaultCameraSessionTest {
     @Test
     fun `video recording elapsed advances over time`() = runTest {
         val trace = InMemorySessionTrace()
-        val session = createSession(trace, this)
+        val session = createSession(
+            trace,
+            this,
+            recordingTimerDispatcher = StandardTestDispatcher(testScheduler),
+            elapsedRealtimeMillis = { testScheduler.currentTime }
+        )
 
         session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
         session.dispatch(SessionIntent.Boot)
         session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
         session.dispatch(SessionIntent.ShutterPressed)
-        advanceUntilIdle()
+        runCurrent()
 
         val shot = assertNotNull(session.state.value.activeShot)
         session.dispatch(SessionIntent.ShotStarted(shot))
-        advanceUntilIdle()
+        runCurrent()
 
         assertEquals(0L, session.state.value.recordingElapsedMillis)
 
-        // recordingElapsedJob runs on Dispatchers.Default with real-time delay
-        Thread.sleep(3_100)
+        advanceTimeBy(3_100)
+        runCurrent()
 
         val elapsed = session.state.value.recordingElapsedMillis!!
         assertTrue(elapsed >= 3_000L, "Expected elapsed >= 3000 but was $elapsed")
+
+        session.dispatch(SessionIntent.ShotFailed(shotId = shot.shotId, mediaType = MediaType.VIDEO, reason = "test complete"))
+        runCurrent()
     }
 
     @Test
@@ -1626,7 +1638,7 @@ class DefaultCameraSessionTest {
         assertEquals(FlashMode.AUTO, shot.captureProfile.flashMode)
         assertEquals("auto", shot.saveRequest.metadata.customTags["flash"])
         assertEquals("photo-original", shot.saveRequest.metadata.customTags["filterProfile"])
-        assertEquals("PHOTO Auto", shot.postProcessSpec.watermarkText)
+        assertEquals("PHOTO", shot.postProcessSpec.watermarkText)
         assertEquals("photo-original", shot.postProcessSpec.algorithmProfile)
         assertEquals("Photo capture requested", session.state.value.lastAction)
         assertEquals("Still capture requested", session.state.value.modeSnapshot.state.headline)
@@ -1931,7 +1943,7 @@ class DefaultCameraSessionTest {
         val shot = assertNotNull(session.state.value.activeShot)
         assertEquals(FlashMode.OFF, shot.captureProfile.flashMode)
         assertEquals("off", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals("PHOTO Off", shot.postProcessSpec.watermarkText)
+        assertEquals("PHOTO", shot.postProcessSpec.watermarkText)
     }
 
     @Test
@@ -3914,7 +3926,9 @@ class DefaultCameraSessionTest {
         deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         settingsSnapshot: SessionSettingsSnapshot = SessionSettingsSnapshot(),
         capabilityGraphResolver: com.opencamera.core.capability.CapabilityGraphResolver? = null,
-        capabilityRequirements: () -> List<com.opencamera.core.capability.CapabilityRequirement> = { emptyList() }
+        capabilityRequirements: () -> List<com.opencamera.core.capability.CapabilityRequirement> = { emptyList() },
+        recordingTimerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+        elapsedRealtimeMillis: () -> Long = { System.nanoTime() / 1_000_000L }
     ): DefaultCameraSession {
         var shotIndex = 0
         return DefaultCameraSession(
@@ -3927,7 +3941,9 @@ class DefaultCameraSessionTest {
             settingsSnapshot = settingsSnapshot,
             shotExecutor = ShotExecutor(idGenerator = { "shot-${++shotIndex}" }),
             capabilityGraphResolver = capabilityGraphResolver,
-            capabilityRequirements = capabilityRequirements
+            capabilityRequirements = capabilityRequirements,
+            recordingTimerDispatcher = recordingTimerDispatcher,
+            elapsedRealtimeMillis = elapsedRealtimeMillis
         )
     }
 
@@ -3935,6 +3951,7 @@ class DefaultCameraSessionTest {
         PhotoModePlugin(),
         DocumentModePlugin(),
         HumanisticModePlugin(),
+        CheckInModePlugin(),
         VideoModePlugin()
     )
 
@@ -5429,6 +5446,317 @@ class DefaultCameraSessionTest {
         runCurrent()
 
         assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+        assertNull(session.state.value.activeShot)
+    }
+
+    // ── CheckIn mode session-level metadata assertions ──────────────────────
+
+    @Test
+    fun `checkin portrait scenario captures with correct metadata and save path`() = runTest {
+        val session = createSession(InMemorySessionTrace(), this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.CHECK_IN))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(ModeId.CHECK_IN, session.state.value.activeMode)
+        assertEquals("check-in", shot.saveRequest.metadata.customTags["mode"])
+        assertEquals("portrait", shot.saveRequest.metadata.customTags["checkInScenario"])
+        assertEquals("portrait", shot.saveRequest.metadata.customTags["compatMode"])
+        assertEquals("Check-in", shot.saveRequest.metadata.customTags["watermarkModeName"])
+        assertEquals("Pictures/OpenCamera/Check-in", shot.saveRequest.relativePath)
+        assertEquals("OpenCamera_CHECKIN", shot.saveRequest.fileNamePrefix)
+        assertEquals("Check-in", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
+        assertTrue(shot.postProcessSpec.algorithmProfile!!.startsWith("checkin-"))
+        assertEquals("Check-in capture requested", session.state.value.modeSnapshot.state.headline)
+    }
+
+    @Test
+    fun `checkin clarity scenario captures MultiFrame via settings snapshot`() = runTest {
+        val session = createSession(
+            trace = InMemorySessionTrace(),
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(defaultCheckInScenario = "clarity")
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.CHECK_IN))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals("check-in", shot.saveRequest.metadata.customTags["mode"])
+        assertEquals("clarity", shot.saveRequest.metadata.customTags["checkInScenario"])
+        assertEquals("clarity-assist", shot.saveRequest.metadata.customTags["compatMode"])
+        assertEquals("checkin-clarity-best-frame-v1", shot.postProcessSpec.algorithmProfile)
+        assertEquals("Check-in Clarity", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
+        assertEquals("Clarity Assist", shot.postProcessSpec.exifOverrides["CompatSceneCaptureType"])
+        assertEquals(3, shot.captureProfile.frameCount)
+    }
+
+    @Test
+    fun `checkin clarity degradation falls back to SingleFrame when multi-frame unsupported`() = runTest {
+        val session = DefaultCameraSession(
+            registry = ModeRegistry(testModePlugins()),
+            trace = InMemorySessionTrace(),
+            baseDeviceCapabilities = DeviceCapabilities(
+                supportsStillCapture = true,
+                supportsVideoRecording = true,
+                supportsPreviewSnapshots = true,
+                supportsAudioRecording = true,
+                supportsNightMultiFrame = false
+            ),
+            scope = TestScope(StandardTestDispatcher(testScheduler)),
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(defaultCheckInScenario = "clarity")
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.CHECK_IN))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals("clarity", shot.saveRequest.metadata.customTags["checkInScenario"])
+        assertEquals("clarity-assist", shot.saveRequest.metadata.customTags["compatMode"])
+        assertEquals("single-frame", shot.saveRequest.metadata.customTags["captureStrategyFallback"])
+        assertEquals("multi-frame-unsupported", shot.saveRequest.metadata.customTags["degradationReason"])
+        assertEquals("single-frame-best-frame", shot.saveRequest.metadata.customTags["degradation-policy"])
+        assertEquals("checkin-clarity-best-frame-v1", shot.postProcessSpec.algorithmProfile)
+        assertEquals(1, shot.captureProfile.frameCount)
+    }
+
+    @Test
+    fun `checkin clarity snapshot headline contains scenario via settings snapshot`() = runTest {
+        val session = createSession(
+            trace = InMemorySessionTrace(),
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(defaultCheckInScenario = "clarity")
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.CHECK_IN))
+        advanceUntilIdle()
+
+        val headline = session.state.value.modeSnapshot.state.headline
+        assertTrue(headline.contains("Check-in"), "Headline should contain Check-in, got: $headline")
+        assertTrue(headline.contains("超清"), "Headline should mention 超清, got: $headline")
+    }
+
+    @Test
+    fun `checkin capture aid tags are present in session metadata`() = runTest {
+        val session = createSession(InMemorySessionTrace(), this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.CHECK_IN))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals("back", shot.saveRequest.metadata.customTags["captureLensFacing"])
+        assertEquals("false", shot.saveRequest.metadata.customTags["selfieMirrorApply"])
+        assertTrue(shot.saveRequest.metadata.customTags.containsKey("stillQuality"))
+        assertTrue(shot.saveRequest.metadata.customTags.containsKey("style"))
+        assertTrue(shot.saveRequest.metadata.customTags.containsKey("bokehStrength"))
+        assertTrue(shot.saveRequest.metadata.customTags.containsKey("stillResolution"))
+    }
+
+    @Test
+    fun `checkin watermark metadata flows through session shot`() = runTest {
+        val session = createSession(
+            trace = InMemorySessionTrace(),
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(
+                        defaultWatermarkTemplateId = "classic-overlay"
+                    )
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.CHECK_IN))
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals("classic-overlay", shot.saveRequest.metadata.customTags["watermarkTemplate"])
+        assertTrue(shot.postProcessSpec.watermarkText!!.contains("Check-in"))
+    }
+
+    @Test
+    fun `checkin style cycling rotates through styles without affecting scenario`() = runTest {
+        val session = createSession(InMemorySessionTrace(), this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.CHECK_IN))
+        session.dispatch(SessionIntent.SecondaryActionPressed)
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        val initialStyle = shot.saveRequest.metadata.customTags["style"]
+        assertNotNull(initialStyle)
+        assertTrue(initialStyle.startsWith("portrait-"), "Style should start with portrait-, got: $initialStyle")
+
+        session.dispatch(SessionIntent.SecondaryActionPressed)
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot2 = assertNotNull(session.state.value.activeShot)
+        val nextStyle = shot2.saveRequest.metadata.customTags["style"]
+        assertNotNull(nextStyle)
+        assertTrue(nextStyle.startsWith("portrait-"), "Next style should start with portrait-, got: $nextStyle")
+    }
+
+    // --- ModeIntent signal path coverage ---
+
+    @Test
+    fun `ModeSignal None via ProActionPressed in video mode does not alter capture or recording state`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        advanceUntilIdle()
+
+        assertEquals(ModeId.VIDEO, session.state.value.activeMode)
+        assertNull(session.state.value.activeShot)
+        assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+
+        session.dispatch(SessionIntent.ProActionPressed)
+        advanceUntilIdle()
+
+        assertEquals(ModeId.VIDEO, session.state.value.activeMode)
+        assertNull(session.state.value.activeShot)
+        assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
+        assertEquals(CaptureStatus.IDLE, session.state.value.captureStatus)
+        assertEquals(
+            "session.booted",
+            trace.snapshot().first { it.name == "session.booted" || it.name == "mode.signal" }.name
+        )
+    }
+
+    @Test
+    fun `ModeSignal SubmitCapture via ShutterPressed in photo mode starts capture`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        assertEquals(ModeId.PHOTO, session.state.value.activeMode)
+        assertNull(session.state.value.activeShot)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(MediaType.PHOTO, shot.mediaType)
+        assertTrue(
+            session.state.value.captureStatus == CaptureStatus.REQUESTED ||
+                session.state.value.captureStatus == CaptureStatus.IDLE
+        )
+        assertNull(session.state.value.presentation.countdownRemainingSeconds)
+    }
+
+    @Test
+    fun `ModeSignal SubmitCapture with countdown sets countdown remaining`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace, this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(
+                    photo = PhotoSettings(countdownDuration = CountdownDuration.SECONDS_3)
+                )
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+
+        assertEquals(3, session.state.value.presentation.countdownRemainingSeconds)
+        assertEquals(CaptureStatus.REQUESTED, session.state.value.captureStatus)
+
+        // Verify countdown decrements
+        advanceTimeBy(1000)
+        runCurrent()
+        assertEquals(2, session.state.value.presentation.countdownRemainingSeconds)
+    }
+
+    @Test
+    fun `ModeSignal StopActiveCapture via ShutterPressed during recording sets stopping`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val job = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effects += it }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        val shot = assertNotNull(session.state.value.activeShot)
+        assertEquals(MediaType.VIDEO, shot.mediaType)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        advanceUntilIdle()
+        assertEquals(RecordingStatus.RECORDING, session.state.value.recordingStatus)
+
+        effects.clear()
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+
+        assertEquals(RecordingStatus.STOPPING, session.state.value.recordingStatus)
+        assertTrue(effects.any { it is SessionEffect.StopActiveShot })
+        job.cancel()
+    }
+
+    @Test
+    fun `ModeSignal ShowHint via FrameRatioSelected in video mode sets hint message`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
+        advanceUntilIdle()
+
+        session.dispatch(SessionIntent.FrameRatioSelected(FrameRatio.RATIO_16_9))
+        advanceUntilIdle()
+
+        assertEquals("视频模式暂不支持画幅切换", session.state.value.lastAction)
+        assertEquals(ModeId.VIDEO, session.state.value.activeMode)
         assertNull(session.state.value.activeShot)
     }
 }

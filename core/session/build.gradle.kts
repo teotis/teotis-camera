@@ -19,6 +19,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     testImplementation(project(":feature:mode-document"))
     testImplementation(project(":feature:mode-humanistic"))
+    testImplementation(project(":feature:mode-checkin"))
     testImplementation(project(":feature:mode-photo"))
     testImplementation(project(":feature:mode-video"))
 }

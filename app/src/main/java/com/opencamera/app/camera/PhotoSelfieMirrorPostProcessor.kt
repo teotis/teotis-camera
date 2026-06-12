@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
+import android.util.Log
 import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
@@ -20,6 +21,8 @@ import kotlinx.coroutines.withContext
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+
+private const val TAG = "PhotoSelfieMirrorPP"
 
 internal data class PhotoSelfieMirrorApplied(val warning: String? = null) : ProcessorEditorResult
 
@@ -88,7 +91,7 @@ internal class AndroidPhotoSelfieMirrorEditor(
 
     override suspend fun apply(target: ProcessorTarget): ProcessorEditorResult =
         withContext(Dispatchers.IO) {
-            val sourceBytes = readSourceBytes(target)
+            val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
                 ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
             if (sourceBytes.isEmpty()) {
                 return@withContext ProcessorEditorResult.Skipped("empty-source")
@@ -121,25 +124,13 @@ internal class AndroidPhotoSelfieMirrorEditor(
 
                 val exifWarning = contentResolver.restorePreservedExif(target, preservedExif)
                 PhotoSelfieMirrorApplied(exifWarning)
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
+                Log.w(TAG, "selfie mirror postprocess failed", e)
                 ProcessorEditorResult.Failed("mirror-exception")
             } finally {
                 decoded.recycle()
             }
         }
-
-    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
-        return when (target) {
-            is ProcessorTarget.FilePath -> {
-                val file = File(target.path)
-                if (!file.exists()) null else file.readBytes()
-            }
-
-            is ProcessorTarget.ContentUri -> {
-                contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
-            }
-        }
-    }
 
     companion object {
         private const val JPEG_QUALITY = 94

@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
 import android.net.Uri
+import android.util.Log
 import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
@@ -22,6 +23,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
+
+private const val TAG = "DocumentAutoCropPP"
 
 internal data class DocumentAutoCropApplied(
     val cropBounds: Rect,
@@ -167,7 +170,7 @@ internal class AndroidDocumentAutoCropEditor(
 
     override suspend fun apply(target: ProcessorTarget): ProcessorEditorResult =
         withContext(Dispatchers.IO) {
-            val sourceBytes = readSourceBytes(target)
+            val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
                 ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
             if (sourceBytes.isEmpty()) {
                 return@withContext ProcessorEditorResult.Skipped("empty-source")
@@ -212,25 +215,13 @@ internal class AndroidDocumentAutoCropEditor(
                     cropBounds = cropBounds,
                     warning = exifWarning
                 )
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
+                Log.w(TAG, "document auto-crop postprocess failed", e)
                 ProcessorEditorResult.Failed("crop-exception")
             } finally {
                 decoded.recycle()
             }
         }
-
-    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
-        return when (target) {
-            is ProcessorTarget.FilePath -> {
-                val file = File(target.path)
-                if (!file.exists()) null else file.readBytes()
-            }
-
-            is ProcessorTarget.ContentUri -> {
-                contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
-            }
-        }
-    }
 
     companion object {
         private const val JPEG_QUALITY = 92

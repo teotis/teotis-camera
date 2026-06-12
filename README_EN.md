@@ -17,7 +17,8 @@ A modern Android camera application with layered architecture design, focused on
 ## Implementation Highlights
 
 - **State-driven preview UI**: `SessionUiRenderModel` combines session state, settings, capability degradation, and mode metadata into render models. The Activity renders those models and dispatches intents instead of driving camera runtime behavior directly.
-- **Independent mode plugins**: The latest development line consolidates product modes into Photo, Check-in, Humanistic, Video, and Document. Portrait, night, full-clear, and professional capabilities are kept as compatibility capabilities inside the Check-in and Humanistic experiences.
+- **Independent mode plugins**: Product modes are consolidated into Photo, Check-in, Humanistic, Video, and Document. Portrait, night, enhanced clarity, and professional capabilities are composed through mode strategies and orchestrated by the session kernel.
+- **Explainable enhanced capture**: Still capture can select CameraX Extensions or multi-frame processing according to device capability, with explicit gating, degradation semantics, and diagnostics.
 - **Real-time color pipeline**: Color Lab separates color selection, style configuration, and preview overlay through `ColorLabSpec`, `StyleColorPipeline`, and `PreviewColorTransform`, making live preview and reusable style persistence part of the same flow.
 - **Composable media post-processing**: Watermark, aspect ratio, portrait rendering, document crop, and algorithm processors are modeled as media pipeline processors, so preview hints and saved output share the same settings and effect contracts.
 - **Document batch model**: Document mode models multi-page capture, crop state, and the thumbnail rail through `DocumentBatch*` state, enabling collection, preview, and later organization of scanned pages.
@@ -69,12 +70,10 @@ The project adopts a **four-layer architecture + cross-cutting concerns** design
 | Module | Feature | Status |
 |--------|---------|--------|
 | `feature:mode-photo` | Standard photo mode | ✅ |
-| `feature:mode-checkin` | Check-in mode: region-aware static capture for portraits, people-place, object-place, and clarity scenes | Completed in active development |
+| `feature:mode-checkin` | Check-in mode: region-aware still capture for portraits, people-place, object-place, and enhanced-clarity scenes | ✅ |
 | `feature:mode-humanistic` | Humanistic mode: creator-focused still capture driven by style recipes and professional parameters | ✅ |
 | `feature:mode-video` | Video recording mode | ✅ |
 | `feature:mode-document` | Document scanning mode | ✅ |
-
-> Legacy portrait, night, full-clear, and pro modes remain as compatibility implementations. The public source may lag behind the full private development line.
 
 ### Core Capabilities
 
@@ -91,6 +90,8 @@ The project adopts a **four-layer architecture + cross-cutting concerns** design
 ### Application Features
 
 - **Gesture Control**: Tap to focus, pinch to zoom, slide to adjust
+- **Enhanced Capture**: CameraX Extensions, multi-frame fusion, and capability-aware degradation
+- **Selfie Mirroring**: Front-camera photos follow the configured mirror post-processing policy
 - **Orientation Aware**: Adaptive landscape/portrait UI layouts
 - **Cockpit Panel**: Professional parameter adjustment interface
 - **Color Lab**: Real-time color style preview
@@ -105,7 +106,7 @@ The project adopts a **four-layer architecture + cross-cutting concerns** design
 | Android SDK | 35 (min 26) | Target platform |
 | Gradle | 8.7 | Build system |
 | AGP | 8.5.2 | Android build plugin |
-| CameraX | 1.3.4 | Camera API abstraction |
+| CameraX | 1.4.2 | Camera API abstraction and extensions |
 | AndroidX | - | Jetpack component library |
 
 ## Project Structure
@@ -127,11 +128,10 @@ teotis-camera/
 │   └── effect/                   # Effect processing
 ├── feature/                      # Feature mode plugins
 │   ├── mode-photo/
-│   ├── mode-checkin/             # latest development line
+│   ├── mode-checkin/
 │   ├── mode-video/
 │   ├── mode-document/
-│   ├── mode-humanistic/
-│   └── ...                       # compatibility mode plugins
+│   └── mode-humanistic/
 ├── build.gradle.kts              # Root build config
 ├── settings.gradle.kts           # Module declarations
 └── gradle.properties             # Gradle configuration

@@ -80,9 +80,25 @@ class CompositeMediaPostProcessorTest {
         val composite = CompositeMediaPostProcessor(listOf(first, second))
 
         val result = composite.process(baseResult())
+        val failureNotes = result.pipelineNotes.filter { it.startsWith("postprocess:failed:") }
 
-        assertEquals(2, result.pipelineNotes.size)
-        assertTrue(result.pipelineNotes.all { it.startsWith("postprocess:failed:") })
+        assertEquals(2, failureNotes.size)
+    }
+
+    @Test
+    fun `error thrown by processor propagates instead of being swallowed`() = runTest {
+        val errorProcessor = ThrowingProcessor(OutOfMemoryError("bitmap allocation"))
+        val composite = CompositeMediaPostProcessor(listOf(errorProcessor))
+
+        val error = try {
+            composite.process(baseResult())
+            null
+        } catch (e: Error) {
+            e
+        }
+
+        assertTrue(error is OutOfMemoryError, "Expected OutOfMemoryError to propagate, got $error")
+        assertEquals("bitmap allocation", error!!.message)
     }
 
     private fun baseResult(): ShotResult {

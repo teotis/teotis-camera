@@ -11,6 +11,20 @@ import kotlin.test.assertTrue
 class PreviewOverlayWatermarkRenderTest {
 
     @Test
+    fun `portrait preview content is aligned to bottom cockpit edge`() {
+        val geometry = previewContentGeometry(
+            viewWidth = 1080,
+            viewHeight = 1920,
+            previewContentAspect = PreviewContentAspect(4, 3)
+        )
+
+        assertEquals(0f, geometry.contentRect.left)
+        assertEquals(480f, geometry.contentRect.top)
+        assertEquals(1080f, geometry.contentRect.right)
+        assertEquals(1920f, geometry.contentRect.bottom)
+    }
+
+    @Test
     fun `expanded frame watermark reserves bottom band outside active capture frame`() {
         val rect = activeSquareFrame()
 

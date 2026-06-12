@@ -296,11 +296,17 @@ class SessionCockpitRenderModelTest {
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Check-in", "Humanistic", "Video"),
+            listOf("Photo", "Check-in", "Humanistic", "Doc", "Video"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
         )
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
+            listOf(
+                ModeId.PHOTO,
+                ModeId.CHECK_IN,
+                ModeId.HUMANISTIC,
+                ModeId.DOCUMENT,
+                ModeId.VIDEO
+            ),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
         assertEquals("Portrait Retro", model.items.first { it.modeId == ModeId.PHOTO }.defaultStyleLabel)
@@ -664,7 +670,7 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `mode track render model includes humanistic entry and uses product order`() {
+    fun `mode track render model includes document entry and uses product order`() {
         val availableModes = listOf(
             ModeId.PHOTO, ModeId.DOCUMENT, ModeId.CHECK_IN, ModeId.HUMANISTIC,
             ModeId.VIDEO
@@ -672,14 +678,20 @@ class SessionCockpitRenderModelTest {
         val state = defaultSessionState(activeMode = ModeId.HUMANISTIC, availableModes = availableModes)
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(4, model.items.size)
+        assertEquals(5, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
+            listOf(
+                ModeId.PHOTO,
+                ModeId.CHECK_IN,
+                ModeId.HUMANISTIC,
+                ModeId.DOCUMENT,
+                ModeId.VIDEO
+            ),
             model.items.map { it.modeId }
         )
         assertTrue(model.items.any { it.modeId == ModeId.CHECK_IN })
         assertTrue(model.items.any { it.modeId == ModeId.HUMANISTIC })
-        assertFalse(model.items.any { it.modeId == ModeId.DOCUMENT })
+        assertTrue(model.items.any { it.modeId == ModeId.DOCUMENT })
         assertTrue(model.items.first { it.modeId == ModeId.HUMANISTIC }.isActive)
     }
 
@@ -1760,5 +1772,60 @@ class SessionCockpitRenderModelTest {
 
         assertFalse(sheet.hasQuickUserAdjustments)
         assertNull(sheet.resetQuickAction)
+    }
+
+    @Test
+    fun `brightness row is visible in Humanistic mode`() {
+        val state = defaultSessionState(activeMode = ModeId.HUMANISTIC)
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(sheet.brightnessRow.isVisible, "Brightness should be visible in Humanistic mode")
+        assertTrue(sheet.brightnessRow.isInteractive, "Brightness should be interactive in Humanistic mode")
+    }
+
+    @Test
+    fun `brightness row is interactive when preview active and Humanistic mode`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.HUMANISTIC,
+            previewStatus = PreviewStatus.ACTIVE
+        )
+        val model = brightnessRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.isVisible)
+        assertTrue(model.isInteractive)
+    }
+
+    @Test
+    fun `brightness row is not interactive when preview inactive in Humanistic mode`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.HUMANISTIC,
+            previewStatus = PreviewStatus.RECOVERING
+        )
+        val model = brightnessRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.isVisible, "Brightness should still be visible when preview is recovering")
+        assertFalse(model.isInteractive, "Brightness should not be interactive when preview is recovering")
+    }
+
+    @Test
+    fun `primary status includes pro active when pro variant is active`() {
+        val state = defaultSessionState(
+            modeSnapshot = ModeSnapshot(
+                id = ModeId.HUMANISTIC,
+                uiSpec = ModeUiSpec(title = "Humanistic", shutterLabel = "Capture"),
+                state = ModeState(headline = "Active", detail = "", isProVariantActive = true)
+            )
+        )
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.statusText.contains("Pro active"), "Status should show Pro active indicator")
+    }
+
+    @Test
+    fun `primary status does not include pro active when pro variant is inactive`() {
+        val state = defaultSessionState()
+        val model = primaryStatusRenderModel(state, TestAppTextResolver())
+
+        assertFalse(model.statusText.contains("Pro active"), "Status should not show Pro active when variant is inactive")
     }
 }

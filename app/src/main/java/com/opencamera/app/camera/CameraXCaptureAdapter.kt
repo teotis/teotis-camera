@@ -19,6 +19,7 @@ import android.net.Uri
 import android.os.Build
 import android.view.Surface
 import android.os.SystemClock
+import android.util.Log
 import android.provider.MediaStore
 import android.util.Range
 import android.util.Size
@@ -90,6 +91,10 @@ import com.opencamera.core.device.normalizedZoomRatioValue
 import com.opencamera.core.device.resolveRuntimeVideoSpec
 import com.opencamera.core.device.toRecordingQualityPreset
 import com.opencamera.core.device.supportSummary
+import com.opencamera.core.device.CameraExtensionMode
+import com.opencamera.core.device.CameraExtensionResolution
+import com.opencamera.core.device.CameraExtensionAvailability
+import com.opencamera.core.device.ExtensionCaptureStrategy
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.ManualCaptureParams
@@ -98,7 +103,12 @@ import com.opencamera.core.settings.VideoResolution
 import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
 import com.opencamera.core.media.CompositeMediaPostProcessor
-import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.FrameBundle
+import com.opencamera.core.media.FrameBundleFrame
+import com.opencamera.core.media.FrameRole
+import com.opencamera.core.media.MotionScore
+import com.opencamera.core.media.NoiseModel
+import com.opencamera.core.media.PixelReference
 import com.opencamera.core.media.withSaveIoTiming
 import com.opencamera.core.media.FlashMode as CaptureFlashMode
 import com.opencamera.core.media.LivePhotoBundle
@@ -110,7 +120,7 @@ import com.opencamera.core.media.temporalNotes
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaOutputHandle
-import com.opencamera.core.media.MultiFrameMergePlaceholderPostProcessor
+import com.opencamera.core.media.MultiFrameFusionProcessor
 import com.opencamera.core.media.PipelineMetadataPostProcessor
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotExecutor
@@ -171,6 +181,7 @@ internal data class StillCaptureTargetResolution(
     val resolutionSource: com.opencamera.core.device.StillCaptureResolutionSource = com.opencamera.core.device.StillCaptureResolutionSource.STANDARD
 )
 
+private const val TAG = "CameraXCaptureAdapter"
 private const val FOUR_THIRDS_RATIO = 4.0 / 3.0
 private const val ASPECT_RATIO_TOLERANCE = 0.05
 private const val PREVIEW_METERING_POINT_SIZE = 0.15f
@@ -1333,50 +1344,53 @@ private fun detectPhysicalStillCaptureOutputProbes(
 
 private fun detectCameraLensProfiles(context: Context): List<CameraLensProfile> {
     val cameraManager = context.getSystemService(CameraManager::class.java) ?: return emptyList()
-    return runCatching {
-        cameraManager.cameraIdList.mapNotNull { cameraId ->
-            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
-            val lensFacing = when (
-                characteristics.get(CameraCharacteristics.LENS_FACING)
-            ) {
-                CameraCharacteristics.LENS_FACING_FRONT -> LensFacing.FRONT
-                CameraCharacteristics.LENS_FACING_BACK -> LensFacing.BACK
-                else -> null
-            } ?: return@mapNotNull null
-
-            val zoomCap = detectZoomRatioCapability(characteristics)
-
-            val allJpegSizes = collectAllJpegOutputSizes(characteristics)
-            val normalizedJpegSizes = normalizeStillCaptureOutputSizes(allJpegSizes)
-            val (physicalCameraIds, physicalOutputProbes) = detectPhysicalStillCaptureOutputProbes(
-                cameraManager = cameraManager,
-                characteristics = characteristics
-            )
-
-            CameraLensProfile(
-                lensFacing = lensFacing,
-                hasFlashUnit = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
-                zoomRatioCapability = zoomCap,
-                previewBrightnessRange = detectPreviewBrightnessRange(characteristics),
-                availableStillCaptureOutputSizes = normalizedJpegSizes,
-                availableStillCaptureResolutionPresets = resolveAvailableStillCaptureResolutionPresets(
-                    allJpegSizes
-                ),
-                stillCaptureCameraProbe = StillCaptureCameraProbe(
-                    cameraId = cameraId,
-                    lensFacing = lensFacing,
-                    physicalCameraIds = physicalCameraIds,
-                    outputSizes = normalizedJpegSizes,
-                    physicalOutputProbes = physicalOutputProbes
-                ),
-                videoSpecConstraints = detectVideoSpecConstraints(
-                    cameraId = cameraId,
-                    characteristics = characteristics
-                ),
-                physicalCameraId = cameraId
-            )
+    return cameraManager.cameraIdList.mapNotNull { cameraId ->
+        val characteristics = try {
+            cameraManager.getCameraCharacteristics(cameraId)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to read characteristics for camera $cameraId", e)
+            return@mapNotNull null
         }
-    }.getOrDefault(emptyList())
+        val lensFacing = when (
+            characteristics.get(CameraCharacteristics.LENS_FACING)
+        ) {
+            CameraCharacteristics.LENS_FACING_FRONT -> LensFacing.FRONT
+            CameraCharacteristics.LENS_FACING_BACK -> LensFacing.BACK
+            else -> null
+        } ?: return@mapNotNull null
+
+        val zoomCap = detectZoomRatioCapability(characteristics)
+
+        val allJpegSizes = collectAllJpegOutputSizes(characteristics)
+        val normalizedJpegSizes = normalizeStillCaptureOutputSizes(allJpegSizes)
+        val (physicalCameraIds, physicalOutputProbes) = detectPhysicalStillCaptureOutputProbes(
+            cameraManager = cameraManager,
+            characteristics = characteristics
+        )
+
+        CameraLensProfile(
+            lensFacing = lensFacing,
+            hasFlashUnit = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
+            zoomRatioCapability = zoomCap,
+            previewBrightnessRange = detectPreviewBrightnessRange(characteristics),
+            availableStillCaptureOutputSizes = normalizedJpegSizes,
+            availableStillCaptureResolutionPresets = resolveAvailableStillCaptureResolutionPresets(
+                allJpegSizes
+            ),
+            stillCaptureCameraProbe = StillCaptureCameraProbe(
+                cameraId = cameraId,
+                lensFacing = lensFacing,
+                physicalCameraIds = physicalCameraIds,
+                outputSizes = normalizedJpegSizes,
+                physicalOutputProbes = physicalOutputProbes
+            ),
+            videoSpecConstraints = detectVideoSpecConstraints(
+                cameraId = cameraId,
+                characteristics = characteristics
+            ),
+            physicalCameraId = cameraId
+        )
+    }
 }
 
 /**
@@ -1439,6 +1453,35 @@ internal fun detectLensNodeMap(
     return result
 }
 
+/**
+ * Resolves an extension-enabled CameraSelector for a requested extension mode and lens facing.
+ * Implementations wrap CameraX ExtensionsManager calls; test fakes simulate availability.
+ */
+fun interface ExtensionSelectorResolver {
+    fun resolve(
+        desiredMode: CameraExtensionMode,
+        lensFacing: LensFacing
+    ): ExtensionSelectorResult
+}
+
+/**
+ * Result of attempting to resolve an extension-enabled camera selector.
+ * Carries both the resolution metadata and, when usable, the resolved CameraSelector.
+ */
+sealed interface ExtensionSelectorResult {
+    /** Extension selector resolved successfully. */
+    data class Resolved(
+        val selector: CameraSelector,
+        val resolution: CameraExtensionResolution
+    ) : ExtensionSelectorResult
+
+    /** Extension not usable; fall back to ordinary selector. */
+    data class Fallback(val resolution: CameraExtensionResolution) : ExtensionSelectorResult
+
+    /** No extension was requested. */
+    data object NotRequested : ExtensionSelectorResult
+}
+
 class CameraXCaptureAdapter(
     private val context: Context,
     private val cameraProfiles: List<CameraLensProfile> = detectCameraLensProfiles(context),
@@ -1456,12 +1499,13 @@ class CameraXCaptureAdapter(
         { VideoSceneSignal() },
     private val mediaPostProcessor: MediaPostProcessor = CompositeMediaPostProcessor(
         listOf(
-            MultiFrameMergePlaceholderPostProcessor(),
+            MultiFrameFusionProcessor(),
             PipelineMetadataPostProcessor()
         )
     ),
     private val livePreviewFrameSource: com.opencamera.app.camera.live.LivePreviewFrameSource? = null,
-    private val linkRecorder: com.opencamera.core.session.PerformanceLinkRecorder? = null
+    private val linkRecorder: com.opencamera.core.session.PerformanceLinkRecorder? = null,
+    private val extensionSelectorResolver: ExtensionSelectorResolver? = null
 ) : CameraDeviceAdapter {
     private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var cameraProvider: ProcessCameraProvider? = null
@@ -1499,6 +1543,8 @@ class CameraXCaptureAdapter(
     private val lifecycleInterruptedShotIds = mutableSetOf<String>()
     private var currentTorchEnabled = false
     private var currentGraph: DeviceGraphSpec? = null
+    var currentExtensionResolution: CameraExtensionResolution? = null
+        private set
     private var boundLifecycleOwner: LifecycleOwner? = null
     private var boundPreviewView: PreviewView? = null
     private var previewStreamObserver: Observer<PreviewView.StreamState>? = null
@@ -1916,6 +1962,7 @@ class CameraXCaptureAdapter(
         val outputPath: String,
         val outputHandle: MediaOutputHandle,
         val livePhotoBundle: LivePhotoBundle?,
+        val frameBundle: FrameBundle?,
         val intermediateOutputPaths: List<String>,
         val deviceDiagnostics: List<String>,
         val requestedAtElapsedMillis: Long,
@@ -1997,6 +2044,7 @@ class CameraXCaptureAdapter(
                     outputPath = execution.outputPath,
                     outputHandle = execution.outputHandle,
                     livePhotoBundle = execution.livePhotoBundle,
+                    frameBundle = execution.frameBundle,
                     intermediateOutputPaths = execution.intermediateOutputPaths,
                     deviceDiagnostics = deviceRequest.diagnostics +
                         adapterManualDiagnostics +
@@ -2012,13 +2060,14 @@ class CameraXCaptureAdapter(
                     // after DataReceived without waiting for postprocess.
                     // Move postprocess off Dispatchers.Main.immediate to avoid main-thread
                     // contention during UI-heavy capture feedback (P6 latency phase).
-                    CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+                    adapterScope.launch(Dispatchers.Default) {
                         runCatching {
                             emitShotCompleted(
                                 plan = shotCompletedParams.plan,
                                 outputPath = shotCompletedParams.outputPath,
                                 outputHandle = shotCompletedParams.outputHandle,
                                 livePhotoBundle = shotCompletedParams.livePhotoBundle,
+                                frameBundle = shotCompletedParams.frameBundle,
                                 intermediateOutputPaths = shotCompletedParams.intermediateOutputPaths,
                                 deviceDiagnostics = shotCompletedParams.deviceDiagnostics,
                                 requestedAtElapsedMillis = shotCompletedParams.requestedAtElapsedMillis,
@@ -2049,6 +2098,7 @@ class CameraXCaptureAdapter(
                             outputPath = shotCompletedParams.outputPath,
                             outputHandle = shotCompletedParams.outputHandle,
                             livePhotoBundle = shotCompletedParams.livePhotoBundle,
+                            frameBundle = shotCompletedParams.frameBundle,
                             intermediateOutputPaths = shotCompletedParams.intermediateOutputPaths,
                             deviceDiagnostics = shotCompletedParams.deviceDiagnostics,
                             requestedAtElapsedMillis = shotCompletedParams.requestedAtElapsedMillis,
@@ -2309,6 +2359,7 @@ class CameraXCaptureAdapter(
     ): PhotoCaptureOutcome {
         val executionPlan = multiFrameExecutionPlanner.plan(deviceRequest)
         val temporaryOutputs = MultiFrameTemporaryOutputTracker()
+        val bundleFrames = mutableListOf<FrameBundleFrame>()
         var finalOutputPath: String? = null
         var finalOutputHandle: MediaOutputHandle? = null
         var firstFrameDeviceCaptureStartedAt: Long = 0L
@@ -2340,6 +2391,18 @@ class CameraXCaptureAdapter(
                             finalOutputPath = result.outputPath
                             finalOutputHandle = result.outputHandle
                         }
+                        bundleFrames += FrameBundleFrame(
+                            frameIndex = step.frameIndex,
+                            pixelReference = PixelReference.File(result.outputPath),
+                            frameRole = when (step.outputRole) {
+                                MultiFrameOutputRole.FINAL_OUTPUT -> FrameRole.FUSION_ANCHOR
+                                MultiFrameOutputRole.TEMPORARY -> FrameRole.FUSION_SUPPLEMENT
+                            },
+                            noiseModel = NoiseModel.Unknown,
+                            motionScore = MotionScore.Unknown,
+                            isDegraded = true,
+                            degradationReasons = listOf("camera-x:no-per-frame-metadata")
+                        )
                     }
                 }
 
@@ -2361,11 +2424,22 @@ class CameraXCaptureAdapter(
         val resolvedFinalOutputHandle = finalOutputHandle
             ?: MediaOutputHandle(displayPath = resolvedFinalOutputPath)
 
+        val bundle = FrameBundle(
+            shotId = plan.request.shotId,
+            frames = bundleFrames,
+            diagnostics = listOf(
+                "device:burst-bundle-frames=${bundleFrames.size}",
+                "device:burst-metadata=unknown",
+                "device:burst-final-frame=${executionPlan.finalFrameIndex}"
+            )
+        )
+
         return PhotoCaptureOutcome.Success(
             outputPath = resolvedFinalOutputPath,
             outputHandle = resolvedFinalOutputHandle,
-            diagnostics = executionPlan.toExecutionDiagnostics(),
+            diagnostics = executionPlan.toExecutionDiagnostics() + bundle.diagnostics,
             intermediateOutputPaths = temporaryOutputs.outputPaths(),
+            frameBundle = bundle,
             deviceCaptureStartedAtElapsedMillis = firstFrameDeviceCaptureStartedAt,
             deviceCaptureCompletedAtElapsedMillis = lastFrameDeviceCaptureCompletedAt
         )
@@ -2455,6 +2529,7 @@ class CameraXCaptureAdapter(
         outputPath: String,
         outputHandle: MediaOutputHandle = MediaOutputHandle(displayPath = outputPath),
         livePhotoBundle: LivePhotoBundle? = null,
+        frameBundle: FrameBundle? = null,
         intermediateOutputPaths: List<String> = emptyList(),
         deviceDiagnostics: List<String> = emptyList(),
         requestedAtElapsedMillis: Long = 0L,
@@ -2466,6 +2541,7 @@ class CameraXCaptureAdapter(
             outputPath = outputPath,
             outputHandle = outputHandle,
             livePhotoBundle = livePhotoBundle,
+            frameBundle = frameBundle,
             intermediateOutputPaths = intermediateOutputPaths
         ).copy(
             pipelineNotes = deviceDiagnostics,
@@ -2475,7 +2551,7 @@ class CameraXCaptureAdapter(
                 deviceCaptureCompletedAtElapsedMillis = deviceCaptureCompletedAtElapsedMillis
             )
         )
-        val processedResult = guardedPostProcess(mediaPostProcessor, rawResult)
+        val processedResult = mediaPostProcessor.process(rawResult)
         val postProcessCompletedAt = SystemClock.elapsedRealtime()
         val timedResult = processedResult.copy(
             timing = processedResult.timing.copy(
@@ -3050,6 +3126,24 @@ class CameraXCaptureAdapter(
         }
     }
 
+    private fun resolveExtensionForBinding(
+        strategy: ExtensionCaptureStrategy,
+        lensFacing: LensFacing
+    ): ExtensionSelectorResult {
+        if (strategy.desiredMode == CameraExtensionMode.NONE) {
+            return ExtensionSelectorResult.NotRequested
+        }
+        val resolver = extensionSelectorResolver
+            ?: return ExtensionSelectorResult.Fallback(
+                CameraExtensionResolution(
+                    requestedMode = strategy.desiredMode,
+                    availability = CameraExtensionAvailability.MANAGER_UNAVAILABLE,
+                    reason = "Extension resolver not configured"
+                )
+            )
+        return resolver.resolve(strategy.desiredMode, lensFacing)
+    }
+
     private fun cameraSelectorForLensNode(
         lensNode: LensNode,
         physicalCameraId: String
@@ -3065,6 +3159,8 @@ class CameraXCaptureAdapter(
                         idField?.isAccessible = true
                         val id = idField?.get(cameraInfo) as? String
                         id == physicalCameraId
+                    }.onFailure { e ->
+                        Log.w(TAG, "Failed to match physical camera $physicalCameraId via reflection", e)
                     }.getOrDefault(false)
                 }
             }
@@ -3256,7 +3352,21 @@ class CameraXCaptureAdapter(
         videoSpecOverride: VideoSpec? = null,
         manualCaptureConfigOverride: Camera2ManualCaptureConfig? = null
     ) {
-        val selector = cameraSelectorFor(deviceGraph.preferredLensFacing)
+        val baseSelector = cameraSelectorFor(deviceGraph.preferredLensFacing)
+        val extResult = resolveExtensionForBinding(
+            deviceGraph.stillCapture.extensionStrategy,
+            deviceGraph.preferredLensFacing
+        )
+        val (selector, extResolution) = when (extResult) {
+            is ExtensionSelectorResult.Resolved -> extResult.selector to extResult.resolution
+            is ExtensionSelectorResult.Fallback -> baseSelector to extResult.resolution
+            is ExtensionSelectorResult.NotRequested -> baseSelector to CameraExtensionResolution(
+                requestedMode = CameraExtensionMode.NONE,
+                availability = CameraExtensionAvailability.NOT_REQUESTED,
+                reason = "No extension requested"
+            )
+        }
+        currentExtensionResolution = extResolution
 
         suppressPreviewStateEvents = true
         if (resetPreviewObserver) {
@@ -3562,6 +3672,7 @@ class CameraXCaptureAdapter(
             val diagnostics: List<String> = emptyList(),
             val intermediateOutputPaths: List<String> = emptyList(),
             val livePhotoBundle: LivePhotoBundle? = null,
+            val frameBundle: FrameBundle? = null,
             val deviceCaptureStartedAtElapsedMillis: Long = 0L,
             val deviceCaptureCompletedAtElapsedMillis: Long = 0L
         ) : PhotoCaptureOutcome
@@ -3620,15 +3731,4 @@ internal fun mapOutputRotationToSurface(
     com.opencamera.core.device.CameraOutputRotation.ROTATION_90 -> Surface.ROTATION_90
     com.opencamera.core.device.CameraOutputRotation.ROTATION_180 -> Surface.ROTATION_180
     com.opencamera.core.device.CameraOutputRotation.ROTATION_270 -> Surface.ROTATION_270
-}
-
-internal suspend fun guardedPostProcess(
-    postProcessor: MediaPostProcessor,
-    rawResult: ShotResult
-): ShotResult {
-    return try {
-        postProcessor.process(rawResult)
-    } catch (error: Throwable) {
-        rawResult.addPipelineNotes("postprocess:failed:composite:${error::class.simpleName}")
-    }
 }

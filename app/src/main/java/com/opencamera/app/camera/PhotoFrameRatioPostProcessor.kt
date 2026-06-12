@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.MediaPostProcessor
@@ -22,6 +23,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+private const val TAG = "PhotoFrameRatioPP"
 
 internal data class PhotoFrameRatioPayload(
     val target: ProcessorTarget,
@@ -194,7 +197,7 @@ internal class AndroidPhotoFrameRatioEditor(
         frameRatio: FrameRatio,
         captureCropZoom: Float
     ): ProcessorEditorResult = withContext(Dispatchers.IO) {
-        val sourceBytes = readSourceBytes(target)
+        val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
             ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
             return@withContext ProcessorEditorResult.Skipped("empty-source")
@@ -272,23 +275,11 @@ internal class AndroidPhotoFrameRatioEditor(
                 cropBounds = combinedBounds ?: CropBounds(0, 0, decoded.width, decoded.height),
                 warning = exifWarning
             )
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "frame ratio postprocess failed", e)
             ProcessorEditorResult.Failed("crop-exception")
         } finally {
             decoded.recycle()
-        }
-    }
-
-    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
-        return when (target) {
-            is ProcessorTarget.FilePath -> {
-                val file = File(target.path)
-                if (!file.exists()) null else file.readBytes()
-            }
-
-            is ProcessorTarget.ContentUri -> {
-                contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
-            }
         }
     }
 

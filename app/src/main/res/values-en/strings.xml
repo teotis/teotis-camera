@@ -334,7 +334,7 @@
     <string name="detail_humanistic_inactive">Switch back to Humanistic to resume street-life capture.</string>
     <string name="detail_photo_inactive">Switch back to photo to resume still capture.</string>
     <string name="detail_video_inactive">Leave recording decisions to the Session Kernel.</string>
-    <string name="detail_fullclear_pipeline_ready">Full clear capture pipeline ready.</string>
+    <string name="detail_fullclear_pipeline_ready">Clarity assist pipeline ready. Uses multi-frame best-frame selection, not true all-in-focus fusion. Tap near and far focusable areas to assist clarity.</string>
     <string name="detail_humanistic_capture_progress">Street-life still request accepted by the unified shot pipeline.</string>
     <string name="detail_recording_requested">Waiting for Session Kernel to start the %s recording task.</string>
     <string name="detail_video_saved">Video saved</string>
@@ -556,4 +556,44 @@
     <string name="filter_adjustment_low">Low</string>
     <string name="filter_adjustment_medium">Medium</string>
     <string name="filter_adjustment_high">High</string>
+
+    <!-- Zoom slider -->
+    <string name="zoom_slider_desc_ratio">Zoom: %.1fx</string>
+    <string name="zoom_slider_desc_reason">Zoom: %s</string>
+
+    <!-- Check-in style panel -->
+    <string name="checkin_editing_hint">Tap to select scene and style</string>
+    <string name="checkin_editing_disabled">Capturing, cannot switch</string>
+    <string name="checkin_scene_title">Scene</string>
+    <string name="checkin_style_title">Style</string>
+    <string name="checkin_select_scene">Select</string>
+    <string name="checkin_use_style">Use</string>
+    <string name="checkin_headline">Check-in Style</string>
+    <string name="checkin_scenario_portrait">Portrait</string>
+    <string name="checkin_scenario_people_place">People &amp; Place</string>
+    <string name="checkin_scenario_object_place">Object &amp; Place</string>
+    <string name="checkin_scenario_clarity">Clarity</string>
+    <string name="checkin_scenario_desc_portrait">Close-up portrait highlighting expression and posture</string>
+    <string name="checkin_scenario_desc_people_place">People combined with environment to capture atmosphere</string>
+    <string name="checkin_scenario_desc_object_place">Objects with environment, capturing detail and space</string>
+    <string name="checkin_scenario_desc_clarity">Multi-frame synthesis for sharper detail</string>
+    <string name="checkin_scene_prefix">Scene: </string>
+    <string name="checkin_focus_mode"> | Focus mode</string>
+    <string name="checkin_guidance_portrait">Tip: keep the subject centered, use depth of field to highlight the focus</string>
+    <string name="checkin_guidance_people_place">Tip: balance the person and environment, leave space for ambiance</string>
+    <string name="checkin_guidance_object_place">Tip: focus on details, use ambient light to enhance texture</string>
+    <string name="checkin_guidance_clarity">Tip: stay steady, multi-frame synthesis will enhance detail</string>
+    <string name="checkin_degraded_badge">Multi-frame unavailable</string>
+    <string name="checkin_degraded_depth">Depth effect unavailable, using Focus mode</string>
+    <string name="checkin_degraded_multiframe">Multi-frame unavailable, using best single-frame</string>
+
+    <!-- Debug summary labels -->
+    <string name="dev_link_timing_header">--- Link Timing ---</string>
+    <string name="dev_status_prefix">Status: </string>
+    <string name="dev_mode_prefix">Mode: </string>
+    <string name="dev_capture_prefix">Capture: </string>
+    <string name="dev_recording_prefix">Recording: </string>
+    <string name="dev_last_timing_prefix"> | Last timing: </string>
+    <string name="dev_slowest_timing_prefix"> | Slowest timing: </string>
+    <string name="dev_last_issue_prefix"> | Last issue: </string>
 </resources>

@@ -60,6 +60,7 @@ class ShotExecutor(
         outputPath: String,
         outputHandle: MediaOutputHandle = MediaOutputHandle(displayPath = outputPath),
         livePhotoBundle: LivePhotoBundle? = null,
+        frameBundle: FrameBundle? = null,
         intermediateOutputPaths: List<String> = emptyList()
     ): ShotResult {
         val metadata = saveTask.saveRequest.metadata.mergeWith(saveTask.postProcessSpec)
@@ -81,6 +82,7 @@ class ShotExecutor(
             captureProfile = saveTask.captureProfile,
             metadata = metadata,
             livePhotoBundle = livePhotoBundle,
+            frameBundle = frameBundle,
             intermediateOutputPaths = intermediateOutputPaths
         )
     }

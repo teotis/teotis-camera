@@ -1,11 +1,15 @@
 package com.opencamera.core.device
 
+import com.opencamera.core.capability.CameraX_1_4_MultiFrameInputApiQuery
 import com.opencamera.core.capability.CapabilityGraphDeviceQuery
 import com.opencamera.core.capability.CapabilityManualControlSummary
 import com.opencamera.core.capability.CapabilitySupport
+import com.opencamera.core.capability.MultiFrameInputCapabilityMatrix
+import com.opencamera.core.capability.MultiFrameInputFormatResolver
 
 class DeviceCapabilitiesGraphQuery(
-    private val capabilities: DeviceCapabilities
+    private val capabilities: DeviceCapabilities,
+    private val multiFrameInputApiQuery: CameraX_1_4_MultiFrameInputApiQuery = CameraX_1_4_MultiFrameInputApiQuery()
 ) : CapabilityGraphDeviceQuery {
     override fun supportsStillCapture(): Boolean = capabilities.supportsStillCapture
     override fun supportsVideoRecording(): Boolean = capabilities.supportsVideoRecording
@@ -37,6 +41,14 @@ class DeviceCapabilitiesGraphQuery(
             ManualControlSupport.SAVED_ONLY -> CapabilitySupport.SAVED_ONLY
             ManualControlSupport.UNSUPPORTED -> CapabilitySupport.UNSUPPORTED
         }
+    }
+
+    override fun multiFrameInputFormatMatrix(): MultiFrameInputCapabilityMatrix {
+        return MultiFrameInputFormatResolver(
+            apiQuery = multiFrameInputApiQuery,
+            supportsStillCapture = capabilities.supportsStillCapture,
+            supportsNightMultiFrame = capabilities.supportsNightMultiFrame
+        ).resolve()
     }
 }
 

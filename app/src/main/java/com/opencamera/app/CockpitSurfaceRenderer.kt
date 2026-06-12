@@ -34,6 +34,7 @@ internal class CockpitSurfaceRenderer(
 
     private val shutterVisualDrawable = ShutterVisualDrawable()
     private var shutterDrawableAttached = false
+    private val text = com.opencamera.app.i18n.AppTextResolver(context)
 
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
@@ -102,11 +103,7 @@ internal class CockpitSurfaceRenderer(
 
         slider.isInteractive = model.isEnabled
         slider.alpha = if (model.isEnabled) 1f else 0.4f
-        slider.contentDescription = if (model.disabledReason != null) {
-            "变焦滑块: ${model.disabledReason}"
-        } else {
-            "变焦滑块: ${String.format(java.util.Locale.US, "%.1fx", model.currentRatio)}"
-        }
+        slider.contentDescription = text.zoomSliderDescription(model.currentRatio, model.disabledReason)
 
         slider.setPresetRatios(model.presetRatios)
         slider.setCurrentRatio(model.currentRatio)

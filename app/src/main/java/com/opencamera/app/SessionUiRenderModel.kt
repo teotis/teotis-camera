@@ -334,10 +334,10 @@ internal fun filterStripRenderModel(
 }
 
 private val CHECK_IN_SCENARIOS = listOf(
-    CheckInScenarioDef("portrait", "人像", "人像特写，突出人物表情与姿态"),
-    CheckInScenarioDef("people-place", "人景", "人物与环境结合，记录场景氛围"),
-    CheckInScenarioDef("object-place", "物景", "物品与环境，记录细节与空间"),
-    CheckInScenarioDef("clarity", "超清", "多帧合成，提升画面清晰度")
+    CheckInScenarioDef("portrait"),
+    CheckInScenarioDef("people-place"),
+    CheckInScenarioDef("object-place"),
+    CheckInScenarioDef("clarity")
 )
 
 internal fun checkInStylePanelRenderModel(
@@ -357,11 +357,11 @@ internal fun checkInStylePanelRenderModel(
         val isDegraded = isClarity && !state.activeDeviceCapabilities.supportsNightMultiFrame
         CheckInScenarioCardRenderModel(
             scenarioId = scenario.id,
-            label = scenario.label,
-            description = scenario.description,
+            label = scenario.label(text),
+            description = scenario.description(text),
             isActive = isActive,
             isDegraded = isDegraded,
-            degradedLabel = if (isDegraded) "设备不支持多帧合成" else null,
+            degradedLabel = if (isDegraded) text.checkInDegradedBadge() else null,
             selectAction = if (editingEnabled && !isActive) PersistedSettingsAction.UpdateCheckInScenario(scenario.id) else null
         )
     }
@@ -382,28 +382,29 @@ internal fun checkInStylePanelRenderModel(
     }
 
     val scenarioSummary = buildString {
-        append("场景: ${activeScenario.label}")
-        if (!depthSupported) append(" | Focus 模式")
+        append(text.checkInScenePrefix())
+        append(activeScenario.label(text))
+        if (!depthSupported) append(text.checkInFocusMode())
     }
 
     val compositionGuidance = when (activeScenarioId) {
-        "portrait" -> "建议: 保持人物在画面中心，利用景深突出主体"
-        "people-place" -> "建议: 兼顾人物与环境，适当留白展现空间"
-        "object-place" -> "建议: 对准物品细节，利用环境光线增强质感"
-        "clarity" -> "建议: 保持稳定，多帧合成将提升细节清晰度"
+        "portrait" -> text.checkInGuidancePortrait()
+        "people-place" -> text.checkInGuidancePeoplePlace()
+        "object-place" -> text.checkInGuidanceObjectPlace()
+        "clarity" -> text.checkInGuidanceClarity()
         else -> ""
     }
 
     val degradationLabel = if (!depthSupported) {
-        "深度效果不可用，使用 Focus 优先模式"
+        text.checkInDegradedDepth()
     } else if (activeScenarioId == "clarity" && !state.activeDeviceCapabilities.supportsNightMultiFrame) {
-        "多帧合成不可用，使用单帧最佳效果"
+        text.checkInDegradedMultiframe()
     } else {
         null
     }
 
     return CheckInStylePanelRenderModel(
-        headline = "打卡风格",
+        headline = text.checkInHeadline(),
         scenarioSummary = scenarioSummary,
         scenarioCards = scenarioCards,
         styleItems = styleItems,
@@ -414,10 +415,24 @@ internal fun checkInStylePanelRenderModel(
 }
 
 private data class CheckInScenarioDef(
-    val id: String,
-    val label: String,
-    val description: String
-)
+    val id: String
+) {
+    fun label(text: AppTextResolver): String = when (id) {
+        "portrait" -> text.checkInScenarioPortrait()
+        "people-place" -> text.checkInScenarioPeoplePlace()
+        "object-place" -> text.checkInScenarioObjectPlace()
+        "clarity" -> text.checkInScenarioClarity()
+        else -> id
+    }
+
+    fun description(text: AppTextResolver): String = when (id) {
+        "portrait" -> text.checkInScenarioDescPortrait()
+        "people-place" -> text.checkInScenarioDescPeoplePlace()
+        "object-place" -> text.checkInScenarioDescObjectPlace()
+        "clarity" -> text.checkInScenarioDescClarity()
+        else -> ""
+    }
+}
 
 internal data class ColorLabPanelRenderModel(
     val title: String,
@@ -1892,6 +1907,7 @@ internal fun devLogRenderModel(
     selectedDomain: TraceEventDomain? = null,
     linkEvents: List<com.opencamera.core.session.PerformanceLinkEvent> = emptyList(),
     deviceProbeSummary: String? = null,
+    latestPipelineNotes: List<String> = emptyList(),
     clearCutoffs: DevLogClearCutoffs = DevLogClearCutoffs()
 ): DevLogRenderModel {
     if (!isDebugBuild) {
@@ -1985,6 +2001,13 @@ internal fun devLogRenderModel(
     val resolvedProbeSummary = deviceProbeSummary
         ?: computeDeviceProbeSummary(state.activeDeviceCapabilities)
 
+    fun deviceProbeBlock(): String {
+        return resolvedProbeSummary
+            .takeIf { it.isNotBlank() }
+            ?.let { "=== DEVICE PROBE ===\n$it" }
+            .orEmpty()
+    }
+
     val coreSummary = buildString {
         appendLine("DebugDump: ${debugDump.lifecycle} | ${debugDump.activeMode.name} | preview=${debugDump.previewStatus} | capture=${debugDump.captureStatus} | recording=${debugDump.recordingStatus}")
         appendLine("PerfSnapshot: last=${perf.lastFirstFrameLatencyMillis ?: "--"} ms, best=${perf.bestFirstFrameLatencyMillis ?: "--"} ms, worst=${perf.worstFirstFrameLatencyMillis ?: "--"} ms, binds=${perf.bindCount}, recoveries=${perf.recoveryCount}")
@@ -2020,8 +2043,31 @@ internal fun devLogRenderModel(
                     appendLine(baseContent)
                     appendLine()
                 }
-                appendLine("--- 链路耗时 ---")
+                appendLine(text.devLinkTimingHeader())
                 append(formatLinkEvents(visibleLinkEvents))
+                val probeBlock = deviceProbeBlock()
+                if (probeBlock.isNotBlank()) {
+                    appendLine()
+                    appendLine()
+                    append(probeBlock)
+                }
+            }
+        } else if (selectedTab == DevLogTab.CORE && deviceProbeBlock().isNotBlank()) {
+            buildString {
+                if (baseContent.isNotBlank()) {
+                    appendLine(baseContent)
+                    appendLine()
+                }
+                append(deviceProbeBlock())
+            }
+        } else if (selectedTab == DevLogTab.ALL && latestPipelineNotes.isNotEmpty()) {
+            buildString {
+                if (baseContent.isNotBlank()) {
+                    appendLine(baseContent)
+                    appendLine()
+                }
+                appendLine("--- Pipeline Notes ---")
+                latestPipelineNotes.forEach { appendLine(it) }
             }
         } else {
             baseContent
@@ -2035,6 +2081,8 @@ internal fun devLogRenderModel(
         appendLine(formatEvents(coreEvents))
         appendLine("=== LINK EVENTS ===")
         appendLine(formatLinkEvents(visibleLinkEvents))
+        appendLine("=== SHOT PIPELINE ===")
+        latestPipelineNotes.forEach { note -> appendLine(note) }
         appendLine("=== ERROR EVENTS ===")
         appendLine(formatEvents(errorEvents))
         appendLine("=== ALL EVENTS ===")
@@ -2056,18 +2104,18 @@ internal fun devLogRenderModel(
         ?.takeIf { timingTotalMillis(it) != null }
     val lastIssue = errorEvents.lastOrNull()
     val summaryText = buildString {
-        append("状态: ${debugDump.previewStatus} | ")
-        append("模式: ${debugDump.activeMode.name} | ")
-        append("拍摄: ${debugDump.captureStatus} | ")
-        append("录制: ${debugDump.recordingStatus}")
+        append(text.devStatusPrefix()); append(debugDump.previewStatus); append(" | ")
+        append(text.devModePrefix()); append(debugDump.activeMode.name); append(" | ")
+        append(text.devCapturePrefix()); append(debugDump.captureStatus); append(" | ")
+        append(text.devRecordingPrefix()); append(debugDump.recordingStatus)
         if (lastTiming != null) {
-            append(" | 最后耗时: ${lastTiming.detail}")
+            append(text.devLastTimingPrefix()); append(lastTiming.detail)
         }
         if (slowestTiming != null && slowestTiming != lastTiming) {
-            append(" | 最慢耗时: ${slowestTiming.detail}")
+            append(text.devSlowestTimingPrefix()); append(slowestTiming.detail)
         }
         if (lastIssue != null) {
-            append(" | 最近问题: ${lastIssue.name}")
+            append(text.devLastIssuePrefix()); append(lastIssue.name)
         }
     }
 

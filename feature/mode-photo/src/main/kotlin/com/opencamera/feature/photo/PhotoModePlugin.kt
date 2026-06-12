@@ -1,6 +1,8 @@
 package com.opencamera.feature.photo
 
 import com.opencamera.core.device.DeviceCapabilities
+import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.device.ExtensionCaptureStrategy
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
@@ -17,13 +19,14 @@ import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
 import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
+import com.opencamera.core.mode.ModeRuntimeState
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.PhotoLowLightRuntimeState
 import com.opencamera.core.mode.StillShotSessionEventText
-import com.opencamera.core.mode.captureAidMetadataTags
+import com.opencamera.core.mode.stillCaptureDeviceGraph
 import com.opencamera.core.device.PhotoLowLightStrategySupport
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.FilterProfile
@@ -45,6 +48,15 @@ private class PhotoModeController(
 
     override val id: ModeId = ModeId.PHOTO
     private var selectedFilter = resolvedDefaultFilter()
+
+    override fun deviceGraph(): DeviceGraphSpec {
+        val sceneSignal = context.photoLowLightRuntimeState.sceneSignal
+        val preferredMode = ExtensionPreferenceResolver.resolvePreferredMode(sceneSignal)
+        return stillCaptureDeviceGraph(
+            runtimeState(),
+            extensionStrategy = ExtensionCaptureStrategy(desiredMode = preferredMode)
+        )
+    }
 
     override fun modeEventPrefix() = "photo"
     override fun initialHeadline() = "Photo pipeline ready"
@@ -93,20 +105,18 @@ private class PhotoModeController(
 
     override fun buildCaptureStrategy(effectSpec: EffectSpec, countdownSeconds: Int): ModeSignal.SubmitCapture {
         val flashMode = currentFlashMode()
-        val flashLabel = flashMode.name.lowercase().replaceFirstChar { it.titlecase() }
-        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
-        val postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec).copy(watermarkText = "PHOTO $flashLabel")
+        val postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec).copy(watermarkText = "PHOTO")
         val lowLight = context.photoLowLightRuntimeState
 
         val strategy = when {
-            lowLight.shouldUseNightAssist -> buildLowLightStrategy(flashMode, postProcessSpec, bridgeTags, lowLight)
+            lowLight.shouldUseNightAssist -> buildLowLightStrategy(effectSpec, flashMode, postProcessSpec, lowLight)
             livePhotoEnabled() -> CaptureStrategy.LivePhoto(
-                saveRequest = buildSaveRequest(flashMode, "on", bridgeTags),
+                saveRequest = buildSaveRequest(effectSpec, flashMode, "on"),
                 postProcessSpec = postProcessSpec, captureProfile = captureProfile(flashMode),
                 livePhotoSpec = toCaptureSpec(context.settingsSnapshot.persisted.photo.liveSaveFormat)
             )
             else -> CaptureStrategy.SingleFrame(
-                saveRequest = buildSaveRequest(flashMode, "off", bridgeTags),
+                saveRequest = buildSaveRequest(effectSpec, flashMode, "off"),
                 postProcessSpec = postProcessSpec, captureProfile = captureProfile(flashMode)
             )
         }
@@ -124,7 +134,10 @@ private class PhotoModeController(
     }
 
     override suspend fun handleShutterPressed(): ModeSignal {
+        val sceneSignal = context.photoLowLightRuntimeState.sceneSignal
+        val preferredMode = ExtensionPreferenceResolver.resolvePreferredMode(sceneSignal)
         context.eventSink("photo.capture.requested.${selectedFilter.id}.flash-${currentFlashMode().name.lowercase()}")
+        context.eventSink("photo.routing.${sceneSignal.lightState.name.lowercase()}.ext-${preferredMode.tagValue}")
         updateSnapshot(headline = if (countdownDuration() == CountdownDuration.OFF) "Still capture requested" else "Countdown started")
         return buildCaptureStrategy(buildEffectSpec(), countdownDuration().seconds)
     }
@@ -145,34 +158,46 @@ private class PhotoModeController(
 
     private fun flashSupported() = runtimeState().deviceCapabilities.supportsFlashControl
 
-    private fun buildSaveRequest(flashMode: FlashMode, liveTag: String, bridgeTags: Map<String, String>) =
+    private fun putSceneRoutingTags(tags: MutableMap<String, String>) {
+        val sceneSignal = context.photoLowLightRuntimeState.sceneSignal
+        val preferredMode = ExtensionPreferenceResolver.resolvePreferredMode(sceneSignal)
+        tags["photoSceneState"] = sceneSignal.lightState.name.lowercase()
+        tags["photoSceneConfidence"] = sceneSignal.confidence?.toString() ?: "unknown"
+        tags["photoExtPreferred"] = preferredMode.tagValue
+        val routingNote = ExtensionPreferenceResolver.routingNote(sceneSignal)
+        tags["photoRoutingNote"] = routingNote
+    }
+
+    private fun buildSaveRequest(effectSpec: EffectSpec, flashMode: FlashMode, liveTag: String) =
         SaveRequest.photoLibrary(metadata = MediaMetadata(customTags = buildMap {
             put("mode", "photo"); put("flash", flashMode.name.lowercase())
             put("livePhotoDefault", liveTag); put("watermarkModeName", "Photo")
             put("watermarkProfileName", flashMode.name.lowercase().replaceFirstChar { it.titlecase() })
             if (liveTag == "on") putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
-            putAll(context.captureAidMetadataTags()); putAll(bridgeTags)
+            putAll(captureMetadataTags(effectSpec = effectSpec, modeTags = this))
+            putSceneRoutingTags(this)
         }))
 
     private fun captureProfile(flashMode: FlashMode) = CaptureProfile(
         flashMode = flashMode, stillCaptureQuality = runtimeState().stillCaptureQuality,
         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset)
 
-    private fun buildLowLightStrategy(flashMode: FlashMode, postProcessSpec: PostProcessSpec,
-        bridgeTags: Map<String, String>, lowLight: PhotoLowLightRuntimeState): CaptureStrategy {
+    private fun buildLowLightStrategy(effectSpec: EffectSpec, flashMode: FlashMode,
+        postProcessSpec: PostProcessSpec, lowLight: PhotoLowLightRuntimeState): CaptureStrategy {
         val signal = lowLight.sceneSignal
-        val base = buildMap {
+        val lowLightModeTags = buildMap {
             put("mode", "photo"); put("flash", flashMode.name.lowercase())
             put("photoLowLightNightAssist", "on")
             put("photoLowLightBrightnessScore", signal.brightnessScore?.toString() ?: "unknown")
             put("photoLowLightSignalSource", signal.source)
             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
-            putAll(context.captureAidMetadataTags()); putAll(bridgeTags)
+            putSceneRoutingTags(this)
         }
+        val composedTags = captureMetadataTags(effectSpec = effectSpec, modeTags = lowLightModeTags)
         return when (lowLight.support) {
             PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME -> {
-                val metadata = MediaMetadata(customTags = base + ("photoLowLightStrategy" to "multi-frame"))
+                val metadata = MediaMetadata(customTags = composedTags + ("photoLowLightStrategy" to "multi-frame"))
                 CaptureStrategy.MultiFrame(
                     saveRequest = SaveRequest.photoLibrary(metadata = metadata),
                     postProcessSpec = postProcessSpec,
@@ -185,14 +210,14 @@ private class PhotoModeController(
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset))
             }
             PhotoLowLightStrategySupport.DEGRADED_SINGLE_FRAME -> {
-                val metadata = MediaMetadata(customTags = base + ("photoLowLightStrategy" to "single-frame-degraded"))
+                val metadata = MediaMetadata(customTags = composedTags + ("photoLowLightStrategy" to "single-frame-degraded"))
                 CaptureStrategy.SingleFrame(
                     saveRequest = SaveRequest.photoLibrary(metadata = metadata),
                     postProcessSpec = postProcessSpec.copy(algorithmProfile = "photo-low-light-single-frame"),
                     captureProfile = captureProfile(flashMode))
             }
             PhotoLowLightStrategySupport.UNSUPPORTED -> {
-                val metadata = MediaMetadata(customTags = base + ("photoLowLightStrategy" to "unsupported-fallback"))
+                val metadata = MediaMetadata(customTags = composedTags + ("photoLowLightStrategy" to "unsupported-fallback"))
                 CaptureStrategy.SingleFrame(
                     saveRequest = SaveRequest.photoLibrary(metadata = metadata),
                     postProcessSpec = postProcessSpec,

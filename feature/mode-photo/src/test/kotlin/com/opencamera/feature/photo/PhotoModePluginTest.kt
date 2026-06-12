@@ -1,6 +1,7 @@
 package com.opencamera.feature.photo
 
 import com.opencamera.core.device.DeviceCapabilities
+import com.opencamera.core.device.ExtensionCaptureStrategy
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.mode.PhotoLowLightRuntimeState
 import com.opencamera.core.device.PhotoLowLightStrategySupport
@@ -36,6 +37,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 class PhotoModePluginTest {
 
@@ -281,5 +283,401 @@ class PhotoModePluginTest {
             photoLowLightRuntimeStateProvider = { lowLightState }
         )
         return PhotoModePlugin().create(context)
+    }
+
+    private fun createLowLightController(
+        lowLightState: PhotoLowLightRuntimeState
+    ): ModeController {
+        val context = ModeContext(
+            deviceCapabilities = DeviceCapabilities.DEFAULT,
+            initialLensFacing = LensFacing.BACK,
+            initialStillCaptureResolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
+            runtimeState = {
+                ModeRuntimeState(
+                    deviceCapabilities = DeviceCapabilities.DEFAULT,
+                    lensFacing = LensFacing.BACK,
+                    stillCaptureResolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
+                    stillCaptureQuality = StillCaptureQualityPreference.LATENCY
+                )
+            },
+            settingsSnapshotProvider = { SessionSettingsSnapshot() },
+            photoLowLightRuntimeStateProvider = { lowLightState }
+        )
+        return PhotoModePlugin().create(context)
+    }
+
+    // ── Characterization: exact metadata maps ────────────────────────────
+
+    @Test
+    fun `char normal capture exact metadata keys`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("photo", metadata["mode"])
+        assertEquals("off", metadata["flash"])
+        assertEquals("off", metadata["livePhotoDefault"])
+        assertEquals("Photo", metadata["watermarkModeName"])
+        assertEquals("Off", metadata["watermarkProfileName"])
+        assertFalse(metadata.containsKey("photoLowLightNightAssist"))
+        assertFalse(metadata.containsKey("photoLowLightStrategy"))
+        assertFalse(metadata.containsKey("algorithmProfile"))
+    }
+
+    @Test
+    fun `char live capture exact metadata keys`(): Unit = runBlocking {
+        val livePhotoController = PhotoModePlugin().create(ModeContext(
+            deviceCapabilities = DeviceCapabilities.DEFAULT,
+            initialLensFacing = LensFacing.BACK,
+            initialStillCaptureResolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
+            runtimeState = {
+                ModeRuntimeState(
+                    deviceCapabilities = DeviceCapabilities.DEFAULT,
+                    lensFacing = LensFacing.BACK,
+                    stillCaptureResolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
+                    stillCaptureQuality = StillCaptureQualityPreference.LATENCY
+                )
+            },
+            settingsSnapshotProvider = {
+                SessionSettingsSnapshot(
+                    persisted = com.opencamera.core.settings.PersistedSettings(
+                        photo = com.opencamera.core.settings.PhotoSettings(
+                            livePhotoEnabledByDefault = true
+                        )
+                    )
+                )
+            }
+        ))
+        val metadata = (livePhotoController.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("photo", metadata["mode"])
+        assertEquals("on", metadata["livePhotoDefault"])
+        assertEquals("Photo", metadata["watermarkModeName"])
+    }
+
+    @Test
+    fun `char low light multi frame exact metadata keys`(): Unit = runBlocking {
+        val controller = createLowLightController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = true,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.2f,
+                    source = "test"
+                ),
+                support = PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME
+            )
+        )
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("photo", metadata["mode"])
+        assertEquals("on", metadata["photoLowLightNightAssist"])
+        assertEquals("multi-frame", metadata["photoLowLightStrategy"])
+        assertEquals("0.2", metadata["photoLowLightBrightnessScore"])
+        assertTrue(metadata.containsKey("filterProfile"))
+        assertTrue(metadata.containsKey("watermarkTemplate"))
+    }
+
+    @Test
+    fun `char low light degraded single frame exact metadata keys`(): Unit = runBlocking {
+        val controller = createLowLightController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = true,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.3f,
+                    source = "test"
+                ),
+                support = PhotoLowLightStrategySupport.DEGRADED_SINGLE_FRAME
+            )
+        )
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("photo", metadata["mode"])
+        assertEquals("single-frame-degraded", metadata["photoLowLightStrategy"])
+    }
+
+    @Test
+    fun `char normal capture has capture aid tags`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("back", metadata["captureLensFacing"])
+        assertEquals("false", metadata["selfieMirrorApply"])
+        assertEquals("on", metadata["shutterSoundEnabled"])
+        assertTrue(metadata.containsKey("stillQuality"))
+    }
+
+    @Test
+    fun `char normal capture has filter profile in bridge tags`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertTrue(metadata.containsKey("filterProfile"))
+    }
+
+    @Test
+    fun `char low light multi frame has capture aid tags but no bridge tags`(): Unit = runBlocking {
+        val controller = createLowLightController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = true,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.2f, source = "test"
+                ),
+                support = PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME
+            )
+        )
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("back", metadata["captureLensFacing"])
+        assertTrue(metadata.containsKey("filterProfile"))
+    }
+
+    @Test
+    fun `char normal capture post process has watermark text with flash label`(): Unit = runBlocking {
+        val controller = createController()
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertEquals("PHOTO", postProcess.watermarkText)
+    }
+
+    @Test
+    fun `char watermark datetime format in photo effect spec`(): Unit = runBlocking {
+        var capturedSpec: EffectSpec? = null
+        val controller = createController(onEffectSpecChanged = { capturedSpec = it })
+        controller.onEnter()
+        val watermark = capturedSpec!!.find<WatermarkEffect>()!!
+        val datetime = watermark.tokens["watermarkDatetime"]!!
+        assertTrue(datetime.matches(Regex("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}")),
+            "watermarkDatetime must match yyyy-MM-dd HH:mm, got: $datetime")
+        assertEquals("OpenCamera", watermark.tokens["watermarkModel"])
+    }
+
+    @Test
+    fun `char photo mode collision mode key from buildSaveRequest not from bridge`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("photo", metadata["mode"])
+        assertFalse(metadata.containsKey("document"))
+        assertFalse(metadata.containsKey("portrait"))
+    }
+
+    // ── Blue hour routing tests ──────────────────────────────────────────
+
+    @Test
+    fun `blue hour scene emits routing diagnostic event`(): Unit = runBlocking {
+        val events = mutableListOf<String>()
+        val controller = createController(
+            eventSink = { events += it },
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = false,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.BLUE_HOUR,
+                    brightnessScore = 0.25f,
+                    source = "preview-bitmap-metrics",
+                    confidence = 0.75f
+                ),
+                support = PhotoLowLightStrategySupport.UNSUPPORTED
+            )
+        )
+
+        controller.handle(ModeIntent.ShutterPressed)
+
+        assertTrue(events.any { it == "photo.routing.blue_hour.ext-hdr" },
+            "Expected routing event for blue hour, got: $events")
+    }
+
+    @Test
+    fun `blue hour scene has ext-preferred hdr in metadata`(): Unit = runBlocking {
+        val controller = createController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = false,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.BLUE_HOUR,
+                    brightnessScore = 0.25f,
+                    source = "preview-bitmap-metrics",
+                    confidence = 0.75f
+                ),
+                support = PhotoLowLightStrategySupport.UNSUPPORTED
+            )
+        )
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("blue_hour", metadata["photoSceneState"])
+        assertEquals("hdr", metadata["photoExtPreferred"])
+        assertEquals("0.75", metadata["photoSceneConfidence"])
+        assertTrue(metadata["photoRoutingNote"]!!.contains("scene=blue_hour"))
+        assertTrue(metadata["photoRoutingNote"]!!.contains("ext-preferred=hdr"))
+    }
+
+    @Test
+    fun `blue hour scene uses SingleFrame capture strategy`(): Unit = runBlocking {
+        val controller = createController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = false,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.BLUE_HOUR,
+                    brightnessScore = 0.25f,
+                    source = "preview-bitmap-metrics"
+                ),
+                support = PhotoLowLightStrategySupport.UNSUPPORTED
+            )
+        )
+        val signal = controller.handle(ModeIntent.ShutterPressed)
+        assertIs<ModeSignal.SubmitCapture>(signal)
+        assertIs<CaptureStrategy.SingleFrame>(signal.strategy)
+    }
+
+    @Test
+    fun `normal scene has ext-preferred none in metadata`(): Unit = runBlocking {
+        val controller = createController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = false,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.NORMAL,
+                    brightnessScore = 0.6f,
+                    source = "test"
+                ),
+                support = PhotoLowLightStrategySupport.UNSUPPORTED
+            )
+        )
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("normal", metadata["photoSceneState"])
+        assertEquals("none", metadata["photoExtPreferred"])
+    }
+
+    @Test
+    fun `low light scene uses night assist and has ext-preferred night`(): Unit = runBlocking {
+        val controller = createController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = true,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.2f,
+                    source = "test"
+                ),
+                support = PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME
+            )
+        )
+        val signal = controller.handle(ModeIntent.ShutterPressed)
+        assertIs<ModeSignal.SubmitCapture>(signal)
+        assertIs<CaptureStrategy.MultiFrame>(signal.strategy)
+        val metadata = signal.strategy.saveRequest.metadata.customTags
+        assertEquals("low_light", metadata["photoSceneState"])
+        assertEquals("night", metadata["photoExtPreferred"])
+        assertEquals("on", metadata["photoLowLightNightAssist"])
+    }
+
+    @Test
+    fun `blue hour device graph includes HDR extension strategy`(): Unit = runBlocking {
+        val controller = createController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = false,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.BLUE_HOUR,
+                    brightnessScore = 0.25f,
+                    source = "test",
+                    confidence = 0.8f
+                ),
+                support = PhotoLowLightStrategySupport.UNSUPPORTED
+            )
+        )
+        val graph = controller.deviceGraph()
+        assertEquals(
+            com.opencamera.core.device.CameraExtensionMode.HDR,
+            graph.stillCapture.extensionStrategy.desiredMode
+        )
+    }
+
+    @Test
+    fun `normal device graph includes NONE extension strategy`(): Unit = runBlocking {
+        val controller = createController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = false,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.NORMAL,
+                    brightnessScore = 0.6f,
+                    source = "test"
+                ),
+                support = PhotoLowLightStrategySupport.UNSUPPORTED
+            )
+        )
+        val graph = controller.deviceGraph()
+        assertEquals(
+            com.opencamera.core.device.CameraExtensionMode.NONE,
+            graph.stillCapture.extensionStrategy.desiredMode
+        )
+    }
+
+    @Test
+    fun `low light device graph includes NIGHT extension strategy`(): Unit = runBlocking {
+        val controller = createController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = true,
+                sceneSignal = PhotoSceneSignal(
+                    lightState = SceneLightState.LOW_LIGHT,
+                    brightnessScore = 0.2f,
+                    source = "test"
+                ),
+                support = PhotoLowLightStrategySupport.SUPPORTED_MULTI_FRAME
+            )
+        )
+        val graph = controller.deviceGraph()
+        assertEquals(
+            com.opencamera.core.device.CameraExtensionMode.NIGHT,
+            graph.stillCapture.extensionStrategy.desiredMode
+        )
+    }
+
+    @Test
+    fun `unknown scene has ext-preferred none in metadata`(): Unit = runBlocking {
+        val controller = createController(
+            lowLightState = PhotoLowLightRuntimeState(
+                settingEnabled = false,
+                sceneSignal = PhotoSceneSignal(lightState = SceneLightState.UNKNOWN),
+                support = PhotoLowLightStrategySupport.UNSUPPORTED
+            )
+        )
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("unknown", metadata["photoSceneState"])
+        assertEquals("none", metadata["photoExtPreferred"])
+    }
+
+    @Test
+    fun `live photo enabled uses LivePhoto capture strategy`(): Unit = runBlocking {
+        val controller = PhotoModePlugin().create(ModeContext(
+            deviceCapabilities = DeviceCapabilities.DEFAULT,
+            initialLensFacing = LensFacing.BACK,
+            initialStillCaptureResolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
+            runtimeState = {
+                ModeRuntimeState(
+                    deviceCapabilities = DeviceCapabilities.DEFAULT,
+                    lensFacing = LensFacing.BACK,
+                    stillCaptureResolutionPreset = StillCaptureResolutionPreset.LARGE_12MP,
+                    stillCaptureQuality = StillCaptureQualityPreference.LATENCY
+                )
+            },
+            settingsSnapshotProvider = {
+                SessionSettingsSnapshot(
+                    persisted = com.opencamera.core.settings.PersistedSettings(
+                        photo = com.opencamera.core.settings.PhotoSettings(
+                            livePhotoEnabledByDefault = true
+                        )
+                    )
+                )
+            }
+        ))
+        val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
+        assertIs<CaptureStrategy.LivePhoto>(signal.strategy)
+    }
+
+    @Test
+    fun `live photo disabled uses SingleFrame capture strategy`(): Unit = runBlocking {
+        val controller = createController()
+        val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
+        assertIs<CaptureStrategy.SingleFrame>(signal.strategy)
     }
 }

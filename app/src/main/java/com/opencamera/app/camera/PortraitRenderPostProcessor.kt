@@ -3,6 +3,7 @@ package com.opencamera.app.camera
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
@@ -296,6 +297,8 @@ internal fun resolvePortraitRenderSpec(
     }
 }
 
+private const val TAG = "PortraitRenderPP"
+
 internal class PortraitRenderPostProcessor(
     private val editor: PortraitRenderEditor,
     private val maskProvider: SavedPhotoSceneMaskProvider? = null,
@@ -318,7 +321,8 @@ internal class PortraitRenderPostProcessor(
                         )
                         val baseResult = applyEditorResult(result, payload, editorResult)
                         maskNotes.fold(baseResult) { acc, note -> acc.addPipelineNotes(note) }
-                    } catch (_: Throwable) {
+                    } catch (e: Throwable) {
+            Log.w(TAG, "portrait render failed", e)
                         result.addPipelineNotes(
                             "portrait-render:degraded:mask-render-exception",
                             "portrait-render:fallback-focus"
@@ -371,7 +375,8 @@ internal class PortraitRenderPostProcessor(
                     null
                 }
             }
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "portrait render failed", e)
             decoded.recycle()
             null
         }
@@ -431,7 +436,7 @@ internal class AndroidPortraitRenderEditor(
         target: ProcessorTarget,
         spec: PortraitRenderSpec
     ): ProcessorEditorResult = withContext(Dispatchers.IO) {
-        val sourceBytes = readSourceBytes(target)
+        val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
             ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
             return@withContext ProcessorEditorResult.Skipped("empty-source")
@@ -468,7 +473,8 @@ internal class AndroidPortraitRenderEditor(
 
             val exifWarning = contentResolver.restorePreservedExif(target, preservedExif)
             PortraitRenderApplied(exifWarning, lightSpotNotes)
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "portrait render failed", e)
             ProcessorEditorResult.Failed("render-exception")
         } finally {
             blurredBitmap?.recycle()
@@ -515,7 +521,8 @@ internal class AndroidPortraitRenderEditor(
             } finally {
                 blurredBitmap.recycle()
             }
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "portrait render failed", e)
             Pair(PortraitRenderApplied(warning = "mask-render-failed"), listOf("portrait-render:fallback-focus"))
         }
     }
@@ -883,19 +890,6 @@ internal class AndroidPortraitRenderEditor(
     }
 
     private data class HighlightCandidate(val x: Int, val y: Int, val luminance: Float)
-
-    private fun readSourceBytes(target: ProcessorTarget): ByteArray? {
-        return when (target) {
-            is ProcessorTarget.FilePath -> {
-                val file = File(target.path)
-                if (!file.exists()) null else file.readBytes()
-            }
-
-            is ProcessorTarget.ContentUri -> {
-                contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
-            }
-        }
-    }
 
     companion object {
         private const val JPEG_QUALITY = 92

@@ -17,6 +17,7 @@ internal class FilterLabPanelRenderer(
 ) {
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
+    private val appText = com.opencamera.app.i18n.AppTextResolver(context)
 
     fun renderPage(model: FilterLabPageRenderModel) {
         views.headline.text = model.headline
@@ -91,34 +92,36 @@ internal class FilterLabPanelRenderer(
         views.selectionList.removeAllViews()
         model.filterItems.forEach { item ->
             val card = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
                 setBackgroundResource(R.drawable.bg_settings_card)
                 alpha = if (item.isSelected) 1f else 0.9f
-                setPadding(14.dp, 14.dp, 14.dp, 14.dp)
             }
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = if (views.selectionList.childCount == 0) 0 else 8.dp
+                topMargin = if (views.selectionList.childCount == 0) 0 else 6.dp
             }
-
-            val title = TextView(context).apply {
-                text = item.title
-                textSize = 15f
-                setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
-            }
-            card.addView(title)
-
-            val supporting = TextView(context).apply {
-                text = item.supportingText
-                textSize = 12f
-                setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
-                setPadding(0, 6.dp, 0, 0)
-            }
-            card.addView(supporting)
 
             if (item.isSelected) {
+                // Selected: vertical layout with compact padding
+                card.orientation = LinearLayout.VERTICAL
+                card.setPadding(12.dp, 10.dp, 12.dp, 10.dp)
+
+                val title = TextView(context).apply {
+                    text = item.title
+                    textSize = 15f
+                    setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+                }
+                card.addView(title)
+
+                val supporting = TextView(context).apply {
+                    text = item.supportingText
+                    textSize = 12f
+                    setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
+                    setPadding(0, 4.dp, 0, 0)
+                }
+                card.addView(supporting)
+
                 if (item.adjustButtonLabel != null) {
                     val adjustButton = Button(
                         context,
@@ -135,11 +138,28 @@ internal class FilterLabPanelRenderer(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply {
-                        topMargin = 10.dp
+                        topMargin = 8.dp
                     }
                     card.addView(adjustButton, adjustParams)
                 }
             } else {
+                // Unselected: compact horizontal row — title + select button
+                card.orientation = LinearLayout.HORIZONTAL
+                card.setPadding(10.dp, 8.dp, 8.dp, 8.dp)
+                card.gravity = android.view.Gravity.CENTER_VERTICAL
+
+                val title = TextView(context).apply {
+                    text = item.title
+                    textSize = 14f
+                    setTextColor(ContextCompat.getColor(context, R.color.oc_text_primary))
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    layoutParams = LinearLayout.LayoutParams(
+                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                    )
+                }
+                card.addView(title)
+
                 val selectButton = Button(
                     context,
                     null,
@@ -148,18 +168,19 @@ internal class FilterLabPanelRenderer(
                 ).apply {
                     text = context.getString(R.string.button_use_this_look)
                     isAllCaps = false
+                    textSize = 12f
                     isEnabled = model.editingEnabled && item.nextAction != null
                     setOnClickListener {
                         item.nextAction?.let(onSelectFilter)
                     }
                 }
-                val selectParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
+                val btnParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = 10.dp
+                    marginStart = 8.dp
                 }
-                card.addView(selectButton, selectParams)
+                card.addView(selectButton, btnParams)
             }
             views.selectionList.addView(card, params)
         }
@@ -237,7 +258,7 @@ internal class FilterLabPanelRenderer(
         views.supportingText.text = model.scenarioSummary
         views.heroSummary.isVisible = false
         views.currentSummary.isVisible = false
-        views.editingHint.text = if (model.editingEnabled) "点击选择场景和风格" else "拍照中，无法切换"
+        views.editingHint.text = appText.checkInEditingHint(model.editingEnabled)
         views.footer.isVisible = false
 
         views.photoTab.isVisible = false
@@ -250,7 +271,7 @@ internal class FilterLabPanelRenderer(
         views.saveCustom.isVisible = false
 
         views.selectionList.removeAllViews()
-        views.sectionFiltersTitle.text = "场景"
+        views.sectionFiltersTitle.text = appText.checkInSceneTitle()
         views.sectionFiltersTitle.isVisible = true
         views.selectionCard.isVisible = true
 
@@ -303,7 +324,7 @@ internal class FilterLabPanelRenderer(
                     0,
                     R.style.Widget_OpenCamera_CompactButton
                 ).apply {
-                    text = "选择此场景"
+                    text = appText.checkInSelectScene()
                     isAllCaps = false
                     isEnabled = model.editingEnabled
                     setOnClickListener { onSelectScenario(card.selectAction) }
@@ -321,7 +342,7 @@ internal class FilterLabPanelRenderer(
 
         if (model.styleItems.isNotEmpty()) {
             val styleTitle = TextView(context).apply {
-                text = "风格"
+                text = appText.checkInStyleTitle()
                 textSize = 14f
                 setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
                 setPadding(0, 16.dp, 0, 8.dp)
@@ -356,7 +377,7 @@ internal class FilterLabPanelRenderer(
                     0,
                     R.style.Widget_OpenCamera_CompactButton
                 ).apply {
-                    text = "选用"
+                    text = appText.checkInUseStyle()
                     isAllCaps = false
                     textSize = 12f
                     isEnabled = model.editingEnabled

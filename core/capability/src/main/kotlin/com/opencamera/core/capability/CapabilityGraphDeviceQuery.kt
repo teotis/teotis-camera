@@ -9,6 +9,13 @@ interface CapabilityGraphDeviceQuery {
     fun rawOutputSupport(): CapabilitySupport
     fun supportsPortraitDepth(): Boolean
     fun supportsDocumentGeometry(): Boolean
+
+    /**
+     * Multi-frame input format capability matrix. Returns null when the resolver
+     * has not been wired up (e.g. legacy call sites). Callers must treat null
+     * as "unknown, assume unsupported for RAW".
+     */
+    fun multiFrameInputFormatMatrix(): MultiFrameInputCapabilityMatrix? = null
 }
 
 data class CapabilityManualControlSummary(

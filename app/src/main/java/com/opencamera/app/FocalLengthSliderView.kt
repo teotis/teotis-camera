@@ -160,6 +160,11 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
     private val labelArrowSize = 4f * density
     private val labelBottomMargin = 6f * density
 
+    private val trackRect = RectF()
+    private val activeTrackRect = RectF()
+    private val labelRect = RectF()
+    private val arrowPath = Path()
+
     private var labelAlpha: Int = 0
     private var labelAnimator: ValueAnimator? = null
     internal var isDragging = false
@@ -201,14 +206,14 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
         val cy = trackTop
 
         // Draw track background
-        val trackRect = RectF(trackLeft, cy - trackHeight / 2, trackRight, cy + trackHeight / 2)
+        trackRect.set(trackLeft, cy - trackHeight / 2, trackRight, cy + trackHeight / 2)
         canvas.drawRoundRect(trackRect, trackHeight / 2, trackHeight / 2, trackPaint)
 
         // Draw active track (from min to current)
         val thumbX = ratioToX(currentRatio)
         if (thumbX > trackLeft + 1) {
-            val activeRect = RectF(trackLeft, cy - trackHeight / 2, thumbX, cy + trackHeight / 2)
-            canvas.drawRoundRect(activeRect, trackHeight / 2, trackHeight / 2, activeTrackPaint)
+            activeTrackRect.set(trackLeft, cy - trackHeight / 2, thumbX, cy + trackHeight / 2)
+            canvas.drawRoundRect(activeTrackRect, trackHeight / 2, trackHeight / 2, activeTrackPaint)
         }
 
         // Draw preset dots with node labels
@@ -255,17 +260,16 @@ internal class FocalLengthSliderView @JvmOverloads constructor(
         labelPaint.alpha = labelAlpha
 
         // Label background
-        val labelRect = RectF(labelLeft, labelTop, labelLeft + labelW, labelTop + labelH)
+        labelRect.set(labelLeft, labelTop, labelLeft + labelW, labelTop + labelH)
         canvas.drawRoundRect(labelRect, labelCornerRadius, labelCornerRadius, labelBgPaint)
 
         // Arrow triangle
         val arrowX = thumbX.coerceIn(labelLeft + labelCornerRadius, labelLeft + labelW - labelCornerRadius)
-        val arrowPath = Path().apply {
-            moveTo(arrowX - labelArrowSize, labelTop + labelH)
-            lineTo(arrowX, labelTop + labelH + labelArrowSize)
-            lineTo(arrowX + labelArrowSize, labelTop + labelH)
-            close()
-        }
+        arrowPath.reset()
+        arrowPath.moveTo(arrowX - labelArrowSize, labelTop + labelH)
+        arrowPath.lineTo(arrowX, labelTop + labelH + labelArrowSize)
+        arrowPath.lineTo(arrowX + labelArrowSize, labelTop + labelH)
+        arrowPath.close()
         canvas.drawPath(arrowPath, labelBgPaint)
 
         // Label text

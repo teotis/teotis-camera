@@ -392,4 +392,142 @@ class AlgorithmProcessorBridgesTest {
         }
         assertFalse(processor.canProcess(sampleRequest()))
     }
+
+    // --- Cross-layer metadata route characterization ---
+
+    @Test
+    fun `document autoCrop false does not trigger document bridge`() {
+        val processor = RecordingDocumentEditor().let {
+            DocumentAutoCropPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertFalse(processor.canProcess(sampleRequest(
+            customTags = mapOf("mode" to "document", "autoCrop" to "false")
+        )))
+    }
+
+    @Test
+    fun `document autoCrop missing does not trigger document bridge`() {
+        val processor = RecordingDocumentEditor().let {
+            DocumentAutoCropPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertFalse(processor.canProcess(sampleRequest(
+            customTags = mapOf("mode" to "document")
+        )))
+    }
+
+    @Test
+    fun `non document mode does not trigger document bridge`() {
+        val processor = RecordingDocumentEditor().let {
+            DocumentAutoCropPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertFalse(processor.canProcess(sampleRequest(
+            customTags = mapOf("mode" to "photo", "autoCrop" to "true")
+        )))
+    }
+
+    @Test
+    fun `humanistic mode without portrait mode tag does not trigger portrait bridge`() {
+        val processor = RecordingPortraitEditor().let {
+            PortraitRenderPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertFalse(processor.canProcess(sampleRequest(
+            customTags = mapOf("mode" to "humanistic", "renderPath" to "/tmp/render.jpg")
+        )))
+    }
+
+    @Test
+    fun `humanistic mode with filterProfile tag triggers photo algorithm bridge`() {
+        val processor = RecordingPhotoAlgorithmEditor().let {
+            PhotoAlgorithmPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertTrue(processor.canProcess(sampleRequest(
+            algorithmProfile = "photo-vivid",
+            customTags = mapOf("filterProfile" to "photo-vivid")
+        )))
+    }
+
+    @Test
+    fun `checkin clarity scenario does not trigger portrait bridge`() {
+        val processor = RecordingPortraitEditor().let {
+            PortraitRenderPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertFalse(processor.canProcess(sampleRequest(
+            customTags = mapOf(
+                "mode" to "check-in",
+                "checkInScenario" to "clarity",
+                "compatMode" to "clarity-assist",
+                "renderPath" to "depth"
+            )
+        )))
+    }
+
+    @Test
+    fun `checkin people-place scenario triggers portrait bridge`() {
+        val processor = RecordingPortraitEditor().let {
+            PortraitRenderPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertTrue(processor.canProcess(sampleRequest(
+            customTags = mapOf(
+                "mode" to "check-in",
+                "checkInScenario" to "people-place",
+                "compatMode" to "portrait",
+                "renderPath" to "depth"
+            )
+        )))
+    }
+
+    @Test
+    fun `checkin object-place scenario triggers portrait bridge`() {
+        val processor = RecordingPortraitEditor().let {
+            PortraitRenderPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertTrue(processor.canProcess(sampleRequest(
+            customTags = mapOf(
+                "mode" to "check-in",
+                "checkInScenario" to "object-place",
+                "compatMode" to "portrait",
+                "renderPath" to "depth"
+            )
+        )))
+    }
+
+    @Test
+    fun `photo mode with filterProfile and algorithmProfile triggers photo algorithm bridge`() {
+        val processor = RecordingPhotoAlgorithmEditor().let {
+            PhotoAlgorithmPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertTrue(processor.canProcess(sampleRequest(
+            algorithmProfile = "photo-rich",
+            customTags = mapOf("filterProfile" to "photo-rich")
+        )))
+    }
+
+    @Test
+    fun `watermark bridge does not trigger for video media type`() {
+        val processor = RecordingWatermarkEditor().let {
+            PhotoWatermarkPostProcessor(it).toAlgorithmProcessor()
+        }
+        // Video doesn't carry watermarkText in the bridge request
+        assertFalse(processor.canProcess(sampleRequest()))
+    }
+
+    @Test
+    fun `frame ratio bridge does not trigger without frameRatio tag`() {
+        val processor = RecordingFrameRatioEditor().let {
+            PhotoFrameRatioPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertFalse(processor.canProcess(sampleRequest(
+            customTags = mapOf("mode" to "humanistic")
+        )))
+    }
+
+    @Test
+    fun `frame ratio bridge triggers for humanistic wide aspect capture`() {
+        val processor = RecordingFrameRatioEditor().let {
+            PhotoFrameRatioPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertTrue(processor.canProcess(sampleRequest(
+            customTags = mapOf("mode" to "humanistic", "frameRatio" to "16:9")
+        )))
+    }
 }

@@ -120,6 +120,7 @@ data class ShotResult(
     val captureProfile: CaptureProfile = CaptureProfile(),
     val metadata: MediaMetadata,
     val livePhotoBundle: LivePhotoBundle? = null,
+    val frameBundle: FrameBundle? = null,
     val intermediateOutputPaths: List<String> = emptyList(),
     val pipelineNotes: List<String> = emptyList(),
     val timing: ShotTiming = ShotTiming()

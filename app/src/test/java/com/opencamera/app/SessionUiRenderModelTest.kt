@@ -1133,11 +1133,17 @@ class SessionUiRenderModelTest {
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
         assertEquals(
-            listOf("Photo", "Check-in", "Humanistic", "Video"),
+            listOf("Photo", "Check-in", "Humanistic", "Doc", "Video"),
             model.items.map(ModeDirectoryItemRenderModel::displayName)
         )
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
+            listOf(
+                ModeId.PHOTO,
+                ModeId.CHECK_IN,
+                ModeId.HUMANISTIC,
+                ModeId.DOCUMENT,
+                ModeId.VIDEO
+            ),
             model.items.map(ModeDirectoryItemRenderModel::modeId)
         )
     }
@@ -1154,9 +1160,9 @@ class SessionUiRenderModelTest {
 
         val model = modeDirectoryRenderModel(state, TestAppTextResolver())
 
-        assertEquals(2, model.items.size)
+        assertEquals(3, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.VIDEO),
+            listOf(ModeId.PHOTO, ModeId.DOCUMENT, ModeId.VIDEO),
             model.items.map { it.modeId }
         )
     }
@@ -1344,7 +1350,7 @@ class SessionUiRenderModelTest {
     }
 
     @Test
-    fun `mode track render model includes humanistic entry and uses product order`() {
+    fun `mode track render model includes document entry and uses product order`() {
         val availableModes = listOf(
             ModeId.PHOTO, ModeId.DOCUMENT, ModeId.CHECK_IN,
             ModeId.HUMANISTIC, ModeId.VIDEO
@@ -1355,14 +1361,20 @@ class SessionUiRenderModelTest {
         )
         val model = modeTrackRenderModel(state, TestAppTextResolver())
 
-        assertEquals(4, model.items.size)
+        assertEquals(5, model.items.size)
         assertEquals(
-            listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
+            listOf(
+                ModeId.PHOTO,
+                ModeId.CHECK_IN,
+                ModeId.HUMANISTIC,
+                ModeId.DOCUMENT,
+                ModeId.VIDEO
+            ),
             model.items.map { it.modeId }
         )
         assertTrue(model.items.any { it.modeId == ModeId.CHECK_IN })
         assertTrue(model.items.any { it.modeId == ModeId.HUMANISTIC })
-        assertFalse(model.items.any { it.modeId == ModeId.DOCUMENT })
+        assertTrue(model.items.any { it.modeId == ModeId.DOCUMENT })
         assertTrue(model.items.first { it.modeId == ModeId.HUMANISTIC }.isActive)
         assertFalse(model.items.first { it.modeId == ModeId.PHOTO }.isActive)
         assertTrue(model.items.all { it.isAvailable })
@@ -2420,7 +2432,7 @@ class SessionUiRenderModelTest {
         val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
 
         assertTrue(model.compositionGuidance.isNotEmpty())
-        assertTrue(model.compositionGuidance.contains("人物"))
+        assertTrue(model.compositionGuidance.contains("subject"))
     }
 
     @Test
@@ -2428,7 +2440,7 @@ class SessionUiRenderModelTest {
         val state = defaultSessionState(activeMode = ModeId.CHECK_IN)
         val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
 
-        assertEquals("打卡风格", model.headline)
+        assertEquals("Check-in Style", model.headline)
     }
 
     @Test

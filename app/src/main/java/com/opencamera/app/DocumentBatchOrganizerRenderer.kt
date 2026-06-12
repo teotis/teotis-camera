@@ -46,10 +46,10 @@ internal class DocumentBatchOrganizerRenderer(
         item: DocumentBatchOrganizerItemRenderModel,
         appText: AppTextResolver
     ): View {
-        val rowPadding = 6.dp(context)
-        val itemMargin = 4.dp(context)
-        val thumbnailSize = 36.dp(context)
-        val buttonHeight = 28.dp(context)
+        val rowPadding = 4.dp(context)
+        val itemMargin = 3.dp(context)
+        val thumbnailSize = 30.dp(context)
+        val buttonHeight = 24.dp(context)
 
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -66,15 +66,13 @@ internal class DocumentBatchOrganizerRenderer(
 
         // Page number
         val pageLabel = TextView(context).apply {
-            text = context.getString(R.string.document_batch_rail_page_description, item.pageNumber)
-            textSize = 12f
+            text = "${item.pageNumber}"
+            textSize = 11f
             setTextColor(0xCCFFFFFF.toInt())
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                20.dp(context),
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                marginEnd = 6.dp(context)
-            }
+            )
         }
         row.addView(pageLabel)
 
@@ -90,7 +88,7 @@ internal class DocumentBatchOrganizerRenderer(
         }
         row.addView(imageView)
 
-        // Crop status label
+        // Crop status label or spacer
         if (item.cropStatusLabel != null) {
             val statusLabel = TextView(context).apply {
                 text = item.cropStatusLabel
@@ -101,12 +99,11 @@ internal class DocumentBatchOrganizerRenderer(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     1f
                 ).apply {
-                    marginStart = 6.dp(context)
+                    marginStart = 4.dp(context)
                 }
             }
             row.addView(statusLabel)
         } else {
-            // Spacer
             val spacer = View(context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, 0, 1f)
             }
@@ -123,16 +120,16 @@ internal class DocumentBatchOrganizerRenderer(
             )
         }
 
-        // Move up button
-        val moveUpButton = createActionButton(context, appText.documentBatchMoveUpLabel(), buttonHeight).apply {
+        // Move up button (compact arrow)
+        val moveUpButton = createTextAction(context, "▲", buttonHeight).apply {
             isEnabled = item.canMoveUp
             alpha = if (item.canMoveUp) 1f else 0.3f
             setOnClickListener { onMoveUpItemClick(item.itemId) }
         }
         actions.addView(moveUpButton)
 
-        // Move down button
-        val moveDownButton = createActionButton(context, appText.documentBatchMoveDownLabel(), buttonHeight).apply {
+        // Move down button (compact arrow)
+        val moveDownButton = createTextAction(context, "▼", buttonHeight).apply {
             isEnabled = item.canMoveDown
             alpha = if (item.canMoveDown) 1f else 0.3f
             setOnClickListener { onMoveDownItemClick(item.itemId) }
@@ -140,7 +137,7 @@ internal class DocumentBatchOrganizerRenderer(
         actions.addView(moveDownButton)
 
         // Remove button
-        val removeButton = createActionButton(context, appText.documentBatchRemoveLabel(), buttonHeight).apply {
+        val removeButton = createTextAction(context, "✕", buttonHeight).apply {
             setOnClickListener { onRemoveItemClick(item.itemId) }
         }
         actions.addView(removeButton)
@@ -150,19 +147,19 @@ internal class DocumentBatchOrganizerRenderer(
         return row
     }
 
-    private fun createActionButton(context: Context, label: String, heightPx: Int): Button {
+    private fun createTextAction(context: Context, label: String, heightPx: Int): Button {
         return Button(context).apply {
             text = label
-            textSize = 10f
+            textSize = 12f
             setTextColor(0xFFFFFFFF.toInt())
             minimumWidth = 0
             minimumHeight = 0
-            setPadding(6.dp(context), 0, 6.dp(context), 0)
+            setPadding(4.dp(context), 0, 4.dp(context), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 heightPx
             ).apply {
-                marginStart = 3.dp(context)
+                marginStart = 2.dp(context)
             }
             background = context.getDrawable(R.drawable.bg_panel_row)
         }

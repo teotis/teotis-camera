@@ -3,9 +3,13 @@ package com.opencamera.core.media
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
+import java.awt.image.BufferedImage
 import java.io.File
+import javax.imageio.ImageIO
 
 class ShotExecutorTest {
     @Test
@@ -276,11 +280,11 @@ class ShotExecutorTest {
     }
 
     @Test
-    fun `multi frame merge placeholder consumes intermediate outputs and appends merge notes`() = runTest {
+    fun `multi frame fusion selects best frame, emits real merge notes, and cleans up`() = runTest {
         val executor = ShotExecutor(idGenerator = { "shot-night-merge" })
         val tempDir = createTempDir(prefix = "night-burst-")
-        val burstA = File(tempDir, "burst_a.jpg").apply { writeText("frame-a") }
-        val burstB = File(tempDir, "burst_b.jpg").apply { writeText("frame-bb") }
+        val burstA = createSyntheticJpeg(tempDir, "burst_a.jpg", baseRgb = 0x404040)
+        val burstB = createSyntheticJpeg(tempDir, "burst_b.jpg", baseRgb = 0xC0C0C0)
 
         try {
             val plan = executor.plan(
@@ -291,24 +295,32 @@ class ShotExecutorTest {
                     )
                 )
             )
+            val bundle = FrameBundle(
+                shotId = plan.request.shotId,
+                frames = listOf(
+                    FrameBundleFrame(0, PixelReference.File(burstA.absolutePath)),
+                    FrameBundleFrame(1, PixelReference.File(burstB.absolutePath)),
+                    FrameBundleFrame(2, PixelReference.File(File(tempDir, "out.jpg").absolutePath),
+                        frameRole = FrameRole.FUSION_ANCHOR)
+                )
+            )
             val rawResult = executor.resultFor(
                 saveTask = plan.saveTask,
-                outputPath = "Pictures/OpenCamera/OpenCamera_NIGHT_merged.jpg",
+                outputPath = File(tempDir, "out.jpg").absolutePath,
+                frameBundle = bundle,
                 intermediateOutputPaths = listOf(
                     burstA.absolutePath,
                     burstB.absolutePath
                 )
             )
 
-            val result = MultiFrameMergePlaceholderPostProcessor().process(rawResult)
+            val result = MultiFrameFusionProcessor().process(rawResult)
 
-            assertTrue(result.pipelineNotes.contains("merge:placeholder"))
-            assertTrue(result.pipelineNotes.contains("merge:inputs=3"))
-            assertTrue(result.pipelineNotes.contains("merge:temp-frames=2"))
-            assertTrue(result.pipelineNotes.any { it.startsWith("merge:temp-bytes=") })
-            assertTrue(result.pipelineNotes.contains("merge:strategy=burst-placeholder"))
-            assertTrue(burstA.exists().not())
-            assertTrue(burstB.exists().not())
+            assertTrue(result.pipelineNotes.any { it.startsWith("merge:applied=") })
+            assertTrue(result.pipelineNotes.any { it.startsWith("merge:inputs=") })
+            assertTrue(result.pipelineNotes.any { it.startsWith("merge:temp-frames=2") })
+            assertTrue(result.pipelineNotes.any { it.startsWith("merge:strategy=") })
+            assertTrue(burstA.exists().not(), "intermediate frame should be cleaned up")
         } finally {
             tempDir.deleteRecursively()
         }
@@ -433,5 +445,121 @@ class ShotExecutorTest {
         assertTrue(result.pipelineNotes.none { it.startsWith("live:source=") })
         assertTrue(result.pipelineNotes.none { it.startsWith("live:frames=") })
         assertTrue(result.pipelineNotes.none { it.startsWith("live:window=") })
+    }
+
+    // ── FrameBundle pass-through ────────────────────────────────────
+
+    @Test
+    fun `resultFor passes frameBundle into ShotResult`() {
+        val executor = ShotExecutor(idGenerator = { "shot-bundle-pass" })
+        val plan = executor.plan(CaptureStrategy.MultiFrame(
+            captureProfile = CaptureProfile(frameCount = 3)
+        ))
+        val bundle = FrameBundle(
+            shotId = "shot-bundle-pass",
+            frames = listOf(
+                FrameBundleFrame(1, PixelReference.File("/tmp/f1.jpg"), noiseModel = NoiseModel.Unknown,
+                    motionScore = MotionScore.Unknown, isDegraded = true,
+                    degradationReasons = listOf("camera-x:no-per-frame-metadata")),
+                FrameBundleFrame(2, PixelReference.File("/tmp/f2.jpg"), noiseModel = NoiseModel.Unknown,
+                    motionScore = MotionScore.Unknown, isDegraded = true,
+                    degradationReasons = listOf("camera-x:no-per-frame-metadata")),
+                FrameBundleFrame(3, PixelReference.File("/tmp/out.jpg"), frameRole = FrameRole.FUSION_ANCHOR,
+                    noiseModel = NoiseModel.Unknown, motionScore = MotionScore.Unknown, isDegraded = true,
+                    degradationReasons = listOf("camera-x:no-per-frame-metadata"))
+            ),
+            diagnostics = listOf(
+                "device:burst-bundle-frames=3",
+                "device:burst-metadata=unknown",
+                "device:burst-final-frame=3"
+            )
+        )
+        val result = executor.resultFor(
+            saveTask = plan.saveTask,
+            outputPath = "/tmp/out.jpg",
+            frameBundle = bundle,
+            intermediateOutputPaths = listOf("/tmp/f1.jpg", "/tmp/f2.jpg")
+        )
+
+        assertNotNull(result.frameBundle)
+        assertEquals(3, result.frameBundle?.frameCount)
+        assertEquals(FrameBundleStatus.DEGRADED, result.frameBundleStatus())
+        assertTrue(result.isFusionDegraded())
+        assertTrue(result.hasFrameBundle())
+        assertEquals(listOf("/tmp/f1.jpg", "/tmp/f2.jpg"), result.intermediateOutputPaths)
+    }
+
+    @Test
+    fun `resultFor without frameBundle keeps intermediateOutputPaths intact`() {
+        val executor = ShotExecutor(idGenerator = { "shot-no-bundle" })
+        val plan = executor.plan(CaptureStrategy.MultiFrame(
+            captureProfile = CaptureProfile(frameCount = 2)
+        ))
+        val result = executor.resultFor(
+            saveTask = plan.saveTask,
+            outputPath = "/tmp/out.jpg",
+            intermediateOutputPaths = listOf("/tmp/temp1.jpg")
+        )
+
+        assertNull(result.frameBundle)
+        assertEquals(FrameBundleStatus.ABSENT, result.frameBundleStatus())
+        assertEquals(listOf("/tmp/temp1.jpg"), result.intermediateOutputPaths)
+    }
+
+    @Test
+    fun `burst bundle diagnostics contain required device burst entries`() {
+        val bundle = FrameBundle(
+            shotId = "diag-test",
+            frames = listOf(
+                FrameBundleFrame(1, PixelReference.File("/f1.jpg")),
+                FrameBundleFrame(2, PixelReference.File("/f2.jpg"))
+            ),
+            diagnostics = listOf(
+                "device:burst-bundle-frames=2",
+                "device:burst-metadata=unknown",
+                "device:burst-final-frame=2"
+            )
+        )
+        assertTrue(bundle.diagnostics.any { it == "device:burst-bundle-frames=2" })
+        assertTrue(bundle.diagnostics.any { it == "device:burst-metadata=unknown" })
+        assertTrue(bundle.diagnostics.any { it == "device:burst-final-frame=2" })
+    }
+
+    @Test
+    fun `multi frame bundle with unknown metadata is degraded and preserves frame count`() {
+        val bundle = FrameBundle(
+            shotId = "degraded-meta",
+            frames = listOf(
+                FrameBundleFrame(0, PixelReference.File("/t0.jpg")),
+                FrameBundleFrame(1, PixelReference.File("/t1.jpg")),
+                FrameBundleFrame(2, PixelReference.File("/out.jpg"), frameRole = FrameRole.FUSION_ANCHOR)
+            )
+        )
+        assertEquals(3, bundle.frameCount)
+        assertTrue(bundle.isDegraded)
+        assertEquals(FrameBundleStatus.DEGRADED, bundle.status())
+        // validFrames filters on the isDegraded flag, not noise/motion unknown status
+        assertEquals(3, bundle.validFrames.size)
+    }
+
+    private fun createSyntheticJpeg(
+        dir: File,
+        name: String,
+        width: Int = 64,
+        height: Int = 64,
+        baseRgb: Int = 0x808080
+    ): File {
+        val image = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val r = (baseRgb shr 16) and 0xFF
+                val g = (baseRgb shr 8) and 0xFF
+                val b = baseRgb and 0xFF
+                image.setRGB(x, y, (r shl 16) or (g shl 8) or b)
+            }
+        }
+        val file = File(dir, name)
+        ImageIO.write(image, "jpg", file)
+        return file
     }
 }

@@ -40,6 +40,7 @@ import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.reduce
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
@@ -62,7 +63,9 @@ class DefaultCameraSession(
     private val shotExecutor: ShotExecutor = ShotExecutor(),
     private val effectCapabilityResolver: com.opencamera.core.effect.EffectCapabilityResolver? = null,
     private val capabilityGraphResolver: com.opencamera.core.capability.CapabilityGraphResolver? = null,
-    private val capabilityRequirements: () -> List<com.opencamera.core.capability.CapabilityRequirement> = { emptyList() }
+    private val capabilityRequirements: () -> List<com.opencamera.core.capability.CapabilityRequirement> = { emptyList() },
+    private val recordingTimerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val elapsedRealtimeMillis: () -> Long = { System.nanoTime() / 1_000_000L }
 ) : CameraSession {
     private val linkRecorder: PerformanceLinkRecorder = linkRecorder ?: InMemoryPerformanceLinkRecorder()
     private val intentChannel = Channel<SessionIntent>(Channel.UNLIMITED)
@@ -142,7 +145,8 @@ class DefaultCameraSession(
             _state.value = transform(_state.value)
         },
         dispatch = { intent -> dispatch(intent) },
-        recordingTimerDispatcher = Dispatchers.Default
+        recordingTimerDispatcher = recordingTimerDispatcher,
+        elapsedRealtimeMillis = elapsedRealtimeMillis
     )
 
     private val previewSessionMutations = object : PreviewSessionMutations {
@@ -1270,12 +1274,6 @@ class DefaultCameraSession(
                 trace.record("mode.hint", signal.message)
             }
         }
-
-        updateState(
-            modeSnapshot = currentController.snapshot.value,
-            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
-            activeDeviceGraph = resolvedActiveDeviceGraph()
-        )
     }
 
     private suspend fun handleDeviceCapabilitiesUpdated(

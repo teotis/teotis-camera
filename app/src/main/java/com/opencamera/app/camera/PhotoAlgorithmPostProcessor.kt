@@ -3,6 +3,7 @@ package com.opencamera.app.camera
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
+import android.util.Log
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
@@ -28,6 +29,8 @@ import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
+
+private const val TAG = "PhotoAlgorithmPP"
 
 internal sealed class MaskResolveResult {
     data class Available(
@@ -236,7 +239,8 @@ internal class PhotoAlgorithmPostProcessor(
                     }
                 } catch (e: OutOfMemoryError) {
                     result.addPipelineNotes("algorithm-render:failed:oom")
-                } catch (_: Throwable) {
+                } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
                     result.addPipelineNotes("algorithm-render:failed:render-exception")
                 } finally {
                     val resolvedMask = maskResolve
@@ -288,7 +292,8 @@ internal class PhotoAlgorithmPostProcessor(
                     ))
                 }
             }
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
             decoded.recycle()
             MaskResolveResult.Fallback(listOf(
                 SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),
@@ -338,14 +343,14 @@ internal class AndroidPhotoAlgorithmEditor(
     context: Context
 ) : MaskAwarePhotoAlgorithmEditor {
     private val appContext = context.applicationContext
-    private val contentResolver: ContentResolver = appContext.contentResolver
+    internal val contentResolver: ContentResolver = appContext.contentResolver
 
     override suspend fun apply(
         target: ProcessorTarget,
         spec: PhotoAlgorithmSpec
     ): ProcessorEditorResult = withContext(Dispatchers.IO) {
         val t0 = System.currentTimeMillis()
-        val sourceBytes = readSourceBytes(target)
+        val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
             ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
         if (sourceBytes.isEmpty()) {
             return@withContext ProcessorEditorResult.Skipped("empty-source")
@@ -363,7 +368,8 @@ internal class AndroidPhotoAlgorithmEditor(
             }
         } catch (e: OutOfMemoryError) {
             return@withContext ProcessorEditorResult.Failed("decode-oom")
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
             return@withContext ProcessorEditorResult.Failed("decode-exception")
         }
         val t1 = System.currentTimeMillis()
@@ -378,7 +384,8 @@ internal class AndroidPhotoAlgorithmEditor(
                 encodeJpeg(mutableBitmap)
             } catch (e: OutOfMemoryError) {
                 return@withContext ProcessorEditorResult.Failed("encode-oom")
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
                 return@withContext ProcessorEditorResult.Failed("encode-failed")
             }
             val t3 = System.currentTimeMillis()
@@ -400,7 +407,8 @@ internal class AndroidPhotoAlgorithmEditor(
             PhotoAlgorithmApplied(exifWarning, timingNote)
         } catch (e: OutOfMemoryError) {
             ProcessorEditorResult.Failed("style-oom")
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
             ProcessorEditorResult.Failed("style-exception")
         } finally {
             mutableBitmap.recycle()
@@ -414,7 +422,7 @@ internal class AndroidPhotoAlgorithmEditor(
         mask: SavedPhotoMaskPixels
     ): Pair<ProcessorEditorResult, List<String>> {
         val t0 = System.currentTimeMillis()
-        val sourceBytes = readSourceBytes(target)
+        val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
         val preservedExif: Map<String, String> = if (sourceBytes != null && sourceBytes.isNotEmpty()) {
             readPreservedExif(sourceBytes)
         } else {
@@ -431,7 +439,8 @@ internal class AndroidPhotoAlgorithmEditor(
                     SceneMaskPipelineNotes.reason("style-oom")
                 )
             )
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
             return Pair(
                 ProcessorEditorResult.Failed("style-exception"),
                 listOf(
@@ -451,7 +460,8 @@ internal class AndroidPhotoAlgorithmEditor(
                     SceneMaskPipelineNotes.reason("encode-oom")
                 )
             )
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
             return Pair(
                 ProcessorEditorResult.Failed("encode-failed"),
                 styleNotes + listOf(
@@ -798,22 +808,6 @@ internal class AndroidPhotoAlgorithmEditor(
         }
     }
 
-    internal fun readSourceBytes(target: ProcessorTarget): ByteArray? {
-        return when (target) {
-            is ProcessorTarget.FilePath -> {
-                val file = File(target.path)
-                if (!file.exists()) {
-                    null
-                } else {
-                    file.readBytes()
-                }
-            }
-
-            is ProcessorTarget.ContentUri -> {
-                contentResolver.openInputStream(Uri.parse(target.value))?.use { it.readBytes() }
-            }
-        }
-    }
 
     internal fun writeEncodedBytes(target: ProcessorTarget, encodedBytes: ByteArray): Boolean =
         contentResolver.writeEncodedBytes(target, encodedBytes)
@@ -1053,7 +1047,7 @@ internal fun resolvePhotoAlgorithmSpec(
             warmthShift = 10
         )
 
-        "fullclear-best-frame-v1" -> PhotoAlgorithmSpec(
+        "clarity-best-frame-v1" -> PhotoAlgorithmSpec(
             profile = profile,
             contrast = 1.08f,
             saturation = 1.03f,
@@ -1110,7 +1104,7 @@ private fun canonicalPhotoAlgorithmProfile(profile: String): String {
         .removeSuffix("-pro-assist")
         .removeSuffix("-pro")
     return when {
-        variantBase == "checkin-clarity-best-frame-v1" -> "fullclear-best-frame-v1"
+        variantBase == "checkin-clarity-best-frame-v1" -> "clarity-best-frame-v1"
         variantBase.startsWith("checkin-") -> variantBase.removePrefix("checkin-")
         else -> variantBase
     }
@@ -1239,7 +1233,7 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
         val target = algorithmPayload.target
         val t0 = System.currentTimeMillis()
 
-        val sourceBytes = algorithmEditor.readSourceBytes(target)
+        val sourceBytes = ProcessorIOUtils.readSourceBytes(target, algorithmEditor.contentResolver)
             ?: return@withContext result.addPipelineNotes(
                 "combined-render:skipped:input-unavailable"
             )
@@ -1298,11 +1292,12 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
                     "combined-render:failed:output-unavailable"
                 )
             }
+            val tWriteDone = System.currentTimeMillis()
 
             val exifWarning = algorithmEditor.restorePreservedExif(target, preservedExif)
             val t5 = System.currentTimeMillis()
 
-            val visibleBytesAfterExif = algorithmEditor.readSourceBytes(target)
+            val visibleBytesAfterExif = ProcessorIOUtils.readSourceBytes(target, algorithmEditor.contentResolver)
             val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
                 originalBytes = sourceBytes,
                 visibleBytesAfterExifRestore = visibleBytesAfterExif,
@@ -1318,7 +1313,7 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
             val timingNote = "combined-render:timing:${algorithmPayload.spec.profile}+${watermarkWork.templateId} " +
                 "size=${decoded.width}x${decoded.height} " +
                 "decode=${t1 - t0}ms style=${t2 - t1}ms watermark=${t3 - t2}ms " +
-                "encode=${t4 - t3}ms write=${t5 - t4}ms exif=${t5 - t5}ms archive=${t6 - t5}ms total=${t6 - t0}ms"
+                "encode=${t4 - t3}ms write=${tWriteDone - t4}ms exif=${t5 - tWriteDone}ms archive=${t6 - t5}ms total=${t6 - t0}ms"
 
             val warnings = listOfNotNull(exifWarning, archiveWarning)
                 .takeIf { it.isNotEmpty() }
@@ -1332,7 +1327,8 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
             result.addPipelineNotes(*baseNotes.toTypedArray())
         } catch (e: OutOfMemoryError) {
             result.addPipelineNotes("combined-render:failed:oom")
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
             result.addPipelineNotes("combined-render:failed:render-exception")
         } finally {
             if (finalBitmap != null && finalBitmap !== workingBitmap) finalBitmap.recycle()
@@ -1393,7 +1389,8 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
             }
         } catch (e: OutOfMemoryError) {
             result.addPipelineNotes("algorithm-render:failed:oom")
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
             result.addPipelineNotes("algorithm-render:failed:render-exception")
         } finally {
             (maskResolve as? MaskResolveResult.Available)?.bitmap?.recycle()
@@ -1406,7 +1403,7 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
         val decoded = if (maskBitmapSource != null) {
             maskBitmapSource.invoke(target) ?: return null
         } else {
-            val sourceBytes = algorithmEditor.readSourceBytes(target) ?: return null
+            val sourceBytes = ProcessorIOUtils.readSourceBytes(target, algorithmEditor.contentResolver) ?: return null
             if (sourceBytes.isEmpty()) return null
             BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size) ?: return null
         }
@@ -1436,7 +1433,8 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
                     ))
                 }
             }
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "algorithm postprocess failed", e)
             decoded.recycle()
             MaskResolveResult.Fallback(listOf(
                 SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),

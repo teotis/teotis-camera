@@ -60,6 +60,12 @@ internal class ShutterVisualDrawable : Drawable() {
         textAlign = Paint.Align.CENTER
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
+    private val failPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
+    private val oval = RectF()
+    private val stopRect = RectF()
 
     private var ringAlpha = 255
     private var fillAlpha = 255
@@ -144,7 +150,7 @@ internal class ShutterVisualDrawable : Drawable() {
                 fillPaint.alpha = fillAlpha
                 val stopSize = maxRadius * 0.35f
                 val stopCorner = 4f * density
-                val stopRect = RectF(
+                stopRect.set(
                     cx - stopSize, cy - stopSize,
                     cx + stopSize, cy + stopSize
                 )
@@ -157,7 +163,7 @@ internal class ShutterVisualDrawable : Drawable() {
                 fillPaint.color = Color.argb(120, 180, 80, 80)
                 fillPaint.alpha = fillAlpha
                 val stopSize = maxRadius * 0.35f
-                val stopRect = RectF(
+                stopRect.set(
                     cx - stopSize, cy - stopSize,
                     cx + stopSize, cy + stopSize
                 )
@@ -189,7 +195,7 @@ internal class ShutterVisualDrawable : Drawable() {
         canvas.drawCircle(cx, cy, ringRadius, ringPaint)
         if (countdownProgress > 0f && progressAlpha > 0) {
             val sweepAngle = countdownProgress * 360f
-            val oval = RectF(cx - ringRadius, cy - ringRadius, cx + ringRadius, cy + ringRadius)
+            oval.set(cx - ringRadius, cy - ringRadius, cx + ringRadius, cy + ringRadius)
             canvas.drawArc(oval, -90f, sweepAngle, false, progressPaint)
         }
     }
@@ -198,7 +204,7 @@ internal class ShutterVisualDrawable : Drawable() {
         canvas.drawCircle(cx, cy, ringRadius, ringPaint)
         if (progressAlpha > 0) {
             progressPaint.color = Color.argb(progressAlpha, 133, 214, 190)
-            val oval = RectF(cx - ringRadius, cy - ringRadius, cx + ringRadius, cy + ringRadius)
+            oval.set(cx - ringRadius, cy - ringRadius, cx + ringRadius, cy + ringRadius)
             val startAngle = savingRotation
             canvas.drawArc(oval, startAngle, 90f, false, progressPaint)
         }
@@ -207,12 +213,8 @@ internal class ShutterVisualDrawable : Drawable() {
     private fun drawFailure(canvas: Canvas, cx: Float, cy: Float, ringRadius: Float, ringStroke: Float) {
         canvas.drawCircle(cx, cy, ringRadius, ringPaint)
         val offset = ringRadius * 0.3f
-        val failPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(ringAlpha, 255, 120, 80)
-            strokeWidth = ringStroke
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.ROUND
-        }
+        failPaint.color = Color.argb(ringAlpha, 255, 120, 80)
+        failPaint.strokeWidth = ringStroke
         canvas.drawLine(cx - offset, cy - offset, cx + offset, cy + offset, failPaint)
         canvas.drawLine(cx + offset, cy - offset, cx - offset, cy + offset, failPaint)
     }

@@ -26,6 +26,8 @@ class PreviewAnalysisFanout(
         }
         try {
             imageProxy.close()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to close image proxy", e)
+        }
     }
 }

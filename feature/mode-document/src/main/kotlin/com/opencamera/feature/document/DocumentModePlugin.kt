@@ -1,40 +1,27 @@
 package com.opencamera.feature.document
 
 import com.opencamera.core.device.DeviceCapabilities
-import com.opencamera.core.device.DeviceGraphSpec
-import com.opencamera.core.device.LensFacing
 import com.opencamera.core.effect.DocumentEffect
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.WatermarkEffect
+import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.MediaMetadata
-
-import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.StillCaptureResolutionPreset
+import com.opencamera.core.mode.AbstractStillCaptureMode
 import com.opencamera.core.mode.CameraModePlugin
 import com.opencamera.core.mode.ModeContext
 import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
-import com.opencamera.core.mode.ModeIntent
-import com.opencamera.core.mode.ModeSessionEvent
-import com.opencamera.core.mode.StillShotSessionEventText
-import com.opencamera.core.mode.reduceStillShotSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
-import com.opencamera.core.mode.captureAidMetadataTags
-import com.opencamera.core.mode.stillCaptureDeviceGraph
-import com.opencamera.core.settings.WatermarkTemplate
+import com.opencamera.core.mode.StillShotSessionEventText
 import com.opencamera.core.settings.watermarkStyleFor
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 class DocumentModePlugin : CameraModePlugin {
     override val id: ModeId = ModeId.DOCUMENT
@@ -49,8 +36,9 @@ class DocumentModePlugin : CameraModePlugin {
 }
 
 private class DocumentModeController(
-    private val context: ModeContext
-) : ModeController {
+    context: ModeContext
+) : AbstractStillCaptureMode(context) {
+
     private var profileIndex = 0
 
     private val uiSpec = ModeUiSpec(
@@ -59,98 +47,45 @@ private class DocumentModeController(
         secondaryActionLabel = "Cycle Scan Style"
     )
 
-    private val mutableSnapshot = MutableStateFlow(
-        buildSnapshot(
-            headline = "Document pipeline ready"
-        )
-    )
-
     override val id: ModeId = ModeId.DOCUMENT
-    override val snapshot: StateFlow<ModeSnapshot> = mutableSnapshot.asStateFlow()
 
-    override fun deviceGraph(): DeviceGraphSpec = currentDeviceGraph()
+    // ── Subclass contract ──────────────────────────────────────────────
 
-    override suspend fun onDeviceCapabilitiesChanged(deviceCapabilities: DeviceCapabilities) {
-        profileIndex = profileIndex.coerceAtMost(currentProfiles().lastIndex)
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (enhancementEnabled()) {
-                "Document scan active"
-            } else {
-                "Document archive active"
-            }
-        )
-    }
+    override fun modeEventPrefix(): String = "document"
 
-    override suspend fun onLensFacingChanged(lensFacing: LensFacing) = Unit
+    override fun initialHeadline(): String = "Document pipeline ready"
 
-    override suspend fun onStillCaptureResolutionChanged(
-        stillCaptureResolutionPreset: StillCaptureResolutionPreset
-    ) {
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (enhancementEnabled()) {
-                "Document resolution updated"
-            } else {
-                "Archive resolution updated"
-            }
-        )
-    }
-
-    override suspend fun onEnter() {
-        context.eventSink("document.enter")
-        mutableSnapshot.value = buildSnapshot(
-            headline = if (enhancementEnabled()) {
-                "Document scan active"
-            } else {
-                "Document archive active"
-            }
-        )
-        context.onEffectSpecChanged(buildEffectSpec())
-    }
-
-    override suspend fun onExit() {
-        context.eventSink("document.exit")
-        mutableSnapshot.value = buildSnapshot(
-            headline = "Document mode inactive"
-        )
-    }
-
-    override suspend fun handle(intent: ModeIntent): ModeSignal {
-        return when (intent) {
-            ModeIntent.ShutterPressed -> submitCurrentProfile()
-            ModeIntent.SecondaryActionPressed -> cycleProfile()
-            ModeIntent.TertiaryActionPressed -> ModeSignal.None
-            is ModeIntent.FrameRatioSelected -> ModeSignal.ShowHint("文档模式使用自动裁边，无需选择画幅比例")
-            ModeIntent.ProActionPressed -> ModeSignal.None
-            is ModeIntent.ScenarioSelected -> ModeSignal.None
-        }
-    }
-
-    override suspend fun onSessionEvent(event: ModeSessionEvent) {
-        reduceStillShotSessionEvent(
-            event = event,
-            text = StillShotSessionEventText(
-                shotStartedHeadline = "Document scan in progress",
-                shotCompletedHeadline = "Document saved",
-                shotFailedHeadline = "Document capture failed"
-            ),
-            updateSnapshot = { headline, detail ->
-                mutableSnapshot.value = if (detail == null) {
-                    buildSnapshot(headline = headline)
-                } else {
-                    buildSnapshot(headline = headline, detail = detail)
-                }
-            }
-        )
-    }
-
-    private suspend fun submitCurrentProfile(): ModeSignal {
+    override fun buildEffectSpec(): EffectSpec {
         val profile = currentProfile()
-        context.eventSink("document.capture.requested.${profile.id}")
-        mutableSnapshot.value = buildSnapshot(
-            headline = "Document capture requested"
-        )
-        val effectSpec = buildEffectSpec()
-        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+        val selectedWatermarkTemplate = selectedWatermarkTemplate()
+        val watermarkStyle = context.settingsSnapshot.persisted.photo
+            .watermarkStyleFor(selectedWatermarkTemplate.id)
+        return EffectSpec(listOf(
+            DocumentEffect(
+                autoCrop = profile.autoCrop,
+                contrastProfile = if (enhancementEnabled()) profile.contrastLabel else null
+            ),
+            WatermarkEffect(
+                templateId = selectedWatermarkTemplate.id,
+                tokens = watermarkTokens(runtimeState().stillCaptureResolutionPreset.label),
+                style = watermarkStyle
+            )
+        ))
+    }
+
+    override suspend fun handleShutterPressed(): ModeSignal {
+        val profile = currentProfile()
+        context.eventSink("${modeEventPrefix()}.capture.requested.${profile.id}")
+        val signal = super.handleShutterPressed()
+        updateSnapshot(headline = "Document capture requested")
+        return signal
+    }
+
+    override fun buildCaptureStrategy(
+        effectSpec: EffectSpec,
+        countdownSeconds: Int
+    ): ModeSignal.SubmitCapture {
+        val profile = currentProfile()
         val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
         val postProcessSpec = basePostProcess.copy(
             watermarkText = if (enhancementEnabled()) {
@@ -173,19 +108,20 @@ private class DocumentModeController(
                     relativePath = "Pictures/OpenCamera/Documents",
                     fileNamePrefix = "OpenCamera_DOC",
                     metadata = MediaMetadata(
-                        customTags = buildMap {
-                            put("mode", "document")
-                            put("profile", profile.id)
-                            put("scanMode", if (enhancementEnabled()) "enhanced" else "basic")
-                            put("outputClass", "scan")
-                            put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
-                            putAll(context.captureAidMetadataTags())
-                            putAll(bridgeTags)
-                        }
+                        customTags = captureMetadataTags(
+                            effectSpec = effectSpec,
+                            modeTags = buildMap {
+                                put("mode", "document")
+                                put("profile", profile.id)
+                                put("scanMode", if (enhancementEnabled()) "enhanced" else "basic")
+                                put("outputClass", "scan")
+                                put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
+                            }
+                        )
                     )
                 ),
                 postProcessSpec = postProcessSpec,
-                captureProfile = com.opencamera.core.media.CaptureProfile(
+                captureProfile = CaptureProfile(
                     stillCaptureQuality = runtimeState().stillCaptureQuality,
                     stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                 )
@@ -193,33 +129,54 @@ private class DocumentModeController(
         )
     }
 
-    private fun buildEffectSpec(): EffectSpec {
-        val profile = currentProfile()
-        val selectedWatermarkTemplate = selectedWatermarkTemplate()
-        val watermarkStyle = context.settingsSnapshot.persisted.photo
-            .watermarkStyleFor(selectedWatermarkTemplate.id)
-        return EffectSpec(listOf(
-            DocumentEffect(
-                autoCrop = profile.autoCrop,
-                contrastProfile = if (enhancementEnabled()) profile.contrastLabel else null
-            ),
-            WatermarkEffect(
-                templateId = selectedWatermarkTemplate.id,
-                tokens = mapOf(
-                    "watermarkModel" to "OpenCamera",
-                    "watermarkDatetime" to watermarkDateTime(),
-                    "watermarkCameraParams" to watermarkCameraParams()
-                ),
-                style = watermarkStyle
+    override fun buildSnapshot(headline: String, detail: String?): ModeSnapshot {
+        return ModeSnapshot(
+            id = ModeId.DOCUMENT,
+            uiSpec = uiSpec,
+            state = ModeState(
+                headline = headline,
+                detail = detail ?: buildDefaultDetail()
             )
-        ))
+        )
     }
 
-    private suspend fun cycleProfile(): ModeSignal {
+    override fun buildDefaultDetail(): String = profileSummary(currentProfile())
+
+    // ── Headlines ─────────────────────────────────────────────────────
+
+    override fun enterHeadline(): String = if (enhancementEnabled()) {
+        "Document scan active"
+    } else {
+        "Document archive active"
+    }
+
+    override fun exitHeadline(): String = "Document mode inactive"
+
+    override fun capabilitiesChangedHeadline(): String = if (enhancementEnabled()) {
+        "Document scan active"
+    } else {
+        "Document archive active"
+    }
+
+    override fun resolutionChangedHeadline(): String = if (enhancementEnabled()) {
+        "Document resolution updated"
+    } else {
+        "Archive resolution updated"
+    }
+
+    override fun sessionEventText(): StillShotSessionEventText = StillShotSessionEventText(
+        shotStartedHeadline = "Document scan in progress",
+        shotCompletedHeadline = "Document saved",
+        shotFailedHeadline = "Document capture failed"
+    )
+
+    // ── Intent overrides ──────────────────────────────────────────────
+
+    override suspend fun handleSecondaryAction(): ModeSignal {
         profileIndex = (profileIndex + 1) % currentProfiles().size
         val profile = currentProfile()
-        context.eventSink("document.profile.selected.${profile.id}")
-        mutableSnapshot.value = buildSnapshot(
+        context.eventSink("${modeEventPrefix()}.profile.selected.${profile.id}")
+        updateSnapshot(
             headline = if (enhancementEnabled()) {
                 "Document style updated"
             } else {
@@ -230,26 +187,21 @@ private class DocumentModeController(
         return ModeSignal.ShowHint("Scan style: ${profile.label}")
     }
 
-    private fun buildSnapshot(
-        headline: String,
-        detail: String = profileSummary(currentProfile())
-    ): ModeSnapshot {
-        return ModeSnapshot(
-            id = ModeId.DOCUMENT,
-            uiSpec = uiSpec,
-            state = ModeState(
-                headline = headline,
-                detail = detail
-            )
-        )
+    override suspend fun handleTertiaryAction(): ModeSignal = ModeSignal.None
+
+    override suspend fun handleFrameRatioSelected(ratio: FrameRatio): ModeSignal =
+        ModeSignal.ShowHint("文档模式使用自动裁边，无需选择画幅比例")
+
+    // ── Capability coercion ───────────────────────────────────────────
+
+    override suspend fun onModeCapabilitiesChanged(deviceCapabilities: DeviceCapabilities) {
+        profileIndex = profileIndex.coerceAtMost(currentProfiles().lastIndex)
     }
 
-    private fun currentDeviceGraph(): DeviceGraphSpec =
-        stillCaptureDeviceGraph(runtimeState())
+    // ── Profile helpers ───────────────────────────────────────────────
 
     private fun enhancementEnabled(): Boolean =
         runtimeState().deviceCapabilities.supportsDocumentScanEnhancement
-    private fun runtimeState() = context.runtimeState()
 
     private fun currentProfiles(): List<DocumentProfile> {
         return if (enhancementEnabled()) {
@@ -267,26 +219,6 @@ private class DocumentModeController(
         } else {
             "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only (document enhancement is unavailable)."
         }
-    }
-
-    private fun selectedWatermarkTemplate(): WatermarkTemplate {
-        val persistedTemplateId = context.settingsSnapshot.persisted.photo.defaultWatermarkTemplateId
-        return context.settingsSnapshot.catalog.watermarkTemplates.firstOrNull { template ->
-            template.id == persistedTemplateId
-        } ?: WatermarkTemplate(
-            id = persistedTemplateId,
-            label = persistedTemplateId
-        )
-    }
-
-    private fun watermarkDateTime(): String {
-        return LocalDateTime.now().format(
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.US)
-        )
-    }
-
-    private fun watermarkCameraParams(): String {
-        return runtimeState().stillCaptureResolutionPreset.label
     }
 
     private data class DocumentProfile(
@@ -339,5 +271,4 @@ private class DocumentModeController(
             )
         )
     }
-
 }

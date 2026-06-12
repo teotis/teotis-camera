@@ -18,6 +18,7 @@ import com.opencamera.app.camera.toSnapshot
 import com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitor
 import com.opencamera.app.camera.CameraSessionCoordinator
 import com.opencamera.app.camera.CameraXCaptureAdapter
+import com.opencamera.app.camera.LazyCameraXExtensionSelectorResolver
 import com.opencamera.app.camera.PreviewSceneBrightnessMonitor
 import com.opencamera.app.camera.toSignalSource
 import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
@@ -36,7 +37,7 @@ import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.effect.PreviewSceneMaskSnapshot
 import com.opencamera.core.media.MediaProcessorAvailability
 import com.opencamera.core.media.CompositeMediaPostProcessor
-import com.opencamera.core.media.MultiFrameMergePlaceholderPostProcessor
+import com.opencamera.core.media.MultiFrameFusionProcessor
 import com.opencamera.core.media.PipelineMetadataPostProcessor
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.mode.ModeRegistry
@@ -78,7 +79,7 @@ class AppContainer(
 
     private val mediaPostProcessor = CompositeMediaPostProcessor(
         processors = listOf(
-            MultiFrameMergePlaceholderPostProcessor(),
+            MultiFrameFusionProcessor(),
             DocumentAutoCropPostProcessor(
                 AndroidDocumentAutoCropEditor(appContext)
             ),
@@ -143,7 +144,8 @@ class AppContainer(
         shotExecutor = shotExecutor,
         mediaPostProcessor = mediaPostProcessor,
         livePreviewFrameSource = livePreviewFrameSource,
-        linkRecorder = linkRecorder
+        linkRecorder = linkRecorder,
+        extensionSelectorResolver = LazyCameraXExtensionSelectorResolver(appContext)
     )
 
     val effectCapabilityResolver = EffectCapabilityResolver(

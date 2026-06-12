@@ -1,13 +1,39 @@
 package com.opencamera.core.media
 
+import java.awt.image.BufferedImage
+import java.io.File
+import javax.imageio.ImageIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
-import java.io.File
 
 class MultiFrameMergeAlgorithmProcessorTest {
+
+    private fun createSyntheticJpeg(
+        dir: File,
+        name: String,
+        width: Int = 64,
+        height: Int = 64,
+        baseRgb: Int = 0x808080
+    ): File {
+        val image = BufferedImage(width, height, BufferedImage.TYPE_INT_RGB)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val r = (baseRgb shr 16) and 0xFF
+                val g = (baseRgb shr 8) and 0xFF
+                val b = baseRgb and 0xFF
+                image.setRGB(x, y, (r shl 16) or (g shl 8) or b)
+            }
+        }
+        val file = File(dir, name)
+        val written = ImageIO.write(image, "jpg", file)
+        require(written) { "ImageIO.write failed for $name" }
+        val readBack = ImageIO.read(file)
+        require(readBack != null) { "ImageIO.read failed for written JPEG: ${file.absolutePath}" }
+        return file
+    }
 
     private fun buildMergeRequest(
         frameCount: Int,
@@ -36,14 +62,14 @@ class MultiFrameMergeAlgorithmProcessorTest {
     }
 
     @Test
-    fun `multi frame merge processor returns Applied when frame count greater than one and intermediates exist`() =
+    fun `multi frame fusion processor returns Applied when valid JPEG frames exist`() =
         runTest {
-            val tempDir = createTempDir(prefix = "merge-test-")
-            val frameA = File(tempDir, "frame_a.jpg").apply { writeText("frame-a-data") }
-            val frameB = File(tempDir, "frame_b.jpg").apply { writeText("frame-bb-data") }
+            val tempDir = createTempDir(prefix = "fusion-alg-test-")
+            val frameA = createSyntheticJpeg(tempDir, "frame_a.jpg", baseRgb = 0x404040)
+            val frameB = createSyntheticJpeg(tempDir, "frame_b.jpg", baseRgb = 0xC0C0C0)
 
             try {
-                val processor = MultiFrameMergePlaceholderPostProcessor().toAlgorithmProcessor()
+                val processor = MultiFrameFusionProcessor().toAlgorithmProcessor()
                 val request = buildMergeRequest(
                     frameCount = 3,
                     inputPaths = listOf(frameA.absolutePath, frameB.absolutePath)
@@ -53,32 +79,31 @@ class MultiFrameMergeAlgorithmProcessorTest {
                 val result = processor.process(request)
 
                 assertTrue(result is AlgorithmResult.Applied)
-                assertTrue((result as AlgorithmResult.Applied).notes.contains("merge:placeholder"))
+                assertTrue((result as AlgorithmResult.Applied).notes.any { it.startsWith("merge:applied=true") })
                 assertTrue(result.notes.any { it.startsWith("merge:inputs=") })
-                assertTrue(result.notes.contains("merge:strategy=burst-placeholder"))
+                assertTrue(result.notes.any { it.startsWith("merge:strategy=") })
             } finally {
                 tempDir.deleteRecursively()
             }
         }
 
     @Test
-    fun `multi frame merge processor returns Skipped when frame count is one`() = runTest {
-        val processor = MultiFrameMergePlaceholderPostProcessor().toAlgorithmProcessor()
+    fun `multi frame fusion processor returns Skipped when frame count is one`() = runTest {
+        val processor = MultiFrameFusionProcessor().toAlgorithmProcessor()
         val request = buildMergeRequest(frameCount = 1, inputPaths = listOf("/tmp/single.jpg"))
 
         assertFalse(processor.canProcess(request))
         val result = processor.process(request)
 
         assertTrue(result is AlgorithmResult.Skipped)
-        assertEquals(
-            "single-frame-or-no-intermediates",
-            (result as AlgorithmResult.Skipped).reason
+        assertTrue(
+            (result as AlgorithmResult.Skipped).reason.contains("no-bundle-or-single-frame")
         )
     }
 
     @Test
-    fun `multi frame merge processor returns Skipped when no intermediate inputs`() = runTest {
-        val processor = MultiFrameMergePlaceholderPostProcessor().toAlgorithmProcessor()
+    fun `multi frame fusion processor returns Skipped when no intermediate inputs`() = runTest {
+        val processor = MultiFrameFusionProcessor().toAlgorithmProcessor()
         val request = buildMergeRequest(frameCount = 5, inputPaths = emptyList())
 
         assertFalse(processor.canProcess(request))
@@ -88,13 +113,13 @@ class MultiFrameMergeAlgorithmProcessorTest {
     }
 
     @Test
-    fun `temp files are deleted after merge regardless of Applied result`() = runTest {
-        val tempDir = createTempDir(prefix = "merge-cleanup-")
-        val frameA = File(tempDir, "burst_a.jpg").apply { writeText("aaa") }
-        val frameB = File(tempDir, "burst_b.jpg").apply { writeText("bbb") }
+    fun `temp files are deleted after fusion regardless of result`() = runTest {
+        val tempDir = createTempDir(prefix = "fusion-cleanup-")
+        val frameA = createSyntheticJpeg(tempDir, "burst_a.jpg", baseRgb = 0x404040)
+        val frameB = createSyntheticJpeg(tempDir, "burst_b.jpg", baseRgb = 0x808080)
 
         try {
-            val processor = MultiFrameMergePlaceholderPostProcessor().toAlgorithmProcessor()
+            val processor = MultiFrameFusionProcessor().toAlgorithmProcessor()
             val request = buildMergeRequest(
                 frameCount = 4,
                 inputPaths = listOf(frameA.absolutePath, frameB.absolutePath)
@@ -102,8 +127,8 @@ class MultiFrameMergeAlgorithmProcessorTest {
 
             val result = processor.process(request)
             assertTrue(result is AlgorithmResult.Applied)
-            assertTrue(frameA.exists().not())
-            assertTrue(frameB.exists().not())
+            // Only intermediate frames (all but last) are cleaned up; last is the reference/output
+            assertTrue(frameA.exists().not(), "intermediate frame should be cleaned up")
         } finally {
             tempDir.deleteRecursively()
         }

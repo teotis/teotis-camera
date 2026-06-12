@@ -13,6 +13,14 @@ class BottomCockpitLayoutContractTest {
     private val dimens = parseDimens(resourceFile("values/dimens.xml"))
 
     @Test
+    fun `preview content uses end aligned aspect fit above bottom cockpit`() {
+        val preview = layout.elementByAndroidId("cameraPreview")
+
+        assertEquals("fitEnd", preview.appAttr("scaleType"))
+        assertEquals("@id/bottomSheet", preview.appAttr("layout_constraintBottom_toTopOf"))
+    }
+
+    @Test
     fun `mode track keeps compact vertical padding`() {
         val modeTrack = layout.elementByAndroidId("modeTrackScroll")
 
@@ -25,13 +33,12 @@ class BottomCockpitLayoutContractTest {
         val bottomSheet = layout.elementByAndroidId("bottomSheet")
         val modeTrack = layout.elementByAndroidId("modeTrackScroll")
         val passiveBottomClearance =
-            resolveDimenDp(bottomSheet.androidAttr("layout_marginBottom")) +
-                resolveDimenDp(bottomSheet.androidAttr("paddingBottom"))
+            resolveDimenDp(bottomSheet.androidAttr("paddingBottom"))
         val compactVerticalChrome =
                 resolveDimenDp(modeTrack.androidAttr("paddingVertical")) * 2 +
                 resolveDimenDp("@dimen/cockpit_control_row_margin_top")
 
-        assertEquals(18, passiveBottomClearance)
+        assertEquals(4, passiveBottomClearance)
         assertTrue(compactVerticalChrome <= 6)
     }
 

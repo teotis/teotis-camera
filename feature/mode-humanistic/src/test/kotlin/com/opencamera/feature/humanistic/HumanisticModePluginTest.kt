@@ -371,6 +371,98 @@ class HumanisticModePluginTest {
         )
         return HumanisticModePlugin().create(context)
     }
+
+    // ── Characterization: exact metadata maps ────────────────────────────
+
+    @Test
+    fun `char standard capture exact metadata keys`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("humanistic", metadata["mode"])
+        assertEquals("humanistic", metadata["modeDisplay"])
+        assertEquals("humanistic-original", metadata["style"])
+        assertEquals("photo-original", metadata["algorithmProfile"])
+        assertEquals("off", metadata["livePhotoDefault"])
+        assertEquals("standard", metadata["modeVariant"])
+        assertEquals("Pictures/OpenCamera/Humanistic",
+            (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+                .strategy.saveRequest.relativePath)
+        assertEquals("OpenCamera_HUMANISTIC",
+            (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+                .strategy.saveRequest.fileNamePrefix)
+    }
+
+    @Test
+    fun `char live photo capture exact metadata keys`(): Unit = runBlocking {
+        val controller = createController(livePhotoEnabled = true)
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("humanistic", metadata["mode"])
+        assertEquals("on", metadata["livePhotoDefault"])
+        assertEquals("standard", metadata["modeVariant"])
+    }
+
+    @Test
+    fun `char pro variant exact metadata keys`(): Unit = runBlocking {
+        val controller = createController()
+        controller.handle(ModeIntent.ProActionPressed)
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("humanistic", metadata["mode"])
+        assertEquals("pro", metadata["modeVariant"])
+        assertTrue(metadata.containsKey("watermarkTemplate"))
+        assertTrue(metadata.containsKey("stillResolution"))
+    }
+
+    @Test
+    fun `char standard capture post process exif`(): Unit = runBlocking {
+        val controller = createController()
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertEquals("Humanistic", postProcess.exifOverrides["SceneCaptureType"])
+        assertEquals("Humanistic Original", postProcess.exifOverrides["HumanisticStyle"])
+        assertTrue(postProcess.watermarkText!!.contains("Humanistic"))
+        assertTrue(postProcess.watermarkText!!.contains("Original"))
+    }
+
+    @Test
+    fun `char humanistic has capture aid tags`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("back", metadata["captureLensFacing"])
+        assertEquals("false", metadata["selfieMirrorApply"])
+        assertTrue(metadata.containsKey("stillQuality"))
+    }
+
+    @Test
+    fun `char humanistic has filter profile in bridge tags`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertTrue(metadata.containsKey("filterProfile"))
+    }
+
+    @Test
+    fun `char humanistic no multi frame or low light metadata`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertFalse(metadata.containsKey("photoLowLightStrategy"))
+        assertFalse(metadata.containsKey("photoLowLightNightAssist"))
+        assertFalse(metadata.containsKey("checkInScenario"))
+        assertFalse(metadata.containsKey("portraitProfile"))
+    }
+
+    @Test
+    fun `char humanistic mode collision - mode key not from portrait effect`(): Unit = runBlocking {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("humanistic", metadata["mode"])
+        assertFalse(metadata.containsKey("portraitProfile"))
+    }
 }
 
 private fun assertFalse(value: Boolean, message: String = "Expected false") {

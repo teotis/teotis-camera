@@ -73,12 +73,20 @@ object VendorCameraProbe {
             return sb.toString()
         }
 
+        appendProbeSection(sb, "camera-extensions") {
+            appendCameraExtensionProbe(sb, CameraExtensionProbe.probe(context))
+        }
+
         for (cameraId in cameraIds) {
             appendCameraProbe(sb, cameraManager, cameraId)
         }
 
         sb.appendLine("===== PROBE COMPLETE =====")
         return sb.toString()
+    }
+
+    fun summary(context: Context): String {
+        return CameraExtensionProbe.probe(context).summaryLine()
     }
 
     private fun appendCameraProbe(
@@ -113,6 +121,7 @@ object VendorCameraProbe {
 
         appendProbeSection(sb, "sensor-info") { appendSensorInfo(sb, chars) }
         appendProbeSection(sb, "lens-info") { appendLensInfo(sb, chars) }
+        appendProbeSection(sb, "extended-scene-modes") { appendExtendedSceneModeProbe(sb, chars) }
         appendProbeSection(sb, "raw-capability") { appendRawCapability(sb, chars) }
         appendProbeSection(sb, "characteristics-keys") { appendAllCharacteristicsKeys(sb, chars) }
         appendProbeSection(sb, "hidden-via-reflection") { appendVendorKeysViaReflection(sb, chars) }
@@ -210,6 +219,61 @@ object VendorCameraProbe {
         }
         if (oisModes != null && oisModes.isNotEmpty()) {
             sb.appendLine("    ois-modes: ${oisModes.joinToString { oisLabel(it) }}")
+        }
+    }
+
+    // ── Extended scene modes (Android 16+, accessed via reflection) ──
+
+    /**
+     * Construct [CameraCharacteristics.Key] for `CONTROL_EXTENDED_SCENE_MODE_AVAILABLE_MODES`
+     * via reflection. The constant was added in API 36, but this project compiles against SDK 35.
+     * Reflection allows probing on devices that report the key at runtime (e.g. vivo V2509A).
+     */
+    private fun extendedSceneModeKey(): CameraCharacteristics.Key<IntArray>? {
+        return try {
+            val clazz = Class.forName("android.hardware.camera2.CameraCharacteristics\$Control")
+            val field = clazz.getDeclaredField("CONTROL_EXTENDED_SCENE_MODE_AVAILABLE_MODES")
+            @Suppress("UNCHECKED_CAST")
+            field.get(null) as CameraCharacteristics.Key<IntArray>
+        } catch (_: Exception) {
+            // Not available under current compileSdk or runtime — probe-only, non-fatal
+            null
+        }
+    }
+
+    private fun appendExtendedSceneModeProbe(sb: StringBuilder, chars: CameraCharacteristics) {
+        val key = extendedSceneModeKey()
+            ?: throw UnsupportedOperationException(
+                "CONTROL_EXTENDED_SCENE_MODE_AVAILABLE_MODES not accessible under compileSdk 35"
+            )
+
+        val modes = chars.get(key) ?: intArrayOf()
+
+        sb.appendLine("  available-extended-scene-modes: ${modes.joinToString(", ") { extendedSceneModeLabel(it) }}")
+        sb.appendLine("  extended-scene-mode-count: ${modes.size}")
+
+        val configMap = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        if (configMap != null) {
+            val maxStreaming = configMap.getOutputSizes(ImageFormat.JPEG)
+                ?.maxByOrNull { it.width * it.height }
+            if (maxStreaming != null) {
+                sb.appendLine("  max-streaming-size: ${maxStreaming.width}×${maxStreaming.height}")
+            }
+        }
+
+        val zoomRange = chars.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)
+        if (zoomRange != null) {
+            sb.appendLine("  zoom-ratio-range: [${zoomRange.lower}, ${zoomRange.upper}]")
+        }
+    }
+
+    private fun extendedSceneModeLabel(mode: Int): String = when (mode) {
+        0 -> "disabled"
+        1 -> "bokeh-still-capture"
+        2 -> "bokeh-continuous"
+        else -> {
+            if (mode >= 0x40) "vendor-0x${mode.toString(16)}"
+            else "unknown-0x${mode.toString(16)}"
         }
     }
 
@@ -559,6 +623,13 @@ object VendorCameraProbe {
         val physicalSize = chars.get(CameraCharacteristics.SENSOR_INFO_PHYSICAL_SIZE) ?: return 1f
         return focalLengthCropFactor(physicalSize)
     }
+}
+
+internal fun appendCameraExtensionProbe(
+    sb: StringBuilder,
+    report: CameraExtensionProbeReport
+) {
+    sb.append(report.toProbeText())
 }
 
 internal fun formatPhysicalSensorSize(physicalSize: SizeF): String {

@@ -4,7 +4,9 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
+import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.LivePhotoCaptureSpec
 import com.opencamera.core.media.MediaMetadata
@@ -33,6 +35,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VideoModePluginTest {
@@ -520,4 +523,66 @@ class VideoModePluginTest {
             thumbnailSource = ThumbnailSource.SavedMedia("/tmp/photo.jpg"),
             metadata = MediaMetadata()
         )
+
+    // ── Characterization: exact metadata maps ────────────────────────────
+
+    @Test
+    fun `char video recording capture has no still capture aid tags`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertFalse(metadata.containsKey("captureLensFacing"))
+        assertFalse(metadata.containsKey("selfieMirrorApply"))
+        assertFalse(metadata.containsKey("stillQuality"))
+        assertFalse(metadata.containsKey("watermarkTemplate"))
+        assertFalse(metadata.containsKey("watermarkModel"))
+        // frameRatio is present (16:9) as a preview/capture aspect guide — honest video metadata
+        assertEquals("16:9", metadata["frameRatio"])
+        assertFalse(metadata.containsKey("stillResolution"))
+        assertFalse(metadata.containsKey("photoLowLightStrategy"))
+        assertFalse(metadata.containsKey("checkInScenario"))
+        assertFalse(metadata.containsKey("portraitProfile"))
+    }
+
+    @Test
+    fun `char video recording exact metadata keys`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("video", metadata["mode"])
+        assertEquals("off", metadata["torch"])
+        assertEquals("4k", metadata["defaultVideoResolution"])
+        assertEquals("25", metadata["defaultVideoFrameRate"])
+        assertEquals("locked", metadata["dynamicFpsPolicy"])
+        assertEquals("standard", metadata["audioProfile"])
+        assertTrue(metadata.containsKey("resolvedVideoResolution"))
+        assertTrue(metadata.containsKey("resolvedVideoFrameRate"))
+        assertTrue(metadata.containsKey("videoQuality"))
+    }
+
+    @Test
+    fun `char video effect spec has FilterEffect and FrameEffect 16-9 but no watermark`() = runTest {
+        var capturedSpec: EffectSpec? = null
+        val controller = createController(onEffectSpecChanged = { capturedSpec = it })
+        controller.onEnter()
+        assertNotNull(capturedSpec!!.find<FilterEffect>())
+        assertNull(capturedSpec!!.find<com.opencamera.core.effect.WatermarkEffect>())
+        val frameEffect = assertNotNull(capturedSpec!!.find<FrameEffect>())
+        assertEquals(FrameRatio.RATIO_16_9, frameEffect.ratio)
+    }
+
+    @Test
+    fun `char video mode has no watermark tags in metadata`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertFalse(metadata.containsKey("watermarkTemplate"))
+        assertFalse(metadata.containsKey("watermarkModel"))
+        assertFalse(metadata.containsKey("watermarkDatetime"))
+        assertFalse(metadata.containsKey("watermarkModeName"))
+        assertFalse(metadata.containsKey("watermarkProfileName"))
+    }
 }

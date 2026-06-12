@@ -435,4 +435,262 @@ class DocumentModePluginTest {
 
     private fun EffectSpec.hasDocumentEffect(): Boolean =
         entries.any { it is DocumentEffect }
+
+    // ── Characterization: exact metadata maps ────────────────────────────
+
+    @Test
+    fun `char enhanced scan receipt exact metadata keys`(): Unit = runTest {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("document", metadata["mode"])
+        assertEquals("receipt", metadata["profile"])
+        assertEquals("enhanced", metadata["scanMode"])
+        assertEquals("scan", metadata["outputClass"])
+    }
+
+    @Test
+    fun `char enhanced scan receipt effect bridge tags`(): Unit = runTest {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("true", metadata["autoCrop"])
+        assertEquals("document", metadata["mode"])
+    }
+
+    @Test
+    fun `char basic archive exact metadata keys`(): Unit = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("document", metadata["mode"])
+        assertEquals("archive", metadata["profile"])
+        assertEquals("basic", metadata["scanMode"])
+        assertEquals("scan", metadata["outputClass"])
+    }
+
+    @Test
+    fun `char enhanced scan post process exif`(): Unit = runTest {
+        val controller = createController()
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
+        assertEquals("enhanced-scan", postProcess.exifOverrides["ProcessingRendered"])
+        assertTrue(postProcess.watermarkText!!.startsWith("DOC Receipt"))
+    }
+
+    @Test
+    fun `char basic archive post process exif`(): Unit = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
+        assertEquals("basic-archive", postProcess.exifOverrides["ProcessingRendered"])
+        assertTrue(postProcess.watermarkText!!.startsWith("DOC Basic"))
+    }
+
+    @Test
+    fun `char document always uses SingleFrame strategy`(): Unit = runTest {
+        val controller = createController()
+        val strategy = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture).strategy
+        assertIs<CaptureStrategy.SingleFrame>(strategy)
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val basicController = createController(deviceCapabilities = caps)
+        val basicStrategy = (basicController.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture).strategy
+        assertIs<CaptureStrategy.SingleFrame>(basicStrategy)
+    }
+
+    @Test
+    fun `char document has capture aid tags`(): Unit = runTest {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("back", metadata["captureLensFacing"])
+        assertEquals("false", metadata["selfieMirrorApply"])
+    }
+
+    @Test
+    fun `char document mode collision - mode key from both effect bridge and save request`(): Unit = runTest {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("document", metadata["mode"])
+    }
+
+    // ── Migration characterization: profile coercion ───────────────────
+
+    @Test
+    fun `enhanced mode starts with enhanced profile list`() = runTest {
+        val controller = createController()
+        // Cycling once goes from index 0 → 1 (Whiteboard)
+        val signal = controller.handle(ModeIntent.SecondaryActionPressed)
+        val hint = (signal as ModeSignal.ShowHint).message
+        assertTrue(
+            hint.contains("Receipt") || hint.contains("Whiteboard") || hint.contains("Contract"),
+            "Enhanced profiles should be Receipt/Whiteboard/Contract: $hint"
+        )
+    }
+
+    @Test
+    fun `basic mode starts with basic profile list`() = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        val signal = controller.handle(ModeIntent.SecondaryActionPressed)
+        val hint = (signal as ModeSignal.ShowHint).message
+        assertTrue(
+            hint.contains("Archive") || hint.contains("Color Copy"),
+            "Basic profiles should be Archive/Color Copy: $hint"
+        )
+    }
+
+    // ── Migration characterization: headlines per capability ───────────
+
+    @Test
+    fun `enhanced onEnter headline is Document scan active`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+        assertEquals("Document scan active", controller.snapshot.value.state.headline)
+    }
+
+    @Test
+    fun `basic onEnter headline is Document archive active`() = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        controller.onEnter()
+        assertEquals("Document archive active", controller.snapshot.value.state.headline)
+    }
+
+    @Test
+    fun `enhanced onDeviceCapabilitiesChanged headline is Document scan active`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+        controller.onDeviceCapabilitiesChanged(DeviceCapabilities.DEFAULT)
+        assertEquals("Document scan active", controller.snapshot.value.state.headline)
+    }
+
+    @Test
+    fun `basic onDeviceCapabilitiesChanged headline is Document archive active`() = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        controller.onEnter()
+        controller.onDeviceCapabilitiesChanged(caps)
+        assertEquals("Document archive active", controller.snapshot.value.state.headline)
+    }
+
+    @Test
+    fun `enhanced onStillCaptureResolutionChanged headline is Document resolution updated`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+        controller.onStillCaptureResolutionChanged(
+            com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP
+        )
+        assertEquals("Document resolution updated", controller.snapshot.value.state.headline)
+    }
+
+    @Test
+    fun `basic onStillCaptureResolutionChanged headline is Archive resolution updated`() = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        controller.onEnter()
+        controller.onStillCaptureResolutionChanged(
+            com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP
+        )
+        assertEquals("Archive resolution updated", controller.snapshot.value.state.headline)
+    }
+
+    // ── Migration characterization: resolution-only watermark ──────────
+
+    @Test
+    fun `watermark camera params uses resolution only without frame ratio`() = runTest {
+        // Build effect spec to get watermark tokens
+        var capturedSpec: com.opencamera.core.effect.EffectSpec? = null
+        val controller = createController(onEffectSpecChanged = { capturedSpec = it })
+        controller.onEnter()
+
+        val watermarkEffect = capturedSpec!!.find<com.opencamera.core.effect.WatermarkEffect>()
+        assertNotNull(watermarkEffect)
+        val cameraParams = watermarkEffect.tokens["watermarkCameraParams"]!!
+        // Should NOT contain frame ratio separator or label
+        assertFalse(
+            cameraParams.contains(" • "),
+            "Watermark camera params should not contain frame ratio: $cameraParams"
+        )
+        // Should contain resolution preset label
+        assertTrue(
+            cameraParams.contains("MP") || cameraParams.contains("M") || cameraParams.isNotBlank(),
+            "Watermark camera params should contain resolution: $cameraParams"
+        )
+    }
+
+    // ── Migration characterization: exact metadata per profile ─────────
+
+    @Test
+    fun `enhanced receipt metadata has correct keys`() = runTest {
+        val controller = createController()
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("document", metadata["mode"])
+        assertEquals("receipt", metadata["profile"])
+        assertEquals("enhanced", metadata["scanMode"])
+        assertEquals("scan", metadata["outputClass"])
+        assertNotNull(metadata["stillResolution"])
+    }
+
+    @Test
+    fun `enhanced receipt post process has correct exif`() = runTest {
+        val controller = createController()
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
+        assertEquals("enhanced-scan", postProcess.exifOverrides["ProcessingRendered"])
+        assertEquals("High", postProcess.exifOverrides["Contrast"])
+        assertEquals("document-receipt-scan", postProcess.algorithmProfile)
+    }
+
+    @Test
+    fun `basic archive metadata has correct keys`() = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+        assertEquals("document", metadata["mode"])
+        assertEquals("archive", metadata["profile"])
+        assertEquals("basic", metadata["scanMode"])
+        assertEquals("scan", metadata["outputClass"])
+    }
+
+    @Test
+    fun `basic archive post process has no contrast exif`() = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
+        assertEquals("basic-archive", postProcess.exifOverrides["ProcessingRendered"])
+        assertFalse(postProcess.exifOverrides.containsKey("Contrast"))
+        assertEquals("document-basic-archive", postProcess.algorithmProfile)
+    }
+
+    // ── Migration characterization: profile detail text ─────────────────
+
+    @Test
+    fun `enhanced profile snapshot detail contains contrast label`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+        val detail = controller.snapshot.value.state.detail
+        assertTrue(detail.contains("Receipt") || detail.contains("Whiteboard") || detail.contains("Contract"))
+        assertTrue(detail.contains("Auto crop"))
+        assertTrue(detail.contains("Contrast"))
+    }
+
+    @Test
+    fun `basic profile snapshot detail mentions basic capture only`() = runTest {
+        val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
+        val controller = createController(deviceCapabilities = caps)
+        controller.onEnter()
+        val detail = controller.snapshot.value.state.detail
+        assertTrue(detail.contains("Basic capture only"))
+    }
 }

@@ -88,8 +88,8 @@ data class VideoSpecConstraints(
     val resolutions: Set<VideoResolution>
         get() = supportedFrameRatesByResolution.keys
 
-    val frameRates: Set<VideoFrameRate>
-        get() = supportedFrameRatesByResolution.values
+    val frameRates: Set<VideoFrameRate> =
+        supportedFrameRatesByResolution.values
             .flatten()
             .toSet()
 

@@ -1,7 +1,7 @@
 package com.opencamera.app.camera
 
 import android.graphics.Bitmap
-import androidx.camera.view.PreviewView
+import com.opencamera.core.device.BlueHourSceneMetrics
 import com.opencamera.core.device.PhotoSceneSignal
 import com.opencamera.core.device.SceneLightState
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +25,7 @@ class PreviewSceneBrightnessMonitor(
     private var isPreviewActive = false
     private var consecutiveLowCount = 0
     private var consecutiveNormalCount = 0
+    private var consecutiveBlueHourCount = 0
     private var currentLightState = SceneLightState.UNKNOWN
 
     fun onPreviewStarted() {
@@ -43,6 +44,7 @@ class PreviewSceneBrightnessMonitor(
         currentLightState = SceneLightState.UNKNOWN
         consecutiveLowCount = 0
         consecutiveNormalCount = 0
+        consecutiveBlueHourCount = 0
     }
 
     private fun startSampling() {
@@ -62,38 +64,54 @@ class PreviewSceneBrightnessMonitor(
 
     private suspend fun sampleBrightness() {
         val bitmap = bitmapProvider() ?: return
-        val score = computeAverageLuma(bitmap)
-        if (score < 0) return
+        val pixels = extractPixels(bitmap) ?: return
+        val metrics = BlueHourSceneMetrics.analyzePixels(pixels) ?: return
+        val rawState = BlueHourSceneMetrics.classify(metrics)
+        val lightState = classifyWithHysteresis(rawState)
 
-        val lightState = classifyLightState(score)
         mutableSignals.emit(
             PhotoSceneSignal(
                 lightState = lightState,
-                brightnessScore = score,
-                source = "preview-bitmap-luma"
+                brightnessScore = metrics.averageLuma,
+                source = "preview-bitmap-metrics",
+                averageLuma = metrics.averageLuma,
+                blueCyanRatio = metrics.blueCyanRatio,
+                highlightRatio = metrics.highlightRatio,
+                confidence = metrics.confidence
             )
         )
     }
 
-    private fun classifyLightState(score: Float): SceneLightState {
-        return when {
-            score <= LOW_LIGHT_ENTER_THRESHOLD -> {
+    private fun classifyWithHysteresis(rawState: SceneLightState): SceneLightState {
+        return when (rawState) {
+            SceneLightState.LOW_LIGHT -> {
                 consecutiveLowCount++
                 consecutiveNormalCount = 0
+                consecutiveBlueHourCount = 0
                 if (consecutiveLowCount >= 2) {
                     currentLightState = SceneLightState.LOW_LIGHT
                 }
                 currentLightState
             }
-            score >= LOW_LIGHT_EXIT_THRESHOLD -> {
+            SceneLightState.NORMAL -> {
                 consecutiveNormalCount++
                 consecutiveLowCount = 0
+                consecutiveBlueHourCount = 0
                 if (consecutiveNormalCount >= 2) {
                     currentLightState = SceneLightState.NORMAL
                 }
                 currentLightState
             }
-            else -> currentLightState
+            SceneLightState.BLUE_HOUR -> {
+                consecutiveBlueHourCount++
+                consecutiveLowCount = 0
+                consecutiveNormalCount = 0
+                if (consecutiveBlueHourCount >= 2) {
+                    currentLightState = SceneLightState.BLUE_HOUR
+                }
+                currentLightState
+            }
+            SceneLightState.UNKNOWN -> currentLightState
         }
     }
 
@@ -103,22 +121,24 @@ class PreviewSceneBrightnessMonitor(
         private const val SAMPLE_WIDTH = 32
         private const val SAMPLE_HEIGHT = 32
 
-        fun computeAverageLuma(bitmap: Bitmap): Float {
-            val scaled = if (bitmap.width > SAMPLE_WIDTH || bitmap.height > SAMPLE_HEIGHT) {
-                Bitmap.createScaledBitmap(bitmap, SAMPLE_WIDTH, SAMPLE_HEIGHT, false)
-            } else {
-                bitmap
+        private fun extractPixels(bitmap: Bitmap): IntArray? {
+            val scaled = try {
+                if (bitmap.width > SAMPLE_WIDTH || bitmap.height > SAMPLE_HEIGHT) {
+                    Bitmap.createScaledBitmap(bitmap, SAMPLE_WIDTH, SAMPLE_HEIGHT, false)
+                } else {
+                    bitmap
+                }
+            } catch (_: Exception) {
+                return null
             }
             val pixels = IntArray(scaled.width * scaled.height)
             scaled.getPixels(pixels, 0, scaled.width, 0, 0, scaled.width, scaled.height)
-            var totalLuma = 0.0
-            for (pixel in pixels) {
-                val r = (pixel shr 16 and 0xFF) / 255.0
-                val g = (pixel shr 8 and 0xFF) / 255.0
-                val b = (pixel and 0xFF) / 255.0
-                totalLuma += 0.2126 * r + 0.7152 * g + 0.0722 * b
-            }
-            return (totalLuma / pixels.size).toFloat()
+            return pixels
+        }
+
+        fun computeAverageLuma(bitmap: Bitmap): Float {
+            val pixels = extractPixels(bitmap) ?: return -1f
+            return BlueHourSceneMetrics.analyzePixels(pixels)?.averageLuma ?: -1f
         }
     }
 }

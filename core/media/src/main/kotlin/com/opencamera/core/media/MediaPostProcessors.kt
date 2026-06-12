@@ -1,6 +1,10 @@
 package com.opencamera.core.media
 
 import java.io.File
+import java.util.logging.Level
+import java.util.logging.Logger
+
+private val logger = Logger.getLogger("MediaPostProcessors")
 
 class CompositeMediaPostProcessor(
     private val processors: List<MediaPostProcessor>,
@@ -15,9 +19,11 @@ class CompositeMediaPostProcessor(
                 processor.process(current)
             } catch (e: Error) {
                 throw e
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
                 val name = processor.diagnosticName()
-                current.addPipelineNotes("postprocess:failed:$name")
+                logger.log(Level.SEVERE, "PostProcessor '$name' failed", e)
+                val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
             }
             val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L
             val name = processor.diagnosticName()
@@ -34,7 +40,6 @@ class CompositeMediaPostProcessor(
         }
     }
 }
-
 private fun MediaPostProcessor.diagnosticName(): String {
     val raw = this::class.java.simpleName
     return raw.removeSuffix("PostProcessor").ifEmpty { raw }
@@ -96,8 +101,11 @@ class PipelineMetadataPostProcessor : MediaPostProcessor {
         }
 
         val degradedNotes = buildList {
-            if ((result.pipelineNotes + transactionNotes).any { it == "merge:placeholder" }) {
-                add("degraded:multi-frame-placeholder")
+            val hasDegradedMerge = (result.pipelineNotes + transactionNotes).any {
+                it.startsWith("merge:degraded=") || it == "merge:applied=false"
+            }
+            if (hasDegradedMerge) {
+                add("degraded:multi-frame-fusion")
             }
             if ((result.pipelineNotes + transactionNotes).any { it == "live:degraded=metadata-only" }) {
                 add("degraded:live-still-only")
@@ -109,36 +117,5 @@ class PipelineMetadataPostProcessor : MediaPostProcessor {
             return result
         }
         return result.copy(pipelineNotes = result.pipelineNotes + allNotes)
-    }
-}
-
-class MultiFrameMergePlaceholderPostProcessor : MediaPostProcessor {
-    override suspend fun process(result: ShotResult): ShotResult {
-        val intermediatePaths = result.intermediateOutputPaths
-        if (result.captureProfile.frameCount <= 1 || intermediatePaths.isEmpty()) {
-            return result
-        }
-
-        val existingInputs = intermediatePaths.map(::File).filter(File::exists)
-        val totalInputBytes = existingInputs.sumOf(File::length)
-        val notes = buildList {
-            add("merge:placeholder")
-            add("merge:inputs=${existingInputs.size + 1}")
-            add("merge:temp-frames=${existingInputs.size}")
-            add("merge:temp-bytes=$totalInputBytes")
-            add("merge:strategy=burst-placeholder")
-        }
-
-        return try {
-            result.copy(
-                pipelineNotes = result.pipelineNotes + notes
-            )
-        } finally {
-            existingInputs.forEach { file ->
-                if (file.exists()) {
-                    file.delete()
-                }
-            }
-        }
     }
 }

@@ -10,6 +10,7 @@ import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.settings.ManualCaptureParams
 import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
+import kotlin.math.roundToInt
 
 data class CaptureReadiness(
     val shotId: String,
@@ -27,13 +28,67 @@ enum class PhotoLowLightStrategySupport {
 enum class SceneLightState {
     UNKNOWN,
     NORMAL,
+    BLUE_HOUR,
     LOW_LIGHT
+}
+
+/**
+ * CameraX extension mode requested for still capture.
+ * [NONE] means ordinary CameraX capture without extension processing.
+ */
+enum class CameraExtensionMode(val tagValue: String, val label: String) {
+    NONE("none", "No extension"),
+    NIGHT("night", "Night"),
+    HDR("hdr", "HDR"),
+    AUTO("auto", "Auto"),
+    BOKEH("bokeh", "Bokeh"),
+    FACE_RETOUCH("face-retouch", "Face retouch")
+}
+
+/**
+ * Describes whether an extension-enabled selector is available for the requested mode.
+ */
+enum class CameraExtensionAvailability {
+    AVAILABLE,
+    UNSUPPORTED,
+    SELECTOR_ERROR,
+    MANAGER_UNAVAILABLE,
+    QUERY_ERROR,
+    NOT_REQUESTED
+}
+
+/**
+ * Encapsulates the desired extension mode for a still capture request.
+ * When [desiredMode] is [CameraExtensionMode.NONE], the adapter uses ordinary capture.
+ */
+data class ExtensionCaptureStrategy(
+    val desiredMode: CameraExtensionMode = CameraExtensionMode.NONE
+)
+
+/**
+ * Records the result of resolving extension availability for a capture request.
+ */
+data class CameraExtensionResolution(
+    val requestedMode: CameraExtensionMode,
+    val availability: CameraExtensionAvailability,
+    val reason: String,
+    val diagnostics: Map<String, String> = emptyMap()
+) {
+    val isUsable: Boolean
+        get() = availability == CameraExtensionAvailability.AVAILABLE
+
+    val pipelineNote: String
+        get() = "extension:${requestedMode.tagValue}=${availability.name.lowercase()}"
 }
 
 data class PhotoSceneSignal(
     val lightState: SceneLightState = SceneLightState.UNKNOWN,
     val brightnessScore: Float? = null,
-    val source: String = "unknown"
+    val source: String = "unknown",
+    val averageLuma: Float? = null,
+    val blueCyanRatio: Float? = null,
+    val highlightRatio: Float? = null,
+    val confidence: Float? = null
 )
 
 fun DeviceCapabilities.photoLowLightStrategySupport(): PhotoLowLightStrategySupport = when {
@@ -435,20 +490,11 @@ data class ZoomRatioCapability(
     /** Maps lens nodes to their availability and threshold ratios. Empty when device has no multi-camera. */
     val lensNodeMap: Map<LensNode, LensNodeAvailability> = emptyMap()
 ) {
-    val normalizedSupportedRatios: List<Float>
-        get() = supportedRatios
-            .map(::normalizedZoomRatioValue)
-            .filter { it > 0f }
-            .distinct()
-            .sorted()
-            .ifEmpty { listOf(1f) }
+    val normalizedSupportedRatios: List<Float> =
+        normalizedZoomRatioValues(supportedRatios).ifEmpty { listOf(1f) }
 
-    val normalizedPreviewBaseRatios: List<Float>
-        get() = previewBaseRatios
-            .map(::normalizedZoomRatioValue)
-            .filter { it > 0f }
-            .distinct()
-            .sorted()
+    val normalizedPreviewBaseRatios: List<Float> =
+        normalizedZoomRatioValues(previewBaseRatios)
 
     val resolvedDefaultRatio: Float
         get() {
@@ -463,7 +509,18 @@ data class ZoomRatioCapability(
 }
 
 fun normalizedZoomRatioValue(value: Float): Float {
-    return String.format(java.util.Locale.US, "%.1f", value).toFloat()
+    if (!value.isFinite()) {
+        return value
+    }
+    return (value * 10f).roundToInt() / 10f
+}
+
+private fun normalizedZoomRatioValues(values: List<Float>): List<Float> {
+    return values
+        .map(::normalizedZoomRatioValue)
+        .filter { it > 0f }
+        .distinct()
+        .sorted()
 }
 
 fun resolvedZoomRatioSelection(
@@ -503,7 +560,8 @@ data class StillCaptureConfig(
     val resolutionOption: StillCaptureResolutionOption? = null,
     val outputSize: StillCaptureOutputSize? = null,
     val qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference = com.opencamera.core.media.StillCaptureQualityPreference.QUALITY,
-    val resolutionPreset: com.opencamera.core.media.StillCaptureResolutionPreset = com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP
+    val resolutionPreset: com.opencamera.core.media.StillCaptureResolutionPreset = com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP,
+    val extensionStrategy: ExtensionCaptureStrategy = ExtensionCaptureStrategy()
 )
 
 enum class RecordingQualityPreset(
@@ -552,7 +610,8 @@ data class DeviceGraphSpec(
             qualityPreference: com.opencamera.core.media.StillCaptureQualityPreference =
                 com.opencamera.core.media.StillCaptureQualityPreference.QUALITY,
             resolutionPreset: com.opencamera.core.media.StillCaptureResolutionPreset =
-                com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP
+                com.opencamera.core.media.StillCaptureResolutionPreset.LARGE_12MP,
+            extensionStrategy: ExtensionCaptureStrategy = ExtensionCaptureStrategy()
         ): DeviceGraphSpec {
             return DeviceGraphSpec(
                 template = CaptureTemplate.STILL_CAPTURE,
@@ -561,7 +620,8 @@ data class DeviceGraphSpec(
                     resolutionOption = resolutionOption,
                     outputSize = outputSize,
                     qualityPreference = qualityPreference,
-                    resolutionPreset = resolutionPreset
+                    resolutionPreset = resolutionPreset,
+                    extensionStrategy = extensionStrategy
                 ),
                 preview = PreviewConfig(
                     snapshotsEnabled = enablePreviewSnapshots,

@@ -34,7 +34,10 @@ import com.opencamera.core.effect.WatermarkPreviewShape
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.WatermarkFrameBackground
 import com.opencamera.core.settings.watermarkStyleFor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @Suppress("EXPOSED_PARAMETER_TYPE")
@@ -47,6 +50,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var lastRequestedThumbnailUri: String? = null
     private var lastSourceIdentity: String? = null
     private var lastPlayedShutterSoundShotId: String? = null
+    private var extractingSourceIdentity: String? = null
+    private var pendingVideoFrameUri: String? = null
+    private var videoFrameExtractionJob: Job? = null
     private val panelRouter = CockpitPanelRouter()
     private val panelState: CockpitPanelUiState
         get() = panelRouter.state
@@ -386,6 +392,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             } else null,
             linkEvents = container.linkRecorder.snapshot(),
             deviceProbeSummary = latestDeviceProbeSummary,
+            latestPipelineNotes = state.presentation.latestPipelineNotes,
             clearCutoffs = devLogClearCutoffs
         )
         latestDevLogRenderModel = devLogModel
@@ -398,36 +405,65 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         val savedMediaType = state.presentation.latestSavedMediaType
         val rawSourceUri = state.presentation.latestThumbnailSource?.renderUriOrNull()
         val nextSourceUri = pendingThumbnailUri ?: rawSourceUri
-        val nextRenderUri = if (pendingThumbnailUri != null) {
-            pendingThumbnailUri
-        } else if (savedMediaType == SavedMediaType.VIDEO && rawSourceUri != null) {
-            VideoFrameExtractor.extract(this, rawSourceUri)
-        } else {
-            rawSourceUri
-        }
         val nextIdentity = if (pendingThumbnailUri != null) {
             pendingThumbnailUri
         } else {
             sourceIdentityFor(nextSourceUri, savedMediaType)
         }
-        when (val command = nextThumbnailRenderCommand(
-            lastRequestedThumbnailUri, nextRenderUri,
-            lastSourceIdentity, nextIdentity
-        )) {
-            ThumbnailRenderCommand.NoOp -> Unit
-            ThumbnailRenderCommand.Clear -> {
-                lastRequestedThumbnailUri = null
-                lastSourceIdentity = null
-                views.preview.thumbnail.setImageDrawable(null)
+
+        if (nextIdentity != null && nextIdentity == extractingSourceIdentity) {
+            // Extraction already in-flight for this source; keep current thumbnail until result arrives
+        } else {
+            extractingSourceIdentity = null
+            val nextRenderUri = computeNextThumbnailUri(pendingThumbnailUri, savedMediaType, rawSourceUri)
+            if (savedMediaType == SavedMediaType.VIDEO && rawSourceUri != null && nextRenderUri == null) {
+                extractingSourceIdentity = nextIdentity
+                videoFrameExtractionJob?.cancel()
+                videoFrameExtractionJob = lifecycleScope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        VideoFrameExtractor.extract(this@MainActivity, rawSourceUri)
+                    }
+                    if (extractingSourceIdentity == nextIdentity) {
+                        pendingVideoFrameUri = result
+                        extractingSourceIdentity = null
+                        latestSessionState?.let { render(it) }
+                    }
+                }
+            } else {
+                videoFrameExtractionJob?.cancel()
+                extractingSourceIdentity = null
+                pendingVideoFrameUri = null
             }
-            is ThumbnailRenderCommand.Load -> {
-                lastRequestedThumbnailUri = command.uri
-                lastSourceIdentity = command.sourceIdentity
-                views.preview.thumbnail.setImageURI(null)
-                views.preview.thumbnail.setImageURI(Uri.parse(command.uri))
+
+            when (val command = nextThumbnailRenderCommand(
+                lastRequestedThumbnailUri, nextRenderUri,
+                lastSourceIdentity, nextIdentity
+            )) {
+                ThumbnailRenderCommand.NoOp -> Unit
+                ThumbnailRenderCommand.Clear -> {
+                    lastRequestedThumbnailUri = null
+                    lastSourceIdentity = null
+                    views.preview.thumbnail.setImageDrawable(null)
+                }
+                is ThumbnailRenderCommand.Load -> {
+                    lastRequestedThumbnailUri = command.uri
+                    lastSourceIdentity = command.sourceIdentity
+                    views.preview.thumbnail.setImageURI(null)
+                    views.preview.thumbnail.setImageURI(Uri.parse(command.uri))
+                }
             }
         }
 
+    }
+
+    private fun computeNextThumbnailUri(
+        pendingThumbnailUri: String?,
+        savedMediaType: SavedMediaType?,
+        rawSourceUri: String?
+    ): String? {
+        if (pendingThumbnailUri != null) return pendingThumbnailUri
+        if (savedMediaType == SavedMediaType.VIDEO && rawSourceUri != null) return pendingVideoFrameUri
+        return rawSourceUri
     }
 
     override fun selectDevLogTab(tab: DevLogTab) {
@@ -450,6 +486,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             storageSummary = summary,
             linkEvents = container.linkRecorder.snapshot(),
             deviceProbeSummary = latestDeviceProbeSummary,
+            latestPipelineNotes = state.presentation.latestPipelineNotes,
             clearCutoffs = devLogClearCutoffs
         )
         latestDevLogRenderModel = model
@@ -869,7 +906,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 val model = latestDevLogRenderModel ?: return
                 val file = devLogExporter.export(model.exportContent, type = selectedDevLogTab)
                 views.preview.captureOutput.text = getString(R.string.toast_debug_log_exported, file.absolutePath)
-                Toast.makeText(this, R.string.dev_export_log, Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_debug_log_exported, file.absolutePath), Toast.LENGTH_SHORT).show()
             }
             .onFailure {
                 Toast.makeText(this, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
@@ -880,9 +917,19 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         Toast.makeText(this, R.string.dev_vendor_probe, Toast.LENGTH_SHORT).show()
         lifecycleScope.launch {
             runCatching {
-                val content = com.opencamera.app.camera.VendorCameraProbe.probe(this@MainActivity)
+                val content = withContext(Dispatchers.IO) {
+                    com.opencamera.app.camera.VendorCameraProbe.probe(this@MainActivity)
+                }
+                latestDeviceProbeSummary = content.lineSequence()
+                    .firstOrNull { it.trimStart().startsWith("extensions: ") }
+                    ?.trim()
+                    ?: withContext(Dispatchers.IO) {
+                        com.opencamera.app.camera.VendorCameraProbe.summary(this@MainActivity)
+                    }
                 val file = devLogExporter.exportVendorProbe(content)
                 views.preview.captureOutput.text = getString(R.string.toast_vendor_probe_exported, file.absolutePath)
+                Toast.makeText(this@MainActivity, getString(R.string.toast_vendor_probe_exported, file.absolutePath), Toast.LENGTH_SHORT).show()
+                refreshDevLogModel()
             }.onFailure {
                 Toast.makeText(this@MainActivity, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
             }

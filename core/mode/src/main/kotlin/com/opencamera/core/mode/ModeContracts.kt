@@ -248,6 +248,25 @@ class ModeRegistry(plugins: List<CameraModePlugin>) {
     }
 }
 
+data class SelfieMirrorPolicy(
+    val shouldMirrorPreview: Boolean,
+    val shouldMirrorSavedOutput: Boolean
+) {
+    val previewMatchesSavedOutput: Boolean
+        get() = shouldMirrorPreview == shouldMirrorSavedOutput
+}
+
+fun selfieMirrorPolicy(
+    lensFacing: LensFacing,
+    selfieMirrorEnabled: Boolean
+): SelfieMirrorPolicy {
+    val apply = lensFacing == LensFacing.FRONT && selfieMirrorEnabled
+    return SelfieMirrorPolicy(
+        shouldMirrorPreview = apply,
+        shouldMirrorSavedOutput = apply
+    )
+}
+
 val FlashMode.label: String
     get() = when (this) {
         FlashMode.OFF -> "Off"

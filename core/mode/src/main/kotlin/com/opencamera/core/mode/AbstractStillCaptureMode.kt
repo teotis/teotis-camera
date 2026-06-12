@@ -1,8 +1,9 @@
 package com.opencamera.core.mode
 
 import com.opencamera.core.device.DeviceCapabilities
-import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.FrameRatio
@@ -122,11 +123,20 @@ abstract class AbstractStillCaptureMode(
     /** Override to add mode-specific exit behavior (before base updates snapshot). */
     protected open suspend fun onModeExit() {}
 
+    /** Called when device capabilities change, before snapshot rebuild. Override for mode-specific adaptation. */
+    protected open suspend fun onModeCapabilitiesChanged(
+        deviceCapabilities: DeviceCapabilities
+    ) = Unit
+
+    /** Optional detail text shown when the mode exits. Null means no detail. */
+    protected open fun exitDetail(): String? = null
+
     // ── ModeController lifecycle ───────────────────────────────────────
 
     override fun deviceGraph(): DeviceGraphSpec = stillCaptureDeviceGraph(runtimeState())
 
     override suspend fun onDeviceCapabilitiesChanged(deviceCapabilities: DeviceCapabilities) {
+        onModeCapabilitiesChanged(deviceCapabilities)
         updateSnapshot(headline = capabilitiesChangedHeadline())
     }
 
@@ -156,7 +166,7 @@ abstract class AbstractStillCaptureMode(
     override suspend fun onExit() {
         context.eventSink("${modeEventPrefix()}.exit")
         onModeExit()
-        updateSnapshot(headline = exitHeadline())
+        updateSnapshot(headline = exitHeadline(), detail = exitDetail())
     }
 
     override suspend fun handle(intent: ModeIntent): ModeSignal {
@@ -190,9 +200,9 @@ abstract class AbstractStillCaptureMode(
         )
         updateSnapshot(
             headline = if (countdownDuration() == CountdownDuration.OFF) {
-                "${id.name.lowercase()} capture requested"
+                "${id.catalogProfile().displayName} capture requested"
             } else {
-                "${id.name.lowercase()} countdown started"
+                "${id.catalogProfile().displayName} countdown started"
             }
         )
         return signal
@@ -223,6 +233,30 @@ abstract class AbstractStillCaptureMode(
     protected open suspend fun handleProAction(): ModeSignal = ModeSignal.None
 
     // ── Shared utilities ───────────────────────────────────────────────
+
+    protected fun watermarkTokens(
+        cameraParams: String = watermarkCameraParams()
+    ): Map<String, String> = mapOf(
+        "watermarkModel" to "OpenCamera",
+        "watermarkDatetime" to watermarkDateTime(),
+        "watermarkCameraParams" to cameraParams
+    )
+
+    protected fun captureMetadataTags(
+        effectSpec: EffectSpec? = null,
+        modeTags: Map<String, String>,
+        overrideTags: Map<String, String> = emptyMap(),
+        includeCaptureAidTags: Boolean = true
+    ): Map<String, String> {
+        val effectTagMap = effectSpec?.let { EffectBridge.toMetadataTags(it) } ?: emptyMap()
+        val captureAidTagMap = if (includeCaptureAidTags) context.captureAidMetadataTags() else emptyMap()
+        return CaptureMetadataLayers(
+            effectTags = effectTagMap,
+            captureAidTags = captureAidTagMap,
+            modeTags = modeTags,
+            overrideTags = overrideTags
+        ).compose()
+    }
 
     protected fun currentFlashMode(): FlashMode = availableFlashModes()[flashModeIndex]
 

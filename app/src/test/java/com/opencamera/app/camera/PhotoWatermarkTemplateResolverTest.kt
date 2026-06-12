@@ -295,7 +295,7 @@ class PhotoWatermarkTemplateResolverTest {
                     "watermarkDatetime" to "2026-06-07 14:30",
                     "watermarkCameraParams" to "12MP • 4:3",
                     "checkInScenario" to "clarity",
-                    "compatMode" to "fullclear"
+                    "compatMode" to "clarity-assist"
                 )
             ),
             preservedExif = mapOf(
