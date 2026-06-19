@@ -165,6 +165,7 @@ data class PermissionState(
 data class PreviewMetrics(
     val bindCount: Int = 0,
     val recoveryCount: Int = 0,
+    val consecutiveRecoveryCount: Int = 0,
     val lastFirstFrameLatencyMillis: Long? = null,
     val bestFirstFrameLatencyMillis: Long? = null,
     val worstFirstFrameLatencyMillis: Long? = null,

@@ -1,5 +1,6 @@
 package com.opencamera.core.media
 
+import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -13,18 +14,43 @@ class CompositeMediaPostProcessor(
     override suspend fun process(result: ShotResult): ShotResult {
         var current = result
         val processorTimings = mutableListOf<Pair<String, Long>>()
-        processors.forEach { processor ->
+        var stopped = false
+        for (processor in processors) {
+            if (!processor.isApplicable(current)) {
+                continue
+            }
             val startNanos = System.nanoTime()
             current = try {
                 processor.process(current)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Error) {
                 throw e
             } catch (e: Throwable) {
                 val name = processor.diagnosticName()
-                logger.log(Level.SEVERE, "PostProcessor '$name' failed", e)
-                val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
-                current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                val failure = classifyExceptionForRecovery(e, name)
+                val action = evaluateRecoveryPolicy(failure)
+                logger.log(Level.SEVERE, "PostProcessor '$name' failed [${failure.cause}] action=$action", e)
+                current = current.addStructuredPostProcessFailure(failure)
+                when (action) {
+                    RecoveryAction.STOP_POSTPROCESS -> {
+                        val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                        stopped = true
+                        current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                    }
+                    RecoveryAction.TERMINATE -> {
+                        val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                        current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                        return current
+                    }
+                    RecoveryAction.PROPAGATE -> throw e
+                    RecoveryAction.CONTINUE -> {
+                        val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                        current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                    }
+                }
             }
+            if (stopped) break
             val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L
             val name = processor.diagnosticName()
             processorTimings.add(name to elapsedMs)

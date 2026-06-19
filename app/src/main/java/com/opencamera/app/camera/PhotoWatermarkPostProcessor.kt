@@ -4,7 +4,6 @@ import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrix
@@ -83,11 +82,11 @@ internal interface PhotoWatermarkEditor {
 }
 
 internal fun decidePhotoWatermarkWork(result: ShotResult): PhotoWatermarkWork {
-    if (result.mediaType != MediaType.PHOTO) {
-        return PhotoWatermarkWork.None
-    }
-    if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return PhotoWatermarkWork.DiagnosticSkip("unsupported-mime")
+    when (result.photoJpegInput()) {
+        PhotoJpegInput.NOT_PHOTO -> return PhotoWatermarkWork.None
+        PhotoJpegInput.UNSUPPORTED_MIME ->
+            return PhotoWatermarkWork.DiagnosticSkip("unsupported-mime")
+        PhotoJpegInput.EDITABLE -> Unit
     }
     val watermarkText = result.metadata.watermarkText
         ?.trim()
@@ -116,6 +115,8 @@ private const val TAG = "PhotoWatermarkPP"
 internal class PhotoWatermarkPostProcessor(
     private val editor: PhotoWatermarkEditor
 ) : MediaPostProcessor {
+    override fun isApplicable(result: ShotResult): Boolean = result.mediaType == MediaType.PHOTO
+
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoWatermarkWork(result)) {
             PhotoWatermarkWork.None -> result
@@ -180,23 +181,21 @@ internal class AndroidPhotoWatermarkEditor(
         }
 
         val preservedExif = readPreservedExif(sourceBytes)
-        val decoded = try {
-            BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+        val mutableBitmap = try {
+            MutableArgbBitmapDecoder.decode(sourceBytes)
                 ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
         } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Watermark decode failed: out of memory", e)
             return@withContext ProcessorEditorResult.Failed("decode-oom")
         } catch (e: Throwable) {
-            Log.w(TAG, "watermark postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Watermark decode failed", e)
             return@withContext ProcessorEditorResult.Failed("decode-exception")
         }
         val t1 = System.currentTimeMillis()
 
-        val originalWidth = decoded.width
-        val originalHeight = decoded.height
-        val mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
-        if (mutableBitmap !== decoded) {
-            decoded.recycle()
-        }
+        val originalWidth = mutableBitmap.width
+        val originalHeight = mutableBitmap.height
 
         var renderedBitmap: Bitmap? = null
         try {
@@ -220,13 +219,24 @@ internal class AndroidPhotoWatermarkEditor(
                     output.toByteArray()
                 }
             } catch (e: OutOfMemoryError) {
+                Log.e(TAG, "Watermark encode failed: out of memory", e)
                 return@withContext ProcessorEditorResult.Failed("encode-oom")
             } catch (e: Throwable) {
-            Log.w(TAG, "watermark postprocess failed", e)
+                e.rethrowIfCancellationOrFatal()
+                Log.w(TAG, "Watermark encode failed", e)
                 return@withContext ProcessorEditorResult.Failed("encode-failed")
             }
             val t3 = System.currentTimeMillis()
-            if (!contentResolver.writeEncodedBytes(target, encodedBytes)) {
+
+            val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
+                originalBytes = sourceBytes,
+                visibleBytesAfterExifRestore = encodedBytes,
+                templateId = templateId,
+                originalWidth = originalWidth,
+                originalHeight = originalHeight
+            )
+            val finalBytes = archiveBytes ?: encodedBytes
+            if (!contentResolver.writeEncodedBytes(target, finalBytes)) {
                 return@withContext ProcessorEditorResult.Failed("output-unavailable")
             }
             val t4 = System.currentTimeMillis()
@@ -237,33 +247,20 @@ internal class AndroidPhotoWatermarkEditor(
             )
             val t5 = System.currentTimeMillis()
 
-            val visibleBytesAfterExif = ProcessorIOUtils.readSourceBytes(target, contentResolver)
-            val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
-                originalBytes = sourceBytes,
-                visibleBytesAfterExifRestore = visibleBytesAfterExif,
-                templateId = templateId,
-                originalWidth = originalWidth,
-                originalHeight = originalHeight
-            )
-            val archiveWriteWarning = if (archiveBytes != null && !contentResolver.writeEncodedBytes(target, archiveBytes)) {
-                "archive-write-failed"
-            } else {
-                null
-            }
-            val t6 = System.currentTimeMillis()
-
             val timingNote = "watermark:timing:$templateId size=${originalWidth}x${originalHeight} " +
                 "decode=${t1 - t0}ms render=${t2 - t1}ms encode=${t3 - t2}ms " +
-                "write=${t4 - t3}ms exif=${t5 - t4}ms archive=${t6 - t5}ms total=${t6 - t0}ms"
+                "write+archive=${t4 - t3}ms exif=${t5 - t4}ms total=${t5 - t0}ms"
 
             PhotoWatermarkApplied(
-                warning = mergeWarnings(renderResult.warning, exifWarning, archiveWarning, archiveWriteWarning),
+                warning = mergeWarnings(renderResult.warning, exifWarning, archiveWarning),
                 timingNote = timingNote
             )
         } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Watermark render failed: out of memory", e)
             ProcessorEditorResult.Failed("render-oom")
         } catch (e: Throwable) {
-            Log.w(TAG, "watermark postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Watermark render failed", e)
             ProcessorEditorResult.Failed("render-exception")
         } finally {
             if (renderedBitmap != null && renderedBitmap !== mutableBitmap) {
@@ -327,7 +324,8 @@ internal fun embedArchiveAfterVisibleWrite(
     return try {
         OcwmJpegContainer.embedArchive(visibleBytesAfterExifRestore, archive) to null
     } catch (e: Throwable) {
-        Log.w(TAG, "watermark postprocess failed", e)
+        e.rethrowIfCancellationOrFatal()
+        Log.w(TAG, "Watermark archive embed failed", e)
         null to "archive-embed-failed"
     }
 }
@@ -344,6 +342,125 @@ private const val MIN_CORNER_RADIUS_PX = 12f
 private const val BLUR_DOWNSAMPLE_DIVISOR = 18
 private const val BLUR_EDGE_DOWNSAMPLE_DIVISOR = 8
 
+internal enum class PhotoWatermarkMetadataToken {
+    DATETIME,
+    LOCATION,
+    CAMERA_PARAMS,
+    PROFILE_NAME
+}
+
+internal enum class PhotoWatermarkTemplateType(
+    val storageKey: String,
+    val defaultPlacement: WatermarkTextPlacement,
+    val defaultFrameBackground: WatermarkFrameBackground,
+    val usesExpandedFrame: Boolean,
+    val metadataTokens: List<PhotoWatermarkMetadataToken>
+) {
+    CLASSIC_OVERLAY(
+        storageKey = TEMPLATE_CLASSIC_OVERLAY,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        defaultFrameBackground = WatermarkFrameBackground.DARK,
+        usesExpandedFrame = false,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.LOCATION,
+            PhotoWatermarkMetadataToken.CAMERA_PARAMS
+        )
+    ),
+    TRAVEL_POLAROID(
+        storageKey = TEMPLATE_TRAVEL_POLAROID,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        defaultFrameBackground = WatermarkFrameBackground.WHITE,
+        usesExpandedFrame = true,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.LOCATION,
+            PhotoWatermarkMetadataToken.PROFILE_NAME
+        )
+    ),
+    RETRO_FRAME(
+        storageKey = TEMPLATE_RETRO_FRAME,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+        defaultFrameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR,
+        usesExpandedFrame = true,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.CAMERA_PARAMS,
+            PhotoWatermarkMetadataToken.PROFILE_NAME
+        )
+    ),
+    PURE_TEXT(
+        storageKey = TEMPLATE_PURE_TEXT,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        defaultFrameBackground = WatermarkFrameBackground.DARK,
+        usesExpandedFrame = false,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.LOCATION,
+            PhotoWatermarkMetadataToken.CAMERA_PARAMS
+        )
+    ),
+    BLUR_FOUR_BORDER(
+        storageKey = TEMPLATE_BLUR_FOUR_BORDER,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        defaultFrameBackground = WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
+        usesExpandedFrame = true,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.CAMERA_PARAMS,
+            PhotoWatermarkMetadataToken.PROFILE_NAME
+        )
+    ),
+    PROFESSIONAL_BOTTOM_BAR(
+        storageKey = TEMPLATE_PROFESSIONAL_BOTTOM_BAR,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+        defaultFrameBackground = WatermarkFrameBackground.DARK,
+        usesExpandedFrame = true,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.CAMERA_PARAMS
+        )
+    ),
+    NIGHT_STREET(
+        storageKey = TEMPLATE_NIGHT_STREET,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        defaultFrameBackground = WatermarkFrameBackground.SOURCE_BLUR,
+        usesExpandedFrame = true,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.LOCATION,
+            PhotoWatermarkMetadataToken.CAMERA_PARAMS
+        )
+    );
+
+    fun resolveFrameBackground(requested: WatermarkFrameBackground?): WatermarkFrameBackground {
+        val resolved = requested ?: defaultFrameBackground
+        return when (this) {
+            BLUR_FOUR_BORDER -> resolved.takeIf { it in SUPPORTED_BLUR_BACKGROUNDS }
+                ?: defaultFrameBackground
+            NIGHT_STREET -> resolved.takeIf { it in SUPPORTED_NIGHT_STREET_BACKGROUNDS }
+                ?: defaultFrameBackground
+            else -> resolved
+        }
+    }
+
+    companion object {
+        private val byStorageKey = entries.associateBy(PhotoWatermarkTemplateType::storageKey)
+
+        fun fromStorageKeyOrNull(storageKey: String?): PhotoWatermarkTemplateType? {
+            return storageKey
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+                ?.let(byStorageKey::get)
+        }
+    }
+}
+
+internal fun resolvePhotoWatermarkTemplateType(templateId: String?): PhotoWatermarkTemplateType {
+    return PhotoWatermarkTemplateType.fromStorageKeyOrNull(templateId)
+        ?: PhotoWatermarkTemplateType.CLASSIC_OVERLAY
+}
+
 internal fun renderPhotoWatermarkBitmap(
     bitmap: Bitmap,
     template: ResolvedPhotoWatermarkTemplate
@@ -355,8 +472,13 @@ internal fun renderPhotoWatermarkBitmap(
         ).coerceIn(MIN_TEXT_SIZE_PX, MAX_TEXT_SIZE_PX * MAX_TEXT_SCALE)
     val detailTextSize = (titleTextSize * DETAIL_TEXT_SCALE).coerceAtLeast(MIN_DETAIL_TEXT_SIZE_PX)
     val padding = (minEdge * PADDING_RATIO).coerceAtLeast(MIN_PADDING_PX)
-    return when (template.templateId) {
-        TEMPLATE_CLASSIC_OVERLAY -> {
+    val templateType = PhotoWatermarkTemplateType.fromStorageKeyOrNull(template.templateId)
+        ?: return PhotoWatermarkBitmapRenderResult(
+            bitmap = bitmap,
+            warning = mergeWarnings(template.warning, "template-fallback")
+        )
+    return when (templateType) {
+        PhotoWatermarkTemplateType.CLASSIC_OVERLAY -> {
             val canvas = Canvas(bitmap)
             drawClassicOverlay(
                 canvas = canvas,
@@ -372,7 +494,7 @@ internal fun renderPhotoWatermarkBitmap(
             )
         }
 
-        TEMPLATE_TRAVEL_POLAROID -> drawExpandedFrame(
+        PhotoWatermarkTemplateType.TRAVEL_POLAROID -> drawExpandedFrame(
             source = bitmap,
             template = template,
             titleTextSize = titleTextSize,
@@ -386,7 +508,7 @@ internal fun renderPhotoWatermarkBitmap(
             centered = false
         )
 
-        TEMPLATE_PURE_TEXT -> {
+        PhotoWatermarkTemplateType.PURE_TEXT -> {
             val canvas = Canvas(bitmap)
             drawPureTextOverlay(
                 canvas = canvas,
@@ -399,7 +521,7 @@ internal fun renderPhotoWatermarkBitmap(
             PhotoWatermarkBitmapRenderResult(bitmap = bitmap, warning = template.warning)
         }
 
-        TEMPLATE_RETRO_FRAME -> drawExpandedFrame(
+        PhotoWatermarkTemplateType.RETRO_FRAME -> drawExpandedFrame(
             source = bitmap,
             template = template,
             titleTextSize = titleTextSize * 0.96f,
@@ -414,7 +536,7 @@ internal fun renderPhotoWatermarkBitmap(
             ornamentalBorder = true
         )
 
-        TEMPLATE_BLUR_FOUR_BORDER -> drawBlurFourBorderFrame(
+        PhotoWatermarkTemplateType.BLUR_FOUR_BORDER -> drawBlurFourBorderFrame(
             source = bitmap,
             template = template,
             titleTextSize = titleTextSize,
@@ -422,7 +544,7 @@ internal fun renderPhotoWatermarkBitmap(
             padding = padding
         )
 
-        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> drawProfessionalBottomBar(
+        PhotoWatermarkTemplateType.PROFESSIONAL_BOTTOM_BAR -> drawProfessionalBottomBar(
             source = bitmap,
             template = template,
             titleTextSize = titleTextSize,
@@ -430,9 +552,12 @@ internal fun renderPhotoWatermarkBitmap(
             padding = padding
         )
 
-        else -> PhotoWatermarkBitmapRenderResult(
-            bitmap = bitmap,
-            warning = mergeWarnings(template.warning, "template-fallback")
+        PhotoWatermarkTemplateType.NIGHT_STREET -> drawNightStreetFrame(
+            source = bitmap,
+            template = template,
+            titleTextSize = titleTextSize,
+            detailTextSize = detailTextSize,
+            padding = padding
         )
     }
 }
@@ -917,6 +1042,114 @@ private fun drawProfessionalBottomBar(
     )
 }
 
+private const val NIGHT_STREET_ACCENT_CYAN = 0xFF00D4AA.toInt()
+private const val NIGHT_STREET_ACCENT_MAGENTA = 0xFFFF3CAC.toInt()
+private const val NIGHT_STREET_ACCENT_AMBER = 0xFFFFAA2E.toInt()
+
+private fun nightStreetAccentColor(index: Int): Int = when (index % 3) {
+    0 -> NIGHT_STREET_ACCENT_CYAN
+    1 -> NIGHT_STREET_ACCENT_MAGENTA
+    else -> NIGHT_STREET_ACCENT_AMBER
+}
+
+private fun drawNightStreetFrame(
+    source: Bitmap,
+    template: ResolvedPhotoWatermarkTemplate,
+    titleTextSize: Float,
+    detailTextSize: Float,
+    padding: Float
+): PhotoWatermarkBitmapRenderResult {
+    val bottomBandHeight = maxOf(titleTextSize * 4.2f, source.height * 0.18f)
+    val accentLineWidth = 2f
+    val framedWidth = source.width
+    val framedHeight = (source.height + bottomBandHeight + accentLineWidth).toInt()
+    val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(framedBitmap)
+
+    val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
+    drawFrameBackground(canvas, source, fullRect, template.frameBackground)
+    canvas.drawBitmap(source, 0f, 0f, null)
+
+    val bandTop = source.height.toFloat() + accentLineWidth
+    val accentY = source.height.toFloat() + accentLineWidth / 2f
+
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = nightStreetAccentColor(template.title.hashCode())
+        style = Paint.Style.STROKE
+        strokeWidth = accentLineWidth
+    }
+    canvas.drawLine(0f, accentY, framedWidth.toFloat(), accentY, accentPaint)
+
+    val contentLeft = padding
+    val contentRight = framedWidth - padding
+
+    val titleColor = when (template.frameBackground) {
+        WatermarkFrameBackground.SOURCE_BLUR,
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(255, 248, 248, 252)
+        else -> Color.argb(255, 235, 238, 242)
+    }
+    val detailColor = when (template.frameBackground) {
+        WatermarkFrameBackground.SOURCE_BLUR,
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(210, 190, 194, 204)
+        else -> Color.argb(200, 180, 184, 194)
+    }
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = titleColor
+        textSize = titleTextSize
+        style = Paint.Style.FILL
+        alpha = (255 * template.textOpacity).toInt()
+        textAlign = when (template.placement) {
+            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
+            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
+            else -> Paint.Align.LEFT
+        }
+    }
+    val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = detailColor
+        textSize = detailTextSize
+        style = Paint.Style.FILL
+        alpha = (255 * template.textOpacity).toInt()
+        textAlign = when (template.placement) {
+            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
+            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
+            else -> Paint.Align.LEFT
+        }
+    }
+
+    val titleMetrics = titlePaint.fontMetrics
+    val detailMetrics = detailPaint.fontMetrics
+    val blockTop = bandTop + padding
+    var baseline = blockTop - titleMetrics.ascent
+
+    val titleX = when (template.placement) {
+        WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
+        WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
+        else -> contentLeft
+    }
+    canvas.drawText(template.title, titleX, baseline, titlePaint)
+
+    val detailX = when (template.placement) {
+        WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
+        WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
+        else -> contentLeft
+    }
+    template.supportingLines.take(2).forEach { line ->
+        baseline += (detailMetrics.descent - detailMetrics.ascent) + detailTextSize * 0.24f
+        canvas.drawText(
+            fitText(line, detailPaint, contentRight - contentLeft),
+            detailX,
+            baseline,
+            detailPaint
+        )
+    }
+
+    return PhotoWatermarkBitmapRenderResult(
+        bitmap = framedBitmap,
+        warning = template.warning
+    )
+}
+
 private fun drawContentAwareEdgeBorder(
     canvas: Canvas,
     source: Bitmap,
@@ -1248,6 +1481,7 @@ private const val TEMPLATE_RETRO_FRAME = "retro-frame"
 private const val TEMPLATE_PURE_TEXT = "pure-text"
 private const val TEMPLATE_BLUR_FOUR_BORDER = "blur-four-border"
 private const val TEMPLATE_PROFESSIONAL_BOTTOM_BAR = "professional-bottom-bar"
+private const val TEMPLATE_NIGHT_STREET = "night-street"
 
 private fun resolveWatermarkTemplateId(templateId: String?): String {
     return templateId
@@ -1263,16 +1497,8 @@ internal fun resolvePhotoWatermarkTemplate(
     preservedExif: Map<String, String>
 ): ResolvedPhotoWatermarkTemplate {
     val requestedTemplateId = templateId.trim().ifEmpty { TEMPLATE_CLASSIC_OVERLAY }
-    val normalizedTemplateId = when (requestedTemplateId) {
-        TEMPLATE_CLASSIC_OVERLAY,
-        TEMPLATE_TRAVEL_POLAROID,
-        TEMPLATE_RETRO_FRAME,
-        TEMPLATE_PURE_TEXT,
-        TEMPLATE_BLUR_FOUR_BORDER,
-        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> requestedTemplateId
-        else -> TEMPLATE_CLASSIC_OVERLAY
-    }
-    val warning = if (normalizedTemplateId == requestedTemplateId) {
+    val templateType = resolvePhotoWatermarkTemplateType(requestedTemplateId)
+    val warning = if (templateType.storageKey == requestedTemplateId) {
         null
     } else {
         "template-fallback"
@@ -1288,28 +1514,26 @@ internal fun resolvePhotoWatermarkTemplate(
     val cameraParams = metadata.customTags[PHOTO_WATERMARK_CAMERA_PARAMS_KEY]
         ?: formatCameraParams(preservedExif)
     val profileName = metadata.customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY]
-    val supportedTokens = when (normalizedTemplateId) {
-        TEMPLATE_CLASSIC_OVERLAY,
-        TEMPLATE_PURE_TEXT -> listOfNotNull(datetime, location, cameraParams)
-        TEMPLATE_TRAVEL_POLAROID -> listOfNotNull(datetime, location, profileName)
-        TEMPLATE_RETRO_FRAME,
-        TEMPLATE_BLUR_FOUR_BORDER -> listOfNotNull(datetime, cameraParams, profileName)
-        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> listOfNotNull(datetime, cameraParams)
-        else -> emptyList()
-    }
+    val tokenValues = mapOf(
+        PhotoWatermarkMetadataToken.DATETIME to datetime,
+        PhotoWatermarkMetadataToken.LOCATION to location,
+        PhotoWatermarkMetadataToken.CAMERA_PARAMS to cameraParams,
+        PhotoWatermarkMetadataToken.PROFILE_NAME to profileName
+    )
+    val supportedTokens = templateType.metadataTokens.mapNotNull(tokenValues::get)
     return ResolvedPhotoWatermarkTemplate(
-        templateId = normalizedTemplateId,
-        title = resolveWatermarkTitle(normalizedTemplateId, watermarkText, metadata.customTags, model),
+        templateId = templateType.storageKey,
+        title = resolveWatermarkTitle(templateType, watermarkText, metadata.customTags, model),
         supportingLines = chunkWatermarkTokens(supportedTokens),
-        frameBackground = resolveWatermarkFrameBackground(
-            templateId = normalizedTemplateId,
-            customTags = metadata.customTags
+        frameBackground = templateType.resolveFrameBackground(
+            WatermarkFrameBackground.fromStorageKey(
+                metadata.customTags[PHOTO_WATERMARK_BACKGROUND_KEY]
+            )
         ),
-        usesExpandedFrame = normalizedTemplateId == TEMPLATE_TRAVEL_POLAROID ||
-            normalizedTemplateId == TEMPLATE_RETRO_FRAME ||
-            normalizedTemplateId == TEMPLATE_BLUR_FOUR_BORDER ||
-            normalizedTemplateId == TEMPLATE_PROFESSIONAL_BOTTOM_BAR,
-        placement = resolveWatermarkPlacement(normalizedTemplateId, metadata.customTags),
+        usesExpandedFrame = templateType.usesExpandedFrame,
+        placement = WatermarkTextPlacement.fromStorageKey(
+            metadata.customTags[PHOTO_WATERMARK_POSITION_KEY]
+        ) ?: templateType.defaultPlacement,
         textScale = metadata.customTags[PHOTO_WATERMARK_TEXT_SCALE_KEY]
             ?.toFloatOrNull()
             ?.coerceIn(0.75f, 1.4f)
@@ -1326,54 +1550,20 @@ internal fun resolvePhotoWatermarkTemplate(
     )
 }
 
-private fun resolveWatermarkPlacement(
-    templateId: String,
-    customTags: Map<String, String>
-): WatermarkTextPlacement {
-    WatermarkTextPlacement.fromStorageKey(customTags[PHOTO_WATERMARK_POSITION_KEY])?.let {
-        return it
-    }
-    return defaultWatermarkPlacement(templateId)
-}
-
-private fun defaultWatermarkPlacement(templateId: String): WatermarkTextPlacement {
-    return when (templateId) {
-        TEMPLATE_RETRO_FRAME -> WatermarkTextPlacement.BOTTOM_CENTER
-        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> WatermarkTextPlacement.BOTTOM_CENTER
-        else -> WatermarkTextPlacement.BOTTOM_LEFT
-    }
-}
-
-private fun resolveWatermarkFrameBackground(
-    templateId: String,
-    customTags: Map<String, String>
-): WatermarkFrameBackground {
-    val resolved = WatermarkFrameBackground.fromStorageKey(customTags[PHOTO_WATERMARK_BACKGROUND_KEY])
-        ?: defaultWatermarkFrameBackground(templateId)
-    if (templateId == TEMPLATE_BLUR_FOUR_BORDER && resolved !in SUPPORTED_BLUR_BACKGROUNDS) {
-        return WatermarkFrameBackground.SOURCE_LIGHT_BLUR
-    }
-    return resolved
-}
-
 private val SUPPORTED_BLUR_BACKGROUNDS = setOf(
     WatermarkFrameBackground.SOURCE_BLUR,
     WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
     WatermarkFrameBackground.SOURCE_VIVID_BLUR
 )
 
-private fun defaultWatermarkFrameBackground(templateId: String): WatermarkFrameBackground {
-    return when (templateId) {
-        TEMPLATE_TRAVEL_POLAROID -> WatermarkFrameBackground.WHITE
-        TEMPLATE_RETRO_FRAME -> WatermarkFrameBackground.SOURCE_VIVID_BLUR
-        TEMPLATE_BLUR_FOUR_BORDER -> WatermarkFrameBackground.SOURCE_LIGHT_BLUR
-        TEMPLATE_PROFESSIONAL_BOTTOM_BAR -> WatermarkFrameBackground.DARK
-        else -> WatermarkFrameBackground.DARK
-    }
-}
+private val SUPPORTED_NIGHT_STREET_BACKGROUNDS = setOf(
+    WatermarkFrameBackground.DARK,
+    WatermarkFrameBackground.SOURCE_BLUR,
+    WatermarkFrameBackground.SOURCE_VIVID_BLUR
+)
 
 private fun resolveWatermarkTitle(
-    templateId: String,
+    templateType: PhotoWatermarkTemplateType,
     watermarkText: String,
     customTags: Map<String, String>,
     deviceModel: String
@@ -1394,7 +1584,8 @@ private fun resolveWatermarkTitle(
     }
     val normalizedText = watermarkText.trim().ifBlank { "OpenCamera" }
     return when {
-        templateId == TEMPLATE_TRAVEL_POLAROID && normalizedText.startsWith("PHOTO ") -> "去有天空的地方"
+        templateType == PhotoWatermarkTemplateType.TRAVEL_POLAROID &&
+            normalizedText.startsWith("PHOTO ") -> "去有天空的地方"
         else -> normalizedText
     }
 }

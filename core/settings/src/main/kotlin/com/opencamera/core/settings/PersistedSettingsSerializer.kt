@@ -38,6 +38,10 @@ object PersistedSettingsSerializer {
     private const val KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_SCALE = "photo.watermark.professionalBottomBar.scale"
     private const val KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_OPACITY = "photo.watermark.professionalBottomBar.opacity"
     private const val KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_BACKGROUND = "photo.watermark.professionalBottomBar.background"
+    private const val KEY_PHOTO_WATERMARK_NIGHT_STREET_POSITION = "photo.watermark.nightStreet.position"
+    private const val KEY_PHOTO_WATERMARK_NIGHT_STREET_SCALE = "photo.watermark.nightStreet.scale"
+    private const val KEY_PHOTO_WATERMARK_NIGHT_STREET_OPACITY = "photo.watermark.nightStreet.opacity"
+    private const val KEY_PHOTO_WATERMARK_NIGHT_STREET_BACKGROUND = "photo.watermark.nightStreet.background"
     private const val KEY_PHOTO_LIVE_DEFAULT = "photo.livePhotoEnabledByDefault"
     private const val KEY_PHOTO_LIVE_SAVE_FORMAT = "photo.live.saveFormat"
     private const val KEY_PHOTO_COUNTDOWN = "photo.countdownDuration"
@@ -93,6 +97,10 @@ object PersistedSettingsSerializer {
             KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_SCALE to settings.photo.professionalBottomBarWatermarkStyle.textScale.storageKey,
             KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_OPACITY to settings.photo.professionalBottomBarWatermarkStyle.textOpacity.storageKey,
             KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_BACKGROUND to settings.photo.professionalBottomBarWatermarkStyle.frameBackground.storageKey,
+            KEY_PHOTO_WATERMARK_NIGHT_STREET_POSITION to settings.photo.nightStreetWatermarkStyle.textPlacement.storageKey,
+            KEY_PHOTO_WATERMARK_NIGHT_STREET_SCALE to settings.photo.nightStreetWatermarkStyle.textScale.storageKey,
+            KEY_PHOTO_WATERMARK_NIGHT_STREET_OPACITY to settings.photo.nightStreetWatermarkStyle.textOpacity.storageKey,
+            KEY_PHOTO_WATERMARK_NIGHT_STREET_BACKGROUND to settings.photo.nightStreetWatermarkStyle.frameBackground.storageKey,
             KEY_PHOTO_LIVE_DEFAULT to settings.photo.livePhotoEnabledByDefault.toString(),
             KEY_PHOTO_LIVE_SAVE_FORMAT to settings.photo.liveSaveFormat.storageKey,
             KEY_PHOTO_COUNTDOWN to settings.photo.countdownDuration.storageKey,
@@ -239,6 +247,20 @@ object PersistedSettingsSerializer {
                     frameBackground = WatermarkFrameBackground.fromStorageKey(
                         values[KEY_PHOTO_WATERMARK_PROFESSIONAL_BOTTOM_BAR_BACKGROUND]
                     ) ?: defaults.photo.professionalBottomBarWatermarkStyle.frameBackground
+                ),
+                nightStreetWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_NIGHT_STREET_POSITION]
+                    ) ?: defaults.photo.nightStreetWatermarkStyle.textPlacement,
+                    textScale = WatermarkTextScale.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_NIGHT_STREET_SCALE]
+                    ) ?: defaults.photo.nightStreetWatermarkStyle.textScale,
+                    textOpacity = WatermarkTextOpacity.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_NIGHT_STREET_OPACITY]
+                    ) ?: defaults.photo.nightStreetWatermarkStyle.textOpacity,
+                    frameBackground = WatermarkFrameBackground.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_NIGHT_STREET_BACKGROUND]
+                    ) ?: defaults.photo.nightStreetWatermarkStyle.frameBackground
                 ),
                 livePhotoEnabledByDefault = parseBoolean(
                     values[KEY_PHOTO_LIVE_DEFAULT],

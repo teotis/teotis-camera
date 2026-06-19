@@ -157,4 +157,41 @@ class SettingsDefaultsTest {
             template.tokenKeys
         )
     }
+
+    @Test
+    fun `night-street template exists with expected kind and constraints`() {
+        val template = DEFAULT_WATERMARK_TEMPLATES.first { it.id == "night-street" }
+        assertEquals(WatermarkTemplateKind.EXPANDED_FRAME, template.kind)
+        assertEquals(true, template.supportsFrameBorder)
+        assertEquals(
+            setOf("model", "datetime", "location", "camera-params"),
+            template.tokenKeys
+        )
+        assertEquals(
+            setOf(
+                WatermarkTextPlacement.BOTTOM_LEFT,
+                WatermarkTextPlacement.BOTTOM_CENTER,
+                WatermarkTextPlacement.BOTTOM_RIGHT
+            ),
+            template.allowedPlacements
+        )
+        assertEquals(
+            setOf(
+                WatermarkFrameBackground.DARK,
+                WatermarkFrameBackground.SOURCE_BLUR,
+                WatermarkFrameBackground.SOURCE_VIVID_BLUR
+            ),
+            template.allowedFrameBackgrounds
+        )
+    }
+
+    @Test
+    fun `night-street default style uses watermark source blur defaults`() {
+        val style = PhotoSettings().nightStreetWatermarkStyle
+
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, style.textPlacement)
+        assertEquals(WatermarkTextScale.NORMAL, style.textScale)
+        assertEquals(WatermarkTextOpacity.SOFT, style.textOpacity)
+        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, style.frameBackground)
+    }
 }

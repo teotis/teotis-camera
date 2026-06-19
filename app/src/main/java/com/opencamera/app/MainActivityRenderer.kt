@@ -3,6 +3,21 @@ package com.opencamera.app
 import android.view.View
 import androidx.core.view.isVisible
 
+internal fun shouldShowStylePresetCardRail(route: CockpitPanelRoute): Boolean {
+    return route is CockpitPanelRoute.StyleLab
+}
+
+internal data class MainActivityPrimaryRenderModels(
+    val modeTrack: ModeTrackRenderModel,
+    val modeAction: ModeActionRenderModel,
+    val settingsPage: SessionSettingsPageRenderModel,
+    val selectedSettingsTab: SettingsTab,
+    val portraitLabPage: PortraitLabPageRenderModel,
+    val watermarkSelectorPage: WatermarkLabSelectorRenderModel,
+    val watermarkDetailPage: WatermarkLabDetailRenderModel,
+    val filterLabPage: FilterLabPageRenderModel
+)
+
 internal class MainActivityRenderer(
     private val views: MainActivityViews,
     private val cockpit: CockpitSurfaceRenderer,
@@ -18,6 +33,18 @@ internal class MainActivityRenderer(
         },
         scrimView = { views.panelDismissScrim }
     )
+
+    fun renderPrimarySurfaces(models: MainActivityPrimaryRenderModels) {
+        cockpit.renderTopTitle()
+        cockpit.renderModeTrack(models.modeTrack)
+        cockpit.renderModeAction(models.modeAction)
+        settings.renderPage(models.settingsPage)
+        settings.renderTabs(models.selectedSettingsTab)
+        settings.renderPortraitLabPage(models.portraitLabPage)
+        settings.renderWatermarkSelectorPage(models.watermarkSelectorPage)
+        settings.renderWatermarkDetailPage(models.watermarkDetailPage)
+        filterLab.renderPage(models.filterLabPage)
+    }
 
     fun renderPanelVisibility(activePanelRoute: CockpitPanelRoute) {
         val route = activePanelRoute
@@ -43,6 +70,8 @@ internal class MainActivityRenderer(
         }
         views.documentBatchOrganizer.panel.isVisible = route is CockpitPanelRoute.DocumentBatchOrganizer
         views.filterStrip.scroll.isVisible = route is CockpitPanelRoute.StyleStrip
+
+        views.bottomCockpit.stylePresetCardRail.isVisible = shouldShowStylePresetCardRail(route)
         views.quickPanel.panel.isVisible = route is CockpitPanelRoute.QuickBubble
         views.panelDismissScrim.isVisible = route.isAnyPanelOpen && route !is CockpitPanelRoute.StyleStrip
 

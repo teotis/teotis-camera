@@ -5,7 +5,8 @@ import androidx.camera.core.ImageProxy
 
 class PreviewAnalysisFanout(
     private val sceneMaskConsumer: ((ImageProxy, Int) -> Unit)? = null,
-    private val livePreviewConsumer: ((ImageProxy, Int) -> Unit)? = null
+    private val livePreviewConsumer: ((ImageProxy, Int) -> Unit)? = null,
+    private val onConsumerError: ((consumerTag: String, error: Throwable) -> Unit)? = null
 ) {
     companion object {
         private const val TAG = "PreviewAnalysisFanout"
@@ -18,11 +19,13 @@ class PreviewAnalysisFanout(
             livePreviewConsumer?.invoke(imageProxy, rotationDegrees)
         } catch (e: Exception) {
             Log.w(TAG, "Live preview frame analysis failed", e)
+            onConsumerError?.invoke("live-preview", e)
         }
         try {
             sceneMaskConsumer?.invoke(imageProxy, rotationDegrees)
         } catch (e: Exception) {
             Log.w(TAG, "Scene mask analysis failed, live preview continues", e)
+            onConsumerError?.invoke("scene-mask", e)
         }
         try {
             imageProxy.close()

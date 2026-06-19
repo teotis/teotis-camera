@@ -54,22 +54,22 @@ private class HumanisticModeController(
 
     override val id: ModeId = ModeId.HUMANISTIC
     override fun modeEventPrefix() = "humanistic"
-    override fun initialHeadline() = "Humanistic pipeline ready"
+    override fun initialHeadline() = "人文模式已就绪"
 
     override suspend fun onModeEnter() {
         styleIndex = resolvedDefaultStyleIndex()
     }
 
-    override fun enterHeadline() = "Humanistic mode active"
-    override fun exitHeadline() = "Humanistic mode inactive"
+    override fun enterHeadline() = "人文模式已就绪"
+    override fun exitHeadline() = "人文模式已退出"
     override fun exitDetail(): String =
-        "Switch back to Humanistic mode to continue street photography."
+        "切换回人文模式以继续街拍。"
 
     override fun sessionEventText() = StillShotSessionEventText(
-        shotStartedHeadline = "Humanistic capture in progress",
-        shotStartedDetail = "Street capture request accepted by unified pipeline.",
-        shotCompletedHeadline = "Humanistic photo saved",
-        shotFailedHeadline = "Humanistic capture failed"
+        shotStartedHeadline = "街拍拍摄中",
+        shotStartedDetail = "街拍请求已提交",
+        shotCompletedHeadline = "街拍照片已保存",
+        shotFailedHeadline = "街拍失败"
     )
 
     override suspend fun handleSecondaryAction(): ModeSignal = cycleStyle()
@@ -78,7 +78,7 @@ private class HumanisticModeController(
 
     override suspend fun handleTertiaryAction(): ModeSignal =
         frameRatioDelegate.cycleFrameRatio(
-            snapshotHeadline = "Humanistic frame ratio updated",
+            snapshotHeadline = "画幅已切换",
             updateSnapshot = { headline -> updateSnapshot(headline = headline) }
         )
 
@@ -139,7 +139,7 @@ private class HumanisticModeController(
             watermarkText = resolvedWatermarkText(style),
             exifOverrides = basePostProcess.exifOverrides + buildMap {
                 put("SceneCaptureType", "Humanistic")
-                put("HumanisticStyle", style.label)
+                put("HumanisticStyle", style.exifLabel)
                 if (proVariantState.isEnabled) {
                     put("HumanisticVariant", proVariantState.variantExifLabel())
                     put("ManualDraft", proVariantState.currentManualDraft().compactSummary())
@@ -211,10 +211,10 @@ private class HumanisticModeController(
         return ModeSnapshot(
             id = ModeId.HUMANISTIC,
             uiSpec = ModeUiSpec(
-                title = "Humanistic",
-                shutterLabel = "Capture Humanistic",
-                secondaryActionLabel = "Cycle Humanistic Style",
-                tertiaryActionLabel = "Cycle Frame",
+                title = "人文",
+                shutterLabel = "拍摄人文",
+                secondaryActionLabel = "切换滤镜",
+                tertiaryActionLabel = "切换画幅",
                 proActionLabel = proVariantState.proActionLabel()
             ),
             state = ModeState(
@@ -229,20 +229,20 @@ private class HumanisticModeController(
 
     override fun buildDefaultDetail(): String {
         val style = currentStyle()
-        val standardSummary = buildString {
-            append("Default style ${style.label}")
-            append(" | Size ${runtimeState().stillCaptureResolutionPreset.label}")
-            append(" | Watermark ${selectedWatermarkTemplate().label}")
-            append(" | Live ${onOffLabel(livePhotoEnabled())}")
-            append(" | Timer ${countdownDuration().label}")
-            append(" | Frame ${currentFrameRatio().label}")
-            append(" | Subfeatures style, frame ratio, Live default, timer, and watermark share settings.")
+        val defaultDetail = buildString {
+            append("默认风格 ${style.label}")
+            append(" | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label}")
+            append(" | 水印 ${selectedWatermarkTemplate().label}")
+            append(" | 动态照片 ${onOffLabel(livePhotoEnabled())}")
+            append(" | 定时 ${countdownDuration().label}")
+            append(" | 画幅 ${currentFrameRatio().label}")
+            append(" | 支持风格、画幅、动态照片、定时及水印共享设置")
         }
         if (!proVariantState.isEnabled) {
-            return standardSummary
+            return defaultDetail
         }
         val proSummary = proVariantState.summaryText("humanistic")
-        return "$standardSummary | $proSummary"
+        return "$defaultDetail | $proSummary"
     }
 
     // ── Humanistic-specific helpers ───────────────────────────────────
@@ -251,9 +251,9 @@ private class HumanisticModeController(
         styleIndex = (styleIndex + 1) % styles.size
         val style = currentStyle()
         context.eventSink("humanistic.style.selected.${style.id}")
-        updateSnapshot(headline = "Humanistic style updated")
+        updateSnapshot(headline = "风格已切换")
         context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("Humanistic style: ${style.label}")
+        return ModeSignal.ShowHint("当前风格：${style.label}")
     }
 
     private suspend fun toggleProVariant(): ModeSignal {
@@ -262,12 +262,12 @@ private class HumanisticModeController(
         updateSnapshot(
             headline = if (proVariantState.isEnabled) {
                 if (proVariantState.manualControlsEnabled()) {
-                    "Professional controls active"
+                    "专业控制已启用"
                 } else {
-                    "Professional assist active"
+                    "专业辅助已启用"
                 }
             } else {
-                "Humanistic mode active"
+                "人文模式已就绪"
             }
         )
         return result.signal
@@ -275,11 +275,11 @@ private class HumanisticModeController(
 
     private fun resolvedWatermarkText(style: HumanisticStyle): String {
         return if (!proVariantState.isEnabled) {
-            "Humanistic ${style.label}"
+            "人文 ${style.label}"
         } else if (proVariantState.manualControlsEnabled()) {
-            "Humanistic Professional ${style.label}"
+            "人文 专业 ${style.label}"
         } else {
-            "Humanistic Professional Assist ${style.label}"
+            "人文 专业辅助 ${style.label}"
         }
     }
 
@@ -299,6 +299,7 @@ private class HumanisticModeController(
                 HumanisticStyle(
                     id = profile.id,
                     label = profile.label,
+                    exifLabel = profile.label,
                     algorithmProfile = mappedAlgorithmProfile(profile.id),
                     renderSpec = profile.renderSpec
                         ?: defaultFilterRenderSpecOrNull(mappedAlgorithmProfile(profile.id))
@@ -325,6 +326,7 @@ private class HumanisticModeController(
     private data class HumanisticStyle(
         val id: String,
         val label: String,
+        val exifLabel: String,
         val algorithmProfile: String,
         val renderSpec: FilterRenderSpec?
     )
@@ -333,31 +335,36 @@ private class HumanisticModeController(
         private val DEFAULT_HUMANISTIC_STYLES = listOf(
             HumanisticStyle(
                 id = "humanistic-original",
-                label = "Humanistic Original",
+                label = "经典",
+                exifLabel = "Humanistic Original",
                 algorithmProfile = "photo-original",
                 renderSpec = defaultFilterRenderSpecOrNull("photo-original")
             ),
             HumanisticStyle(
                 id = "humanistic-vivid",
-                label = "Humanistic Vivid",
+                label = "鲜亮",
+                exifLabel = "Humanistic Vivid",
                 algorithmProfile = "photo-vivid",
                 renderSpec = defaultFilterRenderSpecOrNull("photo-vivid")
             ),
             HumanisticStyle(
                 id = "humanistic-street",
-                label = "Humanistic Street",
+                label = "街拍",
+                exifLabel = "Humanistic Street",
                 algorithmProfile = "photo-chasing-light",
                 renderSpec = defaultFilterRenderSpecOrNull("photo-chasing-light")
             ),
             HumanisticStyle(
                 id = "humanistic-portrait",
-                label = "Humanistic Portrait",
+                label = "人像",
+                exifLabel = "Humanistic Portrait",
                 algorithmProfile = "portrait-original",
                 renderSpec = defaultFilterRenderSpecOrNull("humanistic-portrait")
             ),
             HumanisticStyle(
                 id = "humanistic-life",
-                label = "Humanistic Life",
+                label = "生活",
+                exifLabel = "Humanistic Life",
                 algorithmProfile = "photo-rich",
                 renderSpec = defaultFilterRenderSpecOrNull("photo-rich")
             )

@@ -156,13 +156,13 @@ internal data class PrimaryStatusRenderModel(
 )
 
 internal fun captureDisabledReason(state: SessionState, text: AppTextResolver): String? {
-    if (!state.permissionState.cameraGranted) return text.disabledPermission()
-    if (state.previewStatus == PreviewStatus.RECOVERING) return text.disabledPreviewRecovering()
-    if (state.countdownRemainingSeconds != null) return text.disabledCountdown()
-    if (state.activeShot != null && state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
-    if (state.recordingStatus == RecordingStatus.RECORDING) return text.disabledRecording()
-    if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
-    if (state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED) return text.disabledSavingPhoto()
+    if (!state.permissionState.cameraGranted) return text.get(R.string.disabled_permission)
+    if (state.previewStatus == PreviewStatus.RECOVERING) return text.get(R.string.disabled_preview_recovering)
+    if (state.countdownRemainingSeconds != null) return text.get(R.string.disabled_countdown)
+    if (state.activeShot != null && state.recordingStatus == RecordingStatus.REQUESTING) return text.get(R.string.disabled_preparing_recording)
+    if (state.recordingStatus == RecordingStatus.RECORDING) return text.get(R.string.disabled_recording)
+    if (state.recordingStatus == RecordingStatus.STOPPING) return text.get(R.string.disabled_stopping_recording)
+    if (state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED) return text.get(R.string.disabled_saving_photo)
     return null
 }
 
@@ -173,22 +173,22 @@ internal fun captureDisabledReason(state: SessionState, text: AppTextResolver): 
  * (shutter tap requests permission).
  */
 internal fun shutterDisabledReason(state: SessionState, text: AppTextResolver): String? {
-    if (state.previewStatus == PreviewStatus.RECOVERING) return text.disabledPreviewRecovering()
-    if (state.countdownRemainingSeconds != null) return text.disabledCountdown()
+    if (state.previewStatus == PreviewStatus.RECOVERING) return text.get(R.string.disabled_preview_recovering)
+    if (state.countdownRemainingSeconds != null) return text.get(R.string.disabled_countdown)
     val activeShot = state.activeShot
     if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) {
         // CaptureReadiness marks the explicit user-facing readiness boundary:
         // the frame is acquired and the shutter is safe to re-arm.
         if (state.presentation.captureReadiness != null) return null
-        return text.disabledSavingPhoto()
+        return text.get(R.string.disabled_saving_photo)
     }
     // Session rearm policy: ordinary still capture clears activeShot at DATA_RECEIVED,
     // so the shutter is safe to re-arm even though postprocess/save may still be finishing.
     // BACKGROUND_SAVING visual state shows a subtle indicator while the shutter remains enabled.
     // Conservative capture kinds (multi-frame, live photo) keep activeShot until ShotCompleted.
     if (activeShot == null && (state.captureStatus == CaptureStatus.DATA_RECEIVED || state.captureStatus == CaptureStatus.SAVING)) return null
-    if (state.recordingStatus == RecordingStatus.REQUESTING) return text.disabledPreparingRecording()
-    if (state.recordingStatus == RecordingStatus.STOPPING) return text.disabledStoppingRecording()
+    if (state.recordingStatus == RecordingStatus.REQUESTING) return text.get(R.string.disabled_preparing_recording)
+    if (state.recordingStatus == RecordingStatus.STOPPING) return text.get(R.string.disabled_stopping_recording)
     return null
 }
 
@@ -224,7 +224,8 @@ internal fun shutterVisualState(state: SessionState): ShutterVisualState {
 
 internal fun sessionControlsRenderModel(
     state: SessionState,
-    strings: SessionUiStrings
+    strings: SessionUiStrings,
+    text: AppTextResolver
 ): SessionControlsRenderModel {
     val capability = state.activeDeviceCapabilities.zoomRatioCapability
     val currentRatio = normalizedZoomRatioValue(state.activeDeviceGraph.preview.zoomRatio)
@@ -232,7 +233,7 @@ internal fun sessionControlsRenderModel(
     val exactMatch = currentRatio in presets
     val sliderEnabled = capability.isSwitchingSupported && !isZoomBlockedBySession(state, capability.support)
     val sliderDisabledReason = if (capability.isSwitchingSupported && !sliderEnabled) {
-        zoomDisabledReasonText(state, capability.support)
+        zoomDisabledReasonText(state, capability.support, text)
     } else null
 
     return SessionControlsRenderModel(
@@ -278,20 +279,20 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
     val canInteract = isBrightnessCapableMode && isPreviewActive && !isBusy && !isUnsupported
 
     val valueLabel = if (isUnsupported) {
-        text.quickBrightnessNa()
+        text.get(R.string.button_quick_brightness_na)
     } else {
         brightnessValueLabel(steps)
     }
 
     val disabledReason = when {
         !isBrightnessCapableMode -> null
-        isUnsupported -> text.disabledBrightnessUnsupported()
-        isBusy -> text.disabledBrightnessActiveShot()
+        isUnsupported -> text.get(R.string.disabled_brightness_unsupported)
+        isBusy -> text.get(R.string.disabled_brightness_active_shot)
         else -> null
     }
 
     return QuickBrightnessRenderModel(
-        title = text.quickBrightness(),
+        title = text.get(R.string.button_quick_brightness),
         value = valueLabel,
         steps = steps,
         minSteps = range.minSteps,
@@ -326,13 +327,13 @@ internal fun lowLightNightPromptRenderModel(
         prompt?.status == PhotoLowLightPromptStatus.DEGRADED_DISABLED
     val label = when {
         prompt == null -> ""
-        isDegraded -> text.buttonLowLightNightPromptDegraded()
-        isEnabled -> text.buttonLowLightNightPromptEnabled()
-        else -> text.buttonLowLightNightPromptDisabled()
+        isDegraded -> text.get(R.string.button_low_light_night_prompt_degraded)
+        isEnabled -> text.get(R.string.button_low_light_night_prompt_enabled)
+        else -> text.get(R.string.button_low_light_night_prompt_disabled)
     }
     return LowLightNightPromptRenderModel(
         label = label,
-        contentDescription = text.lowLightNightAssistContentDescription(),
+        contentDescription = text.get(R.string.low_light_night_assist_content_description),
         isVisible = isVisible,
         isEnabled = isEnabled
     )
@@ -344,13 +345,13 @@ internal fun frameRatioControlRenderModel(state: SessionState, text: AppTextReso
     val isBusy = state.activeShot != null || state.countdownRemainingSeconds != null
     val enabled = isSupportedMode && !isBusy
     val reason = when {
-        !isSupportedMode -> text.disabledFrameRatioUnsupportedMode()
-        state.activeShot != null -> text.disabledFrameRatioActiveShot()
-        state.countdownRemainingSeconds != null -> text.disabledFrameRatioCountdown()
+        !isSupportedMode -> text.get(R.string.disabled_frame_ratio_unsupported_mode)
+        state.activeShot != null -> text.get(R.string.disabled_frame_ratio_active_shot)
+        state.countdownRemainingSeconds != null -> text.get(R.string.disabled_frame_ratio_countdown)
         else -> null
     }
     return FrameRatioControlRenderModel(
-        title = text.frameRatioTitle(),
+        title = text.get(R.string.label_frame_ratio_title),
         currentLabel = current.label,
         options = FrameRatio.entries.map { ratio ->
             FrameRatioOptionRenderModel(
@@ -392,8 +393,8 @@ internal fun quickPanelSheetRenderModel(
     val watermarkDisabledReason = when {
         !state.activeDeviceCapabilities.supportsStillCapture -> null
         !stillTemplate -> null
-        stillBusy -> text.disabledSavingPhoto()
-        watermarkTemplates.isEmpty() -> text.noWatermarkTemplates()
+        stillBusy -> text.get(R.string.disabled_saving_photo)
+        watermarkTemplates.isEmpty() -> text.get(R.string.error_no_watermark_templates)
         else -> null
     }
     val nextTemplateId = if (watermarkEnabled && watermarkTemplates.size > 1) {
@@ -416,20 +417,20 @@ internal fun quickPanelSheetRenderModel(
 
     return QuickPanelSheetRenderModel(
         gridRow = QuickPanelRowRenderModel(
-            title = text.quickGrid(),
+            title = text.get(R.string.button_quick_grid),
             value = grid.value,
             isEnabled = grid.isInteractive,
             controlKind = QuickControlKind.CYCLE
         ),
         resolutionRow = QuickPanelRowRenderModel(
-            title = text.quickResolution(),
+            title = text.get(R.string.button_quick_resolution),
             value = stillResolutionQuickLabel(state, strings),
             isEnabled = resolutionEnabled,
             controlKind = QuickControlKind.CYCLE
         ),
         brightnessRow = brightnessControl,
         frameRatioRow = QuickPanelRowRenderModel(
-            title = text.frameRatioTitle(),
+            title = text.get(R.string.label_frame_ratio_title),
             value = frameControl.currentLabel,
             isEnabled = frameControl.isEnabled,
             disabledReason = frameControl.disabledReason,
@@ -440,7 +441,7 @@ internal fun quickPanelSheetRenderModel(
         frameRatioEnabled = frameControl.isEnabled,
         frameRatioDisabledReason = frameControl.disabledReason,
         watermarkRow = QuickPanelRowRenderModel(
-            title = text.quickWatermark(),
+            title = text.get(R.string.button_quick_watermark),
             value = watermarkLabel,
             isEnabled = watermarkEnabled,
             disabledReason = watermarkDisabledReason,
@@ -448,14 +449,14 @@ internal fun quickPanelSheetRenderModel(
         ),
         watermarkNextTemplateId = nextTemplateId,
         liveRow = QuickPanelRowRenderModel(
-            title = text.quickLive(),
+            title = text.get(R.string.button_quick_live),
             value = live.value,
             isEnabled = live.isInteractive,
             controlKind = QuickControlKind.TOGGLE,
             isSelected = live.value.equals(text.onOff(true), ignoreCase = true)
         ),
         timerRow = QuickPanelRowRenderModel(
-            title = text.quickTimer(),
+            title = text.get(R.string.button_quick_timer),
             value = timer.value,
             isEnabled = timer.isInteractive,
             controlKind = QuickControlKind.CYCLE
@@ -591,22 +592,22 @@ internal fun primaryStatusRenderModel(
     val modeLabel = text.modeDisplayName(state.activeMode)
     val pendingPp = state.presentation.pendingPostprocess
     val statusText = if (pendingPp != null) {
-        text.statusProcessingPhotoKeepOpen()
+        text.get(R.string.status_processing_photo_keep_open)
     } else {
         buildString {
-            append(state.previewStatus.name.lowercase().replaceFirstChar(Char::titlecase))
+            append(text.previewStatusLabel(state.previewStatus))
             if (state.captureStatus != CaptureStatus.IDLE) {
-                append(" · ${state.captureStatus.name.lowercase().replaceFirstChar(Char::titlecase)}")
+                append(" · ${text.captureStatusLabel(state.captureStatus)}")
             }
             state.countdownRemainingSeconds?.let { append(" · ${it}s") }
             when (state.recordingStatus) {
-                RecordingStatus.REQUESTING -> append(" · ${text.statusRecordingStarting()}")
-                RecordingStatus.RECORDING -> append(" · ${text.statusRecordingActive()}")
-                RecordingStatus.STOPPING -> append(" · ${text.statusRecordingSaving()}")
+                RecordingStatus.REQUESTING -> append(" · ${text.get(R.string.status_recording_starting)}")
+                RecordingStatus.RECORDING -> append(" · ${text.get(R.string.status_recording_active)}")
+                RecordingStatus.STOPPING -> append(" · ${text.get(R.string.status_recording_saving)}")
                 RecordingStatus.IDLE -> Unit
             }
             if (state.modeSnapshot.state.isProVariantActive) {
-                append(" · Pro active")
+                append(" · ${text.get(R.string.status_pro_active)}")
             }
         }
     }
@@ -628,7 +629,8 @@ internal fun modeDirectoryText(
 
 internal fun sessionCaptureOutputText(
     state: SessionState,
-    strings: SessionUiStrings
+    strings: SessionUiStrings,
+    text: AppTextResolver
 ): String {
     val presentation = state.presentation
     val livePhotoBundle = presentation.latestLivePhotoBundle
@@ -649,25 +651,25 @@ internal fun sessionCaptureOutputText(
                 append(strings.outputLivePrefix)
                 append('\n')
                 appendLiveAssetLine(
-                    label = "Still",
+                    label = text.get(R.string.live_photo_asset_still),
                     path = livePhotoBundle.stillPath,
                     renderUri = livePhotoBundle.thumbnailHandle.contentUri
                 )
                 append('\n')
                 appendLiveAssetLine(
-                    label = "Motion",
+                    label = text.get(R.string.live_photo_asset_motion),
                     path = livePhotoBundle.motionPath,
                     renderUri = livePhotoBundle.motionHandle.contentUri
                 )
                 append('\n')
                 appendLiveAssetLine(
-                    label = "Sidecar",
+                    label = text.get(R.string.live_photo_asset_sidecar),
                     path = livePhotoBundle.sidecarPath,
                     renderUri = livePhotoBundle.sidecarHandle.contentUri
                 )
                 append('\n')
                 appendLiveAssetLine(
-                    label = "Thumbnail",
+                    label = text.get(R.string.live_photo_asset_thumbnail),
                     path = livePhotoBundle.thumbnailPath,
                     renderUri = livePhotoBundle.thumbnailHandle.contentUri
                 )
@@ -739,14 +741,20 @@ private fun isZoomBlockedBySession(state: SessionState, zoomSupport: ZoomControl
     return false
 }
 
-private fun zoomDisabledReasonText(state: SessionState, zoomSupport: ZoomControlSupport = ZoomControlSupport.UNSUPPORTED): String {
-    if (state.countdownRemainingSeconds != null) return "Countdown in progress"
+private fun zoomDisabledReasonText(
+    state: SessionState,
+    zoomSupport: ZoomControlSupport = ZoomControlSupport.UNSUPPORTED,
+    text: AppTextResolver
+): String {
+    if (state.countdownRemainingSeconds != null) return text.get(R.string.disabled_countdown)
     val activeShot = state.activeShot
-    if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) return "Saving previous photo"
-    if (state.recordingStatus == RecordingStatus.REQUESTING) return "Preparing to record"
-    if (state.recordingStatus == RecordingStatus.STOPPING) return "Stopping and saving"
-    if (state.recordingStatus == RecordingStatus.RECORDING && zoomSupport == ZoomControlSupport.DISCRETE_PRESET) return "Preset switching unavailable during recording"
-    return "Zoom unavailable"
+    if (activeShot != null && activeShot.mediaType == com.opencamera.core.media.MediaType.PHOTO) return text.get(R.string.disabled_saving_photo)
+    if (state.recordingStatus == RecordingStatus.REQUESTING) return text.get(R.string.disabled_preparing_recording)
+    if (state.recordingStatus == RecordingStatus.STOPPING) return text.get(R.string.disabled_stopping_recording)
+    if (state.recordingStatus == RecordingStatus.RECORDING && zoomSupport == ZoomControlSupport.DISCRETE_PRESET) {
+        return text.get(R.string.disabled_preset_switching_recording)
+    }
+    return text.get(R.string.disabled_zoom_unavailable)
 }
 
 private fun ZoomRatioCapability.zoomRatioSummary(): String {

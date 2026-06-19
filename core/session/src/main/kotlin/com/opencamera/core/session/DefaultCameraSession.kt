@@ -84,13 +84,15 @@ class DefaultCameraSession(
         available = baseDeviceCapabilities.availableStillCaptureOutputSizes,
         fallbackPreset = initialStillCaptureResolutionPreset
     )
-    private var sessionDeviceCapabilities = baseDeviceCapabilities
-    private var sessionLensFacing = initialLensFacing
-    private var sessionStillCaptureQuality = initialStillCaptureQuality
-    private var sessionStillCaptureResolutionPreset = initialStillCaptureResolutionPreset
-    private var sessionStillCaptureOutputSize = initialStillCaptureOutputSize
-    private var sessionPreviewRatio: PreviewRatio = PreviewRatio.FULL
-    private var sessionSettingsSnapshot = settingsSnapshot
+    private var runtimeConfiguration = SessionRuntimeConfiguration(
+        deviceCapabilities = baseDeviceCapabilities,
+        lensFacing = initialLensFacing,
+        stillCaptureQuality = initialStillCaptureQuality,
+        stillCaptureResolutionPreset = initialStillCaptureResolutionPreset,
+        stillCaptureOutputSize = initialStillCaptureOutputSize,
+        previewRatio = PreviewRatio.FULL,
+        settings = settingsSnapshot
+    )
     private var pendingSwitchTraceHandle: TraceHandle? = null
     private var pendingSwitchSpan: PerformanceSpanSnapshot? = null
     private var currentController: ModeController = createController(
@@ -122,7 +124,7 @@ class DefaultCameraSession(
                 requestedZoomRatio = currentController.deviceGraph().preview.zoomRatio
             ),
             previewMetrics = PreviewMetrics(),
-            settings = sessionSettingsSnapshot,
+            settings = runtimeConfiguration.settings,
             presentation = SessionPresentationState(
                 lastAction = "Session created"
             )
@@ -482,24 +484,28 @@ class DefaultCameraSession(
         previewRecoveryProcessor.requestPreviewUnbind(reason = "Session stopped", clearHost = false)
     }
 
-    private suspend fun handleSwitchMode(modeId: ModeId) {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            updateState(lastAction = "Wait for countdown to finish before switching modes")
-            trace.record("mode.switch.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
-            return
-        }
-        val activeShot = _state.value.activeShot
-        if (activeShot != null) {
-            val reason = if (activeShot.mediaType == MediaType.VIDEO) {
-                "Stop recording before switching modes"
-            } else {
-                "Wait for current capture to finish before switching modes"
-            }
-            updateState(lastAction = reason)
-            trace.record(
-                "mode.switch.blocked",
-                "shot=${activeShot.shotId},mediaType=${activeShot.mediaType}"
+    private fun blockIfCommandNotAdmitted(command: SessionCommandKind, traceEventName: String? = null): Boolean {
+        val admission = SessionCommandAdmission.evaluate(
+            command = command,
+            snapshot = SessionCommandAdmissionSnapshot(
+                countdownInProgress = captureRecordingProcessor.countdownInProgress(),
+                countdownRemainingSeconds = _state.value.countdownRemainingSeconds,
+                activeShot = _state.value.activeShot,
+                recordingStatus = _state.value.recordingStatus
             )
+        )
+        return when (admission) {
+            SessionCommandAdmissionResult.Allowed -> false
+            is SessionCommandAdmissionResult.Blocked -> {
+                updateState(lastAction = admission.lastAction)
+                traceEventName?.let { trace.record(it, admission.traceDetail) }
+                true
+            }
+        }
+    }
+
+    private suspend fun handleSwitchMode(modeId: ModeId) {
+        if (blockIfCommandNotAdmitted(SessionCommandKind.MODE_SWITCH, "mode.switch.blocked")) {
             return
         }
 
@@ -529,9 +535,9 @@ class DefaultCameraSession(
         currentController.onExit()
         currentController = createController(
             modeId = modeId,
-            deviceCapabilities = sessionDeviceCapabilities,
-            lensFacing = sessionLensFacing,
-            stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset
+            deviceCapabilities = runtimeConfiguration.deviceCapabilities,
+            lensFacing = runtimeConfiguration.lensFacing,
+            stillCaptureResolutionPreset = runtimeConfiguration.stillCaptureResolutionPreset
         )
         currentController.onEnter()
         trace.record("mode.switch.bind", modeId.name)
@@ -566,33 +572,18 @@ class DefaultCameraSession(
     private suspend fun handleSettingsUpdated(
         snapshot: SessionSettingsSnapshot
     ) {
-        if (snapshot == sessionSettingsSnapshot) {
+        if (snapshot == runtimeConfiguration.settings) {
             updateState(lastAction = "Session settings already applied")
             trace.record("settings.update.skipped", "no-op")
             return
         }
 
-        if (captureRecordingProcessor.countdownInProgress()) {
-            updateState(lastAction = "Wait for countdown to finish before updating settings")
-            trace.record(
-                "settings.update.blocked",
-                "countdown=${_state.value.countdownRemainingSeconds}"
-            )
-            return
-        }
-
-        val activeShot = _state.value.activeShot
-        if (activeShot != null) {
-            updateState(lastAction = "Wait for current capture to finish before updating settings")
-            trace.record(
-                "settings.update.blocked",
-                "shot=${activeShot.shotId},mediaType=${activeShot.mediaType}"
-            )
+        if (blockIfCommandNotAdmitted(SessionCommandKind.SETTINGS_UPDATE, "settings.update.blocked")) {
             return
         }
 
         val wasRunning = _state.value.lifecycle == SessionLifecycle.RUNNING
-        sessionSettingsSnapshot = snapshot
+        runtimeConfiguration = runtimeConfiguration.copy(settings = snapshot)
         if (wasRunning) {
             currentController.onEnter()
         }
@@ -601,7 +592,7 @@ class DefaultCameraSession(
             modeSnapshot = currentController.snapshot.value,
             activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
             activeDeviceGraph = resolvedActiveDeviceGraph(),
-            settings = sessionSettingsSnapshot,
+            settings = runtimeConfiguration.settings,
             lastAction = "Session settings updated",
             lastError = null
         )
@@ -618,23 +609,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleLensFacingToggled() {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            updateState(lastAction = "Wait for countdown to finish before switching lenses")
-            trace.record("lens.switch.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
-            return
-        }
-        val activeShot = _state.value.activeShot
-        if (activeShot != null) {
-            val reason = if (activeShot.mediaType == MediaType.VIDEO) {
-                "Stop recording before switching lenses"
-            } else {
-                "Wait for current capture to finish before switching lenses"
-            }
-            updateState(lastAction = reason)
-            trace.record(
-                "lens.switch.blocked",
-                "shot=${activeShot.shotId},mediaType=${activeShot.mediaType}"
-            )
+        if (blockIfCommandNotAdmitted(SessionCommandKind.LENS_SWITCH, "lens.switch.blocked")) {
             return
         }
 
@@ -646,17 +621,17 @@ class DefaultCameraSession(
         }
 
         val nextLensFacing = nextLensFacing(
-            current = sessionLensFacing,
+            current = runtimeConfiguration.lensFacing,
             available = availableLensFacings
         )
-        if (nextLensFacing == sessionLensFacing) {
+        if (nextLensFacing == runtimeConfiguration.lensFacing) {
             updateState(lastAction = "Lens already active: ${nextLensFacing.label}")
             trace.record("lens.switch.skipped", nextLensFacing.name)
             return
         }
 
-        val previousLensFacing = sessionLensFacing
-        sessionLensFacing = nextLensFacing
+        val previousLensFacing = runtimeConfiguration.lensFacing
+        runtimeConfiguration = runtimeConfiguration.copy(lensFacing = nextLensFacing)
         pendingSwitchTraceHandle = trace.begin("lens.switch")
         val lensCorrelationId = "lens-${nextLensFacing.name}-${System.nanoTime()}"
         pendingSwitchSpan = linkRecorder.startSpan(
@@ -1009,26 +984,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleStillCaptureQualityToggled() {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            updateState(lastAction = "Wait for countdown to finish before changing still quality")
-            trace.record(
-                "still-quality.blocked",
-                "countdown=${_state.value.countdownRemainingSeconds}"
-            )
-            return
-        }
-        val activeShot = _state.value.activeShot
-        if (activeShot != null) {
-            val reason = if (activeShot.mediaType == MediaType.VIDEO) {
-                "Stop recording before changing still quality"
-            } else {
-                "Wait for current capture to finish before changing still quality"
-            }
-            updateState(lastAction = reason)
-            trace.record(
-                "still-quality.blocked",
-                "shot=${activeShot.shotId},mediaType=${activeShot.mediaType}"
-            )
+        if (blockIfCommandNotAdmitted(SessionCommandKind.STILL_CAPTURE_QUALITY, "still-quality.blocked")) {
             return
         }
 
@@ -1038,11 +994,11 @@ class DefaultCameraSession(
             return
         }
 
-        val nextQuality = when (sessionStillCaptureQuality) {
+        val nextQuality = when (runtimeConfiguration.stillCaptureQuality) {
             StillCaptureQualityPreference.LATENCY -> StillCaptureQualityPreference.QUALITY
             StillCaptureQualityPreference.QUALITY -> StillCaptureQualityPreference.LATENCY
         }
-        sessionStillCaptureQuality = nextQuality
+        runtimeConfiguration = runtimeConfiguration.copy(stillCaptureQuality = nextQuality)
         currentController.onStillCaptureQualityChanged(nextQuality)
         updateState(
             modeSnapshot = currentController.snapshot.value,
@@ -1055,26 +1011,7 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleStillCaptureResolutionToggled() {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            updateState(lastAction = "Wait for countdown to finish before changing still resolution")
-            trace.record(
-                "still-resolution.blocked",
-                "countdown=${_state.value.countdownRemainingSeconds}"
-            )
-            return
-        }
-        val activeShot = _state.value.activeShot
-        if (activeShot != null) {
-            val reason = if (activeShot.mediaType == MediaType.VIDEO) {
-                "Stop recording before changing still resolution"
-            } else {
-                "Wait for current capture to finish before changing still resolution"
-            }
-            updateState(lastAction = reason)
-            trace.record(
-                "still-resolution.blocked",
-                "shot=${activeShot.shotId},mediaType=${activeShot.mediaType}"
-            )
+        if (blockIfCommandNotAdmitted(SessionCommandKind.STILL_CAPTURE_RESOLUTION, "still-resolution.blocked")) {
             return
         }
 
@@ -1084,21 +1021,23 @@ class DefaultCameraSession(
             return
         }
 
-        val nextOutputSize = sessionDeviceCapabilities.availableStillCaptureOutputSizes
+        val nextOutputSize = runtimeConfiguration.deviceCapabilities.availableStillCaptureOutputSizes
             .takeIf { it.isNotEmpty() }
             ?.let { sizes ->
                 nextStillCaptureOutputSize(
-                    current = sessionStillCaptureOutputSize,
+                    current = runtimeConfiguration.stillCaptureOutputSize,
                     available = sizes
                 )
             }
         val nextPreset = nextOutputSize?.let(::resolutionPresetForOutputSize)
             ?: nextStillCaptureResolutionPreset(
-                current = sessionStillCaptureResolutionPreset,
-                available = sessionDeviceCapabilities.availableStillCaptureResolutionPresets
+                current = runtimeConfiguration.stillCaptureResolutionPreset,
+                available = runtimeConfiguration.deviceCapabilities.availableStillCaptureResolutionPresets
             )
-        sessionStillCaptureResolutionPreset = nextPreset
-        sessionStillCaptureOutputSize = nextOutputSize
+        runtimeConfiguration = runtimeConfiguration.copy(
+            stillCaptureResolutionPreset = nextPreset,
+            stillCaptureOutputSize = nextOutputSize
+        )
         currentController.onStillCaptureResolutionChanged(nextPreset)
         val activeGraph = resolveActiveDeviceGraph(
             baseGraph = currentController.deviceGraph(),
@@ -1121,24 +1060,11 @@ class DefaultCameraSession(
     }
 
     private suspend fun handlePreviewRatioToggled() {
-        if (captureRecordingProcessor.countdownInProgress()) {
-            updateState(lastAction = "Wait for countdown to finish before switching preview ratio")
-            trace.record("preview-ratio.blocked", "countdown=${_state.value.countdownRemainingSeconds}")
+        if (blockIfCommandNotAdmitted(SessionCommandKind.PREVIEW_RATIO, "preview-ratio.blocked")) {
             return
         }
-        val activeShot = _state.value.activeShot
-        if (activeShot != null) {
-            val reason = if (activeShot.mediaType == MediaType.VIDEO) {
-                "Stop recording before switching preview ratio"
-            } else {
-                "Wait for current capture to finish before switching preview ratio"
-            }
-            updateState(lastAction = reason)
-            trace.record("preview-ratio.blocked", "shot=${activeShot.shotId},mediaType=${activeShot.mediaType}")
-            return
-        }
-        val nextRatio = nextPreviewRatio(sessionPreviewRatio)
-        sessionPreviewRatio = nextRatio
+        val nextRatio = nextPreviewRatio(runtimeConfiguration.previewRatio)
+        runtimeConfiguration = runtimeConfiguration.copy(previewRatio = nextRatio)
         val activeGraph = resolveActiveDeviceGraph(
             requestedOutputSize = _state.value.activeDeviceGraph.stillCapture.outputSize,
             requestedZoomRatio = _state.value.activeDeviceGraph.preview.zoomRatio,
@@ -1283,19 +1209,21 @@ class DefaultCameraSession(
             return
         }
 
-        sessionDeviceCapabilities = deviceCapabilities
+        runtimeConfiguration = runtimeConfiguration.copy(deviceCapabilities = deviceCapabilities)
         currentController.onDeviceCapabilitiesChanged(deviceCapabilities)
         val clampedResolutionPreset = clampStillCaptureResolutionPreset(
-            current = sessionStillCaptureResolutionPreset,
+            current = runtimeConfiguration.stillCaptureResolutionPreset,
             available = deviceCapabilities.availableStillCaptureResolutionPresets
         )
-        val resolutionAdjusted = clampedResolutionPreset != sessionStillCaptureResolutionPreset
+        val resolutionAdjusted = clampedResolutionPreset != runtimeConfiguration.stillCaptureResolutionPreset
         if (resolutionAdjusted) {
-            sessionStillCaptureResolutionPreset = clampedResolutionPreset
-            sessionStillCaptureOutputSize = resolvedStillCaptureOutputSizeSelection(
-                current = null,
-                available = deviceCapabilities.availableStillCaptureOutputSizes,
-                fallbackPreset = clampedResolutionPreset
+            runtimeConfiguration = runtimeConfiguration.copy(
+                stillCaptureResolutionPreset = clampedResolutionPreset,
+                stillCaptureOutputSize = resolvedStillCaptureOutputSizeSelection(
+                    current = null,
+                    available = deviceCapabilities.availableStillCaptureOutputSizes,
+                    fallbackPreset = clampedResolutionPreset
+                )
             )
             currentController.onStillCaptureResolutionChanged(clampedResolutionPreset)
         }
@@ -1441,12 +1369,7 @@ class DefaultCameraSession(
         if (!_state.value.permissionState.cameraGranted || _state.value.previewHostAvailable.not()) {
             return
         }
-        if (captureRecordingProcessor.countdownInProgress()) {
-            updateState(lastAction = "Wait for countdown to finish before adjusting brightness")
-            return
-        }
-        if (_state.value.activeShot != null) {
-            updateState(lastAction = "Wait for current capture to finish before adjusting brightness")
+        if (blockIfCommandNotAdmitted(SessionCommandKind.PREVIEW_BRIGHTNESS)) {
             return
         }
 
@@ -1758,7 +1681,7 @@ class DefaultCameraSession(
         deviceCapabilities: DeviceCapabilities = _state.value.activeDeviceCapabilities,
         requestedOutputSize: StillCaptureOutputSize? = baseGraph.stillCapture.outputSize,
         requestedZoomRatio: Float? = baseGraph.preview.zoomRatio,
-        requestedPreviewStreamAspect: PreviewStreamAspect = sessionPreviewRatio.toPreviewStreamAspect()
+        requestedPreviewStreamAspect: PreviewStreamAspect = runtimeConfiguration.previewRatio.toPreviewStreamAspect()
     ): DeviceGraphSpec {
         val graphForResolution = if (requestedOutputSize != null) {
             baseGraph.copy(stillCapture = baseGraph.stillCapture.copy(outputSize = requestedOutputSize))
@@ -1799,9 +1722,11 @@ class DefaultCameraSession(
             current = stillCaptureResolutionPreset,
             available = deviceCapabilities.availableStillCaptureResolutionPresets
         )
-        sessionDeviceCapabilities = deviceCapabilities
-        sessionLensFacing = lensFacing
-        sessionStillCaptureResolutionPreset = clampedStillCaptureResolutionPreset
+        runtimeConfiguration = runtimeConfiguration.copy(
+            deviceCapabilities = deviceCapabilities,
+            lensFacing = lensFacing,
+            stillCaptureResolutionPreset = clampedStillCaptureResolutionPreset
+        )
         return registry.createController(
             modeId = modeId,
             context = ModeContext(
@@ -1810,11 +1735,11 @@ class DefaultCameraSession(
                 initialStillCaptureResolutionPreset = clampedStillCaptureResolutionPreset,
                 runtimeState = {
                     ModeRuntimeState(
-                        deviceCapabilities = sessionDeviceCapabilities,
-                        lensFacing = sessionLensFacing,
-                        stillCaptureResolutionPreset = sessionStillCaptureResolutionPreset,
-                        stillCaptureQuality = sessionStillCaptureQuality,
-                        stillCaptureOutputSize = sessionStillCaptureOutputSize
+                        deviceCapabilities = runtimeConfiguration.deviceCapabilities,
+                        lensFacing = runtimeConfiguration.lensFacing,
+                        stillCaptureResolutionPreset = runtimeConfiguration.stillCaptureResolutionPreset,
+                        stillCaptureQuality = runtimeConfiguration.stillCaptureQuality,
+                        stillCaptureOutputSize = runtimeConfiguration.stillCaptureOutputSize
                     )
                 },
                 eventSink = { detail ->
@@ -1842,12 +1767,12 @@ class DefaultCameraSession(
                     }
                 },
                 settingsActionSink = { action ->
-                    val updatedPersisted = sessionSettingsSnapshot.persisted.reduce(action)
+                    val updatedPersisted = runtimeConfiguration.settings.persisted.reduce(action)
                     handleSettingsUpdated(
-                        sessionSettingsSnapshot.copy(persisted = updatedPersisted)
+                        runtimeConfiguration.settings.copy(persisted = updatedPersisted)
                     )
                 },
-                settingsSnapshotProvider = { sessionSettingsSnapshot }
+                settingsSnapshotProvider = { runtimeConfiguration.settings }
             )
         )
     }

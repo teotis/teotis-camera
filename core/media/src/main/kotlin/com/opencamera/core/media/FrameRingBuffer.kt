@@ -1,5 +1,8 @@
 package com.opencamera.core.media
 
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+
 data class FrameSelectionWindow(
     val shutterTimestampNanos: Long,
     val preShutterMillis: Long,
@@ -18,16 +21,19 @@ data class SelectedFrameSet(
 class FrameRingBuffer(private val policy: FrameBufferPolicy) {
 
     private val frames = mutableListOf<FrameDescriptor>()
+    private val lock = ReentrantLock()
 
-    fun append(descriptor: FrameDescriptor) {
+    fun append(descriptor: FrameDescriptor) = lock.withLock {
         frames.add(descriptor)
         frames.sortBy { it.timestampNanos }
         evict()
     }
 
-    fun snapshot(): List<FrameDescriptor> = frames.toList()
+    fun snapshot(): List<FrameDescriptor> = lock.withLock {
+        frames.toList()
+    }
 
-    fun select(window: FrameSelectionWindow): SelectedFrameSet {
+    fun select(window: FrameSelectionWindow): SelectedFrameSet = lock.withLock {
         val preShutterNanos = window.preShutterMillis * 1_000_000
         val postShutterNanos = window.postShutterMillis * 1_000_000
         val startNanos = window.shutterTimestampNanos - preShutterNanos
@@ -58,7 +64,7 @@ class FrameRingBuffer(private val policy: FrameBufferPolicy) {
             }
         }
 
-        return SelectedFrameSet(
+        SelectedFrameSet(
             frames = selected,
             preShutterCount = preShutterCount,
             postShutterCount = postShutterCount,
@@ -68,7 +74,7 @@ class FrameRingBuffer(private val policy: FrameBufferPolicy) {
         )
     }
 
-    fun clear() {
+    fun clear() = lock.withLock {
         frames.clear()
     }
 

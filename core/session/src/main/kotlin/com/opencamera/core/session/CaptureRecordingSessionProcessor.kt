@@ -416,6 +416,14 @@ internal class CaptureRecordingSessionProcessor(
     }
 
     private suspend fun handleShotCompleted(result: ShotResult) {
+        val currentActiveShot = state.value.activeShot
+        if (currentActiveShot != null && currentActiveShot.shotId != result.shotId) {
+            trace.record(
+                "shot.completed.stale",
+                "result=${result.shotId},active=${currentActiveShot.shotId}"
+            )
+            return
+        }
         currentController().onSessionEvent(ModeSessionEvent.ShotCompleted(result))
         recordingElapsedJob?.cancel()
         recordingElapsedJob = null
@@ -586,6 +594,13 @@ internal class CaptureRecordingSessionProcessor(
                 )
             }
         }
+
+        // DFS-13: Transition COMPLETED back to IDLE so shutter re-arms after presentation update.
+        if (result.mediaType == MediaType.PHOTO && state.value.captureStatus == CaptureStatus.COMPLETED) {
+            updateState.update { s ->
+                s.copy(captureStatus = CaptureStatus.IDLE)
+            }
+        }
     }
 
     private fun latestLivePhotoBundleFor(result: ShotResult): LivePhotoBundle? {
@@ -604,6 +619,7 @@ internal class CaptureRecordingSessionProcessor(
         val currentActiveShot = state.value.activeShot
         if (currentActiveShot == null) {
             clearPendingPostprocessIfMatches(shotId)
+            resetCaptureStatusFromTerminalOrDataReceived(shotId, reason)
             trace.record("shot.failed.orphaned", "shotId=$shotId,reason=$reason")
             return
         }
@@ -670,11 +686,59 @@ internal class CaptureRecordingSessionProcessor(
         }
     }
 
+    private suspend fun resetCaptureStatusFromTerminalOrDataReceived(shotId: String, reason: String) {
+        val currentStatus = state.value.captureStatus
+        if (currentStatus != CaptureStatus.DATA_RECEIVED && currentStatus != CaptureStatus.COMPLETED) {
+            return
+        }
+        updateState.update { s ->
+            s.copy(
+                captureStatus = CaptureStatus.IDLE,
+                presentation = s.presentation.copy(
+                    lastAction = if (currentStatus == CaptureStatus.DATA_RECEIVED) {
+                        "Orphaned postprocess cleared for $shotId"
+                    } else {
+                        "Shot failed after completion for $shotId"
+                    },
+                    lastError = reason,
+                    captureReadiness = null
+                )
+            )
+        }
+    }
+
     suspend fun handleInterruptedShotFailure(
         shot: ShotRequest,
         reason: String
     ) {
         cancelRecordingElapsedTimer()
+        // DFS-14: Clear activeShot if it still matches the interrupted shot.
+        val matchedActiveShot = state.value.activeShot
+        if (matchedActiveShot != null && matchedActiveShot.shotId == shot.shotId) {
+            recordingElapsedJob?.cancel()
+            recordingElapsedJob = null
+            updateState.update { s ->
+                s.copy(
+                    captureStatus = CaptureStatus.FAILED,
+                    recordingStatus = RecordingStatus.IDLE,
+                    activeShot = null,
+                    presentation = s.presentation.copy(
+                        countdownRemainingSeconds = null,
+                        recordingStartedAtElapsedMillis = null,
+                        recordingElapsedMillis = null,
+                        pendingPostprocess = null,
+                        captureReadiness = null,
+                        lastAction = if (shot.mediaType == MediaType.PHOTO) {
+                            "Photo capture interrupted"
+                        } else {
+                            "Video recording interrupted"
+                        },
+                        pendingCaptureFeedback = null,
+                        lastError = reason
+                    )
+                )
+            }
+        }
         currentController().onSessionEvent(
             ModeSessionEvent.ShotFailed(
                 shotId = shot.shotId,

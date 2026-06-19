@@ -94,6 +94,43 @@ class PreviewSceneMaskSourceTest {
     }
 
     @Test
+    fun `MlKit source handles imageProxyToBitmap failure gracefully`() {
+        val source = MlKitSelfiePreviewSceneMaskSource()
+        source.start(PreviewSceneMaskConfig(maxFps = 0))
+
+        // Create an ImageProxy with planes whose buffers are empty — conversion will fail
+        val emptyBuffer = java.nio.ByteBuffer.allocate(0)
+        val planeProxy = object : ImageProxy.PlaneProxy {
+            override fun getBuffer() = emptyBuffer
+            override fun getRowStride() = 0
+            override fun getPixelStride() = 1
+        }
+        var closeCount = 0
+        val proxy = object : ImageProxy {
+            override fun close() { closeCount++ }
+            override fun getImage() = null
+            override fun getPlanes() = arrayOf(planeProxy, planeProxy, planeProxy)
+            override fun getWidth() = 640
+            override fun getHeight() = 480
+            override fun getImageInfo() = throw UnsupportedOperationException()
+            override fun getFormat() = 35
+            override fun getCropRect() = android.graphics.Rect(0, 0, 640, 480)
+            override fun setCropRect(rect: android.graphics.Rect?) {}
+        }
+
+        // Must not throw
+        source.onAnalyzeFrame(proxy, 0)
+
+        // Source must not close the proxy — fanout owns lifecycle
+        assertEquals("source must not close ImageProxy on conversion failure", 0, closeCount)
+
+        // Inference path was never reached
+        assertNull(source.latestMask())
+
+        source.stop("test")
+    }
+
+    @Test
     fun `MlKit source handles null image planes gracefully`() {
         val source = MlKitSelfiePreviewSceneMaskSource()
         source.start(PreviewSceneMaskConfig())
@@ -265,6 +302,43 @@ class PreviewSceneMaskSourceTest {
         val descriptor = payload.toDescriptor()
         assertEquals(256, descriptor.transform.sourceWidth)
         assertEquals(256, descriptor.transform.sourceHeight)
+    }
+
+    @Test
+    fun `NoOp source with initError reports diagnostics`() {
+        val source = NoOpPreviewSceneMaskSource(initError = "ML Kit not available")
+        val diagnostics = source.diagnostics
+        assertTrue(diagnostics.any { it.contains("mlkit:init-error=ML Kit not available") })
+        assertTrue(diagnostics.any { it.contains("mlkit:capability=unsupported") })
+    }
+
+    @Test
+    fun `NoOp source without initError reports clean diagnostics`() {
+        val source = NoOpPreviewSceneMaskSource()
+        val diagnostics = source.diagnostics
+        assertFalse(diagnostics.any { it.contains("mlkit:init-error") })
+        assertTrue(diagnostics.any { it.contains("mlkit:capability=unsupported") })
+    }
+
+    @Test
+    fun `MlKit source reports capability when start is called`() {
+        val source = MlKitSelfiePreviewSceneMaskSource()
+        source.start(PreviewSceneMaskConfig())
+        val capability = source.capability
+        // ML Kit may or may not be available in unit test (JVM) environment
+        assertTrue(capability == PreviewSceneMaskCapability.READY || capability == PreviewSceneMaskCapability.DEGRADED)
+        assertTrue(source.diagnostics.any { it.contains("mlkit:capability=") })
+        source.stop("test")
+    }
+
+    @Test
+    fun `MlKit source reports running state in diagnostics`() {
+        val source = MlKitSelfiePreviewSceneMaskSource()
+        source.start(PreviewSceneMaskConfig())
+        // After start, running depends on whether segmenter was created successfully
+        assertTrue(source.diagnostics.any { it.contains("mlkit:running=") })
+        source.stop("test")
+        assertTrue(source.diagnostics.any { it.contains("mlkit:running=false") })
     }
 
     private fun createTestImageProxy(): ImageProxy {

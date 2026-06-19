@@ -123,6 +123,7 @@ data class ShotResult(
     val frameBundle: FrameBundle? = null,
     val intermediateOutputPaths: List<String> = emptyList(),
     val pipelineNotes: List<String> = emptyList(),
+    val structuredPostProcessFailures: List<PostProcessFailure> = emptyList(),
     val timing: ShotTiming = ShotTiming()
 )
 
@@ -147,9 +148,15 @@ fun ThumbnailSource.renderUriOrNull(): String? {
 }
 
 fun ShotResult.hasPostProcessFailures(): Boolean =
-    pipelineNotes.any { it.contains(":failed:") }
+    structuredPostProcessFailures.isNotEmpty() ||
+        pipelineNotes.any { it.contains(":failed:") }
 
 fun ShotResult.postProcessFailureSummary(): String? {
+    if (structuredPostProcessFailures.isNotEmpty()) {
+        return structuredPostProcessFailures.joinToString("; ") {
+            "${it.stage.legacyNotePrefix}:${it.cause.legacyNoteSuffix}"
+        }
+    }
     val failures = pipelineNotes.filter { it.contains(":failed:") }
     return failures.takeIf { it.isNotEmpty() }?.joinToString("; ")
 }

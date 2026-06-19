@@ -45,6 +45,7 @@ internal class PreviewRecoverySessionProcessor(
     companion object {
         private const val METERING_FEEDBACK_DISPLAY_MS = 1_500L
         private const val METERING_FEEDBACK_TIMEOUT_MS = 5_000L
+        const val MAX_CONSECUTIVE_RECOVERIES = 3
     }
 
     suspend fun process(intent: SessionIntent) {
@@ -134,10 +135,12 @@ internal class PreviewRecoverySessionProcessor(
 
         val metrics = state.value.previewMetrics
         mutations.updatePreviewStarting(reason, isRecovery)
+        val consecutiveCount = if (isRecovery) metrics.consecutiveRecoveryCount + 1 else metrics.consecutiveRecoveryCount
         mutations.updatePreviewMetrics(
             metrics.copy(
                 bindCount = metrics.bindCount + 1,
                 recoveryCount = metrics.recoveryCount + if (isRecovery) 1 else 0,
+                consecutiveRecoveryCount = consecutiveCount,
                 lastStartReason = reason
             )
         )
@@ -170,6 +173,7 @@ internal class PreviewRecoverySessionProcessor(
         mutations.updatePreviewActive(firstFrameLatencyMillis)
         mutations.updatePreviewMetrics(
             metrics.copy(
+                consecutiveRecoveryCount = 0,
                 lastFirstFrameLatencyMillis = firstFrameLatencyMillis,
                 bestFirstFrameLatencyMillis = bestLatency,
                 worstFirstFrameLatencyMillis = worstLatency
@@ -256,6 +260,10 @@ internal class PreviewRecoverySessionProcessor(
         }
         if (state.value.recordingStatus == RecordingStatus.RECORDING) {
             cancelRecordingElapsedTimer()
+            val activeShot = state.value.activeShot
+            if (activeShot != null) {
+                effects.emit(SessionEffect.StopActiveShot(activeShot.shotId))
+            }
             handlePreviewError("Preview surface lost during recording: $reason")
             return
         }
@@ -302,6 +310,9 @@ internal class PreviewRecoverySessionProcessor(
         }
         if (countdownInProgress()) {
             cancelPendingCountdown("Countdown cancelled because preview failed")
+        }
+        if (state.value.recordingStatus == RecordingStatus.RECORDING) {
+            cancelRecordingElapsedTimer()
         }
         val renderedReason = issue.displayReason()
         val recoveryWasActive = state.value.previewStatus == PreviewStatus.RECOVERING
@@ -564,6 +575,7 @@ internal class PreviewRecoverySessionProcessor(
             snapshot.permissionState.cameraGranted &&
             snapshot.previewHostAvailable &&
             snapshot.recordingStatus != RecordingStatus.RECORDING &&
-            snapshot.activeShot == null
+            snapshot.activeShot == null &&
+            snapshot.previewMetrics.consecutiveRecoveryCount < MAX_CONSECUTIVE_RECOVERIES
     }
 }

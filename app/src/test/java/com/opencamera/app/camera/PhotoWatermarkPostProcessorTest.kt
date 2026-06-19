@@ -24,6 +24,32 @@ import kotlin.test.assertTrue
 @RunWith(RobolectricTestRunner::class)
 class PhotoWatermarkPostProcessorTest {
     @Test
+    fun `template registry owns every supported storage key`() {
+        assertEquals(
+            listOf(
+                "classic-overlay",
+                "travel-polaroid",
+                "retro-frame",
+                "pure-text",
+                "blur-four-border",
+                "professional-bottom-bar",
+                "night-street"
+            ),
+            PhotoWatermarkTemplateType.entries.map(PhotoWatermarkTemplateType::storageKey)
+        )
+    }
+
+    @Test
+    fun `template registry resolves unknown keys to classic with typed defaults`() {
+        val templateType = resolvePhotoWatermarkTemplateType(" future-template ")
+
+        assertEquals(PhotoWatermarkTemplateType.CLASSIC_OVERLAY, templateType)
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, templateType.defaultPlacement)
+        assertEquals(WatermarkFrameBackground.DARK, templateType.defaultFrameBackground)
+        assertFalse(templateType.usesExpandedFrame)
+    }
+
+    @Test
     fun `photo result with watermark and content uri is rendered`() = runTest {
         val editor = FakePhotoWatermarkEditor(
             result = PhotoWatermarkApplied()
@@ -166,6 +192,27 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    fun `night street template passes through to pipeline notes`() = runTest {
+        val editor = FakePhotoWatermarkEditor(
+            result = PhotoWatermarkApplied()
+        )
+        val processor = PhotoWatermarkPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                watermarkText = "Night Street",
+                watermarkTemplate = "night-street",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/night.jpg",
+                    filePath = "/tmp/night.jpg"
+                )
+            )
+        )
+
+        assertEquals("night-street", editor.invocations.single().templateId)
+        assertTrue(result.pipelineNotes.contains("watermark:rendered:night-street"))
+    }
+
+    @Test
     fun `professional bottom bar template passes through to pipeline notes`() = runTest {
         val editor = FakePhotoWatermarkEditor(
             result = PhotoWatermarkApplied()
@@ -208,6 +255,42 @@ class PhotoWatermarkPostProcessorTest {
         assertTrue(bmp.width >= 432, "travel polaroid should have a more visible side paper frame")
         assertTrue(bmp.height >= 410, "travel polaroid should have a more generous bottom paper band")
         bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    fun `night street output uses expanded frame with dark band below source`() {
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(30, 20, 15))
+        }
+        val template = ResolvedPhotoWatermarkTemplate(
+            templateId = "night-street",
+            title = "Night Street",
+            supportingLines = listOf("2026-06-15 22:30"),
+            frameBackground = WatermarkFrameBackground.SOURCE_BLUR,
+            usesExpandedFrame = true,
+            placement = WatermarkTextPlacement.BOTTOM_LEFT,
+            textScale = 1f,
+            textOpacity = 1f
+        )
+
+        val result = renderPhotoWatermarkBitmap(source, template)
+        val bmp = result.bitmap
+
+        assertEquals(400, bmp.width)
+        assertTrue(bmp.height > 300, "night-street should expand height for bottom band")
+        assertTrue(bmp.height >= 340, "night-street bottom band should be at least ~12% of source")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    fun `night street dark default background is source blur`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "night-street",
+            watermarkText = "OpenCamera",
+            metadata = MediaMetadata(),
+            preservedExif = emptyMap()
+        )
+        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, resolved.frameBackground)
     }
 
     @Test

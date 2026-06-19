@@ -14,6 +14,12 @@ import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.addStructuredPostProcessFailure
+import com.opencamera.core.media.PostProcessFailure
+import com.opencamera.core.media.PostProcessFailureStage
+import com.opencamera.core.media.PostProcessFailureCause
+import com.opencamera.core.media.PostProcessOutputIntegrity
+import com.opencamera.core.media.PostProcessFailureDisposition
 import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.PhotoSettings
 import com.opencamera.core.settings.PortraitBeautyPreset
@@ -87,11 +93,10 @@ internal fun supportsPortraitRenderMetadata(tags: Map<String, String>): Boolean 
 }
 
 internal fun decidePortraitRenderWork(result: ShotResult): ProcessorWork<PortraitRenderPayload> {
-    if (result.mediaType != MediaType.PHOTO) {
-        return ProcessorWork.None
-    }
-    if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return ProcessorWork.DiagnosticSkip("unsupported-mime")
+    when (result.photoJpegInput()) {
+        PhotoJpegInput.NOT_PHOTO -> return ProcessorWork.None
+        PhotoJpegInput.UNSUPPORTED_MIME -> return ProcessorWork.DiagnosticSkip("unsupported-mime")
+        PhotoJpegInput.EDITABLE -> Unit
     }
 
     val tags = result.metadata.customTags
@@ -304,6 +309,8 @@ internal class PortraitRenderPostProcessor(
     private val maskProvider: SavedPhotoSceneMaskProvider? = null,
     private val maskBitmapSource: ((ProcessorTarget) -> Bitmap?)? = null
 ) : MediaPostProcessor {
+    override fun isApplicable(result: ShotResult): Boolean = result.mediaType == MediaType.PHOTO
+
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePortraitRenderWork(result)) {
             ProcessorWork.None -> result
@@ -317,21 +324,39 @@ internal class PortraitRenderPostProcessor(
                 val renderResult = if (maskResult != null && editor is MaskAwarePortraitRenderEditor) {
                     try {
                         val (editorResult, maskNotes) = editor.applyWithMask(
-                            payload.target, maskResult.first, payload.spec, maskResult.second
+                            payload.target, payload.spec, maskResult
                         )
                         val baseResult = applyEditorResult(result, payload, editorResult)
                         maskNotes.fold(baseResult) { acc, note -> acc.addPipelineNotes(note) }
+                    } catch (e: OutOfMemoryError) {
+                        Log.e(TAG, "Portrait mask-aware render failed: out of memory", e)
+                        val structuredFailure = PostProcessFailure(
+                            stage = PostProcessFailureStage.PORTRAIT_RENDER,
+                            cause = PostProcessFailureCause.OUT_OF_MEMORY,
+                            integrity = PostProcessOutputIntegrity.POSSIBLY_MODIFIED,
+                            disposition = PostProcessFailureDisposition.RECOVERABLE,
+                            processorName = "PortraitRender"
+                        )
+                        result.addStructuredPostProcessFailure(structuredFailure).addPipelineNotes(
+                            "portrait-render:degraded:mask-render-oom",
+                            "portrait-render:fallback-focus"
+                        )
                     } catch (e: Throwable) {
-            Log.w(TAG, "portrait render failed", e)
-                        result.addPipelineNotes(
+                        e.rethrowIfCancellationOrFatal()
+                        Log.w(TAG, "Portrait mask-aware render failed", e)
+                        val structuredFailure = PostProcessFailure(
+                            stage = PostProcessFailureStage.PORTRAIT_RENDER,
+                            cause = PostProcessFailureCause.EXCEPTION,
+                            integrity = PostProcessOutputIntegrity.POSSIBLY_MODIFIED,
+                            disposition = PostProcessFailureDisposition.RECOVERABLE,
+                            processorName = "PortraitRender"
+                        )
+                        result.addStructuredPostProcessFailure(structuredFailure).addPipelineNotes(
                             "portrait-render:degraded:mask-render-exception",
                             "portrait-render:fallback-focus"
                         )
-                    } finally {
-                        maskResult.first.recycle()
                     }
                 } else {
-                    maskResult?.first?.recycle()
                     val degradedNote = when {
                         maskProvider == null -> "portrait-mask:saved=degraded:no-provider"
                         maskResult == null -> "portrait-mask:saved=degraded:mask-unavailable"
@@ -349,7 +374,7 @@ internal class PortraitRenderPostProcessor(
         }
     }
 
-    private suspend fun resolveMask(result: ShotResult): Pair<Bitmap, SavedPhotoMaskPixels>? {
+    private suspend fun resolveMask(result: ShotResult): SavedPhotoMaskPixels? {
         val provider = maskProvider ?: return null
         val target = result.outputHandle.toProcessorTargetOrNull() ?: return null
         val decoded = if (maskBitmapSource != null) {
@@ -365,20 +390,16 @@ internal class PortraitRenderPostProcessor(
                 outputHandleTag = result.outputHandle.displayPath
             )
             when (val maskResult = provider.createSubjectMask(decoded, maskRequest)) {
-                is SceneMaskResult.Available -> Pair(decoded, maskResult.mask)
-                is SceneMaskResult.Unavailable -> {
-                    decoded.recycle()
-                    null
-                }
-                is SceneMaskResult.Failed -> {
-                    decoded.recycle()
-                    null
-                }
+                is SceneMaskResult.Available -> maskResult.mask
+                is SceneMaskResult.Unavailable -> null
+                is SceneMaskResult.Failed -> null
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "portrait render failed", e)
-            decoded.recycle()
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Portrait mask resolve failed", e)
             null
+        } finally {
+            decoded.recycle()
         }
     }
 
@@ -427,7 +448,8 @@ internal class PortraitRenderPostProcessor(
 }
 
 internal class AndroidPortraitRenderEditor(
-    context: Context
+    context: Context,
+    private val chunkEngine: PortraitRasterChunkEngine = PortraitRasterChunkEngine()
 ) : MaskAwarePortraitRenderEditor {
     private val appContext = context.applicationContext
     private val contentResolver: ContentResolver = appContext.contentResolver
@@ -443,17 +465,13 @@ internal class AndroidPortraitRenderEditor(
         }
 
         val preservedExif = readPreservedExif(sourceBytes)
-        val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+        val mutableBitmap = MutableArgbBitmapDecoder.decode(sourceBytes)
             ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
-        val mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
-        if (mutableBitmap !== decoded) {
-            decoded.recycle()
-        }
 
         var blurredBitmap: Bitmap? = null
         try {
             blurredBitmap = createBlurredBackground(mutableBitmap, spec)
-            applyPortraitRender(
+            chunkEngine.renderFocus(
                 original = mutableBitmap,
                 blurred = blurredBitmap,
                 spec = spec
@@ -474,7 +492,8 @@ internal class AndroidPortraitRenderEditor(
             val exifWarning = contentResolver.restorePreservedExif(target, preservedExif)
             PortraitRenderApplied(exifWarning, lightSpotNotes)
         } catch (e: Throwable) {
-            Log.w(TAG, "portrait render failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Portrait render failed", e)
             ProcessorEditorResult.Failed("render-exception")
         } finally {
             blurredBitmap?.recycle()
@@ -484,46 +503,64 @@ internal class AndroidPortraitRenderEditor(
 
     override suspend fun applyWithMask(
         target: ProcessorTarget,
-        bitmap: Bitmap,
         spec: PortraitRenderSpec,
         mask: SavedPhotoMaskPixels
     ): Pair<ProcessorEditorResult, List<String>> = withContext(Dispatchers.IO) {
+        val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
+            ?: return@withContext Pair(
+                ProcessorEditorResult.Failed("input-unavailable"),
+                listOf("portrait-render:fallback-focus")
+            )
+        if (sourceBytes.isEmpty()) {
+            return@withContext Pair(
+                ProcessorEditorResult.Failed("empty-source"),
+                listOf("portrait-render:fallback-focus")
+            )
+        }
+
+        val preservedExif = readPreservedExif(sourceBytes)
+        val mutableBitmap = MutableArgbBitmapDecoder.decode(sourceBytes)
+            ?: return@withContext Pair(
+                ProcessorEditorResult.Failed("decode-failed"),
+                listOf("portrait-render:fallback-focus")
+            )
+
+        var blurredBitmap: Bitmap? = null
         try {
-            val blurredBitmap = createBlurredBackground(bitmap, spec)
-            try {
-                applyMaskAwarePortraitRender(
-                    original = bitmap,
-                    blurred = blurredBitmap,
-                    spec = spec,
-                    mask = mask
-                )
-                val lightSpotNotes = applyLightSpotEffect(bitmap, blurredBitmap, spec)
-                val encodedBytes = ByteArrayOutputStream().use { output ->
-                    check(bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
-                        "Mask-aware portrait render JPEG compression failed"
-                    }
-                    output.toByteArray()
+            blurredBitmap = createBlurredBackground(mutableBitmap, spec)
+            chunkEngine.renderMaskAware(
+                original = mutableBitmap,
+                blurred = blurredBitmap,
+                spec = spec,
+                mask = mask
+            )
+            val lightSpotNotes = applyLightSpotEffect(mutableBitmap, blurredBitmap, spec)
+            val encodedBytes = ByteArrayOutputStream().use { output ->
+                check(mutableBitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
+                    "Mask-aware portrait render JPEG compression failed"
                 }
-                if (!contentResolver.writeEncodedBytes(target, encodedBytes)) {
-                    return@withContext Pair(
-                        ProcessorEditorResult.Failed("output-unavailable"),
-                        listOf("portrait-render:fallback-focus")
-                    )
-                }
-                val preservedExif = readPreservedExif(encodedBytes)
-                val exifWarning = contentResolver.restorePreservedExif(target, preservedExif)
-                val notes = mutableListOf(
-                    "portrait-mask:saved=applied",
-                    "portrait-render:subject-mask"
-                )
-                notes.addAll(lightSpotNotes)
-                Pair(PortraitRenderApplied(exifWarning, lightSpotNotes), notes)
-            } finally {
-                blurredBitmap.recycle()
+                output.toByteArray()
             }
+            if (!contentResolver.writeEncodedBytes(target, encodedBytes)) {
+                return@withContext Pair(
+                    ProcessorEditorResult.Failed("output-unavailable"),
+                    listOf("portrait-render:fallback-focus")
+                )
+            }
+            val exifWarning = contentResolver.restorePreservedExif(target, preservedExif)
+            val notes = mutableListOf(
+                "portrait-mask:saved=applied",
+                "portrait-render:subject-mask"
+            )
+            notes.addAll(lightSpotNotes)
+            Pair(PortraitRenderApplied(exifWarning, lightSpotNotes), notes)
         } catch (e: Throwable) {
-            Log.w(TAG, "portrait render failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Portrait mask-aware render failed", e)
             Pair(PortraitRenderApplied(warning = "mask-render-failed"), listOf("portrait-render:fallback-focus"))
+        } finally {
+            blurredBitmap?.recycle()
+            mutableBitmap.recycle()
         }
     }
 
@@ -543,197 +580,6 @@ internal class AndroidPortraitRenderEditor(
             }
             upscaled
         }
-    }
-
-    private fun applyMaskAwarePortraitRender(
-        original: Bitmap,
-        blurred: Bitmap,
-        spec: PortraitRenderSpec,
-        mask: SavedPhotoMaskPixels
-    ) {
-        val width = original.width
-        val height = original.height
-        val originalPixels = IntArray(width * height)
-        val blurredPixels = IntArray(width * height)
-        original.getPixels(originalPixels, 0, width, 0, 0, width, height)
-        blurred.getPixels(blurredPixels, 0, width, 0, 0, width, height)
-
-        val maskMapper = SceneMaskCoordinateMapper(
-            maskWidth = mask.maskWidth,
-            maskHeight = mask.maskHeight,
-            targetWidth = width,
-            targetHeight = height
-        )
-
-        val frameCenterX = width / 2f
-        val frameCenterY = height / 2f
-        val maxDistance = max(1f, sqrt(frameCenterX * frameCenterX + frameCenterY * frameCenterY))
-
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val index = y * width + x
-                val sourceColor = originalPixels[index]
-                val blurredColor = blurredPixels[index]
-                val alpha = sourceColor ushr 24 and 0xFF
-
-                val mx = maskMapper.maskX(x)
-                val my = maskMapper.maskY(y)
-                val rawMaskAlpha = mask.sampleAlpha(mx, my)
-                val subjectWeight = smoothstep(0.15f, 0.85f, rawMaskAlpha)
-                val blurMix = 1f - subjectWeight
-
-                val sourceRed = ((sourceColor ushr 16) and 0xFF).toFloat()
-                val sourceGreen = ((sourceColor ushr 8) and 0xFF).toFloat()
-                val sourceBlue = (sourceColor and 0xFF).toFloat()
-                val blurredRed = ((blurredColor ushr 16) and 0xFF).toFloat()
-                val blurredGreen = ((blurredColor ushr 8) and 0xFF).toFloat()
-                val blurredBlue = (blurredColor and 0xFF).toFloat()
-
-                var red = mixChannel(sourceRed, blurredRed, blurMix)
-                var green = mixChannel(sourceGreen, blurredGreen, blurMix)
-                var blue = mixChannel(sourceBlue, blurredBlue, blurMix)
-
-                val frameDx = x - frameCenterX
-                val frameDy = y - frameCenterY
-                val frameDistance = sqrt(frameDx * frameDx + frameDy * frameDy)
-                val vignette = 1f - ((frameDistance / maxDistance) * spec.vignetteStrength).coerceIn(0f, 0.28f)
-                red *= vignette
-                green *= vignette
-                blue *= vignette
-
-                val smoothingMix = (spec.subjectSmoothing * subjectWeight).coerceIn(0f, 0.28f)
-                if (smoothingMix > 0f) {
-                    red = mixChannel(red, blurredRed, smoothingMix)
-                    green = mixChannel(green, blurredGreen, smoothingMix)
-                    blue = mixChannel(blue, blurredBlue, smoothingMix)
-                }
-
-                val luminance = (red * 0.299f) + (green * 0.587f) + (blue * 0.114f)
-                val saturationBoost = spec.subjectSaturationBoost * subjectWeight
-                if (saturationBoost > 0f) {
-                    red = luminance + (red - luminance) * (1f + saturationBoost)
-                    green = luminance + (green - luminance) * (1f + saturationBoost)
-                    blue = luminance + (blue - luminance) * (1f + saturationBoost)
-                }
-
-                val lift = spec.subjectLift * subjectWeight
-                if (lift > 0f) {
-                    red += (255f - red) * lift
-                    green += (255f - green) * lift
-                    blue += (255f - blue) * lift
-                }
-
-                val highlightFactor = ((luminance / 255f) - 0.52f).coerceIn(0f, 1f)
-                val subjectBloom = spec.highlightBloom * subjectWeight * highlightFactor
-                val backgroundBloom = spec.backgroundBloom * blurMix * highlightFactor
-                val totalBloom = (subjectBloom + backgroundBloom).coerceIn(0f, 0.24f)
-                if (totalBloom > 0f) {
-                    red += (255f - red) * totalBloom
-                    green += (255f - green) * totalBloom
-                    blue += (255f - blue) * totalBloom
-                }
-
-                originalPixels[index] = (alpha shl 24) or
-                    (clampChannel(red).toInt() shl 16) or
-                    (clampChannel(green).toInt() shl 8) or
-                    clampChannel(blue).toInt()
-            }
-        }
-
-        original.setPixels(originalPixels, 0, width, 0, 0, width, height)
-    }
-
-    private fun applyPortraitRender(
-        original: Bitmap,
-        blurred: Bitmap,
-        spec: PortraitRenderSpec
-    ) {
-        val width = original.width
-        val height = original.height
-        val originalPixels = IntArray(width * height)
-        val blurredPixels = IntArray(width * height)
-        original.getPixels(originalPixels, 0, width, 0, 0, width, height)
-        blurred.getPixels(blurredPixels, 0, width, 0, 0, width, height)
-
-        val focusCenterX = width * 0.5f
-        val focusCenterY = height * if (spec.subjectTracking) 0.42f else 0.46f
-        val radiusX = max(1f, width * spec.focusRadiusXFraction)
-        val radiusY = max(1f, height * spec.focusRadiusYFraction)
-        val frameCenterX = width / 2f
-        val frameCenterY = height / 2f
-        val maxDistance = max(1f, sqrt(frameCenterX * frameCenterX + frameCenterY * frameCenterY))
-
-        for (y in 0 until height) {
-            for (x in 0 until width) {
-                val index = y * width + x
-                val sourceColor = originalPixels[index]
-                val blurredColor = blurredPixels[index]
-                val alpha = sourceColor ushr 24 and 0xFF
-
-                val dx = (x - focusCenterX) / radiusX
-                val dy = (y - focusCenterY) / radiusY
-                val normalizedDistance = sqrt(dx * dx + dy * dy)
-                val blurMix = smoothstep(1f, 1f + spec.edgeSoftness, normalizedDistance)
-                val sourceRed = ((sourceColor ushr 16) and 0xFF).toFloat()
-                val sourceGreen = ((sourceColor ushr 8) and 0xFF).toFloat()
-                val sourceBlue = (sourceColor and 0xFF).toFloat()
-                val blurredRed = ((blurredColor ushr 16) and 0xFF).toFloat()
-                val blurredGreen = ((blurredColor ushr 8) and 0xFF).toFloat()
-                val blurredBlue = (blurredColor and 0xFF).toFloat()
-
-                var red = mixChannel(sourceRed, blurredRed, blurMix)
-                var green = mixChannel(sourceGreen, blurredGreen, blurMix)
-                var blue = mixChannel(sourceBlue, blurredBlue, blurMix)
-
-                val frameDx = x - frameCenterX
-                val frameDy = y - frameCenterY
-                val frameDistance = sqrt(frameDx * frameDx + frameDy * frameDy)
-                val vignette = 1f - ((frameDistance / maxDistance) * spec.vignetteStrength).coerceIn(0f, 0.28f)
-                red *= vignette
-                green *= vignette
-                blue *= vignette
-
-                val subjectWeight = 1f - blurMix
-                val smoothingMix = (spec.subjectSmoothing * subjectWeight).coerceIn(0f, 0.28f)
-                if (smoothingMix > 0f) {
-                    red = mixChannel(red, blurredRed, smoothingMix)
-                    green = mixChannel(green, blurredGreen, smoothingMix)
-                    blue = mixChannel(blue, blurredBlue, smoothingMix)
-                }
-
-                val luminance = (red * 0.299f) + (green * 0.587f) + (blue * 0.114f)
-                val saturationBoost = spec.subjectSaturationBoost * subjectWeight
-                if (saturationBoost > 0f) {
-                    red = luminance + (red - luminance) * (1f + saturationBoost)
-                    green = luminance + (green - luminance) * (1f + saturationBoost)
-                    blue = luminance + (blue - luminance) * (1f + saturationBoost)
-                }
-
-                val lift = spec.subjectLift * subjectWeight
-                if (lift > 0f) {
-                    red += (255f - red) * lift
-                    green += (255f - green) * lift
-                    blue += (255f - blue) * lift
-                }
-
-                val highlightFactor = ((luminance / 255f) - 0.52f).coerceIn(0f, 1f)
-                val subjectBloom = spec.highlightBloom * subjectWeight * highlightFactor
-                val backgroundBloom = spec.backgroundBloom * blurMix * highlightFactor
-                val totalBloom = (subjectBloom + backgroundBloom).coerceIn(0f, 0.24f)
-                if (totalBloom > 0f) {
-                    red += (255f - red) * totalBloom
-                    green += (255f - green) * totalBloom
-                    blue += (255f - blue) * totalBloom
-                }
-
-                originalPixels[index] = (alpha shl 24) or
-                    (clampChannel(red).toInt() shl 16) or
-                    (clampChannel(green).toInt() shl 8) or
-                    clampChannel(blue).toInt()
-            }
-        }
-
-        original.setPixels(originalPixels, 0, width, 0, 0, width, height)
     }
 
     private fun applyLightSpotEffect(

@@ -722,6 +722,26 @@ class DevLogRenderModelTest {
     }
 
     @Test
+    fun `core tab includes countdown cancelled event`() {
+        val events = listOf(
+            SessionTraceEvent(
+                sequence = 1,
+                name = "capture.countdown.cancelled",
+                detail = "user cancelled",
+                timestampMillis = 1L
+            )
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = events,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.CORE,
+            text = TestAppTextResolver()
+        )
+        assertTrue(model.content.contains("capture.countdown.cancelled"))
+    }
+
+    @Test
     fun `release build does not export shot pipeline notes`() {
         val pipelineNotes = listOf("extension:auto=available")
         val model = devLogRenderModel(

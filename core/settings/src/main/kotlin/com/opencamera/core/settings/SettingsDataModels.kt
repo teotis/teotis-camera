@@ -189,6 +189,12 @@ data class PhotoSettings(
         textOpacity = WatermarkTextOpacity.SOLID,
         frameBackground = WatermarkFrameBackground.DARK
     ),
+    val nightStreetWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
+        textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        textScale = WatermarkTextScale.NORMAL,
+        textOpacity = WatermarkTextOpacity.SOFT,
+        frameBackground = WatermarkFrameBackground.SOURCE_BLUR
+    ),
     val livePhotoEnabledByDefault: Boolean = false,
     val liveSaveFormat: LiveSaveFormat = LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG,
     val countdownDuration: CountdownDuration = CountdownDuration.OFF,

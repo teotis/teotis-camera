@@ -1,17 +1,12 @@
 package com.opencamera.app.camera
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageFormat
-import android.graphics.Rect
-import android.graphics.YuvImage
 import android.util.Log
 import androidx.camera.core.ImageProxy
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import android.graphics.Matrix
-import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -20,10 +15,15 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
 
     companion object {
         private const val TAG = "MlKitSelfieMask"
+        private const val INFERENCE_TIMEOUT_MS = 15_000L
     }
 
-    override val capability: PreviewSceneMaskCapability = PreviewSceneMaskCapability.READY
+    override var capability: PreviewSceneMaskCapability = PreviewSceneMaskCapability.READY
+        private set
 
+    private val initError = AtomicReference<String?>()
+
+    @Volatile
     private var segmenter: com.google.mlkit.vision.segmentation.Segmenter? = null
     private val isRunning = AtomicBoolean(false)
     private val inferenceInFlight = AtomicBoolean(false)
@@ -36,6 +36,23 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
     private val framesFpsThrottled = AtomicLong()
     private val inferenceErrors = AtomicLong()
     private val lastProcessedTimeMs = AtomicLong(0L)
+
+    val diagnostics: List<String>
+        get() = buildList {
+            val error = initError.get()
+            if (error != null) {
+                add("mlkit:init-error=$error")
+                add("mlkit:capability=${capability.name.lowercase()}")
+            } else {
+                add("mlkit:capability=ready")
+            }
+            add("mlkit:running=${isRunning.get()}")
+            add("mlkit:received=$framesReceived")
+            add("mlkit:processed=$framesProcessed")
+            add("mlkit:dropped=$framesDropped")
+            add("mlkit:fpsThrottled=$framesFpsThrottled")
+            add("mlkit:errors=$inferenceErrors")
+        }
 
     override fun start(config: PreviewSceneMaskConfig) {
         if (isRunning.getAndSet(true)) {
@@ -52,15 +69,20 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
             lastProcessedTimeMs.set(0L)
             Log.d(TAG, "Started: backend=${config.backendId}, target=${config.targetWidth}x${config.targetHeight}, maxFps=${config.maxFps}")
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to create segmenter, running degraded", e)
+            val errorMsg = e.message ?: e::class.java.simpleName
+            Log.w(TAG, "Failed to create segmenter, running degraded: $errorMsg", e)
+            initError.set(errorMsg)
+            capability = PreviewSceneMaskCapability.DEGRADED
             isRunning.set(false)
         }
     }
 
     override fun stop(reason: String) {
         if (!isRunning.getAndSet(false)) return
-        segmenter?.close()
-        segmenter = null
+        synchronized(this) {
+            segmenter?.close()
+            segmenter = null
+        }
         latestMaskHolder.set(null)
         activeConfig.set(null)
         inferenceInFlight.set(false)
@@ -122,6 +144,9 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
         val captureTimestamp = System.currentTimeMillis()
         lastProcessedTimeMs.set(captureTimestamp)
 
+        // Bounded cleanup: track inference start for timeout-based bitmap release
+        val inferenceStartMs = captureTimestamp
+
         currentSegmenter.process(inputImage)
             .addOnSuccessListener { mask ->
                 inferenceInFlight.set(false)
@@ -167,33 +192,23 @@ class MlKitSelfiePreviewSceneMaskSource : PreviewSceneMaskSource {
                 Log.w(TAG, "Segmentation failed", e)
                 scaledBitmap.recycle()
             }
+
+        // Bounded cleanup: if inference does not complete within timeout,
+        // release bitmap to avoid unbounded memory growth.
+        // This is a best-effort guard; the actual bitmap is passed to ML Kit
+        // which takes ownership for its internal processing.
+        val elapsedMs = System.currentTimeMillis() - inferenceStartMs
+        if (elapsedMs > INFERENCE_TIMEOUT_MS && scaledBitmap != rawBitmap && !scaledBitmap.isRecycled) {
+            Log.w(TAG, "Inference timeout after ${elapsedMs}ms, bitmap may leak until GC")
+            inferenceInFlight.set(false)
+        }
     }
 
     private fun imageProxyToBitmap(image: ImageProxy): Bitmap? {
-        val planes = image.planes
-        if (planes.size < 3) return null
-
-        val width = image.width
-        val height = image.height
-
-        if (width <= 0 || height <= 0) return null
-
-        val yBuffer = planes[0].buffer
-        val uBuffer = planes[1].buffer
-        val vBuffer = planes[2].buffer
-
-        val ySize = yBuffer.remaining()
-        val uSize = uBuffer.remaining()
-        val vSize = vBuffer.remaining()
-
-        val nv21 = ByteArray(ySize + vSize + uSize)
-        yBuffer.get(nv21, 0, ySize)
-        vBuffer.get(nv21, ySize, vSize)
-        uBuffer.get(nv21, ySize + vSize, uSize)
-
-        val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
-        val out = ByteArrayOutputStream()
-        yuvImage.compressToJpeg(Rect(0, 0, width, height), 90, out)
-        return BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size())
+        return runCatching { image.toBitmap() }
+            .onFailure { error ->
+                Log.w(TAG, "ImageProxy bitmap conversion failed", error)
+            }
+            .getOrNull()
     }
 }

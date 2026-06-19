@@ -189,7 +189,7 @@
         android:orientation="vertical"
         android:paddingVertical="@dimen/space_4"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toStartOf="@id/floatingUtilityGroup"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
@@ -337,45 +337,6 @@
                 android:visibility="gone" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-
-    <!-- Filter strip: horizontal scrolling chips for filter-only modes (above mode track) -->
-    <HorizontalScrollView
-        android:id="@+id/filterStripScroll"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="0dp"
-        android:scrollbars="none"
-        android:fadeScrollbars="false"
-        android:clipToPadding="false"
-        android:paddingHorizontal="@dimen/space_12"
-        android:paddingVertical="@dimen/space_8"
-        android:visibility="gone"
-        android:background="@color/oc_root_background"
-        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent">
-
-        <LinearLayout
-            android:id="@+id/filterStripChips"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal" />
-    </HorizontalScrollView>
-
-    <!-- Mode action button: Pro toggle (Humanistic) / 氛围-超清 toggle (Check-in) -->
-    <Button
-        android:id="@+id/buttonModeAction"
-        style="@style/Widget.OpenCamera.ModeTrackButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="2dp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <!-- Mode track is now inside bottomSheet -->
 
     <!-- Settings panel (unchanged, adjusts constraints) -->
     <androidx.core.widget.NestedScrollView
@@ -813,7 +774,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Depth"
+                        android:text="@string/portrait_depth_label"
                         android:textColor="@color/oc_text_secondary"
                         android:textSize="@dimen/text_size_status" />
 
@@ -1361,7 +1322,7 @@
         android:padding="0dp"
         android:visibility="gone"
         app:layout_constrainedHeight="true"
-        app:layout_constraintBottom_toTopOf="@id/modeTrackScroll"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/secondaryPanelBottomGuide">
@@ -1626,7 +1587,47 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
 
-        <!-- Mode track: horizontal scrolling strip (first item in cockpit) -->
+        <!-- Filter strip: horizontal scrolling chips for filter-only modes. -->
+        <HorizontalScrollView
+            android:id="@+id/filterStripScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="0dp"
+            android:background="@color/oc_root_background"
+            android:clipToPadding="false"
+            android:fadeScrollbars="false"
+            android:paddingHorizontal="@dimen/space_12"
+            android:paddingVertical="@dimen/space_8"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/filterStripChips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <!-- Mode action: Pro (Humanistic) / Atmosphere-Clarity (Check-in). -->
+        <Button
+            android:id="@+id/buttonModeAction"
+            style="@style/Widget.OpenCamera.ModeTrackButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="2dp"
+            android:visibility="gone" />
+
+
+        <!-- Style preset card rail: horizontal scrolling cards above mode track -->
+        <com.opencamera.app.StylePresetCardRailView
+            android:id="@+id/stylePresetCardRail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="2dp"
+            android:background="@color/oc_root_background"
+            android:visibility="gone" />        <!-- Mode track: horizontal scrolling strip (first item in cockpit) -->
         <HorizontalScrollView
             android:id="@+id/modeTrackScroll"
             android:layout_width="match_parent"

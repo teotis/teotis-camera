@@ -220,6 +220,84 @@ class PreviewAnalysisFanoutTest {
         mlKitSource.stop("test")
     }
 
+    @Test
+    fun `onConsumerError called when scene mask consumer throws`() {
+        var closeCount = 0
+        val proxy = createCountingProxy { closeCount++ }
+        val errors = mutableListOf<Pair<String, Throwable>>()
+
+        val fanout = PreviewAnalysisFanout(
+            sceneMaskConsumer = { _, _ -> throw RuntimeException("ML Kit crash") },
+            livePreviewConsumer = { _, _ -> },
+            onConsumerError = { tag, error -> errors.add(tag to error) }
+        )
+
+        fanout.analyze(proxy, 0)
+
+        assertEquals("onConsumerError should be called once", 1, errors.size)
+        assertEquals("scene-mask", errors[0].first)
+        assertEquals("ML Kit crash", errors[0].second.message)
+        assertEquals(1, closeCount)
+    }
+
+    @Test
+    fun `onConsumerError called when live preview consumer throws`() {
+        var closeCount = 0
+        val proxy = createCountingProxy { closeCount++ }
+        val errors = mutableListOf<Pair<String, Throwable>>()
+
+        val fanout = PreviewAnalysisFanout(
+            sceneMaskConsumer = { _, _ -> },
+            livePreviewConsumer = { _, _ -> throw RuntimeException("frame copy crash") },
+            onConsumerError = { tag, error -> errors.add(tag to error) }
+        )
+
+        fanout.analyze(proxy, 0)
+
+        assertEquals("onConsumerError should be called once", 1, errors.size)
+        assertEquals("live-preview", errors[0].first)
+        assertEquals("frame copy crash", errors[0].second.message)
+        assertEquals(1, closeCount)
+    }
+
+    @Test
+    fun `onConsumerError called for both consumers when both throw`() {
+        var closeCount = 0
+        val proxy = createCountingProxy { closeCount++ }
+        val errors = mutableListOf<Pair<String, Throwable>>()
+
+        val fanout = PreviewAnalysisFanout(
+            sceneMaskConsumer = { _, _ -> throw RuntimeException("scene crash") },
+            livePreviewConsumer = { _, _ -> throw RuntimeException("live crash") },
+            onConsumerError = { tag, error -> errors.add(tag to error) }
+        )
+
+        fanout.analyze(proxy, 0)
+
+        assertEquals("onConsumerError should be called twice", 2, errors.size)
+        assertEquals("live-preview", errors[0].first)
+        assertEquals("scene-mask", errors[1].first)
+        assertEquals(1, closeCount)
+    }
+
+    @Test
+    fun `onConsumerError not called when no errors occur`() {
+        var closeCount = 0
+        val proxy = createCountingProxy { closeCount++ }
+        val errors = mutableListOf<Pair<String, Throwable>>()
+
+        val fanout = PreviewAnalysisFanout(
+            sceneMaskConsumer = { _, _ -> },
+            livePreviewConsumer = { _, _ -> },
+            onConsumerError = { tag, error -> errors.add(tag to error) }
+        )
+
+        fanout.analyze(proxy, 0)
+
+        assertTrue("onConsumerError should not be called", errors.isEmpty())
+        assertEquals(1, closeCount)
+    }
+
     private fun createCountingProxy(onClose: () -> Unit): ImageProxy {
         return object : ImageProxy {
             override fun close() { onClose() }

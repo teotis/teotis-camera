@@ -1,6 +1,7 @@
 package com.opencamera.app.camera
 
 import android.content.Context
+import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.extensions.ExtensionMode
 import androidx.camera.extensions.ExtensionsManager
@@ -10,6 +11,9 @@ import com.opencamera.core.device.CameraExtensionMode
 import com.opencamera.core.device.CameraExtensionResolution
 import com.opencamera.core.device.LensFacing
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+
+private const val TAG = "CameraXExtensionSelectorResolver"
 
 /**
  * Production [ExtensionSelectorResolver] that wraps the real CameraX [ExtensionsManager].
@@ -94,6 +98,8 @@ private fun CameraExtensionMode.toExtensionMode(): Int {
  * The initialization completes synchronously on first use (blocking only the calling thread
  * for the duration of the `ExtensionsManager` async bind, which is typically fast after the
  * first camera session has started).
+ *
+ * Initialization failures are surfaced through [diagnostics] for inspectability.
  */
 internal class LazyCameraXExtensionSelectorResolver(
     private val context: Context
@@ -101,6 +107,21 @@ internal class LazyCameraXExtensionSelectorResolver(
 
     @Volatile
     private var delegate: CameraXExtensionSelectorResolver? = null
+
+    private val initError = AtomicReference<String?>()
+
+    val diagnostics: List<String>
+        get() = buildList {
+            val error = initError.get()
+            if (error != null) {
+                add("extension:init-error=$error")
+                add("extension:manager=unavailable")
+            } else if (delegate != null) {
+                add("extension:manager=ready")
+            } else {
+                add("extension:manager=not-initialized")
+            }
+        }
 
     override fun resolve(
         desiredMode: CameraExtensionMode,
@@ -114,7 +135,7 @@ internal class LazyCameraXExtensionSelectorResolver(
                 CameraExtensionResolution(
                     requestedMode = desiredMode,
                     availability = CameraExtensionAvailability.MANAGER_UNAVAILABLE,
-                    reason = "ExtensionsManager not yet available"
+                    reason = initError.get() ?: "ExtensionsManager not yet available"
                 )
             )
         }
@@ -130,7 +151,10 @@ internal class LazyCameraXExtensionSelectorResolver(
                 val manager = ExtensionsManager.getInstanceAsync(context, provider)
                     .get(5, TimeUnit.SECONDS)
                 CameraXExtensionSelectorResolver(manager).also { delegate = it }
-            } catch (_: Throwable) {
+            } catch (error: Throwable) {
+                val errorMsg = error.message ?: error::class.java.simpleName
+                Log.w(TAG, "ExtensionsManager initialization failed; extensions unavailable: $errorMsg", error)
+                initError.set(errorMsg)
                 null
             }
         }

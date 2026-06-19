@@ -2,6 +2,10 @@ package com.opencamera.core.media
 
 import org.junit.Assert.*
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class FrameRingBufferTest {
 
@@ -121,4 +125,79 @@ class FrameRingBufferTest {
         lensFacingTag = "BACK",
         zoomRatio = 1.0f
     )
+
+    @Test
+    fun `concurrent append select and clear do not throw or corrupt`() {
+        val buffer = FrameRingBuffer(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+        val iterations = 500
+        val writerCount = 4
+        val readerCount = 4
+        val totalThreads = writerCount + readerCount
+        val barrier = CyclicBarrier(totalThreads)
+        val failed = AtomicBoolean(false)
+
+        val latch = CountDownLatch(totalThreads)
+
+        val writers = (0 until writerCount).map { writerIdx ->
+            Thread {
+                barrier.await()
+                for (i in 0 until iterations) {
+                    val ts = (writerIdx * iterations.toLong() + i) * 1_000_000
+                    buffer.append(makeDescriptor("w${writerIdx}_$i", timestampNanos = ts))
+                }
+                latch.countDown()
+            }
+        }
+
+        val readers = (0 until readerCount).map {
+            Thread {
+                barrier.await()
+                repeat(iterations) {
+                    try {
+                        val snap = buffer.snapshot()
+                        for (j in 1 until snap.size) {
+                            assertTrue(
+                                "snapshot not sorted: ${snap[j - 1].timestampNanos} > ${snap[j].timestampNanos}",
+                                snap[j - 1].timestampNanos <= snap[j].timestampNanos
+                            )
+                        }
+
+                        if (snap.isNotEmpty()) {
+                            val mid = snap.size / 2
+                            val window = FrameSelectionWindow(
+                                shutterTimestampNanos = snap[mid].timestampNanos,
+                                preShutterMillis = 10,
+                                postShutterMillis = 10
+                            )
+                            val sel = buffer.select(window)
+                            for (f in sel.frames) {
+                                assertTrue(
+                                    "selected frame outside window",
+                                    f.timestampNanos in (snap[mid].timestampNanos - 10_000_000)..(snap[mid].timestampNanos + 10_000_000)
+                                )
+                            }
+                        }
+                    } catch (e: Exception) {
+                        failed.set(true)
+                        throw e
+                    }
+                }
+                latch.countDown()
+            }
+        }
+
+        (writers + readers).forEach { it.start() }
+        latch.await()
+
+        assertFalse("concurrent access caused an exception", failed.get())
+
+        val finalSnap = buffer.snapshot()
+        for (i in 1 until finalSnap.size) {
+            assertTrue(
+                "final snapshot not sorted",
+                finalSnap[i - 1].timestampNanos <= finalSnap[i].timestampNanos
+            )
+        }
+        assertTrue(finalSnap.size <= FrameBufferPolicy.LIVE_PREVIEW_DEFAULT.maxFrames)
+    }
 }

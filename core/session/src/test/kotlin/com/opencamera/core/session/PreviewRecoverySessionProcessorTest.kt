@@ -69,6 +69,7 @@ class PreviewRecoverySessionProcessorTest {
         val mutations = RecordingMutations(state)
         var countdownActive = false
         val countdownCancellations = mutableListOf<String>()
+        val recordingElapsedTimerCancellations = mutableListOf<String>()
         val testScope = TestScope()
 
         lateinit var processor: PreviewRecoverySessionProcessor
@@ -82,7 +83,7 @@ class PreviewRecoverySessionProcessorTest {
                 mutations = mutations,
                 countdownInProgress = { countdownActive },
                 cancelPendingCountdown = { reason -> countdownCancellations.add(reason) },
-                cancelRecordingElapsedTimer = {},
+                cancelRecordingElapsedTimer = { recordingElapsedTimerCancellations.add("cancelled") },
                 scope = testScope,
                 dispatch = { intent -> processor.process(intent) }
             )
@@ -421,12 +422,13 @@ class PreviewRecoverySessionProcessorTest {
     @Test
     fun `PreviewBindingStarted with recovery increments recovery count`() = runTest {
         val harness = Harness(runningState().copy(
-            previewMetrics = PreviewMetrics(bindCount = 2, recoveryCount = 1)
+            previewMetrics = PreviewMetrics(bindCount = 2, recoveryCount = 1, consecutiveRecoveryCount = 1)
         ))
         harness.dispatch(SessionIntent.PreviewBindingStarted("recover", isRecovery = true))
 
         assertEquals(3, harness.state.value.previewMetrics.bindCount)
         assertEquals(2, harness.state.value.previewMetrics.recoveryCount)
+        assertEquals(2, harness.state.value.previewMetrics.consecutiveRecoveryCount)
     }
 
     @Test
@@ -932,5 +934,136 @@ class PreviewRecoverySessionProcessorTest {
         ))
 
         assertFalse(harness.mutations.calls.any { it.startsWith("thumbnail:") })
+    }
+
+    @Test
+    fun `recovery stops after MAX_CONSECUTIVE_RECOVERIES exhaustion`() = runTest {
+        val harness = Harness(runningState().copy(
+            previewMetrics = PreviewMetrics(consecutiveRecoveryCount = PreviewRecoverySessionProcessor.MAX_CONSECUTIVE_RECOVERIES)
+        ))
+        harness.dispatch(SessionIntent.PreviewError("persistent failure"))
+
+        // Should not attempt recovery
+        assertFalse(harness.allEffects().any { it is SessionEffect.BindPreview })
+        assertEquals("Preview error", harness.state.value.presentation.lastAction)
+    }
+
+    @Test
+    fun `recovery attempted when count is below limit`() = runTest {
+        val harness = Harness(runningState().copy(
+            previewMetrics = PreviewMetrics(consecutiveRecoveryCount = 1)
+        ))
+        harness.dispatch(SessionIntent.PreviewError("transient error"))
+
+        assertTrue(harness.allEffects().any { it is SessionEffect.BindPreview })
+    }
+
+    @Test
+    fun `PreviewSurfaceLost during recording emits StopActiveShot`() = runTest {
+        val shot = testShotRequest("recording-shot-1")
+        val harness = Harness(runningState().copy(
+            recordingStatus = RecordingStatus.RECORDING,
+            activeShot = shot
+        ))
+        harness.dispatch(SessionIntent.PreviewSurfaceLost("surface gone"))
+
+        val stopEffects = harness.allEffects().filterIsInstance<SessionEffect.StopActiveShot>()
+        assertEquals(1, stopEffects.size)
+        assertEquals("recording-shot-1", stopEffects[0].shotId)
+    }
+
+    @Test
+    fun `PreviewSurfaceLost during recording does not emit StopActiveShot when no active shot`() = runTest {
+        val harness = Harness(runningState().copy(
+            recordingStatus = RecordingStatus.RECORDING,
+            activeShot = null
+        ))
+        harness.dispatch(SessionIntent.PreviewSurfaceLost("surface gone"))
+
+        val stopEffects = harness.allEffects().filterIsInstance<SessionEffect.StopActiveShot>()
+        assertTrue(stopEffects.isEmpty())
+    }
+
+    @Test
+    fun `PreviewSurfaceLost during recording cancels elapsed timer`() = runTest {
+        val harness = Harness(runningState().copy(
+            recordingStatus = RecordingStatus.RECORDING
+        ))
+        harness.dispatch(SessionIntent.PreviewSurfaceLost("surface gone"))
+
+        assertTrue(harness.recordingElapsedTimerCancellations.isNotEmpty())
+    }
+
+    @Test
+    fun `PreviewRuntimeIssue cancels recording elapsed timer when recording`() = runTest {
+        val harness = Harness(runningState().copy(
+            recordingStatus = RecordingStatus.RECORDING
+        ))
+        val issue = DeviceRuntimeIssue(
+            kind = DeviceRuntimeIssueKind.BIND_FAILURE,
+            reason = "camera lost",
+            isRecoverable = true
+        )
+        harness.dispatch(SessionIntent.PreviewRuntimeIssue(issue))
+
+        assertEquals(1, harness.recordingElapsedTimerCancellations.size)
+    }
+
+    @Test
+    fun `PreviewRuntimeIssue does not cancel timer when not recording`() = runTest {
+        val harness = Harness(runningState().copy(
+            recordingStatus = RecordingStatus.IDLE
+        ))
+        val issue = DeviceRuntimeIssue(
+            kind = DeviceRuntimeIssueKind.BIND_FAILURE,
+            reason = "camera lost",
+            isRecoverable = true
+        )
+        harness.dispatch(SessionIntent.PreviewRuntimeIssue(issue))
+
+        assertTrue(harness.recordingElapsedTimerCancellations.isEmpty())
+    }
+
+    @Test
+    fun `consecutiveRecoveryCount increments on recovery binding`() = runTest {
+        val harness = Harness(runningState().copy(
+            previewMetrics = PreviewMetrics(bindCount = 1, recoveryCount = 0, consecutiveRecoveryCount = 0)
+        ))
+        harness.dispatch(SessionIntent.PreviewBindingStarted("recover", isRecovery = true))
+
+        assertEquals(1, harness.state.value.previewMetrics.consecutiveRecoveryCount)
+        assertEquals(1, harness.state.value.previewMetrics.recoveryCount)
+    }
+
+    @Test
+    fun `consecutiveRecoveryCount does not increment on non-recovery binding`() = runTest {
+        val harness = Harness(runningState().copy(
+            previewMetrics = PreviewMetrics(bindCount = 1, consecutiveRecoveryCount = 2)
+        ))
+        harness.dispatch(SessionIntent.PreviewBindingStarted("initial", isRecovery = false))
+
+        assertEquals(2, harness.state.value.previewMetrics.consecutiveRecoveryCount)
+    }
+
+    @Test
+    fun `consecutiveRecoveryCount resets to zero on first frame available`() = runTest {
+        val harness = Harness(runningState().copy(
+            previewMetrics = PreviewMetrics(consecutiveRecoveryCount = 2)
+        ))
+        harness.dispatch(SessionIntent.PreviewFirstFrameAvailable(120L))
+
+        assertEquals(0, harness.state.value.previewMetrics.consecutiveRecoveryCount)
+    }
+
+    @Test
+    fun `recovery exhaustion records trace and action text`() = runTest {
+        val harness = Harness(runningState().copy(
+            previewMetrics = PreviewMetrics(consecutiveRecoveryCount = 3)
+        ))
+        harness.dispatch(SessionIntent.PreviewError("something broke"))
+
+        assertEquals("Preview error", harness.state.value.presentation.lastAction)
+        val traceEntries = harness.trace.snapshot()
+        assertTrue(traceEntries.any { it.name == "preview.error" })
     }
 }

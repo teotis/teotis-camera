@@ -514,7 +514,7 @@ class DefaultCameraSessionTest {
         )
         runCurrent()
 
-        assertEquals(CaptureStatus.COMPLETED, session.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, session.state.value.captureStatus)
         assertEquals(RecordingStatus.IDLE, session.state.value.recordingStatus)
         assertEquals("Photo saved", session.state.value.lastAction)
         assertEquals("Pictures/OpenCamera/test.jpg", session.state.value.latestCapturePath)
@@ -1721,10 +1721,11 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.ShutterPressed)
         advanceUntilIdle()
 
+        val activeShot = assertNotNull(session.state.value.activeShot)
         session.dispatch(
             SessionIntent.ShotCompleted(
                 ShotResult(
-                    shotId = "shot-live",
+                    shotId = activeShot.shotId,
                     mediaType = MediaType.PHOTO,
                     outputPath = "Pictures/OpenCamera/live.jpg",
                     saveRequest = SaveRequest.photoLibrary(
@@ -1772,10 +1773,11 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.ShutterPressed)
         advanceUntilIdle()
 
+        val activeShot = assertNotNull(session.state.value.activeShot)
         session.dispatch(
             SessionIntent.ShotCompleted(
                 ShotResult(
-                    shotId = "shot-still-only",
+                    shotId = activeShot.shotId,
                     mediaType = MediaType.PHOTO,
                     outputPath = "Pictures/OpenCamera/still.jpg",
                     saveRequest = SaveRequest.photoLibrary(),
@@ -1817,10 +1819,11 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.ShutterPressed)
         advanceUntilIdle()
 
+        val activeShot = assertNotNull(session.state.value.activeShot)
         session.dispatch(
             SessionIntent.ShotCompleted(
                 ShotResult(
-                    shotId = "shot-degraded",
+                    shotId = activeShot.shotId,
                     mediaType = MediaType.PHOTO,
                     outputPath = "Pictures/OpenCamera/degraded.jpg",
                     saveRequest = SaveRequest.photoLibrary(),
@@ -1992,10 +1995,10 @@ class DefaultCameraSessionTest {
         assertEquals("photo-vivid", shot.postProcessSpec.algorithmProfile)
         assertEquals("Humanistic", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
         assertEquals("Humanistic capture requested", session.state.value.modeSnapshot.state.headline)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Default style Humanistic Vivid"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("默认风格"))
         assertTrue(
             session.state.value.modeSnapshot.state.detail.contains(
-                "Subfeatures style, frame ratio, Live default, timer, and watermark"
+                "支持风格、画幅、动态照片、定时及水印共享设置"
             )
         )
     }
@@ -2228,7 +2231,7 @@ class DefaultCameraSessionTest {
             )
         ))
         runCurrent()
-        assertEquals(CaptureStatus.COMPLETED, session.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, session.state.value.captureStatus)
         assertNull(session.state.value.activeShot)
 
         assertTrue(trace.snapshot().any { it.name == "capture.data.received" })
@@ -2469,7 +2472,7 @@ class DefaultCameraSessionTest {
             session.state.value.activeDeviceGraph.stillCapture.resolutionPreset
         )
         assertEquals("Still resolution set to 8MP", session.state.value.lastAction)
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Size 8MP"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("8MP"))
 
         session.dispatch(SessionIntent.SwitchMode(ModeId.HUMANISTIC))
         advanceUntilIdle()
@@ -2479,7 +2482,7 @@ class DefaultCameraSessionTest {
             StillCaptureResolutionPreset.MEDIUM_8MP,
             session.state.value.activeDeviceGraph.stillCapture.resolutionPreset
         )
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Size 8MP"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("8MP"))
 
         session.dispatch(SessionIntent.ShutterPressed)
         advanceUntilIdle()
@@ -2678,7 +2681,7 @@ class DefaultCameraSessionTest {
             StillCaptureResolutionPreset.SMALL_2MP,
             session.state.value.activeDeviceGraph.stillCapture.resolutionPreset
         )
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Size 2MP"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("2MP"))
         assertEquals(
             "Still resolution adjusted to 2MP for current lens",
             session.state.value.lastAction
@@ -3292,7 +3295,7 @@ class DefaultCameraSessionTest {
         )
         advanceUntilIdle()
 
-        assertEquals(CaptureStatus.COMPLETED, session.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, session.state.value.captureStatus)
         assertNull(session.state.value.activeShot)
         assertEquals("Pictures/OpenCamera/color-lab-photo.jpg", session.state.value.latestCapturePath)
         assertEquals(SavedMediaType.PHOTO, session.state.value.latestSavedMediaType)
@@ -3344,7 +3347,7 @@ class DefaultCameraSessionTest {
         )
         advanceUntilIdle()
 
-        assertEquals(CaptureStatus.COMPLETED, session.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, session.state.value.captureStatus)
         assertNull(session.state.value.activeShot)
         assertEquals("Pictures/OpenCamera/color-lab-degraded.jpg", session.state.value.latestCapturePath)
         assertTrue(session.state.value.latestThumbnailSource is ThumbnailSource.SavedMedia)

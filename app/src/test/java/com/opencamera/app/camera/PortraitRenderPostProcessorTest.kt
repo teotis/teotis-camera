@@ -8,15 +8,19 @@ import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ThumbnailSource
+import com.opencamera.core.media.hasPostProcessFailures
 import com.opencamera.core.settings.PortraitBeautyPreset
 import com.opencamera.core.settings.PortraitBeautyStrength
 import com.opencamera.core.settings.PortraitBokehEffect
 import com.opencamera.core.settings.PortraitProfile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import android.graphics.Bitmap
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -752,7 +756,6 @@ class PortraitRenderPostProcessorTest {
 
         override suspend fun applyWithMask(
             target: ProcessorTarget,
-            bitmap: android.graphics.Bitmap,
             spec: PortraitRenderSpec,
             mask: SavedPhotoMaskPixels
         ): Pair<ProcessorEditorResult, List<String>> {
@@ -906,5 +909,137 @@ class PortraitRenderPostProcessorTest {
         assertEquals(1, editor.invocations.size)
         val spec = editor.invocations.single().spec
         assertEquals(PortraitRenderMode.DEPTH, spec.mode)
+    }
+
+    @Test
+    fun `analysis bitmap is recycled after successful mask creation`() = runTest {
+        val analysisBitmap = mock(Bitmap::class.java)
+        `when`(analysisBitmap.width).thenReturn(50)
+        `when`(analysisBitmap.height).thenReturn(50)
+
+        val mask = SceneMaskTestUtils.createCenterSubjectMask(50, 50)
+        val maskProvider = FakeSavedPhotoSceneMaskProvider(
+            SceneMaskResult.Available(mask)
+        )
+        val processor = PortraitRenderPostProcessor(
+            FakePortraitRenderEditor(PortraitRenderApplied()),
+            maskProvider,
+            maskBitmapSource = { analysisBitmap }
+        )
+        processor.process(
+            photoResult(
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/portrait.jpg",
+                    filePath = "/tmp/portrait.jpg"
+                )
+            )
+        )
+
+        org.mockito.Mockito.verify(analysisBitmap, org.mockito.Mockito.times(1)).recycle()
+    }
+
+    // ── Mask-aware render exception produces failure-visible status ──────────
+
+    @Test
+    fun `mask-aware render exception produces failure-visible status`() = runTest {
+        val maskEditor = ThrowingMaskAwareEditor(RuntimeException("mask render crash"))
+        val mask = SceneMaskTestUtils.createCenterSubjectMask(50, 50)
+        val maskProvider = FakeSavedPhotoSceneMaskProvider(
+            SceneMaskResult.Available(mask)
+        )
+        val processor = PortraitRenderPostProcessor(
+            maskEditor,
+            maskProvider,
+            maskBitmapSource = { mock(Bitmap::class.java) }
+        )
+
+        val result = processor.process(
+            photoResult(
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/portrait.jpg",
+                    filePath = "/tmp/portrait.jpg"
+                )
+            )
+        )
+
+        assertTrue(
+            result.hasPostProcessFailures(),
+            "Mask-aware render exception should produce failure-visible status"
+        )
+        assertTrue(
+            result.pipelineNotes.contains("portrait-render:degraded:mask-render-exception"),
+            "Legacy degraded note should be recorded"
+        )
+        assertTrue(
+            result.structuredPostProcessFailures.any {
+                it.stage == com.opencamera.core.media.PostProcessFailureStage.PORTRAIT_RENDER
+            },
+            "Structured failure should be recorded for portrait-render stage"
+        )
+    }
+
+    @Test
+    fun `mask-aware render cancellation propagates`() = runTest {
+        val maskEditor = ThrowingMaskAwareEditor(CancellationException("portrait cancelled"))
+        val mask = SceneMaskTestUtils.createCenterSubjectMask(50, 50)
+        val maskProvider = FakeSavedPhotoSceneMaskProvider(
+            SceneMaskResult.Available(mask)
+        )
+        val processor = PortraitRenderPostProcessor(
+            maskEditor,
+            maskProvider,
+            maskBitmapSource = { mock(Bitmap::class.java) }
+        )
+
+        assertFailsWith<CancellationException> {
+            processor.process(
+                photoResult(
+                    outputHandle = MediaOutputHandle(
+                        displayPath = "/tmp/portrait-cancel.jpg",
+                        filePath = "/tmp/portrait-cancel.jpg"
+                    )
+                )
+            )
+        }
+    }
+
+    @Test
+    fun `mask-aware render vm error propagates`() = runTest {
+        val maskEditor = ThrowingMaskAwareEditor(StackOverflowError("portrait recursion"))
+        val mask = SceneMaskTestUtils.createCenterSubjectMask(50, 50)
+        val maskProvider = FakeSavedPhotoSceneMaskProvider(
+            SceneMaskResult.Available(mask)
+        )
+        val processor = PortraitRenderPostProcessor(
+            maskEditor,
+            maskProvider,
+            maskBitmapSource = { mock(Bitmap::class.java) }
+        )
+
+        assertFailsWith<StackOverflowError> {
+            processor.process(
+                photoResult(
+                    outputHandle = MediaOutputHandle(
+                        displayPath = "/tmp/portrait-error.jpg",
+                        filePath = "/tmp/portrait-error.jpg"
+                    )
+                )
+            )
+        }
+    }
+
+    private class ThrowingMaskAwareEditor(
+        private val error: Throwable
+    ) : MaskAwarePortraitRenderEditor {
+        override suspend fun apply(
+            target: ProcessorTarget,
+            spec: PortraitRenderSpec
+        ): ProcessorEditorResult = PortraitRenderApplied()
+
+        override suspend fun applyWithMask(
+            target: ProcessorTarget,
+            spec: PortraitRenderSpec,
+            mask: SavedPhotoMaskPixels
+        ): Pair<ProcessorEditorResult, List<String>> = throw error
     }
 }

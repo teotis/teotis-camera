@@ -1,26 +1,23 @@
 package com.opencamera.app.camera
 
-import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.net.Uri
 import android.util.Log
-import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.PostProcessFailure
+import com.opencamera.core.media.PostProcessFailureCause
+import com.opencamera.core.media.PostProcessFailureDisposition
+import com.opencamera.core.media.PostProcessFailureStage
+import com.opencamera.core.media.PostProcessOutputIntegrity
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ProcessorWork
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.addStructuredPostProcessFailure
 import com.opencamera.core.media.toProcessorTargetOrNull
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.File
 
 private const val TAG = "PhotoSelfieMirrorPP"
 
@@ -31,11 +28,10 @@ internal interface PhotoSelfieMirrorEditor {
 }
 
 internal fun decidePhotoSelfieMirrorWork(result: ShotResult): ProcessorWork<ProcessorTarget> {
-    if (result.mediaType != MediaType.PHOTO) {
-        return ProcessorWork.None
-    }
-    if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return ProcessorWork.DiagnosticSkip("unsupported-mime")
+    when (result.photoJpegInput()) {
+        PhotoJpegInput.NOT_PHOTO -> return ProcessorWork.None
+        PhotoJpegInput.UNSUPPORTED_MIME -> return ProcessorWork.DiagnosticSkip("unsupported-mime")
+        PhotoJpegInput.EDITABLE -> Unit
     }
     if (!result.metadata.customTags["selfieMirrorApply"].toBoolean()) {
         return ProcessorWork.None
@@ -48,6 +44,8 @@ internal fun decidePhotoSelfieMirrorWork(result: ShotResult): ProcessorWork<Proc
 internal class PhotoSelfieMirrorPostProcessor(
     private val editor: PhotoSelfieMirrorEditor
 ) : MediaPostProcessor {
+    override fun isApplicable(result: ShotResult): Boolean = result.mediaType == MediaType.PHOTO
+
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoSelfieMirrorWork(result)) {
             ProcessorWork.None -> result
@@ -72,9 +70,17 @@ internal class PhotoSelfieMirrorPostProcessor(
                         "selfie-mirror:skipped:${editorResult.reason}"
                     )
 
-                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
-                        "selfie-mirror:failed:${editorResult.reason}"
-                    )
+                    is ProcessorEditorResult.Failed -> {
+                        val (cause, integrity) = selfieMirrorFailureMapping(editorResult.reason)
+                        val structuredFailure = PostProcessFailure(
+                            stage = PostProcessFailureStage.SELFIE_MIRROR,
+                            cause = cause,
+                            integrity = integrity,
+                            disposition = PostProcessFailureDisposition.RECOVERABLE
+                        )
+                        result.addPipelineNotes("selfie-mirror:failed:${editorResult.reason}")
+                            .addStructuredPostProcessFailure(structuredFailure)
+                    }
 
                     else -> result
                 }
@@ -83,26 +89,27 @@ internal class PhotoSelfieMirrorPostProcessor(
     }
 }
 
+internal fun selfieMirrorFailureMapping(reason: String): Pair<PostProcessFailureCause, PostProcessOutputIntegrity> =
+    when (reason) {
+        "decode-failed" -> PostProcessFailureCause.DECODE_FAILED to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "mirror-exception" -> PostProcessFailureCause.BITMAP_OPERATION to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "output-unavailable" -> PostProcessFailureCause.OUTPUT_UNAVAILABLE to PostProcessOutputIntegrity.POSSIBLY_MODIFIED
+        else -> PostProcessFailureCause.EXCEPTION to PostProcessOutputIntegrity.ORIGINAL_INTACT
+    }
+
 internal class AndroidPhotoSelfieMirrorEditor(
     context: Context
 ) : PhotoSelfieMirrorEditor {
     private val appContext = context.applicationContext
-    private val contentResolver: ContentResolver = appContext.contentResolver
+    private val ioExifProcessor = BitmapIoExifProcessor(
+        contentResolver = appContext.contentResolver,
+        jpegQuality = JPEG_QUALITY
+    )
 
     override suspend fun apply(target: ProcessorTarget): ProcessorEditorResult =
-        withContext(Dispatchers.IO) {
-            val sourceBytes = ProcessorIOUtils.readSourceBytes(target, contentResolver)
-                ?: return@withContext ProcessorEditorResult.Skipped("input-unavailable")
-            if (sourceBytes.isEmpty()) {
-                return@withContext ProcessorEditorResult.Skipped("empty-source")
-            }
-
-            val preservedExif = readPreservedExif(sourceBytes)
-            val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
-                ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
-
-            try {
-                val mirrored = Bitmap.createBitmap(
+        try {
+            when (val result = ioExifProcessor.process(target) { decoded ->
+                Bitmap.createBitmap(
                     decoded,
                     0,
                     0,
@@ -111,25 +118,15 @@ internal class AndroidPhotoSelfieMirrorEditor(
                     Matrix().apply { preScale(-1f, 1f) },
                     true
                 )
-                val encodedBytes = ByteArrayOutputStream().use { output ->
-                    check(mirrored.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, output)) {
-                        "Selfie mirror JPEG compression failed"
-                    }
-                    output.toByteArray()
-                }
-                mirrored.recycle()
-                if (!contentResolver.writeEncodedBytes(target, encodedBytes)) {
-                    return@withContext ProcessorEditorResult.Failed("output-unavailable")
-                }
-
-                val exifWarning = contentResolver.restorePreservedExif(target, preservedExif)
-                PhotoSelfieMirrorApplied(exifWarning)
-            } catch (e: Throwable) {
-                Log.w(TAG, "selfie mirror postprocess failed", e)
-                ProcessorEditorResult.Failed("mirror-exception")
-            } finally {
-                decoded.recycle()
+            }) {
+                is BitmapIoExifResult.Success -> PhotoSelfieMirrorApplied(result.exifWarning)
+                is BitmapIoExifResult.Skipped -> ProcessorEditorResult.Skipped(result.reason)
+                is BitmapIoExifResult.Failed -> ProcessorEditorResult.Failed(result.reason)
             }
+        } catch (e: Throwable) {
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "selfie mirror postprocess failed", e)
+            ProcessorEditorResult.Failed("mirror-exception")
         }
 
     companion object {

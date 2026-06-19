@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import androidx.annotation.StringRes
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
@@ -72,6 +73,31 @@ class CameraCockpitRenderModelTest {
         assertEquals("Humanistic", model.topStatus.modeLabel)
         assertEquals("Color Lab", model.topStatus.labEntryLabel)
         assertEquals("Settings", model.topStatus.settingsEntryLabel)
+    }
+
+    @Test
+    fun `cockpit render model uses generic app string lookup for migrated labels`() {
+        val state = defaultSessionState(activeMode = ModeId.HUMANISTIC)
+        val text = object : TestAppTextResolver() {
+            internal override fun get(@StringRes resId: Int): String = when (resId) {
+                R.string.button_shutter_short -> "Take"
+                R.string.button_color_lab_entry -> "Color"
+                R.string.button_settings_entry -> "Prefs"
+                R.string.button_palette_entry -> "Look"
+                R.string.button_quick_launcher -> "Quickie"
+                R.string.button_dev_entry -> "Debug"
+                else -> super.get(resId)
+            }
+        }
+
+        val model = cameraCockpitRenderModel(state, text, strings)
+
+        assertEquals("Color", model.topStatus.labEntryLabel)
+        assertEquals("Prefs", model.topStatus.settingsEntryLabel)
+        assertEquals("Look", model.rightRail.entries[0].label)
+        assertEquals("Quickie", model.rightRail.entries[1].label)
+        assertEquals("Debug", model.rightRail.entries[2].label)
+        assertEquals("Take", model.bottomCockpit.shutterLabel)
     }
 
     @Test

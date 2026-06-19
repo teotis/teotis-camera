@@ -22,7 +22,7 @@ internal class PermissionUiController(
     }
 
     fun renderPermanentlyDenied() {
-        permissionStatus.text = text().permissionPermanentlyDenied()
+        permissionStatus.text = text().get(R.string.permission_permanently_denied)
         permissionStatus.visibility = View.VISIBLE
         permissionStatus.setOnClickListener {
             val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {

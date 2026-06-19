@@ -50,7 +50,9 @@ fun ShotResult.toTransactionResult(
         }
     }
 
-    val transactionStatus = if (hasPostProcessFailures()) {
+    val transactionStatus = if (structuredPostProcessFailures.isNotEmpty()) {
+        MediaTransactionStatus.PARTIAL_SUCCESS
+    } else if (hasPostProcessFailures()) {
         MediaTransactionStatus.PARTIAL_SUCCESS
     } else {
         MediaTransactionStatus.SUCCESS

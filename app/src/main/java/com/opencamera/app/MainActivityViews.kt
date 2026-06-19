@@ -203,7 +203,8 @@ internal data class BottomCockpitViews(
     val shutter: Button,
     val lensFacing: Button,
     val focalLengthSlider: FocalLengthSliderView,
-    val recordingIndicator: TextView
+    val recordingIndicator: TextView,
+    val stylePresetCardRail: StylePresetCardRailView
 )
 
 internal data class MainActivityViews(
@@ -404,7 +405,8 @@ internal data class MainActivityViews(
                 shutter = activity.findViewById(R.id.buttonShutter),
                 lensFacing = activity.findViewById(R.id.buttonLensFacing),
                 focalLengthSlider = activity.findViewById(R.id.focalLengthSlider),
-                recordingIndicator = activity.findViewById(R.id.recordingIndicator)
+                recordingIndicator = activity.findViewById(R.id.recordingIndicator),
+                stylePresetCardRail = activity.findViewById(R.id.stylePresetCardRail)
             )
             return MainActivityViews(
                 preview = preview,

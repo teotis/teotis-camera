@@ -3,6 +3,8 @@ package com.opencamera.core.media
 import java.io.File
 
 interface MediaPostProcessor {
+    fun isApplicable(result: ShotResult): Boolean = true
+
     suspend fun process(result: ShotResult): ShotResult
 }
 

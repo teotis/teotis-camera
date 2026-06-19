@@ -36,11 +36,10 @@ internal interface DocumentAutoCropEditor {
 }
 
 internal fun decideDocumentAutoCropWork(result: ShotResult): ProcessorWork<ProcessorTarget> {
-    if (result.mediaType != MediaType.PHOTO) {
-        return ProcessorWork.None
-    }
-    if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return ProcessorWork.DiagnosticSkip("unsupported-mime")
+    when (result.photoJpegInput()) {
+        PhotoJpegInput.NOT_PHOTO -> return ProcessorWork.None
+        PhotoJpegInput.UNSUPPORTED_MIME -> return ProcessorWork.DiagnosticSkip("unsupported-mime")
+        PhotoJpegInput.EDITABLE -> Unit
     }
     val tags = result.metadata.customTags
     if (tags["mode"] != "document") {
@@ -128,6 +127,8 @@ internal fun detectDocumentCropBounds(
 internal class DocumentAutoCropPostProcessor(
     private val editor: DocumentAutoCropEditor
 ) : MediaPostProcessor {
+    override fun isApplicable(result: ShotResult): Boolean = result.mediaType == MediaType.PHOTO
+
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decideDocumentAutoCropWork(result)) {
             ProcessorWork.None -> result
@@ -216,6 +217,7 @@ internal class AndroidDocumentAutoCropEditor(
                     warning = exifWarning
                 )
             } catch (e: Throwable) {
+                e.rethrowIfCancellationOrFatal()
                 Log.w(TAG, "document auto-crop postprocess failed", e)
                 ProcessorEditorResult.Failed("crop-exception")
             } finally {
@@ -274,4 +276,3 @@ private fun columnStats(
         range = maxValue - minValue
     )
 }
-

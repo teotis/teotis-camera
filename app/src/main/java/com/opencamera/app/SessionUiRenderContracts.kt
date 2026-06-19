@@ -2,6 +2,19 @@ package com.opencamera.app
 
 import com.opencamera.core.settings.FeatureCatalogAction
 import com.opencamera.core.settings.PersistedSettingsAction
+import com.opencamera.core.session.SessionState
+
+internal interface EditableSettingsPageRenderModel {
+    val headline: String
+    val supportingText: String
+    val heroSummary: String
+    val editingEnabled: Boolean
+    val editingHint: String
+}
+
+internal fun settingsPageEditingEnabled(state: SessionState): Boolean {
+    return state.activeShot == null && state.countdownRemainingSeconds == null
+}
 
 internal data class SessionUiStrings(
     val buttonSwitchToFront: String,

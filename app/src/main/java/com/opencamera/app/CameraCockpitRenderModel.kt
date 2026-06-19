@@ -91,34 +91,34 @@ internal fun cameraCockpitRenderModel(
     strings: SessionUiStrings,
     activeRoute: CockpitPanelRoute = CockpitPanelRoute.None
 ): CameraCockpitRenderModel {
-    val controls = sessionControlsRenderModel(state, strings)
+    val controls = sessionControlsRenderModel(state, strings, text)
     val primary = primaryStatusRenderModel(state, text)
     val modeTrack = modeTrackRenderModel(state, text)
-    val captureOutput = sessionCaptureOutputText(state, strings)
+    val captureOutput = sessionCaptureOutputText(state, strings, text)
 
     return CameraCockpitRenderModel(
         topStatus = TopStatusRenderModel(
             appName = "OpenCamera",
             modeLabel = primary.modeLabel,
             statusText = primary.statusText,
-            labEntryLabel = text.colorLabEntry(),
-            settingsEntryLabel = text.settingsEntry()
+            labEntryLabel = text.get(R.string.button_color_lab_entry),
+            settingsEntryLabel = text.get(R.string.button_settings_entry)
         ),
         rightRail = RightRailRenderModel(
             entries = listOf(
                 RightRailEntryRenderModel(
                     route = CockpitPanelRoute.StyleLab,
-                    label = text.styleEntry(),
+                    label = text.get(R.string.button_palette_entry),
                     isActive = activeRoute is CockpitPanelRoute.StyleLab
                 ),
                 RightRailEntryRenderModel(
                     route = CockpitPanelRoute.QuickBubble,
-                    label = text.quickLauncher(),
+                    label = text.get(R.string.button_quick_launcher),
                     isActive = activeRoute is CockpitPanelRoute.QuickBubble
                 ),
                 RightRailEntryRenderModel(
                     route = CockpitPanelRoute.DevConsole,
-                    label = text.devEntry(),
+                    label = text.get(R.string.button_dev_entry),
                     isActive = activeRoute is CockpitPanelRoute.DevConsole
                 )
             )
@@ -137,7 +137,7 @@ internal fun cameraCockpitRenderModel(
         modeAction = modeActionRenderModel(state),
         bottomCockpit = BottomCockpitRenderModel(
             captureOutputText = captureOutput,
-            shutterLabel = text.shutterShort(),
+            shutterLabel = text.get(R.string.button_shutter_short),
             isShutterEnabled = shutterDisabledReason(state, text) == null,
             isRecording = state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE,
             lensButtonLabel = controls.lensFacingButtonLabel,
@@ -176,10 +176,10 @@ internal fun recordingIndicatorRenderModel(
     val status = state.recordingStatus
     val isVisible = status != com.opencamera.core.session.RecordingStatus.IDLE
     val label = when (status) {
-        com.opencamera.core.session.RecordingStatus.REQUESTING -> text.statusRecordingStarting()
+        com.opencamera.core.session.RecordingStatus.REQUESTING -> text.get(R.string.status_recording_starting)
         com.opencamera.core.session.RecordingStatus.RECORDING ->
             formatRecordingElapsed(state.recordingElapsedMillis ?: 0L)
-        com.opencamera.core.session.RecordingStatus.STOPPING -> text.statusRecordingSaving()
+        com.opencamera.core.session.RecordingStatus.STOPPING -> text.get(R.string.status_recording_saving)
         com.opencamera.core.session.RecordingStatus.IDLE -> ""
     }
     return RecordingIndicatorRenderModel(

@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import androidx.annotation.StringRes
 import com.opencamera.core.device.CaptureReadiness
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
@@ -81,7 +82,7 @@ class SessionCockpitRenderModelTest {
             )
         )
 
-        val model = sessionControlsRenderModel(state, strings)
+        val model = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals("Switch to Front", model.lensFacingButtonLabel)
         assertTrue(model.lensFacingEnabled)
@@ -99,7 +100,7 @@ class SessionCockpitRenderModelTest {
             )
         )
 
-        val model = sessionControlsRenderModel(state, strings)
+        val model = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals("Single Lens", model.lensFacingButtonLabel)
         assertFalse(model.lensFacingEnabled)
@@ -116,7 +117,7 @@ class SessionCockpitRenderModelTest {
 
         assertEquals(
             "Camera issue: Preview binding failed",
-            sessionCaptureOutputText(state, strings)
+            sessionCaptureOutputText(state, strings, TestAppTextResolver())
         )
     }
 
@@ -130,7 +131,7 @@ class SessionCockpitRenderModelTest {
 
         assertEquals(
             "Last video:\n/tmp/clip.mp4\nPipeline: torch:on",
-            sessionCaptureOutputText(state, strings)
+            sessionCaptureOutputText(state, strings, TestAppTextResolver())
         )
     }
 
@@ -152,7 +153,37 @@ class SessionCockpitRenderModelTest {
 
         assertEquals(
             "Last Live photo:\nStill: /tmp/live.jpg\nMotion: /tmp/live.live.mp4\nSidecar: /tmp/live.live.json\nThumbnail: /tmp/live.jpg\nPipeline: live-photo:bundle, live-photo:motion=video/mp4",
-            sessionCaptureOutputText(state, strings)
+            sessionCaptureOutputText(state, strings, TestAppTextResolver())
+        )
+    }
+
+    @Test
+    fun `capture output renders live photo bundle labels from resolver`() {
+        val text = object : TestAppTextResolver() {
+            internal override fun get(@StringRes resId: Int): String = when (resId) {
+                R.string.live_photo_asset_still -> "静态照片"
+                R.string.live_photo_asset_motion -> "动态片段"
+                R.string.live_photo_asset_sidecar -> "附属文件"
+                R.string.live_photo_asset_thumbnail -> "缩略图"
+                else -> super.get(resId)
+            }
+        }
+        val state = defaultSessionState(
+            latestSavedMediaType = SavedMediaType.PHOTO,
+            latestCapturePath = "/tmp/live.jpg",
+            latestLivePhotoBundle = LivePhotoBundle(
+                stillPath = "/tmp/live.jpg",
+                motionPath = "/tmp/live.live.mp4",
+                sidecarPath = "/tmp/live.live.json",
+                motionDurationMillis = 1500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json"
+            )
+        )
+
+        assertEquals(
+            "Last Live photo:\n静态照片: /tmp/live.jpg\n动态片段: /tmp/live.live.mp4\n附属文件: /tmp/live.live.json\n缩略图: /tmp/live.jpg",
+            sessionCaptureOutputText(state, strings, text)
         )
     }
 
@@ -183,7 +214,7 @@ class SessionCockpitRenderModelTest {
 
         assertEquals(
             "Last Live photo:\nStill: Pictures/OpenCamera/live.jpg (content://media/external/images/media/42)\nMotion: Pictures/OpenCamera/live.live.mp4\nSidecar: Pictures/OpenCamera/live.live.json (content://media/external/file/88)\nThumbnail: Pictures/OpenCamera/live.jpg (content://media/external/images/media/42)\nPipeline: live-photo:bundle",
-            sessionCaptureOutputText(state, strings)
+            sessionCaptureOutputText(state, strings, TestAppTextResolver())
         )
     }
 
@@ -210,7 +241,7 @@ class SessionCockpitRenderModelTest {
             )
         )
 
-        val output = sessionCaptureOutputText(state, strings)
+        val output = sessionCaptureOutputText(state, strings, TestAppTextResolver())
         assertTrue(output.contains("live-format:intended=google-motion-photo-jpeg"))
         assertTrue(output.contains("live-format:actual=google-motion-photo-jpeg"))
         assertTrue(output.contains("live-motion:status=encoded"))
@@ -244,7 +275,7 @@ class SessionCockpitRenderModelTest {
             )
         )
 
-        val output = sessionCaptureOutputText(state, strings)
+        val output = sessionCaptureOutputText(state, strings, TestAppTextResolver())
         assertTrue(output.contains("live-format:actual=still-jpeg"))
         assertTrue(output.contains("live-motion:status=failed"))
         assertTrue(output.contains("gallery-recognition=untested"))
@@ -259,7 +290,7 @@ class SessionCockpitRenderModelTest {
             )
         )
 
-        assertEquals("Preview thumbnail:", sessionCaptureOutputText(state, strings))
+        assertEquals("Preview thumbnail:", sessionCaptureOutputText(state, strings, TestAppTextResolver()))
     }
 
     @Test
@@ -346,7 +377,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 1f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals(4, controls.zoomCapsules.size)
         assertEquals(listOf(0.6f, 1f, 2f, 5f), controls.zoomCapsules.map { it.ratio })
@@ -369,7 +400,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 1f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals(listOf("0.6", "1x", "2", "5"), controls.zoomCapsules.map { it.label })
     }
@@ -390,7 +421,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 1f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals(listOf("0.7", "1x", "3"), controls.zoomCapsules.map { it.label })
     }
@@ -411,7 +442,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 2f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertNull(controls.currentZoomLabel)
     }
@@ -432,7 +463,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 1.5f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals("1.5", controls.currentZoomLabel)
     }
@@ -453,7 +484,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 1.5f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals(1f, controls.nearestPresetRatio)
     }
@@ -469,7 +500,7 @@ class SessionCockpitRenderModelTest {
                 )
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertFalse(controls.isZoomCapsuleRowVisible)
         assertTrue(controls.zoomCapsules.isEmpty())
@@ -491,7 +522,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 1f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertTrue(controls.isZoomCapsuleRowVisible)
         assertEquals(3, controls.zoomCapsules.size)
@@ -511,7 +542,7 @@ class SessionCockpitRenderModelTest {
                 )
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertTrue(controls.focalLengthSlider.isVisible)
         assertTrue(controls.focalLengthSlider.isEnabled)
@@ -521,7 +552,7 @@ class SessionCockpitRenderModelTest {
     @Test
     fun `focal slider is hidden when zoom unsupported`() {
         val state = defaultSessionState()
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertFalse(controls.focalLengthSlider.isVisible)
     }
@@ -539,7 +570,7 @@ class SessionCockpitRenderModelTest {
         ).copy(
             presentation = SessionPresentationState(countdownRemainingSeconds = 3)
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertTrue(controls.focalLengthSlider.isVisible)
         assertFalse(controls.focalLengthSlider.isEnabled)
@@ -566,7 +597,7 @@ class SessionCockpitRenderModelTest {
                 captureProfile = CaptureProfile()
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertTrue(controls.focalLengthSlider.isVisible)
         assertFalse(controls.focalLengthSlider.isEnabled)
@@ -584,7 +615,7 @@ class SessionCockpitRenderModelTest {
                 )
             )
         ).copy(recordingStatus = RecordingStatus.REQUESTING)
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertTrue(controls.focalLengthSlider.isVisible)
         assertFalse(controls.focalLengthSlider.isEnabled)
@@ -601,7 +632,7 @@ class SessionCockpitRenderModelTest {
                 )
             )
         ).copy(recordingStatus = RecordingStatus.RECORDING)
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertTrue(controls.focalLengthSlider.isVisible)
         assertTrue(controls.focalLengthSlider.isEnabled)
@@ -625,7 +656,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 2f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals(ratios, controls.focalLengthSlider.presetRatios)
         assertEquals(2f, controls.focalLengthSlider.currentRatio)
@@ -647,7 +678,7 @@ class SessionCockpitRenderModelTest {
                 zoomRatio = 2.345f
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertEquals(2.3f, controls.focalLengthSlider.currentRatio)
     }
@@ -663,7 +694,7 @@ class SessionCockpitRenderModelTest {
                 )
             )
         )
-        val controls = sessionControlsRenderModel(state, strings)
+        val controls = sessionControlsRenderModel(state, strings, TestAppTextResolver())
 
         assertTrue(controls.isZoomCapsuleRowVisible)
         assertTrue(controls.focalLengthSlider.isVisible)
@@ -1053,6 +1084,55 @@ class SessionCockpitRenderModelTest {
         val model = primaryStatusRenderModel(state, TestAppTextResolver())
 
         assertTrue(model.statusText.contains("Saving"))
+    }
+
+    @Test
+    fun `primary status uses localized preview capture and pro labels`() {
+        val text = object : TestAppTextResolver() {
+            internal override fun get(@StringRes resId: Int): String = when (resId) {
+                R.string.status_pro_active -> "专业模式已启用"
+                else -> super.get(resId)
+            }
+
+            override fun previewStatusLabel(status: PreviewStatus): String = "预览中"
+            override fun captureStatusLabel(status: CaptureStatus): String = "保存中"
+        }
+        val baseline = defaultSessionState()
+        val state = baseline.copy(
+            captureStatus = CaptureStatus.SAVING,
+            modeSnapshot = baseline.modeSnapshot.copy(
+                state = baseline.modeSnapshot.state.copy(isProVariantActive = true)
+            )
+        )
+
+        val model = primaryStatusRenderModel(state, text)
+
+        assertEquals("预览中 · 保存中 · 专业模式已启用", model.statusText)
+    }
+
+    @Test
+    fun `zoom disabled reason uses localized resolver text`() {
+        val text = object : TestAppTextResolver() {
+            internal override fun get(@StringRes resId: Int): String = when (resId) {
+                R.string.disabled_countdown -> "倒计时进行中"
+                else -> super.get(resId)
+            }
+        }
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f),
+                    defaultRatio = 1f
+                )
+            )
+        ).copy(
+            presentation = SessionPresentationState(countdownRemainingSeconds = 3)
+        )
+
+        val model = sessionControlsRenderModel(state, strings, text)
+
+        assertEquals("倒计时进行中", model.focalLengthSlider.disabledReason)
     }
 
     @Test
@@ -1827,5 +1907,97 @@ class SessionCockpitRenderModelTest {
         val model = primaryStatusRenderModel(state, TestAppTextResolver())
 
         assertFalse(model.statusText.contains("Pro active"), "Status should not show Pro active when variant is inactive")
+    }
+
+    // --- Package 04: Regression tests for settings/capability projection coherence ---
+
+    @Test
+    fun `controls model reflects settings update after capability projection`() {
+        val baseState = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT),
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.FRONT,
+                enablePreviewSnapshots = true,
+                zoomRatio = 2f
+            )
+        )
+
+        val model = sessionControlsRenderModel(baseState, strings, TestAppTextResolver())
+
+        assertEquals("Switch to Back", model.lensFacingButtonLabel)
+        assertTrue(model.lensFacingEnabled)
+        assertEquals(2f, model.zoomCapsules.firstOrNull { it.isActive }?.ratio)
+    }
+
+    @Test
+    fun `capture output render model coherent after capability update`() {
+        val stateBefore = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableStillCaptureOutputSizes = listOf(
+                    StillCaptureOutputSize(width = 6000, height = 4000),
+                    StillCaptureOutputSize(width = 4000, height = 3000)
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                outputSize = StillCaptureOutputSize(width = 4000, height = 3000)
+            ),
+            latestCapturePath = "Pictures/test.jpg"
+        )
+
+        val outputBefore = sessionCaptureOutputText(stateBefore, strings, TestAppTextResolver())
+        assertNotNull(outputBefore)
+
+        val stateAfter = stateBefore.copy(
+            activeDeviceCapabilities = stateBefore.activeDeviceCapabilities.copy(
+                availableStillCaptureOutputSizes = listOf(
+                    StillCaptureOutputSize(width = 8000, height = 6000),
+                    StillCaptureOutputSize(width = 4000, height = 3000)
+                )
+            )
+        )
+
+        val outputAfter = sessionCaptureOutputText(stateAfter, strings, TestAppTextResolver())
+        assertNotNull(outputAfter)
+        assertEquals(outputBefore, outputAfter)
+    }
+
+    @Test
+    fun `mode summary text reflects settings through session state after migration`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = PhotoSettings(
+                defaultFilterProfileId = "photo-rich",
+                countdownDuration = CountdownDuration.SECONDS_5
+            )
+        )
+
+        val summary = sessionSummaryText(state, TestAppTextResolver())
+
+        assertTrue(summary.contains("Filter Rich"), "Summary should reflect settings filter after runtime config migration")
+        assertTrue(summary.contains("Timer 5s"), "Summary should reflect countdown settings after migration")
+    }
+
+    @Test
+    fun `mode directory render model includes all declared modes after file split`() {
+        val state = defaultSessionState(
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.DOCUMENT, ModeId.VIDEO)
+        )
+
+        val directory = modeDirectoryRenderModel(state, TestAppTextResolver())
+
+        val modeIds = directory.items.map { it.modeId }.toSet()
+        assertTrue(ModeId.PHOTO in modeIds)
+        assertTrue(ModeId.VIDEO in modeIds)
+        assertTrue(ModeId.HUMANISTIC in modeIds)
+        assertTrue(ModeId.CHECK_IN in modeIds)
+        assertTrue(ModeId.DOCUMENT in modeIds)
     }
 }

@@ -280,7 +280,7 @@ class CaptureRecordingSessionProcessorTest {
         ))
         harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
 
-        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
         assertEquals(RecordingStatus.IDLE, harness.state.value.recordingStatus)
         assertNull(harness.state.value.activeShot)
         assertEquals("Photo saved", harness.state.value.presentation.lastAction)
@@ -408,7 +408,7 @@ class CaptureRecordingSessionProcessorTest {
         assertNull(harness.state.value.activeShot)
 
         harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
-        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
         assertNull(harness.state.value.activeShot)
     }
 
@@ -440,7 +440,7 @@ class CaptureRecordingSessionProcessorTest {
         assertNotNull(harness.state.value.activeShot)
 
         harness.process(SessionIntent.ShotCompleted(testShotResult("shot-mf-1", MediaType.PHOTO)))
-        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
         assertNull(harness.state.value.activeShot)
         assertEquals("/sdcard/photo.jpg", harness.state.value.presentation.latestCapturePath)
         assertEquals("Photo saved", harness.state.value.presentation.lastAction)
@@ -455,7 +455,7 @@ class CaptureRecordingSessionProcessorTest {
         assertNull(harness.state.value.activeShot)
 
         harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
-        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
         assertNull(harness.state.value.activeShot)
         assertEquals("/sdcard/photo.jpg", harness.state.value.presentation.latestCapturePath)
         assertEquals("Photo saved", harness.state.value.presentation.lastAction)
@@ -693,7 +693,7 @@ class CaptureRecordingSessionProcessorTest {
 
         harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
         assertNull(harness.state.value.presentation.pendingPostprocess)
-        assertEquals(CaptureStatus.COMPLETED, harness.state.value.captureStatus)
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
     }
 
     @Test
@@ -728,6 +728,8 @@ class CaptureRecordingSessionProcessorTest {
 
         harness.process(SessionIntent.ShotFailed("shot-1", MediaType.PHOTO, "postprocess error"))
         assertNull(harness.state.value.presentation.pendingPostprocess)
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertTrue(harness.state.value.presentation.lastError == "postprocess error")
         assertTrue(harness.trace.snapshot().any { it.name == "shot.failed.orphaned" })
     }
 
@@ -791,5 +793,155 @@ class CaptureRecordingSessionProcessorTest {
 
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(0, batch.items.size)
+    }
+
+    // ── DFS-01: Orphaned ShotFailed regression tests ─────────────────
+
+    @Test
+    fun `DFS-01 orphaned ShotFailed in DATA_RECEIVED resets captureStatus to IDLE`() = runTest {
+        val initialState = runningState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val harness = Harness(initialState)
+
+        harness.process(SessionIntent.ShotFailed("shot-1", MediaType.PHOTO, "postprocess timeout"))
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+        assertEquals("postprocess timeout", harness.state.value.presentation.lastError)
+        assertTrue(harness.trace.snapshot().any { it.name == "shot.failed.orphaned" })
+    }
+
+    @Test
+    fun `DFS-01 orphaned ShotFailed in COMPLETED resets captureStatus to IDLE`() = runTest {
+        val initialState = runningState().copy(
+            captureStatus = CaptureStatus.COMPLETED,
+            activeShot = null
+        )
+        val harness = Harness(initialState)
+
+        harness.process(SessionIntent.ShotFailed("shot-1", MediaType.PHOTO, "late error"))
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertEquals("late error", harness.state.value.presentation.lastError)
+    }
+
+    @Test
+    fun `DFS-01 orphaned ShotFailed with no pending and IDLE status is no-op`() = runTest {
+        val harness = Harness(runningState().copy(
+            captureStatus = CaptureStatus.IDLE,
+            activeShot = null
+        ))
+
+        harness.process(SessionIntent.ShotFailed("shot-1", MediaType.PHOTO, "error"))
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+    }
+
+    // ── DFS-02: Stale ShotCompleted guard test ───────────────────────
+
+    @Test
+    fun `DFS-02 stale ShotCompleted for different active shot is rejected`() = runTest {
+        val activeShot2 = testShotRequest("shot-2", MediaType.PHOTO)
+        val harness = Harness(runningState().copy(
+            activeShot = activeShot2,
+            captureStatus = CaptureStatus.SAVING
+        ))
+        val staleResult = testShotResult("shot-1", MediaType.PHOTO, "/sdcard/stale.jpg")
+
+        harness.process(SessionIntent.ShotCompleted(staleResult))
+
+        // State must not change - stale completion is rejected
+        assertEquals(CaptureStatus.SAVING, harness.state.value.captureStatus)
+        assertEquals(activeShot2, harness.state.value.activeShot)
+        assertNull(harness.state.value.presentation.latestCapturePath)
+        assertTrue(harness.trace.snapshot().any { it.name == "shot.completed.stale" })
+    }
+
+    @Test
+    fun `DFS-02 valid ShotCompleted when activeShot matches is applied`() = runTest {
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+        val harness = Harness(runningState().copy(
+            activeShot = shot,
+            captureStatus = CaptureStatus.SAVING
+        ))
+
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertNull(harness.state.value.activeShot)
+        assertEquals("/sdcard/photo.jpg", harness.state.value.presentation.latestCapturePath)
+        assertFalse(harness.trace.snapshot().any { it.name == "shot.completed.stale" })
+    }
+
+    @Test
+    fun `DFS-02 valid ShotCompleted when activeShot is null is applied`() = runTest {
+        val harness = Harness(runningState().copy(activeShot = null))
+
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertEquals("/sdcard/photo.jpg", harness.state.value.presentation.latestCapturePath)
+    }
+
+    // ── DFS-13: COMPLETED to IDLE transition test ────────────────────
+
+    @Test
+    fun `DFS-13 photo ShotCompleted transitions to IDLE after presentation update`() = runTest {
+        val harness = Harness(runningState().copy(
+            activeShot = testShotRequest("shot-1", MediaType.PHOTO)
+        ))
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
+
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertEquals("Photo saved", harness.state.value.presentation.lastAction)
+        assertEquals("/sdcard/photo.jpg", harness.state.value.presentation.latestCapturePath)
+    }
+
+    // ── DFS-14: Interrupted shot failure clears activeShot ──────────
+
+    @Test
+    fun `DFS-14 handleInterruptedShotFailure clears matching activeShot`() = runTest {
+        val shot = testShotRequest("shot-1", MediaType.PHOTO)
+        val harness = Harness(runningState().copy(
+            activeShot = shot,
+            captureStatus = CaptureStatus.SAVING,
+            recordingStatus = RecordingStatus.IDLE
+        ))
+        harness.processor.handleInterruptedShotFailure(shot, "mode switched")
+
+        assertNull(harness.state.value.activeShot)
+        assertEquals(CaptureStatus.FAILED, harness.state.value.captureStatus)
+        assertEquals(RecordingStatus.IDLE, harness.state.value.recordingStatus)
+        assertEquals("mode switched", harness.state.value.presentation.lastError)
+        assertEquals("Photo capture interrupted", harness.state.value.presentation.lastAction)
+        assertTrue(harness.modeController.sessionEvents.any { event ->
+            event is ModeSessionEvent.ShotFailed &&
+                event.shotId == "shot-1" &&
+                event.reason == "mode switched"
+        })
+        assertTrue(harness.trace.snapshot().any { it.name == "capture.failed" })
+    }
+
+    @Test
+    fun `DFS-14 handleInterruptedShotFailure does not clear non-matching activeShot`() = runTest {
+        val otherShot = testShotRequest("shot-2", MediaType.PHOTO)
+        val harness = Harness(runningState().copy(
+            activeShot = otherShot,
+            captureStatus = CaptureStatus.SAVING
+        ))
+        val interruptedShot = testShotRequest("shot-1", MediaType.PHOTO)
+        harness.processor.handleInterruptedShotFailure(interruptedShot, "mode switched")
+
+        assertNotNull(harness.state.value.activeShot)
+        assertEquals("shot-2", harness.state.value.activeShot?.shotId)
+        assertEquals(CaptureStatus.SAVING, harness.state.value.captureStatus)
+        assertTrue(harness.modeController.sessionEvents.any { event ->
+            event is ModeSessionEvent.ShotFailed && event.shotId == "shot-1"
+        })
     }
 }

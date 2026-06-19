@@ -1,8 +1,12 @@
 package com.opencamera.app
 
+import com.opencamera.core.media.ResourceDiagnosticsSnapshot
 import com.opencamera.core.session.PerformanceLinkEvent
+import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SessionTraceEvent
 import com.opencamera.core.session.TraceEventDomain
+import com.opencamera.core.session.buildSessionDebugDump
+import com.opencamera.app.i18n.AppTextResolver
 
 internal enum class DevLogTab { KEY, CORE, ERROR, ALL }
 
@@ -62,3 +66,4 @@ internal data class DevLogRenderModel(
     val domainTabs: List<DomainTabCount> = emptyList(),
     val selectedDomain: TraceEventDomain? = null
 )
+

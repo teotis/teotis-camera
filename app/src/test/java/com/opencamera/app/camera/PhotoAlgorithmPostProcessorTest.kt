@@ -14,9 +14,11 @@ import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.toMetadataTags
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -145,6 +147,44 @@ class PhotoAlgorithmPostProcessorTest {
         assertEquals(input.outputPath, result.outputPath)
         assertEquals(input.outputHandle, result.outputHandle)
         assertTrue(result.pipelineNotes.contains("algorithm-render:failed:render-exception"))
+    }
+
+    @Test
+    fun `editor cancellation propagates instead of becoming recoverable diagnostic`() = runTest {
+        val processor = PhotoAlgorithmPostProcessor(
+            ThrowingPhotoAlgorithmEditor(CancellationException("job cancelled"))
+        )
+
+        assertFailsWith<CancellationException> {
+            processor.process(
+                photoResult(
+                    algorithmProfile = "photo-vivid",
+                    outputHandle = MediaOutputHandle(
+                        displayPath = "/tmp/cancel-photo.jpg",
+                        filePath = "/tmp/cancel-photo.jpg"
+                    )
+                )
+            )
+        }
+    }
+
+    @Test
+    fun `editor vm error propagates instead of becoming recoverable diagnostic`() = runTest {
+        val processor = PhotoAlgorithmPostProcessor(
+            ThrowingPhotoAlgorithmEditor(StackOverflowError("deep recursion"))
+        )
+
+        assertFailsWith<StackOverflowError> {
+            processor.process(
+                photoResult(
+                    algorithmProfile = "photo-vivid",
+                    outputHandle = MediaOutputHandle(
+                        displayPath = "/tmp/error-photo.jpg",
+                        filePath = "/tmp/error-photo.jpg"
+                    )
+                )
+            )
+        }
     }
 
     @Test

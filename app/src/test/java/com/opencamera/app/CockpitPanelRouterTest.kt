@@ -608,4 +608,239 @@ class CockpitPanelRouterTest {
         assertEquals(CockpitPanelRoute.None, result.route)
         assertFalse(result.route.isAnyPanelOpen)
     }
+
+    // --- 05-interaction-regression: Style card rail interaction tests ---
+
+    @Test
+    fun `ToggleStyleLab replaces CheckInStylePanel (mode switch re-entry)`() {
+        val initial = CockpitPanelUiState(
+            route = CockpitPanelRoute.CheckInStylePanel,
+            selectedFilterLabFamilyOverride = FilterLabFamily.PHOTO
+        )
+        val result = nextState(initial, CockpitPanelCommand.ToggleStyleLab)
+
+        assertEquals(CockpitPanelRoute.StyleLab, result.route)
+        assertTrue(result.isFilterAdjustmentVisible)
+    }
+
+    @Test
+    fun `ToggleStyleStrip from StyleLab replaces route to StyleStrip`() {
+        val initial = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        val result = nextState(initial, CockpitPanelCommand.ToggleStyleStrip)
+
+        assertEquals(CockpitPanelRoute.StyleStrip, result.route)
+    }
+
+    @Test
+    fun `StyleLab toggle open then AndroidBack returns to None`() {
+        var state = CockpitPanelUiState()
+        state = nextState(state, CockpitPanelCommand.ToggleStyleLab)
+        assertEquals(CockpitPanelRoute.StyleLab, state.route)
+        assertTrue(state.route.isAnyPanelOpen)
+
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+        assertFalse(state.route.isAnyPanelOpen)
+    }
+
+    @Test
+    fun `StyleStrip toggle open then AndroidBack returns to None`() {
+        var state = CockpitPanelUiState()
+        state = nextState(state, CockpitPanelCommand.ToggleStyleStrip)
+        assertEquals(CockpitPanelRoute.StyleStrip, state.route)
+        assertTrue(state.route.isAnyPanelOpen)
+
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+        assertFalse(state.route.isAnyPanelOpen)
+    }
+
+    @Test
+    fun `style preset card rail is visible only for StyleLab route`() {
+        assertFalse(shouldShowStylePresetCardRail(CockpitPanelRoute.None))
+        assertTrue(shouldShowStylePresetCardRail(CockpitPanelRoute.StyleLab))
+        assertFalse(shouldShowStylePresetCardRail(CockpitPanelRoute.StyleStrip))
+        assertFalse(shouldShowStylePresetCardRail(CockpitPanelRoute.CheckInStylePanel))
+        assertFalse(shouldShowStylePresetCardRail(CockpitPanelRoute.ColorLab))
+        assertFalse(shouldShowStylePresetCardRail(CockpitPanelRoute.Settings()))
+        assertFalse(shouldShowStylePresetCardRail(CockpitPanelRoute.QuickBubble))
+    }
+
+    @Test
+    fun `CheckInStylePanel toggle open then AndroidBack returns to None`() {
+        var state = CockpitPanelUiState()
+        state = nextState(state, CockpitPanelCommand.ToggleCheckInStylePanel)
+        assertEquals(CockpitPanelRoute.CheckInStylePanel, state.route)
+        assertTrue(state.route.isAnyPanelOpen)
+
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+        assertFalse(state.route.isAnyPanelOpen)
+    }
+
+    @Test
+    fun `full style interaction sequence - open StyleLab then dismiss via scrim`() {
+        var state = CockpitPanelUiState()
+
+        state = nextState(state, CockpitPanelCommand.ToggleStyleLab)
+        assertEquals(CockpitPanelRoute.StyleLab, state.route)
+        assertTrue(state.isFilterAdjustmentVisible)
+
+        // Scrim tap = DismissAll
+        state = nextState(state, CockpitPanelCommand.DismissAll)
+        assertEquals(CockpitPanelRoute.None, state.route)
+        assertFalse(state.isFilterAdjustmentVisible)
+    }
+
+    @Test
+    fun `style route switching - rapid open close open preserves correct state`() {
+        var state = CockpitPanelUiState()
+
+        state = nextState(state, CockpitPanelCommand.ToggleStyleLab)
+        assertEquals(CockpitPanelRoute.StyleLab, state.route)
+
+        state = nextState(state, CockpitPanelCommand.ToggleStyleLab)
+        assertEquals(CockpitPanelRoute.None, state.route)
+
+        state = nextState(state, CockpitPanelCommand.ToggleStyleLab)
+        assertEquals(CockpitPanelRoute.StyleLab, state.route)
+        assertTrue(state.isFilterAdjustmentVisible)
+    }
+
+    @Test
+    fun `style route does not trap mode track - mode switch closes CheckInStylePanel`() {
+        // Simulates: open CheckInStylePanel, then user taps mode track which calls DismissAll
+        var state = CockpitPanelUiState()
+        state = nextState(state, CockpitPanelCommand.ToggleCheckInStylePanel)
+        assertEquals(CockpitPanelRoute.CheckInStylePanel, state.route)
+
+        state = nextState(state, CockpitPanelCommand.DismissAll)
+        assertEquals(CockpitPanelRoute.None, state.route)
+        assertFalse(state.route.isAnyPanelOpen)
+    }
+
+    @Test
+    fun `style route does not trap mode track - mode switch closes StyleStrip`() {
+        var state = CockpitPanelUiState()
+        state = nextState(state, CockpitPanelCommand.ToggleStyleStrip)
+        assertEquals(CockpitPanelRoute.StyleStrip, state.route)
+
+        state = nextState(state, CockpitPanelCommand.DismissAll)
+        assertEquals(CockpitPanelRoute.None, state.route)
+        assertFalse(state.route.isAnyPanelOpen)
+    }
+
+    @Test
+    fun `quick panel open from StyleLab replaces route`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleQuickBubble)
+        assertEquals(CockpitPanelRoute.QuickBubble, state.route)
+    }
+
+    @Test
+    fun `DevConsole open from StyleLab replaces route`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleDevConsole)
+        assertEquals(CockpitPanelRoute.DevConsole, state.route)
+    }
+
+    @Test
+    fun `settings open from StyleLab replaces route`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleSettingsRoot)
+        assertEquals(CockpitPanelRoute.Settings(), state.route)
+    }
+
+    @Test
+    fun `ColorLab open from StyleLab replaces route`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleColorLab)
+        assertEquals(CockpitPanelRoute.ColorLab, state.route)
+    }
+
+    @Test
+    fun `DocumentBatchOrganizer from StyleLab replaces route`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+        assertEquals(CockpitPanelRoute.DocumentBatchOrganizer, state.route)
+    }
+
+    @Test
+    fun `AndroidBack from DocumentBatchOrganizer closes`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.DocumentBatchOrganizer)
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
+
+    @Test
+    fun `CloseDocumentBatchOrganizer from DocumentBatchOrganizer then AndroidBack no-op`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.DocumentBatchOrganizer)
+        state = nextState(state, CockpitPanelCommand.CloseDocumentBatchOrganizer)
+        assertEquals(CockpitPanelRoute.None, state.route)
+        assertTrue(state.isDocumentBatchOrganizerDismissed)
+
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
+
+    @Test
+    fun `existing settings routes not affected by style changes`() {
+        // Ensure Settings back chain still works correctly after style interaction
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleSettingsRoot)
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.ROOT), state.route)
+
+        state = nextState(state, CockpitPanelCommand.OpenPortraitLab)
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.PORTRAIT_LAB), state.route)
+
+        state = nextState(state, CockpitPanelCommand.SettingsBack)
+        assertEquals(CockpitPanelRoute.Settings(SettingsSubpage.ROOT), state.route)
+
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
+
+    @Test
+    fun `existing Color Lab routes not affected by style changes`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleColorLab)
+        assertEquals(CockpitPanelRoute.ColorLab, state.route)
+
+        state = nextState(state, CockpitPanelCommand.SelectFilterFamily(FilterLabFamily.VIDEO))
+        assertEquals(FilterLabFamily.VIDEO, state.selectedFilterLabFamilyOverride)
+        assertTrue(state.isFilterAdjustmentVisible)
+
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
+
+    @Test
+    fun `existing quick panel route not affected by style changes`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleQuickBubble)
+        assertEquals(CockpitPanelRoute.QuickBubble, state.route)
+
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
+
+    @Test
+    fun `existing DevConsole route not affected by style changes`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleDevConsole)
+        assertEquals(CockpitPanelRoute.DevConsole, state.route)
+
+        state = nextState(state, CockpitPanelCommand.AndroidBack)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
+
+    @Test
+    fun `existing document batch route not affected by style changes`() {
+        var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
+        state = nextState(state, CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+        assertEquals(CockpitPanelRoute.DocumentBatchOrganizer, state.route)
+
+        state = nextState(state, CockpitPanelCommand.CloseDocumentBatchOrganizer)
+        assertEquals(CockpitPanelRoute.None, state.route)
+    }
 }

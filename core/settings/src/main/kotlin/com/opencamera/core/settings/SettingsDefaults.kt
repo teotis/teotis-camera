@@ -311,5 +311,22 @@ val DEFAULT_WATERMARK_TEMPLATES: List<WatermarkTemplate> = listOf(
             WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
             WatermarkFrameBackground.SOURCE_VIVID_BLUR
         )
+    ),
+    WatermarkTemplate(
+        id = "night-street",
+        label = "Night Street",
+        tokenKeys = setOf("model", "datetime", "location", "camera-params"),
+        supportsFrameBorder = true,
+        kind = WatermarkTemplateKind.EXPANDED_FRAME,
+        allowedPlacements = setOf(
+            WatermarkTextPlacement.BOTTOM_LEFT,
+            WatermarkTextPlacement.BOTTOM_CENTER,
+            WatermarkTextPlacement.BOTTOM_RIGHT
+        ),
+        allowedFrameBackgrounds = setOf(
+            WatermarkFrameBackground.DARK,
+            WatermarkFrameBackground.SOURCE_BLUR,
+            WatermarkFrameBackground.SOURCE_VIVID_BLUR
+        )
     )
 )

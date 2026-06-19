@@ -90,7 +90,7 @@ class HumanisticModePluginTest {
         controller.onExit()
 
         assertEquals(listOf("humanistic.exit"), events)
-        assertEquals("Humanistic mode inactive", controller.snapshot.value.state.headline)
+        assertEquals("人文模式已退出", controller.snapshot.value.state.headline)
     }
 
     @Test
@@ -100,7 +100,7 @@ class HumanisticModePluginTest {
         controller.onExit()
 
         assertTrue(
-            controller.snapshot.value.state.detail.contains("Switch back to Humanistic"),
+            controller.snapshot.value.state.detail.contains("切换回人文模式以继续街拍"),
             "Exit detail should include resume hint"
         )
     }
@@ -187,7 +187,7 @@ class HumanisticModePluginTest {
         val signal = controller.handle(ModeIntent.SecondaryActionPressed)
 
         assertIs<ModeSignal.ShowHint>(signal)
-        assertTrue(signal.message.contains("Humanistic style:"))
+        assertTrue(signal.message.contains("当前风格："))
         assertTrue(events.any { it.startsWith("humanistic.style.selected.") })
         assertTrue(effects.isNotEmpty())
     }
@@ -239,13 +239,13 @@ class HumanisticModePluginTest {
     }
 
     @Test
-    fun `pro variant watermark text includes Professional label`(): Unit = runBlocking {
+    fun `pro variant watermark text includes professional label`(): Unit = runBlocking {
         val controller = createController()
 
         controller.handle(ModeIntent.ProActionPressed)
         val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
 
-        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Professional"))
+        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("专业"))
     }
 
     @Test
@@ -267,7 +267,7 @@ class HumanisticModePluginTest {
             )
         )
 
-        assertEquals("Humanistic capture in progress", controller.snapshot.value.state.headline)
+        assertEquals("街拍拍摄中", controller.snapshot.value.state.headline)
     }
 
     @Test
@@ -288,7 +288,7 @@ class HumanisticModePluginTest {
             )
         )
 
-        assertEquals("Humanistic photo saved", controller.snapshot.value.state.headline)
+        assertEquals("街拍照片已保存", controller.snapshot.value.state.headline)
     }
 
     @Test
@@ -298,10 +298,10 @@ class HumanisticModePluginTest {
         val snapshot = controller.snapshot.value
 
         assertEquals(ModeId.HUMANISTIC, snapshot.id)
-        assertEquals("Humanistic", snapshot.uiSpec.title)
-        assertEquals("Capture Humanistic", snapshot.uiSpec.shutterLabel)
-        assertEquals("Cycle Humanistic Style", snapshot.uiSpec.secondaryActionLabel)
-        assertEquals("Cycle Frame", snapshot.uiSpec.tertiaryActionLabel)
+        assertEquals("人文", snapshot.uiSpec.title)
+        assertEquals("拍摄人文", snapshot.uiSpec.shutterLabel)
+        assertEquals("切换滤镜", snapshot.uiSpec.secondaryActionLabel)
+        assertEquals("切换画幅", snapshot.uiSpec.tertiaryActionLabel)
         assertTrue(snapshot.state.isTertiaryActionEnabled)
         assertTrue(snapshot.state.isProActionEnabled)
     }
@@ -312,7 +312,7 @@ class HumanisticModePluginTest {
 
         controller.onEnter()
 
-        assertEquals("Humanistic mode active", controller.snapshot.value.state.headline)
+        assertEquals("人文模式已就绪", controller.snapshot.value.state.headline)
     }
 
     @Test
@@ -422,7 +422,7 @@ class HumanisticModePluginTest {
             .strategy.postProcessSpec
         assertEquals("Humanistic", postProcess.exifOverrides["SceneCaptureType"])
         assertEquals("Humanistic Original", postProcess.exifOverrides["HumanisticStyle"])
-        assertTrue(postProcess.watermarkText!!.contains("Humanistic"))
+        assertTrue(postProcess.watermarkText!!.contains("人文"))
         assertTrue(postProcess.watermarkText!!.contains("Original"))
     }
 

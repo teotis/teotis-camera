@@ -69,4 +69,34 @@ class WatermarkStyleForTest {
         assertEquals(WatermarkTextPlacement.BOTTOM_CENTER, style.textPlacement)
         assertEquals(WatermarkFrameBackground.SOURCE_LIGHT_BLUR, style.frameBackground)
     }
+
+    @Test
+    fun `watermarkStyleFor night-street returns nightStreetWatermarkStyle`() {
+        val settings = PhotoSettings(
+            nightStreetWatermarkStyle = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_RIGHT,
+                textScale = WatermarkTextScale.LARGE,
+                textOpacity = WatermarkTextOpacity.SUBTLE,
+                frameBackground = WatermarkFrameBackground.SOURCE_BLUR
+            )
+        )
+        val style = settings.watermarkStyleFor("night-street")
+        assertEquals(WatermarkTextPlacement.BOTTOM_RIGHT, style.textPlacement)
+        assertEquals(WatermarkTextScale.LARGE, style.textScale)
+        assertEquals(WatermarkTextOpacity.SUBTLE, style.textOpacity)
+        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, style.frameBackground)
+    }
+
+    @Test
+    fun `watermarkStyleFor professional-bottom-bar returns professionalBottomBarWatermarkStyle`() {
+        val settings = PhotoSettings(
+            professionalBottomBarWatermarkStyle = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+                frameBackground = WatermarkFrameBackground.WHITE
+            )
+        )
+        val style = settings.watermarkStyleFor("professional-bottom-bar")
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, style.textPlacement)
+        assertEquals(WatermarkFrameBackground.WHITE, style.frameBackground)
+    }
 }

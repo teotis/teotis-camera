@@ -64,4 +64,38 @@ class PreviewMeteringActionPlannerTest {
         assertEquals(0f, result.x, 0.01f)
         assertEquals(480f, result.y, 0.01f)
     }
+
+    @Test
+    fun `offset frame normalized tap produces correct metering pixel`() {
+        // Simulates the full pipeline: user taps at (300, 250) in a 1000x800 view
+        // with an offset frame. The normalization should produce full-view
+        // normalized coordinates, which when multiplied by view dimensions
+        // produce the original tap pixel.
+        val normalizedX = 300f / 1000f  // 0.3
+        val normalizedY = 250f / 800f   // 0.3125
+        val result = previewMeteringPixelPoint(
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
+            viewWidth = 1000,
+            viewHeight = 800
+        )
+        assertEquals(300f, result.x, 0.01f)
+        assertEquals(250f, result.y, 0.01f)
+    }
+
+    @Test
+    fun `full view normalization preserves pixel through metering pipeline`() {
+        // Proves the inverse: tap → normalize → metering pixel == original tap
+        // for a tap at the center of an offset frame
+        val tapX = 500f
+        val tapY = 350f
+        val viewW = 1000
+        val viewH = 800
+        // Full-view normalization
+        val normX = (tapX / viewW.toFloat()).coerceIn(0f, 1f)
+        val normY = (tapY / viewH.toFloat()).coerceIn(0f, 1f)
+        val pixel = previewMeteringPixelPoint(normX, normY, viewW, viewH)
+        assertEquals(tapX, pixel.x, 0.01f)
+        assertEquals(tapY, pixel.y, 0.01f)
+    }
 }

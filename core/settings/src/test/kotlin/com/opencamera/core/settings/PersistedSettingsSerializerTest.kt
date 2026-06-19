@@ -497,6 +497,100 @@ class PersistedSettingsSerializerTest {
     }
 
     @Test
+    fun `serializer round trips night-street watermark style`() {
+        val settings = PersistedSettings(
+            photo = PhotoSettings(
+                defaultWatermarkTemplateId = "night-street",
+                nightStreetWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.BOTTOM_RIGHT,
+                    textScale = WatermarkTextScale.COMPACT,
+                    textOpacity = WatermarkTextOpacity.SOFT,
+                    frameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR
+                )
+            )
+        )
+
+        val serialized = PersistedSettingsSerializer.toMap(settings)
+        assertEquals(
+            "night-street",
+            serialized["photo.defaultWatermarkTemplateId"]
+        )
+        assertEquals(
+            "bottom-right",
+            serialized["photo.watermark.nightStreet.position"]
+        )
+        assertEquals(
+            "compact",
+            serialized["photo.watermark.nightStreet.scale"]
+        )
+        assertEquals(
+            "soft",
+            serialized["photo.watermark.nightStreet.opacity"]
+        )
+        assertEquals(
+            "source-vivid-blur",
+            serialized["photo.watermark.nightStreet.background"]
+        )
+
+        val decoded = PersistedSettingsSerializer.fromMap(serialized)
+        assertEquals(settings, decoded)
+    }
+
+    @Test
+    fun `legacy settings without night-street keys load with safe defaults`() {
+        val legacyMap = mapOf(
+            "common.gridMode" to "rule-of-thirds",
+            "photo.defaultFilterProfileId" to "photo-rich"
+        )
+        val decoded = PersistedSettingsSerializer.fromMap(legacyMap)
+
+        assertEquals("photo-rich", decoded.photo.defaultFilterProfileId)
+        assertEquals(PersistedSettings().photo.nightStreetWatermarkStyle, decoded.photo.nightStreetWatermarkStyle)
+    }
+
+    @Test
+    fun `reducer updates night-street style without affecting other templates`() {
+        val initial = PersistedSettings()
+        val reduced = initial.reduce(
+            PersistedSettingsAction.UpdateWatermarkTextPlacement(
+                templateId = "night-street",
+                placement = WatermarkTextPlacement.BOTTOM_RIGHT
+            )
+        ).reduce(
+            PersistedSettingsAction.UpdateWatermarkTextScale(
+                templateId = "night-street",
+                scale = WatermarkTextScale.LARGE
+            )
+        ).reduce(
+            PersistedSettingsAction.UpdateWatermarkFrameBackground(
+                templateId = "night-street",
+                background = WatermarkFrameBackground.SOURCE_BLUR
+            )
+        )
+
+        assertEquals(
+            WatermarkTextPlacement.BOTTOM_RIGHT,
+            reduced.photo.nightStreetWatermarkStyle.textPlacement
+        )
+        assertEquals(
+            WatermarkTextScale.LARGE,
+            reduced.photo.nightStreetWatermarkStyle.textScale
+        )
+        assertEquals(
+            WatermarkFrameBackground.SOURCE_BLUR,
+            reduced.photo.nightStreetWatermarkStyle.frameBackground
+        )
+        assertEquals(
+            initial.photo.classicOverlayWatermarkStyle,
+            reduced.photo.classicOverlayWatermarkStyle
+        )
+        assertEquals(
+            initial.photo.professionalBottomBarWatermarkStyle,
+            reduced.photo.professionalBottomBarWatermarkStyle
+        )
+    }
+
+    @Test
     fun `default portrait depth strength is 50`() {
         val settings = PhotoSettings()
         assertEquals(50, settings.portraitDepthStrength)

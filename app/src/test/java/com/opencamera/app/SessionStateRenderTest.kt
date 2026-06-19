@@ -108,6 +108,68 @@ class SessionStateRenderTest {
         assertFalse(isStillResolutionToggleEnabled(state))
     }
 
+    // --- Package 04: Regression - settings/capability projection coherence ---
+
+    @Test
+    fun `displayed output size updates coherently after capability change`() {
+        val stateBefore = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableStillCaptureOutputSizes = listOf(
+                    StillCaptureOutputSize(width = 6000, height = 4000),
+                    StillCaptureOutputSize(width = 4000, height = 3000)
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                outputSize = null
+            )
+        )
+
+        val sizeBefore = displayedStillCaptureOutputSize(stateBefore)
+        assertEquals(StillCaptureOutputSize(width = 6000, height = 4000), sizeBefore)
+
+        val stateAfter = stateBefore.copy(
+            activeDeviceCapabilities = stateBefore.activeDeviceCapabilities.copy(
+                availableStillCaptureOutputSizes = listOf(
+                    StillCaptureOutputSize(width = 8000, height = 6000),
+                    StillCaptureOutputSize(width = 4000, height = 3000)
+                )
+            )
+        )
+
+        val sizeAfter = displayedStillCaptureOutputSize(stateAfter)
+        assertEquals(StillCaptureOutputSize(width = 8000, height = 6000), sizeAfter)
+    }
+
+    @Test
+    fun `displayed output size unchanged when only non-output capability fields change`() {
+        val state = defaultSessionState(
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableStillCaptureOutputSizes = listOf(
+                    StillCaptureOutputSize(width = 6000, height = 4000)
+                )
+            ),
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK,
+                enablePreviewSnapshots = true,
+                outputSize = null
+            )
+        )
+
+        val sizeBefore = displayedStillCaptureOutputSize(state)
+
+        val stateAfter = state.copy(
+            activeDeviceCapabilities = state.activeDeviceCapabilities.copy(
+                supportsFlashControl = false,
+                supportsAudioRecording = false
+            )
+        )
+
+        val sizeAfter = displayedStillCaptureOutputSize(stateAfter)
+        assertEquals(sizeBefore, sizeAfter)
+    }
+
     private fun defaultSessionState(
         activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         activeDeviceGraph: DeviceGraphSpec = DeviceGraphSpec.stillCapture(

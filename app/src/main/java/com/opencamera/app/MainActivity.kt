@@ -60,6 +60,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         get() = panelState.route
     private var selectedDevLogTab = DevLogTab.KEY
     private var latestDevLogRenderModel: DevLogRenderModel? = null
+    private var latestStorageSummary: StorageSummary? = null
     private var devLogClearCutoffs = DevLogClearCutoffs()
     private lateinit var devLogExporter: DevLogExporter
     private var latestQuickPanelSheetRenderModel: QuickPanelSheetRenderModel? = null
@@ -182,7 +183,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             views = views.filterLab,
             onOpenAdjustment = { control -> openSelectedFilterAdjustment(control) },
             onSelectFilter = { action -> applySettingsAction(action) },
-            isFilterAdjustmentVisible = { panelState.isFilterAdjustmentVisible }
+            isFilterAdjustmentVisible = { panelState.isFilterAdjustmentVisible },
+            onApplyStyle = { action -> applySettingsAction(action) },
+            cardRail = views.bottomCockpit.stylePresetCardRail
         )
         devConsoleRenderer = DevConsoleRenderer(this, views.devConsole)
         documentBatchRailRenderer = DocumentBatchRailRenderer(
@@ -288,9 +291,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     private fun render(state: SessionState) {
         latestSessionState = state
-        val text = AppTextResolver(this)
         applyLocale(state.settings.persisted)
-        val controls = sessionControlsRenderModel(state, text.sessionUiStrings())
+        val text = AppTextResolver(this)
+        val controls = sessionControlsRenderModel(state, text.sessionUiStrings(), text)
         val settingsPage = sessionSettingsPageRenderModel(state, text)
         val portraitLabPage = portraitLabPageRenderModel(state, text)
         val watermarkSelectorPage = watermarkLabSelectorRenderModel(state, text)
@@ -325,16 +328,18 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         if (panelState.isFilterAdjustmentVisible && activePanelRoute !is CockpitPanelRoute.ColorLab) {
             lightPaletteBaseSpec = filterLabPage.adjustmentPanel.renderSpec
         }
-        // Top panel: lightweight primary status
-        cockpitRenderer.renderTopTitle()
-        cockpitRenderer.renderModeTrack(modeTrack)
-        cockpitRenderer.renderModeAction(modeActionRenderModel(state))
-        settingsRenderer.renderPage(settingsPage)
-        settingsRenderer.renderTabs(panelState.selectedSettingsTab)
-        settingsRenderer.renderPortraitLabPage(portraitLabPage)
-        settingsRenderer.renderWatermarkSelectorPage(watermarkSelectorPage)
-        settingsRenderer.renderWatermarkDetailPage(watermarkDetailPage)
-        filterLabRenderer.renderPage(filterLabPage)
+        mainRenderer.renderPrimarySurfaces(
+            MainActivityPrimaryRenderModels(
+                modeTrack = modeTrack,
+                modeAction = modeActionRenderModel(state),
+                settingsPage = settingsPage,
+                selectedSettingsTab = panelState.selectedSettingsTab,
+                portraitLabPage = portraitLabPage,
+                watermarkSelectorPage = watermarkSelectorPage,
+                watermarkDetailPage = watermarkDetailPage,
+                filterLabPage = filterLabPage
+            )
+        )
         if (activePanelRoute is CockpitPanelRoute.CheckInStylePanel) {
             val checkInModel = checkInStylePanelRenderModel(state, text)
             filterLabRenderer.renderCheckInStylePanel(
@@ -372,7 +377,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         cockpitRenderer.renderRecordingIndicator(
             recordingIndicatorRenderModel(state, text)
         )
-        cockpitRenderer.renderCaptureOutput(sessionCaptureOutputText(state, sessionUiStrings()))
+        cockpitRenderer.renderCaptureOutput(sessionCaptureOutputText(state, sessionUiStrings(), text))
         cockpitRenderer.renderFocalLengthSlider(controls.focalLengthSlider)
         val sheet = quickPanelSheetRenderModel(state, text, sessionUiStrings())
         latestQuickPanelSheetRenderModel = sheet
@@ -387,9 +392,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
             text = text,
-            storageSummary = if (activePanelRoute is CockpitPanelRoute.DevConsole) {
-                runCatching { devLogExporter.storageSummary() }.getOrNull()
-            } else null,
+            storageSummary = latestStorageSummary,
             linkEvents = container.linkRecorder.snapshot(),
             deviceProbeSummary = latestDeviceProbeSummary,
             latestPipelineNotes = state.presentation.latestPipelineNotes,
@@ -476,14 +479,13 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     override fun refreshDevLogModel() {
         val state = latestSessionState ?: return
-        val summary = runCatching { devLogExporter.storageSummary() }.getOrNull()
         val model = devLogRenderModel(
             state = state,
             traceEvents = container.trace.snapshot(),
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
             text = AppTextResolver(this),
-            storageSummary = summary,
+            storageSummary = latestStorageSummary,
             linkEvents = container.linkRecorder.snapshot(),
             deviceProbeSummary = latestDeviceProbeSummary,
             latestPipelineNotes = state.presentation.latestPipelineNotes,
@@ -491,6 +493,14 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         )
         latestDevLogRenderModel = model
         devConsoleRenderer.render(model)
+        if (activePanelRoute is CockpitPanelRoute.DevConsole) {
+            lifecycleScope.launch {
+                latestStorageSummary = withContext(Dispatchers.IO) {
+                    runCatching { devLogExporter.storageSummary() }.getOrNull()
+                }
+                refreshDevLogModel()
+            }
+        }
     }
 
     override fun requestMicrophonePermission() {
@@ -519,7 +529,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
             else -> {
                 val text = AppTextResolver(this)
-                views.topBar.permissionStatus.text = text.permissionPermanentlyDenied()
+                views.topBar.permissionStatus.text = text.get(R.string.permission_permanently_denied)
                 views.topBar.permissionStatus.visibility = View.VISIBLE
                 views.topBar.permissionStatus.setOnClickListener {
                     val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -610,7 +620,11 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         lifecycleScope.launch {
             val result = container.sessionSettingsManager.apply(action)
             if (result is SessionSettingsApplyResult.BlockedByActiveShot) {
-                Toast.makeText(this@MainActivity, AppTextResolver(this@MainActivity).settingsBlockedByCapture(), Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@MainActivity,
+                    AppTextResolver(this@MainActivity).get(R.string.settings_blocked_by_capture),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -618,12 +632,12 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     override fun applySettingsControl(control: SettingsControlRenderModel?) {
         val text = AppTextResolver(this)
         if (control == null) {
-            Toast.makeText(this, text.settingsNotLoaded(), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, text.get(R.string.settings_not_loaded), Toast.LENGTH_SHORT).show()
             return
         }
         val action = control.nextAction
         if (action == null) {
-            Toast.makeText(this, text.settingsActionUnsupported(), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, text.get(R.string.settings_action_unsupported), Toast.LENGTH_SHORT).show()
             return
         }
         val targetValue = settingsActionTargetValue(action, text) ?: control.value
@@ -637,7 +651,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     ): String? {
         return when (action) {
             is PersistedSettingsAction.UpdateLivePhotoDefault -> text.onOff(action.enabled)
-            is PersistedSettingsAction.UpdateLiveSaveFormat -> action.format.label
+            is PersistedSettingsAction.UpdateLiveSaveFormat -> text.liveSaveFormatValueLabel(action.format)
             else -> null
         }
     }
@@ -902,15 +916,19 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
 
     override fun exportDevLog() {
-        runCatching {
-                val model = latestDevLogRenderModel ?: return
-                val file = devLogExporter.export(model.exportContent, type = selectedDevLogTab)
+        val model = latestDevLogRenderModel ?: return
+        val tab = selectedDevLogTab
+        lifecycleScope.launch {
+            runCatching {
+                val file = withContext(Dispatchers.IO) {
+                    devLogExporter.export(model.exportContent, type = tab)
+                }
                 views.preview.captureOutput.text = getString(R.string.toast_debug_log_exported, file.absolutePath)
-                Toast.makeText(this, getString(R.string.toast_debug_log_exported, file.absolutePath), Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.toast_debug_log_exported, file.absolutePath), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(this@MainActivity, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
             }
-            .onFailure {
-                Toast.makeText(this, R.string.toast_export_failed, Toast.LENGTH_SHORT).show()
-            }
+        }
     }
 
     override fun triggerVendorProbe() {
@@ -926,7 +944,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                     ?: withContext(Dispatchers.IO) {
                         com.opencamera.app.camera.VendorCameraProbe.summary(this@MainActivity)
                     }
-                val file = devLogExporter.exportVendorProbe(content)
+                val file = withContext(Dispatchers.IO) {
+                    devLogExporter.exportVendorProbe(content)
+                }
                 views.preview.captureOutput.text = getString(R.string.toast_vendor_probe_exported, file.absolutePath)
                 Toast.makeText(this@MainActivity, getString(R.string.toast_vendor_probe_exported, file.absolutePath), Toast.LENGTH_SHORT).show()
                 refreshDevLogModel()
@@ -937,32 +957,40 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 
     override fun cleanupDevLogByType(type: DevLogTab) {
-        runCatching {
-            val count = devLogExporter.cleanupByType(type)
-            devLogClearCutoffs = devLogClearCutoffs.markCleared(
-                type = type,
-                traceEvents = container.trace.snapshot(),
-                linkEvents = container.linkRecorder.snapshot()
-            )
-            Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
-            refreshDevLogModel()
-        }.onFailure {
-            Toast.makeText(this, R.string.toast_cleanup_failed, Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            runCatching {
+                val count = withContext(Dispatchers.IO) {
+                    devLogExporter.cleanupByType(type)
+                }
+                devLogClearCutoffs = devLogClearCutoffs.markCleared(
+                    type = type,
+                    traceEvents = container.trace.snapshot(),
+                    linkEvents = container.linkRecorder.snapshot()
+                )
+                Toast.makeText(this@MainActivity, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
+                refreshDevLogModel()
+            }.onFailure {
+                Toast.makeText(this@MainActivity, R.string.toast_cleanup_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
     override fun cleanupAllDevLogs() {
-        runCatching {
-            val count = devLogExporter.cleanupAll()
-            devLogClearCutoffs = devLogClearCutoffs.markCleared(
-                type = DevLogTab.ALL,
-                traceEvents = container.trace.snapshot(),
-                linkEvents = container.linkRecorder.snapshot()
-            )
-            Toast.makeText(this, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
-            refreshDevLogModel()
-        }.onFailure {
-            Toast.makeText(this, R.string.toast_cleanup_failed, Toast.LENGTH_SHORT).show()
+        lifecycleScope.launch {
+            runCatching {
+                val count = withContext(Dispatchers.IO) {
+                    devLogExporter.cleanupAll()
+                }
+                devLogClearCutoffs = devLogClearCutoffs.markCleared(
+                    type = DevLogTab.ALL,
+                    traceEvents = container.trace.snapshot(),
+                    linkEvents = container.linkRecorder.snapshot()
+                )
+                Toast.makeText(this@MainActivity, getString(R.string.dev_cleanup_done, count), Toast.LENGTH_SHORT).show()
+                refreshDevLogModel()
+            }.onFailure {
+                Toast.makeText(this@MainActivity, R.string.toast_cleanup_failed, Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

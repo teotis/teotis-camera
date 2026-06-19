@@ -135,9 +135,11 @@ class AppContainer(
 
     private val sceneMaskSource: PreviewSceneMaskSource = try {
         MlKitSelfiePreviewSceneMaskSource()
-    } catch (_: Throwable) {
-        NoOpPreviewSceneMaskSource()
+    } catch (e: Throwable) {
+        NoOpPreviewSceneMaskSource(initError = e.message ?: e::class.java.simpleName)
     }
+
+    private val extensionSelectorResolver = LazyCameraXExtensionSelectorResolver(appContext)
 
     private val cameraAdapter: CameraDeviceAdapter = CameraXCaptureAdapter(
         context = appContext,
@@ -145,7 +147,8 @@ class AppContainer(
         mediaPostProcessor = mediaPostProcessor,
         livePreviewFrameSource = livePreviewFrameSource,
         linkRecorder = linkRecorder,
-        extensionSelectorResolver = LazyCameraXExtensionSelectorResolver(appContext)
+        extensionSelectorResolver = extensionSelectorResolver,
+        sceneMaskSource = sceneMaskSource
     )
 
     val effectCapabilityResolver = EffectCapabilityResolver(

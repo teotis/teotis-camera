@@ -59,8 +59,8 @@ internal fun normalizedPreviewTapOrNull(
     if (activeFrameBounds != null) {
         if (!activeFrameBounds.isValid() || !activeFrameBounds.contains(tapX, tapY)) return null
         return NormalizedPreviewTap(
-            x = ((tapX - activeFrameBounds.left) / activeFrameBounds.width).coerceIn(0f, 1f),
-            y = ((tapY - activeFrameBounds.top) / activeFrameBounds.height).coerceIn(0f, 1f)
+            x = (tapX / viewWidth.toFloat()).coerceIn(0f, 1f),
+            y = (tapY / viewHeight.toFloat()).coerceIn(0f, 1f)
         )
     }
     return NormalizedPreviewTap(

@@ -57,11 +57,10 @@ internal data class CropBounds(
 }
 
 internal fun decidePhotoFrameRatioWork(result: ShotResult): ProcessorWork<PhotoFrameRatioPayload> {
-    if (result.mediaType != MediaType.PHOTO) {
-        return ProcessorWork.None
-    }
-    if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return ProcessorWork.DiagnosticSkip("unsupported-mime")
+    when (result.photoJpegInput()) {
+        PhotoJpegInput.NOT_PHOTO -> return ProcessorWork.None
+        PhotoJpegInput.UNSUPPORTED_MIME -> return ProcessorWork.DiagnosticSkip("unsupported-mime")
+        PhotoJpegInput.EDITABLE -> Unit
     }
     val frameRatio = FrameRatio.fromTag(result.metadata.customTags["frameRatio"])
         ?: return if (result.metadata.customTags.containsKey("frameRatio")) {
@@ -151,6 +150,8 @@ private fun orientedFrameRatioValue(
 internal class PhotoFrameRatioPostProcessor(
     private val editor: PhotoFrameRatioEditor
 ) : MediaPostProcessor {
+    override fun isApplicable(result: ShotResult): Boolean = result.mediaType == MediaType.PHOTO
+
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoFrameRatioWork(result)) {
             ProcessorWork.None -> result
@@ -276,6 +277,7 @@ internal class AndroidPhotoFrameRatioEditor(
                 warning = exifWarning
             )
         } catch (e: Throwable) {
+            e.rethrowIfCancellationOrFatal()
             Log.w(TAG, "frame ratio postprocess failed", e)
             ProcessorEditorResult.Failed("crop-exception")
         } finally {

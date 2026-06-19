@@ -80,11 +80,10 @@ internal interface PhotoAlgorithmEditor {
 }
 
 internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAlgorithmPayload> {
-    if (result.mediaType != MediaType.PHOTO) {
-        return ProcessorWork.None
-    }
-    if (!result.saveRequest.mimeType.equals("image/jpeg", ignoreCase = true)) {
-        return ProcessorWork.DiagnosticSkip("unsupported-mime")
+    when (result.photoJpegInput()) {
+        PhotoJpegInput.NOT_PHOTO -> return ProcessorWork.None
+        PhotoJpegInput.UNSUPPORTED_MIME -> return ProcessorWork.DiagnosticSkip("unsupported-mime")
+        PhotoJpegInput.EDITABLE -> Unit
     }
     val profile = result.metadata.algorithmProfile
         ?.trim()
@@ -186,6 +185,8 @@ internal class PhotoAlgorithmPostProcessor(
     private val maskProvider: SavedPhotoSceneMaskProvider? = null,
     private val maskBitmapSource: ((ProcessorTarget) -> android.graphics.Bitmap?)? = null
 ) : MediaPostProcessor {
+    override fun isApplicable(result: ShotResult): Boolean = result.mediaType == MediaType.PHOTO
+
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoAlgorithmWork(result)) {
             ProcessorWork.None -> result
@@ -238,9 +239,11 @@ internal class PhotoAlgorithmPostProcessor(
                         }
                     }
                 } catch (e: OutOfMemoryError) {
+                    Log.e(TAG, "Algorithm render failed: out of memory", e)
                     result.addPipelineNotes("algorithm-render:failed:oom")
                 } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+                    e.rethrowIfCancellationOrFatal()
+                    Log.w(TAG, "Algorithm render failed", e)
                     result.addPipelineNotes("algorithm-render:failed:render-exception")
                 } finally {
                     val resolvedMask = maskResolve
@@ -293,7 +296,8 @@ internal class PhotoAlgorithmPostProcessor(
                 }
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Algorithm mask resolve failed", e)
             decoded.recycle()
             MaskResolveResult.Fallback(listOf(
                 SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),
@@ -360,16 +364,14 @@ internal class AndroidPhotoAlgorithmEditor(
         val preservedExif: Map<String, String>
         try {
             preservedExif = readPreservedExif(sourceBytes)
-            val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+            mutableBitmap = MutableArgbBitmapDecoder.decode(sourceBytes)
                 ?: return@withContext ProcessorEditorResult.Failed("decode-failed")
-            mutableBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
-            if (mutableBitmap !== decoded) {
-                decoded.recycle()
-            }
         } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Algorithm decode failed: out of memory", e)
             return@withContext ProcessorEditorResult.Failed("decode-oom")
         } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Algorithm decode failed", e)
             return@withContext ProcessorEditorResult.Failed("decode-exception")
         }
         val t1 = System.currentTimeMillis()
@@ -383,9 +385,11 @@ internal class AndroidPhotoAlgorithmEditor(
             val encodedBytes = try {
                 encodeJpeg(mutableBitmap)
             } catch (e: OutOfMemoryError) {
+                Log.e(TAG, "Algorithm encode failed: out of memory", e)
                 return@withContext ProcessorEditorResult.Failed("encode-oom")
             } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+                e.rethrowIfCancellationOrFatal()
+                Log.w(TAG, "Algorithm encode failed", e)
                 return@withContext ProcessorEditorResult.Failed("encode-failed")
             }
             val t3 = System.currentTimeMillis()
@@ -406,9 +410,11 @@ internal class AndroidPhotoAlgorithmEditor(
             )
             PhotoAlgorithmApplied(exifWarning, timingNote)
         } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Algorithm style render failed: out of memory", e)
             ProcessorEditorResult.Failed("style-oom")
         } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Algorithm style render failed", e)
             ProcessorEditorResult.Failed("style-exception")
         } finally {
             mutableBitmap.recycle()
@@ -432,6 +438,7 @@ internal class AndroidPhotoAlgorithmEditor(
         val styleNotes = try {
             applyStyleWithMask(bitmap, spec, mask)
         } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Algorithm mask-aware style render failed: out of memory", e)
             return Pair(
                 ProcessorEditorResult.Failed("style-oom"),
                 listOf(
@@ -440,7 +447,8 @@ internal class AndroidPhotoAlgorithmEditor(
                 )
             )
         } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Algorithm mask-aware style render failed", e)
             return Pair(
                 ProcessorEditorResult.Failed("style-exception"),
                 listOf(
@@ -453,6 +461,7 @@ internal class AndroidPhotoAlgorithmEditor(
         val encodedBytes = try {
             encodeJpeg(bitmap)
         } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Algorithm mask-aware encode failed: out of memory", e)
             return Pair(
                 ProcessorEditorResult.Failed("encode-oom"),
                 styleNotes + listOf(
@@ -461,7 +470,8 @@ internal class AndroidPhotoAlgorithmEditor(
                 )
             )
         } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Algorithm mask-aware encode failed", e)
             return Pair(
                 ProcessorEditorResult.Failed("encode-failed"),
                 styleNotes + listOf(
@@ -1244,13 +1254,10 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
         }
 
         val preservedExif = readPreservedExif(sourceBytes)
-        val decoded = BitmapFactory.decodeByteArray(sourceBytes, 0, sourceBytes.size)
+        val workingBitmap = MutableArgbBitmapDecoder.decode(sourceBytes)
             ?: return@withContext result.addPipelineNotes(
                 "combined-render:failed:decode-failed"
             )
-
-        val workingBitmap = decoded.copy(Bitmap.Config.ARGB_8888, true)
-        if (workingBitmap !== decoded) decoded.recycle()
         val t1 = System.currentTimeMillis()
 
         var maskResolve: MaskResolveResult? = null
@@ -1287,7 +1294,15 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
             val encodedBytes = algorithmEditor.encodeJpeg(finalBitmap)
             val t4 = System.currentTimeMillis()
 
-            if (!algorithmEditor.writeEncodedBytes(target, encodedBytes)) {
+            val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
+                originalBytes = sourceBytes,
+                visibleBytesAfterExifRestore = encodedBytes,
+                templateId = watermarkWork.templateId,
+                originalWidth = workingBitmap.width,
+                originalHeight = workingBitmap.height
+            )
+            val finalBytes = archiveBytes ?: encodedBytes
+            if (!algorithmEditor.writeEncodedBytes(target, finalBytes)) {
                 return@withContext result.addPipelineNotes(
                     "combined-render:failed:output-unavailable"
                 )
@@ -1297,23 +1312,10 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
             val exifWarning = algorithmEditor.restorePreservedExif(target, preservedExif)
             val t5 = System.currentTimeMillis()
 
-            val visibleBytesAfterExif = ProcessorIOUtils.readSourceBytes(target, algorithmEditor.contentResolver)
-            val (archiveBytes, archiveWarning) = embedArchiveAfterVisibleWrite(
-                originalBytes = sourceBytes,
-                visibleBytesAfterExifRestore = visibleBytesAfterExif,
-                templateId = watermarkWork.templateId,
-                originalWidth = decoded.width,
-                originalHeight = decoded.height
-            )
-            if (archiveBytes != null) {
-                algorithmEditor.writeEncodedBytes(target, archiveBytes)
-            }
-            val t6 = System.currentTimeMillis()
-
             val timingNote = "combined-render:timing:${algorithmPayload.spec.profile}+${watermarkWork.templateId} " +
-                "size=${decoded.width}x${decoded.height} " +
+                "size=${workingBitmap.width}x${workingBitmap.height} " +
                 "decode=${t1 - t0}ms style=${t2 - t1}ms watermark=${t3 - t2}ms " +
-                "encode=${t4 - t3}ms write=${tWriteDone - t4}ms exif=${t5 - tWriteDone}ms archive=${t6 - t5}ms total=${t6 - t0}ms"
+                "encode=${t4 - t3}ms write+archive=${tWriteDone - t4}ms exif=${t5 - tWriteDone}ms total=${t5 - t0}ms"
 
             val warnings = listOfNotNull(exifWarning, archiveWarning)
                 .takeIf { it.isNotEmpty() }
@@ -1326,9 +1328,11 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
             )
             result.addPipelineNotes(*baseNotes.toTypedArray())
         } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Algorithm combined render failed: out of memory", e)
             result.addPipelineNotes("combined-render:failed:oom")
         } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Algorithm combined render failed", e)
             result.addPipelineNotes("combined-render:failed:render-exception")
         } finally {
             if (finalBitmap != null && finalBitmap !== workingBitmap) finalBitmap.recycle()
@@ -1388,9 +1392,11 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
                 }
             }
         } catch (e: OutOfMemoryError) {
+            Log.e(TAG, "Algorithm-only render failed: out of memory", e)
             result.addPipelineNotes("algorithm-render:failed:oom")
         } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Algorithm-only render failed", e)
             result.addPipelineNotes("algorithm-render:failed:render-exception")
         } finally {
             (maskResolve as? MaskResolveResult.Available)?.bitmap?.recycle()
@@ -1434,7 +1440,8 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
                 }
             }
         } catch (e: Throwable) {
-            Log.w(TAG, "algorithm postprocess failed", e)
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Algorithm mask resolve failed", e)
             decoded.recycle()
             MaskResolveResult.Fallback(listOf(
                 SceneMaskPipelineNotes.saved(SceneMaskSupport.UNSUPPORTED),

@@ -193,4 +193,45 @@ class PhotoWatermarkArchiveEditorTest {
         assertTrue(original.contentEquals(extracted.payload))
         assertEquals("retro-frame", extracted.manifest.watermarkTemplateId)
     }
+
+    @Test
+    fun `embedArchiveAfterVisibleWrite covers night-street template`() {
+        val original = minimalJpeg()
+        val visible = minimalJpeg()
+        val (bytes, warning) = embedArchiveAfterVisibleWrite(
+            originalBytes = original,
+            visibleBytesAfterExifRestore = visible,
+            templateId = "night-street",
+            originalWidth = 3000,
+            originalHeight = 2000
+        )
+        assertNotNull(bytes)
+        assertEquals(null, warning)
+
+        val extracted = OcwmJpegContainer.extractArchive(bytes!!)
+        assertNotNull(extracted)
+        assertTrue(original.contentEquals(extracted.payload))
+        assertEquals("night-street", extracted.manifest.watermarkTemplateId)
+    }
+
+    @Test
+    fun `buildWatermarkArchive covers night-street template`() {
+        val original = minimalJpeg()
+        val visible = minimalJpeg()
+        val result = buildWatermarkArchive(
+            originalBytes = original,
+            visibleBytes = visible,
+            templateId = "night-street",
+            originalWidth = 4000,
+            originalHeight = 3000
+        )
+        assertNotNull(result)
+        assertEquals("night-street", result.manifest.watermarkTemplateId)
+        assertEquals("after-upstream-postprocessors-before-watermark", result.manifest.pipelineStage)
+        assertEquals(4000, result.manifest.originalWidth)
+        assertEquals(3000, result.manifest.originalHeight)
+        assertTrue(original.contentEquals(result.payload))
+        assertEquals(sha256Hex(original), result.manifest.payloadSha256)
+        assertEquals(sha256Hex(visible), result.manifest.visibleImageSha256)
+    }
 }

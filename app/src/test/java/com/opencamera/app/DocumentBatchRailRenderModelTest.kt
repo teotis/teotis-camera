@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import androidx.annotation.StringRes
 import com.opencamera.app.i18n.AppTextResolver
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.mode.ModeId
@@ -29,11 +30,15 @@ import kotlin.test.assertTrue
 class DocumentBatchRailRenderModelTest {
 
     private val text = object : TestAppTextResolver() {
+        internal override fun get(@StringRes resId: Int): String = when (resId) {
+            R.string.document_batch_remove -> "Remove"
+            R.string.document_batch_crop_applied -> "Cropped"
+            R.string.document_batch_crop_skipped -> "Not cropped"
+            R.string.document_batch_crop_failed -> "Crop failed"
+            else -> super.get(resId)
+        }
+
         override fun documentBatchPageCount(count: Int): String = "$count pages"
-        override fun documentBatchRemoveLabel(): String = "Remove"
-        override fun documentBatchCropApplied(): String = "Cropped"
-        override fun documentBatchCropSkipped(): String = "Not cropped"
-        override fun documentBatchCropFailed(): String = "Crop failed"
     }
 
     private fun batchItem(

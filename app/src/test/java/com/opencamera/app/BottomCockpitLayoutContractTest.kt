@@ -29,6 +29,43 @@ class BottomCockpitLayoutContractTest {
     }
 
     @Test
+    fun `mode specific controls stay inside bottom cockpit with mode track`() {
+        val bottomSheet = layout.elementByAndroidId("bottomSheet")
+        val bottomSheetChildren = bottomSheet.childElementsByAndroidId()
+
+        assertTrue("filterStripScroll" in bottomSheetChildren)
+        assertTrue("buttonModeAction" in bottomSheetChildren)
+        assertTrue("modeTrackScroll" in bottomSheetChildren)
+    }
+
+    @Test
+    fun `constraint layout references stay within direct sibling scope`() {
+        val constraintLayouts =
+            layout.getElementsByTagName("androidx.constraintlayout.widget.ConstraintLayout")
+
+        for (layoutIndex in 0 until constraintLayouts.length) {
+            val constraintLayout = constraintLayouts.item(layoutIndex) as Element
+            val children = constraintLayout.childElements()
+            val siblingIds = children.mapNotNull { it.androidIdOrNull() }.toSet()
+
+            children.forEach { child ->
+                val attributes = child.attributes
+                for (attributeIndex in 0 until attributes.length) {
+                    val attribute = attributes.item(attributeIndex)
+                    if (!attribute.nodeName.startsWith("app:layout_constraint")) continue
+                    if (!attribute.nodeValue.startsWith("@id/")) continue
+
+                    val targetId = attribute.nodeValue.removePrefix("@id/")
+                    assertTrue(
+                        targetId in siblingIds,
+                        "${child.androidIdOrNull() ?: child.tagName} references non-sibling $targetId"
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
     fun `shutter row is lifted from screen edge without inflating the control stack`() {
         val bottomSheet = layout.elementByAndroidId("bottomSheet")
         val modeTrack = layout.elementByAndroidId("modeTrackScroll")
@@ -99,6 +136,23 @@ class BottomCockpitLayoutContractTest {
         error("Missing Android id $id")
     }
 
+    private fun Element.childElementsByAndroidId(): Set<String> = buildSet {
+        childElements().mapNotNullTo(this) { it.androidIdOrNull() }
+    }
+
+    private fun Element.childElements(): List<Element> = buildList {
+        val nodes = childNodes
+        for (index in 0 until nodes.length) {
+            (nodes.item(index) as? Element)?.let(::add)
+        }
+    }
+
+    private fun Element.androidIdOrNull(): String? =
+        getAttribute("android:id")
+            .removePrefix("@+id/")
+            .removePrefix("@id/")
+            .takeIf(String::isNotBlank)
+
     private fun Element.androidAttr(name: String): String =
         getAttribute("android:$name").takeIf(String::isNotBlank)
             ?: error("Missing android:$name on ${tagName}")
@@ -126,4 +180,33 @@ class BottomCockpitLayoutContractTest {
             File("app/src/main/res/$relativePath")
         ).firstOrNull(File::isFile) ?: error("Missing resource file $relativePath")
     }
+
+    @Test
+    fun `style preset card rail is direct child of bottom cockpit above mode track`() {
+        val bottomSheet = layout.elementByAndroidId("bottomSheet")
+        val bottomSheetChildren = bottomSheet.childElementsByAndroidId()
+
+        assertTrue("stylePresetCardRail" in bottomSheetChildren, "stylePresetCardRail must be in bottomSheet")
+        assertTrue("modeTrackScroll" in bottomSheetChildren, "modeTrackScroll must be in bottomSheet")
+
+        // Card rail must appear before mode track in the layout (above it)
+        val childOrder = bottomSheet.childElements().mapNotNull { it.androidIdOrNull() }
+        val railIndex = childOrder.indexOf("stylePresetCardRail")
+        val modeIndex = childOrder.indexOf("modeTrackScroll")
+        assertTrue(railIndex < modeIndex, "stylePresetCardRail must appear before modeTrackScroll")
+    }
+
+    @Test
+    fun `style preset card rail starts invisible`() {
+        val rail = layout.elementByAndroidId("stylePresetCardRail")
+        assertEquals("gone", rail.androidAttr("visibility"))
+    }
+
+    @Test
+    fun `style preset card rail fills width with wrap height`() {
+        val rail = layout.elementByAndroidId("stylePresetCardRail")
+        assertEquals("match_parent", rail.androidAttr("layout_width"))
+        assertEquals("wrap_content", rail.androidAttr("layout_height"))
+    }
+
 }

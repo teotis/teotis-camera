@@ -19,6 +19,16 @@ import com.opencamera.core.session.SessionState
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.ResetTarget
 
+internal fun <T : Any> orderedAdvancedFilterControlBindings(
+    viewsByControl: Map<FilterAdvancedControl, T>
+): List<Pair<T, FilterAdvancedControl>> {
+    return FilterAdvancedControl.entries.map { control ->
+        requireNotNull(viewsByControl[control]) {
+            "Missing view binding for advanced filter control $control"
+        } to control
+    }
+}
+
 internal class MainActivityActionBinder(
     private val views: MainActivityViews,
     private val snapshot: () -> MainActivityUiSnapshot,
@@ -300,41 +310,25 @@ internal class MainActivityActionBinder(
                 callbacks.toggleFilterAdjustmentMode()
             }
         }
-        views.filterLab.advancedExposure.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.EXPOSURE)
-        }
-        views.filterLab.advancedSoftGlow.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.SOFT_GLOW)
-        }
-        views.filterLab.advancedHalo.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.HALO)
-        }
-        views.filterLab.advancedGrain.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.GRAIN)
-        }
-        views.filterLab.advancedSharpness.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.SHARPNESS)
-        }
-        views.filterLab.advancedVignette.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.VIGNETTE)
-        }
-        views.filterLab.advancedHighlights.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.HIGHLIGHTS)
-        }
-        views.filterLab.advancedShadows.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.SHADOWS)
-        }
-        views.filterLab.advancedWarmBoost.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.WARM_BOOST)
-        }
-        views.filterLab.advancedCoolBoost.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.COOL_BOOST)
-        }
-        views.filterLab.advancedTemperatureShift.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.TEMPERATURE_SHIFT)
-        }
-        views.filterLab.advancedTintShift.setOnClickListener {
-            callbacks.applyAdvancedFilterControl(FilterAdvancedControl.TINT_SHIFT)
+        orderedAdvancedFilterControlBindings(
+            mapOf(
+                FilterAdvancedControl.EXPOSURE to views.filterLab.advancedExposure,
+                FilterAdvancedControl.SOFT_GLOW to views.filterLab.advancedSoftGlow,
+                FilterAdvancedControl.HALO to views.filterLab.advancedHalo,
+                FilterAdvancedControl.GRAIN to views.filterLab.advancedGrain,
+                FilterAdvancedControl.SHARPNESS to views.filterLab.advancedSharpness,
+                FilterAdvancedControl.VIGNETTE to views.filterLab.advancedVignette,
+                FilterAdvancedControl.HIGHLIGHTS to views.filterLab.advancedHighlights,
+                FilterAdvancedControl.SHADOWS to views.filterLab.advancedShadows,
+                FilterAdvancedControl.WARM_BOOST to views.filterLab.advancedWarmBoost,
+                FilterAdvancedControl.COOL_BOOST to views.filterLab.advancedCoolBoost,
+                FilterAdvancedControl.TEMPERATURE_SHIFT to views.filterLab.advancedTemperatureShift,
+                FilterAdvancedControl.TINT_SHIFT to views.filterLab.advancedTintShift
+            )
+        ).forEach { (button, control) ->
+            button.setOnClickListener {
+                callbacks.applyAdvancedFilterControl(control)
+            }
         }
         views.filterLab.paletteSurface.setOnPaletteTouchListener { colorAxis, toneAxis ->
             callbacks.handleFilterPaletteTouch(colorAxis, toneAxis)

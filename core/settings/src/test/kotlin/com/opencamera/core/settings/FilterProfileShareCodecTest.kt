@@ -125,4 +125,38 @@ class FilterProfileShareCodecTest {
 
         assertEquals("Missing required filter profile field: id", error.message)
     }
+
+    @Test
+    fun `metadata and share codecs round trip a fully populated render spec`() {
+        val renderSpec = FilterRenderSpec(
+            brightnessShift = 9,
+            contrast = 1.27f,
+            saturation = 0.83f,
+            warmthShift = -6,
+            tintShift = 4,
+            monochromeMix = 0.41f,
+            vignetteStrength = 0.22f,
+            softGlowStrength = 0.13f,
+            haloStrength = 0.17f,
+            grainStrength = 0.09f,
+            sharpnessBoost = 0.31f,
+            highlightCompression = 0.24f,
+            shadowLift = 0.19f,
+            warmBoost = 0.15f,
+            coolBoost = 0.07f
+        )
+        val profile = FilterProfile(
+            id = "custom-full-fields",
+            label = "Full Fields",
+            category = FilterProfileCategory.CUSTOM,
+            builtIn = false,
+            renderSpec = renderSpec
+        )
+
+        val metadataRecovered = FilterRenderSpec.fromMetadataTags(renderSpec.toMetadataTags())
+        val shareRecovered = FilterProfileShareCodec.import(FilterProfileShareCodec.export(profile))
+
+        assertEquals(renderSpec, metadataRecovered)
+        assertEquals(profile, shareRecovered)
+    }
 }

@@ -13,7 +13,9 @@ internal class FilterLabPanelRenderer(
     private val views: FilterLabViews,
     private val onOpenAdjustment: (FilterLabAdjustRenderModel?) -> Unit = {},
     private val onSelectFilter: (PersistedSettingsAction) -> Unit = {},
-    private val isFilterAdjustmentVisible: () -> Boolean = { true }
+    private val isFilterAdjustmentVisible: () -> Boolean = { true },
+    private val onApplyStyle: (PersistedSettingsAction) -> Unit = {},
+    private val cardRail: StylePresetCardRailView? = null
 ) {
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
@@ -24,6 +26,17 @@ internal class FilterLabPanelRenderer(
         views.supportingText.text = model.supportingText
         views.heroSummary.text = model.heroSummary
         views.heroSummary.isVisible = model.heroSummary.isNotEmpty()
+
+        // Card rail: render cards above mode track when available
+        val hasCardRail = model.stylePresetCardRail != null && model.stylePresetCardRail.cards.isNotEmpty()
+        cardRail?.let { rail ->
+            if (hasCardRail) {
+                rail.renderCards(model.stylePresetCardRail!!.cards, onApplyStyle)
+                rail.isVisible = true
+            } else {
+                rail.isVisible = false
+            }
+        }
         views.currentSummary.text = model.currentFilterSummary
         views.editingHint.text = model.editingHint
         views.footer.text = model.footer
@@ -40,12 +53,19 @@ internal class FilterLabPanelRenderer(
             renderTab(views.videoTab, model.videoTab)
         }
 
-        if (model.showFilterItems) {
+        val useCardRail = hasCardRail
+        if (model.showFilterItems && !useCardRail) {
             renderFilterSelectionList(model, onOpenAdjustment, onSelectFilter, isFilterAdjustmentVisible())
             renderSaveCustomControl(model.saveCustomControl, model.editingEnabled)
             views.selectionCard.isVisible = true
             views.currentSummary.isVisible = true
             views.sectionFiltersTitle.isVisible = true
+        } else if (useCardRail) {
+            views.selectionList.removeAllViews()
+            views.selectionCard.isVisible = false
+            views.currentSummary.isVisible = false
+            views.sectionFiltersTitle.isVisible = false
+            views.saveCustom.isVisible = false
         } else {
             views.selectionList.removeAllViews()
             views.selectionCard.isVisible = false
@@ -271,7 +291,7 @@ internal class FilterLabPanelRenderer(
         views.saveCustom.isVisible = false
 
         views.selectionList.removeAllViews()
-        views.sectionFiltersTitle.text = appText.checkInSceneTitle()
+        views.sectionFiltersTitle.text = appText.get(R.string.checkin_scene_title)
         views.sectionFiltersTitle.isVisible = true
         views.selectionCard.isVisible = true
 
@@ -324,7 +344,7 @@ internal class FilterLabPanelRenderer(
                     0,
                     R.style.Widget_OpenCamera_CompactButton
                 ).apply {
-                    text = appText.checkInSelectScene()
+                    text = appText.get(R.string.checkin_select_scene)
                     isAllCaps = false
                     isEnabled = model.editingEnabled
                     setOnClickListener { onSelectScenario(card.selectAction) }
@@ -342,7 +362,7 @@ internal class FilterLabPanelRenderer(
 
         if (model.styleItems.isNotEmpty()) {
             val styleTitle = TextView(context).apply {
-                text = appText.checkInStyleTitle()
+                text = appText.get(R.string.checkin_style_title)
                 textSize = 14f
                 setTextColor(ContextCompat.getColor(context, R.color.oc_text_secondary))
                 setPadding(0, 16.dp, 0, 8.dp)
@@ -377,7 +397,7 @@ internal class FilterLabPanelRenderer(
                     0,
                     R.style.Widget_OpenCamera_CompactButton
                 ).apply {
-                    text = appText.checkInUseStyle()
+                    text = appText.get(R.string.checkin_use_style)
                     isAllCaps = false
                     textSize = 12f
                     isEnabled = model.editingEnabled

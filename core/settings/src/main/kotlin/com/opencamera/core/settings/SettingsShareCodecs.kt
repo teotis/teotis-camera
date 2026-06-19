@@ -11,21 +11,9 @@ object FilterProfileShareCodec {
             appendLine("label=${profile.label}")
             appendLine("category=${profile.category.name}")
             appendLine("builtIn=${profile.builtIn}")
-            appendLine("brightnessShift=${renderSpec.brightnessShift}")
-            appendLine("contrast=${renderSpec.contrast}")
-            appendLine("saturation=${renderSpec.saturation}")
-            appendLine("warmthShift=${renderSpec.warmthShift}")
-            appendLine("tintShift=${renderSpec.tintShift}")
-            appendLine("monochromeMix=${renderSpec.monochromeMix}")
-            appendLine("vignetteStrength=${renderSpec.vignetteStrength}")
-            appendLine("softGlowStrength=${renderSpec.softGlowStrength}")
-            appendLine("haloStrength=${renderSpec.haloStrength}")
-            appendLine("grainStrength=${renderSpec.grainStrength}")
-            appendLine("sharpnessBoost=${renderSpec.sharpnessBoost}")
-            appendLine("highlightCompression=${renderSpec.highlightCompression}")
-            appendLine("shadowLift=${renderSpec.shadowLift}")
-            appendLine("warmBoost=${renderSpec.warmBoost}")
-            appendLine("coolBoost=${renderSpec.coolBoost}")
+            FilterRenderSpecCodec.toShareLines(renderSpec).forEach { (key, value) ->
+                appendLine("$key=$value")
+            }
         }
     }
 
@@ -52,23 +40,7 @@ object FilterProfileShareCodec {
                 FilterProfileCategory.valueOf(categoryValue)
             }.getOrElse { throw IllegalArgumentException("Unknown filter profile category: $categoryValue", it) },
             builtIn = values["builtIn"]?.toBooleanStrictOrNull() ?: false,
-            renderSpec = FilterRenderSpec(
-                brightnessShift = values["brightnessShift"]?.toIntOrNull() ?: 0,
-                contrast = values["contrast"]?.toFloatOrNull() ?: 1f,
-                saturation = values["saturation"]?.toFloatOrNull() ?: 1f,
-                warmthShift = values["warmthShift"]?.toIntOrNull() ?: 0,
-                tintShift = values["tintShift"]?.toIntOrNull() ?: 0,
-                monochromeMix = values["monochromeMix"]?.toFloatOrNull() ?: 0f,
-                vignetteStrength = values["vignetteStrength"]?.toFloatOrNull() ?: 0f,
-                softGlowStrength = values["softGlowStrength"]?.toFloatOrNull() ?: 0f,
-                haloStrength = values["haloStrength"]?.toFloatOrNull() ?: 0f,
-                grainStrength = values["grainStrength"]?.toFloatOrNull() ?: 0f,
-                sharpnessBoost = values["sharpnessBoost"]?.toFloatOrNull() ?: 0f,
-                highlightCompression = values["highlightCompression"]?.toFloatOrNull() ?: 0f,
-                shadowLift = values["shadowLift"]?.toFloatOrNull() ?: 0f,
-                warmBoost = values["warmBoost"]?.toFloatOrNull() ?: 0f,
-                coolBoost = values["coolBoost"]?.toFloatOrNull() ?: 0f
-            )
+            renderSpec = FilterRenderSpecCodec.fromShareValues(values)
         )
     }
 
@@ -101,17 +73,9 @@ object ImportedFilterProfilesSerializer {
 object ManualCaptureDraftSerializer {
     fun serialize(params: ManualCaptureParams): String {
         return buildString {
-            appendLine("rawEnabled=${params.rawEnabled}")
-            appendLine("iso=${params.iso ?: "auto"}")
-            appendLine("shutterSpeedMillis=${params.shutterSpeedMillis ?: "auto"}")
-            appendLine(
-                "exposureCompensationSteps=${params.exposureCompensationSteps ?: "auto"}"
-            )
-            appendLine(
-                "focusDistanceDiopters=${params.focusDistanceDiopters ?: "auto"}"
-            )
-            appendLine("apertureFNumber=${params.apertureFNumber ?: "auto"}")
-            appendLine("whiteBalanceKelvin=${params.whiteBalanceKelvin ?: "auto"}")
+            ManualCaptureParamsCodec.toDraftLines(params).forEach { (key, value) ->
+                appendLine("$key=$value")
+            }
         }.trim()
     }
 
@@ -128,18 +92,6 @@ object ManualCaptureDraftSerializer {
                         line.substring(separatorIndex + 1)
                 }
             }
-        return ManualCaptureParams(
-            rawEnabled = values["rawEnabled"]?.toBooleanStrictOrNull() ?: false,
-            iso = values["iso"].decodeAutoInt(),
-            shutterSpeedMillis = values["shutterSpeedMillis"].decodeAutoLong(),
-            exposureCompensationSteps = values["exposureCompensationSteps"].decodeAutoInt(),
-            focusDistanceDiopters = values["focusDistanceDiopters"].decodeAutoFloat(),
-            apertureFNumber = values["apertureFNumber"].decodeAutoFloat(),
-            whiteBalanceKelvin = values["whiteBalanceKelvin"].decodeAutoInt()
-        )
+        return ManualCaptureParamsCodec.fromDraftValues(values)
     }
 }
-
-private fun String?.decodeAutoInt(): Int? = this?.takeUnless { it == "auto" }?.toIntOrNull()
-private fun String?.decodeAutoLong(): Long? = this?.takeUnless { it == "auto" }?.toLongOrNull()
-private fun String?.decodeAutoFloat(): Float? = this?.takeUnless { it == "auto" }?.toFloatOrNull()

@@ -351,6 +351,104 @@ class PhotoWatermarkTemplateResolverTest {
     }
 
     @Test
+    fun `night street resolver with full structured tags produces correct title and lines`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "night-street",
+            watermarkText = "Night Street",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModel" to "X300 Ultra",
+                    "watermarkModeName" to "Scenery",
+                    "watermarkProfileName" to "Handheld",
+                    "watermarkDatetime" to "2026-06-15 22:30",
+                    "watermarkLocation" to "31.2304, 121.4737",
+                    "watermarkCameraParams" to "1/30s • f/1.8 • ISO 800",
+                    "watermarkFrameBackground" to "dark",
+                    "watermarkPosition" to "bottom-left"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("night-street", resolved.templateId)
+        assertEquals("X300 Ultra · Scenery Handheld", resolved.title)
+        assertEquals(WatermarkFrameBackground.DARK, resolved.frameBackground)
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, resolved.placement)
+        assertTrue(resolved.usesExpandedFrame)
+        assertTrue(resolved.supportingLines.any { it.contains("2026-06-15 22:30") })
+        assertTrue(resolved.supportingLines.any { it.contains("31.2304") })
+        assertTrue(resolved.supportingLines.any { it.contains("ISO 800") })
+    }
+
+    @Test
+    fun `night street resolver degrades gracefully with all missing fields`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "night-street",
+            watermarkText = "OpenCamera",
+            metadata = MediaMetadata(),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("night-street", resolved.templateId)
+        assertEquals("OpenCamera", resolved.title)
+        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, resolved.frameBackground)
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, resolved.placement)
+        assertTrue(resolved.usesExpandedFrame)
+        assertTrue(resolved.supportingLines.isEmpty())
+    }
+
+    @Test
+    fun `night street resolver clamps unsupported white background to source blur`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "night-street",
+            watermarkText = "Night Street",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkFrameBackground" to "white"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("night-street", resolved.templateId)
+        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, resolved.frameBackground)
+    }
+
+    @Test
+    fun `night street resolver allows source vivid blur background`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "night-street",
+            watermarkText = "Night Street",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkFrameBackground" to "source-vivid-blur"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("night-street", resolved.templateId)
+        assertEquals(WatermarkFrameBackground.SOURCE_VIVID_BLUR, resolved.frameBackground)
+    }
+
+    @Test
+    fun `night street resolver clamps source light blur to source blur`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "night-street",
+            watermarkText = "Night Street",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkFrameBackground" to "source-light-blur"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals("night-street", resolved.templateId)
+        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, resolved.frameBackground)
+    }
+
+    @Test
     fun `unknown template falls back to classic overlay and formats gps camera params`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "unsupported-template",

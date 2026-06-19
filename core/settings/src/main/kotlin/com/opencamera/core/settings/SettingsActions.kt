@@ -203,6 +203,7 @@ fun PhotoSettings.watermarkStyleFor(
         "pure-text" -> pureTextWatermarkStyle
         "blur-four-border" -> blurFourBorderWatermarkStyle
         "professional-bottom-bar" -> professionalBottomBarWatermarkStyle
+        "night-street" -> nightStreetWatermarkStyle
         else -> classicOverlayWatermarkStyle
     }
 }
@@ -236,6 +237,9 @@ private fun PhotoSettings.updateWatermarkStyle(
         )
         "professional-bottom-bar" -> copy(
             professionalBottomBarWatermarkStyle = transform(professionalBottomBarWatermarkStyle)
+        )
+        "night-street" -> copy(
+            nightStreetWatermarkStyle = transform(nightStreetWatermarkStyle)
         )
         else -> copy(
             classicOverlayWatermarkStyle = transform(classicOverlayWatermarkStyle)
