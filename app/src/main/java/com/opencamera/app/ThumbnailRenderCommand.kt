@@ -4,7 +4,7 @@ import com.opencamera.core.session.SavedMediaType
 
 internal sealed interface ThumbnailRenderCommand {
     data object NoOp : ThumbnailRenderCommand
-    data object Clear : ThumbnailRenderCommand
+    data object EmptyState : ThumbnailRenderCommand
     data class Load(
         val uri: String,
         val sourceIdentity: String = uri
@@ -20,10 +20,10 @@ internal fun nextThumbnailRenderCommand(
     return when {
         previousSourceIdentity == nextSourceIdentity && previousRequestedUri == nextRequestedUri -> ThumbnailRenderCommand.NoOp
         previousSourceIdentity == nextSourceIdentity && previousRequestedUri != nextRequestedUri -> {
-            if (nextRequestedUri == null) ThumbnailRenderCommand.Clear
+            if (nextRequestedUri == null) ThumbnailRenderCommand.EmptyState
             else ThumbnailRenderCommand.Load(nextRequestedUri, nextSourceIdentity!!)
         }
-        nextRequestedUri == null -> ThumbnailRenderCommand.Clear
+        nextRequestedUri == null -> ThumbnailRenderCommand.EmptyState
         else -> ThumbnailRenderCommand.Load(nextRequestedUri, nextSourceIdentity ?: nextRequestedUri)
     }
 }

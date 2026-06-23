@@ -95,6 +95,7 @@ class DefaultCameraSession(
     )
     private var pendingSwitchTraceHandle: TraceHandle? = null
     private var pendingSwitchSpan: PerformanceSpanSnapshot? = null
+    @Volatile private var pendingSwitchLensNode: LensNode? = null
     private var currentController: ModeController = createController(
         modeId = initialMode,
         deviceCapabilities = baseDeviceCapabilities,
@@ -375,6 +376,9 @@ class DefaultCameraSession(
             is SessionIntent.DocumentBatchRemoveItem -> handleDocumentBatchRemoveItem(intent.itemId)
             is SessionIntent.DocumentBatchMoveItem -> handleDocumentBatchMoveItem(intent.itemId, intent.direction)
             is SessionIntent.DocumentBatchReorder -> handleDocumentBatchReorder(intent.orderedItemIds)
+            is SessionIntent.DocumentBatchUpdateCropStatus -> handleDocumentBatchUpdateCropStatus(
+                intent.itemId, intent.cropStatus, intent.cropRect
+            )
             SessionIntent.DocumentBatchFinish -> handleDocumentBatchFinish()
             else -> error("Unexpected mode control intent: $intent")
         }
@@ -790,22 +794,27 @@ class DefaultCameraSession(
         if (hasMultipleLensNodes) {
             val targetLensNode = evaluateLensNode(clampedRatio, currentLensNode, lensNodeMap)
             if (targetLensNode != currentLensNode) {
-                val switchReason = "Zoom ${zoomLabel(clampedRatio)} crosses threshold for ${targetLensNode.label}"
-                val lensCorrelationId = "lens-${System.nanoTime()}"
-                val lensSpan = linkRecorder.startSpan(
-                    flow = "lens",
-                    stage = "switch_node",
-                    correlationId = lensCorrelationId,
-                    detail = switchReason,
-                    source = "DefaultCameraSession"
-                )
-                _effects.emit(
-                    SessionEffect.SwitchLensNode(
-                        lensNode = targetLensNode,
-                        reason = switchReason
+                // Skip duplicate SwitchLensNode if transition to this node is already pending
+                if (pendingSwitchLensNode != targetLensNode) {
+                    pendingSwitchLensNode = targetLensNode
+                    val switchReason = "Zoom ${zoomLabel(clampedRatio)} crosses threshold for ${targetLensNode.label}"
+                    val lensCorrelationId = "lens-${System.nanoTime()}"
+                    val lensSpan = linkRecorder.startSpan(
+                        flow = "lens",
+                        stage = "switch_node",
+                        correlationId = lensCorrelationId,
+                        detail = switchReason,
+                        source = "DefaultCameraSession"
                     )
-                )
-                linkRecorder.completeSpan(lensSpan, status = LinkEventStatus.COMPLETED)
+                    _effects.emit(
+                        SessionEffect.SwitchLensNode(
+                            lensNode = targetLensNode,
+                            reason = switchReason
+                        )
+                    )
+                    linkRecorder.completeSpan(lensSpan, status = LinkEventStatus.COMPLETED)
+                }
+                pendingSwitchLensNode = null
             }
             updateState(
                 activeDeviceGraph = resolveActiveDeviceGraph(
@@ -934,6 +943,21 @@ class DefaultCameraSession(
             .sorted()
     }
 
+    /**
+     * Computes a continuous preview zoom ratio for a given capture zoom ratio
+     * and sorted preview baseline list.
+     *
+     * Within each baseline interval [b_i, b_{i+1}], [previewZoomRatio] is computed
+     * so that the frame-box scale (previewZoom/captureZoom) transitions smoothly
+     * from [FRAME_BOX_SCALE_MAX] down to [FRAME_BOX_SCALE_MIN]. At [FRAME_BOX_SCALE_MIN]
+     * the ratio jumps to the next baseline (where frameBoxScale resets to [FRAME_BOX_SCALE_MAX]);
+     * because the jump is in the same direction as captureZoom increases, the visual frame-box
+     * size remains continuous.
+     *
+     * At exact baseline values, returns the baseline directly.
+     * Below all baselines: returns the first baseline.
+     * Above all baselines: caps at the last baseline.
+     */
     private fun computePreviewZoomRatioFromBases(
         captureZoom: Float,
         previewBases: List<Float>
@@ -945,41 +969,59 @@ class DefaultCameraSession(
             .distinct()
             .sorted()
         if (bases.isEmpty()) return normalizedCaptureZoom.coerceAtLeast(1f)
-        val hasUltrawideBase = bases.first() < 1f
-        if (normalizedCaptureZoom in bases && !hasUltrawideBase) return normalizedCaptureZoom
+        if (normalizedCaptureZoom <= bases.first()) return bases.first()
 
-        var selected = bases.first()
-        for (index in 1 until bases.size) {
-            val currentBase = bases[index - 1]
-            val nextBase = bases[index]
-            val switchAt = when {
-                hasUltrawideBase && nextBase == 1f -> 2f
-                else -> {
-                    // Switch when the frame box would shrink below MIN_PREVIEW_FRAME_SCALE
-                    // of the preview window, ensuring WYSIWYG fidelity during zoom.
-                    val frameBasedThreshold = currentBase / MIN_PREVIEW_FRAME_SCALE
-                    minOf(frameBasedThreshold, nextBase)
-                }
-            }
-            if (normalizedCaptureZoom + PREVIEW_BASE_SWITCH_EPSILON >= switchAt) {
-                selected = nextBase
-            } else {
-                break
+        // Find the interval [currentBase, nextBase] containing normalizedCaptureZoom.
+        // At exact baseline values, return the baseline directly.
+        for (index in 0 until bases.size - 1) {
+            val currentBase = bases[index]
+            val nextBase = bases[index + 1]
+            if (normalizedCaptureZoom == currentBase) return currentBase
+            if (normalizedCaptureZoom > currentBase && normalizedCaptureZoom < nextBase) {
+                return normalizedPreviewZoomContinuous(normalizedCaptureZoom, currentBase, nextBase)
+                    .coerceAtLeast(MIN_NON_ZERO_PREVIEW_ZOOM_RATIO)
             }
         }
-        return selected.coerceAtMost(normalizedCaptureZoom)
+        // Above all baselines: cap at last baseline
+        return bases.last()
+    }
+
+    /**
+     * Continuous preview zoom ratio within a [currentBase, nextBase] interval.
+     *
+     * `previewZoomRatio = clamp(s_max * captureZoom, currentBase, s_min * captureZoom)`
+     *
+     * When [nextBase] is null (beyond all baselines), caps at [currentBase].
+     */
+    private fun normalizedPreviewZoomContinuous(
+        captureZoom: Float,
+        currentBase: Float,
+        nextBase: Float?
+    ): Float {
+        if (nextBase == null) return currentBase
+        val upper = FRAME_BOX_SCALE_MAX * captureZoom
+        val lower = FRAME_BOX_SCALE_MIN * captureZoom
+        return if (lower > upper) {
+            currentBase
+        } else {
+            upper.coerceIn(lower, nextBase)
+        }
     }
 
     companion object {
         /** Relative hysteresis ratio for lens node switching (5% of current ratio). */
         internal const val LENS_NODE_HYSTERESIS_RATIO = 0.05f
         /**
-         * Minimum ratio of frame box size to preview window size before
-         * the preview baseline switches to the next zoom level.
-         * E.g. 0.7f means switch when frame < 70% of preview.
+         * Minimum frame-box scale relative to preview window (sqrt(0.6) ≈ 0.775).
+         * When frameBoxScale would drop below this, previewZoomRatio switches
+         * to the next higher baseline.
          */
-        private const val MIN_PREVIEW_FRAME_SCALE = 0.7f
-        private const val PREVIEW_BASE_SWITCH_EPSILON = 0.0001f
+        internal const val FRAME_BOX_SCALE_MIN = 0.775f
+        /**
+         * Maximum frame-box scale relative to preview window (sqrt(0.9) ≈ 0.949).
+         * Used as the starting scale at each baseline (closest to full preview).
+         */
+        internal const val FRAME_BOX_SCALE_MAX = 0.949f
         private const val MIN_NON_ZERO_PREVIEW_ZOOM_RATIO = 0.01f
     }
 
@@ -1546,6 +1588,22 @@ class DefaultCameraSession(
         )
     }
 
+    private fun handleDocumentBatchUpdateCropStatus(
+        itemId: String,
+        cropStatus: DocumentBatchCropStatus,
+        cropRect: CropRect?
+    ) {
+        val currentBatch = _state.value.presentation.documentBatch
+        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
+            updateState(lastAction = "Cannot update crop: batch is not active")
+            return
+        }
+        updateState(
+            documentBatch = currentBatch.updateItemCropStatus(itemId, cropStatus, cropRect),
+            lastAction = "Crop status updated for $itemId"
+        )
+    }
+
     private fun handleDocumentBatchFinish() {
         val currentBatch = _state.value.presentation.documentBatch
         if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
@@ -1699,6 +1757,7 @@ class DefaultCameraSession(
             deviceCapabilities.zoomRatioCapability
         )
         return baseGraph.copy(
+            activeLensFacing = runtimeConfiguration.lensFacing,
             preview = baseGraph.preview.copy(
                 zoomRatio = resolvedZoomRatio,
                 previewZoomRatio = resolvedPreviewZoomRatio,

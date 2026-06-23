@@ -24,7 +24,7 @@ class CaptureOutputFactory(
     private val context: Context
 ) {
     fun createPhotoOutputRequest(saveRequest: SaveRequest): PhotoOutputRequest {
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
         val displayName = saveRequest.buildDisplayName(stamp)
         val outputPath = "${saveRequest.relativePath}/$displayName"
 
@@ -58,7 +58,7 @@ class CaptureOutputFactory(
     }
 
     fun createVideoOutputRequest(saveRequest: SaveRequest): VideoOutputRequest {
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
         val displayName = saveRequest.buildDisplayName(stamp)
         val outputPath = "${saveRequest.relativePath}/$displayName"
 

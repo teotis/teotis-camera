@@ -286,7 +286,7 @@ class CheckInModePluginTest {
 
         val signal = controller.handle(ModeIntent.ProActionPressed)
         assertIs<ModeSignal.ShowHint>(signal)
-        assertTrue(signal.message.contains("超清"), "Should toggle to clarity scenario")
+        assertTrue(signal.message.contains("全清"), "Should toggle to clarity scenario")
 
         val signal2 = controller.handle(ModeIntent.ProActionPressed)
         assertIs<ModeSignal.ShowHint>(signal2)
@@ -563,7 +563,7 @@ class CheckInModePluginTest {
 
         val headline = controller.snapshot.value.state.headline
         assertTrue(headline.contains("single-frame fallback"), "Headline should indicate single-frame fallback, got: $headline")
-        assertTrue(headline.contains("超清"), "Headline should mention 超清, got: $headline")
+        assertTrue(headline.contains("全清"), "Headline should mention 全清, got: $headline")
     }
 
     @Test

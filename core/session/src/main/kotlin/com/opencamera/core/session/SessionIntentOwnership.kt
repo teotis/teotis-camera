@@ -37,6 +37,7 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     is SessionIntent.DocumentBatchRemoveItem,
     is SessionIntent.DocumentBatchMoveItem,
     is SessionIntent.DocumentBatchReorder,
+    is SessionIntent.DocumentBatchUpdateCropStatus,
     SessionIntent.DocumentBatchFinish -> SessionIntentOwner.MODE_CONTROL
 
     SessionIntent.PreviewHostAttached,

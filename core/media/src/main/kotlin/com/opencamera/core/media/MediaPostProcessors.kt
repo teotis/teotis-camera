@@ -1,6 +1,7 @@
 package com.opencamera.core.media
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -12,16 +13,101 @@ class CompositeMediaPostProcessor(
     private val onProcessorTimed: ((name: String, elapsedMs: Long) -> Unit)? = null
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
-        var current = result
+        return processWithLiveness(
+            PostProcessRequest(result = result),
+            PostProcessTimeSource { System.nanoTime() / 1_000_000L }
+        )
+    }
+
+    /**
+     * Liveness-aware entry point. When [PostProcessRequest.liveness] is non-null the
+     * composite enforces a per-processor deadline and stops the pipeline with a typed
+     * [PostProcessFailureCause.TIMEOUT] failure on expiry.
+     *
+     * Cooperative cancel ([CancellationException]) from outside the watchdog is always
+     * propagated — it is never misclassified as a timeout.
+     */
+    suspend fun processWithLiveness(
+        request: PostProcessRequest,
+        timeSource: PostProcessTimeSource
+    ): ShotResult {
+        val liveness = request.liveness
+        if (liveness == null) return processBody(request.result, timeSource, liveness)
+
+        // Entry deadline check
+        if (liveness.isExpired(timeSource.elapsedMillis())) {
+            val failure = PostProcessFailure(
+                stage = PostProcessFailureStage.COMPOSITE,
+                cause = PostProcessFailureCause.TIMEOUT,
+                integrity = PostProcessOutputIntegrity.POSSIBLY_MODIFIED,
+                disposition = PostProcessFailureDisposition.RECOVERABLE,
+                processorName = "entry"
+            )
+            return request.result
+                .addPipelineNotes("liveness:postprocess-timeout=entry")
+                .addStructuredPostProcessFailure(failure)
+        }
+
+        return processBody(request.result, timeSource, liveness)
+    }
+
+    private suspend fun processBody(
+        initial: ShotResult,
+        timeSource: PostProcessTimeSource,
+        liveness: PostProcessLivenessDeadline?
+    ): ShotResult {
+        var current = initial
         val processorTimings = mutableListOf<Pair<String, Long>>()
         var stopped = false
         for (processor in processors) {
             if (!processor.isApplicable(current)) {
                 continue
             }
+
+            // Check deadline before starting this processor
+            if (liveness != null && liveness.isExpired(timeSource.elapsedMillis())) {
+                val name = processor.diagnosticName()
+                val failure = PostProcessFailure(
+                    stage = PostProcessFailureStage.COMPOSITE,
+                    cause = PostProcessFailureCause.TIMEOUT,
+                    integrity = PostProcessOutputIntegrity.POSSIBLY_MODIFIED,
+                    disposition = PostProcessFailureDisposition.RECOVERABLE,
+                    processorName = name
+                )
+                return current
+                    .addPipelineNotes("liveness:postprocess-timeout=$name")
+                    .addStructuredPostProcessFailure(failure)
+            }
+
             val startNanos = System.nanoTime()
+
+            // Execute processor with remaining budget as deadline
+            val processorTimeoutMs = if (liveness != null) {
+                val remaining = liveness.deadlineElapsedMillis - timeSource.elapsedMillis()
+                remaining.coerceAtLeast(1L)
+            } else {
+                Long.MAX_VALUE
+            }
+
             current = try {
-                processor.process(current)
+                val result = withTimeoutOrNull(processorTimeoutMs) {
+                    processor.process(current)
+                }
+                if (result == null) {
+                    // Deadline fired — our watchdog, not cooperative cancel
+                    val name = processor.diagnosticName()
+                    val failure = PostProcessFailure(
+                        stage = PostProcessFailureStage.COMPOSITE,
+                        cause = PostProcessFailureCause.TIMEOUT,
+                        integrity = PostProcessOutputIntegrity.POSSIBLY_MODIFIED,
+                        disposition = PostProcessFailureDisposition.RECOVERABLE,
+                        processorName = name
+                    )
+                    return current
+                        .addPipelineNotes("liveness:postprocess-timeout=$name")
+                        .addStructuredPostProcessFailure(failure)
+                }
+                result
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Error) {
@@ -47,6 +133,11 @@ class CompositeMediaPostProcessor(
                     RecoveryAction.CONTINUE -> {
                         val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
                         current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                    }
+                    RecoveryAction.RECOVER_RELEASE -> {
+                        val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                        current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                        return current
                     }
                 }
             }

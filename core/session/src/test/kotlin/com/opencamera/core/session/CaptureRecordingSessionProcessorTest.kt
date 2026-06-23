@@ -4,6 +4,12 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.PostProcessFailure
+import com.opencamera.core.media.PostProcessFailureCause
+import com.opencamera.core.media.PostProcessFailureDisposition
+import com.opencamera.core.media.PostProcessFailureStage
+import com.opencamera.core.media.PostProcessOutputIntegrity
+import com.opencamera.core.media.PostProcessLivenessDeadline
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.ShotKind
@@ -943,5 +949,361 @@ class CaptureRecordingSessionProcessorTest {
         assertTrue(harness.modeController.sessionEvents.any { event ->
             event is ModeSessionEvent.ShotFailed && event.shotId == "shot-1"
         })
+    }
+
+    // ── Document batch liveness reducer branch (package 04) ──────────
+
+    @Test
+    fun `document mode ShotStarted arms liveness watchdog`() = runTest {
+        val documentState = runningState().copy(
+            activeMode = ModeId.DOCUMENT,
+            presentation = SessionPresentationState(
+                documentBatch = DocumentBatchState(
+                    batchId = "batch-1",
+                    status = DocumentBatchStatus.ACTIVE
+                )
+            )
+        )
+        val harness = Harness(documentState)
+        val shot = testShotRequest("doc-shot-1", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+
+        assertNotNull(harness.processor.documentBatchLivenessForTest())
+        assertEquals("doc-shot-1", harness.processor.documentBatchLivenessForTest()?.shotId)
+    }
+
+    @Test
+    fun `document mode watchdog fires and marks batch item FAILED`() = runTest {
+        val documentState = runningState().copy(
+            activeMode = ModeId.DOCUMENT,
+            presentation = SessionPresentationState(
+                documentBatch = DocumentBatchState(
+                    batchId = "batch-1",
+                    status = DocumentBatchStatus.ACTIVE
+                )
+            )
+        )
+        val harness = Harness(documentState)
+        val shot = testShotRequest("doc-shot-1", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+
+        harness.testDispatcher.scheduler.advanceTimeBy(
+            com.opencamera.core.media.PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        harness.testDispatcher.scheduler.runCurrent()
+
+        assertNull(harness.state.value.activeShot)
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+        val batch = harness.state.value.presentation.documentBatch
+        assertEquals(1, batch.items.size)
+        assertEquals(DocumentBatchCropStatus.FAILED, batch.items[0].cropStatus)
+        assertTrue(
+            harness.trace.snapshot().any { it.name == "liveness.document.force-release" }
+        )
+    }
+
+    @Test
+    fun `document batch normal auto-crop path unchanged when watchdog does not fire`() = runTest {
+        val documentState = runningState().copy(
+            activeMode = ModeId.DOCUMENT,
+            presentation = SessionPresentationState(
+                documentBatch = DocumentBatchState(
+                    batchId = "batch-1",
+                    status = DocumentBatchStatus.ACTIVE
+                )
+            )
+        )
+        val harness = Harness(documentState)
+        val shot = testShotRequest("doc-shot-1", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.ShotCompleted(
+            testShotResult("doc-shot-1", MediaType.PHOTO).copy(
+                pipelineNotes = listOf("document:auto-crop:applied")
+            )
+        ))
+
+        val batch = harness.state.value.presentation.documentBatch
+        assertEquals(1, batch.items.size)
+        assertEquals(DocumentBatchCropStatus.APPLIED, batch.items[0].cropStatus)
+        assertEquals("doc-shot-1", batch.latestItemId)
+        assertFalse(harness.trace.snapshot().any { it.name == "liveness.document.force-release" })
+        assertNull(harness.processor.documentBatchLivenessForTest())
+    }
+
+    // ── Package 05: Post-process liveness watchdog (non-document shots) ──
+
+    @Test
+    fun `post-process liveness armed for ordinary still capture`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-pl-1", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+
+        assertNotNull(harness.processor.postProcessLivenessForTest())
+        assertEquals("shot-pl-1", harness.processor.postProcessLivenessForTest()?.shotId)
+        assertNotNull(harness.processor.postProcessLivenessConfigSnapshotForTest())
+    }
+
+    @Test
+    fun `post-process liveness not armed for document mode`() = runTest {
+        val documentState = runningState().copy(
+            activeMode = ModeId.DOCUMENT,
+            presentation = SessionPresentationState(
+                documentBatch = DocumentBatchState(
+                    batchId = "batch-1",
+                    status = DocumentBatchStatus.ACTIVE
+                )
+            )
+        )
+        val harness = Harness(documentState)
+        val shot = testShotRequest("doc-shot-pl", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+
+        assertNull(harness.processor.postProcessLivenessForTest())
+        assertNotNull(harness.processor.documentBatchLivenessForTest())
+    }
+
+    @Test
+    fun `post-process liveness not armed for video`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-v-pl", MediaType.VIDEO)
+        harness.process(SessionIntent.ShotStarted(shot))
+
+        assertNull(harness.processor.postProcessLivenessForTest())
+    }
+
+    @Test
+    fun `ordinary still watchdog force-releases pendingPostprocess after deadline`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-pl-2", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.DataReceived("shot-pl-2", MediaType.PHOTO))
+        assertNotNull(harness.state.value.presentation.pendingPostprocess)
+
+        harness.testDispatcher.scheduler.advanceTimeBy(
+            PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        harness.testDispatcher.scheduler.runCurrent()
+
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+        assertNull(harness.state.value.presentation.captureReadiness)
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertTrue(
+            harness.trace.snapshot().any { it.name == "liveness.session.deadline-expired" }
+        )
+        assertTrue(
+            harness.trace.snapshot().any { it.name == "liveness.session.release" }
+        )
+    }
+
+    @Test
+    fun `ordinary still watchdog does not fire when ShotCompleted arrives in time`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-pl-3", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.DataReceived("shot-pl-3", MediaType.PHOTO))
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-pl-3", MediaType.PHOTO)))
+
+        harness.testDispatcher.scheduler.advanceTimeBy(
+            PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        harness.testDispatcher.scheduler.runCurrent()
+
+        assertFalse(
+            harness.trace.snapshot().any { it.name == "liveness.session.deadline-expired" }
+        )
+        assertNull(harness.processor.postProcessLivenessForTest())
+    }
+
+    @Test
+    fun `ShotCompleted with TIMEOUT failure emits DeadlineExpired event`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-pl-to", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.DataReceived("shot-pl-to", MediaType.PHOTO))
+
+        val result = testShotResult("shot-pl-to", MediaType.PHOTO).copy(
+            structuredPostProcessFailures = listOf(
+                PostProcessFailure(
+                    stage = PostProcessFailureStage.ALGORITHM,
+                    cause = PostProcessFailureCause.TIMEOUT,
+                    integrity = PostProcessOutputIntegrity.UNKNOWN,
+                    disposition = PostProcessFailureDisposition.UNRECOVERABLE,
+                    processorName = "algorithm-render"
+                )
+            )
+        )
+        harness.process(SessionIntent.ShotCompleted(result))
+
+        val deadlineTraces = harness.trace.snapshot().filter {
+            it.name == "liveness.session.deadline-expired"
+        }
+        assertTrue(deadlineTraces.isNotEmpty())
+        assertTrue(deadlineTraces.any { it.detail.contains("deadline-expired") })
+        assertTrue(
+            harness.trace.snapshot().any {
+                it.name == "liveness.session.release" &&
+                    it.detail.contains("shotId=shot-pl-to") &&
+                    it.detail.contains("reason=algorithm-render:timeout")
+            }
+        )
+    }
+
+    @Test
+    fun `ShotCompleted with non-TIMEOUT failure emits PipelineFailed event`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-pl-pf", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.DataReceived("shot-pl-pf", MediaType.PHOTO))
+
+        val result = testShotResult("shot-pl-pf", MediaType.PHOTO).copy(
+            structuredPostProcessFailures = listOf(
+                PostProcessFailure(
+                    stage = PostProcessFailureStage.WATERMARK,
+                    cause = PostProcessFailureCause.ENCODE,
+                    integrity = PostProcessOutputIntegrity.POSSIBLY_MODIFIED,
+                    disposition = PostProcessFailureDisposition.RECOVERABLE,
+                    processorName = null
+                )
+            )
+        )
+        harness.process(SessionIntent.ShotCompleted(result))
+
+        assertTrue(
+            harness.trace.snapshot().any { it.name == "liveness.session.pipeline-failed" }
+        )
+        assertTrue(
+            harness.trace.snapshot().any {
+                it.name == "liveness.session.release" &&
+                    it.detail.contains("reason=watermark:encode-failed")
+            }
+        )
+        assertFalse(
+            harness.trace.snapshot().any {
+                it.detail.contains("deadline-expired") &&
+                    it.detail.contains("shot-pl-pf")
+            }
+        )
+    }
+
+    @Test
+    fun `conservative kind watchdog force-releases activeShot after grace`() = runTest {
+        val harness = Harness()
+        val shot = multiFrameShotRequest("shot-mf-pl")
+        harness.process(SessionIntent.ShotStarted(shot))
+        assertEquals(shot, harness.state.value.activeShot)
+
+        // Advance past the deadline; cooperative-cancel trace should fire.
+        harness.testDispatcher.scheduler.advanceTimeBy(
+            PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        harness.testDispatcher.scheduler.runCurrent()
+        assertTrue(
+            harness.trace.snapshot().any { it.name == "liveness.session.cooperative-cancel" }
+        )
+
+        // Advance past the grace period; force-release should fire.
+        harness.testDispatcher.scheduler.advanceTimeBy(2_000L)
+        harness.testDispatcher.scheduler.runCurrent()
+
+        assertNull(harness.state.value.activeShot)
+        assertNull(harness.state.value.presentation.pendingPostprocess)
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertTrue(harness.processor.conservativeForceReleasedShotIdsForTest().contains("shot-mf-pl"))
+        val releaseTraces = harness.trace.snapshot().filter {
+            it.name == "liveness.session.release" &&
+                it.detail.contains("shotId=shot-mf-pl") &&
+                it.detail.contains("mode=PHOTO") &&
+                it.detail.contains("shotKind=MULTI_FRAME_CAPTURE")
+        }
+        assertTrue(releaseTraces.isNotEmpty())
+    }
+
+    @Test
+    fun `conservative kind watchdog does not fire when ShotCompleted arrives during grace`() = runTest {
+        val harness = Harness()
+        val shot = livePhotoShotRequest("shot-live-pl")
+        harness.process(SessionIntent.ShotStarted(shot))
+
+        // Advance past the deadline; cooperative-cancel fires.
+        harness.testDispatcher.scheduler.advanceTimeBy(
+            PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        harness.testDispatcher.scheduler.runCurrent()
+
+        // ShotCompleted arrives during grace period.
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-live-pl", MediaType.PHOTO)))
+
+        // Advance past grace; force-release should NOT fire.
+        harness.testDispatcher.scheduler.advanceTimeBy(2_000L)
+        harness.testDispatcher.scheduler.runCurrent()
+
+        assertFalse(harness.processor.conservativeForceReleasedShotIdsForTest().contains("shot-live-pl"))
+        assertFalse(
+            harness.trace.snapshot().any {
+                it.name == "liveness.session.release" &&
+                    it.detail.contains("shotId=shot-live-pl")
+            }
+        )
+    }
+
+    @Test
+    fun `late ShotCompleted after conservative force-release is rejected as stale`() = runTest {
+        val harness = Harness()
+        val shot = multiFrameShotRequest("shot-mf-stale")
+        harness.process(SessionIntent.ShotStarted(shot))
+
+        harness.testDispatcher.scheduler.advanceTimeBy(
+            PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS + 2_000L
+        )
+        harness.testDispatcher.scheduler.runCurrent()
+        assertTrue(harness.processor.conservativeForceReleasedShotIdsForTest().contains("shot-mf-stale"))
+
+        val previousLatestCapture = harness.state.value.presentation.latestCapturePath
+        harness.process(SessionIntent.ShotCompleted(testShotResult("shot-mf-stale", MediaType.PHOTO)))
+
+        // Stale completion must not update presentation.
+        assertEquals(previousLatestCapture, harness.state.value.presentation.latestCapturePath)
+        assertTrue(
+            harness.trace.snapshot().any {
+                it.name == "shot.completed.conservative-force-released.stale"
+            }
+        )
+    }
+
+    @Test
+    fun `pendingPostprocess carries liveness attachment for ordinary still`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-pl-att", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.DataReceived("shot-pl-att", MediaType.PHOTO))
+
+        val pending = harness.state.value.presentation.pendingPostprocess
+        assertNotNull(pending)
+        assertNotNull(pending.livenessAttachment)
+        assertNotNull(pending.livenessAttachment?.configSnapshot)
+        assertNotNull(pending.livenessAttachment?.liveness)
+        assertEquals("shot-pl-att", pending.livenessAttachment?.liveness?.shotId)
+    }
+
+    @Test
+    fun `liveness watchdog cancelled on ShotFailed for ordinary still`() = runTest {
+        val harness = Harness()
+        val shot = testShotRequest("shot-pl-fail", MediaType.PHOTO)
+        harness.process(SessionIntent.ShotStarted(shot))
+        harness.process(SessionIntent.DataReceived("shot-pl-fail", MediaType.PHOTO))
+
+        harness.process(SessionIntent.ShotFailed("shot-pl-fail", MediaType.PHOTO, "postprocess error"))
+
+        assertNull(harness.processor.postProcessLivenessForTest())
+        harness.testDispatcher.scheduler.advanceTimeBy(
+            PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        harness.testDispatcher.scheduler.runCurrent()
+        assertFalse(
+            harness.trace.snapshot().any {
+                it.name == "liveness.session.deadline-expired" &&
+                    it.detail.contains("shot-pl-fail")
+            }
+        )
     }
 }

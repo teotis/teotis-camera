@@ -105,7 +105,7 @@ class FilterLabRenderModelTest {
 
             assertTrue(model.humanisticTab.isSelected)
             assertEquals(
-                "Next Humanistic look\nStreet\n可用 • 3 looks | import/export deferred",
+                "Next Humanistic look\nStreet • 3 looks | import/export deferred",
                 model.cycleControl.buttonLabel
             )
             assertEquals(
@@ -412,9 +412,9 @@ class FilterLabRenderModelTest {
             }
 
             // Settings page availability labels must use localized text, not English enum names
-            assertFalse(settingsModel.commonSection.gridMode.buttonLabel.contains("Supported"),
+            assertFalse(settingsModel.photoSection.watermarkTemplate.buttonLabel.contains("Supported"),
                 "Settings buttonLabel should not contain English 'Supported'")
-            assertFalse(settingsModel.photoSection.livePhoto.buttonLabel.contains("Degraded"),
+            assertFalse(settingsModel.photoSection.portraitLab.buttonLabel.contains("Degraded"),
                 "Settings buttonLabel should not contain English 'Degraded'")
         }
 
@@ -660,7 +660,14 @@ class FilterLabRenderModelTest {
             )
 
             assertEquals("Warm / Deep Contrast", model.adjustmentPanel.selectedProfileLabel)
-            assertEquals("", model.adjustmentPanel.lightPalette.summary)
+            assertTrue(
+                model.adjustmentPanel.lightPalette.summary.contains("live color wash"),
+                "Color Lab needs explanatory copy beside the palette, summary=${model.adjustmentPanel.lightPalette.summary}"
+            )
+            assertTrue(
+                model.adjustmentPanel.lightPalette.supportingText.contains("Horizontal"),
+                "Color Lab still needs gesture guidance, hint=${model.adjustmentPanel.lightPalette.supportingText}"
+            )
         }
 
 
@@ -798,8 +805,8 @@ class FilterLabRenderModelTest {
 
 
         @Test
-        fun `styleSurfaceRole returns FILTER_STRIP for DOCUMENT mode`() {
-            assertEquals(StyleSurfaceRole.FILTER_STRIP, styleSurfaceRole(ModeId.DOCUMENT))
+        fun `styleSurfaceRole returns PANEL for DOCUMENT mode`() {
+            assertEquals(StyleSurfaceRole.PANEL, styleSurfaceRole(ModeId.DOCUMENT))
         }
 
         // --- FilterStripRenderModel tests ---
@@ -1026,6 +1033,83 @@ class FilterLabRenderModelTest {
                 selectedFamily = FilterLabFamily.HUMANISTIC
             )
             assertTrue(humanisticModel.stylePresetCardRail!!.supportingText.contains("Street"))
+        }
+
+        @Test
+        fun `style card titles are localized to Chinese in zh locale`() {
+            val state = defaultSessionState(activeMode = ModeId.PHOTO)
+            val model = filterLabPageRenderModel(state, TestAppTextResolver())
+            val rail = model.stylePresetCardRail!!
+
+            val titleByProfile = rail.cards.associate { it.profileId to it.title }
+            assertEquals("鲜明", titleByProfile["photo-vivid"])
+            assertEquals("原色", titleByProfile["photo-original"])
+            assertEquals("追光", titleByProfile["photo-chasing-light"])
+            assertEquals("浓郁", titleByProfile["photo-rich"])
+            assertEquals("质感", titleByProfile["photo-texture"])
+            assertEquals("黑白", titleByProfile["photo-bw"])
+        }
+
+        @Test
+        fun `style card mood labels are localized to Chinese in zh locale`() {
+            val state = defaultSessionState(activeMode = ModeId.PHOTO)
+            val model = filterLabPageRenderModel(state, TestAppTextResolver())
+            val rail = model.stylePresetCardRail!!
+
+            for (card in rail.cards) {
+                assertFalse(card.moodLabel.matches(Regex("[A-Za-z]+")),
+                    "Mood label should not be pure English: ${card.profileId} → ${card.moodLabel}")
+                assertTrue(card.moodLabel.isNotEmpty(),
+                    "Mood label should not be empty: ${card.profileId}")
+            }
+        }
+
+        @Test
+        fun `style card humanistic titles are localized`() {
+            val state = defaultSessionState(activeMode = ModeId.HUMANISTIC)
+            val model = filterLabPageRenderModel(
+                state, TestAppTextResolver(),
+                selectedFamily = FilterLabFamily.HUMANISTIC
+            )
+            val rail = model.stylePresetCardRail!!
+            val titleByProfile = rail.cards.associate { it.profileId to it.title }
+            assertEquals("街头", titleByProfile["humanistic-street"])
+            assertEquals("人文人像", titleByProfile["humanistic-portrait"])
+            assertEquals("生活", titleByProfile["humanistic-life"])
+        }
+
+        @Test
+        fun `style card render models carry filter spec for preview transform`() {
+            val state = defaultSessionState(activeMode = ModeId.PHOTO)
+            val model = filterLabPageRenderModel(state, TestAppTextResolver())
+
+            val rail = model.stylePresetCardRail!!
+            for (card in rail.cards) {
+                val spec = card.spec
+                assertNotNull(spec,
+                    "Card ${card.profileId} should have a FilterRenderSpec for preview transform")
+                // Verify the spec matches the profile's render spec
+                val expectedSpec = com.opencamera.core.settings.DEFAULT_FILTER_PROFILES
+                    .firstOrNull { it.id == card.profileId }?.renderSpec
+                assertEquals(expectedSpec, spec,
+                    "Card ${card.profileId} spec should match its FilterProfile renderSpec")
+            }
+        }
+
+        @Test
+        fun `style card preview has raw spec fields from filter render spec`() {
+            val state = defaultSessionState(activeMode = ModeId.PHOTO)
+            val model = filterLabPageRenderModel(state, TestAppTextResolver())
+
+            val rail = model.stylePresetCardRail!!
+            // Find a preset with a non-default spec (e.g. photo-vivid has saturation > 1)
+            val vividCard = rail.cards.firstOrNull { it.profileId == "photo-vivid" }
+            assertNotNull(vividCard)
+            val preview = vividCard.preview
+            // rawSaturation should be the spec's saturation value (>1 for vivid)
+            assertTrue(preview.rawSaturation >= 1f,
+                "Vivid card rawSaturation should be >= 1.0, got ${preview.rawSaturation}")
+            assertEquals(preview.rawSaturation, vividCard.spec!!.saturation)
         }
 
         // --- CheckInStylePanelRenderModel tests ---

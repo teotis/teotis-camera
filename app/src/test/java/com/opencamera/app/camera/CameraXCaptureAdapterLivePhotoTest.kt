@@ -466,6 +466,8 @@ class CameraXCaptureAdapterLivePhotoTest {
         assertEquals(LiveMotionSource.PREVIEW_RING_BUFFER, result.source)
         assertTrue(result.selectedFrameSet.frames.isNotEmpty())
         assertTrue(result.ringBufferDepthMillis > 0)
+        assertTrue(result.selectedFrameSet.diagnostics.any { it == "frame-source:active=true" })
+        assertTrue(result.diagnostics.any { it == "frame-source:active=true" })
     }
 
     @Test
@@ -480,6 +482,25 @@ class CameraXCaptureAdapterLivePhotoTest {
 
         assertEquals(LiveMotionSource.METADATA_ONLY, result.source)
         assertTrue(result.selectedFrameSet.frames.isEmpty())
+        assertTrue(result.selectedFrameSet.diagnostics.any { it == "frame-source:active=false" })
+        assertTrue(result.selectedFrameSet.diagnostics.any { it.contains("not-active") })
+    }
+
+    @Test
+    fun `resolveLiveMotionSource inactive reports lastStopReason and lastStartReason diagnostics`() {
+        val frameSource = FakeLivePreviewFrameSource()
+        frameSource.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+        frameSource.stop("unbind")
+
+        val result = resolveLiveMotionSource(
+            frameSource = frameSource,
+            shutterTimestampNanos = 1_000_000_000L,
+            spec = LivePhotoCaptureSpec()
+        )
+
+        assertEquals(LiveMotionSource.METADATA_ONLY, result.source)
+        assertTrue(result.diagnostics.any { it == "frame-source:last-stop-reason=unbind" })
+        assertTrue(result.diagnostics.any { it.startsWith("frame-source:last-start-reason=") })
     }
 
     @Test

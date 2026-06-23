@@ -16,13 +16,13 @@ class ThumbnailRenderCommandTest {
     }
 
     @Test
-    fun `null thumbnail path clears current image`() {
+    fun `null thumbnail path shows explicit empty state`() {
         val command = nextThumbnailRenderCommand(
             previousRequestedUri = "file:///tmp/thumb.jpg",
             nextRequestedUri = null
         )
 
-        assertEquals(ThumbnailRenderCommand.Clear, command)
+        assertEquals(ThumbnailRenderCommand.EmptyState, command)
     }
 
     @Test

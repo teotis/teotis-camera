@@ -1,6 +1,7 @@
 package com.opencamera.feature.document
 
 import com.opencamera.core.device.DeviceCapabilities
+import com.opencamera.core.effect.DocumentColorMode
 import com.opencamera.core.effect.DocumentEffect
 import com.opencamera.core.effect.EffectBridge
 import com.opencamera.core.effect.EffectSpec
@@ -21,6 +22,9 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.StillShotSessionEventText
+import com.opencamera.core.settings.SessionSettingsSnapshot
+import com.opencamera.core.settings.StylePresetCatalog
+import com.opencamera.core.settings.StylePresetFamily
 import com.opencamera.core.settings.watermarkStyleFor
 
 class DocumentModePlugin : CameraModePlugin {
@@ -44,7 +48,7 @@ private class DocumentModeController(
     private val uiSpec = ModeUiSpec(
         title = "Document",
         shutterLabel = "Scan Document",
-        secondaryActionLabel = "Cycle Scan Style"
+        secondaryActionLabel = "切换扫描场景"
     )
 
     override val id: ModeId = ModeId.DOCUMENT
@@ -60,10 +64,13 @@ private class DocumentModeController(
         val selectedWatermarkTemplate = selectedWatermarkTemplate()
         val watermarkStyle = context.settingsSnapshot.persisted.photo
             .watermarkStyleFor(selectedWatermarkTemplate.id)
+        val colorMode = resolveDocumentColorMode()
         return EffectSpec(listOf(
             DocumentEffect(
                 autoCrop = profile.autoCrop,
-                contrastProfile = if (enhancementEnabled()) profile.contrastLabel else null
+                contrastProfile = if (enhancementEnabled()) profile.contrastLabel else null,
+                colorMode = colorMode,
+                scanGuide = enhancementEnabled()
             ),
             WatermarkEffect(
                 templateId = selectedWatermarkTemplate.id,
@@ -95,7 +102,7 @@ private class DocumentModeController(
             },
             exifOverrides = basePostProcess.exifOverrides + buildMap {
                 put("SceneCaptureType", "Document")
-                put("ProcessingRendered", if (enhancementEnabled()) "enhanced-scan" else "basic-archive")
+                put("ProcessingRendered", if (enhancementEnabled()) "enhanced-scan:${resolveColorModeTag()}" else "basic-archive")
                 if (enhancementEnabled()) {
                     put("Contrast", profile.contrastLabel)
                 }
@@ -184,7 +191,7 @@ private class DocumentModeController(
             }
         )
         context.onEffectSpecChanged(buildEffectSpec())
-        return ModeSignal.ShowHint("Scan style: ${profile.label}")
+        return ModeSignal.ShowHint("扫描场景: ${profile.label} (色彩: ${resolveColorModeLabel()})")
     }
 
     override suspend fun handleTertiaryAction(): ModeSignal = ModeSignal.None
@@ -214,11 +221,29 @@ private class DocumentModeController(
     private fun currentProfile(): DocumentProfile = currentProfiles()[profileIndex]
 
     private fun profileSummary(profile: DocumentProfile): String {
+        val colorLabel = resolveColorModeLabel()
         return if (enhancementEnabled()) {
-            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Auto crop ${profile.autoCrop} | Contrast ${profile.contrastLabel} | Output optimized for scanned documents."
+            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Auto crop ${profile.autoCrop} | Contrast ${profile.contrastLabel} | Color: $colorLabel | Output optimized for scanned documents."
         } else {
             "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only (document enhancement is unavailable)."
         }
+    }
+
+    private fun resolveDocumentColorMode(): DocumentColorMode? {
+        val preset = StylePresetCatalog.selectedPreset(
+            context.settingsSnapshot.catalog,
+            context.settingsSnapshot.persisted,
+            StylePresetFamily.DOCUMENT
+        ) ?: return null
+        return DOCUMENT_PRESET_TO_COLOR_MODE[preset.profileId]
+    }
+
+    private fun resolveColorModeLabel(): String {
+        return COLOR_MODE_LABELS[resolveDocumentColorMode()] ?: COLOR_MODE_LABELS[DocumentColorMode.COLOR_NEUTRAL]!!
+    }
+
+    private fun resolveColorModeTag(): String {
+        return (resolveDocumentColorMode() ?: DocumentColorMode.COLOR_NEUTRAL).tagValue
     }
 
     private data class DocumentProfile(
@@ -230,6 +255,20 @@ private class DocumentModeController(
     )
 
     companion object {
+        private val COLOR_MODE_LABELS = mapOf(
+            DocumentColorMode.COLOR_NEUTRAL to "原色",
+            DocumentColorMode.COLOR_ENHANCED to "增强",
+            DocumentColorMode.GRAYSCALE to "灰度",
+            DocumentColorMode.BLACK_AND_WHITE to "黑白"
+        )
+
+        private val DOCUMENT_PRESET_TO_COLOR_MODE = mapOf(
+            "doc-color-neutral" to DocumentColorMode.COLOR_NEUTRAL,
+            "doc-color-enhanced" to DocumentColorMode.COLOR_ENHANCED,
+            "doc-grayscale" to DocumentColorMode.GRAYSCALE,
+            "doc-bw" to DocumentColorMode.BLACK_AND_WHITE
+        )
+
         private val ENHANCED_PROFILES = listOf(
             DocumentProfile(
                 id = "receipt",

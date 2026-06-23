@@ -17,6 +17,11 @@ internal class CameraXLivePreviewFrameSource(
     private val _isActive = AtomicBoolean(false)
     override val isActive: Boolean get() = _isActive.get()
 
+    @Volatile override var lastStartReason: String? = null
+        private set
+    @Volatile override var lastStopReason: String? = null
+        private set
+
     private var buffer: FrameRingBuffer? = null
     private val capturedFrames = LinkedHashMap<String, CapturedPreviewYuvFrame>()
     private var frameCounter = 0L
@@ -26,6 +31,7 @@ internal class CameraXLivePreviewFrameSource(
             Log.w(TAG, "Already active, ignoring start")
             return
         }
+        lastStartReason = "policy=target-fps=${policy.targetFps},maxFrames=${policy.maxFrames}"
         buffer = FrameRingBuffer(policy)
         synchronized(capturedFrames) {
             capturedFrames.clear()
@@ -38,6 +44,7 @@ internal class CameraXLivePreviewFrameSource(
         if (!_isActive.getAndSet(false)) {
             return
         }
+        lastStopReason = reason
         buffer?.clear()
         buffer = null
         synchronized(capturedFrames) {

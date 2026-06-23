@@ -85,6 +85,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DefaultCameraSessionTest {
@@ -898,14 +899,17 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         // captureZoom = 3.0 → bases [1.0, 2.0, 5.0]
-        // 1.0→2.0 switchAt=1.0/0.7≈1.43 → selected=2.0
-        // 2.0→5.0 switchAt=2.0/0.7≈2.86 → selected=5.0
-        // previewZoom = min(5.0, 3.0) = 3.0 (WYSIWYG)
+        // switchAt 2.0→5.0 = 2.0/0.775 ≈ 2.58; 3.0 >= 2.58 → base 5.0
+        // Continuous: min(0.949*3.0, 5.0) = 2.847
         session.dispatch(SessionIntent.ApplyZoomRatio(3.0f))
         advanceUntilIdle()
 
         assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.zoomRatio)
-        assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        val previewZoom3 = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+        assertTrue(
+            previewZoom3 >= 2.8f && previewZoom3 <= 2.9f,
+            "At 3.0x: expected ≈2.847, got $previewZoom3"
+        )
     }
 
     @Test
@@ -929,19 +933,18 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         // captureZoom = 2.5 → bases [1.0, 2.0, 5.0]
-        // 1.0→2.0 switchAt=1.43, 2.5 >= 1.43 → selected=2.0
-        // 2.0→5.0 switchAt=2.86, 2.5 < 2.86 → break
-        // previewZoom = min(2.0, 2.5) = 2.0
+        // switchAt 2.0→5.0 = 2.0/0.775 ≈ 2.58; 2.5 < 2.58 → base 2.0
+        // Continuous: min(0.949*2.5, 5.0) = 2.372
         session.dispatch(SessionIntent.ApplyZoomRatio(2.5f))
         advanceUntilIdle()
-        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        val at25 = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+        assertTrue(at25 >= 2.3f && at25 <= 2.45f, "At 2.5x: expected ≈2.372, got $at25")
 
-        // captureZoom = 3.5 → bases [1.0, 2.0, 5.0]
-        // 2.0→5.0 switchAt=2.86, 3.5 >= 2.86 → selected=5.0
-        // previewZoom = min(5.0, 3.5) = 3.5 (WYSIWYG)
+        // captureZoom = 3.5 → switchAt 2.58 passed → base 5.0; continuous: min(0.949*3.5, 5.0) = 3.322
         session.dispatch(SessionIntent.ApplyZoomRatio(3.5f))
         advanceUntilIdle()
-        assertEquals(3.5f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        val at35 = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+        assertTrue(at35 >= 3.25f && at35 <= 3.4f, "At 3.5x: expected ≈3.322, got $at35")
     }
 
     @Test
@@ -964,14 +967,14 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.Boot)
         advanceUntilIdle()
 
-        // captureZoom = 4.5 → bases [1.0, 2.0, 5.0]
-        // 2.0→5.0 switchAt=2.86, 4.5 >= 2.86 → selected=5.0
-        // previewZoom = min(5.0, 4.5) = 4.5 (WYSIWYG)
+        // captureZoom = 4.5 → bases [1.0, 2.0, 5.0]; interval [2.0, 5.0]
+        // Continuous: min(0.949*4.5, 5.0) = 4.271
         session.dispatch(SessionIntent.ApplyZoomRatio(4.5f))
         advanceUntilIdle()
-        assertEquals(4.5f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        val at45 = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+        assertTrue(at45 >= 4.2f && at45 <= 4.35f, "At 4.5x: expected ≈4.271, got $at45")
 
-        // captureZoom = 6.0 → previewZoom = min(5.0, 6.0) = 5.0
+        // captureZoom = 6.0 → above all baselines → cap at 5.0
         session.dispatch(SessionIntent.ApplyZoomRatio(6.0f))
         advanceUntilIdle()
         assertEquals(5.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
@@ -1697,7 +1700,7 @@ class DefaultCameraSessionTest {
         assertEquals("bottom-center", shot.saveRequest.metadata.customTags["watermarkPosition"])
         assertEquals("1.0", shot.saveRequest.metadata.customTags["watermarkTextScale"])
         assertEquals("0.8", shot.saveRequest.metadata.customTags["watermarkTextOpacity"])
-        assertEquals("source-vivid-blur", shot.saveRequest.metadata.customTags["watermarkFrameBackground"])
+        assertEquals("white", shot.saveRequest.metadata.customTags["watermarkFrameBackground"])
         assertEquals("photo-rich", shot.postProcessSpec.algorithmProfile)
     }
 
@@ -2357,11 +2360,13 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
 
         assertEquals(LensFacing.BACK, session.state.value.activeDeviceGraph.preferredLensFacing)
+        assertEquals(LensFacing.BACK, session.state.value.activeDeviceGraph.activeLensFacing)
 
         session.dispatch(SessionIntent.LensFacingToggled)
         advanceUntilIdle()
 
         assertEquals(LensFacing.FRONT, session.state.value.activeDeviceGraph.preferredLensFacing)
+        assertEquals(LensFacing.FRONT, session.state.value.activeDeviceGraph.activeLensFacing)
         assertEquals("Switched to front lens", session.state.value.lastAction)
 
         session.dispatch(SessionIntent.SwitchMode(ModeId.VIDEO))
@@ -2369,6 +2374,7 @@ class DefaultCameraSessionTest {
 
         assertEquals(ModeId.VIDEO, session.state.value.activeMode)
         assertEquals(LensFacing.FRONT, session.state.value.activeDeviceGraph.preferredLensFacing)
+        assertEquals(LensFacing.FRONT, session.state.value.activeDeviceGraph.activeLensFacing)
     }
 
     @Test
@@ -4927,24 +4933,29 @@ class DefaultCameraSessionTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
         // twoNodeMap: WIDE(0f)→base=1.0, TELE(2.0f)→base=2.0 → bases [1.0, 2.0]
-        // 1.0→2.0 switchAt = 1.0/0.7 ≈ 1.43
-        // At 1.4f (< 1.43): stays at base 1.0, previewZoom = min(1.0, 1.4) = 1.0
+        // switchAt = 1.0 / 0.775 ≈ 1.29
+        // At 1.0f: at baseline, returns 1.0
         assertEquals(1.0f, session.computePreviewZoomRatio(1.0f, twoNodeMap))
-        assertEquals(1.0f, session.computePreviewZoomRatio(1.4f, twoNodeMap))
-        // At 1.5f (>= 1.43): switches to base 2.0, previewZoom = min(2.0, 1.5) = 1.5 (WYSIWYG)
-        assertEquals(1.5f, session.computePreviewZoomRatio(1.5f, twoNodeMap))
+        // At 1.2f (< switchAt): still in interval, continuous formula gives 1.163
+        val at12 = session.computePreviewZoomRatio(1.2f, twoNodeMap)
+        assertTrue(at12 >= 1.0f && at12 <= 2.0f, "Expected between 1.0 and 2.0, got $at12")
+        // At 1.5f (>= switchAt): switches to base 2.0, continuous formula gives min(0.949*1.5, 2.0)=1.424
+        val at15 = session.computePreviewZoomRatio(1.5f, twoNodeMap)
+        assertTrue(at15 >= 1.4f && at15 <= 1.45f, "Expected ≈1.424, got $at15")
     }
 
     @Test
     fun `computePreviewZoomRatio switches to next preview base when frame scale drops below threshold`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
-        // twoNodeMap gives bases [1.0, 2.0]; switchAt = 1.0/0.7 ≈ 1.43
-        // Below threshold: frameScale at 1.4 = 1.0/1.4 ≈ 71% (>= 70%)
-        assertEquals(1.0f, session.computePreviewZoomRatio(1.4f, twoNodeMap))
-        // Above threshold: WYSIWYG previewZoom = captureZoom = 1.5
-        assertEquals(1.5f, session.computePreviewZoomRatio(1.5f, twoNodeMap))
-        // At base value: early return
+        // twoNodeMap gives bases [1.0, 2.0]; switchAt = 1.0/0.775 ≈ 1.29
+        // Below switchAt: continuous formula applied within interval
+        val at12 = session.computePreviewZoomRatio(1.2f, twoNodeMap)
+        assertTrue(at12 >= 1.0f && at12 <= 1.5f, "At 1.2x (below switchAt), got $at12")
+        // Above switchAt: switches to base 2.0, continuous formula = min(0.949*1.5, 2.0) = 1.424
+        val at15 = session.computePreviewZoomRatio(1.5f, twoNodeMap)
+        assertTrue(at15 >= 1.4f && at15 <= 1.5f, "At 1.5x (above switchAt), got $at15")
+        // At base value: returns the base directly
         assertEquals(2.0f, session.computePreviewZoomRatio(2.0f, twoNodeMap))
     }
 
@@ -4958,13 +4969,20 @@ class DefaultCameraSessionTest {
             previewBaseRatios = listOf(0.7f, 1.0f, 3.0f, 5.0f)
         )
 
+        // At 0.7x: baseline, returns 0.7
         assertEquals(0.7f, session.computePreviewZoomRatio(0.7f, capability))
-        assertEquals(0.7f, session.computePreviewZoomRatio(0.9f, capability))
-        assertEquals(0.7f, session.computePreviewZoomRatio(1.0f, capability))
-        assertEquals(0.7f, session.computePreviewZoomRatio(1.5f, capability))
-        // At 2.0f: UW→W special case triggers, then frame-scale immediately advances to 3.0 base
-        // → previewZoom = min(3.0, 2.0) = 2.0
-        assertEquals(2.0f, session.computePreviewZoomRatio(2.0f, capability))
+        // At 0.9x: below first base (0.7) + in 0.7→1.0 interval; continuous formula
+        val at09 = session.computePreviewZoomRatio(0.9f, capability)
+        assertTrue(at09 >= 0.7f && at09 <= 1.0f, "At 0.9x: expected [0.7, 1.0], got $at09")
+        // At 1.0x: at baseline 1.0, returns 1.0 (firstBase >= 1.0)
+        assertEquals(1.0f, session.computePreviewZoomRatio(1.0f, capability))
+        // At 1.5x: in 1.0→3.0 interval; switchAt = 1.0/0.775 ≈ 1.29, 1.5 >= 1.29 → base 3.0
+        // Continuous formula: min(0.949*1.5, 3.0) = 1.424
+        val at15 = session.computePreviewZoomRatio(1.5f, capability)
+        assertTrue(at15 >= 1.4f && at15 <= 1.45f, "At 1.5x: expected ≈1.424, got $at15")
+        // At 2.0f: switchAt 1.29 already passed → base 3.0; continuous formula: min(0.949*2.0, 3.0) = 1.898
+        val at20 = session.computePreviewZoomRatio(2.0f, capability)
+        assertTrue(at20 >= 1.85f && at20 <= 1.95f, "At 2.0x: expected ≈1.898, got $at20")
     }
 
     @Test
@@ -4972,13 +4990,16 @@ class DefaultCameraSessionTest {
         val trace = InMemorySessionTrace()
         val session = createSession(trace = trace, testScope = this)
         // threeNodeMap gives bases [1.0, 2.0, 5.0]
-        // 1.0→2.0 switchAt = 1.0/0.7 ≈ 1.43
-        // 2.0→5.0 switchAt = 2.0/0.7 ≈ 2.86
-        // At 2.5: 2.0 base selected but 2.0→5.0 switch not yet; previewZoom = min(2.0, 2.5) = 2.0
-        assertEquals(2.0f, session.computePreviewZoomRatio(2.5f, threeNodeMap))
-        // At 3.0: 2.0→5.0 switch triggered; previewZoom = min(5.0, 3.0) = 3.0 (WYSIWYG)
-        assertEquals(3.0f, session.computePreviewZoomRatio(3.0f, threeNodeMap))
-        // At 5.0: early return (in bases list)
+        // 1.0→2.0 switchAt = 1.0/0.775 ≈ 1.29
+        // 2.0→5.0 switchAt = 2.0/0.775 ≈ 2.58
+        // At 2.5: switchAt 1.29 passed → base 2.0; switchAt 2.58 not reached
+        // Continuous: min(0.949*2.5, 5.0) = 2.372
+        val at25 = session.computePreviewZoomRatio(2.5f, threeNodeMap)
+        assertTrue(at25 >= 2.3f && at25 <= 2.45f, "At 2.5x: expected ≈2.372, got $at25")
+        // At 3.0: 2.0→5.0 switchAt passed → base 5.0; continuous: min(0.949*3.0, 5.0) = 2.847
+        val at30 = session.computePreviewZoomRatio(3.0f, threeNodeMap)
+        assertTrue(at30 >= 2.8f && at30 <= 2.9f, "At 3.0x: expected ≈2.847, got $at30")
+        // At 5.0: baseline, returns 5.0
         assertEquals(5.0f, session.computePreviewZoomRatio(5.0f, threeNodeMap))
     }
 
@@ -5062,23 +5083,216 @@ class DefaultCameraSessionTest {
         advanceUntilIdle()
         effects.clear()
 
-        // At 1.5f: UW→W special case (switchAt=2f) keeps preview at 0.7 base
-        // previewZoom = min(0.7, 1.5) = 0.7 (below UW special case threshold)
+        // At 1.5f: in interval [1.0, 3.0]; continuous: min(0.949*1.5, 3.0) = 1.424
         session.dispatch(SessionIntent.ApplyZoomRatio(1.5f))
         advanceUntilIdle()
-        assertEquals(0.7f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        val at15 = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+        assertTrue(at15 >= 1.4f && at15 <= 1.45f, "At 1.5x: expected ≈1.424, got $at15")
 
-        // At 3.3f: UW→W triggers at 2f, then frame-scale 1.0→3.0 at 1.43 triggers
-        // selected=3.0, previewZoom = min(3.0, 3.3) = 3.0
+        // At 3.3f: in interval [3.0, 5.0]; continuous: min(0.949*3.3, 5.0) = 3.132
         session.dispatch(SessionIntent.ApplyZoomRatio(3.3f))
         advanceUntilIdle()
-        assertEquals(3.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+        val at33 = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+        assertTrue(at33 >= 3.1f && at33 <= 3.2f, "At 3.3x: expected ≈3.132, got $at33")
         assertTrue(effects.filterIsInstance<SessionEffect.ApplyZoomRatio>().any {
-            it.zoomRatio == 3.3f && it.previewZoomRatio == 3.0f
+            it.zoomRatio == 3.3f && it.previewZoomRatio == at33
         })
         assertTrue(effects.none { it is SessionEffect.SwitchLensNode })
 
         effectCollector.cancel()
+    }
+
+    // ── Continuous previewZoomRatio contract tests ────────────────────────
+
+    @Test
+    fun `previewZoomRatio stays within frame-scale bounds for 1x to 10x sweep`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+        val testRatios = listOf(0.6f, 0.7f, 1.0f, 1.3f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f, 5.0f, 7.0f, 10.0f)
+        var previousPreviewZoom = 0f
+        for (captureZoom in testRatios) {
+            session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+            session.dispatch(SessionIntent.Boot)
+            advanceUntilIdle()
+            session.dispatch(SessionIntent.ApplyZoomRatio(captureZoom))
+            advanceUntilIdle()
+            val previewZoom = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+            val capture = session.state.value.activeDeviceGraph.preview.zoomRatio
+            assertTrue(
+                previewZoom <= capture,
+                "previewZoomRatio ($previewZoom) should be <= captureZoomRatio ($capture) at captureZoom=$captureZoom"
+            )
+            assertTrue(
+                previewZoom >= 0.01f,
+                "previewZoomRatio ($previewZoom) should be >= MIN_NON_ZERO at captureZoom=$captureZoom"
+            )
+            if (previousPreviewZoom > 0f && previousPreviewZoom > 1.0f && previousPreviewZoom < 5.0f) {
+                // Between first and last baselines: no consecutive equal values
+                assertTrue(
+                    previewZoom != previousPreviewZoom,
+                    "previewZoomRatio must be continuous (changed at every step), but was $previousPreviewZoom then $previewZoom at captureZoom=$captureZoom"
+                )
+            }
+            previousPreviewZoom = previewZoom
+        }
+    }
+
+    @Test
+    fun `previewZoomRatio continuous between 1x and 2x`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = twoNodeMap
+                )
+            )
+        )
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        val values = mutableListOf<Float>()
+        var zoom = 1.0f
+        while (zoom <= 2.0f) {
+            session.dispatch(SessionIntent.ApplyZoomRatio(zoom))
+            advanceUntilIdle()
+            values.add(session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+            zoom = (zoom * 10f + 0.1f * 10f).roundToInt() / 10f
+        }
+
+        // No constant interval: no 3 consecutive equal values
+        for (i in 2 until values.size) {
+            assertFalse(
+                values[i] == values[i - 1] && values[i - 1] == values[i - 2],
+                "previewZoomRatio has constant interval at index $i: ${values[i - 2]}, ${values[i - 1]}, ${values[i]}"
+            )
+        }
+        // Always <= captureZoom
+        zoom = 1.0f
+        for (v in values) {
+            assertTrue(v <= zoom, "previewZoomRatio ($v) should be <= captureZoom ($zoom)")
+            zoom = (zoom * 10f + 0.1f * 10f).roundToInt() / 10f
+        }
+    }
+
+    @Test
+    fun `previewZoomRatio continuous between 2x and 3x`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        val values = mutableListOf<Float>()
+        var zoom = 2.0f
+        while (zoom <= 3.0f) {
+            session.dispatch(SessionIntent.ApplyZoomRatio(zoom))
+            advanceUntilIdle()
+            values.add(session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+            zoom = (zoom * 10f + 0.1f * 10f).roundToInt() / 10f
+        }
+
+        // No constant interval
+        for (i in 2 until values.size) {
+            assertFalse(
+                values[i] == values[i - 1] && values[i - 1] == values[i - 2],
+                "previewZoomRatio has constant interval at index $i: ${values[i - 2]}, ${values[i - 1]}, ${values[i]}"
+            )
+        }
+        // At exact baseline values, returns the baseline
+        session.dispatch(SessionIntent.ApplyZoomRatio(2.0f))
+        advanceUntilIdle()
+        assertEquals(2.0f, session.state.value.activeDeviceGraph.preview.previewZoomRatio)
+    }
+
+    @Test
+    fun `previewZoomRatio does not jump when physical lens switches`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(
+            trace = trace,
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.CONTINUOUS,
+                    supportedRatios = listOf(0.6f, 1f, 2f, 5f, 10f),
+                    defaultRatio = 1f,
+                    lensNodeMap = threeNodeMap
+                )
+            )
+        )
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        // Walk through 1.5x to 2.5x (lens switch at evaluateLensNode threshold ~2.1)
+        val zoomSteps = listOf(1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f, 2.1f, 2.2f, 2.3f, 2.4f, 2.5f)
+        var prevPreview = 0f
+        for (zoom in zoomSteps) {
+            session.dispatch(SessionIntent.ApplyZoomRatio(zoom))
+            advanceUntilIdle()
+            val preview = session.state.value.activeDeviceGraph.preview.previewZoomRatio
+            assertTrue(
+                preview <= zoom,
+                "previewZoomRatio ($preview) should be <= captureZoom ($zoom)"
+            )
+            // Check for small jumps (< 0.2) between adjacent steps
+            if (prevPreview > 0f) {
+                val jump = kotlin.math.abs(preview - prevPreview)
+                assertTrue(
+                    jump < 0.2f,
+                    "previewZoomRatio jump too large: $prevPreview → $preview at captureZoom=$zoom (delta=$jump)"
+                )
+            }
+            prevPreview = preview
+        }
+    }
+
+    @Test
+    fun `previewZoomRatio at lens threshold is within continuous bounds`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace = trace, testScope = this)
+        // threeNodeMap: evaluateLensNode threshold at ~2.1 (with hysteresis from WIDE)
+        // At 2.0x: base 2.0, previewZoom = 2.0 (exact baseline)
+        // At 2.1x: base 2.0 (hysteresis keeps WIDE), previewZoom in [2.0, 5.0] interval
+        val at20 = session.computePreviewZoomRatio(2.0f, threeNodeMap)
+        val at21 = session.computePreviewZoomRatio(2.1f, threeNodeMap)
+        assertEquals(2.0f, at20, "At 2.0x baseline: should return 2.0")
+        assertTrue(
+            at21 >= 1.9f && at21 <= 2.15f,
+            "At 2.1x (near threshold): expected within ±0.15 of 2.0, got $at21"
+        )
+        val jump = kotlin.math.abs(at21 - at20)
+        assertTrue(
+            jump <= 0.15f,
+            "Jump at lens threshold: $at20 → $at21 (delta=$jump) should be ≤ 0.15"
+        )
     }
 
     // ── CaptureReadiness contract tests ───────────────────────────────
@@ -5560,7 +5774,7 @@ class DefaultCameraSessionTest {
 
         val headline = session.state.value.modeSnapshot.state.headline
         assertTrue(headline.contains("Check-in"), "Headline should contain Check-in, got: $headline")
-        assertTrue(headline.contains("超清"), "Headline should mention 超清, got: $headline")
+        assertTrue(headline.contains("全清"), "Headline should mention 全清, got: $headline")
     }
 
     @Test

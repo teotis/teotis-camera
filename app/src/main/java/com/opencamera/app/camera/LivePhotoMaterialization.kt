@@ -50,11 +50,18 @@ internal fun resolveLiveMotionSource(
                 postShutterCount = 0,
                 coveredPreShutterMillis = 0,
                 coveredPostShutterMillis = 0,
-                diagnostics = listOf("frame-source:not-active")
+                diagnostics = listOf(
+                    "frame-source:not-active",
+                    "frame-source:active=false"
+                )
             ),
             ringBufferDepthMillis = 0,
             postShutterBudgetMillis = 0,
-            diagnostics = listOf("live:source=metadata-only")
+            diagnostics = buildList {
+                add("live:source=metadata-only")
+                frameSource.lastStopReason?.let { add("frame-source:last-stop-reason=$it") }
+                frameSource.lastStartReason?.let { add("frame-source:last-start-reason=$it") }
+            }
         )
     }
 
@@ -63,13 +70,21 @@ internal fun resolveLiveMotionSource(
     return if (selectedFrameSet.frames.isNotEmpty()) {
         LiveMotionSourceResult(
             source = LiveMotionSource.PREVIEW_RING_BUFFER,
-            selectedFrameSet = selectedFrameSet,
+            selectedFrameSet = SelectedFrameSet(
+                frames = selectedFrameSet.frames,
+                preShutterCount = selectedFrameSet.preShutterCount,
+                postShutterCount = selectedFrameSet.postShutterCount,
+                coveredPreShutterMillis = selectedFrameSet.coveredPreShutterMillis,
+                coveredPostShutterMillis = selectedFrameSet.coveredPostShutterMillis,
+                diagnostics = selectedFrameSet.diagnostics + "frame-source:active=true"
+            ),
             ringBufferDepthMillis = spec.motionDurationMillis,
             postShutterBudgetMillis = spec.motionDurationMillis / 5,
             diagnostics = buildList {
                 add("live:source=preview-ring-buffer")
                 add("frame-buffer:selected=${selectedFrameSet.frames.size}")
                 add("frame-buffer:window=-${selectedFrameSet.coveredPreShutterMillis}ms,+${selectedFrameSet.coveredPostShutterMillis}ms")
+                add("frame-source:active=true")
             }
         )
     } else {
@@ -81,6 +96,7 @@ internal fun resolveLiveMotionSource(
             diagnostics = buildList {
                 add("live:source=metadata-only")
                 add("live:degraded=no-frames-near-shutter")
+                add("frame-source:active=true")
             }
         )
     }

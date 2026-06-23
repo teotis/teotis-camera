@@ -17,6 +17,15 @@ sealed class CockpitPanelRoute {
     data object CheckInStylePanel : CockpitPanelRoute()
     data object ColorLab : CockpitPanelRoute()
     data object DocumentBatchOrganizer : CockpitPanelRoute()
+
+    /** Batch overview: dedicated panel for reviewing all captured pages. */
+    data object BatchOverview : CockpitPanelRoute()
+
+    /** Crop edit: overlay for editing a single page's crop. */
+    data object CropEdit : CockpitPanelRoute()
+
+    /** Export: overlay showing batch export progress. */
+    data object Export : CockpitPanelRoute()
 }
 
 internal val CockpitPanelRoute.isSettingsOpen: Boolean

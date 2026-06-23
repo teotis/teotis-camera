@@ -22,7 +22,8 @@ enum class PostProcessFailureCause {
     BITMAP_OPERATION,
     ENCODE,
     OUTPUT_UNAVAILABLE,
-    EXCEPTION
+    EXCEPTION,
+    TIMEOUT
 }
 
 enum class PostProcessOutputIntegrity {
@@ -71,6 +72,7 @@ val PostProcessFailureCause.legacyNoteSuffix: String
         PostProcessFailureCause.ENCODE -> "encode-failed"
         PostProcessFailureCause.OUTPUT_UNAVAILABLE -> "output-unavailable"
         PostProcessFailureCause.EXCEPTION -> "exception"
+        PostProcessFailureCause.TIMEOUT -> "timeout"
     }
 
 fun ShotResult.addStructuredPostProcessFailure(failure: PostProcessFailure): ShotResult {

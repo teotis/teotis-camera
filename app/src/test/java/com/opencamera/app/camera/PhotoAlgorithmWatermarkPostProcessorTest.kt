@@ -2,6 +2,7 @@ package com.opencamera.app.camera
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.media.MediaMetadata
@@ -17,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.test.Test
@@ -65,6 +67,34 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
         val file = File.createTempFile("combined-input-", ".jpg")
         file.writeBytes(jpegBytes)
         return file
+    }
+
+    private fun countVisiblePixelDelta(file: File, referenceColor: Int): Int {
+        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+        assertNotNull(bitmap, "processed JPEG must decode")
+        try {
+            var changed = 0
+            for (y in 0 until bitmap.height) {
+                for (x in 0 until bitmap.width) {
+                    if (colorDistance(bitmap.getPixel(x, y), referenceColor) > 70) changed++
+                }
+            }
+            return changed
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    private fun colorDistance(a: Int, b: Int): Int {
+        return kotlin.math.abs(Color.red(a) - Color.red(b)) +
+            kotlin.math.abs(Color.green(a) - Color.green(b)) +
+            kotlin.math.abs(Color.blue(a) - Color.blue(b))
+    }
+
+    private fun decodeJpeg(file: File): Bitmap {
+        return requireNotNull(BitmapFactory.decodeFile(file.absolutePath)) {
+            "processed JPEG must decode"
+        }
     }
 
     private fun combinedShotResult(
@@ -126,6 +156,89 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
                 "timing note must be present")
         } finally {
             inputFile.delete()
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `combined path writes visible watermark pixels to final jpeg`() = runTest {
+        val baseColor = Color.rgb(100, 140, 180)
+        val inputFile = writeJpegToTempFile(createSyntheticJpeg(320, 240))
+        try {
+            val processor = createCombinedProcessor()
+            val result = processor.process(
+                combinedShotResult(
+                    inputFile,
+                    algorithmProfile = "recipe-only",
+                    watermarkText = "OpenCamera Visible Test",
+                    watermarkTemplate = "classic-overlay"
+                )
+            )
+
+            assertTrue(
+                result.pipelineNotes.any {
+                    it.contains("combined-render:applied") || it.contains("watermark:rendered:classic-overlay")
+                },
+                "final-output watermark processing must complete, got: ${result.pipelineNotes}"
+            )
+            val changedPixels = countVisiblePixelDelta(inputFile, baseColor)
+            assertTrue(
+                changedPixels > 400,
+                "final JPEG should contain visible watermark ink, not only metadata/archive changes; changedPixels=$changedPixels"
+            )
+        } finally {
+            inputFile.delete()
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `combined path writes visible output for every selectable watermark template`() = runTest {
+        val baseColor = Color.rgb(100, 140, 180)
+        val selectableTemplates = PhotoWatermarkTemplateType.entries.map(PhotoWatermarkTemplateType::storageKey)
+
+        selectableTemplates.forEach { templateId ->
+            val inputFile = writeJpegToTempFile(createSyntheticJpeg(320, 240))
+            try {
+                val processor = createCombinedProcessor()
+                val result = processor.process(
+                    combinedShotResult(
+                        inputFile,
+                        algorithmProfile = "recipe-only",
+                        watermarkText = "OpenCamera Visible Test",
+                        watermarkTemplate = templateId
+                    )
+                )
+
+                assertTrue(
+                    result.pipelineNotes.any {
+                        it.contains("combined-render:applied:recipe-only+$templateId") ||
+                            it.contains("watermark:rendered:$templateId")
+                    },
+                    "$templateId must complete final-output rendering, got: ${result.pipelineNotes}"
+                )
+
+                val bitmap = decodeJpeg(inputFile)
+                try {
+                    val expandedFrame = resolvePhotoWatermarkTemplateType(templateId).usesExpandedFrame
+                    if (expandedFrame) {
+                        assertTrue(
+                            bitmap.width > 320 || bitmap.height > 240,
+                            "$templateId should leave a visible expanded-frame output, got ${bitmap.width}x${bitmap.height}"
+                        )
+                    } else {
+                        val changedPixels = countVisiblePixelDelta(inputFile, baseColor)
+                        assertTrue(
+                            changedPixels > 400,
+                            "$templateId should contain visible watermark ink, changedPixels=$changedPixels"
+                        )
+                    }
+                } finally {
+                    bitmap.recycle()
+                }
+            } finally {
+                inputFile.delete()
+            }
         }
     }
 

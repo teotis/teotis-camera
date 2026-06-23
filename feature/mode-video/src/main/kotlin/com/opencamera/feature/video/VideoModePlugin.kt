@@ -230,7 +230,7 @@ private class VideoModeController(
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
         return EffectSpec(listOf(
             FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe),
-            FrameEffect(FrameRatio.RATIO_16_9)
+            FrameEffect(FrameRatio.RATIO_4_3)
         ))
     }
 

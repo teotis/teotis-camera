@@ -14,6 +14,9 @@ import androidx.core.os.LocaleListCompat
 import androidx.activity.result.contract.ActivityResultContracts
 import com.opencamera.app.neutralColorLabAction as neutralColorLabTopLevel
 import com.opencamera.app.i18n.AppTextResolver
+import com.opencamera.app.permissions.CameraPermissionAction
+import com.opencamera.app.permissions.CameraPermissionGate
+import com.opencamera.app.permissions.PermissionRequestHistory
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -28,8 +31,10 @@ import com.opencamera.core.session.SavedMediaType
 import com.opencamera.core.session.SessionIntent
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.RecordingStatus
+import com.opencamera.core.settings.FeatureCatalogAction
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.effect.WatermarkHintSpec
+import com.opencamera.core.effect.WatermarkPreviewDecoration
 import com.opencamera.core.effect.WatermarkPreviewShape
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.WatermarkFrameBackground
@@ -73,6 +78,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var latestSessionState: SessionState? = null
     private var lightPaletteBaseSpec: FilterRenderSpec? = null
     private var latestDeviceProbeSummary: String? = null
+    private val cameraPermissionGate = CameraPermissionGate()
+    private lateinit var permissionRequestHistory: PermissionRequestHistory
 
     // Shared scroll guard for mode track scroll-vs-tap disambiguation
     private val modeTrackScrollGuard = ModeTrackScrollGuard(scrollSlopPx = 12f)
@@ -88,6 +95,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private lateinit var actionBinder: MainActivityActionBinder
     private lateinit var documentBatchRailRenderer: DocumentBatchRailRenderer
     private lateinit var documentBatchOrganizerRenderer: DocumentBatchOrganizerRenderer
+    private lateinit var runtimeProControlsRenderer: RuntimeProControlsRenderer
+    private lateinit var cropEditOverlay: DocumentCropEditOverlay
+    private lateinit var exportOverlay: DocumentExportOverlay
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -113,6 +123,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         views = MainActivityViews.bind(this)
         initRenderers()
         devLogExporter = DevLogExporter(this)
+        permissionRequestHistory = PermissionRequestHistory(
+            getSharedPreferences("permission_request_history", MODE_PRIVATE)
+        )
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.topPanel)) { v, insets ->
             val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
@@ -190,7 +203,16 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         devConsoleRenderer = DevConsoleRenderer(this, views.devConsole)
         documentBatchRailRenderer = DocumentBatchRailRenderer(
             views = views.documentBatchRail,
-            onRemoveItemClick = { itemId -> dispatch(SessionIntent.DocumentBatchRemoveItem(itemId)) }
+            onRemoveItemClick = { itemId -> dispatch(SessionIntent.DocumentBatchRemoveItem(itemId)) },
+            onMoveUpItemClick = { itemId ->
+                dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.UP))
+            },
+            onMoveDownItemClick = { itemId ->
+                dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.DOWN))
+            },
+            onOverviewRequested = {
+                reducePanel(CockpitPanelCommand.NavigateToBatchOverview)
+            }
         )
         documentBatchOrganizerRenderer = DocumentBatchOrganizerRenderer(
             views = views.documentBatchOrganizer,
@@ -200,8 +222,65 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             },
             onMoveDownItemClick = { itemId ->
                 dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.DOWN))
+            },
+            onCropEditItemClick = { itemId ->
+                reducePanel(CockpitPanelCommand.SelectCropEditItem(itemId))
+                reducePanel(CockpitPanelCommand.NavigateToCropEdit)
+                renderAfterPanelChange()
+            },
+            onContinueShooting = { reducePanel(CockpitPanelCommand.CloseBatchOverview) },
+            onExport = { reducePanel(CockpitPanelCommand.NavigateToExport) }
+        )
+        runtimeProControlsRenderer = RuntimeProControlsRenderer(
+            context = this,
+            views = views.runtimeProControls,
+            onApplyControl = ::applyFeatureCatalogControl
+        )
+        cropEditOverlay = DocumentCropEditOverlay(
+            context = this,
+            onConfirm = {
+                val panelState = panelRouter.state
+                val itemId = panelState.selectedCropEditItemId
+                if (itemId != null) {
+                    dispatch(SessionIntent.DocumentBatchUpdateCropStatus(
+                        itemId = itemId,
+                        cropStatus = com.opencamera.core.session.DocumentBatchCropStatus.APPLIED_MANUAL,
+                        cropRect = cropEditOverlay.getCurrentEdges().toCropRect()
+                    ))
+                }
+                reducePanel(CockpitPanelCommand.CloseCropEdit)
+                renderAfterPanelChange()
+            },
+            onCancel = {
+                reducePanel(CockpitPanelCommand.CloseCropEdit)
+                renderAfterPanelChange()
+            },
+            onEdgeDragged = { }
+        )
+        val rootLayout = findViewById<android.widget.FrameLayout>(android.R.id.content)
+        rootLayout.addView(cropEditOverlay, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+        exportOverlay = DocumentExportOverlay(
+            context = this,
+            onCancel = {
+                reducePanel(CockpitPanelCommand.CloseExport)
+                renderAfterPanelChange()
+            },
+            onReturn = {
+                reducePanel(CockpitPanelCommand.ReturnToShooting)
+                renderAfterPanelChange()
+            },
+            onRetry = {
+                reducePanel(CockpitPanelCommand.StartExport)
+                renderAfterPanelChange()
             }
         )
+        rootLayout.addView(exportOverlay, android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+        ))
         mainRenderer = MainActivityRenderer(
             views, cockpitRenderer, settingsRenderer, filterLabRenderer, devConsoleRenderer
         )
@@ -222,8 +301,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             views.bottomCockpit.shutter,
             views.bottomCockpit.lensFacing,
             // Quick panel text-bearing buttons
-            views.quickPanel.frameRatio,
-            views.settingsPanel.gridMode
+            views.quickPanel.frameRatio
         ).forEach { it.rotation = degrees }
         cockpitRenderer.controlRotationDegrees = degrees
     }
@@ -255,14 +333,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     private fun loadLatestGalleryMedia() {
         lifecycleScope.launch {
-            val latestMedia = queryLatestGalleryMedia(this@MainActivity)
-            if (latestMedia != null) {
-                dispatch(SessionIntent.LatestGalleryMediaLoaded(latestMedia.source, latestMedia.mediaType))
-            } else {
-                val latestImage = queryLatestGalleryImage(this@MainActivity)
-                if (latestImage != null) {
-                    dispatch(SessionIntent.LatestGalleryImageLoaded(latestImage))
-                }
+            val latestPhoto = queryLatestGalleryImage(this@MainActivity)
+            if (latestPhoto != null) {
+                dispatch(SessionIntent.LatestGalleryMediaLoaded(latestPhoto, SavedMediaType.PHOTO))
             }
         }
     }
@@ -357,14 +430,15 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         if (activePanelRoute is CockpitPanelRoute.StyleStrip) {
             renderLatestFilterStrip()
         }
-        mainRenderer.renderPanelVisibility(activePanelRoute)
+        mainRenderer.renderPanelVisibility(activePanelRoute, styleSurfaceRole(state.activeMode) != StyleSurfaceRole.HIDDEN)
         views.preview.overlayView.render(
             previewOverlayRenderModel(
                 state = state,
                 effectAdapter = container.previewEffectAdapter,
                 maskSnapshot = container.previewMaskSnapshot,
                 previewContentAspect = previewRatioToContentAspect(state.previewRatio),
-                stagedWatermarkHint = stagedWatermarkHintForOverlay(state)
+                stagedWatermarkHint = stagedWatermarkHintForOverlay(state),
+                isGeometryLocked = container.cameraCoordinator.isGeometryLocked
             )
         )
         views.preview.overlayView.updateFocusReticle(
@@ -383,24 +457,29 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         latestQuickPanelSheetRenderModel = sheet
         cockpitRenderer.renderQuickBubble(settingsPage, sheet)
         cockpitRenderer.renderLowLightNightPrompt(lowLightNightPromptRenderModel(state, text))
-        documentBatchRailRenderer.render(documentBatchRailRenderModel(state, text))
-        documentBatchOrganizerRenderer.render(documentBatchOrganizerRenderModel(state, text))
+        runtimeProControlsRenderer.render(runtimeProControlsRenderModel(state, text))
+        documentBatchRailRenderer.render(documentBatchRailRenderModel(state, text, activePanelRoute))
+        documentBatchOrganizerRenderer.render(documentBatchOrganizerRenderModel(state, text, activePanelRoute))
+        cropEditOverlay.render(cropEditRenderModel(state, text, panelRouter.state.selectedCropEditItemId))
+        exportOverlay.render(exportRenderModel(panelRouter.state, text))
         mainRenderer.renderDevEntryVisibility(com.opencamera.app.BuildConfig.DEBUG)
-        val devLogModel = devLogRenderModel(
-            state = state,
-            traceEvents = container.trace.snapshot(),
-            isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
-            selectedTab = selectedDevLogTab,
-            text = text,
-            storageSummary = latestStorageSummary,
-            linkEvents = container.linkRecorder.snapshot(),
-            deviceProbeSummary = latestDeviceProbeSummary,
-            latestPipelineNotes = state.presentation.latestPipelineNotes,
-            clearCutoffs = devLogClearCutoffs
-        )
-        latestDevLogRenderModel = devLogModel
         devConsoleRenderer.renderVisibility(activePanelRoute)
-        devConsoleRenderer.render(devLogModel)
+        if (activePanelRoute is CockpitPanelRoute.DevConsole) {
+            val devLogModel = devLogRenderModel(
+                state = state,
+                traceEvents = container.trace.snapshotForDisplay(PRODUCTION_TRACE_DISPLAY_WINDOW),
+                isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
+                selectedTab = selectedDevLogTab,
+                text = text,
+                storageSummary = latestStorageSummary,
+                linkEvents = container.linkRecorder.snapshotForDisplay(),
+                deviceProbeSummary = latestDeviceProbeSummary,
+                latestPipelineNotes = state.presentation.latestPipelineNotes,
+                clearCutoffs = devLogClearCutoffs
+            )
+            latestDevLogRenderModel = devLogModel
+            devConsoleRenderer.render(devLogModel)
+        }
 
         val pendingThumbnailUri = state.presentation.pendingCaptureFeedback?.let { feedback ->
             feedback.outputPath.takeIf { File(it).isAbsolute }?.let { File(it).toURI().toString() }
@@ -443,14 +522,18 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 lastSourceIdentity, nextIdentity
             )) {
                 ThumbnailRenderCommand.NoOp -> Unit
-                ThumbnailRenderCommand.Clear -> {
+                ThumbnailRenderCommand.EmptyState -> {
                     lastRequestedThumbnailUri = null
                     lastSourceIdentity = null
-                    views.preview.thumbnail.setImageDrawable(null)
+                    views.preview.thumbnail.setImageResource(R.drawable.ic_thumbnail_empty)
+                    views.preview.thumbnail.contentDescription =
+                        getString(R.string.preview_thumbnail_empty_content_description)
                 }
                 is ThumbnailRenderCommand.Load -> {
                     lastRequestedThumbnailUri = command.uri
                     lastSourceIdentity = command.sourceIdentity
+                    views.preview.thumbnail.contentDescription =
+                        getString(R.string.preview_thumbnail_content_description)
                     views.preview.thumbnail.setImageURI(null)
                     views.preview.thumbnail.setImageURI(Uri.parse(command.uri))
                 }
@@ -481,12 +564,12 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         val state = latestSessionState ?: return
         val model = devLogRenderModel(
             state = state,
-            traceEvents = container.trace.snapshot(),
+            traceEvents = container.trace.snapshotForDisplay(PRODUCTION_TRACE_DISPLAY_WINDOW),
             isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
             selectedTab = selectedDevLogTab,
             text = AppTextResolver(this),
             storageSummary = latestStorageSummary,
-            linkEvents = container.linkRecorder.snapshot(),
+            linkEvents = container.linkRecorder.snapshotForDisplay(),
             deviceProbeSummary = latestDeviceProbeSummary,
             latestPipelineNotes = state.presentation.latestPipelineNotes,
             clearCutoffs = devLogClearCutoffs
@@ -498,27 +581,50 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 latestStorageSummary = withContext(Dispatchers.IO) {
                     runCatching { devLogExporter.storageSummary() }.getOrNull()
                 }
-                refreshDevLogModel()
+                val refreshedModel = devLogRenderModel(
+                    state = state,
+                    traceEvents = container.trace.snapshotForDisplay(PRODUCTION_TRACE_DISPLAY_WINDOW),
+                    isDebugBuild = com.opencamera.app.BuildConfig.DEBUG,
+                    selectedTab = selectedDevLogTab,
+                    text = AppTextResolver(this@MainActivity),
+                    storageSummary = latestStorageSummary,
+                    linkEvents = container.linkRecorder.snapshotForDisplay(),
+                    deviceProbeSummary = latestDeviceProbeSummary,
+                    latestPipelineNotes = state.presentation.latestPipelineNotes,
+                    clearCutoffs = devLogClearCutoffs
+                )
+                latestDevLogRenderModel = refreshedModel
+                devConsoleRenderer.render(refreshedModel)
             }
         }
     }
 
     override fun requestMicrophonePermission() {
+        permissionRequestHistory.markMicrophoneRequested()
         permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
     }
 
     override fun requestCameraPermissionIfNeeded() {
-        when {
-            hasPermission(Manifest.permission.CAMERA) -> {
+        val state = cameraPermissionGate.resolve(
+            cameraGranted = hasPermission(Manifest.permission.CAMERA),
+            hasRequestedCamera = permissionRequestHistory.hasRequestedCamera(),
+            shouldShowRationale = shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
+        )
+        when (cameraPermissionGate.actionFor(state)) {
+            CameraPermissionAction.NONE -> {
                 views.topBar.permissionStatus.text = if (hasPermission(Manifest.permission.RECORD_AUDIO)) {
                     getString(R.string.permission_granted)
                 } else {
                     getString(R.string.permission_camera_only)
                 }
+                views.topBar.permissionStatus.setOnClickListener(null)
             }
 
-            shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> {
+            CameraPermissionAction.REQUEST_SYSTEM_PERMISSION -> {
                 views.topBar.permissionStatus.text = getString(R.string.permission_pending)
+                views.topBar.permissionStatus.setOnClickListener(null)
+                permissionRequestHistory.markCameraRequested()
+                permissionRequestHistory.markMicrophoneRequested()
                 permissionLauncher.launch(
                     arrayOf(
                         Manifest.permission.CAMERA,
@@ -527,7 +633,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 )
             }
 
-            else -> {
+            CameraPermissionAction.OPEN_APPLICATION_SETTINGS -> {
                 val text = AppTextResolver(this)
                 views.topBar.permissionStatus.text = text.get(R.string.permission_permanently_denied)
                 views.topBar.permissionStatus.visibility = View.VISIBLE
@@ -582,7 +688,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             lightPaletteBaseSpec = null
         }
         renderLatestSettingsSurfaces()
-        mainRenderer.renderPanelVisibility(activePanelRoute)
+        mainRenderer.renderPanelVisibility(activePanelRoute, latestSessionState?.let { styleSurfaceRole(it.activeMode) != StyleSurfaceRole.HIDDEN } ?: true)
         devConsoleRenderer.renderVisibility(activePanelRoute)
         latestDevLogRenderModel?.let { devConsoleRenderer.render(it) }
     }
@@ -625,35 +731,45 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                     AppTextResolver(this@MainActivity).get(R.string.settings_blocked_by_capture),
                     Toast.LENGTH_SHORT
                 ).show()
+            } else if (result is SessionSettingsApplyResult.Applied) {
+                // Eagerly re-render the card rail so the selection ring flips in the
+                // same frame instead of waiting for the settings flow to propagate.
+                renderLatestFilterLab()
             }
         }
     }
 
     override fun applySettingsControl(control: SettingsControlRenderModel?) {
         val text = AppTextResolver(this)
-        if (control == null) {
-            Toast.makeText(this, text.get(R.string.settings_not_loaded), Toast.LENGTH_SHORT).show()
+        val toastMessage = settingsControlApplyToastMessage(control, text)
+        if (toastMessage != null) {
+            Toast.makeText(this, toastMessage, Toast.LENGTH_SHORT).show()
             return
         }
-        val action = control.nextAction
-        if (action == null) {
-            Toast.makeText(this, text.get(R.string.settings_action_unsupported), Toast.LENGTH_SHORT).show()
-            return
-        }
-        val targetValue = settingsActionTargetValue(action, text) ?: control.value
-        Toast.makeText(this, "${control.label}: $targetValue", Toast.LENGTH_SHORT).show()
-        applySettingsAction(action)
+        applySettingsAction(control?.nextAction ?: return)
     }
 
-    private fun settingsActionTargetValue(
-        action: PersistedSettingsAction,
-        text: AppTextResolver
-    ): String? {
-        return when (action) {
-            is PersistedSettingsAction.UpdateLivePhotoDefault -> text.onOff(action.enabled)
-            is PersistedSettingsAction.UpdateLiveSaveFormat -> text.liveSaveFormatValueLabel(action.format)
-            else -> null
+    override fun applyFeatureCatalogAction(action: FeatureCatalogAction) {
+        lifecycleScope.launch {
+            val result = container.sessionSettingsManager.apply(action)
+            if (result is SessionSettingsApplyResult.BlockedByActiveShot) {
+                Toast.makeText(
+                    this@MainActivity,
+                    AppTextResolver(this@MainActivity).get(R.string.settings_blocked_by_capture),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
+    }
+
+    override fun applyFeatureCatalogControl(control: FeatureCatalogControlRenderModel?) {
+        val text = AppTextResolver(this)
+        val toastMessage = featureCatalogControlApplyToastMessage(control, text)
+        if (toastMessage != null) {
+            Toast.makeText(this, toastMessage, Toast.LENGTH_SHORT).show()
+            return
+        }
+        applyFeatureCatalogAction(control?.nextAction ?: return)
     }
 
     override fun openPortraitLab() {
@@ -881,10 +997,15 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         if (activePanelRoute is CockpitPanelRoute.StyleStrip) {
             renderLatestFilterStrip()
         }
-        mainRenderer.renderPanelVisibility(activePanelRoute)
+        mainRenderer.renderPanelVisibility(activePanelRoute, latestSessionState?.let { styleSurfaceRole(it.activeMode) != StyleSurfaceRole.HIDDEN } ?: true)
         devConsoleRenderer.renderVisibility(activePanelRoute)
         if (activePanelRoute.isSettingsOpen) {
             renderLatestSettingsSurfaces()
+        }
+        val latestState = latestSessionState
+        if (latestState != null) {
+            cropEditOverlay.render(cropEditRenderModel(latestState, AppTextResolver(this), panelRouter.state.selectedCropEditItemId))
+            exportOverlay.render(exportRenderModel(panelRouter.state, AppTextResolver(this)))
         }
     }
 
@@ -916,12 +1037,23 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
 
     override fun exportDevLog() {
-        val model = latestDevLogRenderModel ?: return
+        val state = latestSessionState ?: return
         val tab = selectedDevLogTab
         lifecycleScope.launch {
             runCatching {
+                val exportContent = withContext(Dispatchers.IO) {
+                    buildDevLogExportContent(
+                        state = state,
+                        traceEvents = container.trace.snapshot(),
+                        linkEvents = container.linkRecorder.snapshot(),
+                        resourceDiagnostics = null,
+                        deviceProbeSummary = latestDeviceProbeSummary,
+                        pipelineNotes = state.presentation.latestPipelineNotes,
+                        clearCutoffs = devLogClearCutoffs
+                    )
+                }
                 val file = withContext(Dispatchers.IO) {
-                    devLogExporter.export(model.exportContent, type = tab)
+                    devLogExporter.export(exportContent, type = tab)
                 }
                 views.preview.captureOutput.text = getString(R.string.toast_debug_log_exported, file.absolutePath)
                 Toast.makeText(this@MainActivity, getString(R.string.toast_debug_log_exported, file.absolutePath), Toast.LENGTH_SHORT).show()
@@ -1042,34 +1174,58 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     ): WatermarkHintSpec? {
         val style = state.settings.persisted.photo.watermarkStyleFor(templateId)
         val shape = when (templateId) {
-            "pure-text" -> WatermarkPreviewShape.TEXT_ONLY
+            "pure-text" -> WatermarkPreviewShape.BOTTOM_BAR
             "blur-four-border" -> WatermarkPreviewShape.FOUR_BORDER
             "professional-bottom-bar" -> WatermarkPreviewShape.BOTTOM_BAR
-            "travel-polaroid", "retro-frame" -> WatermarkPreviewShape.EXPANDED_FRAME
+            "travel-polaroid",
+            "retro-frame",
+            "night-street",
+            "van-gogh-starry",
+            "blue-hour" -> WatermarkPreviewShape.EXPANDED_FRAME
             else -> WatermarkPreviewShape.BACKED_TEXT
         }
-        val previewLabels = if (templateId == "professional-bottom-bar") {
-            listOf(state.settings.persisted.photo.defaultWatermarkTemplateId)
-        } else {
-            emptyList()
+        val previewLabels = when (templateId) {
+            "pure-text" -> listOf("BLUE HOUR", "2026.06.22 19:41", "TEOTIS CAMERA")
+            "professional-bottom-bar" -> listOf(state.settings.persisted.photo.defaultWatermarkTemplateId)
+            "van-gogh-starry" -> listOf("2026.06.22 19:41", "CITY NIGHT", "24mm")
+            "blue-hour" -> listOf("2026.06.22 19:41", "CITY NIGHT", "24mm")
+            else -> emptyList()
         }
-        val barBackground = if (templateId == "professional-bottom-bar") {
-            when (style.frameBackground) {
-                WatermarkFrameBackground.DARK -> 0xFE000000.toInt()
-                WatermarkFrameBackground.WHITE -> -1
-                WatermarkFrameBackground.SOURCE_BLUR -> 0xFE000000.toInt()
-                WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> 0xFE000000.toInt()
-                WatermarkFrameBackground.SOURCE_VIVID_BLUR -> 0xFE000000.toInt()
+        val decoration = when (templateId) {
+            "travel-polaroid" -> WatermarkPreviewDecoration.TRAVEL_MAP
+            "retro-frame" -> WatermarkPreviewDecoration.ARCHIVAL_PAPER
+            "night-street" -> WatermarkPreviewDecoration.NIGHT_MEMORY
+            "van-gogh-starry" -> WatermarkPreviewDecoration.STARRY_MOON
+            "blue-hour" -> WatermarkPreviewDecoration.BLUE_HOUR
+            "blur-four-border" -> WatermarkPreviewDecoration.IMPRESSION_CHROMA
+            else -> WatermarkPreviewDecoration.NONE
+        }
+        val barBackground = when (templateId) {
+            "pure-text" -> 0xCC071321.toInt()
+            "professional-bottom-bar" -> {
+                when (style.frameBackground) {
+                    WatermarkFrameBackground.DARK -> 0xFE000000.toInt()
+                    WatermarkFrameBackground.WHITE -> -1
+                    WatermarkFrameBackground.SOURCE_BLUR -> 0xFE000000.toInt()
+                    WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> 0xFE000000.toInt()
+                    WatermarkFrameBackground.SOURCE_VIVID_BLUR -> 0xFE000000.toInt()
+                }
             }
-        } else 0
+            else -> 0
+        }
         return WatermarkHintSpec(
             templateId = templateId,
             placement = style.textPlacement,
-            previewText = templateId,
+            previewText = when (templateId) {
+                "van-gogh-starry" -> previewLabels.joinToString(" · ")
+                "blue-hour" -> "BLUE HOUR"
+                else -> templateId
+            },
             opacity = style.textOpacity.alphaFraction * 0.6f,
             shape = shape,
             textScale = style.textScale.multiplier,
             previewLabels = previewLabels,
+            decoration = decoration,
             barBackground = barBackground
         )
     }

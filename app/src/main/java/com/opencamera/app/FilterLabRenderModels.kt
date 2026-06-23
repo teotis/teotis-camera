@@ -26,7 +26,8 @@ internal enum class FilterLabFamily {
     PHOTO,
     HUMANISTIC,
     PORTRAIT,
-    VIDEO
+    VIDEO,
+    DOCUMENT
 }
 
 internal enum class FilterAdjustmentMode {
@@ -56,7 +57,8 @@ internal enum class StyleAndColorLabRole {
 
 internal enum class StyleSurfaceRole {
     FILTER_STRIP,
-    PANEL
+    PANEL,
+    HIDDEN
 }
 
 // ── Data Classes ─────────────────────────────────────────────────────────
@@ -149,6 +151,7 @@ internal data class FilterLabPageRenderModel(
     val humanisticTab: FilterLabTabRenderModel,
     val portraitTab: FilterLabTabRenderModel,
     val videoTab: FilterLabTabRenderModel,
+    val documentTab: FilterLabTabRenderModel,
     val filterItems: List<FilterLabFilterItemRenderModel>,
     val adjustControl: FilterLabAdjustRenderModel,
     val adjustmentPanel: FilterAdjustmentPanelRenderModel,
@@ -195,7 +198,8 @@ internal data class StylePresetCardRenderModel(
     val isSelected: Boolean,
     val isEnabled: Boolean,
     val applyAction: PersistedSettingsAction?,
-    val moodLabel: String
+    val moodLabel: String,
+    val spec: FilterRenderSpec? = null
 )
 
 /**
@@ -216,6 +220,7 @@ internal fun filterLabFamilyToStylePresetFamily(family: FilterLabFamily): StyleP
     FilterLabFamily.HUMANISTIC -> StylePresetFamily.HUMANISTIC
     FilterLabFamily.PORTRAIT -> StylePresetFamily.PORTRAIT
     FilterLabFamily.VIDEO -> StylePresetFamily.VIDEO
+    FilterLabFamily.DOCUMENT -> StylePresetFamily.DOCUMENT
 }
 
 private fun stylePresetCardRail(
@@ -229,19 +234,21 @@ private fun stylePresetCardRail(
     val presetFamily = filterLabFamilyToStylePresetFamily(family)
     val presets = StylePresetCatalog.presetsFor(catalog, settings, presetFamily)
     val isEnabled = editingEnabled && supported
+    val specByProfileId = catalog.filterProfiles.associateBy { it.id }
     return StylePresetRailRenderModel(
         title = text.styleRailTitle(family),
         activeFamily = family,
         cards = presets.map { preset ->
             StylePresetCardRenderModel(
                 profileId = preset.profileId,
-                title = preset.label,
+                title = text.styleCardTitle(preset.profileId, preset.family),
                 family = family,
                 preview = preset.preview,
                 isSelected = preset.isSelected,
                 isEnabled = isEnabled,
                 applyAction = if (!preset.isSelected) preset.applyAction else null,
-                moodLabel = preset.preview.derivedMoodLabel
+                moodLabel = text.styleCardMoodLabel(preset.preview.moodDescriptor),
+                spec = specByProfileId[preset.profileId]?.renderSpec
             )
         },
         isEnabled = isEnabled,
@@ -255,9 +262,9 @@ internal fun defaultFilterLabFamily(activeMode: ModeId): FilterLabFamily {
     return when (activeMode) {
         ModeId.HUMANISTIC -> FilterLabFamily.HUMANISTIC
         ModeId.VIDEO -> FilterLabFamily.VIDEO
+        ModeId.DOCUMENT -> FilterLabFamily.DOCUMENT
         ModeId.PHOTO,
-        ModeId.CHECK_IN,
-        ModeId.DOCUMENT -> FilterLabFamily.PHOTO
+        ModeId.CHECK_IN -> FilterLabFamily.PHOTO
     }
 }
 
@@ -271,8 +278,9 @@ internal fun styleSurfaceRole(activeMode: ModeId): StyleSurfaceRole {
     return when (activeMode) {
         ModeId.PHOTO,
         ModeId.CHECK_IN,
-        ModeId.HUMANISTIC -> StyleSurfaceRole.PANEL
-        else -> StyleSurfaceRole.FILTER_STRIP
+        ModeId.HUMANISTIC,
+        ModeId.DOCUMENT -> StyleSurfaceRole.PANEL
+        ModeId.VIDEO -> StyleSurfaceRole.FILTER_STRIP
     }
 }
 
@@ -338,6 +346,16 @@ private fun filterLabFamilyState(
             supported = state.activeDeviceCapabilities.supportsVideoRecording,
             unsupportedReason = text.get(R.string.error_video_recording_unavailable),
             updateAction = PersistedSettingsAction::UpdateVideoFilter
+        )
+
+        FilterLabFamily.DOCUMENT -> FilterLabFamilyState(
+            family = selectedFamily,
+            label = text.styleRailTitle(FilterLabFamily.DOCUMENT),
+            currentFilterId = settings.photo.defaultDocumentFilterProfileId,
+            filters = catalog.filterProfilesFor(FilterProfileCategory.DOCUMENT, includeCustom = false),
+            supported = state.activeDeviceCapabilities.supportsStillCapture,
+            unsupportedReason = text.get(R.string.error_still_capture_unavailable),
+            updateAction = PersistedSettingsAction::UpdateDocumentFilter
         )
     }
 }
@@ -460,8 +478,12 @@ internal fun filterLabPageRenderModel(
             StyleAndColorLabRole.STYLE -> text.get(R.string.style_panel_title)
             StyleAndColorLabRole.COLOR_LAB -> text.get(R.string.color_lab_panel_title)
         },
-        supportingText = text.get(R.string.filter_lab_supporting_text),
-        heroSummary = "",
+        supportingText = if (isColorLab) {
+            text.get(R.string.filter_lab_color_summary)
+        } else {
+            text.get(R.string.filter_lab_supporting_text)
+        },
+        heroSummary = if (isColorLab) text.get(R.string.filter_lab_color_hint) else "",
         currentFilterSummary = if (isColorLab) "" else text.filterLabCurrentDefault(currentFilterLabel),
         rosterText = if (isColorLab) {
             ""
@@ -504,6 +526,11 @@ internal fun filterLabPageRenderModel(
         videoTab = filterLabTabRenderModel(
             family = FilterLabFamily.VIDEO,
             familyLabel = text.get(R.string.filter_family_video),
+            selectedFamily = family.family
+        ),
+        documentTab = filterLabTabRenderModel(
+            family = FilterLabFamily.DOCUMENT,
+            familyLabel = text.styleRailTitle(FilterLabFamily.DOCUMENT),
             selectedFamily = family.family
         ),
         adjustControl = FilterLabAdjustRenderModel(
@@ -553,9 +580,13 @@ internal fun filterLabPageRenderModel(
                 text.get(R.string.button_switch_to_light)
             },
             lightPalette = FilterLightPaletteRenderModel(
-                summary = if (isColorLab) "" else currentRenderSpec.lightPaletteSummary(text),
+                summary = if (isColorLab) {
+                    text.get(R.string.filter_lab_color_summary)
+                } else {
+                    currentRenderSpec.lightPaletteSummary(text)
+                },
                 supportingText = if (isColorLab) {
-                    text.get(R.string.filter_lab_light_palette_hint)
+                    text.get(R.string.filter_lab_color_hint)
                 } else if (currentProfile?.builtIn == true) {
                     text.get(R.string.filter_lab_drag_to_create_custom)
                 } else {

@@ -37,7 +37,7 @@ class CameraXCaptureAdapterManualRequestTest {
         assertEquals(2, config?.exposureCompensationSteps)
         assertEquals(1.5f, config?.focusDistanceDiopters)
         assertEquals(1.8f, config?.apertureFNumber)
-        assertNull(config?.whiteBalanceKelvin)
+        assertEquals(4800, config?.whiteBalanceKelvin)
     }
 
     @Test
@@ -56,8 +56,8 @@ class CameraXCaptureAdapterManualRequestTest {
         )
 
         assertTrue("adapter:manual-request=partial" in diagnostics)
-        assertTrue("adapter:manual-applied=iso+shutter+ev+focus+aperture" in diagnostics)
-        assertTrue("adapter:manual-saved-only=raw+wb" in diagnostics)
+        assertTrue("adapter:manual-applied=iso+shutter+ev+focus+aperture+wb" in diagnostics)
+        assertTrue("adapter:manual-saved-only=raw" in diagnostics)
     }
 
     @Test

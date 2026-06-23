@@ -6,6 +6,10 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.PostProcessFailureCause
+import com.opencamera.core.media.PostProcessFailureDisposition
+import com.opencamera.core.media.PostProcessFailureStage
+import com.opencamera.core.media.PostProcessOutputIntegrity
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.SaveRequest
@@ -567,6 +571,170 @@ class PhotoAlgorithmPostProcessorTest {
         } finally {
             tempFile.delete()
         }
+    }
+
+    // ── Structured failure mapping ──────────────────────────────────────────
+
+    @Test
+    fun `algorithmFailureMapping maps decode-failed correctly`() {
+        val (cause, integrity) = algorithmFailureMapping("decode-failed")
+        assertEquals(PostProcessFailureCause.DECODE_FAILED, cause)
+        assertEquals(PostProcessOutputIntegrity.ORIGINAL_INTACT, integrity)
+    }
+
+    @Test
+    fun `algorithmFailureMapping maps decode-oom correctly`() {
+        val (cause, integrity) = algorithmFailureMapping("decode-oom")
+        assertEquals(PostProcessFailureCause.OUT_OF_MEMORY, cause)
+        assertEquals(PostProcessOutputIntegrity.ORIGINAL_INTACT, integrity)
+    }
+
+    @Test
+    fun `algorithmFailureMapping maps style-oom correctly`() {
+        val (cause, integrity) = algorithmFailureMapping("style-oom")
+        assertEquals(PostProcessFailureCause.OUT_OF_MEMORY, cause)
+        assertEquals(PostProcessOutputIntegrity.ORIGINAL_INTACT, integrity)
+    }
+
+    @Test
+    fun `algorithmFailureMapping maps encode-failed correctly`() {
+        val (cause, integrity) = algorithmFailureMapping("encode-failed")
+        assertEquals(PostProcessFailureCause.ENCODE, cause)
+        assertEquals(PostProcessOutputIntegrity.ORIGINAL_INTACT, integrity)
+    }
+
+    @Test
+    fun `algorithmFailureMapping maps output-unavailable with possibly-modified`() {
+        val (cause, integrity) = algorithmFailureMapping("output-unavailable")
+        assertEquals(PostProcessFailureCause.OUTPUT_UNAVAILABLE, cause)
+        assertEquals(PostProcessOutputIntegrity.POSSIBLY_MODIFIED, integrity)
+    }
+
+    @Test
+    fun `algorithmFailureMapping maps unknown reason to EXCEPTION`() {
+        val (cause, integrity) = algorithmFailureMapping("something-else")
+        assertEquals(PostProcessFailureCause.EXCEPTION, cause)
+        assertEquals(PostProcessOutputIntegrity.ORIGINAL_INTACT, integrity)
+    }
+
+    @Test
+    fun `editor Failed decode-failed produces structured failure`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(
+            result = ProcessorEditorResult.Failed("decode-failed")
+        )
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/test.jpg",
+                    filePath = "/tmp/test.jpg"
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.any { it.contains("algorithm-render:failed:decode-failed") },
+            "Should contain failure note: ${result.pipelineNotes}")
+        assertEquals(1, result.structuredPostProcessFailures.size, "Should have one structured failure")
+        val failure = result.structuredPostProcessFailures.single()
+        assertEquals(PostProcessFailureStage.ALGORITHM, failure.stage)
+        assertEquals(PostProcessFailureCause.DECODE_FAILED, failure.cause)
+        assertEquals(PostProcessOutputIntegrity.ORIGINAL_INTACT, failure.integrity)
+        assertEquals(PostProcessFailureDisposition.RECOVERABLE, failure.disposition)
+    }
+
+    @Test
+    fun `editor Failed output-unavailable produces structured failure with possibly-modified`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(
+            result = ProcessorEditorResult.Failed("output-unavailable")
+        )
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/test.jpg",
+                    filePath = "/tmp/test.jpg"
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.any { it.contains("algorithm-render:failed:output-unavailable") },
+            "Should contain failure note: ${result.pipelineNotes}")
+        assertEquals(1, result.structuredPostProcessFailures.size)
+        val failure = result.structuredPostProcessFailures.single()
+        assertEquals(PostProcessFailureStage.ALGORITHM, failure.stage)
+        assertEquals(PostProcessFailureCause.OUTPUT_UNAVAILABLE, failure.cause)
+        assertEquals(PostProcessOutputIntegrity.POSSIBLY_MODIFIED, failure.integrity)
+    }
+
+    @Test
+    fun `OOM during process produces structured failure`() = runTest {
+        val processor = PhotoAlgorithmPostProcessor(
+            ThrowingPhotoAlgorithmEditor(OutOfMemoryError("bitmap too large"))
+        )
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/test.jpg",
+                    filePath = "/tmp/test.jpg"
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("algorithm-render:failed:oom"))
+        assertEquals(1, result.structuredPostProcessFailures.size)
+        val failure = result.structuredPostProcessFailures.single()
+        assertEquals(PostProcessFailureStage.ALGORITHM, failure.stage)
+        assertEquals(PostProcessFailureCause.OUT_OF_MEMORY, failure.cause)
+        assertEquals(PostProcessOutputIntegrity.ORIGINAL_INTACT, failure.integrity)
+    }
+
+    @Test
+    fun `exception during process produces structured failure`() = runTest {
+        val processor = PhotoAlgorithmPostProcessor(
+            ThrowingPhotoAlgorithmEditor(RuntimeException("unexpected"))
+        )
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/test.jpg",
+                    filePath = "/tmp/test.jpg"
+                )
+            )
+        )
+
+        assertTrue(result.pipelineNotes.contains("algorithm-render:failed:render-exception"))
+        assertEquals(1, result.structuredPostProcessFailures.size)
+        val failure = result.structuredPostProcessFailures.single()
+        assertEquals(PostProcessFailureStage.ALGORITHM, failure.stage)
+        assertEquals(PostProcessFailureCause.EXCEPTION, failure.cause)
+        assertEquals(PostProcessOutputIntegrity.ORIGINAL_INTACT, failure.integrity)
+    }
+
+    @Test
+    fun `structured failure legacy projection matches legacy pipeline note`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(
+            result = ProcessorEditorResult.Failed("decode-failed")
+        )
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/test.jpg",
+                    filePath = "/tmp/test.jpg"
+                )
+            )
+        )
+
+        val legacyNote = result.structuredPostProcessFailures.single().toLegacyNote()
+        assertTrue(result.pipelineNotes.contains(legacyNote),
+            "Legacy projection '$legacyNote' should be among pipeline notes: ${result.pipelineNotes}")
     }
 
     private fun photoResult(

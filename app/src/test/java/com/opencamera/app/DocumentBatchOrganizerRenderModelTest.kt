@@ -28,11 +28,7 @@ import kotlin.test.assertTrue
 class DocumentBatchOrganizerRenderModelTest {
 
     private val text = object : TestAppTextResolver() {
-        override fun documentBatchOrganizerTitle(): String = "Organize Batch"
         override fun documentBatchPageCount(count: Int): String = "$count pages"
-        override fun documentBatchRemoveLabel(): String = "Remove"
-        override fun documentBatchMoveUpLabel(): String = "Move Up"
-        override fun documentBatchMoveDownLabel(): String = "Move Down"
     }
 
     private fun batchItem(
@@ -68,7 +64,7 @@ class DocumentBatchOrganizerRenderModelTest {
         )
         val state = documentBatchSessionState(batchState)
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertTrue(model.visible)
         assertEquals(3, model.items.size)
@@ -92,7 +88,7 @@ class DocumentBatchOrganizerRenderModelTest {
         )
         val state = documentBatchSessionState(batchState)
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertFalse(model.items[0].canMoveUp, "First item should not be able to move up")
         assertTrue(model.items[1].canMoveUp, "Second item should be able to move up")
@@ -110,7 +106,7 @@ class DocumentBatchOrganizerRenderModelTest {
         )
         val state = documentBatchSessionState(batchState)
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertTrue(model.items[0].canMoveDown, "First item should be able to move down")
         assertFalse(model.items[1].canMoveDown, "Last item should not be able to move down")
@@ -151,7 +147,7 @@ class DocumentBatchOrganizerRenderModelTest {
             presentation = SessionPresentationState(documentBatch = batchState)
         )
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertFalse(model.visible, "Organizer should be hidden outside document mode")
         assertTrue(model.items.isEmpty(), "Items should be empty when hidden")
@@ -166,7 +162,7 @@ class DocumentBatchOrganizerRenderModelTest {
         )
         val state = documentBatchSessionState(batchState)
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertTrue(model.visible, "Organizer should be visible in document mode even with empty batch")
         assertTrue(model.items.isEmpty())
@@ -184,7 +180,7 @@ class DocumentBatchOrganizerRenderModelTest {
         )
         val state = documentBatchSessionState(batchState)
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertEquals(1, model.items.size)
         assertFalse(model.items[0].canMoveUp, "Single item should not move up")
@@ -203,7 +199,7 @@ class DocumentBatchOrganizerRenderModelTest {
         )
         val state = documentBatchSessionState(batchState)
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertEquals(1, model.items.size)
         assertEquals(outputPath, model.items[0].renderUri)
@@ -224,7 +220,7 @@ class DocumentBatchOrganizerRenderModelTest {
         )
         val state = documentBatchSessionState(batchState)
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertEquals(5, model.items.size)
         assertEquals("5 pages", model.countText)
@@ -237,10 +233,116 @@ class DocumentBatchOrganizerRenderModelTest {
     fun `inactive batch is hidden even in document mode`() {
         val state = documentBatchSessionState(DocumentBatchState.inactive())
 
-        val model = documentBatchOrganizerRenderModel(state, text)
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertFalse(model.visible, "Inactive batch should be hidden")
         assertTrue(model.items.isEmpty())
+    }
+
+    // --- BatchOverview-specific tests ---
+
+    @Test
+    fun `batch overview mode is active when route is BatchOverview`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(batchItem("item-1", 0))
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertTrue(model.visible)
+        assertTrue(model.isBatchOverviewMode)
+    }
+
+    @Test
+    fun `organizer hidden when route is None even with active batch`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(batchItem("item-1", 0))
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.None)
+
+        assertFalse(model.visible, "Organizer should be hidden when route is None")
+        assertFalse(model.isBatchOverviewMode)
+    }
+
+    @Test
+    fun `continue shooting button visible in batch overview mode`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(batchItem("item-1", 0))
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertTrue(model.showContinueShooting)
+    }
+
+    @Test
+    fun `export button visible when batch has items`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(batchItem("item-1", 0))
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertTrue(model.showExport)
+    }
+
+    @Test
+    fun `export button hidden when batch is empty`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = emptyList()
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertFalse(model.showExport, "Export button should be hidden for empty batch")
+        assertTrue(model.showContinueShooting)
+    }
+
+    @Test
+    fun `empty hint text is set in batch overview mode`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = emptyList()
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertTrue(model.emptyHint.isNotEmpty())
+    }
+
+    @Test
+    fun `each item has crop edit label in batch overview mode`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(
+                batchItem("item-1", 0),
+                batchItem("item-2", 1)
+            )
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertTrue(model.items.all { it.cropEditLabel != null })
     }
 
     private fun documentBatchSessionState(batchState: DocumentBatchState): SessionState {

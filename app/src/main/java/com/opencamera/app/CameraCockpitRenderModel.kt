@@ -80,6 +80,7 @@ internal data class CameraCockpitRenderModel(
     val bottomCockpit: BottomCockpitRenderModel,
     val previewRatioChip: PreviewRatioChipRenderModel,
     val activePanelRoute: CockpitPanelRoute = CockpitPanelRoute.None,
+    val isStyleEntryVisible: Boolean = true,
     val orientation: CockpitOrientationRenderModel = CockpitOrientationRenderModel(
         CockpitDisplayOrientation.PORTRAIT, 0f
     )
@@ -151,7 +152,8 @@ internal fun cameraCockpitRenderModel(
             ratio = state.previewRatio,
             isActive = true
         ),
-        activePanelRoute = activeRoute
+        activePanelRoute = activeRoute,
+        isStyleEntryVisible = styleSurfaceRole(state.activeMode) != StyleSurfaceRole.HIDDEN
     )
 }
 

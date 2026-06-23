@@ -37,6 +37,7 @@
     <dimen name="text_size_title">17sp</dimen>
     <dimen name="text_size_status">12sp</dimen>
     <dimen name="text_size_mode_chip">15sp</dimen>
+    <dimen name="text_size_mode_track_button">13sp</dimen>
     <dimen name="text_size_zoom_chip">12sp</dimen>
     <dimen name="text_size_right_rail">12sp</dimen>
     <dimen name="text_size_panel_title">18sp</dimen>
@@ -56,9 +57,14 @@
     <dimen name="panel_margin_horizontal">16dp</dimen>
     <dimen name="panel_padding">18dp</dimen>
     <dimen name="panel_max_height">480dp</dimen>
+    <dimen name="dev_console_panel_min_height">360dp</dimen>
+    <dimen name="dev_console_panel_max_height">520dp</dimen>
+    <dimen name="dev_console_log_height">180dp</dimen>
     <dimen name="dev_console_scroll_button_size">42dp</dimen>
     <dimen name="dev_console_scroll_floating_padding">28dp</dimen>
     <dimen name="dev_console_scroll_floating_bottom_margin">72dp</dimen>
+    <dimen name="style_rail_bottom_gap">8dp</dimen>
+    <dimen name="floating_tool_bottom_clearance">56dp</dimen>
     <dimen name="bottom_cockpit_padding_horizontal">16dp</dimen>
     <dimen name="bottom_cockpit_margin_bottom">14dp</dimen>
     <dimen name="bottom_cockpit_navigation_padding_max">16dp</dimen>

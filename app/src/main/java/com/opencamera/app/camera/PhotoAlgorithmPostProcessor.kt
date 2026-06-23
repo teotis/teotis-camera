@@ -10,6 +10,11 @@ import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.effect.RenderRecipe
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.PostProcessFailure
+import com.opencamera.core.media.PostProcessFailureCause
+import com.opencamera.core.media.PostProcessFailureDisposition
+import com.opencamera.core.media.PostProcessFailureStage
+import com.opencamera.core.media.PostProcessOutputIntegrity
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ProcessorWork
@@ -18,6 +23,7 @@ import com.opencamera.core.media.SceneMaskPayload
 import com.opencamera.core.media.SceneMaskPipelineNotes
 import com.opencamera.core.media.SceneMaskSupport
 import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.addStructuredPostProcessFailure
 import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PerceptualColorRecipe
@@ -110,14 +116,43 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
         ?: return ProcessorWork.None
     }
 
-    if (isKnownNearNeutralProfile(spec)) {
-        return ProcessorWork.DiagnosticSkip("near-neutral:${spec.profile}")
+    val finalSpec = applyDocumentColorModeOverride(result.metadata.customTags, spec)
+
+    if (isKnownNearNeutralProfile(finalSpec)) {
+        return ProcessorWork.DiagnosticSkip("near-neutral:${finalSpec.profile}")
     }
 
     val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
 
-    return ProcessorWork.Execute(PhotoAlgorithmPayload(target, spec))
+    return ProcessorWork.Execute(PhotoAlgorithmPayload(target, finalSpec))
+}
+
+private fun applyDocumentColorModeOverride(
+    customTags: Map<String, String>,
+    spec: PhotoAlgorithmSpec
+): PhotoAlgorithmSpec {
+    val tagValue = customTags["documentColorMode"] ?: return spec
+    return when (tagValue) {
+        "color-neutral" -> spec.copy(
+            monochromeMix = 0f,
+            saturation = 1f
+        )
+        "color-enhanced" -> spec.copy(
+            monochromeMix = 0f,
+            saturation = 1.15f
+        )
+        "grayscale" -> spec.copy(
+            monochromeMix = 1f,
+            saturation = 0f
+        )
+        "black-and-white" -> spec.copy(
+            monochromeMix = 1f,
+            saturation = 0f,
+            contrast = max(spec.contrast, 1.2f)
+        )
+        else -> spec
+    }
 }
 
 private fun isKnownNearNeutralProfile(spec: PhotoAlgorithmSpec): Boolean {
@@ -241,10 +276,26 @@ internal class PhotoAlgorithmPostProcessor(
                 } catch (e: OutOfMemoryError) {
                     Log.e(TAG, "Algorithm render failed: out of memory", e)
                     result.addPipelineNotes("algorithm-render:failed:oom")
+                        .addStructuredPostProcessFailure(
+                            PostProcessFailure(
+                                stage = PostProcessFailureStage.ALGORITHM,
+                                cause = PostProcessFailureCause.OUT_OF_MEMORY,
+                                integrity = PostProcessOutputIntegrity.ORIGINAL_INTACT,
+                                disposition = PostProcessFailureDisposition.RECOVERABLE
+                            )
+                        )
                 } catch (e: Throwable) {
                     e.rethrowIfCancellationOrFatal()
                     Log.w(TAG, "Algorithm render failed", e)
                     result.addPipelineNotes("algorithm-render:failed:render-exception")
+                        .addStructuredPostProcessFailure(
+                            PostProcessFailure(
+                                stage = PostProcessFailureStage.ALGORITHM,
+                                cause = PostProcessFailureCause.EXCEPTION,
+                                integrity = PostProcessOutputIntegrity.ORIGINAL_INTACT,
+                                disposition = PostProcessFailureDisposition.RECOVERABLE
+                            )
+                        )
                 } finally {
                     val resolvedMask = maskResolve
                     if (resolvedMask is MaskResolveResult.Available) {
@@ -334,14 +385,36 @@ internal class PhotoAlgorithmPostProcessor(
                 "algorithm-render:skipped:${renderResult.reason}"
             )
 
-            is ProcessorEditorResult.Failed -> result.addPipelineNotes(
-                "algorithm-render:failed:${renderResult.reason}"
-            )
+            is ProcessorEditorResult.Failed -> {
+                val (cause, integrity) = algorithmFailureMapping(renderResult.reason)
+                val structuredFailure = PostProcessFailure(
+                    stage = PostProcessFailureStage.ALGORITHM,
+                    cause = cause,
+                    integrity = integrity,
+                    disposition = PostProcessFailureDisposition.RECOVERABLE
+                )
+                result.addPipelineNotes(
+                    "algorithm-render:failed:${renderResult.reason}"
+                ).addStructuredPostProcessFailure(structuredFailure)
+            }
 
             else -> result
         }
     }
 }
+
+internal fun algorithmFailureMapping(reason: String): Pair<PostProcessFailureCause, PostProcessOutputIntegrity> =
+    when (reason) {
+        "decode-failed" -> PostProcessFailureCause.DECODE_FAILED to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "decode-oom" -> PostProcessFailureCause.OUT_OF_MEMORY to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "decode-exception" -> PostProcessFailureCause.DECODE_FAILED to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "style-oom" -> PostProcessFailureCause.OUT_OF_MEMORY to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "style-exception" -> PostProcessFailureCause.BITMAP_OPERATION to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "encode-oom" -> PostProcessFailureCause.OUT_OF_MEMORY to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "encode-failed" -> PostProcessFailureCause.ENCODE to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "output-unavailable" -> PostProcessFailureCause.OUTPUT_UNAVAILABLE to PostProcessOutputIntegrity.POSSIBLY_MODIFIED
+        else -> PostProcessFailureCause.EXCEPTION to PostProcessOutputIntegrity.ORIGINAL_INTACT
+    }
 
 internal class AndroidPhotoAlgorithmEditor(
     context: Context
@@ -1305,6 +1378,13 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
             if (!algorithmEditor.writeEncodedBytes(target, finalBytes)) {
                 return@withContext result.addPipelineNotes(
                     "combined-render:failed:output-unavailable"
+                ).addStructuredPostProcessFailure(
+                    PostProcessFailure(
+                        stage = PostProcessFailureStage.COMPOSITE,
+                        cause = PostProcessFailureCause.OUTPUT_UNAVAILABLE,
+                        integrity = PostProcessOutputIntegrity.POSSIBLY_MODIFIED,
+                        disposition = PostProcessFailureDisposition.RECOVERABLE
+                    )
                 )
             }
             val tWriteDone = System.currentTimeMillis()
@@ -1330,10 +1410,26 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
         } catch (e: OutOfMemoryError) {
             Log.e(TAG, "Algorithm combined render failed: out of memory", e)
             result.addPipelineNotes("combined-render:failed:oom")
+                .addStructuredPostProcessFailure(
+                    PostProcessFailure(
+                        stage = PostProcessFailureStage.COMPOSITE,
+                        cause = PostProcessFailureCause.OUT_OF_MEMORY,
+                        integrity = PostProcessOutputIntegrity.ORIGINAL_INTACT,
+                        disposition = PostProcessFailureDisposition.RECOVERABLE
+                    )
+                )
         } catch (e: Throwable) {
             e.rethrowIfCancellationOrFatal()
             Log.w(TAG, "Algorithm combined render failed", e)
             result.addPipelineNotes("combined-render:failed:render-exception")
+                .addStructuredPostProcessFailure(
+                    PostProcessFailure(
+                        stage = PostProcessFailureStage.COMPOSITE,
+                        cause = PostProcessFailureCause.EXCEPTION,
+                        integrity = PostProcessOutputIntegrity.ORIGINAL_INTACT,
+                        disposition = PostProcessFailureDisposition.RECOVERABLE
+                    )
+                )
         } finally {
             if (finalBitmap != null && finalBitmap !== workingBitmap) finalBitmap.recycle()
             workingBitmap.recycle()
@@ -1361,9 +1457,18 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
                         is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
                             "algorithm-render:skipped:${editorResult.reason}"
                         )
-                        is ProcessorEditorResult.Failed -> result.addPipelineNotes(
-                            "algorithm-render:failed:${editorResult.reason}"
-                        )
+                        is ProcessorEditorResult.Failed -> {
+                            val (cause, integrity) = algorithmFailureMapping(editorResult.reason)
+                            result.addPipelineNotes("algorithm-render:failed:${editorResult.reason}")
+                                .addStructuredPostProcessFailure(
+                                    PostProcessFailure(
+                                        stage = PostProcessFailureStage.ALGORITHM,
+                                        cause = cause,
+                                        integrity = integrity,
+                                        disposition = PostProcessFailureDisposition.RECOVERABLE
+                                    )
+                                )
+                        }
                         else -> result
                     }
                     maskNotes.fold(baseResult) { acc, note -> acc.addPipelineNotes(note) }
@@ -1375,7 +1480,18 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
                             r.timingNote ?: "algorithm-render:timing:unavailable"
                         )
                         is ProcessorEditorResult.Skipped -> result.addPipelineNotes("algorithm-render:skipped:${r.reason}")
-                        is ProcessorEditorResult.Failed -> result.addPipelineNotes("algorithm-render:failed:${r.reason}")
+                        is ProcessorEditorResult.Failed -> {
+                            val (cause, integrity) = algorithmFailureMapping(r.reason)
+                            result.addPipelineNotes("algorithm-render:failed:${r.reason}")
+                                .addStructuredPostProcessFailure(
+                                    PostProcessFailure(
+                                        stage = PostProcessFailureStage.ALGORITHM,
+                                        cause = cause,
+                                        integrity = integrity,
+                                        disposition = PostProcessFailureDisposition.RECOVERABLE
+                                    )
+                                )
+                        }
                         else -> result
                     }
                 }
@@ -1386,7 +1502,18 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
                             r.timingNote ?: "algorithm-render:timing:unavailable"
                         )
                         is ProcessorEditorResult.Skipped -> result.addPipelineNotes("algorithm-render:skipped:${r.reason}")
-                        is ProcessorEditorResult.Failed -> result.addPipelineNotes("algorithm-render:failed:${r.reason}")
+                        is ProcessorEditorResult.Failed -> {
+                            val (cause, integrity) = algorithmFailureMapping(r.reason)
+                            result.addPipelineNotes("algorithm-render:failed:${r.reason}")
+                                .addStructuredPostProcessFailure(
+                                    PostProcessFailure(
+                                        stage = PostProcessFailureStage.ALGORITHM,
+                                        cause = cause,
+                                        integrity = integrity,
+                                        disposition = PostProcessFailureDisposition.RECOVERABLE
+                                    )
+                                )
+                        }
                         else -> result
                     }
                 }
@@ -1394,10 +1521,26 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
         } catch (e: OutOfMemoryError) {
             Log.e(TAG, "Algorithm-only render failed: out of memory", e)
             result.addPipelineNotes("algorithm-render:failed:oom")
+                .addStructuredPostProcessFailure(
+                    PostProcessFailure(
+                        stage = PostProcessFailureStage.ALGORITHM,
+                        cause = PostProcessFailureCause.OUT_OF_MEMORY,
+                        integrity = PostProcessOutputIntegrity.ORIGINAL_INTACT,
+                        disposition = PostProcessFailureDisposition.RECOVERABLE
+                    )
+                )
         } catch (e: Throwable) {
             e.rethrowIfCancellationOrFatal()
             Log.w(TAG, "Algorithm-only render failed", e)
             result.addPipelineNotes("algorithm-render:failed:render-exception")
+                .addStructuredPostProcessFailure(
+                    PostProcessFailure(
+                        stage = PostProcessFailureStage.ALGORITHM,
+                        cause = PostProcessFailureCause.EXCEPTION,
+                        integrity = PostProcessOutputIntegrity.ORIGINAL_INTACT,
+                        disposition = PostProcessFailureDisposition.RECOVERABLE
+                    )
+                )
         } finally {
             (maskResolve as? MaskResolveResult.Available)?.bitmap?.recycle()
         }

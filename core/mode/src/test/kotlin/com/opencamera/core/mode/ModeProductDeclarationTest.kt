@@ -121,6 +121,20 @@ class ModeProductDeclarationTest {
     }
 
     @Test
+    fun `document declaration effect profile enables document color mode and scan guide`() {
+        val declaration = ModeId.DOCUMENT.modeProductDeclaration()
+        assertTrue(declaration.effectProfile.usesDocumentColorMode)
+        assertTrue(declaration.effectProfile.usesDocumentScanGuide)
+    }
+
+    @Test
+    fun `photo declaration effect profile does not use document color mode or scan guide`() {
+        val declaration = ModeId.PHOTO.modeProductDeclaration()
+        assertFalse(declaration.effectProfile.usesDocumentColorMode)
+        assertFalse(declaration.effectProfile.usesDocumentScanGuide)
+    }
+
+    @Test
     fun `humanistic declaration effect profile includes filter and frame but not portrait`() {
         val declaration = ModeId.HUMANISTIC.modeProductDeclaration()
         assertTrue(declaration.effectProfile.usesFilter)

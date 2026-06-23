@@ -8,10 +8,13 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
+import android.text.TextPaint
+import android.text.TextUtils
 import android.util.AttributeSet
 import android.view.View
-import com.opencamera.core.settings.PreviewTier
-import com.opencamera.core.settings.PreviewWarmth
+import com.opencamera.core.effect.PreviewStop
+import com.opencamera.core.effect.applyFilterRenderSpecToStops
+import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.StylePresetPreview
 
 /**
@@ -49,13 +52,13 @@ internal class StylePresetCardTileView @JvmOverloads constructor(
         style = Paint.Style.FILL
         color = Color.argb(40, 255, 255, 255)
     }
-    private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(248, 248, 250, 252) // oc_text_primary
         textSize = 11f * context.resources.displayMetrics.scaledDensity
         typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
     }
-    private val moodPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val moodPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(203, 203, 213, 225) // oc_text_secondary
         textSize = 9f * context.resources.displayMetrics.scaledDensity
         textAlign = Paint.Align.CENTER
@@ -63,59 +66,71 @@ internal class StylePresetCardTileView @JvmOverloads constructor(
 
     private var currentModel: StylePresetCardRenderModel? = null
     private var tileCornerRadius: Float = 8f * context.resources.displayMetrics.density
+    private var pendingSelected: Boolean = false
 
     fun bind(model: StylePresetCardRenderModel) {
         currentModel = model
+        pendingSelected = false
 
         titlePaint.textSize = 11f * context.resources.displayMetrics.scaledDensity
         moodPaint.textSize = 9f * context.resources.displayMetrics.scaledDensity
 
         alpha = if (model.isEnabled) 1f else 0.5f
 
-        computePreviewColors(model.preview)
+        computePreviewColors(model.preview, model.spec)
         previewGradient = null
 
         invalidate()
     }
 
-    private fun computePreviewColors(preview: StylePresetPreview) {
-        val (topColor, bottomColor) = when {
-            preview.monochromeLevel >= 0.65f -> {
-                val level = (180 - preview.monochromeLevel * 100).toInt().coerceIn(80, 200)
-                Pair(Color.rgb(level, level, level), Color.rgb(level / 2, level / 2, level / 2))
-            }
-            preview.monochromeLevel > 0.3f -> {
-                val level = (220 - preview.monochromeLevel * 80).toInt().coerceIn(140, 230)
-                Pair(Color.rgb(level, level, level), Color.rgb(level / 3, level / 3, level / 3))
-            }
-            else -> {
-                val warmthBias = when (preview.warmthDirection) {
-                    PreviewWarmth.WARM -> 0.12f
-                    PreviewWarmth.COOL -> -0.08f
-                    PreviewWarmth.NEUTRAL -> 0f
-                }
-                val contrastBias = when (preview.contrastTier) {
-                    PreviewTier.HIGH -> 0.15f
-                    PreviewTier.LOW -> -0.1f
-                    PreviewTier.NEUTRAL -> 0f
-                }
-                val brightnessBias = when (preview.brightnessTier) {
-                    PreviewTier.HIGH -> 0.12f
-                    PreviewTier.LOW -> -0.08f
-                    PreviewTier.NEUTRAL -> 0f
-                }
-                val base = 120
-                val topR = (base + 50 + contrastBias * 60 + warmthBias * 40).toInt().coerceIn(60, 240)
-                val topG = (base + 40 + contrastBias * 40 - warmthBias * 10).toInt().coerceIn(60, 230)
-                val topB = (base + 30 - warmthBias * 40 - contrastBias * 10).toInt().coerceIn(60, 220)
-                val btmR = (base - 30 + brightnessBias * 50 + warmthBias * 30).toInt().coerceIn(30, 180)
-                val btmG = (base - 40 + brightnessBias * 30 - warmthBias * 15).toInt().coerceIn(30, 170)
-                val btmB = (base - 30 - warmthBias * 30 - brightnessBias * 10).toInt().coerceIn(30, 160)
-                Pair(Color.rgb(topR, topG, topB), Color.rgb(btmR, btmG, btmB))
-            }
+    /**
+     * Immediately reflect selection visually before the render model arrives,
+     * giving the user frame-accurate click feedback.
+     */
+    fun setPendingSelected(selected: Boolean) {
+        if (pendingSelected == selected) return
+        pendingSelected = selected
+        invalidate()
+    }
+
+    /**
+     * Scene reference stops: sky blue → neutral gray → warm highlight → dark shadow.
+     * These 4 fixed stops simulate a photographic scene whose colors are
+     * then transformed by the filter's [FilterRenderSpec] to show the
+     * characteristic tonal/color shift of the style preset.
+     */
+    private val sceneStops = listOf(
+        PreviewStop(Color.rgb(135, 180, 220), 0f),
+        PreviewStop(Color.rgb(160, 160, 165), 0.35f),
+        PreviewStop(Color.rgb(220, 190, 155), 0.65f),
+        PreviewStop(Color.rgb(50, 45, 55), 1f)
+    )
+
+    private fun computePreviewColors(
+        preview: StylePresetPreview,
+        spec: FilterRenderSpec?
+    ) {
+        val transformed = if (spec != null) {
+            applyFilterRenderSpecToStops(spec, sceneStops)
+        } else {
+            sceneStops
         }
-        previewColors = intArrayOf(topColor, bottomColor)
-        previewFractions = floatArrayOf(0f, 1f)
+
+        // Monochrome override: for high monochrome level, force grayscale gradient
+        if (preview.monochromeLevel >= 0.65f) {
+            val hiLevel = (180 - preview.monochromeLevel * 100).toInt().coerceIn(80, 200)
+            val loLevel = hiLevel / 2
+            previewColors = intArrayOf(
+                Color.rgb(hiLevel, hiLevel, hiLevel),
+                Color.rgb(hiLevel, hiLevel, hiLevel),
+                Color.rgb(loLevel, loLevel, loLevel),
+                Color.rgb(loLevel, loLevel, loLevel)
+            )
+            previewFractions = floatArrayOf(0f, 0.4f, 0.7f, 1f)
+        } else {
+            previewColors = IntArray(transformed.size) { transformed[it].color }
+            previewFractions = FloatArray(transformed.size) { transformed[it].fraction }
+        }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -148,16 +163,26 @@ internal class StylePresetCardTileView @JvmOverloads constructor(
 
         val previewBottom = previewRect.bottom
         val titleY = previewBottom + 13f * resources.displayMetrics.scaledDensity
-        val titleText = currentModel?.title?.take(8) ?: ""
+        val titleRaw = currentModel?.title ?: ""
+        val availableWidth = w - 2f * 4f * resources.displayMetrics.density
+        val titleText = if (titleRaw.isNotEmpty()) {
+            TextUtils.ellipsize(titleRaw, titlePaint, availableWidth, TextUtils.TruncateAt.END)
+                .toString()
+        } else ""
+
         canvas.drawText(titleText, w / 2f, titleY, titlePaint)
 
         val moodY = titleY + 13f * resources.displayMetrics.scaledDensity
-        val moodText = currentModel?.moodLabel?.take(10) ?: ""
+        val moodRaw = currentModel?.moodLabel ?: ""
+        val moodText = if (moodRaw.isNotEmpty()) {
+            TextUtils.ellipsize(moodRaw, moodPaint, availableWidth, TextUtils.TruncateAt.END)
+                .toString()
+        } else ""
         if (moodText.isNotEmpty()) {
             canvas.drawText(moodText, w / 2f, moodY, moodPaint)
         }
 
-        val paint = if (currentModel?.isSelected == true) selectionPaint else deselectionPaint
+        val paint = if (pendingSelected || currentModel?.isSelected == true) selectionPaint else deselectionPaint
         canvas.drawRoundRect(0f, 0f, w, h, tileCornerRadius, tileCornerRadius, paint)
     }
 }

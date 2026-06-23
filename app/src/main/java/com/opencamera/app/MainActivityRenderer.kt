@@ -7,6 +7,22 @@ internal fun shouldShowStylePresetCardRail(route: CockpitPanelRoute): Boolean {
     return route is CockpitPanelRoute.StyleLab
 }
 
+internal fun shouldShowFilterLabPanel(route: CockpitPanelRoute): Boolean {
+    return route is CockpitPanelRoute.ColorLab ||
+        route is CockpitPanelRoute.CheckInStylePanel
+}
+
+internal fun shouldRunPanelTransition(route: CockpitPanelRoute): Boolean {
+    return when (route) {
+        is CockpitPanelRoute.StyleLab,
+        is CockpitPanelRoute.StyleStrip,
+        is CockpitPanelRoute.None,
+        is CockpitPanelRoute.CropEdit,
+        is CockpitPanelRoute.Export -> false
+        else -> true
+    }
+}
+
 internal data class MainActivityPrimaryRenderModels(
     val modeTrack: ModeTrackRenderModel,
     val modeAction: ModeActionRenderModel,
@@ -46,7 +62,7 @@ internal class MainActivityRenderer(
         filterLab.renderPage(models.filterLabPage)
     }
 
-    fun renderPanelVisibility(activePanelRoute: CockpitPanelRoute) {
+    fun renderPanelVisibility(activePanelRoute: CockpitPanelRoute, isStyleEntryVisible: Boolean = true) {
         val route = activePanelRoute
         val routeChanged = route != lastRenderedPanelRoute
 
@@ -58,9 +74,7 @@ internal class MainActivityRenderer(
 
         // Set final visibility deterministically for all panels.
         views.settingsPanel.panel.isVisible = route.isSettingsOpen
-        views.filterLab.panel.isVisible = route is CockpitPanelRoute.StyleLab ||
-            route is CockpitPanelRoute.ColorLab ||
-            route is CockpitPanelRoute.CheckInStylePanel
+        views.filterLab.panel.isVisible = shouldShowFilterLabPanel(route)
         if (route is CockpitPanelRoute.ColorLab) {
             views.filterLab.panel.isNestedScrollingEnabled = false
             views.filterLab.panel.overScrollMode = android.view.View.OVER_SCROLL_NEVER
@@ -68,12 +82,14 @@ internal class MainActivityRenderer(
             views.filterLab.panel.isNestedScrollingEnabled = true
             views.filterLab.panel.overScrollMode = android.view.View.OVER_SCROLL_ALWAYS
         }
-        views.documentBatchOrganizer.panel.isVisible = route is CockpitPanelRoute.DocumentBatchOrganizer
+        views.documentBatchOrganizer.panel.isVisible = route is CockpitPanelRoute.DocumentBatchOrganizer ||
+            route is CockpitPanelRoute.BatchOverview
         views.filterStrip.scroll.isVisible = route is CockpitPanelRoute.StyleStrip
 
         views.bottomCockpit.stylePresetCardRail.isVisible = shouldShowStylePresetCardRail(route)
         views.quickPanel.panel.isVisible = route is CockpitPanelRoute.QuickBubble
-        views.panelDismissScrim.isVisible = route.isAnyPanelOpen && route !is CockpitPanelRoute.StyleStrip
+        views.panelDismissScrim.isVisible = route.isAnyPanelOpen
+            && route !is CockpitPanelRoute.StyleStrip
 
         // Reset panel transforms to final state so cancelled animations don't leak.
         if (route.isAnyPanelOpen) {
@@ -93,7 +109,7 @@ internal class MainActivityRenderer(
 
         if (routeChanged) {
             // Run transition for the newly visible panel.
-            if (route.isAnyPanelOpen) {
+            if (shouldRunPanelTransition(route)) {
                 transitionController.transition(opening = true)
             }
 
@@ -111,6 +127,7 @@ internal class MainActivityRenderer(
 
         views.topBar.colorLabEntry.alpha = if (route is CockpitPanelRoute.ColorLab) 1f else 0.92f
         views.topBar.settingsEntry.alpha = if (route.isSettingsOpen) 1f else 0.92f
+        views.topBar.filterEntry.isVisible = isStyleEntryVisible
         views.topBar.filterEntry.alpha = if (route is CockpitPanelRoute.StyleLab || route is CockpitPanelRoute.CheckInStylePanel) 1f else 0.92f
         views.quickPanel.launcher.alpha = if (route is CockpitPanelRoute.QuickBubble) 1f else 0.86f
     }
@@ -121,12 +138,21 @@ internal class MainActivityRenderer(
 
     private fun activePanelView(route: CockpitPanelRoute): View? = when (route) {
         is CockpitPanelRoute.Settings -> views.settingsPanel.panel
-        is CockpitPanelRoute.StyleLab,
         is CockpitPanelRoute.ColorLab,
         is CockpitPanelRoute.CheckInStylePanel -> views.filterLab.panel
-        is CockpitPanelRoute.DocumentBatchOrganizer -> views.documentBatchOrganizer.panel
+        is CockpitPanelRoute.DocumentBatchOrganizer,
+        is CockpitPanelRoute.BatchOverview -> views.documentBatchOrganizer.panel
         is CockpitPanelRoute.QuickBubble -> views.quickPanel.panel
         is CockpitPanelRoute.DevConsole -> views.devConsole.panel
+        is CockpitPanelRoute.CropEdit,
+        is CockpitPanelRoute.Export -> null
+        // StyleLab's unique visible surface is `views.bottomCockpit.stylePresetCardRail`,
+        // managed directly by `shouldShowStylePresetCardRail(route)` in `renderPanelVisibility`.
+        // It must NOT map to `views.filterLab.panel` here: doing so would let
+        // `PanelTransitionController.animateOpen` force `filterLab.panel` visible,
+        // breaking the unique-surface invariant (ISSUE-001 / EV-010).
+        // StyleStrip and None likewise drive no slide-in panel.
+        is CockpitPanelRoute.StyleLab,
         is CockpitPanelRoute.StyleStrip,
         is CockpitPanelRoute.None -> null
     }

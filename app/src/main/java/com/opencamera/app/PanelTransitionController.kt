@@ -54,6 +54,10 @@ internal class PanelTransitionController(
      * Immediately apply the final visual state for the given direction
      * without any animation. This is the deterministic fallback used when
      * animations are disabled or cancelled.
+     *
+     * The scrim's visibility is owned by [MainActivityRenderer.renderPanelVisibility];
+     * this method only adjusts alpha so that routes which intentionally hide the
+     * scrim (e.g. StyleStrip) are not forced visible by the transition path.
      */
     fun applyFinalState(opening: Boolean) {
         for (panel in panelViews()) {
@@ -69,8 +73,9 @@ internal class PanelTransitionController(
         }
         val scrim = scrimView()
         if (opening) {
-            scrim.alpha = 1f
-            scrim.visibility = View.VISIBLE
+            if (scrim.visibility == View.VISIBLE) {
+                scrim.alpha = 1f
+            }
         } else {
             scrim.alpha = 0f
             scrim.visibility = View.GONE
@@ -84,14 +89,16 @@ internal class PanelTransitionController(
             panel.translationY = PANEL_SLIDE_OFFSET_PX
         }
         val scrim = scrimView()
-        scrim.visibility = View.VISIBLE
-        scrim.alpha = 0f
-
-        // Animate scrim fade-in
-        scrim.animate()
-            .alpha(1f)
-            .setDuration(durationMs)
-            .start()
+        // Only animate the scrim when the renderer intended it to be visible.
+        // Forcing it visible here would override routes that keep the scrim
+        // hidden (e.g. StyleStrip) — see ISSUE-002.
+        if (scrim.visibility == View.VISIBLE) {
+            scrim.alpha = 0f
+            scrim.animate()
+                .alpha(1f)
+                .setDuration(durationMs)
+                .start()
+        }
 
         // Animate first panel (only one should be visible at a time)
         val primaryPanel = panelViews().firstOrNull { it.visibility == View.VISIBLE }

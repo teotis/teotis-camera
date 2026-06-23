@@ -228,6 +228,51 @@ class PostProcessRecoveryPolicyTest {
         assertEquals(RecoveryAction.CONTINUE, evaluateRecoveryPolicy(failure))
     }
 
+    // ── TIMEOUT recovery policy ───────────────────────────────────────────────
+
+    @Test
+    fun `evaluateTimeoutPolicy returns RECOVER_RELEASE`() {
+        assertEquals(RecoveryAction.RECOVER_RELEASE, evaluateTimeoutPolicy())
+    }
+
+    @Test
+    fun `core evaluateRecoveryPolicy never returns RECOVER_RELEASE`() {
+        // RECOVER_RELEASE is only for timeout — the core policy doesn't return it
+        val combinations = listOf(
+            Triple(PostProcessFailureDisposition.RECOVERABLE, PostProcessOutputIntegrity.ORIGINAL_INTACT, RecoveryAction.CONTINUE),
+            Triple(PostProcessFailureDisposition.RECOVERABLE, PostProcessOutputIntegrity.POSSIBLY_MODIFIED, RecoveryAction.STOP_POSTPROCESS),
+            Triple(PostProcessFailureDisposition.RECOVERABLE, PostProcessOutputIntegrity.UNKNOWN, RecoveryAction.STOP_POSTPROCESS),
+            Triple(PostProcessFailureDisposition.UNRECOVERABLE, PostProcessOutputIntegrity.ORIGINAL_INTACT, RecoveryAction.TERMINATE),
+            Triple(PostProcessFailureDisposition.UNRECOVERABLE, PostProcessOutputIntegrity.POSSIBLY_MODIFIED, RecoveryAction.TERMINATE),
+            Triple(PostProcessFailureDisposition.UNRECOVERABLE, PostProcessOutputIntegrity.UNKNOWN, RecoveryAction.PROPAGATE)
+        )
+        for ((disposition, integrity, expected) in combinations) {
+            val failure = PostProcessFailure(
+                stage = PostProcessFailureStage.COMPOSITE,
+                cause = PostProcessFailureCause.TIMEOUT,
+                integrity = integrity,
+                disposition = disposition,
+                processorName = "Test"
+            )
+            val action = evaluateRecoveryPolicy(failure)
+            assertEquals(
+                expected, action,
+                "evaluateRecoveryPolicy($disposition, $integrity) should be $expected, got $action"
+            )
+            assertTrue(
+                action != RecoveryAction.RECOVER_RELEASE,
+                "Core policy should never return RECOVER_RELEASE"
+            )
+        }
+    }
+
+    // ── RECOVER_RELEASE is in RecoveryAction enum ─────────────────────────
+
+    @Test
+    fun `RecoveryAction entries include RECOVER_RELEASE`() {
+        assertTrue(RecoveryAction.entries.contains(RecoveryAction.RECOVER_RELEASE))
+    }
+
     // ── Ordinary exception behavior (backward compatibility) ───────────────────
 
     @Test

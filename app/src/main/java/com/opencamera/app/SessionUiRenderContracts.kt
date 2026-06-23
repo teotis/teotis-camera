@@ -56,13 +56,27 @@ internal data class SettingsControlRenderModel(
     val isInteractive: Boolean
         get() = enabled && availability != SettingsControlAvailability.UNSUPPORTED && nextAction != null
 
+    val statusText: String
+        get() = when (availability) {
+            SettingsControlAvailability.SUPPORTED -> ""
+            SettingsControlAvailability.DEGRADED,
+            SettingsControlAvailability.UNSUPPORTED -> availabilityLabel.ifEmpty {
+                availability.name.lowercase().replaceFirstChar(Char::titlecase)
+            }
+        }
+
+    val supportText: String
+        get() = supportLabel ?: ""
+
     val buttonLabel: String
         get() = buildString {
             append(label)
             append('\n')
             append(value)
-            append('\n')
-            append(availabilityLabel.ifEmpty { availability.name.lowercase().replaceFirstChar(Char::titlecase) })
+            if (availability != SettingsControlAvailability.SUPPORTED) {
+                append('\n')
+                append(availabilityLabel.ifEmpty { availability.name.lowercase().replaceFirstChar(Char::titlecase) })
+            }
             supportLabel?.let {
                 append(" • ")
                 append(it)

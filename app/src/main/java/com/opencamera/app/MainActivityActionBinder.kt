@@ -67,16 +67,12 @@ internal class MainActivityActionBinder(
         views.topBar.filterEntry.setOnClickListener {
             val activeMode = snapshot().sessionState?.activeMode
             val role = if (activeMode != null) styleSurfaceRole(activeMode) else StyleSurfaceRole.PANEL
-            when (role) {
-                StyleSurfaceRole.FILTER_STRIP -> callbacks.reducePanel(CockpitPanelCommand.ToggleStyleStrip)
-                StyleSurfaceRole.PANEL -> {
-                    if (activeMode == ModeId.CHECK_IN) {
-                        callbacks.reducePanel(CockpitPanelCommand.ToggleCheckInStylePanel)
-                    } else {
-                        callbacks.reducePanel(CockpitPanelCommand.ToggleStyleLab)
-                    }
-                }
-            }
+            // 统一风格入口路由：拍照 / 人文 / 视频 / 打卡四模式下点击风格入口只激活
+            // `CockpitPanelRoute.StyleLab`，由 `stylePresetCardRail` 作为唯一可见表面承载。
+            // `StyleStrip` 与 `CheckInStylePanel` 不再从风格入口激活（ISSUE-001），
+            // 其命令与路由保留以隔离而非删除，避免破坏既有路由器测试与非风格入口引用。
+            if (role == StyleSurfaceRole.HIDDEN) return@setOnClickListener
+            callbacks.reducePanel(CockpitPanelCommand.ToggleStyleLab)
             callbacks.renderAfterPanelChange()
         }
         views.quickPanel.launcher.setOnClickListener {
@@ -91,12 +87,20 @@ internal class MainActivityActionBinder(
             callbacks.toggleLowLightNightAssist()
             callbacks.renderAfterPanelChange()
         }
-        views.documentBatchRail.header.setOnClickListener {
-            callbacks.reducePanel(CockpitPanelCommand.ToggleDocumentBatchOrganizer)
+        views.documentBatchRail.overviewButton.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.NavigateToBatchOverview)
             callbacks.renderAfterPanelChange()
         }
         views.documentBatchOrganizer.close.setOnClickListener {
             callbacks.reducePanel(CockpitPanelCommand.CloseDocumentBatchOrganizer)
+            callbacks.renderAfterPanelChange()
+        }
+        views.documentBatchOrganizer.continueShooting.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.CloseBatchOverview)
+            callbacks.renderAfterPanelChange()
+        }
+        views.documentBatchOrganizer.exportButton.setOnClickListener {
+            callbacks.reducePanel(CockpitPanelCommand.NavigateToExport)
             callbacks.renderAfterPanelChange()
         }
     }
@@ -148,7 +152,13 @@ internal class MainActivityActionBinder(
 
         // Quick panel
         views.quickPanel.grid.setOnClickListener {
-            callbacks.applySettingsControl(snapshot().settingsPage?.commonSection?.gridMode)
+            val settings = snapshot().sessionState?.settings?.persisted ?: return@setOnClickListener
+            callbacks.applySettingsAction(PersistedSettingsAction.UpdateGridMode(
+                com.opencamera.core.settings.CompositionGridMode.entries.let { modes ->
+                    val idx = modes.indexOf(settings.common.gridMode)
+                    modes[(idx + 1) % modes.size]
+                }
+            ))
         }
 
         views.quickPanel.resolution.setOnClickListener {
@@ -178,10 +188,26 @@ internal class MainActivityActionBinder(
             callbacks.applySettingsAction(PersistedSettingsAction.UpdatePhotoWatermarkTemplate(nextTemplateId))
         }
         views.quickPanel.livePhoto.setOnHapticClickListener {
-            callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.livePhoto)
+            val settings = snapshot().sessionState?.settings?.persisted ?: return@setOnHapticClickListener
+            callbacks.applySettingsAction(PersistedSettingsAction.UpdateLivePhotoDefault(
+                !settings.photo.livePhotoEnabledByDefault
+            ))
         }
         views.quickPanel.timer.setOnClickListener {
-            callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.countdown)
+            val state = snapshot().sessionState ?: return@setOnClickListener
+            val settings = state.settings.persisted
+            val catalog = state.settings.catalog
+            val nextAction = settings.photo.countdownDuration.let { current ->
+                catalog.countdownOptions
+                    .sortedBy(com.opencamera.core.settings.CountdownDuration::ordinal)
+                    .let { options ->
+                        val idx = options.indexOf(current)
+                        if (idx >= 0 && options.size > 1) options[(idx + 1) % options.size] else null
+                    }
+            }?.let(PersistedSettingsAction::UpdateCountdownDuration)
+            if (nextAction != null) {
+                callbacks.applySettingsAction(nextAction)
+            }
         }
         views.quickPanel.resetDefaults.setOnClickListener {
             val action = snapshot().quickPanelSheet?.resetQuickAction ?: return@setOnClickListener
@@ -189,9 +215,6 @@ internal class MainActivityActionBinder(
         }
 
         // Settings sub-page buttons
-        views.settingsPanel.gridMode.setOnClickListener {
-            callbacks.applySettingsControl(snapshot().settingsPage?.commonSection?.gridMode)
-        }
         views.settingsPanel.shutterSound.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.commonSection?.shutterSound)
         }
@@ -211,13 +234,13 @@ internal class MainActivityActionBinder(
             callbacks.openWatermarkLabSelector()
         }
         views.settingsPanel.photoLive.setOnHapticClickListener {
-            callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.livePhoto)
+            callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.photoLive)
         }
         views.settingsPanel.photoLiveSaveFormat.setOnHapticClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.liveSaveFormat)
         }
-        views.settingsPanel.photoTimer.setOnClickListener {
-            callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.countdown)
+        views.settingsPanel.photoTimer.setOnHapticClickListener {
+            callbacks.applySettingsControl(snapshot().settingsPage?.photoSection?.photoTimer)
         }
         views.settingsPanel.videoResolution.setOnClickListener {
             callbacks.applySettingsControl(snapshot().settingsPage?.videoSection?.resolution)

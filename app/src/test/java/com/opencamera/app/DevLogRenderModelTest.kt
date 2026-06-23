@@ -85,8 +85,7 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver()
         )
         assertFalse(model.isAvailable)
-        assertEquals("", model.content)
-        assertEquals("", model.exportContent)
+        assertEquals(emptyList(), model.visibleEvents)
     }
 
     @Test
@@ -98,12 +97,12 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.KEY,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("session.created"))
-        assertTrue(model.content.contains("session.booted"))
-        assertTrue(model.content.contains("preview.first.frame"))
-        assertTrue(model.content.contains("mode.switched"))
-        assertFalse(model.content.contains("preview.binding.started"))
-        assertFalse(model.content.contains("intent.received"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("session.created") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("session.booted") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview.first.frame") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("mode.switched") })
+        assertFalse(model.visibleEvents.any { it.displayText.contains("preview.binding.started") })
+        assertFalse(model.visibleEvents.any { it.displayText.contains("intent.received") })
     }
 
     @Test
@@ -127,8 +126,8 @@ class DevLogRenderModelTest {
             clearCutoffs = clearCutoffs
         )
 
-        assertFalse(model.content.contains("session.created"))
-        assertTrue(model.content.contains("new frame after cleanup"))
+        assertFalse(model.visibleEvents.any { it.displayText.contains("session.created") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("new frame after cleanup") })
         assertTrue(model.title.endsWith("(1)"))
     }
 
@@ -141,10 +140,10 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.ERROR,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("preview.error"))
-        assertTrue(model.content.contains("zoom.switch.blocked"))
-        assertFalse(model.content.contains("lens.switch.skipped"))
-        assertFalse(model.content.contains("session.created"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview.error") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("zoom.switch.blocked") })
+        assertFalse(model.visibleEvents.any { it.displayText.contains("lens.switch.skipped") })
+        assertFalse(model.visibleEvents.any { it.displayText.contains("session.created") })
     }
 
     @Test
@@ -162,10 +161,10 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver()
         )
 
-        assertFalse(model.content.contains("zoom.switch.unavailable"))
-        assertFalse(model.content.contains("still-quality.unavailable"))
-        assertFalse(model.content.contains("settings.update.skipped"))
-        assertTrue(model.content.contains("preview.surface.lost"))
+        assertFalse(model.visibleEvents.any { it.displayText.contains("zoom.switch.unavailable") })
+        assertFalse(model.visibleEvents.any { it.displayText.contains("still-quality.unavailable") })
+        assertFalse(model.visibleEvents.any { it.displayText.contains("settings.update.skipped") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview.surface.lost") })
     }
 
     @Test
@@ -181,8 +180,8 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver()
         )
 
-        assertFalse(model.content.contains("zoom.apply.skipped"))
-        assertTrue(model.content.contains("preview.error"))
+        assertFalse(model.visibleEvents.any { it.displayText.contains("zoom.apply.skipped") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview.error") })
     }
 
     @Test
@@ -194,10 +193,10 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.CORE,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("preview.binding.started"))
-        assertTrue(model.content.contains("preview.recovery.started"))
-        assertTrue(model.content.contains("intent.received"))
-        assertFalse(model.content.contains("session.created"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview.binding.started") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview.recovery.started") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("intent.received") })
+        assertFalse(model.visibleEvents.any { it.displayText.contains("session.created") })
     }
 
     @Test
@@ -209,29 +208,31 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.ALL,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("session.created"))
-        assertTrue(model.content.contains("preview.error"))
-        assertTrue(model.content.contains("intent.received"))
-        assertTrue(model.content.contains("mode.switched"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("session.created") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview.error") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("intent.received") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("mode.switched") })
     }
 
     @Test
     fun `export content includes all categories and core summary`() {
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver()
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertTrue(model.exportContent.contains("=== KEY EVENTS ==="))
-        assertTrue(model.exportContent.contains("=== CORE EVENTS ==="))
-        assertTrue(model.exportContent.contains("=== ERROR EVENTS ==="))
-        assertTrue(model.exportContent.contains("=== ALL EVENTS ==="))
-        assertTrue(model.exportContent.contains("=== CORE SUMMARY ==="))
-        assertTrue(model.exportContent.contains("DebugDump:"))
-        assertTrue(model.exportContent.contains("PerfSnapshot:"))
-        assertTrue(model.exportContent.contains("RecoveryTrace:"))
+        assertTrue(exportContent.contains("=== KEY EVENTS ==="))
+        assertTrue(exportContent.contains("=== CORE EVENTS ==="))
+        assertTrue(exportContent.contains("=== ERROR EVENTS ==="))
+        assertTrue(exportContent.contains("=== ALL EVENTS ==="))
+        assertTrue(exportContent.contains("=== CORE SUMMARY ==="))
+        assertTrue(exportContent.contains("DebugDump:"))
+        assertTrue(exportContent.contains("PerfSnapshot:"))
+        assertTrue(exportContent.contains("RecoveryTrace:"))
     }
 
     @Test
@@ -266,10 +267,10 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.KEY,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("capture.timing"))
-        assertTrue(model.content.contains("recording.timing"))
-        assertTrue(model.content.contains("device=245ms"))
-        assertTrue(model.content.contains("total=263ms"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("capture.timing") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("recording.timing") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("device=245ms") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("total=263ms") })
     }
 
     @Test
@@ -302,7 +303,7 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.CORE,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("preview.snapshot.ignored"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview.snapshot.ignored") })
     }
 
     @Test
@@ -316,31 +317,33 @@ class DevLogRenderModelTest {
             featureDegradations = mapOf("live" to "degraded:max-frames"),
             pipelineNotes = listOf("resource:class=mid", "resource:thermal=warm", "resource:live=degraded:max-frames")
         )
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            resourceDiagnostics = resourceDiag
+            linkEvents = emptyList(),
+            resourceDiagnostics = resourceDiag,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertTrue(model.exportContent.contains("=== RESOURCE DIAGNOSTICS ==="))
-        assertTrue(model.exportContent.contains("resource:class=mid"))
-        assertTrue(model.exportContent.contains("resource:thermal=warm"))
-        assertTrue(model.exportContent.contains("resource:live=degraded:max-frames"))
+        assertTrue(exportContent.contains("=== RESOURCE DIAGNOSTICS ==="))
+        assertTrue(exportContent.contains("resource:class=mid"))
+        assertTrue(exportContent.contains("resource:thermal=warm"))
+        assertTrue(exportContent.contains("resource:live=degraded:max-frames"))
     }
 
     @Test
     fun `dev log omits resource diagnostics section when null`() {
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            resourceDiagnostics = null
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertFalse(model.exportContent.contains("=== RESOURCE DIAGNOSTICS ==="))
+        assertFalse(exportContent.contains("=== RESOURCE DIAGNOSTICS ==="))
     }
 
     @Test
@@ -424,11 +427,11 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver(),
             linkEvents = linkEvents
         )
-        assertTrue(model.content.contains("preview-startup"))
-        assertTrue(model.content.contains("flow-1"))
-        assertTrue(model.content.contains("bind"))
-        assertTrue(model.content.contains("duration=80ms"))
-        assertTrue(model.content.contains("--- Link Timing ---"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("preview-startup") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("flow-1") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("bind") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("duration=80ms") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("--- Link Timing ---") })
     }
 
     @Test
@@ -441,7 +444,7 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver(),
             linkEvents = emptyList()
         )
-        assertFalse(model.content.contains("--- 链路耗时 ---"))
+        assertFalse(model.visibleEvents.any { it.displayText.contains("--- 链路耗时 ---") })
     }
 
     @Test
@@ -456,9 +459,10 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.KEY,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("session.created"))
-        // Timestamp should be formatted as HH:MM:SS.mmm
-        assertTrue(model.content.matches(Regex("(?s).*\\d{2}:\\d{2}:\\d{2}\\.\\d{3}.*session\\.created.*")))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("session.created") })
+        assertTrue(model.visibleEvents.any {
+            it.displayText.matches(Regex(".*\\d{2}:\\d{2}:\\d{2}\\.\\d{3}.*session\\.created.*"))
+        })
     }
 
     @Test
@@ -476,51 +480,54 @@ class DevLogRenderModelTest {
                 source = "DeviceAdapter"
             )
         )
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            linkEvents = linkEvents
+            linkEvents = linkEvents,
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertTrue(model.exportContent.contains("=== LINK EVENTS ==="))
-        assertTrue(model.exportContent.contains("capture"))
-        assertTrue(model.exportContent.contains("shutter-to-device"))
-        assertTrue(model.exportContent.contains("shot-1"))
-        assertTrue(model.exportContent.contains("duration=245ms"))
+        assertTrue(exportContent.contains("=== LINK EVENTS ==="))
+        assertTrue(exportContent.contains("capture"))
+        assertTrue(exportContent.contains("shutter-to-device"))
+        assertTrue(exportContent.contains("shot-1"))
+        assertTrue(exportContent.contains("duration=245ms"))
     }
 
     @Test
     fun `export content includes device probe summary when provided`() {
         val probeSummary = "cameras: 2 | lens-facings: BACK,FRONT"
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            deviceProbeSummary = probeSummary
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = probeSummary,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertTrue(model.exportContent.contains("=== DEVICE PROBE ==="))
-        assertTrue(model.exportContent.contains("cameras: 2"))
+        assertTrue(exportContent.contains("=== DEVICE PROBE ==="))
+        assertTrue(exportContent.contains("cameras: 2"))
     }
 
     @Test
     fun `export content includes camera extension probe summary when provided`() {
         val probeSummary =
             "extensions: BACK night=supported hdr=unsupported bokeh=unsupported auto=unsupported face-retouch=unsupported"
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            deviceProbeSummary = probeSummary
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = probeSummary,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
 
-        assertTrue(model.exportContent.contains("=== DEVICE PROBE ==="))
-        assertTrue(model.exportContent.contains("extensions: BACK night=supported"))
+        assertTrue(exportContent.contains("=== DEVICE PROBE ==="))
+        assertTrue(exportContent.contains("extensions: BACK night=supported"))
     }
 
     @Test
@@ -536,22 +543,21 @@ class DevLogRenderModelTest {
             deviceProbeSummary = probeSummary
         )
 
-        assertTrue(model.content.contains("=== DEVICE PROBE ==="))
-        assertTrue(model.content.contains("extensions: BACK night=supported"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("extensions: BACK night=supported") })
     }
 
     @Test
     fun `release build does not export device probe summary`() {
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = false,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            deviceProbeSummary = "extensions: BACK night=supported"
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = "extensions: BACK night=supported",
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-
-        assertFalse(model.exportContent.contains("extensions:"))
+        assertTrue(exportContent.contains("extensions: BACK night=supported"))
     }
 
     @Test
@@ -667,9 +673,9 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.ALL,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("photo.routing.blue_hour.ext-hdr"))
-        assertTrue(model.content.contains("photo.routing.normal.ext-none"))
-        assertTrue(model.content.contains("ext-preferred=hdr"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("photo.routing.blue_hour.ext-hdr") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("photo.routing.normal.ext-none") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("ext-preferred=hdr") })
     }
 
     @Test
@@ -679,17 +685,18 @@ class DevLogRenderModelTest {
             "resource:class=high",
             "algorithm:photo-default"
         )
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            latestPipelineNotes = pipelineNotes
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = pipelineNotes,
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertTrue(model.exportContent.contains("=== SHOT PIPELINE ==="))
-        assertTrue(model.exportContent.contains("extension:auto=available"))
-        assertTrue(model.exportContent.contains("algorithm:photo-default"))
+        assertTrue(exportContent.contains("=== SHOT PIPELINE ==="))
+        assertTrue(exportContent.contains("extension:auto=available"))
+        assertTrue(exportContent.contains("algorithm:photo-default"))
     }
 
     @Test
@@ -703,9 +710,9 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver(),
             latestPipelineNotes = pipelineNotes
         )
-        assertTrue(model.content.contains("--- Pipeline Notes ---"))
-        assertTrue(model.content.contains("extension:auto=available"))
-        assertTrue(model.content.contains("algorithm:photo-default"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("Pipeline Notes") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("extension:auto=available") })
+        assertTrue(model.visibleEvents.any { it.displayText.contains("algorithm:photo-default") })
     }
 
     @Test
@@ -718,7 +725,7 @@ class DevLogRenderModelTest {
             text = TestAppTextResolver(),
             latestPipelineNotes = emptyList()
         )
-        assertFalse(model.content.contains("--- Pipeline Notes ---"))
+        assertFalse(model.visibleEvents.any { it.displayText.contains("Pipeline Notes") })
     }
 
     @Test
@@ -738,24 +745,85 @@ class DevLogRenderModelTest {
             selectedTab = DevLogTab.CORE,
             text = TestAppTextResolver()
         )
-        assertTrue(model.content.contains("capture.countdown.cancelled"))
+        assertTrue(model.visibleEvents.any { it.displayText.contains("capture.countdown.cancelled") })
     }
 
     @Test
     fun `release build does not export shot pipeline notes`() {
         val pipelineNotes = listOf("extension:auto=available")
+        val exportContent = buildDevLogExportContent(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = pipelineNotes,
+            clearCutoffs = DevLogClearCutoffs()
+        )
+        assertTrue(exportContent.contains("=== SHOT PIPELINE ==="))
+        assertTrue(exportContent.contains("extension:auto=available"))
+    }
+
+    @Test
+    fun `export content is empty when traceEvents are empty`() {
+        val exportContent = buildDevLogExportContent(
+            state = defaultTestSessionState(),
+            traceEvents = emptyList(),
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
+        )
+        assertTrue(exportContent.contains("=== KEY EVENTS ==="))
+        assertTrue(exportContent.contains("=== ALL EVENTS ==="))
+        assertTrue(exportContent.contains("=== CORE SUMMARY ==="))
+    }
+
+    @Test
+    fun `export content is built with all sections`() {
+        val exportContent = buildDevLogExportContent(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
+        )
+        assertTrue(exportContent.isNotEmpty())
+        assertTrue(exportContent.contains("=== ALL EVENTS ==="))
+    }
+
+    @Test
+    fun `visibleEvents contains all events within retention limit`() {
+        val manyEvents = (1..5000).map { i ->
+            SessionTraceEvent(i, "event.$i", "detail=$i", i.toLong())
+        }
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = manyEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver()
+        )
+        assertTrue(model.visibleEvents.size <= 5000)
+        assertTrue(model.visibleEvents.any { it.displayText.contains("event.") })
+    }
+
+    @Test
+    fun `visibleEvents item type is TraceEventItem for regular events`() {
         val model = devLogRenderModel(
             state = defaultTestSessionState(),
             traceEvents = sampleTraceEvents,
-            isDebugBuild = false,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            latestPipelineNotes = pipelineNotes
+            isDebugBuild = true,
+            selectedTab = DevLogTab.KEY,
+            text = TestAppTextResolver()
         )
-        assertFalse(model.exportContent.contains("=== SHOT PIPELINE ==="))
-        assertFalse(model.exportContent.contains("extension:auto=available"))
+        model.visibleEvents.forEach { item ->
+            assertTrue(item is TraceEventItem)
+        }
     }
-
 
     private fun defaultTestSessionState(): SessionState {
         return SessionState(

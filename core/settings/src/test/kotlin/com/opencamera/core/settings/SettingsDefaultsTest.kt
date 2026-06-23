@@ -13,6 +13,7 @@ package com.opencamera.core.settings
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -143,8 +144,9 @@ class SettingsDefaultsTest {
     }
 
     @Test
-    fun `pure-text template uses TEXT_OVERLAY kind`() {
+    fun `pure-text template is kept as translucent bottom bar storage key`() {
         val template = DEFAULT_WATERMARK_TEMPLATES.first { it.id == "pure-text" }
+        assertEquals("Translucent Bottom Bar", template.label)
         assertEquals(WatermarkTemplateKind.TEXT_OVERLAY, template.kind)
         assertEquals(false, template.supportsFrameBorder)
     }
@@ -159,39 +161,52 @@ class SettingsDefaultsTest {
     }
 
     @Test
-    fun `night-street template exists with expected kind and constraints`() {
-        val template = DEFAULT_WATERMARK_TEMPLATES.first { it.id == "night-street" }
-        assertEquals(WatermarkTemplateKind.EXPANDED_FRAME, template.kind)
-        assertEquals(true, template.supportsFrameBorder)
-        assertEquals(
-            setOf("model", "datetime", "location", "camera-params"),
-            template.tokenKeys
-        )
-        assertEquals(
-            setOf(
-                WatermarkTextPlacement.BOTTOM_LEFT,
-                WatermarkTextPlacement.BOTTOM_CENTER,
-                WatermarkTextPlacement.BOTTOM_RIGHT
-            ),
-            template.allowedPlacements
-        )
-        assertEquals(
-            setOf(
-                WatermarkFrameBackground.DARK,
-                WatermarkFrameBackground.SOURCE_BLUR,
-                WatermarkFrameBackground.SOURCE_VIVID_BLUR
-            ),
-            template.allowedFrameBackgrounds
-        )
+    fun `retired watermark templates are not offered by default catalog`() {
+        val ids = DEFAULT_WATERMARK_TEMPLATES.map(WatermarkTemplate::id)
+
+        assertFalse("professional-bottom-bar" in ids)
+        assertFalse("night-street" in ids)
     }
 
     @Test
-    fun `night-street default style uses watermark source blur defaults`() {
+    fun `van-gogh-starry and blue-hour templates are expanded dark frame templates`() {
+        val starry = DEFAULT_WATERMARK_TEMPLATES.first { it.id == "van-gogh-starry" }
+        val blueHour = DEFAULT_WATERMARK_TEMPLATES.first { it.id == "blue-hour" }
+
+        listOf(starry, blueHour).forEach { template ->
+            assertEquals(WatermarkTemplateKind.EXPANDED_FRAME, template.kind)
+            assertEquals(true, template.supportsFrameBorder)
+            assertEquals(
+                setOf("model", "datetime", "location", "camera-params"),
+                template.tokenKeys
+            )
+            assertEquals(
+                setOf(
+                    WatermarkTextPlacement.BOTTOM_LEFT,
+                    WatermarkTextPlacement.BOTTOM_CENTER,
+                    WatermarkTextPlacement.BOTTOM_RIGHT
+                ),
+                template.allowedPlacements
+            )
+            assertEquals(setOf(WatermarkFrameBackground.DARK), template.allowedFrameBackgrounds)
+        }
+    }
+
+    @Test
+    fun `shared dark frame style uses dark blue frame defaults`() {
         val style = PhotoSettings().nightStreetWatermarkStyle
 
         assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, style.textPlacement)
         assertEquals(WatermarkTextScale.NORMAL, style.textScale)
         assertEquals(WatermarkTextOpacity.SOFT, style.textOpacity)
-        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, style.frameBackground)
+        assertEquals(WatermarkFrameBackground.DARK, style.frameBackground)
+    }
+
+    @Test
+    fun `retro frame default style uses calm paper background`() {
+        val style = PhotoSettings().retroFrameWatermarkStyle
+
+        assertEquals(WatermarkTextPlacement.BOTTOM_CENTER, style.textPlacement)
+        assertEquals(WatermarkFrameBackground.WHITE, style.frameBackground)
     }
 }

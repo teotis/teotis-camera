@@ -72,7 +72,7 @@ enum class CheckInScenario(
     ),
     CLARITY(
         id = "clarity",
-        label = "超清",
+        label = "全清",
         filterCategory = FilterProfileCategory.PORTRAIT,
         captureStrategyType = StrategyType.MULTI_FRAME
     );
@@ -153,7 +153,7 @@ private class CheckInModeController(
                 shutterLabel = "Check-in Capture",
                 secondaryActionLabel = "Cycle Check-in Style",
                 tertiaryActionLabel = "Cycle Frame",
-                proActionLabel = if (currentScenario().captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) "超清" else "氛围"
+                proActionLabel = if (currentScenario().captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) "全清" else "氛围"
             ),
             state = ModeState(
                 headline = headline,
@@ -231,7 +231,7 @@ private class CheckInModeController(
         context.eventSink("checkin.scenario.toggled.${scenario.id}")
         updateSnapshot(headline = resolvedEnterHeadline())
         context.onEffectSpecChanged(buildEffectSpec())
-        val label = if (scenario.captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) "超清" else "氛围"
+        val label = if (scenario.captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) "全清" else "氛围"
         return ModeSignal.ShowHint("打卡: $label")
     }
 

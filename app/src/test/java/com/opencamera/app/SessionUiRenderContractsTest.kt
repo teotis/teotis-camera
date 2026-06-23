@@ -100,7 +100,8 @@ class SessionUiRenderContractsTest {
         val label = model.buttonLabel
         assertTrue(label.contains("Shutter Sound"))
         assertTrue(label.contains("On"))
-        assertTrue(label.contains("Supported"))
+        // SUPPORTED items omit availability text from buttonLabel (shown separately as statusText)
+        assertFalse(label.contains("Supported"))
     }
 
     @Test

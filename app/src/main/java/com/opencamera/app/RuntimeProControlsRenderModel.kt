@@ -75,9 +75,10 @@ internal fun runtimeProControlsRenderModel(
             availability = manualCapabilities.iso.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.iso.toSettingsAvailability()),
             supportLabel = manualCapabilities.iso.manualSupportLabel(text),
-            nextAction = nextListValueOrNull(draft.iso, MANUAL_ISO_OPTIONS)
-                ?.let(FeatureCatalogAction::UpdateManualIso)
-                ?.takeIf { isVisible && editingEnabled }
+            nextAction = FeatureCatalogAction.UpdateManualIso(
+                nextNullableListValue(draft.iso, MANUAL_ISO_OPTIONS)
+            )
+                .takeIf { isVisible && editingEnabled }
         ),
         shutterControl = FeatureCatalogControlRenderModel(
             label = text.get(R.string.label_shutter),
@@ -85,11 +86,10 @@ internal fun runtimeProControlsRenderModel(
             availability = manualCapabilities.shutter.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.shutter.toSettingsAvailability()),
             supportLabel = manualCapabilities.shutter.manualSupportLabel(text),
-            nextAction = nextListValueOrNull(
-                draft.shutterSpeedMillis,
-                MANUAL_SHUTTER_OPTIONS
-            )?.let(FeatureCatalogAction::UpdateManualShutterSpeedMillis)
-                ?.takeIf { isVisible && editingEnabled }
+            nextAction = FeatureCatalogAction.UpdateManualShutterSpeedMillis(
+                nextNullableListValue(draft.shutterSpeedMillis, MANUAL_SHUTTER_OPTIONS)
+            )
+                .takeIf { isVisible && editingEnabled }
         ),
         exposureControl = FeatureCatalogControlRenderModel(
             label = text.get(R.string.label_ev),
@@ -97,11 +97,10 @@ internal fun runtimeProControlsRenderModel(
             availability = manualCapabilities.exposureCompensation.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.exposureCompensation.toSettingsAvailability()),
             supportLabel = manualCapabilities.exposureCompensation.manualSupportLabel(text),
-            nextAction = nextListValueOrNull(
-                draft.exposureCompensationSteps,
-                MANUAL_EXPOSURE_OPTIONS
-            )?.let(FeatureCatalogAction::UpdateManualExposureCompensationSteps)
-                ?.takeIf { isVisible && editingEnabled }
+            nextAction = FeatureCatalogAction.UpdateManualExposureCompensationSteps(
+                nextNullableListValue(draft.exposureCompensationSteps, MANUAL_EXPOSURE_OPTIONS)
+            )
+                .takeIf { isVisible && editingEnabled }
         ),
         focusControl = FeatureCatalogControlRenderModel(
             label = text.get(R.string.label_focus),
@@ -110,11 +109,10 @@ internal fun runtimeProControlsRenderModel(
             availability = manualCapabilities.focusDistance.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.focusDistance.toSettingsAvailability()),
             supportLabel = manualCapabilities.focusDistance.manualSupportLabel(text),
-            nextAction = nextListValueOrNull(
-                draft.focusDistanceDiopters,
-                MANUAL_FOCUS_OPTIONS
-            )?.let(FeatureCatalogAction::UpdateManualFocusDistanceDiopters)
-                ?.takeIf { isVisible && editingEnabled }
+            nextAction = FeatureCatalogAction.UpdateManualFocusDistanceDiopters(
+                nextNullableListValue(draft.focusDistanceDiopters, MANUAL_FOCUS_OPTIONS)
+            )
+                .takeIf { isVisible && editingEnabled }
         ),
         apertureControl = FeatureCatalogControlRenderModel(
             label = text.get(R.string.label_aperture),
@@ -122,11 +120,10 @@ internal fun runtimeProControlsRenderModel(
             availability = manualCapabilities.aperture.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.aperture.toSettingsAvailability()),
             supportLabel = manualCapabilities.aperture.manualSupportLabel(text),
-            nextAction = nextListValueOrNull(
-                draft.apertureFNumber,
-                MANUAL_APERTURE_OPTIONS
-            )?.let(FeatureCatalogAction::UpdateManualApertureFNumber)
-                ?.takeIf { isVisible && editingEnabled }
+            nextAction = FeatureCatalogAction.UpdateManualApertureFNumber(
+                nextNullableListValue(draft.apertureFNumber, MANUAL_APERTURE_OPTIONS)
+            )
+                .takeIf { isVisible && editingEnabled }
         ),
         whiteBalanceControl = FeatureCatalogControlRenderModel(
             label = text.get(R.string.label_wb),
@@ -134,11 +131,10 @@ internal fun runtimeProControlsRenderModel(
             availability = manualCapabilities.whiteBalance.toSettingsAvailability(),
             availabilityLabel = text.availabilityLabel(manualCapabilities.whiteBalance.toSettingsAvailability()),
             supportLabel = manualCapabilities.whiteBalance.manualSupportLabel(text),
-            nextAction = nextListValueOrNull(
-                draft.whiteBalanceKelvin,
-                MANUAL_WHITE_BALANCE_OPTIONS
-            )?.let(FeatureCatalogAction::UpdateManualWhiteBalanceKelvin)
-                ?.takeIf { isVisible && editingEnabled }
+            nextAction = FeatureCatalogAction.UpdateManualWhiteBalanceKelvin(
+                nextNullableListValue(draft.whiteBalanceKelvin, MANUAL_WHITE_BALANCE_OPTIONS)
+            )
+                .takeIf { isVisible && editingEnabled }
         )
     )
 }

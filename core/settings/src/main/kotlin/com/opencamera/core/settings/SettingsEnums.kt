@@ -100,6 +100,7 @@ enum class FilterProfileCategory {
     PHOTO,
     PORTRAIT,
     HUMANISTIC,
+    DOCUMENT,
     CUSTOM
 }
 

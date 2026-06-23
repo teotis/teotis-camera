@@ -60,7 +60,7 @@ internal fun sessionDiagnosticsText(
 
 // -- Dev Log --
 
-private val KEY_EVENT_NAMES = setOf(
+internal val KEY_EVENT_NAMES = setOf(
     "session.created", "session.booted", "session.stopped",
     "mode.switched", "lens.switched", "zoom.updated",
     "preview.first.frame", "preview.host.attached", "preview.host.detached",
@@ -72,7 +72,7 @@ private val KEY_EVENT_NAMES = setOf(
     "permissions.updated", "device.capabilities.updated", "settings.updated"
 )
 
-private val CORE_EVENT_NAMES = setOf(
+internal val CORE_EVENT_NAMES = setOf(
     "preview.binding.started", "preview.recovery.started", "preview.recovery.requested",
     "preview.stopped", "preview.snapshot.updated", "preview.snapshot.ignored",
     "capture.countdown.started", "capture.countdown.tick", "capture.countdown.cancelled",
@@ -86,7 +86,7 @@ private val CORE_EVENT_NAMES = setOf(
     "intent.received"
 )
 
-private val ERROR_EVENT_NAMES = setOf(
+internal val ERROR_EVENT_NAMES = setOf(
     "preview.error", "preview.surface.lost", "preview.runtime.issue",
     "preview.recovery.failed", "preview.blocked",
     "capture.failed", "recording.failed", "recording.stop.blocked",
@@ -95,15 +95,15 @@ private val ERROR_EVENT_NAMES = setOf(
     "still-quality.blocked", "still-resolution.blocked", "settings.update.blocked"
 )
 
-private fun isErrorEvent(name: String): Boolean {
+internal fun isErrorEvent(name: String): Boolean {
     return name in ERROR_EVENT_NAMES
 }
 
-private fun escapeLinkValue(value: String): String {
+internal fun escapeLinkValue(value: String): String {
     return value.replace(" ", "_").replace("=", "_")
 }
 
-private fun formatTimestamp(timestampMillis: Long): String {
+internal fun formatTimestamp(timestampMillis: Long): String {
     if (timestampMillis <= 0) return "??:??:??"
     val seconds = (timestampMillis / 1000) % 60
     val minutes = (timestampMillis / 60_000) % 60
@@ -132,8 +132,7 @@ internal fun devLogRenderModel(
             selectedTab = selectedTab,
             title = text.get(R.string.button_dev_entry),
             summaryText = "",
-            content = "",
-            exportContent = ""
+            visibleEvents = emptyList()
         )
     }
 
@@ -166,13 +165,6 @@ internal fun devLogRenderModel(
         return "%02d:%02d:%02d.%03d".format(hours, minutes, seconds, millis)
     }
 
-    fun formatEvents(events: List<SessionTraceEvent>): String {
-        return events.joinToString("\n") { event ->
-            val timeStr = formatTimestamp(event.timestampMillis)
-            "[$timeStr] [${event.domain.label}] ${event.sequence}. ${event.name} -> ${event.detail}"
-        }
-    }
-
     fun timingTotalMillis(event: SessionTraceEvent): Long? {
         if (!event.name.endsWith(".timing")) return null
         val marker = "total="
@@ -183,37 +175,7 @@ internal fun devLogRenderModel(
         return event.detail.substring(valueStart, valueEnd).trim().toLongOrNull()
     }
 
-    fun formatLinkEvents(events: List<com.opencamera.core.session.PerformanceLinkEvent>): String {
-        return events.joinToString("\n") { event ->
-            val parts = mutableListOf(
-                "[Link] flow=${escapeLinkValue(event.flow)}",
-                "stage=${escapeLinkValue(event.stage)}",
-                "status=${event.status.label}"
-            )
-            if (event.correlationId.isNotBlank()) {
-                parts += "id=${escapeLinkValue(event.correlationId)}"
-            }
-            if (event.startElapsedMillis >= 0) {
-                parts += "start=${event.startElapsedMillis}"
-            }
-            if (event.endElapsedMillis != null) {
-                parts += "end=${event.endElapsedMillis}"
-            }
-            if (event.durationMillis != null) {
-                parts += "duration=${event.durationMillis}ms"
-            }
-            if (!event.detail.isNullOrBlank()) {
-                val detail = event.detail!!
-                parts += "detail=${escapeLinkValue(detail)}"
-            }
-            parts += "source=${escapeLinkValue(event.source)}"
-            parts.joinToString(" ")
-        }
-    }
-
     val debugDump = buildSessionDebugDump(state, allEvents, resourceDiagnostics = resourceDiagnostics)
-    val perf = debugDump.perfSnapshot
-    val recovery = debugDump.recoveryTrace
     val resolvedProbeSummary = deviceProbeSummary
         ?: computeDeviceProbeSummary(state.activeDeviceCapabilities)
 
@@ -222,15 +184,6 @@ internal fun devLogRenderModel(
             .takeIf { it.isNotBlank() }
             ?.let { "=== DEVICE PROBE ===\n$it" }
             .orEmpty()
-    }
-
-    val coreSummary = buildString {
-        appendLine("DebugDump: ${debugDump.lifecycle} | ${debugDump.activeMode.name} | preview=${debugDump.previewStatus} | capture=${debugDump.captureStatus} | recording=${debugDump.recordingStatus}")
-        appendLine("PerfSnapshot: last=${perf.lastFirstFrameLatencyMillis ?: "--"} ms, best=${perf.bestFirstFrameLatencyMillis ?: "--"} ms, worst=${perf.worstFirstFrameLatencyMillis ?: "--"} ms, binds=${perf.bindCount}, recoveries=${perf.recoveryCount}")
-        appendLine("RecoveryTrace: ${if (recovery.isRecoveryActive) "active" else "idle"}, last=${recovery.lastRecoveryReason ?: "--"}, recoveredFrame=${recovery.recoveredFirstFrameLatencyMillis ?: "--"} ms, failure=${recovery.lastFailureReason ?: "--"}")
-        debugDump.resourceDiagnostics?.let { res ->
-            appendLine("Resource: thermal=${res.thermalState.tagValue} | class=${res.performanceClass.tagValue} | jobs=${res.activeAlgorithmJobs}/${res.maxConcurrentAlgorithmJobs}")
-        }
     }
 
     val domainFiltered = if (selectedDomain != null) {
@@ -244,75 +197,43 @@ internal fun devLogRenderModel(
         null
     }
 
-    val tabContent = if (domainFiltered != null) {
-        formatEvents(domainFiltered)
-    } else {
-        val baseContent = when (selectedTab) {
-            DevLogTab.KEY -> formatEvents(keyEvents)
-            DevLogTab.CORE -> formatEvents(coreEvents)
-            DevLogTab.ERROR -> formatEvents(errorEvents)
-            DevLogTab.ALL -> formatEvents(allEvents)
+    val visibleEvents: List<DevLogEventItem> = buildList {
+        val baseEvents = domainFiltered ?: when (selectedTab) {
+            DevLogTab.KEY -> keyEvents
+            DevLogTab.CORE -> coreEvents
+            DevLogTab.ERROR -> errorEvents
+            DevLogTab.ALL -> allEvents
+        }
+        baseEvents.forEach { event ->
+            val timeStr = formatTimestamp(event.timestampMillis)
+            add(TraceEventItem(event.sequence, "[$timeStr] [${event.domain.label}] ${event.sequence}. ${event.name} -> ${event.detail}"))
         }
         if (selectedTab == DevLogTab.CORE && visibleLinkEvents.isNotEmpty()) {
-            buildString {
-                if (baseContent.isNotBlank()) {
-                    appendLine(baseContent)
-                    appendLine()
-                }
-                appendLine(text.get(R.string.dev_link_timing_header))
-                append(formatLinkEvents(visibleLinkEvents))
-                val probeBlock = deviceProbeBlock()
-                if (probeBlock.isNotBlank()) {
-                    appendLine()
-                    appendLine()
-                    append(probeBlock)
-                }
+            add(SectionHeaderItem(text.get(R.string.dev_link_timing_header)))
+            visibleLinkEvents.forEach { event ->
+                val parts = mutableListOf(
+                    "[Link] flow=${escapeLinkValue(event.flow)}",
+                    "stage=${escapeLinkValue(event.stage)}",
+                    "status=${event.status.label}"
+                )
+                if (event.correlationId.isNotBlank()) parts += "id=${escapeLinkValue(event.correlationId)}"
+                if (event.startElapsedMillis >= 0) parts += "start=${event.startElapsedMillis}"
+                if (event.endElapsedMillis != null) parts += "end=${event.endElapsedMillis}"
+                if (event.durationMillis != null) parts += "duration=${event.durationMillis}ms"
+                if (!event.detail.isNullOrBlank()) parts += "detail=${escapeLinkValue(event.detail!!)}"
+                parts += "source=${escapeLinkValue(event.source)}"
+                add(LinkEventItem(parts.joinToString(" ")))
+            }
+            val probeBlock = deviceProbeBlock()
+            if (probeBlock.isNotBlank()) {
+                add(SectionHeaderItem(probeBlock))
             }
         } else if (selectedTab == DevLogTab.CORE && deviceProbeBlock().isNotBlank()) {
-            buildString {
-                if (baseContent.isNotBlank()) {
-                    appendLine(baseContent)
-                    appendLine()
-                }
-                append(deviceProbeBlock())
-            }
+            add(SectionHeaderItem(deviceProbeBlock()))
         } else if (selectedTab == DevLogTab.ALL && latestPipelineNotes.isNotEmpty()) {
-            buildString {
-                if (baseContent.isNotBlank()) {
-                    appendLine(baseContent)
-                    appendLine()
-                }
-                appendLine("--- Pipeline Notes ---")
-                latestPipelineNotes.forEach { appendLine(it) }
-            }
-        } else {
-            baseContent
+            add(SectionHeaderItem("--- Pipeline Notes ---"))
+            latestPipelineNotes.forEach { note -> add(SectionHeaderItem(note)) }
         }
-    }
-
-    val exportContent = buildString {
-        appendLine("=== KEY EVENTS ===")
-        appendLine(formatEvents(keyEvents))
-        appendLine("=== CORE EVENTS ===")
-        appendLine(formatEvents(coreEvents))
-        appendLine("=== LINK EVENTS ===")
-        appendLine(formatLinkEvents(visibleLinkEvents))
-        appendLine("=== SHOT PIPELINE ===")
-        latestPipelineNotes.forEach { note -> appendLine(note) }
-        appendLine("=== ERROR EVENTS ===")
-        appendLine(formatEvents(errorEvents))
-        appendLine("=== ALL EVENTS ===")
-        appendLine(formatEvents(allEvents))
-        debugDump.resourceDiagnostics?.let { res ->
-            appendLine("=== RESOURCE DIAGNOSTICS ===")
-            res.pipelineNotes.forEach { note -> appendLine(note) }
-        }
-        if (!resolvedProbeSummary.isNullOrBlank()) {
-            appendLine("=== DEVICE PROBE ===")
-            appendLine(resolvedProbeSummary)
-        }
-        appendLine("=== CORE SUMMARY ===")
-        append(coreSummary)
     }
 
     val lastTiming = traceEvents.lastOrNull { it.name.endsWith(".timing") }
@@ -346,8 +267,7 @@ internal fun devLogRenderModel(
             DevLogTab.ALL -> text.devLogTitleAll(domainFilteredCount ?: allEvents.size)
         },
         summaryText = summaryText,
-        content = tabContent,
-        exportContent = exportContent,
+        visibleEvents = visibleEvents,
         storageUsedDisplay = storageSummary?.usedDisplay ?: "",
         storageCapacityDisplay = storageSummary?.capacityDisplay ?: "",
         storageUsageRatio = storageSummary?.usageRatio ?: 0f,

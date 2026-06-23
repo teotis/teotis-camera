@@ -51,7 +51,7 @@ data class PerformanceSpanSnapshot(
     )
 }
 
-fun createPerformanceLinkRecorder(maxEvents: Int = 100): PerformanceLinkRecorder =
+fun createPerformanceLinkRecorder(maxEvents: Int = 500): PerformanceLinkRecorder =
     InMemoryPerformanceLinkRecorder(maxEvents = maxEvents)
 
 interface PerformanceLinkRecorder {
@@ -72,15 +72,18 @@ interface PerformanceLinkRecorder {
     fun recordEvent(event: PerformanceLinkEvent)
 
     fun snapshot(): List<PerformanceLinkEvent>
+
+    fun snapshotForDisplay(window: Int = 500): List<PerformanceLinkEvent> =
+        snapshot().takeLast(window)
 }
 
 internal typealias ElapsedTimeSource = () -> Long
 
 internal class InMemoryPerformanceLinkRecorder(
-    private val maxEvents: Int = 100,
+    private val maxEvents: Int = 500,
     private val elapsedTimeSource: ElapsedTimeSource = { System.nanoTime() / 1_000_000L }
 ) : PerformanceLinkRecorder {
-    private val events = mutableListOf<PerformanceLinkEvent>()
+    private val events = ArrayDeque<PerformanceLinkEvent>()
 
     override fun startSpan(
         flow: String,
@@ -124,13 +127,20 @@ internal class InMemoryPerformanceLinkRecorder(
         synchronized(events) {
             events += event
             if (events.size > maxEvents) {
-                events.removeAt(0)
+                events.removeFirst()
             }
         }
     }
 
     override fun snapshot(): List<PerformanceLinkEvent> {
         return synchronized(events) { events.toList() }
+    }
+
+    override fun snapshotForDisplay(window: Int): List<PerformanceLinkEvent> {
+        return synchronized(events) {
+            val start = (events.size - window).coerceAtLeast(0)
+            events.toList().subList(start, events.size)
+        }
     }
 }
 

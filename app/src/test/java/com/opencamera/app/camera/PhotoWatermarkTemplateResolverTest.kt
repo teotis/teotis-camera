@@ -138,7 +138,7 @@ class PhotoWatermarkTemplateResolverTest {
     }
 
     @Test
-    fun `retro frame resolver prefers explicit metadata tokens and background override`() {
+    fun `retro frame resolver keeps explicit tokens but rejects source blur background`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "retro-frame",
             watermarkText = "Night Street",
@@ -158,7 +158,7 @@ class PhotoWatermarkTemplateResolverTest {
 
         assertEquals("retro-frame", resolved.templateId)
         assertEquals("Night Street", resolved.title)
-        assertEquals(WatermarkFrameBackground.SOURCE_LIGHT_BLUR, resolved.frameBackground)
+        assertEquals(WatermarkFrameBackground.WHITE, resolved.frameBackground)
         assertEquals(WatermarkTextPlacement.BOTTOM_RIGHT, resolved.placement)
         assertEquals(1.2f, resolved.textScale)
         assertEquals(0.8f, resolved.textOpacity)
@@ -391,14 +391,14 @@ class PhotoWatermarkTemplateResolverTest {
 
         assertEquals("night-street", resolved.templateId)
         assertEquals("OpenCamera", resolved.title)
-        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, resolved.frameBackground)
+        assertEquals(WatermarkFrameBackground.DARK, resolved.frameBackground)
         assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, resolved.placement)
         assertTrue(resolved.usesExpandedFrame)
         assertTrue(resolved.supportingLines.isEmpty())
     }
 
     @Test
-    fun `night street resolver clamps unsupported white background to source blur`() {
+    fun `night street resolver clamps unsupported white background to dark`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "night-street",
             watermarkText = "Night Street",
@@ -411,11 +411,11 @@ class PhotoWatermarkTemplateResolverTest {
         )
 
         assertEquals("night-street", resolved.templateId)
-        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, resolved.frameBackground)
+        assertEquals(WatermarkFrameBackground.DARK, resolved.frameBackground)
     }
 
     @Test
-    fun `night street resolver allows source vivid blur background`() {
+    fun `night street resolver clamps source vivid blur background to dark`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "night-street",
             watermarkText = "Night Street",
@@ -428,11 +428,11 @@ class PhotoWatermarkTemplateResolverTest {
         )
 
         assertEquals("night-street", resolved.templateId)
-        assertEquals(WatermarkFrameBackground.SOURCE_VIVID_BLUR, resolved.frameBackground)
+        assertEquals(WatermarkFrameBackground.DARK, resolved.frameBackground)
     }
 
     @Test
-    fun `night street resolver clamps source light blur to source blur`() {
+    fun `night street resolver clamps source light blur to dark`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "night-street",
             watermarkText = "Night Street",
@@ -445,7 +445,7 @@ class PhotoWatermarkTemplateResolverTest {
         )
 
         assertEquals("night-street", resolved.templateId)
-        assertEquals(WatermarkFrameBackground.SOURCE_BLUR, resolved.frameBackground)
+        assertEquals(WatermarkFrameBackground.DARK, resolved.frameBackground)
     }
 
     @Test

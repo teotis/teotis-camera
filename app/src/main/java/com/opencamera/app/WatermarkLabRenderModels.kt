@@ -258,8 +258,8 @@ internal fun WatermarkTemplate.localizedLabel(text: AppTextResolver): String {
         "retro-frame" -> text.get(R.string.watermark_template_retro_frame)
         "pure-text" -> text.get(R.string.watermark_template_pure_text)
         "blur-four-border" -> text.get(R.string.watermark_template_blur_four_border)
-        "professional-bottom-bar" -> text.get(R.string.watermark_template_professional_bottom_bar)
-        "night-street" -> text.get(R.string.watermark_template_night_street)
+        "van-gogh-starry" -> text.get(R.string.watermark_template_van_gogh_starry)
+        "blue-hour" -> text.get(R.string.watermark_template_blue_hour)
         else -> label
     }
 }

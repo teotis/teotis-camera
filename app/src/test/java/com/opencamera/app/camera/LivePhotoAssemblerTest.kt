@@ -1,5 +1,8 @@
 package com.opencamera.app.camera
 
+import android.net.Uri
+import com.opencamera.app.camera.live.LivePhotoMediaStoreWriter
+import com.opencamera.app.camera.live.MediaStoreVideoRecord
 import com.opencamera.core.media.*
 import com.opencamera.core.settings.LiveSaveFormat
 import kotlinx.coroutines.CancellationException
@@ -9,10 +12,13 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.Mockito.mock
 import java.io.File
 import java.nio.file.Files
 
 class LivePhotoAssemblerTest {
+
+    private fun motionResult(outputUri: String) = MotionPhotoMaterializationResult(outputUri = outputUri)
 
     private fun fakeCapturedResult(
         outputPath: String,
@@ -76,7 +82,7 @@ class LivePhotoAssemblerTest {
                 saveFormat = LiveSaveFormat.STILL_JPEG_ONLY,
                 motionSourceResult = makeMotionSource(),
                 prepareMotionSegment = { _, p -> Result.success(p) },
-                materializeContainer = { Result.success(it) },
+                materializeContainer = { Result.success(motionResult(it)) },
                 writeContentUriPayload = { _, _ -> }
             )
 
@@ -151,7 +157,7 @@ class LivePhotoAssemblerTest {
                 },
                 materializeContainer = { motionPath ->
                     assertEquals(bundle.motionPath, motionPath)
-                    Result.success(stillPath.replace(".jpg", "_MP.jpg"))
+                    Result.success(motionResult(stillPath))
                 },
                 writeContentUriPayload = { _, _ -> }
             )
@@ -205,12 +211,11 @@ class LivePhotoAssemblerTest {
     }
 
     @Test
-    fun `mp4 sidecar materialization success returns materialized diagnostics`() {
-        val tempDir = Files.createTempDirectory("assembler-mp4").toFile()
+    fun `mp4 sidecar without writer emits mediastore-skipped and not success`() {
+        val tempDir = Files.createTempDirectory("assembler-mp4-skipped").toFile()
         try {
             val stillPath = File(tempDir, "capture.jpg").absolutePath
             val motionPath = File(tempDir, "capture.live.mp4").absolutePath
-            // Create motion file so bytes diagnostic is added
             File(motionPath).writeText("fake motion data")
             val result = fakeCapturedResult(stillPath)
             val bundle = LivePhotoBundle(
@@ -240,8 +245,173 @@ class LivePhotoAssemblerTest {
             )
 
             assertNotNull(outcome.livePhotoBundle)
+            assertEquals(LiveBundleStatus.STILL_ONLY_FALLBACK, outcome.livePhotoBundle!!.bundleStatus)
             assertTrue(outcome.diagnostics.contains("motion-photo:motion-segment=materialized"))
             assertTrue(outcome.diagnostics.any { it.startsWith("motion-photo:appended-mp4-bytes=") })
+            assertTrue(outcome.diagnostics.contains("motion-photo:sidecar-mp4=mediastore-skipped"))
+            assertFalse(outcome.diagnostics.contains("motion-photo:sidecar-mp4=mediastore-inserted"))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `mp4 sidecar with successful insert returns mediastore-inserted and verify`() {
+        val tempDir = Files.createTempDirectory("assembler-mp4-inserted").toFile()
+        try {
+            val stillPath = File(tempDir, "capture.jpg").absolutePath
+            val motionPath = File(tempDir, "capture.live.mp4").absolutePath
+            File(motionPath).writeText("fake motion data")
+            val result = fakeCapturedResult(stillPath)
+            val bundle = LivePhotoBundle(
+                stillPath = stillPath,
+                motionPath = motionPath,
+                sidecarPath = File(tempDir, "capture.live.json").absolutePath,
+                motionDurationMillis = 1_500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json"
+            )
+            val frame = makeFrameDescriptor()
+            val motionSource = makeMotionSource(
+                source = LiveMotionSource.PREVIEW_RING_BUFFER,
+                frames = listOf(frame)
+            )
+            val writer = FakeLivePhotoMediaStoreWriter(
+                insertUri = mock(Uri::class.java),
+                verifyRecord = MediaStoreVideoRecord(
+                    uri = "content://media/external/video/media/42",
+                    displayName = "capture.live.mp4",
+                    relativePath = "Pictures/OpenCamera",
+                    mimeType = "video/mp4",
+                    size = "16",
+                    duration = "1500",
+                    isPending = "0"
+                )
+            )
+
+            val outcome = LivePhotoAssembler.assembleLivePhoto(
+                capturedResult = result,
+                livePhotoBundle = bundle,
+                saveFormat = LiveSaveFormat.MOTION_MP4_SIDECAR,
+                motionSourceResult = motionSource,
+                prepareMotionSegment = { frames, motionPath ->
+                    Result.success(motionPath)
+                },
+                materializeContainer = { error("must not be called for MP4 sidecar") },
+                writeContentUriPayload = { _, _ -> },
+                mediaStoreWriter = writer
+            )
+
+            assertNotNull(outcome.livePhotoBundle)
+            assertEquals(LiveBundleStatus.COMPLETE, outcome.livePhotoBundle!!.bundleStatus)
+            assertTrue(outcome.diagnostics.contains("motion-photo:sidecar-mp4=mediastore-inserted"))
+            assertTrue(outcome.diagnostics.any { it.startsWith("motion-photo:sidecar-mp4=verify:") })
+            assertTrue(outcome.diagnostics.any {
+                it == "motion-photo:sidecar-mp4=verify:capture.live.mp4|Pictures/OpenCamera|video/mp4|16|1500|0"
+            })
+            assertFalse(outcome.diagnostics.contains("motion-photo:sidecar-mp4=mediastore-failed:verify:unknown"))
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `mp4 sidecar with failed insert returns mediastore-failed and not success`() {
+        val tempDir = Files.createTempDirectory("assembler-mp4-failed").toFile()
+        try {
+            val stillPath = File(tempDir, "capture.jpg").absolutePath
+            val motionPath = File(tempDir, "capture.live.mp4").absolutePath
+            File(motionPath).writeText("fake motion data")
+            val result = fakeCapturedResult(stillPath)
+            val bundle = LivePhotoBundle(
+                stillPath = stillPath,
+                motionPath = motionPath,
+                sidecarPath = File(tempDir, "capture.live.json").absolutePath,
+                motionDurationMillis = 1_500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json"
+            )
+            val frame = makeFrameDescriptor()
+            val motionSource = makeMotionSource(
+                source = LiveMotionSource.PREVIEW_RING_BUFFER,
+                frames = listOf(frame)
+            )
+            val writer = FakeLivePhotoMediaStoreWriter(
+                insertError = IllegalStateException("Failed to insert MP4 sidecar into MediaStore for capture.live.mp4")
+            )
+
+            val outcome = LivePhotoAssembler.assembleLivePhoto(
+                capturedResult = result,
+                livePhotoBundle = bundle,
+                saveFormat = LiveSaveFormat.MOTION_MP4_SIDECAR,
+                motionSourceResult = motionSource,
+                prepareMotionSegment = { frames, motionPath ->
+                    Result.success(motionPath)
+                },
+                materializeContainer = { error("must not be called for MP4 sidecar") },
+                writeContentUriPayload = { _, _ -> },
+                mediaStoreWriter = writer
+            )
+
+            assertNotNull(outcome.livePhotoBundle)
+            assertEquals(LiveBundleStatus.STILL_ONLY_FALLBACK, outcome.livePhotoBundle!!.bundleStatus)
+            assertTrue(outcome.diagnostics.any {
+                it.startsWith("motion-photo:sidecar-mp4=mediastore-failed:") &&
+                    it.contains("Failed to insert MP4 sidecar into MediaStore")
+            })
+            assertFalse(outcome.diagnostics.contains("motion-photo:sidecar-mp4=mediastore-inserted"))
+            assertTrue(outcome.diagnostics.any { it.startsWith("motion-photo:appended-mp4-bytes=") })
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `mp4 sidecar with verify failure returns mediastore-failed verify`() {
+        val tempDir = Files.createTempDirectory("assembler-mp4-verify-fail").toFile()
+        try {
+            val stillPath = File(tempDir, "capture.jpg").absolutePath
+            val motionPath = File(tempDir, "capture.live.mp4").absolutePath
+            File(motionPath).writeText("fake motion data")
+            val result = fakeCapturedResult(stillPath)
+            val bundle = LivePhotoBundle(
+                stillPath = stillPath,
+                motionPath = motionPath,
+                sidecarPath = File(tempDir, "capture.live.json").absolutePath,
+                motionDurationMillis = 1_500,
+                motionMimeType = "video/mp4",
+                sidecarMimeType = "application/vnd.opencamera.live+json"
+            )
+            val frame = makeFrameDescriptor()
+            val motionSource = makeMotionSource(
+                source = LiveMotionSource.PREVIEW_RING_BUFFER,
+                frames = listOf(frame)
+            )
+            val writer = FakeLivePhotoMediaStoreWriter(
+                insertUri = mock(Uri::class.java),
+                verifyError = IllegalStateException("MediaStore query returned no rows for MP4 sidecar")
+            )
+
+            val outcome = LivePhotoAssembler.assembleLivePhoto(
+                capturedResult = result,
+                livePhotoBundle = bundle,
+                saveFormat = LiveSaveFormat.MOTION_MP4_SIDECAR,
+                motionSourceResult = motionSource,
+                prepareMotionSegment = { frames, motionPath ->
+                    Result.success(motionPath)
+                },
+                materializeContainer = { error("must not be called for MP4 sidecar") },
+                writeContentUriPayload = { _, _ -> },
+                mediaStoreWriter = writer
+            )
+
+            assertNotNull(outcome.livePhotoBundle)
+            assertEquals(LiveBundleStatus.STILL_ONLY_FALLBACK, outcome.livePhotoBundle!!.bundleStatus)
+            assertTrue(outcome.diagnostics.any {
+                it.startsWith("motion-photo:sidecar-mp4=mediastore-failed:verify:") &&
+                    it.contains("MediaStore query returned no rows")
+            })
+            assertFalse(outcome.diagnostics.contains("motion-photo:sidecar-mp4=mediastore-inserted"))
         } finally {
             tempDir.deleteRecursively()
         }
@@ -350,14 +520,13 @@ class LivePhotoAssemblerTest {
                 saveFormat = LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG,
                 motionSourceResult = motionSource,
                 prepareMotionSegment = { _, p -> Result.success(p) },
-                materializeContainer = { Result.success(stillPath) },
+                materializeContainer = { Result.success(motionResult(stillPath)) },
                 writeContentUriPayload = { _, _ -> throw sidecarWriteError }
             )
 
-            // Sidecar failure is non-fatal: still photo was already saved
-            assertNull(outcome.livePhotoBundle)
-            assertTrue(outcome.diagnostics.any { it.contains("device:live-sidecar=failed:") })
-            assertTrue(outcome.diagnostics.contains("device:live-photo=still-only-fallback"))
+            // Sidecar failure is non-fatal: live photo bundle remains available
+            assertNotNull(outcome.livePhotoBundle)
+            assertTrue(outcome.diagnostics.any { it.contains("device:live-diagnostic-sidecar=failed:") })
         } finally {
             tempDir.deleteRecursively()
         }
@@ -384,7 +553,7 @@ class LivePhotoAssemblerTest {
                 saveFormat = LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG,
                 motionSourceResult = makeMotionSource(source = LiveMotionSource.METADATA_ONLY),
                 prepareMotionSegment = { _, p -> Result.success(p) },
-                materializeContainer = { Result.success(stillPath) },
+                materializeContainer = { Result.success(motionResult(stillPath)) },
                 writeContentUriPayload = { _, _ -> }
             )
 
@@ -420,7 +589,7 @@ class LivePhotoAssemblerTest {
             saveFormat = LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG,
             motionSourceResult = makeMotionSource(source = LiveMotionSource.METADATA_ONLY),
             prepareMotionSegment = { _, p -> Result.success(p) },
-            materializeContainer = { Result.success("Pictures/OpenCamera/capture_MP.jpg") },
+            materializeContainer = { Result.success(motionResult("Pictures/OpenCamera/capture_MP.jpg")) },
             writeContentUriPayload = { _, _ -> }
         )
 
@@ -501,7 +670,7 @@ class LivePhotoAssemblerTest {
                 prepareMotionSegment = { _, _ -> Result.success("/tmp/generated.mp4") },
                 materializeContainer = { motionPath ->
                     assertEquals("/tmp/generated.mp4", motionPath)
-                    Result.success(stillPath.replace(".jpg", "_MP.jpg"))
+                    Result.success(motionResult(stillPath))
                 },
                 writeContentUriPayload = { _, _ -> }
             )
@@ -538,7 +707,7 @@ class LivePhotoAssemblerTest {
                 saveFormat = LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG,
                 motionSourceResult = motionSource,
                 prepareMotionSegment = { _, p -> Result.success(p) },
-                materializeContainer = { Result.success(stillPath.replace(".jpg", "_MP.jpg")) },
+                materializeContainer = { Result.success(motionResult(stillPath)) },
                 writeContentUriPayload = { _, _ -> }
             )
 
@@ -584,5 +753,29 @@ class LivePhotoAssemblerTest {
         } finally {
             tempDir.deleteRecursively()
         }
+    }
+}
+
+private class FakeLivePhotoMediaStoreWriter(
+    private val insertUri: Uri? = null,
+    private val insertError: Throwable? = null,
+    private val verifyRecord: MediaStoreVideoRecord? = null,
+    private val verifyError: Throwable? = null
+) : LivePhotoMediaStoreWriter(mock(android.content.Context::class.java)) {
+
+    override fun insertMotionMp4Sidecar(
+        jpegRelativePath: String,
+        mp4DisplayNamePrefix: String,
+        mp4Bytes: ByteArray
+    ): Result<Uri> {
+        insertError?.let { return Result.failure(it) }
+        insertUri?.let { return Result.success(it) }
+        return Result.failure(IllegalStateException("FakeLivePhotoMediaStoreWriter not configured"))
+    }
+
+    override fun verifyMotionMp4Sidecar(uri: Uri): Result<MediaStoreVideoRecord> {
+        verifyError?.let { return Result.failure(it) }
+        verifyRecord?.let { return Result.success(it) }
+        return Result.failure(IllegalStateException("FakeLivePhotoMediaStoreWriter not configured"))
     }
 }

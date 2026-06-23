@@ -146,6 +146,7 @@ data class PhotoSettings(
     val defaultFilterProfileId: String = "photo-original",
     val defaultHumanisticFilterProfileId: String = "humanistic-original",
     val defaultPortraitFilterProfileId: String = "portrait-original",
+    val defaultDocumentFilterProfileId: String = "doc-color-neutral",
     val defaultCheckInScenario: String = "portrait",
     val portraitProfile: PortraitProfile = PortraitProfile.NATIVE,
     val portraitBeautyPreset: PortraitBeautyPreset = PortraitBeautyPreset.AUTHENTIC,
@@ -169,7 +170,7 @@ data class PhotoSettings(
         textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
         textScale = WatermarkTextScale.NORMAL,
         textOpacity = WatermarkTextOpacity.SOFT,
-        frameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR
+        frameBackground = WatermarkFrameBackground.WHITE
     ),
     val pureTextWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
         textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
@@ -193,7 +194,7 @@ data class PhotoSettings(
         textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
         textScale = WatermarkTextScale.NORMAL,
         textOpacity = WatermarkTextOpacity.SOFT,
-        frameBackground = WatermarkFrameBackground.SOURCE_BLUR
+        frameBackground = WatermarkFrameBackground.DARK
     ),
     val livePhotoEnabledByDefault: Boolean = false,
     val liveSaveFormat: LiveSaveFormat = LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG,
@@ -250,6 +251,7 @@ fun PersistedSettings.hasUserAdjustments(target: ResetTarget): Boolean {
         ResetTarget.STYLE -> photo.defaultFilterProfileId != defaults.photo.defaultFilterProfileId ||
             photo.defaultHumanisticFilterProfileId != defaults.photo.defaultHumanisticFilterProfileId ||
             photo.defaultPortraitFilterProfileId != defaults.photo.defaultPortraitFilterProfileId ||
+            photo.defaultDocumentFilterProfileId != defaults.photo.defaultDocumentFilterProfileId ||
             photo.defaultCheckInScenario != defaults.photo.defaultCheckInScenario ||
             photo.styleStrength != defaults.photo.styleStrength ||
             photo.colorLabSpec != defaults.photo.colorLabSpec

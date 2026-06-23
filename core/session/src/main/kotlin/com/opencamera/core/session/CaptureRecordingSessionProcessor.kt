@@ -2,10 +2,17 @@ package com.opencamera.core.session
 
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.EffectiveStillCaptureRecipe
+import com.opencamera.core.effect.RenderRecipe
 import com.opencamera.core.media.CaptureStrategy
+import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.PostProcessFailureCause.TIMEOUT
+import com.opencamera.core.media.PostProcessFailureStage
+import com.opencamera.core.media.PostProcessFailureCause
+import com.opencamera.core.media.PostProcessLivenessDeadline
+import com.opencamera.core.media.ShotConfigSnapshot
 import com.opencamera.core.media.ShotExecutor
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
@@ -14,6 +21,8 @@ import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.hasPostProcessFailures
 import com.opencamera.core.media.isTemporalMedia
+import com.opencamera.core.media.legacyNotePrefix
+import com.opencamera.core.media.legacyNoteSuffix
 import com.opencamera.core.media.outputPathOrNull
 import com.opencamera.core.media.renderUriOrNull
 import com.opencamera.core.media.postProcessFailureSummary
@@ -66,6 +75,27 @@ internal class CaptureRecordingSessionProcessor(
     private var recordingWatchdogJob: Job? = null
     private var recordingElapsedJob: Job? = null
     private val activeShotSpans = mutableMapOf<String, PerformanceSpanSnapshot>()
+    private var documentBatchWatchdogJob: Job? = null
+    private var documentBatchLiveness: PostProcessLivenessDeadline? = null
+    private val forceReleasedShotIds = mutableSetOf<String>()
+    private var postProcessLiveness: PostProcessLivenessDeadline? = null
+    private var postProcessLivenessJob: Job? = null
+    private var postProcessLivenessShot: ShotRequest? = null
+    private var postProcessLivenessConfigSnapshot: ShotConfigSnapshot? = null
+    private val conservativeForceReleasedShotIds = mutableSetOf<String>()
+
+    /**
+     * Extra grace window granted to conservative kinds (live photo / multi-frame) after the
+     * post-process liveness deadline elapses, before the reducer force-releases the shot.
+     *
+     * The deadline itself ([PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS]) already aligns
+     * with the longest [com.opencamera.core.media.AlgorithmJobSpec.timeoutMillis]; conservative
+     * kinds legitimately need additional time because their pipelines run multiple frame passes
+     * plus a composite stage. The grace below is the cooperative-cancel window: the pipeline
+     * has this long to finish on its own after the deadline before [forceReleaseConservativeShot]
+     * tears down [SessionState.activeShot].
+     */
+    private val conservativeLivenessGraceMs: Long = 2_000L
 
     // ── Public queries ──────────────────────────────────────────────
 
@@ -304,6 +334,8 @@ internal class CaptureRecordingSessionProcessor(
             if (shot.mediaType == MediaType.PHOTO) "capture.saving" else "recording.started",
             "shot=${shot.shotId},mode=${currentController().id}"
         )
+        maybeStartDocumentBatchWatchdog(shot)
+        maybeArmPostProcessLiveness(shot)
         // Record link event for device capture started
         activeShotSpans[shot.shotId]?.let { _ ->
             linkRecorder.recordEvent(
@@ -329,6 +361,14 @@ internal class CaptureRecordingSessionProcessor(
     }
 
     private suspend fun handleDataReceived(shotId: String, mediaType: MediaType) {
+        if (shouldForceReleaseDocumentBatchShot(shotId)) {
+            forceReleaseDocumentBatchShot(
+                shotId = shotId,
+                mediaType = mediaType,
+                reason = "deadline-expired:data-received"
+            )
+            return
+        }
         updateState.update { s ->
             val activeShot = s.activeShot ?: return@update s
             if (activeShot.shotId != shotId || mediaType != MediaType.PHOTO) return@update s
@@ -348,7 +388,8 @@ internal class CaptureRecordingSessionProcessor(
                             shotId = shotId,
                             mediaType = mediaType,
                             message = "",
-                            warnBeforeExit = true
+                            warnBeforeExit = true,
+                            livenessAttachment = currentLivenessAttachment()
                         )
                     )
                 )
@@ -404,7 +445,8 @@ internal class CaptureRecordingSessionProcessor(
                             shotId = shotId,
                             mediaType = mediaType,
                             message = "",
-                            warnBeforeExit = true
+                            warnBeforeExit = true,
+                            livenessAttachment = currentLivenessAttachment()
                         )
                     )
                 )
@@ -416,6 +458,29 @@ internal class CaptureRecordingSessionProcessor(
     }
 
     private suspend fun handleShotCompleted(result: ShotResult) {
+        if (result.shotId in forceReleasedShotIds) {
+            trace.record(
+                "shot.completed.force-released.stale",
+                "result=${result.shotId}"
+            )
+            return
+        }
+        if (result.shotId in conservativeForceReleasedShotIds) {
+            trace.record(
+                "shot.completed.conservative-force-released.stale",
+                "result=${result.shotId}"
+            )
+            cancelPostProcessLiveness(result.shotId)
+            return
+        }
+        if (shouldForceReleaseDocumentBatchShot(result.shotId)) {
+            forceReleaseDocumentBatchShot(
+                shotId = result.shotId,
+                mediaType = result.mediaType,
+                reason = "deadline-expired:shot-completed"
+            )
+            return
+        }
         val currentActiveShot = state.value.activeShot
         if (currentActiveShot != null && currentActiveShot.shotId != result.shotId) {
             trace.record(
@@ -498,6 +563,7 @@ internal class CaptureRecordingSessionProcessor(
                         val cropStatus = documentCropStatusFrom(result.pipelineNotes)
                         val cropSuffix = when (cropStatus) {
                             DocumentBatchCropStatus.APPLIED -> " • auto-cropped"
+                            DocumentBatchCropStatus.APPLIED_MANUAL -> " • manually cropped"
                             DocumentBatchCropStatus.SKIPPED -> " • original kept"
                             DocumentBatchCropStatus.FAILED -> " • processing degraded"
                             DocumentBatchCropStatus.NOT_REQUESTED -> ""
@@ -601,6 +667,9 @@ internal class CaptureRecordingSessionProcessor(
                 s.copy(captureStatus = CaptureStatus.IDLE)
             }
         }
+        emitPostProcessLivenessEventsForCompleted(result)
+        cancelDocumentBatchWatchdog(result.shotId)
+        cancelPostProcessLiveness(result.shotId)
     }
 
     private fun latestLivePhotoBundleFor(result: ShotResult): LivePhotoBundle? {
@@ -616,11 +685,35 @@ internal class CaptureRecordingSessionProcessor(
         mediaType: MediaType,
         reason: String
     ) {
+        if (shotId in forceReleasedShotIds) {
+            trace.record(
+                "shot.failed.force-released.stale",
+                "shotId=$shotId,reason=$reason"
+            )
+            return
+        }
+        if (shotId in conservativeForceReleasedShotIds) {
+            trace.record(
+                "shot.failed.conservative-force-released.stale",
+                "shotId=$shotId,reason=$reason"
+            )
+            cancelPostProcessLiveness(shotId)
+            return
+        }
+        if (shouldForceReleaseDocumentBatchShot(shotId)) {
+            forceReleaseDocumentBatchShot(
+                shotId = shotId,
+                mediaType = mediaType,
+                reason = "deadline-expired:shot-failed"
+            )
+            return
+        }
         val currentActiveShot = state.value.activeShot
         if (currentActiveShot == null) {
             clearPendingPostprocessIfMatches(shotId)
             resetCaptureStatusFromTerminalOrDataReceived(shotId, reason)
             trace.record("shot.failed.orphaned", "shotId=$shotId,reason=$reason")
+            cancelPostProcessLiveness(shotId)
             return
         }
         if (currentActiveShot.shotId != shotId) {
@@ -673,6 +766,8 @@ internal class CaptureRecordingSessionProcessor(
         activeShotSpans.remove(shotId)?.let { span ->
             linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = reason)
         }
+        cancelDocumentBatchWatchdog(shotId)
+        cancelPostProcessLiveness(shotId)
     }
 
     private fun clearPendingPostprocessIfMatches(shotId: String) {
@@ -754,6 +849,8 @@ internal class CaptureRecordingSessionProcessor(
         activeShotSpans.remove(shot.shotId)?.let { span ->
             linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = reason)
         }
+        cancelDocumentBatchWatchdog(shot.shotId)
+        cancelPostProcessLiveness(shot.shotId)
     }
 
     // ── Capture strategy ────────────────────────────────────────────
@@ -885,6 +982,355 @@ internal class CaptureRecordingSessionProcessor(
             scope.launch(block = block)
         }
     }
+
+    // ── Document batch liveness watchdog ───────────────────────────
+
+    private fun maybeStartDocumentBatchWatchdog(shot: ShotRequest) {
+        if (shot.mediaType != MediaType.PHOTO) return
+        if (state.value.activeMode != ModeId.DOCUMENT) return
+        val start = elapsedRealtimeMillis()
+        val deadline = PostProcessLivenessDeadline.forShot(
+            shotId = shot.shotId,
+            start = start,
+            budgetMs = PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        documentBatchLiveness = deadline
+        documentBatchWatchdogJob?.cancel()
+        documentBatchWatchdogJob = launchRecordingTimer {
+            delay(deadline.budgetMillis)
+            val stillActive = state.value.activeShot?.shotId == shot.shotId ||
+                state.value.presentation.pendingPostprocess?.shotId == shot.shotId
+            if (!stillActive) return@launchRecordingTimer
+            forceReleaseDocumentBatchShot(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                reason = "document-batch-liveness-deadline"
+            )
+        }
+    }
+
+    private fun cancelDocumentBatchWatchdog(shotId: String?) {
+        if (shotId != null && documentBatchLiveness?.shotId != shotId) return
+        documentBatchWatchdogJob?.cancel()
+        documentBatchWatchdogJob = null
+        documentBatchLiveness = null
+    }
+
+    private fun shouldForceReleaseDocumentBatchShot(shotId: String): Boolean {
+        if (shotId in forceReleasedShotIds) return false
+        val liveness = documentBatchLiveness ?: return false
+        if (liveness.shotId != shotId) return false
+        return liveness.isExpired(elapsedRealtimeMillis())
+    }
+
+    private suspend fun forceReleaseDocumentBatchShot(
+        shotId: String,
+        mediaType: MediaType,
+        reason: String
+    ) {
+        if (shotId in forceReleasedShotIds) return
+        forceReleasedShotIds.add(shotId)
+        val liveness = documentBatchLiveness
+        val nowMs = elapsedRealtimeMillis()
+        val elapsedSinceShutterMs = liveness?.let { nowMs - it.startedAtElapsedMillis } ?: 0L
+        val mode = state.value.activeMode
+        val event = PostProcessLivenessEvent.ForceReleasedFromDocumentBatch(
+            shotId = shotId,
+            mediaType = mediaType,
+            mode = mode,
+            stage = PostProcessLivenessStage.DOCUMENT_BATCH,
+            reason = reason,
+            elapsedSinceShutterMs = elapsedSinceShutterMs.coerceAtLeast(0L),
+            elapsedSincePostprocessStartMs = elapsedSinceShutterMs.coerceAtLeast(0L),
+            itemId = shotId
+        )
+        trace.record("liveness.document.force-release", event.toDiagnosticString())
+        updateState.update { s ->
+            val currentBatch = s.presentation.documentBatch
+            val existingItem = currentBatch.items.firstOrNull { it.shotId == shotId }
+            val updatedItems = if (existingItem != null) {
+                currentBatch.items.map { item ->
+                    if (item.shotId == shotId) item.copy(
+                        cropStatus = DocumentBatchCropStatus.FAILED,
+                        pipelineNotes = item.pipelineNotes + "document:liveness:force-released"
+                    ) else item
+                }
+            } else {
+                val newItem = DocumentBatchItem(
+                    itemId = shotId,
+                    shotId = shotId,
+                    orderIndex = currentBatch.items.size,
+                    outputPath = null,
+                    renderUri = null,
+                    thumbnailSource = ThumbnailSource.Pending,
+                    profileId = null,
+                    scanMode = null,
+                    cropStatus = DocumentBatchCropStatus.FAILED,
+                    pipelineNotes = listOf("document:liveness:force-released")
+                )
+                currentBatch.items + newItem
+            }
+            s.copy(
+                captureStatus = CaptureStatus.IDLE,
+                recordingStatus = RecordingStatus.IDLE,
+                activeShot = null,
+                presentation = s.presentation.copy(
+                    countdownRemainingSeconds = null,
+                    pendingPostprocess = null,
+                    captureReadiness = null,
+                    documentBatch = currentBatch.copy(
+                        items = updatedItems,
+                        latestItemId = updatedItems.lastOrNull()?.itemId ?: currentBatch.latestItemId,
+                        lastMessage = "Page processing timed out"
+                    ),
+                    lastAction = "Document page processing timed out",
+                    lastError = reason
+                )
+            )
+        }
+        cancelDocumentBatchWatchdog(shotId)
+    }
+
+    internal fun documentBatchLivenessForTest(): PostProcessLivenessDeadline? = documentBatchLiveness
+    internal fun forceReleasedShotIdsForTest(): Set<String> = forceReleasedShotIds.toSet()
+
+    // ── Post-process liveness (non-document shots) ─────────────────
+
+    /**
+     * Builds the shot-time [ShotConfigSnapshot] from the current [ShotRequest] so the
+     * post-process pipeline can read frozen UI configuration instead of live settings.
+     *
+     * The snapshot is stored alongside the [PostProcessLivenessDeadline] in
+     * [PendingPostprocessUiState.livenessAttachment] for ordinary still captures.
+     * Conservative kinds keep it in [postProcessLivenessConfigSnapshot] because their
+     * [PendingPostprocessUiState] is not populated until [SessionIntent.ShotCompleted].
+     */
+    private fun buildShotConfigSnapshot(shot: ShotRequest): ShotConfigSnapshot {
+        val recipe = RenderRecipe.from(shot)
+        val isDocumentMode = state.value.activeMode == ModeId.DOCUMENT
+        return ShotConfigSnapshot(
+            watermarkTemplateId = recipe.watermarkTemplateId,
+            frameRatio = recipe.frameRatio ?: FrameRatio.RATIO_4_3,
+            colorRecipeId = recipe.filterProfileId,
+            isDocumentMode = isDocumentMode
+        )
+    }
+
+    private fun currentLivenessAttachment(): PendingPostprocessLivenessAttachment? {
+        val snapshot = postProcessLivenessConfigSnapshot ?: return null
+        return PendingPostprocessLivenessAttachment(
+            configSnapshot = snapshot,
+            liveness = postProcessLiveness
+        )
+    }
+
+    /**
+     * Arms the per-shot post-process liveness watchdog for non-document photo shots.
+     * Document mode is owned by [maybeStartDocumentBatchWatchdog]; video is owned by
+     * [startRecordingWatchdog]. This watchdog covers the post-process window for:
+     *
+     * - Ordinary still captures: protects the DATA_RECEIVED → ShotCompleted gap when
+     *   [activeShot] has already been cleared by rearm but [PendingPostprocessUiState]
+     *   is still set. On deadline, clears pendingPostprocess + captureReadiness and
+     *   emits [PostProcessLivenessEvent.DeadlineExpired].
+     * - Conservative kinds (live photo / multi-frame): protects the ShotStarted →
+     *   ShotCompleted gap during which [activeShot] stays set. On deadline, emits a
+     *   cooperative-cancel trace, waits [conservativeLivenessGraceMs], and if the shot
+     *   is still active force-releases [activeShot] + pendingPostprocess and emits
+     *   [PostProcessLivenessEvent.DeadlineExpired] with mode/shotKind fields.
+     */
+    private fun maybeArmPostProcessLiveness(shot: ShotRequest) {
+        if (shot.mediaType != MediaType.PHOTO) return
+        if (state.value.activeMode == ModeId.DOCUMENT) return
+        val start = elapsedRealtimeMillis()
+        val deadline = PostProcessLivenessDeadline.forShot(
+            shotId = shot.shotId,
+            start = start,
+            budgetMs = PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        postProcessLiveness = deadline
+        postProcessLivenessShot = shot
+        postProcessLivenessConfigSnapshot = buildShotConfigSnapshot(shot)
+        postProcessLivenessJob?.cancel()
+        val isConservative = shot.shotKind != ShotKind.STILL_CAPTURE
+        val shotForWatchdog = shot
+        postProcessLivenessJob = launchRecordingTimer {
+            delay(deadline.budgetMillis)
+            if (isConservative) {
+                trace.record(
+                    "liveness.session.cooperative-cancel",
+                    "shotId=${shotForWatchdog.shotId},mode=${state.value.activeMode},shotKind=${shotForWatchdog.shotKind}"
+                )
+                delay(conservativeLivenessGraceMs)
+                val stillActive = state.value.activeShot?.shotId == shotForWatchdog.shotId ||
+                    state.value.presentation.pendingPostprocess?.shotId == shotForWatchdog.shotId
+                if (!stillActive) return@launchRecordingTimer
+                forceReleaseConservativeShot(shotForWatchdog, reason = "conservative-liveness-deadline")
+            } else {
+                val stillPending = state.value.presentation.pendingPostprocess?.shotId == shotForWatchdog.shotId
+                if (!stillPending) return@launchRecordingTimer
+                forceReleasePostProcessLiveness(shotForWatchdog, reason = "postprocess-liveness-deadline")
+            }
+        }
+    }
+
+    private fun cancelPostProcessLiveness(shotId: String?) {
+        if (shotId != null && postProcessLiveness?.shotId != shotId) return
+        postProcessLivenessJob?.cancel()
+        postProcessLivenessJob = null
+        postProcessLiveness = null
+        postProcessLivenessShot = null
+        postProcessLivenessConfigSnapshot = null
+    }
+
+    private suspend fun forceReleasePostProcessLiveness(
+        shot: ShotRequest,
+        reason: String
+    ) {
+        val liveness = postProcessLiveness
+        val nowMs = elapsedRealtimeMillis()
+        val elapsedSinceShutterMs = liveness?.let { nowMs - it.startedAtElapsedMillis } ?: 0L
+        val mode = state.value.activeMode
+        val event = PostProcessLivenessEvent.DeadlineExpired(
+            shotId = shot.shotId,
+            mediaType = shot.mediaType,
+            mode = mode,
+            stage = PostProcessLivenessStage.MEDIA_POST_PROCESS,
+            reason = reason,
+            elapsedSinceShutterMs = elapsedSinceShutterMs.coerceAtLeast(0L),
+            elapsedSincePostprocessStartMs = elapsedSinceShutterMs.coerceAtLeast(0L),
+            budgetMillis = liveness?.budgetMillis ?: PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS
+        )
+        trace.record("liveness.session.deadline-expired", event.toDiagnosticString())
+        trace.record(
+            "liveness.session.release",
+            "shotId=${shot.shotId} stage=${event.stage.name} reason=$reason"
+        )
+        updateState.update { s ->
+            s.copy(
+                captureStatus = CaptureStatus.IDLE,
+                presentation = s.presentation.copy(
+                    pendingPostprocess = null,
+                    captureReadiness = null,
+                    lastAction = "Previous photo processing timed out",
+                    lastError = reason
+                )
+            )
+        }
+        cancelPostProcessLiveness(shot.shotId)
+    }
+
+    private suspend fun forceReleaseConservativeShot(
+        shot: ShotRequest,
+        reason: String
+    ) {
+        if (shot.shotId in conservativeForceReleasedShotIds) return
+        conservativeForceReleasedShotIds.add(shot.shotId)
+        val liveness = postProcessLiveness
+        val nowMs = elapsedRealtimeMillis()
+        val elapsedSinceShutterMs = liveness?.let { nowMs - it.startedAtElapsedMillis } ?: 0L
+        val mode = state.value.activeMode
+        val budgetWithGrace = (liveness?.budgetMillis ?: PostProcessLivenessDeadline.DEFAULT_BUDGET_MILLIS) +
+            conservativeLivenessGraceMs
+        val event = PostProcessLivenessEvent.DeadlineExpired(
+            shotId = shot.shotId,
+            mediaType = shot.mediaType,
+            mode = mode,
+            stage = PostProcessLivenessStage.MEDIA_POST_PROCESS,
+            reason = reason,
+            elapsedSinceShutterMs = elapsedSinceShutterMs.coerceAtLeast(0L),
+            elapsedSincePostprocessStartMs = elapsedSinceShutterMs.coerceAtLeast(0L),
+            budgetMillis = budgetWithGrace
+        )
+        trace.record("liveness.session.deadline-expired", event.toDiagnosticString())
+        trace.record(
+            "liveness.session.release",
+            "shotId=${shot.shotId} stage=${event.stage.name} reason=$reason mode=${mode.name} shotKind=${shot.shotKind.name}"
+        )
+        recordingElapsedJob?.cancel()
+        recordingElapsedJob = null
+        updateState.update { s ->
+            s.copy(
+                captureStatus = CaptureStatus.IDLE,
+                recordingStatus = RecordingStatus.IDLE,
+                activeShot = null,
+                presentation = s.presentation.copy(
+                    countdownRemainingSeconds = null,
+                    recordingStartedAtElapsedMillis = null,
+                    recordingElapsedMillis = null,
+                    pendingPostprocess = null,
+                    captureReadiness = null,
+                    lastAction = "Previous capture processing timed out",
+                    lastError = reason
+                )
+            )
+        }
+        activeShotSpans.remove(shot.shotId)?.let { span ->
+            linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = reason)
+        }
+        cancelPostProcessLiveness(shot.shotId)
+    }
+
+    /**
+     * Inspects [ShotResult.structuredPostProcessFailures] and emits the matching
+     * [PostProcessLivenessEvent] variant per typed failure:
+     *
+     * - [PostProcessFailureCause.TIMEOUT] → [PostProcessLivenessEvent.DeadlineExpired]
+     * - any other cause → [PostProcessLivenessEvent.PipelineFailed]
+     *
+     * Emitted only when [postProcessLiveness] is armed (i.e. the shot went through
+     * [maybeArmPostProcessLiveness]). Document mode is skipped because its failures
+     * are surfaced via [PostProcessLivenessEvent.ForceReleasedFromDocumentBatch].
+     */
+    private fun emitPostProcessLivenessEventsForCompleted(result: ShotResult) {
+        val failures = result.structuredPostProcessFailures
+        if (failures.isEmpty()) return
+        val liveness = postProcessLiveness ?: return
+        val nowMs = elapsedRealtimeMillis()
+        val elapsedSinceShutterMs = (nowMs - liveness.startedAtElapsedMillis).coerceAtLeast(0L)
+        val mode = state.value.activeMode
+        val stage = PostProcessLivenessStage.MEDIA_POST_PROCESS
+        for (failure in failures) {
+            val reason = "${failure.stage.legacyNotePrefix}:${failure.cause.legacyNoteSuffix}"
+            val event: PostProcessLivenessEvent = if (failure.cause == TIMEOUT) {
+                PostProcessLivenessEvent.DeadlineExpired(
+                    shotId = result.shotId,
+                    mediaType = result.mediaType,
+                    mode = mode,
+                    stage = stage,
+                    reason = reason,
+                    elapsedSinceShutterMs = elapsedSinceShutterMs,
+                    elapsedSincePostprocessStartMs = elapsedSinceShutterMs,
+                    budgetMillis = liveness.budgetMillis
+                )
+            } else {
+                PostProcessLivenessEvent.PipelineFailed(
+                    shotId = result.shotId,
+                    mediaType = result.mediaType,
+                    mode = mode,
+                    stage = stage,
+                    reason = reason,
+                    elapsedSinceShutterMs = elapsedSinceShutterMs,
+                    elapsedSincePostprocessStartMs = elapsedSinceShutterMs
+                )
+            }
+            trace.record(
+                if (failure.cause == TIMEOUT) "liveness.session.deadline-expired"
+                else "liveness.session.pipeline-failed",
+                event.toDiagnosticString()
+            )
+            trace.record(
+                "liveness.session.release",
+                "shotId=${result.shotId} stage=${stage.name} reason=$reason"
+            )
+        }
+    }
+
+    internal fun postProcessLivenessForTest(): PostProcessLivenessDeadline? = postProcessLiveness
+    internal fun conservativeForceReleasedShotIdsForTest(): Set<String> =
+        conservativeForceReleasedShotIds.toSet()
+    internal fun postProcessLivenessConfigSnapshotForTest(): ShotConfigSnapshot? =
+        postProcessLivenessConfigSnapshot
 }
 
 internal fun documentCropStatusFrom(notes: List<String>): DocumentBatchCropStatus {

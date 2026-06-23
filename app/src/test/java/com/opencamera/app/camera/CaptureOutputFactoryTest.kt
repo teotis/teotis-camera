@@ -1,6 +1,7 @@
 package com.opencamera.app.camera
 
 import android.os.Build
+import android.provider.MediaStore
 import org.robolectric.RuntimeEnvironment
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.SaveRequest
@@ -10,7 +11,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
+import org.robolectric.fakes.BaseCursor
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
@@ -33,6 +36,20 @@ class CaptureOutputFactoryTest {
         assertTrue(File(request.outputPath).isAbsolute)
         assertTrue(request.outputPath.endsWith(".jpg"))
         assertNotNull(request.outputHandle)
+    }
+
+    @Test
+    fun `photo output display name includes millisecond stamp`() {
+        val factory = legacyFactory()
+        val saveRequest = SaveRequest.photoLibrary(
+            metadata = com.opencamera.core.media.MediaMetadata()
+        )
+
+        val request = factory.createPhotoOutputRequest(saveRequest)
+
+        assertTrue(
+            request.outputPath.matches(Regex(""".*_\d{8}_\d{6}_\d{3}\.jpg$"""))
+        )
     }
 
     @Config(sdk = [28])
@@ -62,6 +79,20 @@ class CaptureOutputFactoryTest {
         assertTrue(File(request.outputPath).isAbsolute)
         assertTrue(request.outputPath.endsWith(".mp4"))
         assertNotNull(request.outputHandle)
+    }
+
+    @Test
+    fun `video output display name includes millisecond stamp`() {
+        val factory = legacyFactory()
+        val saveRequest = SaveRequest.videoLibrary(
+            metadata = com.opencamera.core.media.MediaMetadata()
+        )
+
+        val request = factory.createVideoOutputRequest(saveRequest)
+
+        assertTrue(
+            request.outputPath.matches(Regex(""".*_\d{8}_\d{6}_\d{3}\.mp4$"""))
+        )
     }
 
     @Config(sdk = [28])
@@ -356,6 +387,27 @@ class CaptureOutputFactoryTest {
 
     @Config(sdk = [Build.VERSION_CODES.Q])
     @Test
+    fun `API 29+ photo output resolves editable MediaStore target when CameraX omits saved uri`() {
+        val context = RuntimeEnvironment.getApplication()
+        val factory = CaptureOutputFactory(context)
+        val request = factory.createPhotoOutputRequest(
+            SaveRequest.photoLibrary(metadata = com.opencamera.core.media.MediaMetadata())
+        )
+        Shadows.shadowOf(context.contentResolver).setCursor(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            FakePhotoCursor(
+                columnNames = arrayOf(MediaStore.Images.Media._ID),
+                rows = listOf(arrayOf(42L))
+            )
+        )
+
+        val handle = request.resolveOutputHandle(null, context.contentResolver)
+
+        assertEquals("content://media/external/images/media/42", handle.contentUri)
+    }
+
+    @Config(sdk = [Build.VERSION_CODES.Q])
+    @Test
     fun `API 29+ video output uses MediaStore`() {
         val factory = legacyFactory()
         val saveRequest = SaveRequest.videoLibrary(
@@ -367,4 +419,33 @@ class CaptureOutputFactoryTest {
         assertTrue(request.outputPath.endsWith(".mp4"))
         assertEquals(request.outputPath, request.outputHandle.displayPath)
     }
+}
+
+private class FakePhotoCursor(
+    private val columnNames: Array<String>,
+    private val rows: List<Array<Any?>>
+) : BaseCursor() {
+
+    override fun getCount(): Int = rows.size
+
+    override fun moveToFirst(): Boolean = rows.isNotEmpty()
+
+    override fun getColumnIndex(columnName: String): Int = columnNames.indexOf(columnName)
+
+    override fun getColumnIndexOrThrow(columnName: String): Int {
+        val index = columnNames.indexOf(columnName)
+        if (index < 0) throw IllegalArgumentException("No such column: $columnName")
+        return index
+    }
+
+    override fun getColumnName(columnIndex: Int): String = columnNames[columnIndex]
+
+    override fun getColumnNames(): Array<String> = columnNames
+
+    override fun getColumnCount(): Int = columnNames.size
+
+    override fun getLong(columnIndex: Int): Long =
+        (rows[0][columnIndex] as? Long) ?: (rows[0][columnIndex]?.toString()?.toLongOrNull() ?: 0L)
+
+    override fun close() {}
 }

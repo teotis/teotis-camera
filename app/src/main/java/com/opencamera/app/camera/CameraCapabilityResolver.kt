@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.ImageFormat
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CameraMetadata
 import android.os.Build
 import android.util.Log
 import android.util.Size
@@ -282,6 +283,45 @@ internal fun previewBaseRatiosForZoomRange(minRatio: Float, maxRatio: Float): Li
         .sorted()
 }
 
+internal fun detectManualControlCapabilities(
+    characteristics: CameraCharacteristics
+): ManualControlCapabilityMatrix {
+    val iso = if (
+        characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE) != null
+    ) ManualControlSupport.APPLY else ManualControlSupport.UNSUPPORTED
+    val shutter = if (
+        characteristics.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE) != null
+    ) ManualControlSupport.APPLY else ManualControlSupport.UNSUPPORTED
+    val focusDistance = if (
+        (characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f) > 0f
+    ) ManualControlSupport.APPLY else ManualControlSupport.UNSUPPORTED
+    val awbModes = characteristics.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES)
+    val whiteBalance = if (
+        awbModes != null && CameraMetadata.CONTROL_AWB_MODE_OFF in awbModes
+    ) ManualControlSupport.APPLY else ManualControlSupport.SAVED_ONLY
+    val evRange = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+    val evSteps = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)
+    val exposure = if (
+        evRange != null && evSteps != null && evSteps.toFloat() > 0f &&
+            (evRange.lower != 0 || evRange.upper != 0)
+    ) ManualControlSupport.APPLY else ManualControlSupport.UNSUPPORTED
+    val apertures = characteristics.get(CameraCharacteristics.LENS_INFO_AVAILABLE_APERTURES)
+    val aperture = if (apertures != null && apertures.size > 1) {
+        ManualControlSupport.APPLY
+    } else {
+        ManualControlSupport.UNSUPPORTED
+    }
+    return ManualControlCapabilityMatrix(
+        raw = ManualControlSupport.SAVED_ONLY,
+        iso = iso,
+        shutter = shutter,
+        exposureCompensation = exposure,
+        focusDistance = focusDistance,
+        aperture = aperture,
+        whiteBalance = whiteBalance
+    )
+}
+
 internal fun detectPreviewBrightnessRange(
     characteristics: CameraCharacteristics
 ): PreviewBrightnessRange {
@@ -377,6 +417,7 @@ internal fun detectCameraLensProfiles(context: Context): List<CameraLensProfile>
         } ?: return@mapNotNull null
 
         val zoomCap = detectZoomRatioCapability(characteristics)
+        val manualControlCapabilities = detectManualControlCapabilities(characteristics)
 
         val allJpegSizes = collectAllJpegOutputSizes(characteristics)
         val normalizedJpegSizes = normalizeStillCaptureOutputSizes(allJpegSizes)
@@ -389,6 +430,7 @@ internal fun detectCameraLensProfiles(context: Context): List<CameraLensProfile>
             lensFacing = lensFacing,
             hasFlashUnit = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
             zoomRatioCapability = zoomCap,
+            manualControlCapabilities = manualControlCapabilities,
             previewBrightnessRange = detectPreviewBrightnessRange(characteristics),
             availableStillCaptureOutputSizes = normalizedJpegSizes,
             availableStillCaptureResolutionPresets = resolveAvailableStillCaptureResolutionPresets(

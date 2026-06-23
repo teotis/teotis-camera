@@ -4,6 +4,7 @@ import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.w3c.dom.Document
 import org.w3c.dom.Element
@@ -17,7 +18,23 @@ class BottomCockpitLayoutContractTest {
         val preview = layout.elementByAndroidId("cameraPreview")
 
         assertEquals("fitEnd", preview.appAttr("scaleType"))
-        assertEquals("@id/bottomSheet", preview.appAttr("layout_constraintBottom_toTopOf"))
+        assertEquals("@id/previewBottomGuide", preview.appAttr("layout_constraintBottom_toBottomOf"))
+    }
+
+    @Test
+    fun `preview viewport stays stable across bottom cockpit height changes`() {
+        val preview = layout.elementByAndroidId("cameraPreview")
+        val overlay = layout.elementByAndroidId("previewOverlay")
+        val guideline = layout.elementByAndroidId("previewBottomGuide")
+
+        assertEquals("@id/previewBottomGuide", preview.appAttr("layout_constraintBottom_toBottomOf"))
+        assertEquals("@id/previewBottomGuide", overlay.appAttr("layout_constraintBottom_toBottomOf"))
+        assertEquals("androidx.constraintlayout.widget.Guideline", guideline.tagName)
+        val percent = guideline.appAttr("layout_constraintGuide_percent")
+        assertTrue(
+            percent.toDouble() in 0.72..0.8,
+            "Preview bottom guide should leave a compact cockpit without a large dead gap: $percent"
+        )
     }
 
     @Test
@@ -29,13 +46,54 @@ class BottomCockpitLayoutContractTest {
     }
 
     @Test
+    fun `mode track distributes equal width across five modes`() {
+        val modeTrackScroll = layout.elementByAndroidId("modeTrackScroll")
+        val modeTrackLinearLayout = layout.elementByAndroidId("modeTrack")
+
+        assertEquals("true", modeTrackScroll.androidAttr("fillViewport"))
+        assertEquals("match_parent", modeTrackLinearLayout.androidAttr("layout_width"))
+
+        val modeButtonIds = listOf(
+            "buttonPhotoMode",
+            "buttonCheckInMode",
+            "buttonVideoMode",
+            "buttonDocumentMode",
+            "buttonHumanisticMode"
+        )
+        for (id in modeButtonIds) {
+            val button = layout.elementByAndroidId(id)
+            assertEquals("0dp", button.androidAttr("layout_width"),
+                "$id must use 0dp layout_width for weight distribution")
+            assertEquals("1", button.androidAttr("layout_weight"),
+                "$id must use layout_weight=1 for equal distribution")
+        }
+    }
+
+    @Test
+    fun `humanistic mode button is visible by default`() {
+        val humanistic = layout.elementByAndroidId("buttonHumanisticMode")
+        val visibility = humanistic.androidAttr("visibility")
+        assertFalse(
+            visibility == "gone",
+            "buttonHumanisticMode must not default to visibility=gone"
+        )
+    }
+
+    @Test
     fun `mode specific controls stay inside bottom cockpit with mode track`() {
         val bottomSheet = layout.elementByAndroidId("bottomSheet")
         val bottomSheetChildren = bottomSheet.childElementsByAndroidId()
 
-        assertTrue("filterStripScroll" in bottomSheetChildren)
-        assertTrue("buttonModeAction" in bottomSheetChildren)
         assertTrue("modeTrackScroll" in bottomSheetChildren)
+        assertTrue("focalLengthSlider" in bottomSheetChildren)
+
+        val floatingToolLayer = layout.elementByAndroidId("floatingToolLayer")
+        val floatingChildren = floatingToolLayer.childElementsByAndroidId()
+
+        assertTrue("filterStripScroll" in floatingChildren)
+        assertTrue("runtimeProControlsScroll" in floatingChildren)
+        assertTrue("buttonModeAction" in floatingChildren)
+        assertFalse("focalLengthSlider" in floatingChildren)
     }
 
     @Test
@@ -70,12 +128,15 @@ class BottomCockpitLayoutContractTest {
         val bottomSheet = layout.elementByAndroidId("bottomSheet")
         val modeTrack = layout.elementByAndroidId("modeTrackScroll")
         val passiveBottomClearance =
-            resolveDimenDp(bottomSheet.androidAttr("paddingBottom"))
+                resolveDimenDp(bottomSheet.androidAttr("paddingBottom"))
+        val cockpitBottomMargin =
+                resolveDimenDp(bottomSheet.androidAttr("layout_marginBottom"))
         val compactVerticalChrome =
                 resolveDimenDp(modeTrack.androidAttr("paddingVertical")) * 2 +
                 resolveDimenDp("@dimen/cockpit_control_row_margin_top")
 
         assertEquals(4, passiveBottomClearance)
+        assertTrue(cockpitBottomMargin >= 14)
         assertTrue(compactVerticalChrome <= 6)
     }
 
@@ -182,18 +243,27 @@ class BottomCockpitLayoutContractTest {
     }
 
     @Test
-    fun `style preset card rail is direct child of bottom cockpit above mode track`() {
+    fun `style preset card rail is not child of bottom cockpit to avoid measuring overhead`() {
         val bottomSheet = layout.elementByAndroidId("bottomSheet")
         val bottomSheetChildren = bottomSheet.childElementsByAndroidId()
 
-        assertTrue("stylePresetCardRail" in bottomSheetChildren, "stylePresetCardRail must be in bottomSheet")
+        assertFalse("stylePresetCardRail" in bottomSheetChildren, "stylePresetCardRail must not be in bottomSheet")
         assertTrue("modeTrackScroll" in bottomSheetChildren, "modeTrackScroll must be in bottomSheet")
+    }
 
-        // Card rail must appear before mode track in the layout (above it)
-        val childOrder = bottomSheet.childElements().mapNotNull { it.androidIdOrNull() }
-        val railIndex = childOrder.indexOf("stylePresetCardRail")
-        val modeIndex = childOrder.indexOf("modeTrackScroll")
-        assertTrue(railIndex < modeIndex, "stylePresetCardRail must appear before modeTrackScroll")
+    @Test
+    fun `style preset card rail is direct child of style rail overlay`() {
+        val overlay = layout.elementByAndroidId("styleRailOverlay")
+        val overlayChildren = overlay.childElementsByAndroidId()
+
+        assertTrue("stylePresetCardRail" in overlayChildren, "stylePresetCardRail must be in styleRailOverlay")
+    }
+
+    @Test
+    fun `style rail overlay floats above bottom tool layer`() {
+        val overlay = layout.elementByAndroidId("styleRailOverlay")
+        assertEquals("@id/floatingToolLayer", overlay.appAttr("layout_constraintBottom_toTopOf"))
+        assertEquals("@dimen/style_rail_bottom_gap", overlay.androidAttr("layout_marginBottom"))
     }
 
     @Test
@@ -207,6 +277,82 @@ class BottomCockpitLayoutContractTest {
         val rail = layout.elementByAndroidId("stylePresetCardRail")
         assertEquals("match_parent", rail.androidAttr("layout_width"))
         assertEquals("wrap_content", rail.androidAttr("layout_height"))
+        assertEquals("@android:color/transparent", rail.androidAttr("background"))
+    }
+
+    @Test
+    fun `settings common section does not include unbound empty rows`() {
+        val commonSection = layout.elementByAndroidId("settingsCommonSection")
+        val commonChildren = commonSection.childElementsByAndroidId()
+
+        assertFalse(
+            "buttonGridMode" in commonChildren,
+            "buttonGridMode is not rendered by SettingsPanelRenderer and must not reserve blank space"
+        )
+    }
+
+    @Test
+    fun `dev console panel has compact height cap`() {
+        val panel = layout.elementByAndroidId("devConsolePanel")
+
+        assertEquals("0dp", panel.androidAttr("layout_height"))
+        assertEquals("@dimen/dev_console_panel_min_height", panel.androidAttr("minHeight"))
+        assertEquals("@dimen/dev_console_panel_max_height", panel.appAttr("layout_constraintHeight_max"))
+    }
+
+    @Test
+    fun `dev console log list has stable scrollable height`() {
+        val logList = layout.elementByAndroidId("devConsoleContent")
+
+        assertEquals("@dimen/dev_console_log_height", logList.androidAttr("layout_height"))
+        assertEquals("true", logList.androidAttr("nestedScrollingEnabled"))
+        assertTrue(resolveDimenDp("@dimen/dev_console_log_height") >= 160)
+    }
+
+    @Test
+    fun `floating tool layer does not participate in bottom cockpit measurement`() {
+        val bottomSheet = layout.elementByAndroidId("bottomSheet")
+        val bottomSheetChildren = bottomSheet.childElementsByAndroidId()
+
+        assertFalse("floatingToolLayer" in bottomSheetChildren,
+            "floatingToolLayer must not be a direct child of bottomSheet")
+
+        // Verify that floating-only views are no longer in bottomSheet.
+        assertFalse("filterStripScroll" in bottomSheetChildren)
+        assertFalse("runtimeProControlsScroll" in bottomSheetChildren)
+        assertFalse("buttonModeAction" in bottomSheetChildren)
+        assertFalse("stylePresetCardRail" in bottomSheetChildren)
+        assertFalse("recordingIndicator" in bottomSheetChildren)
+        assertTrue(
+            "focalLengthSlider" in bottomSheetChildren,
+            "focalLengthSlider must stay attached to the bottom cockpit instead of floating over preview"
+        )
+
+        // Verify they are in floatingToolLayer
+        val floatingToolLayer = layout.elementByAndroidId("floatingToolLayer")
+        val floatingChildren = floatingToolLayer.childElementsByAndroidId()
+
+        assertTrue("filterStripScroll" in floatingChildren)
+        assertTrue("runtimeProControlsScroll" in floatingChildren)
+        assertTrue("buttonModeAction" in floatingChildren)
+        assertFalse("stylePresetCardRail" in floatingChildren)
+        assertFalse("focalLengthSlider" in floatingChildren)
+        assertTrue("recordingIndicator" in floatingChildren)
+    }
+
+    @Test
+    fun `floating tool layer clears bottom cockpit visual band`() {
+        val floatingToolLayer = layout.elementByAndroidId("floatingToolLayer")
+
+        assertEquals("@id/bottomSheet", floatingToolLayer.appAttr("layout_constraintBottom_toTopOf"))
+        assertEquals(
+            "@dimen/floating_tool_bottom_clearance",
+            floatingToolLayer.androidAttr("layout_marginBottom")
+        )
+        assertTrue(
+            resolveDimenDp("@dimen/floating_tool_bottom_clearance") >= 48,
+            "Mode actions and Pro controls must float above the bottom cockpit band"
+        )
     }
 
 }

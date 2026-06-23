@@ -248,6 +248,43 @@ val DEFAULT_FILTER_PROFILES: List<FilterProfile> = listOf(
             warmthShift = 5,
             vignetteStrength = 0.08f
         )
+    ),
+    builtInFilterProfile(
+        id = "doc-color-neutral",
+        label = "原色",
+        category = FilterProfileCategory.DOCUMENT,
+        renderSpec = renderSpec(
+            contrast = 1f,
+            saturation = 1f
+        )
+    ),
+    builtInFilterProfile(
+        id = "doc-color-enhanced",
+        label = "增强彩色",
+        category = FilterProfileCategory.DOCUMENT,
+        renderSpec = renderSpec(
+            contrast = 1.05f,
+            saturation = 1.15f
+        )
+    ),
+    builtInFilterProfile(
+        id = "doc-grayscale",
+        label = "灰度",
+        category = FilterProfileCategory.DOCUMENT,
+        renderSpec = renderSpec(
+            saturation = 0f,
+            monochromeMix = 1f
+        )
+    ),
+    builtInFilterProfile(
+        id = "doc-bw",
+        label = "黑白",
+        category = FilterProfileCategory.DOCUMENT,
+        renderSpec = renderSpec(
+            contrast = 1.2f,
+            saturation = 0f,
+            monochromeMix = 1f
+        )
     )
 )
 
@@ -267,11 +304,21 @@ val DEFAULT_WATERMARK_TEMPLATES: List<WatermarkTemplate> = listOf(
         id = "retro-frame",
         label = "Retro Frame",
         tokenKeys = setOf("model", "datetime", "camera-params"),
-        supportsFrameBorder = true
+        supportsFrameBorder = true,
+        kind = WatermarkTemplateKind.EXPANDED_FRAME,
+        allowedPlacements = setOf(
+            WatermarkTextPlacement.BOTTOM_LEFT,
+            WatermarkTextPlacement.BOTTOM_CENTER,
+            WatermarkTextPlacement.BOTTOM_RIGHT
+        ),
+        allowedFrameBackgrounds = setOf(
+            WatermarkFrameBackground.WHITE,
+            WatermarkFrameBackground.DARK
+        )
     ),
     WatermarkTemplate(
         id = "pure-text",
-        label = "Pure Text",
+        label = "Translucent Bottom Bar",
         tokenKeys = setOf("model", "datetime", "camera-params"),
         supportsFrameBorder = false,
         kind = WatermarkTemplateKind.TEXT_OVERLAY
@@ -294,27 +341,8 @@ val DEFAULT_WATERMARK_TEMPLATES: List<WatermarkTemplate> = listOf(
         )
     ),
     WatermarkTemplate(
-        id = "professional-bottom-bar",
-        label = "Professional Bottom Bar",
-        tokenKeys = setOf("model", "datetime", "camera-params"),
-        supportsFrameBorder = true,
-        kind = WatermarkTemplateKind.EXPANDED_FRAME,
-        allowedPlacements = setOf(
-            WatermarkTextPlacement.BOTTOM_LEFT,
-            WatermarkTextPlacement.BOTTOM_CENTER,
-            WatermarkTextPlacement.BOTTOM_RIGHT
-        ),
-        allowedFrameBackgrounds = setOf(
-            WatermarkFrameBackground.DARK,
-            WatermarkFrameBackground.WHITE,
-            WatermarkFrameBackground.SOURCE_BLUR,
-            WatermarkFrameBackground.SOURCE_LIGHT_BLUR,
-            WatermarkFrameBackground.SOURCE_VIVID_BLUR
-        )
-    ),
-    WatermarkTemplate(
-        id = "night-street",
-        label = "Night Street",
+        id = "van-gogh-starry",
+        label = "Van Gogh Starry",
         tokenKeys = setOf("model", "datetime", "location", "camera-params"),
         supportsFrameBorder = true,
         kind = WatermarkTemplateKind.EXPANDED_FRAME,
@@ -324,9 +352,22 @@ val DEFAULT_WATERMARK_TEMPLATES: List<WatermarkTemplate> = listOf(
             WatermarkTextPlacement.BOTTOM_RIGHT
         ),
         allowedFrameBackgrounds = setOf(
-            WatermarkFrameBackground.DARK,
-            WatermarkFrameBackground.SOURCE_BLUR,
-            WatermarkFrameBackground.SOURCE_VIVID_BLUR
+            WatermarkFrameBackground.DARK
+        )
+    ),
+    WatermarkTemplate(
+        id = "blue-hour",
+        label = "Blue Hour",
+        tokenKeys = setOf("model", "datetime", "location", "camera-params"),
+        supportsFrameBorder = true,
+        kind = WatermarkTemplateKind.EXPANDED_FRAME,
+        allowedPlacements = setOf(
+            WatermarkTextPlacement.BOTTOM_LEFT,
+            WatermarkTextPlacement.BOTTOM_CENTER,
+            WatermarkTextPlacement.BOTTOM_RIGHT
+        ),
+        allowedFrameBackgrounds = setOf(
+            WatermarkFrameBackground.DARK
         )
     )
 )

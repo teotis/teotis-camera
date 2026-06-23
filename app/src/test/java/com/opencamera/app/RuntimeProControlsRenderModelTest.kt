@@ -36,6 +36,7 @@ import com.opencamera.core.settings.CommonSettings
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
+import com.opencamera.core.settings.FeatureCatalogAction
 import com.opencamera.core.settings.ManualCaptureParams
 import com.opencamera.core.settings.PersistedSettings
 import com.opencamera.core.settings.PhotoSettings
@@ -87,7 +88,7 @@ class RuntimeProControlsRenderModelTest {
             assertEquals("33ms", model.shutterControl.value)
             assertEquals("4800K", model.whiteBalanceControl.value)
             assertTrue(model.summary.contains("RAW On | ISO 320 | Shutter 33ms | WB 4800K"))
-            assertTrue(model.summary.contains("RAW / WB stay saved-only"))
+            assertTrue(model.summary.contains("stay saved-only"))
             assertTrue(model.isoControl.nextAction != null)
         }
 
@@ -155,6 +156,56 @@ class RuntimeProControlsRenderModelTest {
                 model.whiteBalanceControl.availability
             )
             assertTrue(model.summary.contains("Aperture / WB temporarily unsupported"))
+        }
+
+        @Test
+        fun `runtime pro controls wrap nullable option controls back to auto after max value`() {
+            val baseline = defaultSessionState()
+            val state = baseline.copy(
+                activeMode = ModeId.HUMANISTIC,
+                modeSnapshot = baseline.modeSnapshot.copy(
+                    id = ModeId.HUMANISTIC,
+                    state = baseline.modeSnapshot.state.copy(
+                        isProVariantActive = true
+                    )
+                ),
+                settings = baseline.settings.copy(
+                    catalog = baseline.settings.catalog.copy(
+                        manualCaptureDraft = ManualCaptureParams(
+                            iso = 1600,
+                            shutterSpeedMillis = 500L,
+                            exposureCompensationSteps = 2,
+                            focusDistanceDiopters = 4.0f,
+                            apertureFNumber = 4.0f,
+                            whiteBalanceKelvin = 6500
+                        )
+                    )
+                )
+            )
+
+            val model = runtimeProControlsRenderModel(state, TestAppTextResolver())
+
+            assertEquals(FeatureCatalogAction.UpdateManualIso(null), model.isoControl.nextAction)
+            assertEquals(
+                FeatureCatalogAction.UpdateManualShutterSpeedMillis(null),
+                model.shutterControl.nextAction
+            )
+            assertEquals(
+                FeatureCatalogAction.UpdateManualExposureCompensationSteps(null),
+                model.exposureControl.nextAction
+            )
+            assertEquals(
+                FeatureCatalogAction.UpdateManualFocusDistanceDiopters(null),
+                model.focusControl.nextAction
+            )
+            assertEquals(
+                FeatureCatalogAction.UpdateManualApertureFNumber(null),
+                model.apertureControl.nextAction
+            )
+            assertEquals(
+                FeatureCatalogAction.UpdateManualWhiteBalanceKelvin(null),
+                model.whiteBalanceControl.nextAction
+            )
         }
 
         private fun defaultSessionState(

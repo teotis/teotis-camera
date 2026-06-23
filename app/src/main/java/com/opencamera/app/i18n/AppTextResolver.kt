@@ -9,6 +9,7 @@ import com.opencamera.app.FilterLabFamily
 import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewStatus
+import com.opencamera.core.settings.StyleMoodDescriptor
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.AppLanguage
 import com.opencamera.core.settings.CompositionGridMode
@@ -18,6 +19,7 @@ import com.opencamera.core.settings.LiveSaveFormat
 import com.opencamera.core.settings.LiveWatermarkMotionBehavior
 import com.opencamera.core.settings.PersistedSettings
 import com.opencamera.core.settings.PortraitBeautyPreset
+import com.opencamera.core.settings.StylePresetFamily
 import com.opencamera.core.settings.PortraitBeautyStrength
 import com.opencamera.core.settings.PortraitBokehEffect
 import com.opencamera.core.settings.PortraitProfile
@@ -129,6 +131,7 @@ open class AppTextResolver(private val context: Context?) {
         FilterLabFamily.HUMANISTIC -> str(R.string.style_rail_title_humanistic, "Humanistic Styles")
         FilterLabFamily.PORTRAIT -> str(R.string.style_rail_title_portrait, "Portrait Styles")
         FilterLabFamily.VIDEO -> str(R.string.style_rail_title_video, "Video Styles")
+        FilterLabFamily.DOCUMENT -> str(R.string.style_rail_title_document, "文档色彩")
     }
 
     internal open fun styleRailSupportingText(family: FilterLabFamily): String = when (family) {
@@ -136,6 +139,7 @@ open class AppTextResolver(private val context: Context?) {
         FilterLabFamily.HUMANISTIC -> str(R.string.style_rail_supporting_humanistic, "Street and life presets for a human perspective.")
         FilterLabFamily.PORTRAIT -> str(R.string.style_rail_supporting_portrait, "Portrait-specific tone presets.")
         FilterLabFamily.VIDEO -> str(R.string.style_rail_supporting_video, "Video look presets applied before recording.")
+        FilterLabFamily.DOCUMENT -> str(R.string.style_rail_supporting_document, "选择文档色彩模式")
     }
 
     open fun filterLabHeroSummary(familyLabel: String, filterLabel: String, count: Int): String =
@@ -177,6 +181,8 @@ open class AppTextResolver(private val context: Context?) {
     }
 
     open fun liveSaveFormatSupportLabel(count: Int): String = String.format(str(R.string.format_live_save_format_support, "%d formats: Motion Photo, MP4 Sidecar, JPEG Only"), count)
+
+    open fun livePhotoDefaultSupportLabel(motionDurationMs: Int): String = String.format(str(R.string.settings_page_live_photo_default_support, "Toggle default; %d ms motion bundle"), motionDurationMs)
 
     open fun zoomRatioLabel(ratio: Float): String = String.format(str(R.string.format_zoom_ratio, "%sx"), ratio)
     open fun countdownSeconds(seconds: Int): String = String.format(str(R.string.format_countdown_seconds, "%ss"), seconds)
@@ -273,7 +279,52 @@ open class AppTextResolver(private val context: Context?) {
         "portrait-original" -> str(R.string.filter_profile_portrait_original, "Portrait Original")
         "portrait-chasing-light" -> str(R.string.filter_profile_portrait_chasing_light, "Portrait Chasing Light")
         "portrait-rich" -> str(R.string.filter_profile_portrait_rich, "Portrait Rich")
+        "doc-color-neutral" -> str(R.string.filter_profile_doc_color_neutral, "原色")
+        "doc-color-enhanced" -> str(R.string.filter_profile_doc_color_enhanced, "增强彩色")
+        "doc-grayscale" -> str(R.string.filter_profile_doc_grayscale, "灰度")
+        "doc-bw" -> str(R.string.filter_profile_doc_bw, "黑白")
         else -> fallback
+    }
+
+    open fun styleCardTitle(profileId: String, family: StylePresetFamily): String {
+        val resolved = filterProfileLabel(profileId, "")
+        if (resolved.isNotEmpty()) return resolved
+        val fallbackKey = "${family.name.lowercase()}-original"
+        val fallbackResolved = filterProfileLabel(fallbackKey, "")
+        if (fallbackResolved.isNotEmpty()) return fallbackResolved
+        return filterProfileLabel("photo-original", fallbackKey)
+    }
+
+    open fun styleCardMoodLabel(descriptor: StyleMoodDescriptor): String {
+        if (descriptor.isBw) return str(R.string.style_mood_bw, "B&W")
+        if (descriptor.isMonochrome) return str(R.string.style_mood_monochrome, "Monochrome")
+        val name = resolveMoodKeyName(descriptor)
+        val resId = context?.resources?.getIdentifier(name, "string", context?.packageName) ?: 0
+        if (resId != 0) return str(resId, name)
+        val parts = buildList {
+            if (descriptor.isVivid) add(str(R.string.style_mood_vivid, "Vivid"))
+            if (descriptor.isMuted) add(str(R.string.style_mood_muted, "Muted"))
+            if (descriptor.isPunchy) add(str(R.string.style_mood_punchy, "Punchy"))
+            if (descriptor.isSoft) add(str(R.string.style_mood_soft, "Soft"))
+            if (descriptor.isWarm) add(str(R.string.style_mood_warm, "Warm"))
+            if (descriptor.isCool) add(str(R.string.style_mood_cool, "Cool"))
+            if (descriptor.isFilm) add(str(R.string.style_mood_film, "Film"))
+        }
+        if (parts.isEmpty()) return str(R.string.style_mood_natural, "Natural")
+        return parts.joinToString(str(R.string.style_mood_separator, " "))
+    }
+
+    private fun resolveMoodKeyName(descriptor: StyleMoodDescriptor): String {
+        val flags = mutableListOf<String>()
+        if (descriptor.isVivid) flags.add("vivid")
+        if (descriptor.isMuted) flags.add("muted")
+        if (descriptor.isPunchy) flags.add("punchy")
+        if (descriptor.isSoft) flags.add("soft")
+        if (descriptor.isWarm) flags.add("warm")
+        if (descriptor.isCool) flags.add("cool")
+        if (descriptor.isFilm) flags.add("film")
+        if (flags.isEmpty()) return "style_mood_natural"
+        return "style_mood_${flags.joinToString("_")}"
     }
 
     // Portrait lab
@@ -336,6 +387,7 @@ open class AppTextResolver(private val context: Context?) {
 
     // Document batch organizer
     open fun documentBatchPageCount(count: Int): String = String.format(str(R.string.document_batch_page_count, "%d pages"), count)
+    open fun documentExportProgress(current: Int, total: Int): String = String.format(str(R.string.document_export_progress, "Exporting %d/%d pages"), current, total)
 
     internal open fun sessionUiStrings(): com.opencamera.app.SessionUiStrings {
         return com.opencamera.app.SessionUiStrings(

@@ -15,7 +15,8 @@ enum class RecoveryAction {
     CONTINUE,
     STOP_POSTPROCESS,
     TERMINATE,
-    PROPAGATE
+    PROPAGATE,
+    RECOVER_RELEASE
 }
 
 /**
@@ -96,3 +97,22 @@ internal fun classifyExceptionForRecovery(
         processorName = processorName
     )
 }
+
+/**
+ * Lightweight monotonic time source so the watchdog can check deadline expiry without
+ * coupling to `android.os.SystemClock`. Production callers supply
+ * `SystemClock.elapsedRealtime()` or `System.nanoTime() / 1_000_000`; tests supply
+ * a controllable virtual clock.
+ */
+fun interface PostProcessTimeSource {
+    fun elapsedMillis(): Long
+}
+
+/**
+ * Evaluate the recovery policy for a timeout failure.
+ *
+ * Timeout failures are always [RecoveryAction.RECOVER_RELEASE]: the session must
+ * release `activeShot` and `pendingPostprocess` so the capture link is never
+ * occupied indefinitely by a single shot.
+ */
+fun evaluateTimeoutPolicy(): RecoveryAction = RecoveryAction.RECOVER_RELEASE

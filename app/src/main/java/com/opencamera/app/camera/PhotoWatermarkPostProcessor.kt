@@ -9,8 +9,10 @@ import android.graphics.Color
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import androidx.exifinterface.media.ExifInterface
@@ -18,11 +20,17 @@ import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.OcwmJpegContainer
+import com.opencamera.core.media.PostProcessFailure
+import com.opencamera.core.media.PostProcessFailureCause
+import com.opencamera.core.media.PostProcessFailureDisposition
+import com.opencamera.core.media.PostProcessFailureStage
+import com.opencamera.core.media.PostProcessOutputIntegrity
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ReversibleWatermarkArchiveManifest
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.addPipelineNotes
+import com.opencamera.core.media.addStructuredPostProcessFailure
 import com.opencamera.core.media.sha256Hex
 import com.opencamera.core.media.toProcessorTargetOrNull
 import com.opencamera.core.settings.WatermarkFrameBackground
@@ -149,10 +157,19 @@ internal class PhotoWatermarkPostProcessor(
                         "watermark:skipped:${renderResult.reason}"
                     )
 
-                    is ProcessorEditorResult.Failed -> result.addPipelineNotes(
-                        "watermark:template:${work.templateId}",
-                        "watermark:failed:${renderResult.reason}"
-                    )
+                    is ProcessorEditorResult.Failed -> {
+                        val (cause, integrity) = watermarkFailureMapping(renderResult.reason)
+                        val structuredFailure = PostProcessFailure(
+                            stage = PostProcessFailureStage.WATERMARK,
+                            cause = cause,
+                            integrity = integrity,
+                            disposition = PostProcessFailureDisposition.RECOVERABLE
+                        )
+                        result.addPipelineNotes(
+                            "watermark:template:${work.templateId}",
+                            "watermark:failed:${renderResult.reason}"
+                        ).addStructuredPostProcessFailure(structuredFailure)
+                    }
 
                     else -> result
                 }
@@ -160,6 +177,17 @@ internal class PhotoWatermarkPostProcessor(
         }
     }
 }
+
+internal fun watermarkFailureMapping(reason: String): Pair<PostProcessFailureCause, PostProcessOutputIntegrity> =
+    when (reason) {
+        "decode-failed" -> PostProcessFailureCause.DECODE_FAILED to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "decode-oom" -> PostProcessFailureCause.OUT_OF_MEMORY to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "decode-exception" -> PostProcessFailureCause.DECODE_FAILED to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "encode-oom" -> PostProcessFailureCause.OUT_OF_MEMORY to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "encode-failed" -> PostProcessFailureCause.ENCODE to PostProcessOutputIntegrity.ORIGINAL_INTACT
+        "output-unavailable" -> PostProcessFailureCause.OUTPUT_UNAVAILABLE to PostProcessOutputIntegrity.POSSIBLY_MODIFIED
+        else -> PostProcessFailureCause.EXCEPTION to PostProcessOutputIntegrity.ORIGINAL_INTACT
+    }
 
 internal class AndroidPhotoWatermarkEditor(
     context: Context
@@ -342,6 +370,42 @@ private const val MIN_CORNER_RADIUS_PX = 12f
 private const val BLUR_DOWNSAMPLE_DIVISOR = 18
 private const val BLUR_EDGE_DOWNSAMPLE_DIVISOR = 8
 
+private enum class ExpandedFrameDecoration {
+    NONE,
+    TRAVEL_MAP,
+    ARCHIVAL_PAPER,
+    NIGHT_MEMORY,
+    STARRY_MOON,
+    BLUE_HOUR
+}
+
+private enum class ComplexWatermarkOverlayStyle {
+    STARRY_MOON,
+    BLUE_HOUR
+}
+
+private data class ComplexWatermarkFrameLayout(
+    val framedWidth: Int,
+    val framedHeight: Int,
+    val sideBorder: Float,
+    val topBorder: Float,
+    val bottomBandHeight: Float,
+    val sourceWidth: Int,
+    val sourceHeight: Int,
+    val padding: Float
+) {
+    val bandTop: Float = topBorder + sourceHeight
+    val sourceRect: RectF
+        get() = RectF(
+            sideBorder,
+            topBorder,
+            sideBorder + sourceWidth,
+            topBorder + sourceHeight
+        )
+    val bottomBandRect: RectF
+        get() = RectF(0f, bandTop, framedWidth.toFloat(), framedHeight.toFloat())
+}
+
 internal enum class PhotoWatermarkMetadataToken {
     DATETIME,
     LOCATION,
@@ -381,7 +445,7 @@ internal enum class PhotoWatermarkTemplateType(
     RETRO_FRAME(
         storageKey = TEMPLATE_RETRO_FRAME,
         defaultPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
-        defaultFrameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR,
+        defaultFrameBackground = WatermarkFrameBackground.WHITE,
         usesExpandedFrame = true,
         metadataTokens = listOf(
             PhotoWatermarkMetadataToken.DATETIME,
@@ -424,7 +488,29 @@ internal enum class PhotoWatermarkTemplateType(
     NIGHT_STREET(
         storageKey = TEMPLATE_NIGHT_STREET,
         defaultPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
-        defaultFrameBackground = WatermarkFrameBackground.SOURCE_BLUR,
+        defaultFrameBackground = WatermarkFrameBackground.DARK,
+        usesExpandedFrame = true,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.LOCATION,
+            PhotoWatermarkMetadataToken.CAMERA_PARAMS
+        )
+    ),
+    VAN_GOGH_STARRY(
+        storageKey = TEMPLATE_VAN_GOGH_STARRY,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+        defaultFrameBackground = WatermarkFrameBackground.DARK,
+        usesExpandedFrame = true,
+        metadataTokens = listOf(
+            PhotoWatermarkMetadataToken.DATETIME,
+            PhotoWatermarkMetadataToken.LOCATION,
+            PhotoWatermarkMetadataToken.CAMERA_PARAMS
+        )
+    ),
+    BLUE_HOUR(
+        storageKey = TEMPLATE_BLUE_HOUR,
+        defaultPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        defaultFrameBackground = WatermarkFrameBackground.DARK,
         usesExpandedFrame = true,
         metadataTokens = listOf(
             PhotoWatermarkMetadataToken.DATETIME,
@@ -438,7 +524,11 @@ internal enum class PhotoWatermarkTemplateType(
         return when (this) {
             BLUR_FOUR_BORDER -> resolved.takeIf { it in SUPPORTED_BLUR_BACKGROUNDS }
                 ?: defaultFrameBackground
-            NIGHT_STREET -> resolved.takeIf { it in SUPPORTED_NIGHT_STREET_BACKGROUNDS }
+            RETRO_FRAME -> resolved.takeIf { it in SUPPORTED_RETRO_FRAME_BACKGROUNDS }
+                ?: defaultFrameBackground
+            NIGHT_STREET,
+            VAN_GOGH_STARRY,
+            BLUE_HOUR -> resolved.takeIf { it in SUPPORTED_NIGHT_STREET_BACKGROUNDS }
                 ?: defaultFrameBackground
             else -> resolved
         }
@@ -459,6 +549,14 @@ internal enum class PhotoWatermarkTemplateType(
 internal fun resolvePhotoWatermarkTemplateType(templateId: String?): PhotoWatermarkTemplateType {
     return PhotoWatermarkTemplateType.fromStorageKeyOrNull(templateId)
         ?: PhotoWatermarkTemplateType.CLASSIC_OVERLAY
+}
+
+internal fun usesComplexWatermarkOverlay(templateId: String?): Boolean {
+    return when (PhotoWatermarkTemplateType.fromStorageKeyOrNull(templateId)) {
+        PhotoWatermarkTemplateType.VAN_GOGH_STARRY,
+        PhotoWatermarkTemplateType.BLUE_HOUR -> true
+        else -> false
+    }
 }
 
 internal fun renderPhotoWatermarkBitmap(
@@ -503,14 +601,15 @@ internal fun renderPhotoWatermarkBitmap(
             sideBorderScale = 1.0f,
             topBorderScale = 0.9f,
             bottomBandScale = 4.6f,
-            titleColor = Color.argb(255, 74, 54, 38),
-            detailColor = Color.argb(255, 132, 103, 72),
-            centered = false
+            titleColor = Color.rgb(42, 82, 61),
+            detailColor = Color.rgb(94, 125, 103),
+            centered = false,
+            decoration = ExpandedFrameDecoration.TRAVEL_MAP
         )
 
         PhotoWatermarkTemplateType.PURE_TEXT -> {
             val canvas = Canvas(bitmap)
-            drawPureTextOverlay(
+            drawTranslucentBottomBarOverlay(
                 canvas = canvas,
                 bitmap = bitmap,
                 template = template,
@@ -530,10 +629,10 @@ internal fun renderPhotoWatermarkBitmap(
             sideBorderScale = 1.05f,
             topBorderScale = 0.92f,
             bottomBandScale = 4.2f,
-            titleColor = Color.argb(255, 62, 74, 64),
-            detailColor = Color.argb(255, 98, 112, 92),
+            titleColor = Color.argb(255, 88, 72, 52),
+            detailColor = Color.argb(235, 132, 108, 78),
             centered = true,
-            ornamentalBorder = true
+            decoration = ExpandedFrameDecoration.ARCHIVAL_PAPER
         )
 
         PhotoWatermarkTemplateType.BLUR_FOUR_BORDER -> drawBlurFourBorderFrame(
@@ -552,10 +651,32 @@ internal fun renderPhotoWatermarkBitmap(
             padding = padding
         )
 
-        PhotoWatermarkTemplateType.NIGHT_STREET -> drawNightStreetFrame(
+        PhotoWatermarkTemplateType.NIGHT_STREET -> drawExpandedFrame(
             source = bitmap,
             template = template,
-            titleTextSize = titleTextSize,
+            titleTextSize = titleTextSize * 0.98f,
+            detailTextSize = detailTextSize,
+            padding = padding,
+            sideBorderScale = 0.95f,
+            topBorderScale = 0.82f,
+            bottomBandScale = 4.35f,
+            titleColor = Color.argb(255, 230, 234, 240),
+            detailColor = Color.argb(220, 174, 184, 198),
+            centered = false,
+            decoration = ExpandedFrameDecoration.NIGHT_MEMORY
+        )
+
+        PhotoWatermarkTemplateType.VAN_GOGH_STARRY -> drawVanGoghStarryFrame(
+            source = bitmap,
+            template = template,
+            detailTextSize = detailTextSize,
+            padding = padding
+        )
+
+        PhotoWatermarkTemplateType.BLUE_HOUR -> drawBlueHourFrame(
+            source = bitmap,
+            template = template,
+            titleTextSize = titleTextSize * 1.12f,
             detailTextSize = detailTextSize,
             padding = padding
         )
@@ -630,7 +751,7 @@ private fun drawClassicOverlay(
     }
 }
 
-private fun drawPureTextOverlay(
+private fun drawTranslucentBottomBarOverlay(
     canvas: Canvas,
     bitmap: Bitmap,
     template: ResolvedPhotoWatermarkTemplate,
@@ -638,58 +759,60 @@ private fun drawPureTextOverlay(
     detailTextSize: Float,
     padding: Float
 ) {
-    val align = when (template.placement) {
-        WatermarkTextPlacement.TOP_LEFT,
-        WatermarkTextPlacement.BOTTOM_LEFT -> Paint.Align.LEFT
-        WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
-        WatermarkTextPlacement.TOP_RIGHT,
-        WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
-    }
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textSize = titleTextSize
+    val minEdge = minOf(bitmap.width, bitmap.height).toFloat()
+    val barHeight = maxOf(
+        minEdge * 0.19f,
+        titleTextSize + detailTextSize * 2.0f + padding * 1.35f
+    ).coerceAtMost(bitmap.height * 0.28f)
+    val barTop = bitmap.height - barHeight
+    val barRect = RectF(0f, barTop, bitmap.width.toFloat(), bitmap.height.toFloat())
+    val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb((188 * template.textOpacity).toInt().coerceIn(0, 188), 7, 19, 33)
         style = Paint.Style.FILL
-        textAlign = align
-        alpha = (255 * template.textOpacity).toInt()
-        setShadowLayer(titleTextSize * 0.22f, 0f, titleTextSize * 0.08f, Color.argb(190, 0, 0, 0))
+    }
+    canvas.drawRect(barRect, backgroundPaint)
+
+    val accentWidth = (minEdge * 0.01f).coerceIn(3f, 7f)
+    val accentLeft = padding * 0.68f
+    val accentRect = RectF(
+        accentLeft,
+        barTop + barHeight * 0.22f,
+        accentLeft + accentWidth,
+        bitmap.height - barHeight * 0.18f
+    )
+    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb((230 * template.textOpacity).toInt().coerceIn(0, 230), 238, 214, 154)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRoundRect(accentRect, accentWidth, accentWidth, accentPaint)
+
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb((248 * template.textOpacity).toInt().coerceIn(0, 248), 246, 250, 255)
+        textSize = titleTextSize * 0.88f
+        style = Paint.Style.FILL
+        textAlign = Paint.Align.LEFT
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
     }
     val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(220, 235, 238, 242)
-        textSize = detailTextSize
+        color = Color.argb((220 * template.textOpacity).toInt().coerceIn(0, 220), 196, 214, 232)
+        textSize = detailTextSize * 0.92f
         style = Paint.Style.FILL
-        textAlign = align
-        alpha = (220 * template.textOpacity).toInt()
-        setShadowLayer(detailTextSize * 0.22f, 0f, detailTextSize * 0.08f, Color.argb(190, 0, 0, 0))
+        textAlign = Paint.Align.LEFT
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
     }
-    val lineGap = detailTextSize * 0.28f
+    val textLeft = accentRect.right + padding * 0.72f
+    val availableWidth = bitmap.width - textLeft - padding
     val titleMetrics = titlePaint.fontMetrics
-    val detailMetrics = detailPaint.fontMetrics
-    val titleHeight = titleMetrics.descent - titleMetrics.ascent
-    val detailHeight = detailMetrics.descent - detailMetrics.ascent
-    val blockHeight = titleHeight +
-        template.supportingLines.size * detailHeight +
-        template.supportingLines.size * lineGap
-    val x = when (template.placement) {
-        WatermarkTextPlacement.TOP_LEFT,
-        WatermarkTextPlacement.BOTTOM_LEFT -> padding
-        WatermarkTextPlacement.BOTTOM_CENTER -> bitmap.width / 2f
-        WatermarkTextPlacement.TOP_RIGHT,
-        WatermarkTextPlacement.BOTTOM_RIGHT -> bitmap.width - padding
-    }
-    val top = when (template.placement) {
-        WatermarkTextPlacement.TOP_LEFT,
-        WatermarkTextPlacement.TOP_RIGHT -> padding
-        WatermarkTextPlacement.BOTTOM_LEFT,
-        WatermarkTextPlacement.BOTTOM_RIGHT,
-        WatermarkTextPlacement.BOTTOM_CENTER -> bitmap.height - padding - blockHeight - padding
-    }
-    val maxWidth = bitmap.width - padding * 2
-    var baseline = top - titleMetrics.ascent
-    canvas.drawText(template.title, x, baseline, titlePaint)
-    template.supportingLines.take(2).forEach { rawLine ->
-        baseline += detailHeight + lineGap
-        val line = fitText(rawLine, detailPaint, maxWidth)
-        canvas.drawText(line, x, baseline, detailPaint)
+    val titleBaseline = barTop + barHeight * 0.38f - (titleMetrics.ascent + titleMetrics.descent) / 2f
+    canvas.drawText(fitText(template.title, titlePaint, availableWidth), textLeft, titleBaseline, titlePaint)
+
+    val secondary = template.supportingLines.take(2).joinToString("  ·  ")
+    if (secondary.isNotBlank()) {
+        val detailMetrics = detailPaint.fontMetrics
+        val detailBaseline = titleBaseline +
+            (titleMetrics.descent - titleMetrics.ascent) * 0.72f +
+            (detailMetrics.descent - detailMetrics.ascent) * 0.52f
+        canvas.drawText(fitText(secondary, detailPaint, availableWidth), textLeft, detailBaseline, detailPaint)
     }
 }
 
@@ -705,7 +828,7 @@ private fun drawExpandedFrame(
     titleColor: Int,
     detailColor: Int,
     centered: Boolean,
-    ornamentalBorder: Boolean = false
+    decoration: ExpandedFrameDecoration = ExpandedFrameDecoration.NONE
 ): PhotoWatermarkBitmapRenderResult {
     val sideBorder = (padding * sideBorderScale).coerceAtLeast(MIN_PADDING_PX * 0.7f)
     val topBorder = (padding * topBorderScale).coerceAtLeast(MIN_PADDING_PX * 0.65f)
@@ -717,6 +840,18 @@ private fun drawExpandedFrame(
     val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
     drawFrameBackground(canvas, source, fullRect, template.frameBackground)
     canvas.drawBitmap(source, sideBorder, topBorder, null)
+    if (decoration == ExpandedFrameDecoration.NIGHT_MEMORY) {
+        drawNightMemoryFrameWash(
+            canvas = canvas,
+            framedWidth = framedWidth,
+            framedHeight = framedHeight,
+            bandTop = topBorder + source.height,
+            sideBorder = sideBorder,
+            topBorder = topBorder,
+            sourceWidth = source.width,
+            sourceHeight = source.height
+        )
+    }
 
     val contentLeft = sideBorder + padding
     val contentRight = framedWidth - sideBorder - padding
@@ -767,23 +902,330 @@ private fun drawExpandedFrame(
         )
     }
 
-    if (ornamentalBorder) {
-        drawOrnamentalBorder(
+    when (decoration) {
+        ExpandedFrameDecoration.TRAVEL_MAP -> drawTravelMapDecoration(
+            canvas = canvas,
+            framedWidth = framedWidth,
+            framedHeight = framedHeight,
+            bandTop = topBorder + source.height,
+            sideBorder = sideBorder,
+            padding = padding
+        )
+
+        ExpandedFrameDecoration.ARCHIVAL_PAPER -> drawArchivalPaperBorder(
             canvas = canvas,
             framedWidth = framedWidth,
             framedHeight = framedHeight,
             sideBorder = sideBorder,
             topBorder = topBorder,
-            bottomBandHeight = bottomBandHeight,
             sourceWidth = source.width,
             sourceHeight = source.height
         )
+
+        ExpandedFrameDecoration.NIGHT_MEMORY -> drawNightMemoryDecoration(
+            canvas = canvas,
+            framedWidth = framedWidth,
+            framedHeight = framedHeight,
+            bandTop = topBorder + source.height,
+            sideBorder = sideBorder,
+            topBorder = topBorder,
+            sourceWidth = source.width,
+            sourceHeight = source.height,
+            padding = padding
+        )
+
+        ExpandedFrameDecoration.STARRY_MOON,
+        ExpandedFrameDecoration.BLUE_HOUR,
+        ExpandedFrameDecoration.NONE -> Unit
     }
 
     return PhotoWatermarkBitmapRenderResult(
         bitmap = framedBitmap,
         warning = template.warning
     )
+}
+
+private fun drawVanGoghStarryFrame(
+    source: Bitmap,
+    template: ResolvedPhotoWatermarkTemplate,
+    detailTextSize: Float,
+    padding: Float
+): PhotoWatermarkBitmapRenderResult {
+    val sideBorder = (padding * 0.95f).coerceAtLeast(MIN_PADDING_PX * 0.7f)
+    val topBorder = (padding * 0.82f).coerceAtLeast(MIN_PADDING_PX * 0.65f)
+    val bottomBandHeight = maxOf(detailTextSize * 4.1f, source.height * 0.18f)
+    return drawComplexWatermarkFrame(
+        source = source,
+        template = template,
+        sideBorder = sideBorder,
+        topBorder = topBorder,
+        bottomBandHeight = bottomBandHeight,
+        padding = padding,
+        overlayStyle = ComplexWatermarkOverlayStyle.STARRY_MOON
+    ) { canvas, layout ->
+        val metadata = starryMoonMetadata(template.supportingLines)
+        if (metadata.isBlank()) return@drawComplexWatermarkFrame
+        val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb((228 * template.textOpacity).toInt().coerceIn(0, 228), 224, 198, 142)
+            textSize = (detailTextSize * 0.98f).coerceAtLeast(MIN_DETAIL_TEXT_SIZE_PX)
+            style = Paint.Style.FILL
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+            setShadowLayer(detailTextSize * 0.18f, 0f, detailTextSize * 0.04f, Color.argb(132, 0, 0, 0))
+        }
+        val metrics = detailPaint.fontMetrics
+        val baseline = layout.bandTop + layout.bottomBandHeight * 0.57f - (metrics.ascent + metrics.descent) / 2f
+        canvas.drawText(
+            fitText(metadata, detailPaint, layout.framedWidth - layout.sideBorder * 2f - layout.padding * 2f),
+            layout.framedWidth / 2f,
+            baseline,
+            detailPaint
+        )
+    }
+}
+
+private fun drawBlueHourFrame(
+    source: Bitmap,
+    template: ResolvedPhotoWatermarkTemplate,
+    titleTextSize: Float,
+    detailTextSize: Float,
+    padding: Float
+): PhotoWatermarkBitmapRenderResult {
+    val sideBorder = (padding * 0.86f).coerceAtLeast(MIN_PADDING_PX * 0.68f)
+    val topBorder = (padding * 0.75f).coerceAtLeast(MIN_PADDING_PX * 0.62f)
+    val bottomBandHeight = maxOf(titleTextSize * 3.75f, source.height * 0.18f)
+    return drawComplexWatermarkFrame(
+        source = source,
+        template = template,
+        sideBorder = sideBorder,
+        topBorder = topBorder,
+        bottomBandHeight = bottomBandHeight,
+        padding = padding,
+        overlayStyle = ComplexWatermarkOverlayStyle.BLUE_HOUR
+    ) { canvas, layout ->
+        val contentLeft = layout.sideBorder + layout.padding
+        val contentRight = layout.framedWidth - layout.sideBorder - layout.padding
+        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb((255 * template.textOpacity).toInt().coerceIn(0, 255), 196, 220, 248)
+            textSize = titleTextSize
+            style = Paint.Style.FILL
+            textAlign = Paint.Align.LEFT
+            typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+            setShadowLayer(titleTextSize * 0.16f, 0f, titleTextSize * 0.04f, Color.argb(142, 0, 4, 16))
+        }
+        val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb((224 * template.textOpacity).toInt().coerceIn(0, 224), 162, 190, 220)
+            textSize = detailTextSize
+            style = Paint.Style.FILL
+            textAlign = Paint.Align.LEFT
+            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+        }
+        val titleMetrics = titlePaint.fontMetrics
+        val titleBaseline =
+            layout.bandTop + layout.bottomBandHeight * 0.36f - (titleMetrics.ascent + titleMetrics.descent) / 2f
+        canvas.drawText("BLUE HOUR", contentLeft, titleBaseline, titlePaint)
+
+        val metadata = blueHourMetadata(template.supportingLines)
+        if (metadata.isNotBlank()) {
+            val detailBaseline = titleBaseline + (titleMetrics.descent - titleMetrics.ascent) * 0.74f
+            canvas.drawText(
+                fitText(metadata, detailPaint, (contentRight - contentLeft) * 0.66f),
+                contentLeft,
+                detailBaseline,
+                detailPaint
+            )
+        }
+    }
+}
+
+private fun drawComplexWatermarkFrame(
+    source: Bitmap,
+    template: ResolvedPhotoWatermarkTemplate,
+    sideBorder: Float,
+    topBorder: Float,
+    bottomBandHeight: Float,
+    padding: Float,
+    overlayStyle: ComplexWatermarkOverlayStyle,
+    drawTextBlock: (Canvas, ComplexWatermarkFrameLayout) -> Unit
+): PhotoWatermarkBitmapRenderResult {
+    val framedWidth = (source.width + sideBorder * 2f).toInt()
+    val framedHeight = (source.height + topBorder + bottomBandHeight).toInt()
+    val layout = ComplexWatermarkFrameLayout(
+        framedWidth = framedWidth,
+        framedHeight = framedHeight,
+        sideBorder = sideBorder,
+        topBorder = topBorder,
+        bottomBandHeight = bottomBandHeight,
+        sourceWidth = source.width,
+        sourceHeight = source.height,
+        padding = padding
+    )
+    val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(framedBitmap)
+    val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
+    drawFrameBackground(canvas, source, fullRect, template.frameBackground)
+    canvas.drawBitmap(source, sideBorder, topBorder, null)
+    drawComplexWatermarkOverlayLayer(canvas, layout, overlayStyle)
+    drawTextBlock(canvas, layout)
+    return PhotoWatermarkBitmapRenderResult(
+        bitmap = framedBitmap,
+        warning = template.warning
+    )
+}
+
+private fun drawComplexWatermarkOverlayLayer(
+    canvas: Canvas,
+    layout: ComplexWatermarkFrameLayout,
+    overlayStyle: ComplexWatermarkOverlayStyle
+) {
+    val overlayBitmap = Bitmap.createBitmap(layout.framedWidth, layout.framedHeight, Bitmap.Config.ARGB_8888)
+    val overlayCanvas = Canvas(overlayBitmap)
+    drawNightMemoryFrameWash(
+        canvas = overlayCanvas,
+        framedWidth = layout.framedWidth,
+        framedHeight = layout.framedHeight,
+        bandTop = layout.bandTop,
+        sideBorder = layout.sideBorder,
+        topBorder = layout.topBorder,
+        sourceWidth = layout.sourceWidth,
+        sourceHeight = layout.sourceHeight
+    )
+    drawComplexOverlayFrameTexture(overlayCanvas, layout, overlayStyle)
+    when (overlayStyle) {
+        ComplexWatermarkOverlayStyle.STARRY_MOON -> drawStarryMoonFrameDecoration(
+            canvas = overlayCanvas,
+            framedWidth = layout.framedWidth,
+            framedHeight = layout.framedHeight,
+            bandTop = layout.bandTop,
+            sideBorder = layout.sideBorder,
+            topBorder = layout.topBorder,
+            sourceWidth = layout.sourceWidth,
+            sourceHeight = layout.sourceHeight,
+            padding = layout.padding
+        )
+        ComplexWatermarkOverlayStyle.BLUE_HOUR -> drawBlueHourFrameDecoration(
+            canvas = overlayCanvas,
+            framedWidth = layout.framedWidth,
+            framedHeight = layout.framedHeight,
+            bandTop = layout.bandTop,
+            sideBorder = layout.sideBorder,
+            topBorder = layout.topBorder,
+            sourceWidth = layout.sourceWidth,
+            sourceHeight = layout.sourceHeight,
+            padding = layout.padding
+        )
+    }
+    canvas.drawBitmap(overlayBitmap, 0f, 0f, null)
+    overlayBitmap.recycle()
+}
+
+private fun drawComplexOverlayFrameTexture(
+    canvas: Canvas,
+    layout: ComplexWatermarkFrameLayout,
+    overlayStyle: ComplexWatermarkOverlayStyle
+) {
+    val sourceRect = layout.sourceRect
+    val bottomBandRect = layout.bottomBandRect
+    val bandWashColor = when (overlayStyle) {
+        ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(72, 10, 32, 74)
+        ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(58, 18, 48, 82)
+    }
+    canvas.drawRect(bottomBandRect, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = bandWashColor
+        style = Paint.Style.FILL
+    })
+
+    val sourceEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = when (overlayStyle) {
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(58, 226, 178, 84)
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(72, 156, 202, 238)
+        }
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1f, layout.framedWidth * 0.0014f)
+    }
+    val sourceInset = maxOf(2f, layout.framedWidth * 0.0032f)
+    canvas.drawRect(
+        sourceRect.left - sourceInset,
+        sourceRect.top - sourceInset,
+        sourceRect.right + sourceInset,
+        sourceRect.bottom + sourceInset,
+        sourceEdgePaint
+    )
+
+    val separatorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = when (overlayStyle) {
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(88, 226, 178, 84)
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(82, 156, 202, 238)
+        }
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(0.9f, layout.framedWidth * 0.0014f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawLine(
+        layout.sideBorder + layout.padding * 0.18f,
+        layout.bandTop + layout.padding * 0.2f,
+        layout.framedWidth - layout.sideBorder - layout.padding * 0.18f,
+        layout.bandTop + layout.padding * 0.16f,
+        separatorPaint
+    )
+    canvas.drawLine(
+        layout.sideBorder + layout.padding * 0.32f,
+        layout.framedHeight - layout.padding * 0.34f,
+        layout.framedWidth - layout.sideBorder - layout.padding * 0.32f,
+        layout.framedHeight - layout.padding * 0.38f,
+        Paint(separatorPaint).apply { alpha = (separatorPaint.alpha * 0.64f).toInt() }
+    )
+
+    val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(236, 198, 122)
+        style = Paint.Style.FILL
+    }
+    val coolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = when (overlayStyle) {
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.rgb(54, 139, 218)
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.rgb(158, 202, 238)
+        }
+        style = Paint.Style.FILL
+    }
+    val speckleCount = when (overlayStyle) {
+        ComplexWatermarkOverlayStyle.STARRY_MOON -> 150
+        ComplexWatermarkOverlayStyle.BLUE_HOUR -> 86
+    }
+    repeat(speckleCount) { index ->
+        val region = index % 5
+        val x = when (region) {
+            0 -> frameNoise(index * 17 + 3) * layout.framedWidth
+            1 -> frameNoise(index * 19 + 7) * layout.framedWidth
+            2 -> frameNoise(index * 23 + 11) * layout.sideBorder
+            3 -> layout.framedWidth - layout.sideBorder + frameNoise(index * 29 + 13) * layout.sideBorder
+            else -> frameNoise(index * 31 + 17) * layout.framedWidth
+        }
+        val y = when (region) {
+            0 -> frameNoise(index * 37 + 5) * layout.topBorder
+            1 -> layout.bandTop + frameNoise(index * 41 + 9) * layout.bottomBandHeight
+            2, 3 -> layout.topBorder + frameNoise(index * 43 + 15) * layout.sourceHeight
+            else -> layout.framedHeight - layout.padding * (0.3f + frameNoise(index * 47 + 21) * 1.7f)
+        }
+        val paint = if (overlayStyle == ComplexWatermarkOverlayStyle.STARRY_MOON && index % 3 != 0) {
+            warmPaint
+        } else {
+            coolPaint
+        }
+        paint.alpha = when (overlayStyle) {
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> (46 + frameNoise(index * 53 + 1) * 64f).toInt()
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> (28 + frameNoise(index * 53 + 1) * 42f).toInt()
+        }
+        val radius = when (overlayStyle) {
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> layout.padding * (0.018f + frameNoise(index * 59 + 4) * 0.028f)
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> layout.padding * (0.012f + frameNoise(index * 59 + 4) * 0.02f)
+        }.coerceAtLeast(0.7f)
+        canvas.drawCircle(x, y, radius, paint)
+    }
+}
+
+private fun frameNoise(seed: Int): Float {
+    val mixed = seed * 1103515245 + 12345
+    return ((mixed ushr 8) and 0x3ff) / 1023f
 }
 
 private fun drawBlurFourBorderFrame(
@@ -822,10 +1264,7 @@ private fun drawBlurFourBorderFrame(
         framedWidth = framedWidth,
         framedHeight = framedHeight,
         sideBorder = sideBorder,
-        topBorder = topBorder,
-        bottomBorder = bottomBorder,
-        sourceWidth = source.width,
-        sourceHeight = source.height
+        bottomBorder = bottomBorder
     )
 
     val titleColor = when (template.frameBackground) {
@@ -845,46 +1284,42 @@ private fun drawBlurFourBorderFrame(
         textSize = titleTextSize
         style = Paint.Style.FILL
         alpha = (255 * template.textOpacity).toInt()
-        textAlign = when (template.placement) {
-            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
-            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
-            else -> Paint.Align.LEFT
-        }
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
     }
     val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = detailColor
         textSize = detailTextSize
         style = Paint.Style.FILL
         alpha = (255 * template.textOpacity).toInt()
-        textAlign = when (template.placement) {
-            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
-            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
-            else -> Paint.Align.LEFT
-        }
+        textAlign = Paint.Align.CENTER
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
     }
     val contentLeft = sideBorder + padding
     val contentRight = framedWidth - sideBorder - padding
-    val blockTop = source.height + topBorder + padding
+    val metadata = blurFourBorderSignatureMetadata(template.supportingLines)
     val titleMetrics = titlePaint.fontMetrics
     val detailMetrics = detailPaint.fontMetrics
-    var baseline = blockTop - titleMetrics.ascent
-    val titleX = when (template.placement) {
-        WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
-        WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
-        else -> contentLeft
-    }
-    canvas.drawText(template.title, titleX, baseline, titlePaint)
-    template.supportingLines.take(2).forEach { line ->
-        baseline += (detailMetrics.descent - detailMetrics.ascent) + detailTextSize * 0.24f
-        val detailX = when (template.placement) {
-            WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
-            WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
-            else -> contentLeft
-        }
+    val titleHeight = titleMetrics.descent - titleMetrics.ascent
+    val detailHeight = detailMetrics.descent - detailMetrics.ascent
+    val lineGap = detailTextSize * 0.42f
+    val blockHeight = titleHeight + if (metadata.isNotEmpty()) lineGap + detailHeight else 0f
+    val bandTop = source.height + topBorder
+    val blockTop = bandTop + (bottomBorder - blockHeight) / 2f
+    val centerX = framedWidth / 2f
+    val titleBaseline = blockTop - titleMetrics.ascent
+    canvas.drawText(
+        fitText(template.title, titlePaint, contentRight - contentLeft),
+        centerX,
+        titleBaseline,
+        titlePaint
+    )
+    if (metadata.isNotEmpty()) {
+        val metadataBaseline = titleBaseline + titleMetrics.descent + lineGap - detailMetrics.ascent
         canvas.drawText(
-            fitText(line, detailPaint, contentRight - contentLeft),
-            detailX,
-            baseline,
+            fitText(metadata, detailPaint, contentRight - contentLeft),
+            centerX,
+            metadataBaseline,
             detailPaint
         )
     }
@@ -893,6 +1328,13 @@ private fun drawBlurFourBorderFrame(
         bitmap = framedBitmap,
         warning = template.warning
     )
+}
+
+internal fun blurFourBorderSignatureMetadata(lines: List<String>): String {
+    return lines
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .joinToString("   ")
 }
 
 internal data class BlurFourBorderFrameMetrics(
@@ -918,15 +1360,12 @@ private fun drawFourBorderCardAccents(
     framedWidth: Int,
     framedHeight: Int,
     sideBorder: Float,
-    topBorder: Float,
-    bottomBorder: Float,
-    sourceWidth: Int,
-    sourceHeight: Int
+    bottomBorder: Float
 ) {
     val accentColor = when (background) {
-        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(60, 245, 202, 126)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(58, 178, 196, 214)
         WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(50, 245, 238, 220)
-        else -> Color.argb(55, 220, 248, 246)
+        else -> Color.argb(48, 176, 202, 208)
     }
     val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = accentColor
@@ -940,6 +1379,25 @@ private fun drawFourBorderCardAccents(
         framedHeight - 1f,
         accentPaint
     )
+    if (background == WatermarkFrameBackground.SOURCE_VIVID_BLUR ||
+        background == WatermarkFrameBackground.SOURCE_LIGHT_BLUR
+    ) {
+        val y = framedHeight - bottomBorder + bottomBorder * 0.18f
+        val rosePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(72, 198, 174, 205)
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1f, framedWidth * 0.002f)
+            strokeCap = Paint.Cap.ROUND
+        }
+        val cyanPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(66, 164, 200, 212)
+            style = Paint.Style.STROKE
+            strokeWidth = maxOf(1f, framedWidth * 0.002f)
+            strokeCap = Paint.Cap.ROUND
+        }
+        canvas.drawLine(sideBorder + 8f, y, framedWidth / 2f, y, rosePaint)
+        canvas.drawLine(framedWidth / 2f, y, framedWidth - sideBorder - 8f, y, cyanPaint)
+    }
 }
 
 private fun drawProfessionalBottomBar(
@@ -1042,114 +1500,6 @@ private fun drawProfessionalBottomBar(
     )
 }
 
-private const val NIGHT_STREET_ACCENT_CYAN = 0xFF00D4AA.toInt()
-private const val NIGHT_STREET_ACCENT_MAGENTA = 0xFFFF3CAC.toInt()
-private const val NIGHT_STREET_ACCENT_AMBER = 0xFFFFAA2E.toInt()
-
-private fun nightStreetAccentColor(index: Int): Int = when (index % 3) {
-    0 -> NIGHT_STREET_ACCENT_CYAN
-    1 -> NIGHT_STREET_ACCENT_MAGENTA
-    else -> NIGHT_STREET_ACCENT_AMBER
-}
-
-private fun drawNightStreetFrame(
-    source: Bitmap,
-    template: ResolvedPhotoWatermarkTemplate,
-    titleTextSize: Float,
-    detailTextSize: Float,
-    padding: Float
-): PhotoWatermarkBitmapRenderResult {
-    val bottomBandHeight = maxOf(titleTextSize * 4.2f, source.height * 0.18f)
-    val accentLineWidth = 2f
-    val framedWidth = source.width
-    val framedHeight = (source.height + bottomBandHeight + accentLineWidth).toInt()
-    val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(framedBitmap)
-
-    val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
-    drawFrameBackground(canvas, source, fullRect, template.frameBackground)
-    canvas.drawBitmap(source, 0f, 0f, null)
-
-    val bandTop = source.height.toFloat() + accentLineWidth
-    val accentY = source.height.toFloat() + accentLineWidth / 2f
-
-    val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = nightStreetAccentColor(template.title.hashCode())
-        style = Paint.Style.STROKE
-        strokeWidth = accentLineWidth
-    }
-    canvas.drawLine(0f, accentY, framedWidth.toFloat(), accentY, accentPaint)
-
-    val contentLeft = padding
-    val contentRight = framedWidth - padding
-
-    val titleColor = when (template.frameBackground) {
-        WatermarkFrameBackground.SOURCE_BLUR,
-        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(255, 248, 248, 252)
-        else -> Color.argb(255, 235, 238, 242)
-    }
-    val detailColor = when (template.frameBackground) {
-        WatermarkFrameBackground.SOURCE_BLUR,
-        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(210, 190, 194, 204)
-        else -> Color.argb(200, 180, 184, 194)
-    }
-
-    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = titleColor
-        textSize = titleTextSize
-        style = Paint.Style.FILL
-        alpha = (255 * template.textOpacity).toInt()
-        textAlign = when (template.placement) {
-            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
-            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
-            else -> Paint.Align.LEFT
-        }
-    }
-    val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = detailColor
-        textSize = detailTextSize
-        style = Paint.Style.FILL
-        alpha = (255 * template.textOpacity).toInt()
-        textAlign = when (template.placement) {
-            WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
-            WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
-            else -> Paint.Align.LEFT
-        }
-    }
-
-    val titleMetrics = titlePaint.fontMetrics
-    val detailMetrics = detailPaint.fontMetrics
-    val blockTop = bandTop + padding
-    var baseline = blockTop - titleMetrics.ascent
-
-    val titleX = when (template.placement) {
-        WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
-        WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
-        else -> contentLeft
-    }
-    canvas.drawText(template.title, titleX, baseline, titlePaint)
-
-    val detailX = when (template.placement) {
-        WatermarkTextPlacement.BOTTOM_CENTER -> framedWidth / 2f
-        WatermarkTextPlacement.BOTTOM_RIGHT -> contentRight
-        else -> contentLeft
-    }
-    template.supportingLines.take(2).forEach { line ->
-        baseline += (detailMetrics.descent - detailMetrics.ascent) + detailTextSize * 0.24f
-        canvas.drawText(
-            fitText(line, detailPaint, contentRight - contentLeft),
-            detailX,
-            baseline,
-            detailPaint
-        )
-    }
-
-    return PhotoWatermarkBitmapRenderResult(
-        bitmap = framedBitmap,
-        warning = template.warning
-    )
-}
-
 private fun drawContentAwareEdgeBorder(
     canvas: Canvas,
     source: Bitmap,
@@ -1186,7 +1536,7 @@ private fun drawContentAwareEdgeBorder(
 internal fun contentAwareEdgeTintOverlay(background: WatermarkFrameBackground): Int {
     return when (background) {
         WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(64, 20, 20, 20)
-        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(72, 245, 210, 170)
+        WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(64, 210, 218, 226)
         else -> Color.TRANSPARENT
     }
 }
@@ -1216,9 +1566,9 @@ private fun createBlurredExpandedEdgeBitmap(
     }
     applySeparableBoxBlur(
         bitmap = mutable,
-        horizontalRadius = maxOf(4, blurRadiusForLength(framedWidth) / divisor),
-        verticalRadius = maxOf(4, blurRadiusForLength(framedHeight) / divisor),
-        passes = 2
+        horizontalRadius = maxOf(4, blurFourBorderBlurRadiusForLength(framedWidth) / divisor),
+        verticalRadius = maxOf(4, blurFourBorderBlurRadiusForLength(framedHeight) / divisor),
+        passes = 3
     )
     val result = if (divisor > 1) {
         val upscaled = Bitmap.createScaledBitmap(mutable, framedWidth, framedHeight, true)
@@ -1242,8 +1592,8 @@ private fun createCaptureCropSource(source: Bitmap, captureCropZoom: Float): Bit
     return Bitmap.createBitmap(source, left, top, cropWidth, cropHeight)
 }
 
-private fun blurRadiusForLength(length: Int): Int {
-    return maxOf(14, minOf(64, length / 28))
+internal fun blurFourBorderBlurRadiusForLength(length: Int): Int {
+    return maxOf(16, minOf(72, length / 24))
 }
 
 private fun applySeparableBoxBlur(
@@ -1382,7 +1732,7 @@ private fun drawFrameBackground(
             val overlayColor = when (background) {
                 WatermarkFrameBackground.SOURCE_BLUR -> Color.argb(88, 20, 20, 20)
                 WatermarkFrameBackground.SOURCE_LIGHT_BLUR -> Color.argb(124, 255, 244, 228)
-                WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(104, 246, 198, 138)
+                WatermarkFrameBackground.SOURCE_VIVID_BLUR -> Color.argb(96, 218, 220, 232)
                 else -> Color.TRANSPARENT
             }
             canvas.drawRect(destination, Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1393,46 +1743,409 @@ private fun drawFrameBackground(
     }
 }
 
-private fun drawOrnamentalBorder(
+private fun drawTravelMapDecoration(
+    canvas: Canvas,
+    framedWidth: Int,
+    framedHeight: Int,
+    bandTop: Float,
+    sideBorder: Float,
+    padding: Float
+) {
+    val left = maxOf(framedWidth * 0.56f, framedWidth / 2f + padding)
+    val right = framedWidth - sideBorder - padding * 0.55f
+    val top = bandTop + padding * 0.72f
+    val bottom = framedHeight - padding * 0.7f
+    if (right <= left || bottom <= top) return
+
+    val width = right - left
+    val height = bottom - top
+    val contourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(72, 83, 132, 100)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1.2f, framedWidth * 0.0024f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    repeat(3) { index ->
+        val offset = index * height * 0.19f
+        val contour = Path().apply {
+            moveTo(left + width * 0.02f, top + height * (0.2f + index * 0.11f))
+            cubicTo(
+                left + width * 0.24f, top - height * 0.05f + offset,
+                left + width * 0.43f, top + height * 0.52f + offset,
+                left + width * 0.64f, top + height * 0.28f + offset
+            )
+            cubicTo(
+                left + width * 0.78f, top + height * 0.12f + offset,
+                left + width * 0.9f, top + height * 0.48f + offset,
+                right, top + height * 0.34f + offset
+            )
+        }
+        canvas.drawPath(contour, contourPaint)
+    }
+
+    val routePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(178, 42, 82, 61)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1.8f, framedWidth * 0.0035f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val route = Path().apply {
+        moveTo(left + width * 0.08f, bottom - height * 0.14f)
+        cubicTo(
+            left + width * 0.28f, top + height * 0.36f,
+            left + width * 0.48f, bottom - height * 0.12f,
+            left + width * 0.7f, top + height * 0.24f
+        )
+    }
+    canvas.drawPath(route, routePaint)
+
+    val markerRadius = maxOf(2.4f, framedWidth * 0.006f)
+    val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(210, 42, 82, 61)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1.4f, markerRadius * 0.42f)
+    }
+    canvas.drawCircle(left + width * 0.08f, bottom - height * 0.14f, markerRadius, markerPaint)
+    canvas.drawCircle(left + width * 0.7f, top + height * 0.24f, markerRadius, markerPaint)
+
+    val crossX = left + width * 0.89f
+    val crossY = bottom - height * 0.2f
+    val crossSize = markerRadius * 1.9f
+    canvas.drawLine(crossX - crossSize, crossY, crossX + crossSize, crossY, markerPaint)
+    canvas.drawLine(crossX, crossY - crossSize, crossX, crossY + crossSize, markerPaint)
+}
+
+private fun drawNightMemoryFrameWash(
+    canvas: Canvas,
+    framedWidth: Int,
+    framedHeight: Int,
+    bandTop: Float,
+    sideBorder: Float,
+    topBorder: Float,
+    sourceWidth: Int,
+    sourceHeight: Int
+) {
+    val nightWashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(218, 9, 12, 24)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(0f, 0f, framedWidth.toFloat(), topBorder, nightWashPaint)
+    canvas.drawRect(0f, topBorder, sideBorder, topBorder + sourceHeight, nightWashPaint)
+    canvas.drawRect(
+        sideBorder + sourceWidth,
+        topBorder,
+        framedWidth.toFloat(),
+        topBorder + sourceHeight,
+        nightWashPaint
+    )
+    canvas.drawRect(0f, bandTop, framedWidth.toFloat(), framedHeight.toFloat(), nightWashPaint)
+}
+
+private fun drawNightMemoryDecoration(
+    canvas: Canvas,
+    framedWidth: Int,
+    framedHeight: Int,
+    bandTop: Float,
+    sideBorder: Float,
+    topBorder: Float,
+    sourceWidth: Int,
+    sourceHeight: Int,
+    padding: Float
+) {
+    val coolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(88, 160, 176, 202)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1f, framedWidth * 0.0018f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val warmLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(172, 222, 160, 82)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1.1f, framedWidth * 0.002f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val lampPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(196, 226, 158, 82)
+        style = Paint.Style.FILL
+    }
+    val frameInset = maxOf(5f, minOf(framedWidth, framedHeight) * 0.009f)
+    val corner = maxOf(24f, minOf(framedWidth, framedHeight) * 0.055f)
+    fun drawCorner(left: Boolean, top: Boolean) {
+        val x = if (left) frameInset else framedWidth - frameInset
+        val y = if (top) frameInset else framedHeight - frameInset
+        val xDir = if (left) 1f else -1f
+        val yDir = if (top) 1f else -1f
+        canvas.drawLine(x, y, x + xDir * corner, y, coolPaint)
+        canvas.drawLine(x, y, x, y + yDir * corner, coolPaint)
+    }
+    drawCorner(left = true, top = true)
+    drawCorner(left = false, top = true)
+    drawCorner(left = true, top = false)
+    drawCorner(left = false, top = false)
+
+    val imageInset = maxOf(3f, framedWidth * 0.004f)
+    canvas.drawRect(
+        sideBorder - imageInset,
+        topBorder - imageInset,
+        sideBorder + sourceWidth + imageInset,
+        topBorder + sourceHeight + imageInset,
+        Paint(coolPaint).apply { alpha = 52 }
+    )
+    canvas.drawLine(
+        sideBorder + padding * 0.25f,
+        bandTop + padding * 0.54f,
+        framedWidth - sideBorder - padding * 0.25f,
+        bandTop + padding * 0.48f,
+        warmLinePaint
+    )
+    val lampRadius = maxOf(3f, padding * 0.13f)
+    canvas.drawCircle(framedWidth - sideBorder - padding * 0.65f, bandTop + padding * 0.9f, lampRadius, lampPaint)
+    canvas.drawCircle(
+        framedWidth - sideBorder - padding * 1.12f,
+        bandTop + padding * 1.22f,
+        lampRadius * 0.72f,
+        lampPaint
+    )
+}
+
+private fun drawStarryMoonFrameDecoration(
+    canvas: Canvas,
+    framedWidth: Int,
+    framedHeight: Int,
+    bandTop: Float,
+    sideBorder: Float,
+    topBorder: Float,
+    sourceWidth: Int,
+    sourceHeight: Int,
+    padding: Float
+) {
+    val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(172, 226, 178, 84)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1.1f, framedWidth * 0.0021f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val coolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(116, 38, 130, 218)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(0.9f, framedWidth * 0.0017f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(220, 242, 206, 126)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1.0f, framedWidth * 0.0019f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(235, 248, 220, 154)
+        style = Paint.Style.FILL
+    }
+    val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(255, 9, 12, 24)
+        style = Paint.Style.FILL
+    }
+
+    val moonX = sideBorder + padding * 0.65f
+    val moonY = topBorder + padding * 0.68f
+    val moonRadius = maxOf(9f, padding * 0.42f)
+    canvas.drawCircle(moonX, moonY, moonRadius, fillPaint)
+    canvas.drawCircle(moonX + moonRadius * 0.46f, moonY - moonRadius * 0.08f, moonRadius * 0.92f, maskPaint)
+
+    fun drawWave(startX: Float, endX: Float, y: Float, amplitude: Float, paint: Paint) {
+        val path = Path().apply {
+            moveTo(startX, y)
+            cubicTo(
+                startX + (endX - startX) * 0.28f,
+                y - amplitude,
+                startX + (endX - startX) * 0.58f,
+                y + amplitude,
+                endX,
+                y - amplitude * 0.22f
+            )
+        }
+        canvas.drawPath(path, paint)
+    }
+    val topStart = sideBorder + padding * 2.7f
+    val topEnd = framedWidth - sideBorder - padding * 0.65f
+    repeat(4) { index ->
+        val y = topBorder * 0.42f + padding * (0.48f + index * 0.16f)
+        drawWave(topStart, topEnd, y, padding * (0.38f + index * 0.04f), if (index % 2 == 0) warmPaint else coolPaint)
+    }
+    repeat(4) { index ->
+        val y = bandTop + padding * (0.58f + index * 0.18f)
+        drawWave(sideBorder + padding * 0.4f, framedWidth - sideBorder - padding * 0.45f, y, padding * 0.34f, if (index % 2 == 0) coolPaint else warmPaint)
+    }
+    drawWave(sideBorder * 0.48f, sideBorder + padding * 0.38f, topBorder + sourceHeight * 0.18f, padding * 0.5f, warmPaint)
+    drawWave(framedWidth - sideBorder - padding * 0.3f, framedWidth - sideBorder * 0.34f, topBorder + sourceHeight * 0.35f, padding * 0.44f, coolPaint)
+
+    val starPositions = listOf(
+        sideBorder * 0.78f to topBorder + sourceHeight * 0.18f,
+        framedWidth - sideBorder * 0.55f to topBorder + sourceHeight * 0.12f,
+        framedWidth - sideBorder * 0.82f to topBorder + sourceHeight * 0.52f,
+        sideBorder + sourceWidth * 0.08f to bandTop + padding * 0.95f,
+        framedWidth - sideBorder - sourceWidth * 0.08f to bandTop + padding * 1.35f,
+        framedWidth * 0.74f to framedHeight - padding * 0.68f,
+        framedWidth * 0.23f to framedHeight - padding * 0.72f
+    )
+    starPositions.forEachIndexed { index, (x, y) ->
+        val radius = padding * if (index % 3 == 0) 0.16f else 0.11f
+        canvas.drawLine(x - radius, y, x + radius, y, starPaint)
+        canvas.drawLine(x, y - radius, x, y + radius, starPaint)
+    }
+}
+
+private fun drawBlueHourFrameDecoration(
+    canvas: Canvas,
+    framedWidth: Int,
+    framedHeight: Int,
+    bandTop: Float,
+    sideBorder: Float,
+    topBorder: Float,
+    sourceWidth: Int,
+    sourceHeight: Int,
+    padding: Float
+) {
+    val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(190, 196, 220, 248)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1f, framedWidth * 0.0018f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(206, 230, 184, 104)
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(1.2f, framedWidth * 0.0021f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    val inset = maxOf(4f, minOf(framedWidth, framedHeight) * 0.008f)
+    canvas.drawRoundRect(
+        RectF(
+            inset,
+            inset,
+            framedWidth - inset,
+            framedHeight - inset
+        ),
+        padding * 0.28f,
+        padding * 0.28f,
+        linePaint
+    )
+    canvas.drawRect(
+        sideBorder - inset,
+        topBorder - inset,
+        sideBorder + sourceWidth + inset,
+        topBorder + sourceHeight + inset,
+        Paint(linePaint).apply { alpha = 78 }
+    )
+
+    val iconX = framedWidth - sideBorder - padding * 2.1f
+    val iconY = bandTop + padding * 1.35f
+    val moonRadius = padding * 0.28f
+    canvas.drawArc(
+        RectF(iconX, iconY - moonRadius, iconX + moonRadius * 1.8f, iconY + moonRadius * 0.8f),
+        85f,
+        220f,
+        false,
+        warmPaint
+    )
+    val lampX = iconX + padding * 1.34f
+    val lampTop = iconY + padding * 0.22f
+    val lampBottom = framedHeight - padding * 0.82f
+    canvas.drawLine(lampX, lampTop, lampX, lampBottom, warmPaint)
+    canvas.drawLine(lampX - padding * 0.26f, lampBottom, lampX + padding * 0.26f, lampBottom, warmPaint)
+    canvas.drawLine(lampX - padding * 0.18f, lampTop + padding * 0.3f, lampX + padding * 0.18f, lampTop + padding * 0.3f, warmPaint)
+    val cameraLeft = iconX + padding * 0.1f
+    val cameraTop = iconY + padding * 0.68f
+    canvas.drawRoundRect(
+        RectF(cameraLeft, cameraTop, cameraLeft + padding * 0.78f, cameraTop + padding * 0.52f),
+        padding * 0.08f,
+        padding * 0.08f,
+        warmPaint
+    )
+    canvas.drawCircle(cameraLeft + padding * 0.39f, cameraTop + padding * 0.26f, padding * 0.13f, warmPaint)
+}
+
+private fun starryMoonMetadata(lines: List<String>): String {
+    return lines
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .joinToString(" · ")
+}
+
+private fun blueHourMetadata(lines: List<String>): String {
+    return lines
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .joinToString(" · ")
+}
+
+private fun drawArchivalPaperBorder(
     canvas: Canvas,
     framedWidth: Int,
     framedHeight: Int,
     sideBorder: Float,
     topBorder: Float,
-    bottomBandHeight: Float,
     sourceWidth: Int,
     sourceHeight: Int
 ) {
-    val frameColor = Color.argb(180, 62, 74, 64)
-    val innerColor = Color.argb(90, 62, 74, 64)
+    val frameColor = Color.argb(128, 132, 104, 66)
+    val innerColor = Color.argb(58, 184, 146, 94)
     val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = frameColor
         style = Paint.Style.STROKE
-        strokeWidth = 1.8f
+        strokeWidth = 1.2f
     }
     val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerColor
         style = Paint.Style.STROKE
-        strokeWidth = 1.0f
+        strokeWidth = 0.8f
     }
-    // Outer frame border around the full card
-    canvas.drawRect(4f, 4f, framedWidth - 4f, framedHeight - 4f, outerPaint)
-    // Inner ornamental line inset slightly from the source image boundary
+    val outerInset = maxOf(4f, minOf(framedWidth, framedHeight) * 0.01f)
+    canvas.drawRect(
+        outerInset,
+        outerInset,
+        framedWidth - outerInset,
+        framedHeight - outerInset,
+        outerPaint
+    )
+
     val inset = 5f
     canvas.drawRect(
         sideBorder - inset, topBorder - inset,
         sideBorder + sourceWidth + inset, topBorder + sourceHeight + inset,
         innerPaint
     )
-    // Small horizontal accent line separating the photo from the text band
     val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(70, 62, 74, 64)
+        color = Color.argb(58, 132, 104, 66)
         style = Paint.Style.STROKE
         strokeWidth = 1.0f
+        strokeCap = Paint.Cap.SQUARE
     }
     val lineY = topBorder + sourceHeight + inset + 3f
     val lineMargin = sideBorder + 8f
     canvas.drawLine(lineMargin, lineY, framedWidth - lineMargin, lineY, accentPaint)
+
+    val step = maxOf(8f, minOf(framedWidth, framedHeight) * 0.028f)
+    fun drawCorner(left: Boolean, top: Boolean) {
+        val xEdge = if (left) outerInset + step * 0.5f else framedWidth - outerInset - step * 0.5f
+        val yEdge = if (top) outerInset + step * 0.5f else framedHeight - outerInset - step * 0.5f
+        val xDirection = if (left) 1f else -1f
+        val yDirection = if (top) 1f else -1f
+        canvas.drawLine(xEdge, yEdge, xEdge + xDirection * step * 2.2f, yEdge, outerPaint)
+        canvas.drawLine(xEdge, yEdge, xEdge, yEdge + yDirection * step * 2.2f, outerPaint)
+        canvas.drawLine(
+            xEdge + xDirection * step * 0.55f,
+            yEdge + yDirection * step * 0.38f,
+            xEdge + xDirection * step * 1.8f,
+            yEdge + yDirection * step * 0.38f,
+            innerPaint
+        )
+    }
+    drawCorner(left = true, top = true)
+    drawCorner(left = false, top = true)
+    drawCorner(left = true, top = false)
+    drawCorner(left = false, top = false)
+
 }
 
 private fun fitText(
@@ -1482,6 +2195,8 @@ private const val TEMPLATE_PURE_TEXT = "pure-text"
 private const val TEMPLATE_BLUR_FOUR_BORDER = "blur-four-border"
 private const val TEMPLATE_PROFESSIONAL_BOTTOM_BAR = "professional-bottom-bar"
 private const val TEMPLATE_NIGHT_STREET = "night-street"
+private const val TEMPLATE_VAN_GOGH_STARRY = "van-gogh-starry"
+private const val TEMPLATE_BLUE_HOUR = "blue-hour"
 
 private fun resolveWatermarkTemplateId(templateId: String?): String {
     return templateId
@@ -1556,10 +2271,13 @@ private val SUPPORTED_BLUR_BACKGROUNDS = setOf(
     WatermarkFrameBackground.SOURCE_VIVID_BLUR
 )
 
+private val SUPPORTED_RETRO_FRAME_BACKGROUNDS = setOf(
+    WatermarkFrameBackground.WHITE,
+    WatermarkFrameBackground.DARK
+)
+
 private val SUPPORTED_NIGHT_STREET_BACKGROUNDS = setOf(
-    WatermarkFrameBackground.DARK,
-    WatermarkFrameBackground.SOURCE_BLUR,
-    WatermarkFrameBackground.SOURCE_VIVID_BLUR
+    WatermarkFrameBackground.DARK
 )
 
 private fun resolveWatermarkTitle(
@@ -1570,6 +2288,9 @@ private fun resolveWatermarkTitle(
 ): String {
     val modeName = customTags[PHOTO_WATERMARK_MODE_NAME_KEY]
     val profileName = customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY]
+    if (templateType == PhotoWatermarkTemplateType.BLUE_HOUR) {
+        return "BLUE HOUR"
+    }
     if (modeName != null) {
         val title = buildString {
             append(deviceModel)

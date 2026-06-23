@@ -6,6 +6,8 @@ import com.opencamera.core.mode.ModeId
 import com.opencamera.core.settings.CompositionGridMode
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.PersistedSettings
+import com.opencamera.core.settings.StyleMoodDescriptor
+import com.opencamera.core.settings.StylePresetFamily
 
 open class TestAppTextResolver : AppTextResolver(null) {
     internal override fun get(@StringRes resId: Int): String = when (resId) {
@@ -123,6 +125,21 @@ open class TestAppTextResolver : AppTextResolver(null) {
         R.string.document_batch_move_up -> "Move up"
         R.string.document_batch_organizer_title -> "Organize Batch"
         R.string.document_batch_remove -> "Remove from batch"
+        R.string.button_document_batch_continue_shooting -> "Continue Shooting"
+        R.string.button_document_batch_crop_edit -> "Enter Crop Edit"
+        R.string.button_document_batch_crop_edit_coming_soon -> "Crop Edit Coming Soon"
+        R.string.document_crop_edit_title -> "Crop Edit"
+        R.string.document_crop_edit_confirm -> "Confirm"
+        R.string.document_crop_edit_cancel -> "Cancel"
+        R.string.document_crop_edit_page_format -> "Page %d"
+        R.string.document_crop_edit_marked_manual -> "Marked as cropped"
+        R.string.button_document_batch_export -> "Export Batch"
+        R.string.document_export_progress -> "Exporting %d/%d pages"
+        R.string.document_export_success -> "Export success, %d pages"
+        R.string.document_export_failed -> "Export failed"
+        R.string.button_document_export_return -> "Return to Shooting"
+        R.string.button_document_export_retry -> "Retry"
+        R.string.document_batch_empty_hint -> "No pages yet, tap Continue Shooting to start"
         R.string.error_microphone_unavailable -> "Microphone capture unavailable on this device"
         R.string.error_no_compatible_filters -> "No compatible filters"
         R.string.error_no_watermark_templates -> "No watermark templates available"
@@ -152,6 +169,8 @@ open class TestAppTextResolver : AppTextResolver(null) {
         R.string.filter_lab_editing_disabled -> "Finish the current capture before changing filter defaults."
         R.string.filter_lab_editing_enabled -> "Selected family defaults save instantly and refresh the active mode when relevant."
         R.string.filter_lab_footer -> "Independent Tone Lab prioritized. Panel adjustments and custom saves ongoing; import/export deferred."
+        R.string.filter_lab_color_summary -> "Color Lab edits a live color wash over the current mode: warm/cool runs left to right, tone depth runs top to bottom."
+        R.string.filter_lab_color_hint -> "Horizontal swipe adjusts warmth and tint; vertical swipe controls lift or deep contrast."
         R.string.filter_lab_light_palette_hint -> "Horizontal swipe for color, vertical swipe for tone."
         R.string.filter_lab_save_custom_already_custom -> "Unavailable • Current default already custom"
         R.string.filter_lab_save_custom_unavailable_profile -> "Unavailable • Missing source profile"
@@ -269,8 +288,6 @@ open class TestAppTextResolver : AppTextResolver(null) {
         R.string.settings_joiner_timer -> " | Timer "
         R.string.settings_joiner_watermark -> " | Watermark "
         R.string.settings_not_loaded -> "Settings not loaded yet"
-        R.string.settings_page_catalog_footer_1 -> "Still watermark templates now flow into metadata and photo rendering."
-        R.string.settings_page_catalog_footer_2 -> "Manual drafts and Live/video defaults remain staged in the same settings spine."
         R.string.settings_page_portrait_support -> "Open profile + beauty + bokeh tuning"
         R.string.settings_page_pro_manual_prefix -> " | Humanistic manual draft "
         R.string.settings_page_supporting -> "Quick defaults with explicit supported, degraded, and staged capability hints."
@@ -319,7 +336,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
         R.string.watermark_detail_editing_enabled -> "Template-specific styles save instantly and stay attached to this watermark preset."
         R.string.watermark_detail_footer_frame -> "Frame border rendering is live for static-photo export."
         R.string.watermark_detail_footer_overlay -> "Classic overlay stays inside the source image without an expanded border."
-        R.string.watermark_detail_footer_pure_text -> "Clean text sits directly on the source image with no border or background container."
+        R.string.watermark_detail_footer_pure_text -> "A translucent blue bottom bar stays inside the source image with a small warm light accent."
         R.string.watermark_detail_supporting_not_selected -> "This template is not yet the current default. Adjust here first, then switch from the selector page when ready."
         R.string.watermark_detail_supporting_selected -> "This is the active default watermark. Changes here will affect the next static photo rendered with this template."
         R.string.watermark_detail_tokens_prefix -> "Tokens: "
@@ -329,17 +346,17 @@ open class TestAppTextResolver : AppTextResolver(null) {
         R.string.watermark_selector_edit_attrs_frame -> "Placement, scale, opacity, background"
         R.string.watermark_selector_editing_disabled -> "Finish the current capture before changing watermark defaults."
         R.string.watermark_selector_editing_enabled -> "Default template changes save instantly. Each template keeps its own placement, scale, opacity, and frame background preset."
-        R.string.watermark_selector_footer_supported -> "Pure Text shows no frame; Classic Overlay keeps its border fixed; Travel Polaroid and Retro Frame expose frame variants; Blur Four Border uses blur-only backgrounds."
+        R.string.watermark_selector_footer_supported -> "Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages. All still-photo watermarks embed a reversible original JPEG archive, extractable via the provided tooling."
         R.string.watermark_selector_footer_unsupported -> "Still capture is unavailable on this device, so Watermark Lab stays read-only."
         R.string.watermark_selector_supporting -> "Watermark selection sits one level below Settings. Pick the active template here, then enter the template-specific style page to edit."
         R.string.watermark_template_blur_four_border -> "Blur four border"
+        R.string.watermark_template_blue_hour -> "Blue Hour"
         R.string.watermark_template_classic_overlay -> "Classic overlay"
         R.string.watermark_template_expanded_frame -> "Expanded frame"
-        R.string.watermark_template_night_street -> "Night Street"
-        R.string.watermark_template_professional_bottom_bar -> "Professional Bottom Bar"
-        R.string.watermark_template_pure_text -> "Pure text"
+        R.string.watermark_template_pure_text -> "Translucent Bottom Bar"
         R.string.watermark_template_retro_frame -> "Retro Frame"
         R.string.watermark_template_travel_polaroid -> "Travel Polaroid"
+        R.string.watermark_template_van_gogh_starry -> "Van Gogh Starry"
         R.string.watermark_token_camera_params -> "Camera Params"
         R.string.watermark_token_datetime -> "Date/Time"
         R.string.watermark_token_location -> "Location"
@@ -375,12 +392,14 @@ open class TestAppTextResolver : AppTextResolver(null) {
         FilterLabFamily.HUMANISTIC -> "Humanistic Styles"
         FilterLabFamily.PORTRAIT -> "Portrait Styles"
         FilterLabFamily.VIDEO -> "Video Styles"
+        FilterLabFamily.DOCUMENT -> "文档色彩"
     }
     internal override fun styleRailSupportingText(family: FilterLabFamily): String = when (family) {
         FilterLabFamily.PHOTO -> "Tap a card to apply this look instantly."
         FilterLabFamily.HUMANISTIC -> "Street and life presets for a human perspective."
         FilterLabFamily.PORTRAIT -> "Portrait-specific tone presets."
         FilterLabFamily.VIDEO -> "Video look presets applied before recording."
+        FilterLabFamily.DOCUMENT -> "选择文档色彩模式"
     }
     override fun filterLabHeroSummary(familyLabel: String, filterLabel: String, count: Int): String = "$familyLabel default $filterLabel • $count looks staged"
     override fun filterLabCurrentDefault(filterLabel: String): String = "Current default $filterLabel"
@@ -393,6 +412,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
     override fun devLogTitleAll(count: Int): String = "All Events ($count)"
     override fun devLogTitleLink(count: Int): String = "Link Flow ($count)"
     override fun liveSaveFormatSupportLabel(count: Int): String = "$count formats: Motion Photo, MP4 Sidecar, JPEG Only"
+    override fun livePhotoDefaultSupportLabel(motionDurationMs: Int): String = "Toggle default; $motionDurationMs ms motion bundle"
     override fun zoomRatioLabel(ratio: Float): String = "${ratio}x"
     override fun countdownSeconds(seconds: Int): String = "${seconds}s"
     override fun outputSizeLabel(width: Int, height: Int): String = "${width}x${height}"
@@ -435,6 +455,46 @@ open class TestAppTextResolver : AppTextResolver(null) {
     // Check-in style panel
     override fun checkInEditingHint(enabled: Boolean): String = if (enabled) "Tap to select scene and style" else "Capturing, cannot switch"
     override fun zoomSliderDescription(ratio: Float, disabledReason: String?): String = if (disabledReason != null) "Zoom: $disabledReason" else String.format("Zoom: %.1fx", ratio)
+
+    override fun styleCardTitle(profileId: String, family: StylePresetFamily): String = when (profileId) {
+        "photo-vivid" -> "鲜明"
+        "photo-original" -> "原色"
+        "photo-chasing-light" -> "追光"
+        "photo-rich" -> "浓郁"
+        "photo-texture" -> "质感"
+        "photo-bw" -> "黑白"
+        "humanistic-original" -> "人文原色"
+        "humanistic-vivid" -> "人文鲜明"
+        "humanistic-street" -> "街头"
+        "humanistic-portrait" -> "人文人像"
+        "humanistic-life" -> "生活"
+        "portrait-blue" -> "冷调人像"
+        "portrait-retro" -> "复古人像"
+        "portrait-ccd" -> "CCD 人像"
+        "portrait-vivid" -> "鲜明人像"
+        "portrait-original" -> "原色人像"
+        "portrait-chasing-light" -> "追光人像"
+        "portrait-rich" -> "浓郁人像"
+        else -> super.styleCardTitle(profileId, family)
+    }
+
+    override fun styleCardMoodLabel(descriptor: StyleMoodDescriptor): String = when {
+        descriptor.isBw -> "黑白"
+        descriptor.isMonochrome -> "单色"
+        descriptor.isNatural -> "自然"
+        descriptor.activeFlags().isEmpty() -> "自然"
+        else -> {
+            val zhParts = mutableListOf<String>()
+            if (descriptor.isVivid) zhParts.add("鲜明")
+            if (descriptor.isMuted) zhParts.add("柔和")
+            if (descriptor.isPunchy) zhParts.add("明快")
+            if (descriptor.isSoft) zhParts.add("柔焦")
+            if (descriptor.isWarm) zhParts.add("暖色")
+            if (descriptor.isCool) zhParts.add("冷色")
+            if (descriptor.isFilm) zhParts.add("胶片")
+            zhParts.joinToString("")
+        }
+    }
 
     // Portrait lab
 
@@ -496,4 +556,9 @@ open class TestAppTextResolver : AppTextResolver(null) {
             outputWaiting = "No photo captured yet."
         )
     }
+
+    open fun documentBatchOrganizerTitle(): String = "Organize Batch"
+    open fun documentBatchRemoveLabel(): String = "Remove from batch"
+    open fun documentBatchMoveUpLabel(): String = "Move up"
+    open fun documentBatchMoveDownLabel(): String = "Move down"
 }

@@ -438,13 +438,35 @@ class PostProcessFailureContractsTest {
     @Test
     fun `failure causes cover all characterized failure categories`() {
         val causes = PostProcessFailureCause.entries
-        assertEquals(6, causes.size)
+        assertEquals(7, causes.size)
         assertTrue(causes.contains(PostProcessFailureCause.DECODE_FAILED))
         assertTrue(causes.contains(PostProcessFailureCause.OUT_OF_MEMORY))
         assertTrue(causes.contains(PostProcessFailureCause.BITMAP_OPERATION))
         assertTrue(causes.contains(PostProcessFailureCause.ENCODE))
         assertTrue(causes.contains(PostProcessFailureCause.OUTPUT_UNAVAILABLE))
         assertTrue(causes.contains(PostProcessFailureCause.EXCEPTION))
+        assertTrue(causes.contains(PostProcessFailureCause.TIMEOUT))
+    }
+
+    // ── TIMEOUT cause ────────────────────────────────────────────────────
+
+    @Test
+    fun `TIMEOUT cause projects legacy note suffix correctly`() {
+        assertEquals("timeout", PostProcessFailureCause.TIMEOUT.legacyNoteSuffix)
+    }
+
+    @Test
+    fun `timeout failure legacy note is greppable`() {
+        val failure = PostProcessFailure(
+            stage = PostProcessFailureStage.COMPOSITE,
+            cause = PostProcessFailureCause.TIMEOUT,
+            integrity = PostProcessOutputIntegrity.POSSIBLY_MODIFIED,
+            disposition = PostProcessFailureDisposition.RECOVERABLE,
+            processorName = "SlowProcessor"
+        )
+        val note = failure.toLegacyNote()
+        assertTrue(note.contains(":failed:"))
+        assertEquals("postprocess:failed:SlowProcessor:composite-failure", note)
     }
 
     // ── Helper function ────────────────────────────────────────────────────

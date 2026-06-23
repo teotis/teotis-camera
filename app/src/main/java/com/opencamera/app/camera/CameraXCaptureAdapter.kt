@@ -121,8 +121,10 @@ import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -400,6 +402,7 @@ class CameraXCaptureAdapter(
 
     override suspend fun release() {
         withContext(Dispatchers.Main.immediate) {
+            adapterScope.cancel()
             if (activeRecording != null) {
                 recordingController.release()
                 recordingController.outcomes.toList().forEach { outcome ->
@@ -555,6 +558,7 @@ class CameraXCaptureAdapter(
                     // Move postprocess off Dispatchers.Main.immediate to avoid main-thread
                     // contention during UI-heavy capture feedback (P6 latency phase).
                     adapterScope.launch(Dispatchers.Default) {
+                        if (!adapterScope.isActive) return@launch
                         runCatching {
                             emitShotCompleted(
                                 plan = shotCompletedParams.plan,
@@ -801,6 +805,7 @@ class CameraXCaptureAdapter(
                         activeRecording = null
 
                         adapterScope.launch {
+                            if (!adapterScope.isActive) return@launch
                             recordingController.outcomes.toList().let { recentOutcomes ->
                                 recordingController.outcomes.clear()
                                 recentOutcomes.forEach { outcome ->
@@ -973,18 +978,22 @@ class CameraXCaptureAdapter(
     private fun captureCaptureFeedbackSnapshot(shotId: String) {
         val previewView = _bindingController.currentBoundPreviewView ?: return
         adapterScope.launch {
+            if (!adapterScope.isActive) return@launch
             val bitmap = awaitPreviewBitmap(previewView) ?: return@launch
-            runCatching {
-                saveCaptureFeedbackBitmap(shotId, bitmap)
-            }.onSuccess { outputPath ->
-                _events.emit(
-                    DeviceEvent.CaptureFeedbackSnapshotAvailable(
-                        shotId = shotId,
-                        outputPath = outputPath
+            try {
+                runCatching {
+                    saveCaptureFeedbackBitmap(shotId, bitmap)
+                }.onSuccess { outputPath ->
+                    _events.emit(
+                        DeviceEvent.CaptureFeedbackSnapshotAvailable(
+                            shotId = shotId,
+                            outputPath = outputPath
+                        )
                     )
-                )
+                }
+            } finally {
+                bitmap.recycle()
             }
-            bitmap.recycle()
         }
     }
 

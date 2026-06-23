@@ -176,7 +176,8 @@ data class PendingPostprocessUiState(
     val shotId: String,
     val mediaType: MediaType,
     val message: String,
-    val warnBeforeExit: Boolean = true
+    val warnBeforeExit: Boolean = true,
+    val livenessAttachment: PendingPostprocessLivenessAttachment? = null
 )
 
 data class SessionPresentationState(
@@ -351,6 +352,11 @@ sealed interface SessionIntent {
     data class DocumentBatchRemoveItem(val itemId: String) : SessionIntent
     data class DocumentBatchMoveItem(val itemId: String, val direction: DocumentBatchMoveDirection) : SessionIntent
     data class DocumentBatchReorder(val orderedItemIds: List<String>) : SessionIntent
+    data class DocumentBatchUpdateCropStatus(
+        val itemId: String,
+        val cropStatus: DocumentBatchCropStatus,
+        val cropRect: CropRect? = null
+    ) : SessionIntent
     data object DocumentBatchFinish : SessionIntent
 }
 

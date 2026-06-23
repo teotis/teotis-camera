@@ -438,30 +438,7 @@ class PersistedSettingsSerializerTest {
     }
 
     @Test
-    fun `default watermark catalog includes professional bottom bar`() {
-        val catalog = FeatureCatalog()
-        val proBar = catalog.watermarkTemplates.first { it.id == "professional-bottom-bar" }
-
-        assertEquals(WatermarkTemplateKind.EXPANDED_FRAME, proBar.kind)
-        assertTrue(proBar.supportsFrameBorder)
-        assertEquals(
-            setOf("model", "datetime", "camera-params"),
-            proBar.tokenKeys
-        )
-        assertEquals(
-            setOf(
-                WatermarkTextPlacement.BOTTOM_LEFT,
-                WatermarkTextPlacement.BOTTOM_CENTER,
-                WatermarkTextPlacement.BOTTOM_RIGHT
-            ),
-            proBar.allowedPlacements
-        )
-        assertTrue(proBar.allowedFrameBackgrounds.contains(WatermarkFrameBackground.DARK))
-        assertTrue(proBar.allowedFrameBackgrounds.contains(WatermarkFrameBackground.WHITE))
-    }
-
-    @Test
-    fun `serializer round trips professional bottom bar watermark style`() {
+    fun `serializer decodes retired professional bottom bar default id to safe default`() {
         val settings = PersistedSettings(
             photo = PhotoSettings(
                 defaultWatermarkTemplateId = "professional-bottom-bar",
@@ -493,11 +470,15 @@ class PersistedSettingsSerializerTest {
         )
 
         val decoded = PersistedSettingsSerializer.fromMap(serialized)
-        assertEquals(settings, decoded)
+        assertEquals("classic-overlay", decoded.photo.defaultWatermarkTemplateId)
+        assertEquals(
+            settings.photo.professionalBottomBarWatermarkStyle,
+            decoded.photo.professionalBottomBarWatermarkStyle
+        )
     }
 
     @Test
-    fun `serializer round trips night-street watermark style`() {
+    fun `serializer decodes retired night-street default id to safe default`() {
         val settings = PersistedSettings(
             photo = PhotoSettings(
                 defaultWatermarkTemplateId = "night-street",
@@ -533,7 +514,8 @@ class PersistedSettingsSerializerTest {
         )
 
         val decoded = PersistedSettingsSerializer.fromMap(serialized)
-        assertEquals(settings, decoded)
+        assertEquals("classic-overlay", decoded.photo.defaultWatermarkTemplateId)
+        assertEquals(settings.photo.nightStreetWatermarkStyle, decoded.photo.nightStreetWatermarkStyle)
     }
 
     @Test

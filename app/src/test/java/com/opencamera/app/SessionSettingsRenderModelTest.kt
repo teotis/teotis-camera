@@ -100,7 +100,7 @@ class SessionSettingsRenderModelTest {
                 )
             )
             assertTrue(summary.contains("Video defaults: 4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich"))
-            assertTrue(summary.contains("Catalog: 18 filters | 7 watermark templates | Live 1500 ms bundle"))
+            assertTrue(summary.contains("Catalog: 22 filters | 7 watermark templates | Live 1500 ms bundle"))
             assertTrue(summary.contains("Manual draft: RAW Off | ISO Auto | S Auto | WB Auto"))
             assertTrue(summary.contains("Action: Still resolution set to 4000x3000"))
         }
@@ -122,7 +122,7 @@ class SessionSettingsRenderModelTest {
                 "4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich",
                 model.videoSummary
             )
-            assertEquals("18 filters | 7 watermark templates | Live 1500 ms bundle", model.catalogSummary)
+            assertEquals("22 filters | 7 watermark templates | Live 1500 ms bundle", model.catalogSummary)
             assertEquals("RAW Off | ISO Auto | S Auto | WB Auto", model.manualDraftSummary)
         }
 
@@ -136,11 +136,7 @@ class SessionSettingsRenderModelTest {
             assertEquals("", model.heroSummary)
             assertTrue(model.editingEnabled)
             assertEquals(
-                "Composition grid\n3x3\n可用 • Cycle 3 layouts",
-                model.commonSection.gridMode.buttonLabel
-            )
-            assertEquals(
-                "Default photo filter\nPortrait Retro\n可用 • 18 curated looks",
+                "Default photo filter\nPortrait Retro • 18 curated looks",
                 model.photoSection.defaultFilter.buttonLabel
             )
             assertEquals(
@@ -152,12 +148,8 @@ class SessionSettingsRenderModelTest {
                 model.photoSection.watermarkTemplate.buttonLabel
             )
             assertEquals(
-                "Resolution\n4K\n可用 • 4 options",
+                "Resolution\n4K • 4 options",
                 model.videoSection.resolution.buttonLabel
-            )
-            assertEquals(
-                PersistedSettingsAction.UpdateGridMode(CompositionGridMode.GOLDEN_RATIO),
-                model.commonSection.gridMode.nextAction
             )
             assertEquals(
                 PersistedSettingsAction.UpdatePhotoFilter("portrait-ccd"),
@@ -175,7 +167,6 @@ class SessionSettingsRenderModelTest {
                 ),
                 model.videoSection.resolution.nextAction
             )
-            assertEquals("", model.catalogFooter)
         }
 
 
@@ -187,16 +178,6 @@ class SessionSettingsRenderModelTest {
             assertEquals("", model.commonSection.summary)
             assertEquals("", model.photoSection.summary)
             assertEquals("", model.videoSection.summary)
-            assertEquals("Composition grid", model.commonSection.gridMode.label)
-        }
-
-
-
-        @Test
-        fun `settings page does not aggregate child states in footer`() {
-            val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
-            assertTrue(model.catalogFooter.isBlank())
-            assertFalse(model.catalogFooter.contains("|"))
         }
 
 
@@ -231,20 +212,13 @@ class SessionSettingsRenderModelTest {
         fun `settings page render model surfaces supported degraded and unsupported controls`() {
             val supportedModel = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
 
-            assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.photoSection.livePhoto.availability)
-            assertTrue(supportedModel.photoSection.livePhoto.isInteractive)
             assertEquals(SettingsControlAvailability.SUPPORTED, supportedModel.photoSection.liveSaveFormat.availability)
             assertTrue(supportedModel.photoSection.liveSaveFormat.isInteractive)
             assertNotNull(supportedModel.photoSection.liveSaveFormat.nextAction)
             assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.photoSection.portraitLab.availability)
             assertFalse(supportedModel.photoSection.portraitLab.isInteractive)
-            assertEquals(
-                "Live photo default\nOn\n部分支持 • Saved default only; 1500 ms bundle | dynamic watermark Follow Frame Luma + Motion",
-                supportedModel.photoSection.livePhoto.buttonLabel
-            )
             assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.photoSection.watermarkTemplate.availability)
             assertFalse(supportedModel.photoSection.watermarkTemplate.isInteractive)
-            assertEquals(SettingsControlAvailability.SUPPORTED, supportedModel.photoSection.countdown.availability)
             assertEquals(SettingsControlAvailability.SUPPORTED, supportedModel.videoSection.frameRate.availability)
             assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.videoSection.dynamicFps.availability)
             assertEquals(SettingsControlAvailability.DEGRADED, supportedModel.videoSection.audioProfile.availability)
@@ -261,8 +235,6 @@ class SessionSettingsRenderModelTest {
                 TestAppTextResolver()
             )
 
-            assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.livePhoto.availability)
-            assertFalse(unsupportedModel.photoSection.livePhoto.isInteractive)
             assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.liveSaveFormat.availability)
             assertFalse(unsupportedModel.photoSection.liveSaveFormat.isInteractive)
             assertEquals(null, unsupportedModel.photoSection.liveSaveFormat.nextAction)
@@ -271,8 +243,6 @@ class SessionSettingsRenderModelTest {
             assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.watermarkTemplate.availability)
             assertFalse(unsupportedModel.photoSection.watermarkTemplate.isInteractive)
             assertEquals(null, unsupportedModel.photoSection.watermarkTemplate.nextAction)
-            assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.photoSection.countdown.availability)
-            assertEquals(null, unsupportedModel.photoSection.countdown.nextAction)
             assertEquals(SettingsControlAvailability.UNSUPPORTED, unsupportedModel.videoSection.resolution.availability)
             assertFalse(unsupportedModel.videoSection.resolution.isInteractive)
             assertEquals(null, unsupportedModel.videoSection.resolution.nextAction)
@@ -287,15 +257,37 @@ class SessionSettingsRenderModelTest {
         @Test
         fun `availability labels use dedicated strings not quality level labels`() {
             val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
-            assertTrue(model.photoSection.livePhoto.buttonLabel.contains("部分支持"))
             assertTrue(model.photoSection.portraitLab.buttonLabel.contains("部分支持"))
             assertTrue(model.photoSection.watermarkTemplate.buttonLabel.contains("部分支持"))
-            assertTrue(model.photoSection.countdown.buttonLabel.contains("可用"))
-            assertTrue(model.videoSection.frameRate.buttonLabel.contains("可用"))
-            assertFalse(model.photoSection.livePhoto.buttonLabel.contains("Fast"))
-            assertFalse(model.photoSection.livePhoto.buttonLabel.contains("Max"))
+            assertFalse(model.videoSection.frameRate.buttonLabel.contains("可用"))
             assertFalse(model.videoSection.frameRate.buttonLabel.contains("Fast"))
             assertFalse(model.videoSection.frameRate.buttonLabel.contains("N/A"))
+        }
+
+
+
+        @Test
+        fun `statusText is empty for supported and present for degraded and unsupported`() {
+            val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
+
+            // SUPPORTED: statusText is empty
+            assertEquals("", model.photoSection.liveSaveFormat.statusText)
+
+            // DEGRADED: statusText contains availability label
+            assertEquals("部分支持", model.photoSection.portraitLab.statusText)
+            assertEquals("部分支持", model.videoSection.dynamicFps.statusText)
+
+            // UNSUPPORTED model
+            val unsupportedModel = sessionSettingsPageRenderModel(
+                defaultSessionState(
+                    activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                        supportsStillCapture = false,
+                        supportsVideoRecording = false
+                    )
+                ),
+                TestAppTextResolver()
+            )
+            assertEquals("不支持", unsupportedModel.videoSection.resolution.statusText)
         }
 
 
@@ -430,6 +422,36 @@ class SessionSettingsRenderModelTest {
             )
             val sheetOff = quickPanelSheetRenderModel(stateOff, TestAppTextResolver(), strings)
             assertFalse(sheetOff.liveRow.isSelected)
+        }
+
+        @Test
+        fun `settings page does not contain grid countdown or livePhoto controls`() {
+            val model = sessionSettingsPageRenderModel(defaultSessionState(), TestAppTextResolver())
+
+            // Grid, Countdown, Live Photo removed from settings page (data class fields removed)
+            // CommonSettingsSectionRenderModel has no gridMode field
+            // PhotoSettingsSectionRenderModel has no livePhoto or countdown fields
+            // Only remaining photo controls: defaultFilter, portraitLab, watermarkTemplate, liveSaveFormat
+            assertNotNull(model.photoSection.defaultFilter)
+            assertNotNull(model.photoSection.portraitLab)
+            assertNotNull(model.photoSection.watermarkTemplate)
+            assertNotNull(model.photoSection.liveSaveFormat)
+        }
+
+        @Test
+        fun `quick panel retains grid timer live and watermark controls`() {
+            val state = defaultSessionState()
+            val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+            // Quick panel retains all dedup items
+            assertNotNull(sheet.gridRow)
+            assertEquals("Grid", sheet.gridRow.title)
+            assertNotNull(sheet.timerRow)
+            assertEquals("Timer", sheet.timerRow.title)
+            assertNotNull(sheet.liveRow)
+            assertEquals("Live", sheet.liveRow.title)
+            assertNotNull(sheet.watermarkRow)
+            assertEquals("Watermark", sheet.watermarkRow.title)
         }
 
         private fun defaultSessionState(

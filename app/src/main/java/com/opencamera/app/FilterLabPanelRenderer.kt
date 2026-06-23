@@ -66,6 +66,18 @@ internal class FilterLabPanelRenderer(
             views.currentSummary.isVisible = false
             views.sectionFiltersTitle.isVisible = false
             views.saveCustom.isVisible = false
+            views.headline.isVisible = false
+            views.supportingText.isVisible = false
+            views.heroSummary.isVisible = false
+            views.editingHint.isVisible = false
+            views.footer.isVisible = false
+            views.photoTab.isVisible = false
+            views.humanisticTab.isVisible = false
+            views.portraitTab.isVisible = false
+            views.videoTab.isVisible = false
+            views.sectionPaletteTitle.isVisible = false
+            views.adjustmentPanel.isVisible = false
+            views.resetDefaults.isVisible = false
         } else {
             views.selectionList.removeAllViews()
             views.selectionCard.isVisible = false

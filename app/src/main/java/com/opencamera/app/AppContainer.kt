@@ -68,7 +68,7 @@ class AppContainer(
         catalog = featureCatalogStore.load()
     )
 
-    val trace = InMemorySessionTrace()
+    val trace = createProductionSessionTrace()
     val linkRecorder: com.opencamera.core.session.PerformanceLinkRecorder = com.opencamera.core.session.createPerformanceLinkRecorder()
     private val shotExecutor = ShotExecutor()
     private val savedMaskProvider: SavedPhotoSceneMaskProvider = try {
@@ -190,5 +190,15 @@ class AppContainer(
             PreviewStartupRuntimeIssueMonitor(applicationScope)
         ),
         sceneBrightnessSource = PreviewSceneBrightnessMonitor(applicationScope).toSignalSource()
+    )
+}
+
+internal const val PRODUCTION_TRACE_MEMORY_RETENTION = 10_000
+internal const val PRODUCTION_TRACE_DISPLAY_WINDOW = 5_000
+
+internal fun createProductionSessionTrace(): InMemorySessionTrace {
+    return InMemorySessionTrace(
+        memoryRetention = PRODUCTION_TRACE_MEMORY_RETENTION,
+        displayWindow = PRODUCTION_TRACE_DISPLAY_WINDOW
     )
 }

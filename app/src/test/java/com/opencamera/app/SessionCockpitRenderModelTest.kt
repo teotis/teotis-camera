@@ -41,6 +41,10 @@ import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.CommonSettings
 import com.opencamera.core.settings.CountdownDuration
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
+import com.opencamera.core.settings.FeatureCatalog
+import com.opencamera.core.settings.FilterProfile
+import com.opencamera.core.settings.FilterProfileCategory
+import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.PersistedSettings
 import com.opencamera.core.settings.ResetTarget
@@ -249,7 +253,8 @@ class SessionCockpitRenderModelTest {
         // Output must not dump raw metadata blobs
         assertFalse(output.contains("x:xmpmeta"))
         assertFalse(output.contains("rdf:RDF"))
-        assertEquals(6, output.lines().size, "Output must stay compact for QA")
+        // 7 lines: prefix + status line + 4 asset lines + pipeline notes
+        assertEquals(7, output.lines().size, "Output must stay compact for QA")
     }
 
     @Test
@@ -1172,8 +1177,18 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `capture disabled reason returns saving photo`() {
-        val state = defaultSessionState().copy(captureStatus = CaptureStatus.SAVING)
+    fun `capture disabled reason returns saving photo when activeShot set`() {
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "test-shot",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        ).copy(captureStatus = CaptureStatus.SAVING)
         val reason = captureDisabledReason(state, TestAppTextResolver())
 
         assertEquals("Saving previous photo", reason)
@@ -1794,7 +1809,7 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `capture disabled reason blocks config while pending postprocess is active`() {
+    fun `capture disabled reason returns null during pending postprocess with no activeShot`() {
         val state = defaultSessionState().copy(
             captureStatus = CaptureStatus.DATA_RECEIVED,
             activeShot = null,
@@ -1809,8 +1824,7 @@ class SessionCockpitRenderModelTest {
         )
         val reason = captureDisabledReason(state, TestAppTextResolver())
 
-        assertNotNull(reason)
-        assertEquals("Saving previous photo", reason)
+        assertNull(reason)
     }
 
     @Test
@@ -1830,6 +1844,121 @@ class SessionCockpitRenderModelTest {
         )
         assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
         assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    }
+
+    // ── Package 05: watchdog release returns cockpit to non-disabled state ──
+
+    @Test
+    fun `cockpit returns to PHOTO_READY after post-process liveness watchdog release`() {
+        // After the post-process liveness watchdog force-releases the previous shot,
+        // the session state has activeShot=null && pendingPostprocess=null. The cockpit
+        // must not keep the shutter in SAVING or show a disabled reason.
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.IDLE,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = null,
+                captureReadiness = null
+            )
+        )
+        assertNull(captureDisabledReason(state, TestAppTextResolver()))
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertNotEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
+    }
+
+    @Test
+    fun `cockpit render model unblocks shutter after watchdog release`() {
+        // Full cockpit render model: after watchdog release, shutter is enabled and
+        // no disabled reason is surfaced on the bottom cockpit.
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.IDLE,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = null,
+                captureReadiness = null
+            )
+        )
+        val cockpit = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(cockpit.bottomCockpit.isShutterEnabled)
+        assertNull(cockpit.bottomCockpit.disabledReason)
+        assertNotEquals(ShutterVisualState.SAVING, cockpit.bottomCockpit.shutterVisualState)
+    }
+
+    @Test
+    fun `config controls remain enabled during pending postprocess with no activeShot`() {
+        // After session rearm: pendingPostprocess is active but activeShot is null.
+        // Frame ratio, grid, watermark, timer, and live photo should stay enabled.
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.DATA_RECEIVED,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(sheet.frameRatioEnabled, "frame ratio should be enabled during pending postprocess")
+        assertNull(sheet.frameRatioDisabledReason)
+        assertTrue(sheet.gridRow.isEnabled, "grid should be enabled during pending postprocess")
+        assertTrue(sheet.watermarkRow.isEnabled, "watermark should be enabled during pending postprocess")
+        assertNull(sheet.watermarkRow.disabledReason)
+        assertTrue(sheet.liveRow.isEnabled, "live photo toggle should be enabled during pending postprocess")
+        assertTrue(sheet.timerRow.isEnabled, "timer should be enabled during pending postprocess")
+    }
+
+    @Test
+    fun `shutter visual state is BACKGROUND_SAVING during pending postprocess with null activeShot`() {
+        // After session rearm: captureStatus is SAVING, activeShot is null, pendingPostprocess is active.
+        // Shutter shows BACKGROUND_SAVING (subtle indicator) and remains enabled.
+        val state = defaultSessionState().copy(
+            captureStatus = CaptureStatus.SAVING,
+            activeShot = null,
+            presentation = SessionPresentationState(
+                pendingPostprocess = PendingPostprocessUiState(
+                    shotId = "shot-1",
+                    mediaType = MediaType.PHOTO,
+                    message = "",
+                    warnBeforeExit = true
+                )
+            )
+        )
+        assertNull(captureDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.BACKGROUND_SAVING, shutterVisualState(state))
+    }
+
+    @Test
+    fun `all config controls disabled during active photo shot`() {
+        // Preserve invariant: when activeShot != null, all non-shutter config controls
+        // remain disabled regardless of pendingPostprocess state.
+        val state = defaultSessionState(
+            activeShot = ShotRequest(
+                shotId = "active-test",
+                shotKind = ShotKind.STILL_CAPTURE,
+                mediaType = MediaType.PHOTO,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+                postProcessSpec = PostProcessSpec(),
+                captureProfile = CaptureProfile()
+            )
+        )
+        val frameControl = frameRatioControlRenderModel(state, TestAppTextResolver())
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(frameControl.isEnabled, "frame ratio should be disabled during active shot")
+        assertNotNull(frameControl.disabledReason)
+        assertFalse(sheet.frameRatioEnabled, "quick panel frame ratio should be disabled during active shot")
+        assertFalse(sheet.gridRow.isEnabled, "grid should be disabled during active shot")
+        assertFalse(sheet.watermarkRow.isEnabled, "watermark should be disabled during active shot")
+        assertNotNull(sheet.watermarkRow.disabledReason)
+        assertFalse(sheet.liveRow.isEnabled, "live photo should be disabled during active shot")
+        assertFalse(sheet.timerRow.isEnabled, "timer should be disabled during active shot")
     }
 
     @Test
@@ -1861,6 +1990,18 @@ class SessionCockpitRenderModelTest {
 
         assertTrue(sheet.brightnessRow.isVisible, "Brightness should be visible in Humanistic mode")
         assertTrue(sheet.brightnessRow.isInteractive, "Brightness should be interactive in Humanistic mode")
+    }
+
+    @Test
+    fun `brightness row is visible in video mode`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            previewStatus = PreviewStatus.ACTIVE
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(sheet.brightnessRow.isVisible, "Brightness should be visible in video mode")
+        assertTrue(sheet.brightnessRow.isInteractive, "Brightness should be interactive in video mode")
     }
 
     @Test
@@ -1999,5 +2140,80 @@ class SessionCockpitRenderModelTest {
         assertTrue(ModeId.HUMANISTIC in modeIds)
         assertTrue(ModeId.CHECK_IN in modeIds)
         assertTrue(ModeId.DOCUMENT in modeIds)
+    }
+
+    // --- Package 03: Style card selection flip after apply ---
+
+    @Test
+    fun `style card selection flips in rail model after apply UpdatePhotoFilter`() {
+        val catalog = FeatureCatalog(
+            filterProfiles = listOf(
+                FilterProfile(
+                    id = "photo-vivid",
+                    label = "Vivid",
+                    category = FilterProfileCategory.PHOTO,
+                    renderSpec = FilterRenderSpec(contrast = 1.08f, saturation = 1.14f)
+                ),
+                FilterProfile(
+                    id = "photo-original",
+                    label = "Original",
+                    category = FilterProfileCategory.PHOTO,
+                    renderSpec = FilterRenderSpec(contrast = 1.01f, saturation = 1.01f)
+                )
+            )
+        )
+        val text = TestAppTextResolver()
+
+        // Before apply: "photo-vivid" is selected, "photo-original" is available.
+        val photoSettingsBefore = PhotoSettings(
+            defaultFilterProfileId = "photo-vivid",
+            defaultWatermarkTemplateId = "travel-polaroid",
+            livePhotoEnabledByDefault = true,
+            countdownDuration = CountdownDuration.SECONDS_3
+        )
+        val stateBefore = defaultSessionState(
+            persistedPhotoSettings = photoSettingsBefore
+        ).copy(
+            settings = defaultSessionState(persistedPhotoSettings = photoSettingsBefore).settings.copy(catalog = catalog)
+        )
+        val railBefore = filterLabPageRenderModel(
+            state = stateBefore,
+            text = text,
+            selectedFamily = FilterLabFamily.PHOTO,
+            panelRole = StyleAndColorLabRole.STYLE
+        ).stylePresetCardRail!!
+
+        val vividBefore = railBefore.cards.first { it.profileId == "photo-vivid" }
+        val originalBefore = railBefore.cards.first { it.profileId == "photo-original" }
+        assertTrue(vividBefore.isSelected, "vivid should be selected before apply")
+        assertFalse(originalBefore.isSelected, "original should not be selected before apply")
+        assertNotNull(originalBefore.applyAction, "original should have applyAction before apply")
+        assertNull(vividBefore.applyAction, "vivid should have null applyAction when already selected")
+
+        // After apply: "photo-original" is now selected, "photo-vivid" is available.
+        val photoSettingsAfter = PhotoSettings(
+            defaultFilterProfileId = "photo-original",
+            defaultWatermarkTemplateId = "travel-polaroid",
+            livePhotoEnabledByDefault = true,
+            countdownDuration = CountdownDuration.SECONDS_3
+        )
+        val stateAfter = defaultSessionState(
+            persistedPhotoSettings = photoSettingsAfter
+        ).copy(
+            settings = defaultSessionState(persistedPhotoSettings = photoSettingsAfter).settings.copy(catalog = catalog)
+        )
+        val railAfter = filterLabPageRenderModel(
+            state = stateAfter,
+            text = text,
+            selectedFamily = FilterLabFamily.PHOTO,
+            panelRole = StyleAndColorLabRole.STYLE
+        ).stylePresetCardRail!!
+
+        val vividAfter = railAfter.cards.first { it.profileId == "photo-vivid" }
+        val originalAfter = railAfter.cards.first { it.profileId == "photo-original" }
+        assertFalse(vividAfter.isSelected, "vivid should no longer be selected after apply")
+        assertTrue(originalAfter.isSelected, "original should be selected after apply")
+        assertNotNull(vividAfter.applyAction, "vivid should now have applyAction after being deselected")
+        assertNull(originalAfter.applyAction, "original should have null applyAction when now selected")
     }
 }

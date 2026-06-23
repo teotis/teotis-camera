@@ -7,11 +7,18 @@ class FakeLivePreviewFrameSource : LivePreviewFrameSource {
     private var buffer: FrameRingBuffer? = null
     override val isActive: Boolean get() = buffer != null
 
+    override var lastStartReason: String? = null
+        private set
+    override var lastStopReason: String? = null
+        private set
+
     override fun start(policy: FrameBufferPolicy) {
+        lastStartReason = "policy=target-fps=${policy.targetFps},maxFrames=${policy.maxFrames}"
         buffer = FrameRingBuffer(policy)
     }
 
     override fun stop(reason: String) {
+        lastStopReason = reason
         buffer?.clear()
         buffer = null
     }

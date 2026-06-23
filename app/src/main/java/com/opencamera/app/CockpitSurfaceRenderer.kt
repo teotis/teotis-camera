@@ -35,6 +35,7 @@ internal class CockpitSurfaceRenderer(
     private val shutterVisualDrawable = ShutterVisualDrawable()
     private var shutterDrawableAttached = false
     private val text = com.opencamera.app.i18n.AppTextResolver(context)
+    private var lastAppliedMirrorScaleX: Float = Float.NaN
 
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
@@ -74,14 +75,15 @@ internal class CockpitSurfaceRenderer(
     }
 
     fun renderPreviewMirror(state: SessionState) {
-        preview.previewView.scaleX = if (
-            state.activeDeviceGraph.preferredLensFacing == com.opencamera.core.device.LensFacing.FRONT &&
-            state.settings.persisted.common.selfieMirrorEnabled
-        ) {
-            -1f
-        } else {
-            1f
-        }
+        val policy = com.opencamera.core.mode.selfieMirrorPolicy(
+            activeLensFacing = state.activeDeviceGraph.activeLensFacing,
+            preferredLensFacing = state.activeDeviceGraph.preferredLensFacing,
+            selfieMirrorEnabled = state.settings.persisted.common.selfieMirrorEnabled
+        )
+        val scaleX = if (policy.shouldMirrorPreview) -1f else 1f
+        if (scaleX == lastAppliedMirrorScaleX) return
+        lastAppliedMirrorScaleX = scaleX
+        preview.previewView.scaleX = scaleX
     }
 
     private var sliderInitialized = false

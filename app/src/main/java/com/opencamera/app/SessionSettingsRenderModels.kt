@@ -28,7 +28,6 @@ internal data class SessionSettingsRenderModel(
 internal data class CommonSettingsSectionRenderModel(
     val summary: String,
     val languageControl: SettingsControlRenderModel,
-    val gridMode: SettingsControlRenderModel,
     val shutterSound: SettingsControlRenderModel,
     val selfieMirror: SettingsControlRenderModel
 )
@@ -38,9 +37,9 @@ internal data class PhotoSettingsSectionRenderModel(
     val defaultFilter: SettingsControlRenderModel,
     val portraitLab: SettingsControlRenderModel,
     val watermarkTemplate: SettingsControlRenderModel,
-    val livePhoto: SettingsControlRenderModel,
+    val photoLive: SettingsControlRenderModel,
     val liveSaveFormat: SettingsControlRenderModel,
-    val countdown: SettingsControlRenderModel
+    val photoTimer: SettingsControlRenderModel
 )
 
 internal data class VideoSettingsSectionRenderModel(
@@ -61,7 +60,6 @@ internal data class SessionSettingsPageRenderModel(
     val commonSection: CommonSettingsSectionRenderModel,
     val photoSection: PhotoSettingsSectionRenderModel,
     val videoSection: VideoSettingsSectionRenderModel,
-    val catalogFooter: String,
     val hasSettingsUserAdjustments: Boolean = false,
     val resetSettingsAction: PersistedSettingsAction.ResetToDefaults? = null
 ) : EditableSettingsPageRenderModel
@@ -185,16 +183,6 @@ internal fun sessionSettingsPageRenderModel(
                     }
                 )
             ),
-            gridMode = SettingsControlRenderModel(
-                label = text.get(R.string.label_composition_grid),
-                value = text.gridModeLabel(settings.common.gridMode),
-                availability = SettingsControlAvailability.SUPPORTED,
-                availabilityLabel = text.availabilityLabel(SettingsControlAvailability.SUPPORTED),
-                supportLabel = text.gridSupportLabel(CompositionGridMode.entries.size),
-                nextAction = PersistedSettingsAction.UpdateGridMode(
-                    nextListValue(settings.common.gridMode, CompositionGridMode.entries.toList())
-                )
-            ),
             shutterSound = SettingsControlRenderModel(
                 label = text.get(R.string.label_shutter_tone),
                 value = onOffLabel(settings.common.shutterSoundEnabled, text),
@@ -293,21 +281,21 @@ internal fun sessionSettingsPageRenderModel(
                 },
                 nextAction = null
             ),
-            livePhoto = SettingsControlRenderModel(
+            photoLive = SettingsControlRenderModel(
                 label = text.get(R.string.label_live_photo_default),
                 value = onOffLabel(settings.photo.livePhotoEnabledByDefault, text),
                 availability = if (supportsStillCapture) {
-                    SettingsControlAvailability.DEGRADED
+                    SettingsControlAvailability.SUPPORTED
                 } else {
                     SettingsControlAvailability.UNSUPPORTED
                 },
                 availabilityLabel = text.availabilityLabel(if (supportsStillCapture) {
-                    SettingsControlAvailability.DEGRADED
+                    SettingsControlAvailability.SUPPORTED
                 } else {
                     SettingsControlAvailability.UNSUPPORTED
                 }),
                 supportLabel = if (supportsStillCapture) {
-                    text.liveSupportLabel(catalog.liveMediaBundleDraft.motionDurationMillis.toInt(), text.liveWatermarkMotionBehaviorLabel(catalog.liveMediaBundleDraft.watermarkMotionBehavior))
+                    text.livePhotoDefaultSupportLabel(catalog.liveMediaBundleDraft.motionDurationMillis.toInt())
                 } else {
                     text.get(R.string.error_still_capture_unavailable)
                 },
@@ -345,7 +333,7 @@ internal fun sessionSettingsPageRenderModel(
                     null
                 }
             ),
-            countdown = SettingsControlRenderModel(
+            photoTimer = SettingsControlRenderModel(
                 label = text.get(R.string.label_countdown),
                 value = text.countdownValueLabel(settings.photo.countdownDuration),
                 availability = if (supportsStillCapture) {
@@ -359,14 +347,14 @@ internal fun sessionSettingsPageRenderModel(
                     SettingsControlAvailability.UNSUPPORTED
                 }),
                 supportLabel = if (supportsStillCapture) {
-                    text.presetsCount(catalog.countdownOptions.size)
+                    text.supportCount(catalog.countdownOptions.size)
                 } else {
                     text.get(R.string.error_still_capture_unavailable)
                 },
                 nextAction = if (supportsStillCapture) {
                     nextListValueOrNull(
                         current = settings.photo.countdownDuration,
-                        values = catalog.countdownOptions.sortedBy(CountdownDuration::ordinal)
+                        values = catalog.countdownOptions.sortedBy(CountdownDuration::ordinal).toList()
                     )?.let(PersistedSettingsAction::UpdateCountdownDuration)
                 } else {
                     null
@@ -549,7 +537,6 @@ internal fun sessionSettingsPageRenderModel(
                 }
             )
         ),
-        catalogFooter = "",
         hasSettingsUserAdjustments = settings.hasUserAdjustments(ResetTarget.SETTINGS),
         resetSettingsAction = PersistedSettingsAction.ResetToDefaults(ResetTarget.SETTINGS)
     )

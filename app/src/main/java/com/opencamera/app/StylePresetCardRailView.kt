@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -9,6 +10,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.HorizontalScrollView
 import kotlin.math.min
 
@@ -75,13 +77,55 @@ internal class StylePresetCardRailView @JvmOverloads constructor(
                 }
                 bind(card)
                 setOnClickListener {
-                    if (card.isEnabled && card.applyAction != null) {
-                        onApplyStyle(card.applyAction)
+                    if (card.isEnabled) {
+                        if (card.isSelected) {
+                            // Already selected: show press feedback only, no persist.
+                            animatePressFeedback(this)
+                        } else if (card.applyAction != null) {
+                            // Immediately reflect selection visually before render.
+                            setPendingSelected(true)
+                            animateSelection(this)
+                            onApplyStyle(card.applyAction)
+                        }
                     }
                 }
             }
             cardContainer.addView(tile)
         }
+    }
+
+    private fun animateSelection(tile: StylePresetCardTileView) {
+        val animDuration = 200L
+        tile.scaleX = 0.96f
+        tile.scaleY = 0.96f
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = animDuration
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { animator ->
+                val fraction = animator.animatedValue as Float
+                val scale = 0.96f + (1f - 0.96f) * fraction
+                tile.scaleX = scale
+                tile.scaleY = scale
+            }
+            start()
+        }
+    }
+
+    private fun animatePressFeedback(tile: StylePresetCardTileView) {
+        tile.animate()
+            .scaleX(0.98f)
+            .scaleY(0.98f)
+            .setDuration(80)
+            .setInterpolator(DecelerateInterpolator())
+            .withEndAction {
+                tile.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .setDuration(80)
+                    .setInterpolator(DecelerateInterpolator())
+                    .start()
+            }
+            .start()
     }
 
     override fun onDraw(canvas: Canvas) {

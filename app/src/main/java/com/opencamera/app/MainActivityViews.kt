@@ -55,7 +55,6 @@ internal data class SettingsPanelViews(
     val commonSummary: TextView,
     val photoSummary: TextView,
     val videoSummary: TextView,
-    val catalogFooter: TextView,
     val editingHint: TextView,
     val tabCommon: Button,
     val tabPhoto: Button,
@@ -63,21 +62,20 @@ internal data class SettingsPanelViews(
     val commonSection: LinearLayout,
     val photoSection: LinearLayout,
     val videoSection: LinearLayout,
-    val gridMode: Button,
-    val shutterSound: Button,
-    val selfieMirror: Button,
-    val appLanguage: Button,
-    val photoFilter: Button,
-    val photoPortraitLab: Button,
-    val photoWatermark: Button,
-    val photoLive: Button,
-    val photoLiveSaveFormat: Button,
-    val photoTimer: Button,
-    val videoResolution: Button,
-    val videoFrameRate: Button,
-    val videoDynamicFps: Button,
-    val videoAudio: Button,
-    val videoFilter: Button,
+    val shutterSound: LinearLayout,
+    val selfieMirror: LinearLayout,
+    val appLanguage: LinearLayout,
+    val photoFilter: LinearLayout,
+    val photoPortraitLab: LinearLayout,
+    val photoWatermark: LinearLayout,
+    val photoLive: LinearLayout,
+    val photoLiveSaveFormat: LinearLayout,
+    val photoTimer: LinearLayout,
+    val videoResolution: LinearLayout,
+    val videoFrameRate: LinearLayout,
+    val videoDynamicFps: LinearLayout,
+    val videoAudio: LinearLayout,
+    val videoFilter: LinearLayout,
     val portraitHeadline: TextView,
     val portraitSupportingText: TextView,
     val portraitHeroSummary: TextView,
@@ -156,7 +154,7 @@ internal data class DevConsoleViews(
     val tabAll: Button,
     val title: TextView,
     val summary: TextView,
-    val content: TextView,
+    val eventsRecycler: androidx.recyclerview.widget.RecyclerView,
     val storageInfo: TextView,
     val export: Button,
     val vendorProbe: Button,
@@ -182,11 +180,20 @@ internal data class FloatingUtilityViews(
 
 internal data class DocumentBatchRailViews(
     val rail: LinearLayout,
-    val header: Button,
-    val list: LinearLayout
+    val chip: android.widget.TextView,
+    val thumbnail: android.widget.ImageView,
+    val itemList: LinearLayout,
+    val moveUpButton: Button,
+    val moveDownButton: Button,
+    val overviewButton: Button
 )
 
 internal data class FilterStripViews(
+    val scroll: android.widget.HorizontalScrollView,
+    val chips: LinearLayout
+)
+
+internal data class RuntimeProControlsViews(
     val scroll: android.widget.HorizontalScrollView,
     val chips: LinearLayout
 )
@@ -196,7 +203,11 @@ internal data class DocumentBatchOrganizerViews(
     val title: TextView,
     val count: TextView,
     val itemList: LinearLayout,
-    val close: Button
+    val close: Button,
+    val emptyHint: TextView,
+    val footer: LinearLayout,
+    val continueShooting: Button,
+    val exportButton: Button
 )
 
 internal data class BottomCockpitViews(
@@ -215,6 +226,7 @@ internal data class MainActivityViews(
     val documentBatchRail: DocumentBatchRailViews,
     val documentBatchOrganizer: DocumentBatchOrganizerViews,
     val filterStrip: FilterStripViews,
+    val runtimeProControls: RuntimeProControlsViews,
     val settingsPanel: SettingsPanelViews,
     val filterLab: FilterLabViews,
     val devConsole: DevConsoleViews,
@@ -269,7 +281,6 @@ internal data class MainActivityViews(
                 commonSummary = activity.findViewById(R.id.settingsCommonSummary),
                 photoSummary = activity.findViewById(R.id.settingsPhotoSummary),
                 videoSummary = activity.findViewById(R.id.settingsVideoSummary),
-                catalogFooter = activity.findViewById(R.id.settingsCatalogFooter),
                 editingHint = activity.findViewById(R.id.settingsEditingHint),
                 tabCommon = activity.findViewById(R.id.buttonSettingsTabCommon),
                 tabPhoto = activity.findViewById(R.id.buttonSettingsTabPhoto),
@@ -277,7 +288,6 @@ internal data class MainActivityViews(
                 commonSection = activity.findViewById(R.id.settingsCommonSection),
                 photoSection = activity.findViewById(R.id.settingsPhotoSection),
                 videoSection = activity.findViewById(R.id.settingsVideoSection),
-                gridMode = activity.findViewById(R.id.buttonGridMode),
                 shutterSound = activity.findViewById(R.id.buttonShutterSound),
                 selfieMirror = activity.findViewById(R.id.buttonSelfieMirror),
                 appLanguage = activity.findViewById(R.id.buttonAppLanguage),
@@ -368,7 +378,7 @@ internal data class MainActivityViews(
                 tabAll = activity.findViewById(R.id.buttonDevTabAll),
                 title = activity.findViewById(R.id.devConsoleTitle),
                 summary = activity.findViewById(R.id.devConsoleSummary),
-                content = activity.findViewById(R.id.devConsoleContent),
+                eventsRecycler = activity.findViewById(R.id.devConsoleContent),
                 storageInfo = activity.findViewById(R.id.devConsoleStorageInfo),
                 export = activity.findViewById(R.id.buttonDevExport),
                 vendorProbe = activity.findViewById(R.id.buttonDevVendorProbe),
@@ -387,19 +397,31 @@ internal data class MainActivityViews(
             )
             val documentBatchRail = DocumentBatchRailViews(
                 rail = activity.findViewById(R.id.documentBatchRail),
-                header = activity.findViewById(R.id.documentBatchRailHeader),
-                list = activity.findViewById(R.id.documentBatchRailList)
+                chip = activity.findViewById(R.id.documentBatchRailChip),
+                thumbnail = activity.findViewById(R.id.documentBatchRailThumbnail),
+                itemList = activity.findViewById(R.id.documentBatchRailItemList),
+                moveUpButton = activity.findViewById(R.id.documentBatchRailMoveUpButton),
+                moveDownButton = activity.findViewById(R.id.documentBatchRailMoveDownButton),
+                overviewButton = activity.findViewById(R.id.documentBatchRailOverviewButton)
             )
             val documentBatchOrganizer = DocumentBatchOrganizerViews(
                 panel = activity.findViewById(R.id.documentBatchOrganizerPanel),
                 title = activity.findViewById(R.id.documentBatchOrganizerTitle),
                 count = activity.findViewById(R.id.documentBatchOrganizerCount),
                 itemList = activity.findViewById(R.id.documentBatchOrganizerItemList),
-                close = activity.findViewById(R.id.buttonCloseDocumentBatchOrganizer)
+                close = activity.findViewById(R.id.buttonCloseDocumentBatchOrganizer),
+                emptyHint = activity.findViewById(R.id.documentBatchOrganizerEmptyHint),
+                footer = activity.findViewById(R.id.documentBatchOrganizerFooter),
+                continueShooting = activity.findViewById(R.id.buttonDocumentBatchContinueShooting),
+                exportButton = activity.findViewById(R.id.buttonDocumentBatchExport)
             )
             val filterStrip = FilterStripViews(
                 scroll = activity.findViewById(R.id.filterStripScroll),
                 chips = activity.findViewById(R.id.filterStripChips)
+            )
+            val runtimeProControls = RuntimeProControlsViews(
+                scroll = activity.findViewById(R.id.runtimeProControlsScroll),
+                chips = activity.findViewById(R.id.runtimeProControlsChips)
             )
             val bottomCockpit = BottomCockpitViews(
                 shutter = activity.findViewById(R.id.buttonShutter),
@@ -416,6 +438,7 @@ internal data class MainActivityViews(
                 documentBatchRail = documentBatchRail,
                 documentBatchOrganizer = documentBatchOrganizer,
                 filterStrip = filterStrip,
+                runtimeProControls = runtimeProControls,
                 settingsPanel = settingsPanel,
                 filterLab = filterLab,
                 devConsole = devConsole,

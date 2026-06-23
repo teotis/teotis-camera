@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import com.opencamera.core.effect.DocumentEffect
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.effect.PreviewEffectRenderModel
@@ -21,10 +22,12 @@ internal data class PreviewOverlayRenderModel(
     val isCountdownVisible: Boolean,
     val effectModel: PreviewEffectRenderModel? = null,
     val frame: PreviewFrameRenderModel? = null,
-    val previewContentAspect: PreviewContentAspect? = null
+    val previewContentAspect: PreviewContentAspect? = null,
+    val isGeometryLocked: Boolean = false,
+    val scanGuide: PreviewScanGuideRenderModel? = null
 ) {
     val isVisible: Boolean
-        get() = isGridVisible || isCountdownVisible || effectModel != null || frame != null
+        get() = isGridVisible || isCountdownVisible || effectModel != null || frame != null || scanGuide != null
 }
 
 internal data class PreviewContentAspect(
@@ -38,7 +41,15 @@ internal data class PreviewFrameRenderModel(
     val dimOutsideFrame: Boolean,
     val bottomInsetPx: Float = 0f,
     val zoomRatio: Float = 1f,
-    val previewZoomRatio: Float = 1f
+    val previewZoomRatio: Float = 1f,
+    val frameScrimAlpha: Int = PreviewOverlayView.FRAME_SCRIM_ALPHA_DEFAULT
+)
+
+internal data class PreviewScanGuideRenderModel(
+    val isVisible: Boolean,
+    val label: String,
+    val contentAspect: PreviewContentAspect,
+    val cornerLengthDp: Float
 )
 
 internal fun focusReticleRenderModel(
@@ -60,7 +71,8 @@ internal fun previewOverlayRenderModel(
     effectAdapter: PreviewEffectAdapter? = null,
     maskSnapshot: PreviewSceneMaskSnapshot? = null,
     previewContentAspect: PreviewContentAspect? = null,
-    stagedWatermarkHint: WatermarkHintSpec? = null
+    stagedWatermarkHint: WatermarkHintSpec? = null,
+    isGeometryLocked: Boolean = false
 ): PreviewOverlayRenderModel {
     val resolvedSnapshot = maskSnapshot ?: PreviewSceneMaskSnapshot.UNAVAILABLE
     val gridMode = state.settings.persisted.common.gridMode
@@ -97,6 +109,18 @@ internal fun previewOverlayRenderModel(
     } else {
         null
     }
+    val docEffect = state.activeEffectSpec.find<DocumentEffect>()
+    val scanGuide = if (docEffect != null && docEffect.scanGuide && frame == null) {
+        val aspect = previewContentAspect ?: PreviewContentAspect(4, 3)
+        PreviewScanGuideRenderModel(
+            isVisible = true,
+            label = "对准文档",
+            contentAspect = aspect,
+            cornerLengthDp = 48f
+        )
+    } else {
+        null
+    }
     return PreviewOverlayRenderModel(
         gridMode = gridMode,
         isGridVisible = previewSupportsOverlay && gridMode != CompositionGridMode.OFF,
@@ -106,7 +130,9 @@ internal fun previewOverlayRenderModel(
             state.permissionState.cameraGranted,
         effectModel = effectModel,
         frame = frame,
-        previewContentAspect = previewContentAspect
+        previewContentAspect = previewContentAspect,
+        isGeometryLocked = isGeometryLocked,
+        scanGuide = scanGuide
     )
 }
 

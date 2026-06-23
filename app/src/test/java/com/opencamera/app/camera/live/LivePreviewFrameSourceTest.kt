@@ -70,6 +70,42 @@ class LivePreviewFrameSourceTest {
     }
 
     @Test
+    fun `lastStartReason is null initially and set after start`() {
+        val source = FakeLivePreviewFrameSource()
+        assertNull(source.lastStartReason)
+
+        source.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+
+        assertNotNull(source.lastStartReason)
+        assertTrue(source.lastStartReason!!.contains("policy="))
+    }
+
+    @Test
+    fun `lastStopReason is null initially and set after stop`() {
+        val source = FakeLivePreviewFrameSource()
+        assertNull(source.lastStopReason)
+
+        source.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+        source.stop("unbind")
+
+        assertNotNull(source.lastStopReason)
+        assertEquals("unbind", source.lastStopReason)
+    }
+
+    @Test
+    fun `CameraXLivePreviewFrameSource tracks lastStartReason and lastStopReason`() {
+        val source = CameraXLivePreviewFrameSource()
+        assertNull(source.lastStartReason)
+        assertNull(source.lastStopReason)
+
+        source.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+        assertNotNull(source.lastStartReason)
+
+        source.stop("release")
+        assertEquals("release", source.lastStopReason)
+    }
+
+    @Test
     fun `CameraXLivePreviewFrameSource compiles and has correct interface`() {
         // Verify CameraXLivePreviewFrameSource implements LivePreviewFrameSource
         val source: LivePreviewFrameSource = CameraXLivePreviewFrameSource()

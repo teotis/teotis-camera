@@ -573,4 +573,63 @@ class CameraCockpitRenderModelTest {
         assertEquals(4, model.zoomStrip.chips.size)
         assertTrue(model.modeTrack.items.isNotEmpty())
     }
+
+    // --- Style entry mode gating tests ---
+
+    @Test
+    fun `style entry is visible in document mode`() {
+        val state = defaultSessionState(activeMode = ModeId.DOCUMENT)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.isStyleEntryVisible)
+    }
+
+    @Test
+    fun `style entry is visible in photo mode`() {
+        val state = defaultSessionState(activeMode = ModeId.PHOTO)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.isStyleEntryVisible)
+    }
+
+    @Test
+    fun `style entry is visible in humanistic mode`() {
+        val state = defaultSessionState(activeMode = ModeId.HUMANISTIC)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.isStyleEntryVisible)
+    }
+
+    @Test
+    fun `style entry is visible in video mode`() {
+        val state = defaultSessionState(activeMode = ModeId.VIDEO)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.isStyleEntryVisible)
+    }
+
+    @Test
+    fun `style entry is visible in check-in mode`() {
+        val state = defaultSessionState(activeMode = ModeId.CHECK_IN)
+        val model = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(model.isStyleEntryVisible)
+    }
+
+    @Test
+    fun `styleSurfaceRole returns PANEL for document mode`() {
+        assertEquals(StyleSurfaceRole.PANEL, styleSurfaceRole(ModeId.DOCUMENT))
+    }
+
+    @Test
+    fun `styleSurfaceRole returns PANEL for photo check-in and humanistic modes`() {
+        assertEquals(StyleSurfaceRole.PANEL, styleSurfaceRole(ModeId.PHOTO))
+        assertEquals(StyleSurfaceRole.PANEL, styleSurfaceRole(ModeId.CHECK_IN))
+        assertEquals(StyleSurfaceRole.PANEL, styleSurfaceRole(ModeId.HUMANISTIC))
+    }
+
+    @Test
+    fun `styleSurfaceRole returns FILTER_STRIP for video mode`() {
+        assertEquals(StyleSurfaceRole.FILTER_STRIP, styleSurfaceRole(ModeId.VIDEO))
+    }
 }

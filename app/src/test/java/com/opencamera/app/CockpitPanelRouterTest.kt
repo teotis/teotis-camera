@@ -472,7 +472,7 @@ class CockpitPanelRouterTest {
         val result = nextState(armed, CockpitPanelCommand.ToggleDocumentBatchOrganizer)
 
         assertFalse(armed.isDocumentBatchOrganizerDismissed)
-        assertEquals(CockpitPanelRoute.DocumentBatchOrganizer, result.route)
+        assertEquals(CockpitPanelRoute.BatchOverview, result.route)
     }
 
     @Test
@@ -667,6 +667,24 @@ class CockpitPanelRouterTest {
     }
 
     @Test
+    fun `filter lab panel is not visible for StyleLab card rail route`() {
+        assertFalse(shouldShowFilterLabPanel(CockpitPanelRoute.StyleLab))
+        assertTrue(shouldShowFilterLabPanel(CockpitPanelRoute.ColorLab))
+        assertTrue(shouldShowFilterLabPanel(CockpitPanelRoute.CheckInStylePanel))
+        assertFalse(shouldShowFilterLabPanel(CockpitPanelRoute.StyleStrip))
+        assertFalse(shouldShowFilterLabPanel(CockpitPanelRoute.None))
+    }
+
+    @Test
+    fun `StyleLab card rail route does not run legacy panel transition`() {
+        assertFalse(shouldRunPanelTransition(CockpitPanelRoute.StyleLab))
+        assertFalse(shouldRunPanelTransition(CockpitPanelRoute.StyleStrip))
+        assertTrue(shouldRunPanelTransition(CockpitPanelRoute.ColorLab))
+        assertTrue(shouldRunPanelTransition(CockpitPanelRoute.CheckInStylePanel))
+        assertTrue(shouldRunPanelTransition(CockpitPanelRoute.DevConsole))
+    }
+
+    @Test
     fun `CheckInStylePanel toggle open then AndroidBack returns to None`() {
         var state = CockpitPanelUiState()
         state = nextState(state, CockpitPanelCommand.ToggleCheckInStylePanel)
@@ -762,7 +780,7 @@ class CockpitPanelRouterTest {
     fun `DocumentBatchOrganizer from StyleLab replaces route`() {
         var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
         state = nextState(state, CockpitPanelCommand.ToggleDocumentBatchOrganizer)
-        assertEquals(CockpitPanelRoute.DocumentBatchOrganizer, state.route)
+        assertEquals(CockpitPanelRoute.BatchOverview, state.route)
     }
 
     @Test
@@ -838,7 +856,7 @@ class CockpitPanelRouterTest {
     fun `existing document batch route not affected by style changes`() {
         var state = CockpitPanelUiState(route = CockpitPanelRoute.StyleLab)
         state = nextState(state, CockpitPanelCommand.ToggleDocumentBatchOrganizer)
-        assertEquals(CockpitPanelRoute.DocumentBatchOrganizer, state.route)
+        assertEquals(CockpitPanelRoute.BatchOverview, state.route)
 
         state = nextState(state, CockpitPanelCommand.CloseDocumentBatchOrganizer)
         assertEquals(CockpitPanelRoute.None, state.route)

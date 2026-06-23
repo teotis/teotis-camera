@@ -131,4 +131,36 @@ class EffectSpecTest {
         )
         assertEquals(EffectTarget.BOTH, watermark.target)
     }
+
+    @Test
+    fun `DocumentColorMode has four values`() {
+        assertEquals(4, DocumentColorMode.entries.size)
+    }
+
+    @Test
+    fun `DocumentColorMode tagValue values are kebab-case`() {
+        assertEquals("color-neutral", DocumentColorMode.COLOR_NEUTRAL.tagValue)
+        assertEquals("color-enhanced", DocumentColorMode.COLOR_ENHANCED.tagValue)
+        assertEquals("grayscale", DocumentColorMode.GRAYSCALE.tagValue)
+        assertEquals("black-and-white", DocumentColorMode.BLACK_AND_WHITE.tagValue)
+    }
+
+    @Test
+    fun `DocumentEffect default construction has null colorMode and false scanGuide`() {
+        val doc = DocumentEffect(autoCrop = true, contrastProfile = "high")
+        assertNull(doc.colorMode)
+        assertFalse(doc.scanGuide)
+    }
+
+    @Test
+    fun `DocumentEffect with colorMode and scanGuide`() {
+        val doc = DocumentEffect(
+            autoCrop = true,
+            contrastProfile = "high",
+            colorMode = DocumentColorMode.GRAYSCALE,
+            scanGuide = true
+        )
+        assertEquals(DocumentColorMode.GRAYSCALE, doc.colorMode)
+        assertTrue(doc.scanGuide)
+    }
 }

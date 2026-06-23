@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import com.opencamera.core.session.SessionIntent
+import com.opencamera.core.settings.FeatureCatalogAction
 import com.opencamera.core.settings.PersistedSettingsAction
 
 @Suppress("EXPOSED_PARAMETER_TYPE")
@@ -8,6 +9,8 @@ internal interface MainActivityActionCallbacks {
     fun dispatch(intent: SessionIntent)
     fun applySettingsAction(action: PersistedSettingsAction)
     fun applySettingsControl(control: SettingsControlRenderModel?)
+    fun applyFeatureCatalogAction(action: FeatureCatalogAction)
+    fun applyFeatureCatalogControl(control: FeatureCatalogControlRenderModel?)
     fun reducePanel(command: CockpitPanelCommand)
     fun renderAfterPanelChange()
     fun renderLatestSettingsSurfaces()

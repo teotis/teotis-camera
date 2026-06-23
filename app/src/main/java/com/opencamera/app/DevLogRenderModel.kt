@@ -52,13 +52,59 @@ internal data class DomainTabCount(
     val count: Int
 )
 
+/** Sealed hierarchy for RecyclerView adapter items in the dev log panel. */
+sealed class DevLogEventItem(
+    val type: Int,
+    open val displayText: String
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is DevLogEventItem) return false
+        return type == other.type && displayText == other.displayText
+    }
+
+    override fun hashCode(): Int = 31 * type + displayText.hashCode()
+}
+
+class TraceEventItem(
+    val sequence: Int,
+    override val displayText: String
+) : DevLogEventItem(TYPE, displayText) {
+    companion object {
+        const val TYPE = 0
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is TraceEventItem) return false
+        return sequence == other.sequence && displayText == other.displayText
+    }
+
+    override fun hashCode(): Int = 31 * TYPE + sequence.hashCode() + 31 * displayText.hashCode()
+}
+
+class SectionHeaderItem(
+    override val displayText: String
+) : DevLogEventItem(TYPE, displayText) {
+    companion object {
+        const val TYPE = 1
+    }
+}
+
+class LinkEventItem(
+    override val displayText: String
+) : DevLogEventItem(TYPE, displayText) {
+    companion object {
+        const val TYPE = 2
+    }
+}
+
 internal data class DevLogRenderModel(
     val isAvailable: Boolean,
     val selectedTab: DevLogTab,
     val title: String,
     val summaryText: String,
-    val content: String,
-    val exportContent: String,
+    val visibleEvents: List<DevLogEventItem>,
     val storageUsedDisplay: String = "",
     val storageCapacityDisplay: String = "",
     val storageUsageRatio: Float = 0f,

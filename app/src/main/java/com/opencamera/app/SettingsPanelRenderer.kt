@@ -25,23 +25,16 @@ internal class SettingsPanelRenderer(
         views.photoSummary.isVisible = model.photoSection.summary.isNotEmpty()
         views.videoSummary.text = model.videoSection.summary
         views.videoSummary.isVisible = model.videoSection.summary.isNotEmpty()
-        views.catalogFooter.text = model.catalogFooter
-        views.catalogFooter.isVisible = model.catalogFooter.isNotEmpty()
         views.editingHint.text = model.editingHint
-        renderControl(views.gridMode, model.commonSection.gridMode, model.editingEnabled)
         renderControl(views.appLanguage, model.commonSection.languageControl, model.editingEnabled)
         renderControl(views.shutterSound, model.commonSection.shutterSound, model.editingEnabled)
         renderControl(views.selfieMirror, model.commonSection.selfieMirror, model.editingEnabled)
         renderControl(views.photoFilter, model.photoSection.defaultFilter, model.editingEnabled)
-        views.photoPortraitLab.text = model.photoSection.portraitLab.buttonLabel
-        views.photoPortraitLab.isEnabled = model.editingEnabled &&
-            model.photoSection.portraitLab.availability != SettingsControlAvailability.UNSUPPORTED
-        views.photoWatermark.text = model.photoSection.watermarkTemplate.buttonLabel
-        views.photoWatermark.isEnabled = model.editingEnabled &&
-            model.photoSection.watermarkTemplate.availability != SettingsControlAvailability.UNSUPPORTED
-        renderControl(views.photoLive, model.photoSection.livePhoto, model.editingEnabled)
+        renderControl(views.photoPortraitLab, model.photoSection.portraitLab, model.editingEnabled)
+        renderControl(views.photoWatermark, model.photoSection.watermarkTemplate, model.editingEnabled)
+        renderControl(views.photoLive, model.photoSection.photoLive, model.editingEnabled)
         renderControl(views.photoLiveSaveFormat, model.photoSection.liveSaveFormat, model.editingEnabled)
-        renderControl(views.photoTimer, model.photoSection.countdown, model.editingEnabled)
+        renderControl(views.photoTimer, model.photoSection.photoTimer, model.editingEnabled)
         renderControl(views.videoResolution, model.videoSection.resolution, model.editingEnabled)
         renderControl(views.videoFrameRate, model.videoSection.frameRate, model.editingEnabled)
         renderControl(views.videoDynamicFps, model.videoSection.dynamicFps, model.editingEnabled)
@@ -202,6 +195,30 @@ internal class SettingsPanelRenderer(
             renderControl(views.watermarkFrameBackground, control, model.editingEnabled)
         } ?: run {
             views.watermarkFrameBackground.isVisible = false
+        }
+    }
+
+    private fun renderControl(
+        container: LinearLayout,
+        model: SettingsControlRenderModel,
+        editingEnabled: Boolean
+    ) {
+        container.findViewById<TextView>(R.id.settingsItemTitle)?.text = model.label
+        container.findViewById<TextView>(R.id.settingsItemSupport)?.apply {
+            text = model.supportText
+            isVisible = model.supportText.isNotEmpty()
+        }
+        container.findViewById<TextView>(R.id.settingsItemValue)?.text = model.value
+        container.findViewById<TextView>(R.id.settingsItemStatus)?.apply {
+            text = model.statusText
+            isVisible = model.statusText.isNotEmpty()
+        }
+        container.isEnabled = editingEnabled
+        if (editingEnabled && model.isInteractive && model.nextAction != null) {
+            container.setOnClickListener { onApplySettingsAction(model.nextAction!!) }
+        } else {
+            container.setOnClickListener(null)
+            container.isClickable = false
         }
     }
 

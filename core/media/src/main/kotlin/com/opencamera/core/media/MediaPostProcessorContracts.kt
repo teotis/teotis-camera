@@ -33,3 +33,18 @@ fun MediaOutputHandle.toProcessorTargetOrNull(): ProcessorTarget? {
 fun ShotResult.addPipelineNotes(vararg notes: String): ShotResult {
     return copy(pipelineNotes = pipelineNotes + notes)
 }
+
+/**
+ * Liveness-aware entry envelope for a media post-processor invocation.
+ *
+ * Adds an optional [configSnapshot] (shot-time UI configuration) and an optional
+ * [liveness] deadline so a processor can both (a) read frozen config instead of live
+ * settings and (b) abort on deadline expiry. Both default to `null` so existing
+ * call-sites can adopt the type incrementally; the implementation in
+ * `MediaPostProcessors.kt` is owned by package 03 and unchanged here.
+ */
+data class PostProcessRequest(
+    val result: ShotResult,
+    val configSnapshot: ShotConfigSnapshot? = null,
+    val liveness: PostProcessLivenessDeadline? = null
+)

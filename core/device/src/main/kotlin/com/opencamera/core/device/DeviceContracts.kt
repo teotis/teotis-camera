@@ -202,7 +202,7 @@ data class ManualControlCapabilityMatrix(
             exposureCompensation = ManualControlSupport.APPLY,
             focusDistance = ManualControlSupport.APPLY,
             aperture = ManualControlSupport.APPLY,
-            whiteBalance = ManualControlSupport.SAVED_ONLY
+            whiteBalance = ManualControlSupport.APPLY
         )
 
         val SAVED_ONLY_DEFAULT = ManualControlCapabilityMatrix(
@@ -596,6 +596,7 @@ data class RecordingConfig(
 data class DeviceGraphSpec(
     val template: CaptureTemplate,
     val preferredLensFacing: LensFacing = LensFacing.BACK,
+    val activeLensFacing: LensFacing? = null,
     val stillCapture: StillCaptureConfig = StillCaptureConfig(),
     val preview: PreviewConfig = PreviewConfig(),
     val recording: RecordingConfig = RecordingConfig()

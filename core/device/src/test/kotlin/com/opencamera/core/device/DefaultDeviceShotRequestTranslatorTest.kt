@@ -111,7 +111,7 @@ class DefaultDeviceShotRequestTranslatorTest {
         assertTrue("device:manual-ev=applied:2" in request.diagnostics)
         assertTrue("device:manual-focus=applied:1.5" in request.diagnostics)
         assertTrue("device:manual-aperture=applied:1.8" in request.diagnostics)
-        assertTrue("device:manual-wb=saved-only:5600K" in request.diagnostics)
+        assertTrue("device:manual-wb=applied:5600K" in request.diagnostics)
     }
 
     @Test

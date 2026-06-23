@@ -89,6 +89,11 @@ internal class AdapterBindingCallbacks(
     val livePreviewFrameSource: CameraXLivePreviewFrameSource? = null
 )
 
+internal enum class LensTransitionState {
+    IDLE,
+    TRANSITIONING
+}
+
 /**
  * Sole owner of camera binding state: ProcessCameraProvider, bound use cases (ImageCapture,
  * VideoCapture, Camera), DeviceGraphSpec, lifecycle/preview hosts, observers, and current
@@ -146,6 +151,11 @@ internal class CameraBindingController(
     private var bindStartElapsedRealtimeNanos: Long = 0L
     private var previewSnapshotGeneration: Int = 0
 
+    // -- Lens transition state machine --
+
+    @Volatile private var _lensTransitionState: LensTransitionState = LensTransitionState.IDLE
+    @Volatile private var _lensTransitionTarget: LensNode? = null
+
     // -- Public accessors (read-only) --
 
     val currentGraph: DeviceGraphSpec? get() = _currentGraph
@@ -160,6 +170,11 @@ internal class CameraBindingController(
     val currentBoundCamera: Camera? get() = boundCamera
     val currentBoundPreviewView: PreviewView? get() = boundPreviewView
     val currentLifecycleOwner: LifecycleOwner? get() = boundLifecycleOwner
+
+    fun isLensTransitioning(): Boolean = _lensTransitionState == LensTransitionState.TRANSITIONING
+
+    fun isTransitioningTo(node: LensNode): Boolean =
+        _lensTransitionState == LensTransitionState.TRANSITIONING && _lensTransitionTarget == node
 
     fun currentSnapshot(): BindingSnapshot = BindingSnapshot(
         graph = _currentGraph,
@@ -223,6 +238,8 @@ internal class CameraBindingController(
         firstFrameReportedForCurrentBind = false
         bindStartElapsedRealtimeNanos = 0L
         suppressPreviewStateEvents = false
+        _lensTransitionState = LensTransitionState.IDLE
+        _lensTransitionTarget = null
         adapterCallbacks.onImageCaptureChanged(null)
         adapterCallbacks.onVideoCaptureChanged(null)
         adapterCallbacks.onBoundCameraChanged(null)
@@ -231,6 +248,11 @@ internal class CameraBindingController(
     // -- Switch lens --
 
     suspend fun switchLensNode(lensNode: LensNode, reason: String) {
+        // Duplicate guard: already transitioning to this node
+        if (_lensTransitionState == LensTransitionState.TRANSITIONING && _lensTransitionTarget == lensNode) {
+            return
+        }
+
         val activeGraph = _currentGraph ?: return
         val availability = capabilities.zoomRatioCapability.lensNodeMap[lensNode]
 
@@ -251,6 +273,10 @@ internal class CameraBindingController(
         val p = provider ?: return
         val lifecycleOwner = boundLifecycleOwner ?: return
         val previewView = boundPreviewView ?: return
+
+        val targetPreviewZoomRatio = activeGraph.preview.previewZoomRatio
+        _lensTransitionState = LensTransitionState.TRANSITIONING
+        _lensTransitionTarget = lensNode
 
         bindingExecutionContext.run {
             _currentGraph = activeGraph.copy(
@@ -287,12 +313,20 @@ internal class CameraBindingController(
                         Log.w(TAG, "Reflection fallback also failed for $physicalCameraId (lens ${lensNode.tagValue}): ${e2.message}")
                         _currentGraph = activeGraph
                         suppressPreviewStateEvents = prevSuppress
+                        boundCamera = null
+                        adapterCallbacks.onBoundCameraChanged(null)
+                        _lensTransitionState = LensTransitionState.IDLE
+                        _lensTransitionTarget = null
                         emitLensNodeBindFailure(physicalCameraId, lensNode, "${e.message}; reflection fallback also failed: ${e2.message}")
                         return@run
                     }
                 } else {
                     _currentGraph = activeGraph
                     suppressPreviewStateEvents = prevSuppress
+                    boundCamera = null
+                    adapterCallbacks.onBoundCameraChanged(null)
+                    _lensTransitionState = LensTransitionState.IDLE
+                    _lensTransitionTarget = null
                     emitLensNodeBindFailure(physicalCameraId, lensNode, e.message ?: "no matching camera and no reflection fallback available")
                     return@run
                 }
@@ -301,6 +335,10 @@ internal class CameraBindingController(
             if (boundUseCaseCamera == null) {
                 _currentGraph = activeGraph
                 suppressPreviewStateEvents = prevSuppress
+                boundCamera = null
+                adapterCallbacks.onBoundCameraChanged(null)
+                _lensTransitionState = LensTransitionState.IDLE
+                _lensTransitionTarget = null
                 emitLensNodeBindFailure(physicalCameraId, lensNode, "resolved to null; no matching camera found")
                 return@run
             }
@@ -308,7 +346,12 @@ internal class CameraBindingController(
             boundCamera = boundUseCaseCamera
             suppressPreviewStateEvents = prevSuppress
 
-            boundUseCaseCamera.cameraControl.setZoomRatio(activeGraph.preview.previewZoomRatio)
+            observeCameraState(boundUseCaseCamera)
+            observePreviewStream(previewView, lifecycleOwner)
+
+            boundUseCaseCamera.cameraControl.setZoomRatio(targetPreviewZoomRatio)
+            _lensTransitionState = LensTransitionState.IDLE
+            _lensTransitionTarget = null
         }
     }
 
@@ -776,9 +819,13 @@ internal class CameraBindingController(
         }
 
         if (deviceGraph.template == CaptureTemplate.STILL_CAPTURE) {
-            adapterCallbacks.livePreviewFrameSource?.start(
-                com.opencamera.core.media.FrameBufferPolicy.LIVE_PREVIEW_DEFAULT
-            )
+            val liveSource = adapterCallbacks.livePreviewFrameSource
+            if (liveSource != null) {
+                Log.d(TAG, "frame-source:start-requested(template=${deviceGraph.template},liveEnabled=true)")
+                liveSource.start(com.opencamera.core.media.FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+            }
+        } else if (adapterCallbacks.livePreviewFrameSource != null) {
+            Log.d(TAG, "frame-source:start-skipped(template-not-still-capture,template=${deviceGraph.template})")
         }
 
         suppressPreviewStateEvents = false

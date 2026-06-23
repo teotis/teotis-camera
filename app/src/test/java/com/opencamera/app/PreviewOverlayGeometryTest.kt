@@ -181,11 +181,17 @@ class PreviewOverlayGeometryTest {
     // --- zoom-scaled frame rect tests ---
 
     @Test
-    fun `zoom 2x halves the frame rect dimensions`() {
-        val base = computeFrameRect(1080, 1920, 4, 3)
-        val scaled = scaleFrameRect(base, 1f / 2f)
-        assertApprox(base.width / 2f, scaled.width)
-        assertApprox(base.height / 2f, scaled.height)
+    fun `zoom 2x frame rect area stays within 60_80 percent of preview content`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val scale = zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 1.0f)
+        assertTrue(scale in SQRT_AREA_RATIO_MIN..SQRT_AREA_RATIO_MAX,
+            "zoomFrameScale(2.0, 1.0) = $scale, expected in [$SQRT_AREA_RATIO_MIN, $SQRT_AREA_RATIO_MAX]")
+        val scaled = scaleFrameRect(content, scale)
+        val scaledArea = scaled.width * scaled.height
+        val contentArea = content.width * content.height
+        val areaRatio = scaledArea / contentArea
+        assertTrue(areaRatio in 0.6f..0.82f,
+            "Area ratio $areaRatio not in [0.6, 0.82] for 2x zoom")
     }
 
     @Test
@@ -197,13 +203,20 @@ class PreviewOverlayGeometryTest {
     }
 
     @Test
-    fun `zoom 3x produces third-sized frame centered`() {
-        val base = computeFrameRect(1080, 1920, 4, 3)
-        val scaled = scaleFrameRect(base, 1f / 3f)
-        assertApprox(base.centerX, scaled.centerX)
-        assertApprox(base.centerY, scaled.centerY)
-        assertApprox(base.width / 3f, scaled.width)
-        assertApprox(base.height / 3f, scaled.height)
+    fun `zoom 3x frame rect area stays within 60_80 percent of preview content`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val scale = zoomFrameScale(captureZoomRatio = 3.0f, previewZoomRatio = 1.0f)
+        assertTrue(scale in SQRT_AREA_RATIO_MIN..SQRT_AREA_RATIO_MAX,
+            "zoomFrameScale(3.0, 1.0) = $scale, expected in [$SQRT_AREA_RATIO_MIN, $SQRT_AREA_RATIO_MAX]")
+        val scaled = scaleFrameRect(content, scale)
+        val scaledArea = scaled.width * scaled.height
+        val contentArea = content.width * content.height
+        val areaRatio = scaledArea / contentArea
+        assertTrue(areaRatio in 0.6f..0.82f,
+            "Area ratio $areaRatio not in [0.6, 0.82] for 3x zoom")
+        // Frame should be centered
+        assertApprox(content.centerX, scaled.centerX, 1f)
+        assertApprox(content.centerY, scaled.centerY, 1f)
     }
 
     // --- gridLinePositions tests ---
@@ -397,6 +410,74 @@ class PreviewOverlayGeometryTest {
         }
     }
 
+    // --- scan guide geometry bounds tests ---
+
+    @Test
+    fun `scan guide rect stays within content rect for 4_3 portrait view`() {
+        val density = 3.0f
+        val marginPx = 28f * density
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val left = content.left + marginPx
+        val top = content.top + marginPx
+        val right = content.right - marginPx
+        val bottom = content.bottom - marginPx
+        assertTrue(left >= content.left, "Scan guide left must be within content left")
+        assertTrue(top >= content.top, "Scan guide top must be within content top")
+        assertTrue(right <= content.right, "Scan guide right must be within content right")
+        assertTrue(bottom <= content.bottom, "Scan guide bottom must be within content bottom")
+        assertTrue(right > left, "Scan guide must have positive width")
+        assertTrue(bottom > top, "Scan guide must have positive height")
+    }
+
+    @Test
+    fun `scan guide rect stays within content rect for 4_3 landscape view`() {
+        val density = 3.0f
+        val marginPx = 28f * density
+        val content = computeFrameRect(1920, 1080, 4, 3)
+        val left = content.left + marginPx
+        val top = content.top + marginPx
+        val right = content.right - marginPx
+        val bottom = content.bottom - marginPx
+        assertTrue(left >= content.left)
+        assertTrue(top >= content.top)
+        assertTrue(right <= content.right)
+        assertTrue(bottom <= content.bottom)
+        assertTrue(right > left && bottom > top)
+    }
+
+    @Test
+    fun `scan guide rect stays within content rect for all aspect ratios`() {
+        val density = 3.0f
+        val marginPx = 28f * density
+        for ((vw, vh) in listOf(1080 to 1920, 1920 to 1080, 1080 to 2400, 2400 to 1080)) {
+            for ((rw, rh) in listOf(4 to 3, 16 to 9, 1 to 1)) {
+                val content = computeFrameRect(vw, vh, rw, rh)
+                val left = content.left + marginPx
+                val top = content.top + marginPx
+                val right = content.right - marginPx
+                val bottom = content.bottom - marginPx
+                assertTrue(left >= content.left, "left out of bounds for ${rw}:${rh} in ${vw}x${vh}")
+                assertTrue(top >= content.top, "top out of bounds for ${rw}:${rh} in ${vw}x${vh}")
+                assertTrue(right <= content.right, "right out of bounds for ${rw}:${rh} in ${vw}x${vh}")
+                assertTrue(bottom <= content.bottom, "bottom out of bounds for ${rw}:${rh} in ${vw}x${vh}")
+                assertTrue(right > left && bottom > top, "zero-size guide for ${rw}:${rh} in ${vw}x${vh}")
+            }
+        }
+    }
+
+    @Test
+    fun `corner length is clamped within guide rect bounds`() {
+        val density = 3.0f
+        val marginPx = 28f * density
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val guideWidth = (content.right - content.left) - 2 * marginPx
+        val guideHeight = (content.bottom - content.top) - 2 * marginPx
+        val cornerLength = (minOf(guideWidth, guideHeight) * 0.12f)
+            .coerceIn(36f * density, 72f * density)
+        assertTrue(cornerLength > 0f, "Corner length must be positive")
+        assertTrue(cornerLength <= minOf(guideWidth, guideHeight) / 2f, "Corner length must fit within guide")
+    }
+
     private fun assertFrameWithinContent(viewW: Int, viewH: Int, ratioW: Int, ratioH: Int) {
         val rect = computeFrameRect(viewW, viewH, ratioW, ratioH)
         assertTrue(
@@ -512,36 +593,128 @@ class PreviewOverlayGeometryTest {
     @Test
     fun `frame scale previewZoom over captureZoom produces smaller frame`() {
         val base = computeFrameRect(1080, 1920, 4, 3)
-        val scaled = scaleFrameRect(base, zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 1.0f))
-        assertApprox(base.width / 2f, scaled.width)
-        assertApprox(base.height / 2f, scaled.height)
+        val scale = zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 1.0f)
+        assertEquals(SQRT_AREA_RATIO_MIN, scale, 0.001f,
+            "preview/capture=1/2 should clamp to SQRT_AREA_RATIO_MIN")
+        val scaled = scaleFrameRect(base, scale)
+        assertApprox(base.width * SQRT_AREA_RATIO_MIN, scaled.width, 1f)
+        assertApprox(base.height * SQRT_AREA_RATIO_MIN, scaled.height, 1f)
     }
 
     @Test
-    fun `frame scale equal zoom and previewZoom produces full frame`() {
-        val base = computeFrameRect(1080, 1920, 4, 3)
-        val scaled = scaleFrameRect(base, zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 2.0f))
-        assertApprox(base.width, scaled.width)
-        assertApprox(base.height, scaled.height)
-    }
-
-    @Test
-    fun `frame scale at lens switch point resets to full frame`() {
+    fun `frame scale equal zoom and previewZoom produces full area-constrained frame`() {
         val base = computeFrameRect(1080, 1920, 4, 3)
         val scale = zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 2.0f)
+        assertEquals(SQRT_AREA_RATIO_MAX, scale, 0.001f,
+            "preview/capture=1/1 should clamp to SQRT_AREA_RATIO_MAX")
         val scaled = scaleFrameRect(base, scale)
-        assertApprox(base.width, scaled.width)
-        assertApprox(base.height, scaled.height)
+        assertApprox(base.width * SQRT_AREA_RATIO_MAX, scaled.width, 1f)
+        assertApprox(base.height * SQRT_AREA_RATIO_MAX, scaled.height, 1f)
     }
 
     @Test
-    fun `frame scale grows when preview window jumps to higher baseline`() {
-        val base = computeFrameRect(1080, 1920, 4, 3)
-        val beforeSwitch = scaleFrameRect(base, zoomFrameScale(captureZoomRatio = 3.3f, previewZoomRatio = 1.0f))
-        val afterSwitch = scaleFrameRect(base, zoomFrameScale(captureZoomRatio = 3.3f, previewZoomRatio = 3.0f))
+    fun `frame scale at 1x leaves watermark preview breathing room`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val scale = zoomFrameScale(captureZoomRatio = 1.0f, previewZoomRatio = 1.0f)
+        val scaled = scaleFrameRect(content, scale)
+        val areaRatio = (scaled.width * scaled.height) / (content.width * content.height)
 
-        assertTrue(afterSwitch.width > beforeSwitch.width * 2f)
-        assertApprox(base.width * (3.0f / 3.3f), afterSwitch.width, 1f)
+        assertTrue(
+            areaRatio <= 0.82f,
+            "1x frame area ratio $areaRatio should leave visible space for full watermark preview"
+        )
+        assertApprox(content.centerX, scaled.centerX, 1f)
+        assertApprox(content.centerY, scaled.centerY, 1f)
+    }
+
+    @Test
+    fun `frame scale at lens switch point stays within area bounds`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        // At lens switch point: capture=2.0, preview=2.0 -> rawScale=1.0, clamped by max area.
+        val scale = zoomFrameScale(captureZoomRatio = 2.0f, previewZoomRatio = 2.0f)
+        assertTrue(scale in SQRT_AREA_RATIO_MIN..SQRT_AREA_RATIO_MAX,
+            "At lens switch: scale=$scale not in [$SQRT_AREA_RATIO_MIN, $SQRT_AREA_RATIO_MAX]")
+        val scaled = scaleFrameRect(content, scale)
+        // Should NOT be full-size.
+        assertTrue(scaled.width < content.width - 1f,
+            "Frame width ${scaled.width} should be smaller than content ${content.width}")
+        assertTrue(scaled.height < content.height - 1f,
+            "Frame height ${scaled.height} should be smaller than content ${content.height}")
+    }
+
+    @Test
+    fun `frame scale stays within sqrt area bounds across zoom sweep`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        val zoomSteps = listOf(0.7f, 1.0f, 1.3f, 1.5f, 2.0f, 2.5f, 3.0f, 5.0f, 7.0f, 10.0f)
+        for (capture in zoomSteps) {
+            val preview = (capture * 0.9f).coerceAtLeast(0.01f)
+            val scale = zoomFrameScale(captureZoomRatio = capture, previewZoomRatio = preview)
+            assertTrue(scale in SQRT_AREA_RATIO_MIN..SQRT_AREA_RATIO_MAX,
+                "zoomFrameScale($capture, $preview)=$scale not in [$SQRT_AREA_RATIO_MIN, $SQRT_AREA_RATIO_MAX]")
+            // Area constraint check
+            val scaled = scaleFrameRect(content, scale)
+            val areaRatio = (scaled.width * scaled.height) / (content.width * content.height)
+            assertTrue(areaRatio in 0.6f..0.82f,
+                "Area ratio $areaRatio out of [0.6, 0.82] for captureZoom=$capture")
+        }
+    }
+
+    // --- area-constrained frame box: sweep tests ---
+
+    @Test
+    fun `frame box area ratio is within 0_6 to 0_82 for captureZoom 0_7 to 10_0 sweep`() {
+        val previewAspects = listOf(4 to 3, 16 to 9, 1 to 1)
+        val frameRatios = listOf(4 to 3, 16 to 9, 3 to 4, 1 to 1)
+        for ((pw, ph) in previewAspects) {
+            val viewW = if (pw > ph) 1920 else 1080
+            val viewH = if (pw > ph) 1080 else 1920
+            val content = computeFrameRect(viewW, viewH, pw, ph)
+            for ((fw, fh) in frameRatios) {
+                for (capture in listOf(0.7f, 1.0f, 1.3f, 2.0f, 3.0f, 5.0f, 10.0f)) {
+                    val preview = (capture * 0.9f).coerceAtLeast(0.01f)
+                    val scale = zoomFrameScale(captureZoomRatio = capture, previewZoomRatio = preview)
+                    assertTrue(scale in SQRT_AREA_RATIO_MIN..SQRT_AREA_RATIO_MAX,
+                        "scale=$scale out of bounds for capture=$capture, preview=$preview")
+                    val scaled = scaleFrameRect(content, scale)
+                    val scaledArea = scaled.width * scaled.height
+                    val contentArea = content.width * content.height
+                    val areaRatio = scaledArea / contentArea
+                    assertTrue(areaRatio in 0.6f..0.82f,
+                        "Area ratio $areaRatio out of [0.6, 0.82] for ${pw}:${ph} preview + ${fw}:${fh} frame at zoom $capture")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `frame scrim alpha default is 200`() {
+        assertEquals(200, PreviewOverlayView.FRAME_SCRIM_ALPHA_DEFAULT)
+    }
+
+    @Test
+    fun `frame scrim alpha configurable via render model`() {
+        val ratio = FrameRatio.RATIO_4_3
+        val defaultModel = PreviewFrameRenderModel(
+            ratio = ratio,
+            label = "4:3",
+            dimOutsideFrame = true
+        )
+        assertEquals(PreviewOverlayView.FRAME_SCRIM_ALPHA_DEFAULT, defaultModel.frameScrimAlpha)
+
+        val customModel = defaultModel.copy(frameScrimAlpha = 180)
+        assertEquals(180, customModel.frameScrimAlpha)
+    }
+
+    @Test
+    fun `frame box stays centered across zoom sweep`() {
+        val content = computeFrameRect(1080, 1920, 4, 3)
+        for (capture in listOf(0.7f, 1.0f, 2.0f, 5.0f, 10.0f)) {
+            val preview = (capture * 0.9f).coerceAtLeast(0.01f)
+            val scale = zoomFrameScale(captureZoomRatio = capture, previewZoomRatio = preview)
+            val scaled = scaleFrameRect(content, scale)
+            assertApprox(content.centerX, scaled.centerX, 1f)
+            assertApprox(content.centerY, scaled.centerY, 1f)
+        }
     }
 
     // --- clampReticleCenter tests ---

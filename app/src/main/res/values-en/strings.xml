@@ -42,10 +42,12 @@
     <string name="style_rail_title_humanistic">Humanistic Styles</string>
     <string name="style_rail_title_portrait">Portrait Styles</string>
     <string name="style_rail_title_video">Video Styles</string>
+    <string name="style_rail_title_document">Document Colors</string>
     <string name="style_rail_supporting_photo">Tap a card to apply this look instantly.</string>
     <string name="style_rail_supporting_humanistic">Street and life presets for a human perspective.</string>
     <string name="style_rail_supporting_portrait">Portrait-specific tone presets.</string>
     <string name="style_rail_supporting_video">Video look presets applied before recording.</string>
+    <string name="style_rail_supporting_document">Select document color mode</string>
     <string name="button_filter_close">Close Tone Lab</string>
     <string name="permission_pending">Camera permission is required before preview can start.</string>
     <string name="permission_granted">Camera permission granted. Preview is ready.</string>
@@ -60,6 +62,7 @@
     <string name="output_error_prefix">Camera issue:</string>
     <string name="output_preview_prefix">Preview thumbnail:</string>
     <string name="preview_thumbnail_content_description">Latest preview thumbnail</string>
+    <string name="preview_thumbnail_empty_content_description">No recent photo</string>
     <string name="settings_panel_content_description">Camera settings</string>
     <string name="filter_panel_content_description">Tone Lab independent defaults panel</string>
     <string name="settings_section_common">General</string>
@@ -326,7 +329,7 @@
     <string name="settings_blocked_by_capture">Capture in progress, settings locked</string>
     <string name="settings_not_loaded">Settings not loaded yet</string>
     <string name="settings_action_unsupported">Action not supported in current mode</string>
-    <string name="format_color_tone">Color: %.2f, Tone: %.2f</string>
+    <string name="format_color_tone">Color: %1$.2f, Tone: %2$.2f</string>
     <string name="status_document_pipeline_ready">Document pipeline ready</string>
     <string name="status_document_mode_inactive">Document mode inactive</string>
     <string name="status_document_capture_requested">Document capture requested</string>
@@ -392,6 +395,8 @@
     <string name="filter_lab_hero_summary">%1$s default %2$s • %3$d looks staged</string>
     <string name="filter_lab_current_default">Current default %s</string>
     <string name="filter_lab_selected_default"> | Selected default</string>
+    <string name="filter_lab_color_summary">Color Lab edits a live color wash over the current mode: warm/cool runs left to right, tone depth runs top to bottom.</string>
+    <string name="filter_lab_color_hint">Horizontal swipe adjusts warmth and tint; vertical swipe controls lift or deep contrast.</string>
     <string name="filter_lab_light_palette_hint">Horizontal swipe for color, vertical swipe for tone.</string>
     <string name="filter_lab_drag_to_create_custom">Drag palette to save as custom</string>
     <string name="filter_lab_next_look">Next %s look</string>
@@ -441,13 +446,12 @@
     <string name="settings_page_portrait_support">Open profile, beauty, and bokeh tuning</string>
     <string name="settings_page_watermark_support">Open selector + per-template tuning; %d templates</string>
     <string name="settings_page_live_support">Saved default only; %1$d ms bundle | dynamic watermark %2$s</string>
+    <string name="settings_page_live_photo_default_support">Toggle default; %d ms motion bundle</string>
     <string name="settings_page_degraded_resolution">Saved as %1$s, active graph uses %2$s</string>
     <string name="settings_page_degraded_framerate">Saved as %1$s, active graph uses %2$s</string>
     <string name="settings_page_degraded_dynamic_fps">Saved as %1$s, active graph uses %2$s</string>
     <string name="settings_page_degraded_audio">Saved as %1$s, active graph uses %2$s</string>
     <string name="settings_page_video_filter_seed">Saved filter seed; %d looks staged</string>
-    <string name="settings_page_catalog_footer_1">Still watermark templates now flow into metadata and photo rendering.</string>
-    <string name="settings_page_catalog_footer_2">Manual drafts and Live/video defaults remain staged in the same settings spine.</string>
     <string name="settings_page_pro_manual_prefix"> | Humanistic manual draft </string>
 
     <!-- Watermark selector -->
@@ -465,7 +469,7 @@
     <string name="watermark_detail_supporting_not_selected">This template is not yet the current default. Adjust here first, then switch from the selector page when ready.</string>
     <string name="watermark_detail_footer_frame">Frame border rendering is live for static-photo export.</string>
     <string name="watermark_detail_footer_overlay">Classic overlay stays inside the source image without an expanded border.</string>
-    <string name="watermark_detail_footer_pure_text">Clean text sits directly on the source image with no border or background container.</string>
+    <string name="watermark_detail_footer_pure_text">A translucent blue bottom bar stays inside the source image with a small warm light accent.</string>
     <string name="watermark_detail_tokens_prefix">Tokens: </string>
 
     <!-- Watermark attribute prefixes for hero summary -->
@@ -475,12 +479,12 @@
     <string name="watermark_attr_background_prefix">Background </string>
     <string name="watermark_template_expanded_frame">Expanded frame</string>
     <string name="watermark_template_classic_overlay">Classic overlay</string>
-    <string name="watermark_template_pure_text">Clean text overlay</string>
+    <string name="watermark_template_pure_text">Translucent Bottom Bar</string>
     <string name="watermark_template_blur_four_border">Blurred image frame</string>
     <string name="watermark_template_travel_polaroid">Travel Polaroid</string>
     <string name="watermark_template_retro_frame">Retro Frame</string>
-    <string name="watermark_template_professional_bottom_bar">Professional Bottom Bar</string>
-    <string name="watermark_template_night_street">Night Street</string>
+    <string name="watermark_template_van_gogh_starry">Van Gogh Starry</string>
+    <string name="watermark_template_blue_hour">Blue Hour</string>
     <string name="watermark_placement_top_left">Top Left</string>
     <string name="watermark_placement_top_right">Top Right</string>
     <string name="watermark_placement_bottom_left">Bottom Left</string>
@@ -515,6 +519,10 @@
     <string name="filter_profile_portrait_original">Portrait Original</string>
     <string name="filter_profile_portrait_chasing_light">Portrait Chasing Light</string>
     <string name="filter_profile_portrait_rich">Portrait Rich</string>
+    <string name="filter_profile_doc_color_neutral">Original</string>
+    <string name="filter_profile_doc_color_enhanced">Vivid</string>
+    <string name="filter_profile_doc_grayscale">Grayscale</string>
+    <string name="filter_profile_doc_bw">B&amp;W</string>
     <string name="filter_profile_receipt">Receipt</string>
     <string name="filter_profile_whiteboard">Whiteboard</string>
     <string name="filter_profile_contract">Contract</string>
@@ -528,6 +536,40 @@
     <string name="filter_profile_night">Night</string>
     <string name="filter_profile_contrast">Contrast</string>
     <string name="filter_profile_low_light">Low Light</string>
+
+    <!-- Style card mood labels -->
+    <string name="style_mood_bw">B&amp;W</string>
+    <string name="style_mood_monochrome">Monochrome</string>
+    <string name="style_mood_natural">Natural</string>
+    <string name="style_mood_vivid">Vivid</string>
+    <string name="style_mood_muted">Muted</string>
+    <string name="style_mood_punchy">Punchy</string>
+    <string name="style_mood_soft">Soft</string>
+    <string name="style_mood_warm">Warm</string>
+    <string name="style_mood_cool">Cool</string>
+    <string name="style_mood_film">Film</string>
+    <string name="style_mood_separator"> </string>
+    <string name="style_mood_vivid_warm">Vivid Warm</string>
+    <string name="style_mood_vivid_cool">Vivid Cool</string>
+    <string name="style_mood_vivid_film">Vivid Film</string>
+    <string name="style_mood_vivid_punchy">Vivid Punchy</string>
+    <string name="style_mood_vivid_punchy_warm">Vivid Punchy Warm</string>
+    <string name="style_mood_vivid_punchy_cool">Vivid Punchy Cool</string>
+    <string name="style_mood_vivid_punchy_film">Vivid Punchy Film</string>
+    <string name="style_mood_vivid_warm_film">Vivid Warm Film</string>
+    <string name="style_mood_vivid_cool_film">Vivid Cool Film</string>
+    <string name="style_mood_muted_soft">Muted Soft</string>
+    <string name="style_mood_muted_cool">Muted Cool</string>
+    <string name="style_mood_muted_soft_cool">Muted Soft Cool</string>
+    <string name="style_mood_punchy_warm">Punchy Warm</string>
+    <string name="style_mood_punchy_cool">Punchy Cool</string>
+    <string name="style_mood_punchy_film">Punchy Film</string>
+    <string name="style_mood_punchy_warm_film">Punchy Warm Film</string>
+    <string name="style_mood_soft_cool">Soft Cool</string>
+    <string name="style_mood_soft_warm">Soft Warm</string>
+    <string name="style_mood_soft_film">Soft Film</string>
+    <string name="style_mood_warm_film">Warm Film</string>
+    <string name="style_mood_cool_film">Cool Film</string>
     <string name="contrast_label_high">High</string>
     <string name="contrast_label_balanced">Balanced</string>
     <string name="contrast_label_natural">Natural</string>
@@ -553,6 +595,7 @@
     <string name="document_batch_crop_skipped">Not cropped</string>
     <string name="document_batch_crop_failed">Crop failed</string>
     <string name="document_batch_rail_page_description">Page %d</string>
+    <string name="document_batch_rail_overview_description">View batch</string>
     <string name="button_document_batch_organizer_close">Close</string>
     <string name="button_reset_defaults">Reset to defaults</string>
     <string name="status_processing_photo_keep_open">Processing photo, do not exit OpenCamera.</string>
@@ -646,4 +689,19 @@
     <string name="dev_last_timing_prefix"> | Last timing: </string>
     <string name="dev_slowest_timing_prefix"> | Slowest timing: </string>
     <string name="dev_last_issue_prefix"> | Last issue: </string>
+    <string name="button_document_batch_continue_shooting">Continue Shooting</string>
+    <string name="button_document_batch_crop_edit">Crop Edit</string>
+    <string name="button_document_batch_crop_edit_coming_soon">Crop Edit Coming Soon</string>
+    <string name="document_crop_edit_title">Crop Edit</string>
+    <string name="document_crop_edit_confirm">Confirm Crop</string>
+    <string name="document_crop_edit_cancel">Discard</string>
+    <string name="document_crop_edit_page_format">Page %d</string>
+    <string name="document_crop_edit_marked_manual">Marked for Manual Crop</string>
+    <string name="button_document_batch_export">Export Batch</string>
+    <string name="document_export_progress">Exporting %1$d/%2$d pages</string>
+    <string name="document_export_success">Export complete, %d pages</string>
+    <string name="document_export_failed">Export failed</string>
+    <string name="button_document_export_return">Return to Shooting</string>
+    <string name="button_document_export_retry">Retry</string>
+    <string name="document_batch_empty_hint">No pages captured yet. Tap "Continue Shooting" to start.</string>
 </resources>

@@ -175,12 +175,16 @@ class PreviewEffectAdapterTest {
     }
 
     @Test
-    fun `pure text watermark hint is text overlay`() {
+    fun `pure text storage key previews as translucent bottom bar`() {
         val model = adapter.adapt(
             EffectSpec(listOf(
                 WatermarkEffect(
                     templateId = "pure-text",
-                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    tokens = mapOf(
+                        "watermarkModel" to "BLUE HOUR",
+                        "datetime" to "2026.06.22 19:41",
+                        "camera-params" to "24mm"
+                    ),
                     style = WatermarkStyleSettings(
                         textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
                         textOpacity = WatermarkTextOpacity.SOFT
@@ -190,7 +194,12 @@ class PreviewEffectAdapterTest {
         )
 
         assertEquals("pure-text", model.watermarkHint?.templateId)
-        assertEquals(WatermarkPreviewShape.TEXT_ONLY, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewShape.BOTTOM_BAR, model.watermarkHint?.shape)
+        assertEquals(
+            listOf("BLUE HOUR", "2026.06.22 19:41", "24mm"),
+            model.watermarkHint?.previewLabels
+        )
+        assertEquals(0xCC071321.toInt(), model.watermarkHint?.barBackground)
     }
 
     @Test
@@ -199,7 +208,11 @@ class PreviewEffectAdapterTest {
             EffectSpec(listOf(
                 WatermarkEffect(
                     templateId = "blur-four-border",
-                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    tokens = mapOf(
+                        "watermarkModel" to "OpenCamera",
+                        "datetime" to "2026.06.23 10:18",
+                        "camera-params" to "35mm  1/2100s  ISO50"
+                    ),
                     style = WatermarkStyleSettings(
                         textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
                         textOpacity = WatermarkTextOpacity.SOLID,
@@ -210,6 +223,11 @@ class PreviewEffectAdapterTest {
         )
 
         assertEquals(WatermarkPreviewShape.FOUR_BORDER, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewDecoration.IMPRESSION_CHROMA, model.watermarkHint?.decoration)
+        assertEquals(
+            listOf("OpenCamera", "2026.06.23 10:18", "35mm  1/2100s  ISO50"),
+            model.watermarkHint?.previewLabels
+        )
     }
 
     @Test
@@ -225,6 +243,7 @@ class PreviewEffectAdapterTest {
         )
 
         assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewDecoration.TRAVEL_MAP, model.watermarkHint?.decoration)
     }
 
     @Test
@@ -240,6 +259,7 @@ class PreviewEffectAdapterTest {
         )
 
         assertEquals(WatermarkPreviewShape.BACKED_TEXT, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewDecoration.NONE, model.watermarkHint?.decoration)
     }
 
     @Test
@@ -321,6 +341,79 @@ class PreviewEffectAdapterTest {
     }
 
     @Test
+    fun `night street watermark hint is low light memory expanded frame`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "night-street",
+                    tokens = mapOf("watermarkModel" to "OpenCamera"),
+                    style = WatermarkStyleSettings(
+                        frameBackground = WatermarkFrameBackground.DARK
+                    )
+                )
+            ))
+        )
+
+        assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewDecoration.NIGHT_MEMORY, model.watermarkHint?.decoration)
+    }
+
+    @Test
+    fun `van gogh starry watermark hint is centered metadata starry frame`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "van-gogh-starry",
+                    tokens = mapOf(
+                        "watermarkModel" to "Night Street",
+                        "datetime" to "2026.06.22 19:41",
+                        "camera-params" to "24mm"
+                    ),
+                    style = WatermarkStyleSettings(
+                        frameBackground = WatermarkFrameBackground.DARK
+                    )
+                )
+            ))
+        )
+
+        assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewDecoration.STARRY_MOON, model.watermarkHint?.decoration)
+        assertEquals("2026.06.22 19:41 · 24mm", model.watermarkHint?.previewText)
+        assertEquals(
+            listOf("2026.06.22 19:41", "24mm"),
+            model.watermarkHint?.previewLabels
+        )
+    }
+
+    @Test
+    fun `blue hour watermark hint uses fixed title with common params`() {
+        val model = adapter.adapt(
+            EffectSpec(listOf(
+                WatermarkEffect(
+                    templateId = "blue-hour",
+                    tokens = mapOf(
+                        "watermarkModel" to "Ignored",
+                        "datetime" to "2026.06.22 19:41",
+                        "location" to "CITY NIGHT",
+                        "camera-params" to "24mm"
+                    ),
+                    style = WatermarkStyleSettings(
+                        frameBackground = WatermarkFrameBackground.DARK
+                    )
+                )
+            ))
+        )
+
+        assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewDecoration.BLUE_HOUR, model.watermarkHint?.decoration)
+        assertEquals("BLUE HOUR", model.watermarkHint?.previewText)
+        assertEquals(
+            listOf("2026.06.22 19:41", "CITY NIGHT", "24mm"),
+            model.watermarkHint?.previewLabels
+        )
+    }
+
+    @Test
     fun `non-bottom-bar templates have empty preview labels`() {
         val model = adapter.adapt(
             EffectSpec(listOf(
@@ -350,6 +443,7 @@ class PreviewEffectAdapterTest {
         )
 
         assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
+        assertEquals(WatermarkPreviewDecoration.ARCHIVAL_PAPER, model.watermarkHint?.decoration)
     }
 
     @Test

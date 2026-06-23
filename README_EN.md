@@ -20,7 +20,7 @@ A modern Android camera application with layered architecture design, focused on
 - **Independent mode plugins**: Product modes are consolidated into Photo, Check-in, Humanistic, Video, and Document. Portrait, night, enhanced clarity, and professional capabilities are composed through mode strategies and orchestrated by the session kernel.
 - **Explainable enhanced capture**: Still capture can select CameraX Extensions or multi-frame processing according to device capability, with explicit gating, degradation semantics, and diagnostics.
 - **Real-time color pipeline**: Color Lab separates color selection, style configuration, and preview overlay through `ColorLabSpec`, `StyleColorPipeline`, and `PreviewColorTransform`, making live preview and reusable style persistence part of the same flow.
-- **Composable media post-processing**: Watermark, aspect ratio, portrait rendering, document crop, and algorithm processors are modeled as media pipeline processors, so preview hints and saved output share the same settings and effect contracts.
+- **Composable media post-processing**: Watermark, aspect ratio, portrait rendering, document crop, and algorithm processors are modeled as media pipeline processors, so preview hints and saved output share the same settings and effect contracts and watermark templates reach saved photos.
 - **Document batch model**: Document mode models multi-page capture, crop state, and the thumbnail rail through `DocumentBatch*` state, enabling collection, preview, and later organization of scanned pages.
 - **Built-in observability**: The developer panel surfaces diagnostics, recent issues, elapsed time, and link status directly on device, making capture, post-processing, and settings synchronization easier to debug in real scenes.
 
@@ -95,7 +95,7 @@ The project adopts a **four-layer architecture + cross-cutting concerns** design
 - **Orientation Aware**: Adaptive landscape/portrait UI layouts
 - **Cockpit Panel**: Professional parameter adjustment interface
 - **Color Lab**: Real-time color style preview
-- **Watermark System**: Configurable watermark post-processing pipeline
+- **Watermark System**: Configurable templates, preview hints, and saved-photo post-processing
 - **Dev Console**: Runtime diagnostics and log export
 
 ## Tech Stack

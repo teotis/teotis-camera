@@ -41,6 +41,8 @@ object EffectBridge {
             tags["mode"] = "document"
             tags["autoCrop"] = effect.autoCrop.toString()
             effect.contrastProfile?.let { tags["contrastProfile"] = it }
+            effect.colorMode?.let { tags["documentColorMode"] = it.tagValue }
+            tags["documentScanGuide"] = effect.scanGuide.toString()
         }
 
         spec.find<SelfieMirrorEffect>()?.let {

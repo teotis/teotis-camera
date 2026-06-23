@@ -1,13 +1,14 @@
 package com.opencamera.app.camera
 
 import android.content.Context
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.core.content.ContextCompat
+import com.opencamera.app.camera.live.LivePhotoMediaStoreWriter
 import com.opencamera.app.camera.live.LivePreviewFrameSource
-import com.opencamera.app.camera.live.MotionPhotoFileMaterializer
 import com.opencamera.app.camera.live.MotionSegmentFrameSource
 import com.opencamera.core.device.DeviceShotRequest
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlan
@@ -71,7 +72,10 @@ internal class StillCaptureExecutor(
                         continuation.resume(
                             PhotoCaptureOutcome.Success(
                                 outputPath = request.outputPath,
-                                outputHandle = request.resolveOutputHandle(outputFileResults.savedUri),
+                                outputHandle = request.resolveOutputHandle(
+                                    outputFileResults.savedUri,
+                                    context.contentResolver
+                                ),
                                 deviceCaptureStartedAtElapsedMillis = deviceCaptureStartedAt,
                                 deviceCaptureCompletedAtElapsedMillis = deviceCaptureCompletedAt
                             )
@@ -257,6 +261,7 @@ internal class StillCaptureExecutor(
                 )
 
                 val motionFrameSource = frameSource as? MotionSegmentFrameSource
+                val mediaStoreWriter = LivePhotoMediaStoreWriter(context)
                 val outcome = LivePhotoAssembler.assembleLivePhoto(
                     capturedResult = CapturedPhotoResult(
                         outputPath = result.outputPath,
@@ -272,19 +277,29 @@ internal class StillCaptureExecutor(
                             )
                     },
                     materializeContainer = { motionPath ->
-                        val materializer = MotionPhotoFileMaterializer()
-                        val motionFile = File(motionPath)
-                        materializer.materialize(
-                            stillPath = result.outputPath,
-                            motionPath = motionPath,
-                            outputPath = result.outputPath.replace(".jpg", "_MP.jpg"),
-                            spec = MotionPhotoContainerSpec(
-                                motionLengthBytes = motionFile.takeIf { it.exists() }?.length() ?: 0L
-                            ),
-                            cleanupTempMotion = false
-                        )
+                        val savedUri = result.outputHandle.contentUri?.let(Uri::parse)
+                        if (savedUri != null) {
+                            val combinedResult = mediaStoreWriter.createMotionPhotoBytes(
+                                savedUri = savedUri,
+                                motionPath = motionPath,
+                                spec = MotionPhotoContainerSpec(
+                                    motionLengthBytes = File(motionPath).length()
+                                )
+                            )
+                            combinedResult.mapCatching { combinedBytes ->
+                                mediaStoreWriter.overwriteMotionPhotoJpeg(savedUri, combinedBytes)
+                                    .getOrThrow()
+                            }.map {
+                                MotionPhotoMaterializationResult(outputUri = savedUri.toString())
+                            }
+                        } else {
+                            Result.failure(
+                                IllegalStateException("MediaStore content URI not available for motion photo overwrite")
+                            )
+                        }
                     },
-                    writeContentUriPayload = writeContentUriPayload
+                    writeContentUriPayload = writeContentUriPayload,
+                    mediaStoreWriter = mediaStoreWriter
                 )
 
                 // Content URI cleanup on sidecar write failure

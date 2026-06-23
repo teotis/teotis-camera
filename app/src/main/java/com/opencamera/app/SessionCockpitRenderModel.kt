@@ -25,6 +25,8 @@ import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.PhotoLowLightPromptStatus
 import com.opencamera.app.i18n.AppTextResolver
+import com.opencamera.app.camera.live.LivePhotoStatusProjection
+import com.opencamera.core.settings.LiveSaveFormat
 import kotlin.math.roundToInt
 
 internal data class ZoomCapsuleRenderModel(
@@ -162,7 +164,7 @@ internal fun captureDisabledReason(state: SessionState, text: AppTextResolver): 
     if (state.activeShot != null && state.recordingStatus == RecordingStatus.REQUESTING) return text.get(R.string.disabled_preparing_recording)
     if (state.recordingStatus == RecordingStatus.RECORDING) return text.get(R.string.disabled_recording)
     if (state.recordingStatus == RecordingStatus.STOPPING) return text.get(R.string.disabled_stopping_recording)
-    if (state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED) return text.get(R.string.disabled_saving_photo)
+    if (state.activeShot != null && (state.captureStatus == CaptureStatus.REQUESTED || state.captureStatus == CaptureStatus.SAVING || state.captureStatus == CaptureStatus.DATA_RECEIVED)) return text.get(R.string.disabled_saving_photo)
     return null
 }
 
@@ -263,7 +265,6 @@ private val stillModesWithFrameRatio = setOf(
 )
 
 internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): QuickBrightnessRenderModel {
-    val isPhotoMode = state.activeMode == ModeId.PHOTO
     val isBrightnessCapableMode = state.activeMode in BRIGHTNESS_CAPABLE_MODES
     val isPreviewActive = state.previewStatus == PreviewStatus.ACTIVE
     val isBusy = state.activeShot != null || state.countdownRemainingSeconds != null
@@ -306,7 +307,8 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
 private val BRIGHTNESS_CAPABLE_MODES = setOf(
     ModeId.PHOTO,
     ModeId.HUMANISTIC,
-    ModeId.CHECK_IN
+    ModeId.CHECK_IN,
+    ModeId.VIDEO
 )
 
 private fun brightnessValueLabel(steps: Int): String {
@@ -372,26 +374,34 @@ internal fun quickPanelSheetRenderModel(
     text: AppTextResolver,
     strings: SessionUiStrings
 ): QuickPanelSheetRenderModel {
-    val settingsPage = sessionSettingsPageRenderModel(state, text)
-    val grid = settingsPage.commonSection.gridMode
-    val live = settingsPage.photoSection.livePhoto
-    val timer = settingsPage.photoSection.countdown
+    val settings = state.settings.persisted
     val frameControl = frameRatioControlRenderModel(state, text)
     val brightnessControl = brightnessRenderModel(state, text)
 
     val stillTemplate = state.activeDeviceGraph.template == CaptureTemplate.STILL_CAPTURE
     val stillBusy = state.activeShot != null || state.countdownRemainingSeconds != null
     val stillQualityEnabled = stillTemplate && !stillBusy && state.activeDeviceCapabilities.supportsStillCapture
+    val supportsStillCapture = state.activeDeviceCapabilities.supportsStillCapture
 
     val resolutionEnabled = stillQualityEnabled && isStillResolutionToggleEnabled(state)
 
+    val gridValue = text.gridModeLabel(settings.common.gridMode)
+    val gridEnabled = !stillBusy
+
+    val liveEnabled = supportsStillCapture && !stillBusy
+    val liveValue = text.onOff(settings.photo.livePhotoEnabledByDefault)
+    val liveSelected = settings.photo.livePhotoEnabledByDefault
+
+    val countdownLabel = text.countdownValueLabel(settings.photo.countdownDuration)
+    val timerEnabled = supportsStillCapture && !stillBusy
+
     val catalog = state.settings.catalog
     val watermarkTemplates = catalog.watermarkTemplates
-    val currentTemplateId = state.settings.persisted.photo.defaultWatermarkTemplateId
+    val currentTemplateId = settings.photo.defaultWatermarkTemplateId
     val currentTemplate = watermarkTemplates.firstOrNull { it.id == currentTemplateId }
-    val watermarkEnabled = stillTemplate && !stillBusy && state.activeDeviceCapabilities.supportsStillCapture && watermarkTemplates.isNotEmpty()
+    val watermarkEnabled = stillTemplate && !stillBusy && supportsStillCapture && watermarkTemplates.isNotEmpty()
     val watermarkDisabledReason = when {
-        !state.activeDeviceCapabilities.supportsStillCapture -> null
+        !supportsStillCapture -> null
         !stillTemplate -> null
         stillBusy -> text.get(R.string.disabled_saving_photo)
         watermarkTemplates.isEmpty() -> text.get(R.string.error_no_watermark_templates)
@@ -418,8 +428,8 @@ internal fun quickPanelSheetRenderModel(
     return QuickPanelSheetRenderModel(
         gridRow = QuickPanelRowRenderModel(
             title = text.get(R.string.button_quick_grid),
-            value = grid.value,
-            isEnabled = grid.isInteractive,
+            value = gridValue,
+            isEnabled = gridEnabled,
             controlKind = QuickControlKind.CYCLE
         ),
         resolutionRow = QuickPanelRowRenderModel(
@@ -450,15 +460,15 @@ internal fun quickPanelSheetRenderModel(
         watermarkNextTemplateId = nextTemplateId,
         liveRow = QuickPanelRowRenderModel(
             title = text.get(R.string.button_quick_live),
-            value = live.value,
-            isEnabled = live.isInteractive,
+            value = liveValue,
+            isEnabled = liveEnabled,
             controlKind = QuickControlKind.TOGGLE,
-            isSelected = live.value.equals(text.onOff(true), ignoreCase = true)
+            isSelected = liveSelected
         ),
         timerRow = QuickPanelRowRenderModel(
             title = text.get(R.string.button_quick_timer),
-            value = timer.value,
-            isEnabled = timer.isInteractive,
+            value = countdownLabel,
+            isEnabled = timerEnabled,
             controlKind = QuickControlKind.CYCLE
         ),
         hasQuickUserAdjustments = false,
@@ -650,6 +660,20 @@ internal fun sessionCaptureOutputText(
             buildString {
                 append(strings.outputLivePrefix)
                 append('\n')
+                val hasLivePhotoFormat = presentation.latestPipelineNotes.any {
+                    it.startsWith("live-export:format=") || it.startsWith("live-motion:status=")
+                }
+                if (hasLivePhotoFormat) {
+                    val status = LivePhotoStatusProjection.project(
+                        pipelineNotes = presentation.latestPipelineNotes,
+                        bundle = livePhotoBundle,
+                        saveFormat = extractLiveSaveFormat(presentation.latestPipelineNotes)
+                    )
+                    LivePhotoStatusProjection.statusText(status)?.let { statusText ->
+                        append(statusText)
+                        append('\n')
+                    }
+                }
                 appendLiveAssetLine(
                     label = text.get(R.string.live_photo_asset_still),
                     path = livePhotoBundle.stillPath,
@@ -821,4 +845,10 @@ private fun Set<StillCaptureResolutionPreset>.stillResolutionPresetSummary(): St
 
 private fun List<StillCaptureOutputSize>.stillCaptureOutputSizeSummary(): String {
     return this.take(4).joinToString(separator = "/") { it.label }
+}
+
+private fun extractLiveSaveFormat(pipelineNotes: List<String>): LiveSaveFormat {
+    val line = pipelineNotes.firstOrNull { it.startsWith("live-export:format=") }
+    val key = line?.substringAfter("=")
+    return LiveSaveFormat.fromStorageKey(key) ?: LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG
 }

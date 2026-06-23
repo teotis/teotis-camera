@@ -45,6 +45,7 @@ sealed interface PersistedSettingsAction {
         PersistedSettingsAction
     data class UpdateDefaultVideoSpec(val videoSpec: VideoSpec) : PersistedSettingsAction
     data class UpdateVideoFilter(val filterProfileId: String) : PersistedSettingsAction
+    data class UpdateDocumentFilter(val filterProfileId: String) : PersistedSettingsAction
     data class UpdateColorLabSpec(val spec: ColorLabSpec) : PersistedSettingsAction
     data class UpdatePhotoStyleStrength(val strength: Float) : PersistedSettingsAction
     data class UpdatePhotoLowLightNightAssistEnabled(val enabled: Boolean) : PersistedSettingsAction
@@ -152,6 +153,10 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
             video = video.copy(defaultFilterProfileId = action.filterProfileId)
         )
 
+        is PersistedSettingsAction.UpdateDocumentFilter -> copy(
+            photo = photo.copy(defaultDocumentFilterProfileId = action.filterProfileId)
+        )
+
         is PersistedSettingsAction.UpdateColorLabSpec -> copy(
             photo = photo.copy(colorLabSpec = action.spec.normalized())
         )
@@ -173,6 +178,7 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
                         defaultFilterProfileId = defaults.photo.defaultFilterProfileId,
                         defaultHumanisticFilterProfileId = defaults.photo.defaultHumanisticFilterProfileId,
                         defaultPortraitFilterProfileId = defaults.photo.defaultPortraitFilterProfileId,
+                        defaultDocumentFilterProfileId = defaults.photo.defaultDocumentFilterProfileId,
                         defaultCheckInScenario = defaults.photo.defaultCheckInScenario,
                         styleStrength = defaults.photo.styleStrength,
                         colorLabSpec = defaults.photo.colorLabSpec
@@ -204,6 +210,10 @@ fun PhotoSettings.watermarkStyleFor(
         "blur-four-border" -> blurFourBorderWatermarkStyle
         "professional-bottom-bar" -> professionalBottomBarWatermarkStyle
         "night-street" -> nightStreetWatermarkStyle
+        "van-gogh-starry" -> nightStreetWatermarkStyle.copy(
+            textPlacement = WatermarkTextPlacement.BOTTOM_CENTER
+        )
+        "blue-hour" -> nightStreetWatermarkStyle
         else -> classicOverlayWatermarkStyle
     }
 }
@@ -239,6 +249,14 @@ private fun PhotoSettings.updateWatermarkStyle(
             professionalBottomBarWatermarkStyle = transform(professionalBottomBarWatermarkStyle)
         )
         "night-street" -> copy(
+            nightStreetWatermarkStyle = transform(nightStreetWatermarkStyle)
+        )
+        "van-gogh-starry" -> copy(
+            nightStreetWatermarkStyle = transform(
+                nightStreetWatermarkStyle.copy(textPlacement = WatermarkTextPlacement.BOTTOM_CENTER)
+            )
+        )
+        "blue-hour" -> copy(
             nightStreetWatermarkStyle = transform(nightStreetWatermarkStyle)
         )
         else -> copy(

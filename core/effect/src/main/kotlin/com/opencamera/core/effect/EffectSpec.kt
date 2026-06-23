@@ -7,6 +7,13 @@ import com.opencamera.core.settings.WatermarkStyleSettings
 
 enum class EffectTarget { PREVIEW, CAPTURE, BOTH }
 
+enum class DocumentColorMode(val tagValue: String) {
+    COLOR_NEUTRAL("color-neutral"),
+    COLOR_ENHANCED("color-enhanced"),
+    GRAYSCALE("grayscale"),
+    BLACK_AND_WHITE("black-and-white")
+}
+
 sealed interface EffectEntry {
     val target: EffectTarget
 }
@@ -43,6 +50,8 @@ data class PortraitEffect(
 data class DocumentEffect(
     val autoCrop: Boolean,
     val contrastProfile: String?,
+    val colorMode: DocumentColorMode? = null,
+    val scanGuide: Boolean = false,
     override val target: EffectTarget = EffectTarget.CAPTURE
 ) : EffectEntry
 

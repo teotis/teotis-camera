@@ -8,6 +8,7 @@ object PersistedSettingsSerializer {
     private const val KEY_PHOTO_FILTER = "photo.defaultFilterProfileId"
     private const val KEY_HUMANISTIC_FILTER = "photo.defaultHumanisticFilterProfileId"
     private const val KEY_PORTRAIT_FILTER = "photo.defaultPortraitFilterProfileId"
+    private const val KEY_DOCUMENT_FILTER = "photo.defaultDocumentFilterProfileId"
     private const val KEY_PORTRAIT_PROFILE = "photo.portrait.profile"
     private const val KEY_PORTRAIT_BEAUTY_PRESET = "photo.portrait.beautyPreset"
     private const val KEY_PORTRAIT_BEAUTY_STRENGTH = "photo.portrait.beautyStrength"
@@ -67,6 +68,7 @@ object PersistedSettingsSerializer {
             KEY_PHOTO_FILTER to settings.photo.defaultFilterProfileId,
             KEY_HUMANISTIC_FILTER to settings.photo.defaultHumanisticFilterProfileId,
             KEY_PORTRAIT_FILTER to settings.photo.defaultPortraitFilterProfileId,
+            KEY_DOCUMENT_FILTER to settings.photo.defaultDocumentFilterProfileId,
             KEY_PORTRAIT_PROFILE to settings.photo.portraitProfile.storageKey,
             KEY_PORTRAIT_BEAUTY_PRESET to settings.photo.portraitBeautyPreset.storageKey,
             KEY_PORTRAIT_BEAUTY_STRENGTH to settings.photo.portraitBeautyStrength.storageKey,
@@ -145,6 +147,9 @@ object PersistedSettingsSerializer {
                 defaultPortraitFilterProfileId = values[KEY_PORTRAIT_FILTER]
                     ?.takeIf { it.isNotBlank() }
                     ?: defaults.photo.defaultPortraitFilterProfileId,
+                defaultDocumentFilterProfileId = values[KEY_DOCUMENT_FILTER]
+                    ?.takeIf { it.isNotBlank() }
+                    ?: defaults.photo.defaultDocumentFilterProfileId,
                 portraitProfile = PortraitProfile.fromStorageKey(values[KEY_PORTRAIT_PROFILE])
                     ?: defaults.photo.portraitProfile,
                 portraitBeautyPreset = PortraitBeautyPreset.fromStorageKey(

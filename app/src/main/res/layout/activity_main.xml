@@ -5,6 +5,14 @@
     android:layout_height="match_parent"
     android:background="@color/oc_root_background">
 
+    <!-- Stable preview viewport baseline: preview bottom anchors here, bottomSheet floats above -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/previewBottomGuide"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.76" />
+
     <!-- Layer 1: Full-screen camera preview -->
     <!-- Layer 2: Lightweight top status -->
     <!-- Layer 3: Floating Focus utilities -->
@@ -18,7 +26,7 @@
         android:layout_height="0dp"
         android:layout_marginTop="-20dp"
         app:implementationMode="performance"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toBottomOf="@id/previewBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
@@ -31,7 +39,7 @@
         android:layout_marginTop="-20dp"
         android:clickable="false"
         android:focusable="false"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toBottomOf="@id/previewBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
@@ -138,7 +146,7 @@
         android:layout_marginEnd="@dimen/space_16"
         android:gravity="center"
         android:orientation="vertical"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toBottomOf="@id/previewBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
@@ -178,38 +186,81 @@
             android:text="@string/button_dev_entry" />
     </LinearLayout>
 
-    <!-- Document batch side rail (visible only in document mode with active batch) -->
+    <!-- Document batch side rail: compact vertical order control in shooting mode. -->
     <LinearLayout
         android:id="@+id/documentBatchRail"
-        android:layout_width="56dp"
-        android:layout_height="0dp"
-        android:layout_marginEnd="@dimen/space_8"
-        android:background="#40000000"
+        android:layout_width="104dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_8"
+        android:layout_marginTop="88dp"
+        android:background="@drawable/document_batch_rail_chip_bg"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingVertical="@dimen/space_4"
+        android:paddingHorizontal="6dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="@dimen/space_8"
         android:visibility="gone"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
-        app:layout_constraintEnd_toStartOf="@id/floatingUtilityGroup"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
-        <Button
-            android:id="@+id/documentBatchRailHeader"
-            style="@style/Widget.OpenCamera.RightRailButton"
+        <TextView
+            android:id="@+id/documentBatchRailChip"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="32dp"
-            android:textSize="11sp" />
+            android:background="#33FFFFFF"
+            android:gravity="center"
+            android:paddingHorizontal="4dp"
+            android:paddingVertical="3dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/documentBatchRailThumbnail"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginTop="4dp"
+            android:scaleType="centerCrop"
+            android:background="#20FFFFFF"
+            android:visibility="gone" />
 
         <LinearLayout
-            android:id="@+id/documentBatchRailList"
+            android:id="@+id/documentBatchRailItemList"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginTop="@dimen/space_4"
-            android:layout_weight="1"
-            android:clipToPadding="false"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:orientation="vertical"
-            android:gravity="center_horizontal" />
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/documentBatchRailMoveUpButton"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:layout_marginTop="6dp"
+            android:minHeight="0dp"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/documentBatchRailMoveDownButton"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:layout_marginTop="4dp"
+            android:minHeight="0dp"
+            android:textSize="10sp"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/documentBatchRailOverviewButton"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:layout_marginTop="6dp"
+            android:minHeight="0dp"
+            android:textSize="10sp"
+            android:visibility="gone" />
     </LinearLayout>
 
     <!-- Overlay: Quick Panel Sheet -->
@@ -441,10 +492,8 @@
                     android:id="@+id/settingsCommonSection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
-                    android:background="@drawable/bg_settings_card"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_16">
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -458,49 +507,26 @@
                         android:id="@+id/settingsCommonSummary"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="4dp"
                         android:textColor="@color/oc_text_secondary"
                         android:textSize="@dimen/text_size_control_value" />
 
-                    <Button
-                        android:id="@+id/buttonGridMode"
-                        style="@style/Widget.OpenCamera.SettingsButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
-
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonShutterSound"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_height="wrap_content" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonSelfieMirror"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonAppLanguage"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -508,9 +534,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_settings_card"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_16">
+                    android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -524,69 +548,44 @@
                         android:id="@+id/settingsPhotoSummary"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="4dp"
                         android:textColor="@color/oc_text_secondary"
                         android:textSize="@dimen/text_size_control_value" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonPhotoFilter"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_height="wrap_content" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonPhotoPortraitLab"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonPhotoWatermark"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonPhotoLive"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonPhotoLiveSaveFormat"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonPhotoTimer"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -594,9 +593,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="14dp"
-                    android:background="@drawable/bg_settings_card"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_16">
+                    android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
@@ -610,74 +607,45 @@
                         android:id="@+id/settingsVideoSummary"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="4dp"
                         android:textColor="@color/oc_text_secondary"
                         android:textSize="@dimen/text_size_control_value" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonVideoResolution"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_height="wrap_content" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonVideoFrameRate"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonVideoDynamicFps"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonVideoAudio"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
 
-                    <Button
+                    <include layout="@layout/settings_item_row"
                         android:id="@+id/buttonVideoFilter"
-                        style="@style/Widget.OpenCamera.SettingsButton"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="10dp"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="12dp"
-                        android:textAlignment="viewStart" />
+                        android:layout_marginTop="8dp" />
                 </LinearLayout>
-
-                <TextView
-                    android:id="@+id/settingsCatalogFooter"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="14dp"
-                    android:textColor="@color/oc_text_muted"
-                    android:textSize="@dimen/text_size_status" />
 
                 <TextView
                     android:id="@+id/settingsEditingHint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="10dp"
                     android:textColor="@color/oc_accent"
                     android:textSize="@dimen/text_size_status" />
             </LinearLayout>
@@ -1307,25 +1275,25 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Document batch organizer panel (compact floating sheet) -->
+    <!-- Document batch overview panel (dedicated overlay for reviewing all captured pages) -->
     <androidx.core.widget.NestedScrollView
         android:id="@+id/documentBatchOrganizerPanel"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
-        android:layout_marginBottom="@dimen/space_8"
         android:background="@drawable/bg_settings_panel"
         android:contentDescription="@string/document_batch_organizer_title"
         android:elevation="8dp"
         android:fillViewport="true"
-        android:maxHeight="180dp"
         android:padding="0dp"
         android:visibility="gone"
         app:layout_constrainedHeight="true"
-        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintBottom_toBottomOf="@id/previewBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/secondaryPanelBottomGuide">
+        app:layout_constraintTop_toBottomOf="@id/secondaryPanelBottomGuide"
+        app:layout_constraintHeight_default="percent"
+        app:layout_constraintHeight_percent="0.55">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -1370,12 +1338,59 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
+            <!-- Empty state hint (shown when no items) -->
+            <TextView
+                android:id="@+id/documentBatchOrganizerEmptyHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:text="@string/document_batch_empty_hint"
+                android:textColor="@color/oc_text_secondary"
+                android:textSize="@dimen/text_size_status"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:id="@+id/documentBatchOrganizerItemList"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:orientation="vertical" />
+
+            <!-- Footer actions row -->
+            <LinearLayout
+                android:id="@+id/documentBatchOrganizerFooter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <Button
+                    android:id="@+id/buttonDocumentBatchContinueShooting"
+                    style="@style/Widget.OpenCamera.PillButton"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="@string/button_document_batch_continue_shooting"
+                    android:textSize="11sp" />
+
+                <Button
+                    android:id="@+id/buttonDocumentBatchExport"
+                    style="@style/Widget.OpenCamera.PillButton"
+                    android:layout_width="0dp"
+                    android:layout_height="32dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="@string/button_document_batch_export"
+                    android:textSize="11sp" />
+            </LinearLayout>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
@@ -1383,9 +1398,10 @@
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/devConsolePanel"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginHorizontal="@dimen/panel_margin_horizontal"
         android:layout_marginTop="14dp"
+        android:minHeight="@dimen/dev_console_panel_min_height"
         android:visibility="gone"
         app:cardBackgroundColor="@color/oc_surface_panel"
         app:cardCornerRadius="@dimen/radius_panel_shell"
@@ -1393,6 +1409,7 @@
         app:layout_constrainedHeight="true"
         app:layout_constraintBottom_toTopOf="@id/secondaryPanelBottomGuide"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHeight_max="@dimen/dev_console_panel_max_height"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
@@ -1516,14 +1533,12 @@
                         android:textSize="@dimen/text_size_status" />
 
                     <!-- Content area -->
-                    <TextView
+                    <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/devConsoleContent"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                        android:layout_height="@dimen/dev_console_log_height"
                         android:layout_marginTop="8dp"
-                        android:fontFamily="monospace"
-                        android:textColor="@color/oc_text_secondary"
-                        android:textSize="@dimen/text_size_dev_log" />
+                        android:nestedScrollingEnabled="true" />
 
                     <!-- Storage info -->
                     <TextView
@@ -1571,21 +1586,39 @@
         </FrameLayout>
     </com.google.android.material.card.MaterialCardView>
 
-
-    <!-- Layer 3: Bottom control strip (three-segment cockpit) -->
-    <LinearLayout
-        android:id="@+id/bottomSheet"
+    <!-- Style rail overlay: floating card rail above bottom cockpit, outside bottomSheet to avoid measuring overhead.
+         Elevation 8dp places the rail above panelDismissScrim (7dp) so the rail cards remain
+         tappable when the scrim is visible under CockpitPanelRoute.StyleLab (ISSUE-002). -->
+    <FrameLayout
+        android:id="@+id/styleRailOverlay"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_bottom_panel"
-        android:orientation="vertical"
-        android:paddingStart="@dimen/bottom_cockpit_padding_horizontal"
-        android:paddingTop="0dp"
-        android:paddingEnd="@dimen/bottom_cockpit_padding_horizontal"
-        android:paddingBottom="@dimen/space_4"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="8dp"
+        android:layout_marginBottom="@dimen/style_rail_bottom_gap"
+        app:layout_constraintBottom_toTopOf="@id/floatingToolLayer"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent">
+
+        <com.opencamera.app.StylePresetCardRailView
+            android:id="@+id/stylePresetCardRail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@android:color/transparent"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- Floating tool layer: preview overlay controls kept above the bottom cockpit visual band. -->
+    <FrameLayout
+        android:id="@+id/floatingToolLayer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="@dimen/floating_tool_bottom_clearance"
+        android:elevation="8dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomSheet"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <!-- Filter strip: horizontal scrolling chips for filter-only modes. -->
         <HorizontalScrollView
@@ -1609,6 +1642,28 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
+        <!-- Runtime pro controls: compact manual parameter strip for Humanistic Professional mode. -->
+        <HorizontalScrollView
+            android:id="@+id/runtimeProControlsScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="44dp"
+            android:background="@color/oc_root_background"
+            android:clipToPadding="false"
+            android:fadeScrollbars="false"
+            android:paddingHorizontal="@dimen/space_12"
+            android:paddingVertical="@dimen/space_8"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/runtimeProControlsChips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
         <!-- Mode action: Pro (Humanistic) / Atmosphere-Clarity (Check-in). -->
         <Button
             android:id="@+id/buttonModeAction"
@@ -1619,21 +1674,53 @@
             android:layout_marginBottom="2dp"
             android:visibility="gone" />
 
-
-        <!-- Style preset card rail: horizontal scrolling cards above mode track -->
-        <com.opencamera.app.StylePresetCardRailView
-            android:id="@+id/stylePresetCardRail"
+        <!-- Recording elapsed indicator -->
+        <TextView
+            android:id="@+id/recordingIndicator"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="2dp"
-            android:background="@color/oc_root_background"
-            android:visibility="gone" />        <!-- Mode track: horizontal scrolling strip (first item in cockpit) -->
+            android:layout_marginTop="@dimen/space_2"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:textColor="@color/oc_accent"
+            android:textSize="@dimen/text_size_status"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- Layer 3: Bottom control strip (three-segment cockpit) -->
+    <LinearLayout
+        android:id="@+id/bottomSheet"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_bottom_panel"
+        android:orientation="vertical"
+        android:paddingStart="@dimen/bottom_cockpit_padding_horizontal"
+        android:paddingTop="0dp"
+        android:paddingEnd="@dimen/bottom_cockpit_padding_horizontal"
+        android:paddingBottom="@dimen/space_4"
+        android:layout_marginBottom="@dimen/bottom_cockpit_margin_bottom"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!-- Focal length slider: belongs to the bottom cockpit so it does not drift over preview. -->
+        <com.opencamera.app.FocalLengthSliderView
+            android:id="@+id/focalLengthSlider"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="@dimen/space_16"
+            android:layout_marginTop="@dimen/space_2"
+            android:visibility="gone" />
+
+        <!-- Mode track: horizontal scrolling strip under the zoom control. -->
         <HorizontalScrollView
             android:id="@+id/modeTrackScroll"
             android:layout_width="match_parent"
             android:layout_height="@dimen/mode_track_height"
             android:layout_marginTop="2dp"
             android:layout_marginBottom="2dp"
+            android:fillViewport="true"
             android:scrollbars="none"
             android:fadeScrollbars="false"
             android:clipToPadding="false"
@@ -1643,7 +1730,7 @@
 
             <LinearLayout
                 android:id="@+id/modeTrack"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
@@ -1651,42 +1738,63 @@
                 <Button
                     android:id="@+id/buttonPhotoMode"
                     style="@style/Widget.OpenCamera.ModeTrackButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:textSize="@dimen/text_size_mode_track_button"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="@string/button_photo_mode" />
 
                 <Button
                     android:id="@+id/buttonCheckInMode"
                     style="@style/Widget.OpenCamera.ModeTrackButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:textSize="@dimen/text_size_mode_track_button"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="@string/button_checkin_mode" />
 
                 <Button
                     android:id="@+id/buttonVideoMode"
                     style="@style/Widget.OpenCamera.ModeTrackButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:textSize="@dimen/text_size_mode_track_button"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="@string/button_video_mode" />
 
                 <Button
                     android:id="@+id/buttonDocumentMode"
                     style="@style/Widget.OpenCamera.ModeTrackButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:textSize="@dimen/text_size_mode_track_button"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="@string/button_document_mode" />
 
                 <Button
                     android:id="@+id/buttonHumanisticMode"
                     style="@style/Widget.OpenCamera.ModeTrackButton"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:minWidth="0dp"
+                    android:textSize="@dimen/text_size_mode_track_button"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="@string/button_humanistic_mode"
-                    android:visibility="gone" />
+                    android:visibility="visible" />
             </LinearLayout>
         </HorizontalScrollView>
 
@@ -1699,27 +1807,6 @@
             android:maxLines="1"
             android:text="@string/output_waiting"
             android:textColor="@color/oc_text_secondary"
-            android:textSize="@dimen/text_size_status"
-            android:visibility="gone" />
-
-        <!-- Focal length slider -->
-        <com.opencamera.app.FocalLengthSliderView
-            android:id="@+id/focalLengthSlider"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:layout_marginHorizontal="@dimen/space_16"
-            android:visibility="gone" />
-
-        <!-- Recording elapsed indicator -->
-        <TextView
-            android:id="@+id/recordingIndicator"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:fontFamily="monospace"
-            android:gravity="center"
-            android:textColor="@color/oc_accent"
             android:textSize="@dimen/text_size_status"
             android:visibility="gone" />
 
@@ -1737,9 +1824,10 @@
                 android:layout_width="@dimen/thumbnail_size"
                 android:layout_height="@dimen/thumbnail_size"
                 android:background="@drawable/bg_thumbnail"
-                android:contentDescription="@string/preview_thumbnail_content_description"
+                android:contentDescription="@string/preview_thumbnail_empty_content_description"
                 android:padding="2dp"
                 android:scaleType="centerCrop"
+                android:src="@drawable/ic_thumbnail_empty"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toStartOf="@id/buttonShutter"
                 app:layout_constraintHorizontal_bias="0"

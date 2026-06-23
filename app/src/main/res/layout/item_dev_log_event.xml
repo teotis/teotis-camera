@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/devLogEventText"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fontFamily="monospace"
+    android:textColor="@color/oc_text_secondary"
+    android:textSize="@dimen/text_size_dev_log"
+    android:paddingVertical="2dp"
+    android:textIsSelectable="true" />

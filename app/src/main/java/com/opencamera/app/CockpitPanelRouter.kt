@@ -1,5 +1,7 @@
 package com.opencamera.app
 
+import com.opencamera.core.session.DocumentWorkflowPhase
+
 internal data class CockpitPanelUiState(
     val route: CockpitPanelRoute = CockpitPanelRoute.None,
     val selectedSettingsTab: SettingsTab = SettingsTab.COMMON,
@@ -7,7 +9,11 @@ internal data class CockpitPanelUiState(
     val selectedFilterLabFamilyOverride: FilterLabFamily? = null,
     val isFilterAdjustmentVisible: Boolean = false,
     val filterAdjustmentMode: FilterAdjustmentMode = FilterAdjustmentMode.LIGHT,
-    val isDocumentBatchOrganizerDismissed: Boolean = false
+    val isDocumentBatchOrganizerDismissed: Boolean = false,
+    /** ID of the batch item currently being crop-edited. */
+    val selectedCropEditItemId: String? = null,
+    /** Current export state, non-null when export route is active. */
+    val exportState: ExportState? = null
 )
 
 internal sealed class CockpitPanelCommand {
@@ -33,6 +39,18 @@ internal sealed class CockpitPanelCommand {
     data class SelectCheckInStyle(val styleId: String) : CockpitPanelCommand()
     data object ToggleDocumentBatchOrganizer : CockpitPanelCommand()
     data object CloseDocumentBatchOrganizer : CockpitPanelCommand()
+    data object NavigateToCropEdit : CockpitPanelCommand()
+    data object NavigateToExport : CockpitPanelCommand()
+    data object NavigateToBatchOverview : CockpitPanelCommand()
+    data object CloseBatchOverview : CockpitPanelCommand()
+    data object CloseCropEdit : CockpitPanelCommand()
+    data class SelectCropEditItem(val itemId: String) : CockpitPanelCommand()
+    data object StartExport : CockpitPanelCommand()
+    data class UpdateExportProgress(val currentPage: Int, val totalPages: Int) : CockpitPanelCommand()
+    data object CompleteExport : CockpitPanelCommand()
+    data object FailExport : CockpitPanelCommand()
+    data object CloseExport : CockpitPanelCommand()
+    data object ReturnToShooting : CockpitPanelCommand()
     data object DocumentBatchCaptureTriggered : CockpitPanelCommand()
     data object AndroidBack : CockpitPanelCommand()
 }
@@ -49,6 +67,13 @@ internal class CockpitPanelRouter(
     }
 }
 
+internal fun workflowPhaseToRoute(phase: DocumentWorkflowPhase): CockpitPanelRoute = when (phase) {
+    DocumentWorkflowPhase.Shooting -> CockpitPanelRoute.None
+    DocumentWorkflowPhase.BatchOverview -> CockpitPanelRoute.BatchOverview
+    DocumentWorkflowPhase.CropEdit -> CockpitPanelRoute.CropEdit
+    DocumentWorkflowPhase.Export -> CockpitPanelRoute.Export
+}
+
 internal fun nextState(
     current: CockpitPanelUiState,
     command: CockpitPanelCommand
@@ -57,6 +82,7 @@ internal fun nextState(
     return when (command) {
         is CockpitPanelCommand.DismissAll -> defaultState.copy(
             isDocumentBatchOrganizerDismissed = current.route is CockpitPanelRoute.DocumentBatchOrganizer ||
+                current.route is CockpitPanelRoute.BatchOverview ||
                 current.isDocumentBatchOrganizerDismissed
         )
 
@@ -223,7 +249,8 @@ internal fun nextState(
         }
 
         is CockpitPanelCommand.ToggleDocumentBatchOrganizer -> {
-            if (current.route is CockpitPanelRoute.DocumentBatchOrganizer) {
+            if (current.route is CockpitPanelRoute.DocumentBatchOrganizer ||
+                current.route is CockpitPanelRoute.BatchOverview) {
                 current.copy(
                     route = CockpitPanelRoute.None,
                     isDocumentBatchOrganizerDismissed = true
@@ -231,12 +258,13 @@ internal fun nextState(
             } else if (current.isDocumentBatchOrganizerDismissed) {
                 current
             } else {
-                current.copy(route = CockpitPanelRoute.DocumentBatchOrganizer)
+                current.copy(route = CockpitPanelRoute.BatchOverview)
             }
         }
 
         is CockpitPanelCommand.CloseDocumentBatchOrganizer -> {
-            if (current.route is CockpitPanelRoute.DocumentBatchOrganizer) {
+            if (current.route is CockpitPanelRoute.DocumentBatchOrganizer ||
+                current.route is CockpitPanelRoute.BatchOverview) {
                 current.copy(
                     route = CockpitPanelRoute.None,
                     isDocumentBatchOrganizerDismissed = true
@@ -244,6 +272,82 @@ internal fun nextState(
             } else {
                 current
             }
+        }
+
+        is CockpitPanelCommand.NavigateToCropEdit -> {
+            current.copy(route = CockpitPanelRoute.CropEdit)
+        }
+
+        is CockpitPanelCommand.NavigateToExport -> {
+            current.copy(route = CockpitPanelRoute.Export)
+        }
+
+        is CockpitPanelCommand.NavigateToBatchOverview -> {
+            current.copy(
+                route = CockpitPanelRoute.BatchOverview,
+                isDocumentBatchOrganizerDismissed = false,
+                selectedCropEditItemId = null
+            )
+        }
+
+        is CockpitPanelCommand.CloseBatchOverview -> {
+            current.copy(
+                route = CockpitPanelRoute.None,
+                isDocumentBatchOrganizerDismissed = false,
+                selectedCropEditItemId = null
+            )
+        }
+
+        is CockpitPanelCommand.CloseCropEdit -> {
+            current.copy(
+                route = CockpitPanelRoute.BatchOverview,
+                selectedCropEditItemId = null
+            )
+        }
+
+        is CockpitPanelCommand.SelectCropEditItem -> {
+            current.copy(selectedCropEditItemId = command.itemId)
+        }
+
+        is CockpitPanelCommand.StartExport -> {
+            current.copy(
+                route = CockpitPanelRoute.Export,
+                exportState = ExportState.InProgress(currentPage = 0, totalPages = 0)
+            )
+        }
+
+        is CockpitPanelCommand.UpdateExportProgress -> {
+            current.copy(
+                exportState = ExportState.InProgress(
+                    currentPage = command.currentPage,
+                    totalPages = command.totalPages
+                )
+            )
+        }
+
+        is CockpitPanelCommand.CompleteExport -> {
+            val totalPages = (current.exportState as? ExportState.InProgress)?.totalPages ?: 0
+            current.copy(exportState = ExportState.Success(totalPages))
+        }
+
+        is CockpitPanelCommand.FailExport -> {
+            current.copy(exportState = ExportState.Failed(errorMessage = "导出失败"))
+        }
+
+        is CockpitPanelCommand.CloseExport -> {
+            current.copy(
+                route = CockpitPanelRoute.BatchOverview,
+                exportState = null,
+                selectedCropEditItemId = null
+            )
+        }
+
+        is CockpitPanelCommand.ReturnToShooting -> {
+            current.copy(
+                route = CockpitPanelRoute.None,
+                exportState = null,
+                isDocumentBatchOrganizerDismissed = true
+            )
         }
 
         is CockpitPanelCommand.DocumentBatchCaptureTriggered -> {
@@ -291,6 +395,21 @@ internal fun nextState(
                         route = CockpitPanelRoute.None,
                         isDocumentBatchOrganizerDismissed = current.route is CockpitPanelRoute.DocumentBatchOrganizer ||
                             current.isDocumentBatchOrganizerDismissed
+                    )
+                }
+                is CockpitPanelRoute.BatchOverview -> {
+                    current.copy(route = CockpitPanelRoute.None)
+                }
+                is CockpitPanelRoute.CropEdit -> {
+                    current.copy(
+                        route = CockpitPanelRoute.BatchOverview,
+                        selectedCropEditItemId = null
+                    )
+                }
+                is CockpitPanelRoute.Export -> {
+                    current.copy(
+                        route = CockpitPanelRoute.BatchOverview,
+                        exportState = null
                     )
                 }
             }

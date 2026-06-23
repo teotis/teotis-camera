@@ -226,6 +226,7 @@ class SessionSettingsManager(
             FilterLabFamily.PORTRAIT ->
                 PersistedSettingsAction.UpdatePortraitFilter(filterProfileId)
             FilterLabFamily.VIDEO -> PersistedSettingsAction.UpdateVideoFilter(filterProfileId)
+            FilterLabFamily.DOCUMENT -> PersistedSettingsAction.UpdateDocumentFilter(filterProfileId)
         }
     }
 }

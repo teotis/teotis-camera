@@ -35,6 +35,7 @@ class DocumentBatchRailRenderModelTest {
             R.string.document_batch_crop_applied -> "Cropped"
             R.string.document_batch_crop_skipped -> "Not cropped"
             R.string.document_batch_crop_failed -> "Crop failed"
+            R.string.document_batch_rail_overview_description -> "查看批次"
             else -> super.get(resId)
         }
 
@@ -181,6 +182,32 @@ class DocumentBatchRailRenderModelTest {
     }
 
     @Test
+    fun `rail items expose vertical reorder affordances`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(
+                batchItem("item-1", 0),
+                batchItem("item-2", 1),
+                batchItem("item-3", 2)
+            ),
+            latestItemId = "item-2"
+        )
+        val state = sessionState(ModeId.DOCUMENT, batchState)
+
+        val model = documentBatchRailRenderModel(state, text, CockpitPanelRoute.None)
+
+        assertFalse(model.items[0].canMoveUp)
+        assertTrue(model.items[0].canMoveDown)
+        assertTrue(model.items[1].canMoveUp)
+        assertTrue(model.items[1].canMoveDown)
+        assertTrue(model.items[2].canMoveUp)
+        assertFalse(model.items[2].canMoveDown)
+        assertEquals("Move up", model.moveUpLabel)
+        assertEquals("Move down", model.moveDownLabel)
+    }
+
+    @Test
     fun `crop status labels match text resolver`() {
         val batchState = DocumentBatchState(
             batchId = "batch-1",
@@ -250,6 +277,60 @@ class DocumentBatchRailRenderModelTest {
         val model = documentBatchRailRenderModel(state, text)
 
         assertFalse(model.visible, "Finished batch should be hidden")
+    }
+
+    @Test
+    fun `shooting mode shows slim rail with count and latest thumbnail`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(
+                batchItem("item-1", 0, renderUri = "/images/item-1.jpg"),
+                batchItem("item-2", 1, renderUri = "/images/item-2.jpg")
+            ),
+            latestItemId = "item-2"
+        )
+        val state = sessionState(ModeId.DOCUMENT, batchState)
+
+        val model = documentBatchRailRenderModel(state, text, CockpitPanelRoute.None)
+
+        assertTrue(model.visible)
+        assertTrue(model.isSlimShooting)
+        assertEquals("2 pages", model.countText)
+        assertEquals("/images/item-2.jpg", model.latestThumbnailUri)
+        assertEquals("查看批次", model.overviewLabel)
+    }
+
+    @Test
+    fun `non-shooting mode hides rail`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(batchItem("item-1", 0))
+        )
+        val state = sessionState(ModeId.DOCUMENT, batchState)
+
+        val model = documentBatchRailRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertFalse(model.visible, "Rail should be hidden when a panel is open")
+        assertFalse(model.isSlimShooting)
+    }
+
+    @Test
+    fun `shooting mode with no latest item still visible`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(batchItem("item-1", 0, renderUri = null)),
+            latestItemId = null
+        )
+        val state = sessionState(ModeId.DOCUMENT, batchState)
+
+        val model = documentBatchRailRenderModel(state, text, CockpitPanelRoute.None)
+
+        assertTrue(model.visible)
+        assertTrue(model.isSlimShooting)
+        assertNull(model.latestThumbnailUri)
     }
 
     private fun sessionState(mode: ModeId, batchState: DocumentBatchState): SessionState {

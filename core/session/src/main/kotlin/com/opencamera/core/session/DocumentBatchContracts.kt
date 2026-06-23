@@ -31,6 +31,34 @@ enum class DocumentBatchStatus {
     FINISHED
 }
 
+/**
+ * Four-phase workflow state for document mode.
+ *
+ * - [Shooting]: Camera active, user captures pages.
+ * - [BatchOverview]: Overview of all captured pages with reorder/remove.
+ * - [CropEdit]: Individual page crop editing.
+ * - [Export]: Batch export in progress.
+ */
+enum class DocumentWorkflowPhase {
+    Shooting,
+    BatchOverview,
+    CropEdit,
+    Export
+}
+
+fun DocumentWorkflowPhase.toBatchStatus(): DocumentBatchStatus = when (this) {
+    DocumentWorkflowPhase.Shooting -> DocumentBatchStatus.ACTIVE
+    DocumentWorkflowPhase.BatchOverview -> DocumentBatchStatus.ACTIVE
+    DocumentWorkflowPhase.CropEdit -> DocumentBatchStatus.ACTIVE
+    DocumentWorkflowPhase.Export -> DocumentBatchStatus.FINISHED
+}
+
+fun DocumentBatchStatus.toWorkflowPhase(): DocumentWorkflowPhase = when (this) {
+    DocumentBatchStatus.INACTIVE -> DocumentWorkflowPhase.Shooting
+    DocumentBatchStatus.ACTIVE -> DocumentWorkflowPhase.Shooting
+    DocumentBatchStatus.FINISHED -> DocumentWorkflowPhase.Export
+}
+
 data class DocumentBatchItem(
     val itemId: String,
     val shotId: String,
@@ -41,15 +69,30 @@ data class DocumentBatchItem(
     val profileId: String?,
     val scanMode: String?,
     val cropStatus: DocumentBatchCropStatus,
-    val pipelineNotes: List<String>
+    val pipelineNotes: List<String>,
+    /** Manual crop rect in normalized 0..1 coords relative to the image (left, top, right, bottom). Null = no manual crop applied. */
+    val manualCropRect: CropRect? = null,
+    /** Whether the crop rect was manually adjusted by the user. */
+    val isManuallyCropped: Boolean = false
 )
 
 enum class DocumentBatchCropStatus {
     NOT_REQUESTED,
     APPLIED,
     SKIPPED,
-    FAILED
+    FAILED,
+    APPLIED_MANUAL
 }
+
+/**
+ * Normalized crop rectangle in 0..1 coordinates relative to the image bounds.
+ */
+data class CropRect(
+    val left: Float = 0f,
+    val top: Float = 0f,
+    val right: Float = 1f,
+    val bottom: Float = 1f
+)
 
 fun DocumentBatchState.removeItem(itemId: String): DocumentBatchState {
     val newItems = items
@@ -59,6 +102,24 @@ fun DocumentBatchState.removeItem(itemId: String): DocumentBatchState {
         items = newItems,
         latestItemId = newItems.lastOrNull()?.itemId,
         lastMessage = "Item removed"
+    )
+}
+
+fun DocumentBatchState.updateItemCropStatus(
+    itemId: String,
+    cropStatus: DocumentBatchCropStatus,
+    cropRect: CropRect? = null
+): DocumentBatchState {
+    val newItems = items.map { item ->
+        if (item.itemId == itemId) item.copy(
+            cropStatus = cropStatus,
+            manualCropRect = cropRect,
+            isManuallyCropped = cropStatus == DocumentBatchCropStatus.APPLIED_MANUAL
+        ) else item
+    }
+    return copy(
+        items = newItems,
+        lastMessage = "Crop status updated for $itemId"
     )
 }
 

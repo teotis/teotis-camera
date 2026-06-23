@@ -16,6 +16,16 @@ enum class WatermarkPreviewShape {
     BOTTOM_BAR
 }
 
+enum class WatermarkPreviewDecoration {
+    NONE,
+    TRAVEL_MAP,
+    ARCHIVAL_PAPER,
+    NIGHT_MEMORY,
+    STARRY_MOON,
+    BLUE_HOUR,
+    IMPRESSION_CHROMA
+}
+
 data class PreviewEffectRenderModel(
     val filterOverlay: FilterOverlaySpec?,
     val watermarkHint: WatermarkHintSpec?,
@@ -43,12 +53,46 @@ data class SubjectMaskPreviewDescriptor(
     }
 }
 
+/**
+ * Overlay spec for the preview filter surface.
+ *
+ * [colorMatrix] carries the non-identity 4x5 color matrix produced by
+ * [PreviewColorTransform]. When non-null, downstream overlay views must apply
+ * it via [android.graphics.ColorMatrixColorFilter] so non-tint transforms
+ * (black-and-white, warmth, coolness, contrast) reach the preview surface
+ * instead of being silently dropped when [tintAlpha] is zero.
+ */
 data class FilterOverlaySpec(
     val tintColor: Int,
     val tintAlpha: Float,
     val vignetteStrength: Float,
-    val warmthShift: Float
-)
+    val warmthShift: Float,
+    val colorMatrix: FloatArray? = null
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is FilterOverlaySpec) return false
+        if (tintColor != other.tintColor) return false
+        if (tintAlpha != other.tintAlpha) return false
+        if (vignetteStrength != other.vignetteStrength) return false
+        if (warmthShift != other.warmthShift) return false
+        return when {
+            colorMatrix == null && other.colorMatrix == null -> true
+            colorMatrix != null && other.colorMatrix != null ->
+                colorMatrix.contentEquals(other.colorMatrix)
+            else -> false
+        }
+    }
+
+    override fun hashCode(): Int {
+        var result = tintColor
+        result = 31 * result + tintAlpha.hashCode()
+        result = 31 * result + vignetteStrength.hashCode()
+        result = 31 * result + warmthShift.hashCode()
+        result = 31 * result + (colorMatrix?.contentHashCode() ?: 0)
+        return result
+    }
+}
 
 data class WatermarkHintSpec(
     val templateId: String,
@@ -58,7 +102,8 @@ data class WatermarkHintSpec(
     val shape: WatermarkPreviewShape = WatermarkPreviewShape.BACKED_TEXT,
     val textScale: Float = 1f,
     val previewLabels: List<String> = emptyList(),
-    val barBackground: Int = 0
+    val barBackground: Int = 0,
+    val decoration: WatermarkPreviewDecoration = WatermarkPreviewDecoration.NONE
 )
 
 data class FrameGuidelineSpec(

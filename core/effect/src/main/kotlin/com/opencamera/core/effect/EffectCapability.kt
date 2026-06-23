@@ -69,7 +69,12 @@ class EffectCapabilityResolver(
         return if (capabilities.supportsDocumentGeometry()) {
             EffectCapabilityResult(entry, EffectSupport.SUPPORTED)
         } else {
-            val degraded = entry.copy(autoCrop = false, contrastProfile = null)
+            val degraded = entry.copy(
+                autoCrop = false,
+                contrastProfile = null,
+                colorMode = null,
+                scanGuide = false
+            )
             EffectCapabilityResult(
                 degraded,
                 EffectSupport.DEGRADED,

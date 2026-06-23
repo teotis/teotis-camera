@@ -31,19 +31,71 @@ data class StylePresetPreview(
     val warmthDirection: PreviewWarmth,
     val vignetteStrength: Float,
     val grainStrength: Float,
-    val derivedMoodLabel: String
+    val moodDescriptor: StyleMoodDescriptor,
+    val rawSaturation: Float = 1f,
+    val rawContrast: Float = 1f,
+    val rawBrightnessShift: Int = 0,
+    val rawWarmthShift: Int = 0
 )
 
-enum class PreviewTier(val label: String) {
-    LOW("Soft"),
-    NEUTRAL("Neutral"),
-    HIGH("Punchy")
+/**
+ * Structured mood descriptor derived from [FilterRenderSpec].
+ * Carries boolean flags for each mood dimension; the display layer
+ * resolves these to localized strings via [AppTextResolver.styleCardMoodLabel].
+ */
+data class StyleMoodDescriptor(
+    val isBw: Boolean = false,
+    val isMonochrome: Boolean = false,
+    val isVivid: Boolean = false,
+    val isMuted: Boolean = false,
+    val isPunchy: Boolean = false,
+    val isSoft: Boolean = false,
+    val isWarm: Boolean = false,
+    val isCool: Boolean = false,
+    val isFilm: Boolean = false,
+    val isNatural: Boolean = false
+) {
+    /** Ordered list of non-default flag names for diagnostic logging. */
+    fun activeFlags(): List<String> = buildList {
+        if (isBw) add("bw")
+        if (isMonochrome) add("monochrome")
+        if (isVivid) add("vivid")
+        if (isMuted) add("muted")
+        if (isPunchy) add("punchy")
+        if (isSoft) add("soft")
+        if (isWarm) add("warm")
+        if (isCool) add("cool")
+        if (isFilm) add("film")
+        if (isNatural) add("natural")
+    }
+
+    /** Legacy English label for backward-compat tests only. */
+    fun legacyLabel(): String {
+        if (isBw) return "B&W"
+        if (isMonochrome) return "Monochrome"
+        val parts = mutableListOf<String>()
+        if (isVivid) parts.add("Vivid")
+        if (isMuted) parts.add("Muted")
+        if (isPunchy) parts.add("Punchy")
+        if (isSoft) parts.add("Soft")
+        if (isWarm) parts.add("Warm")
+        if (isCool) parts.add("Cool")
+        if (isFilm) parts.add("Film")
+        if (parts.isEmpty() || isNatural) return "Natural"
+        return parts.joinToString(" ")
+    }
 }
 
-enum class PreviewWarmth(val label: String) {
-    COOL("Cool"),
-    NEUTRAL("Neutral"),
-    WARM("Warm")
+enum class PreviewTier {
+    LOW,
+    NEUTRAL,
+    HIGH
+}
+
+enum class PreviewWarmth {
+    COOL,
+    NEUTRAL,
+    WARM
 }
 
 /**
@@ -86,6 +138,12 @@ enum class StylePresetFamily(
         modeKey = "video",
         label = "Video",
         selectionField = SelectionField.VIDEO_FILTER
+    ),
+    DOCUMENT(
+        profileCategory = FilterProfileCategory.DOCUMENT,
+        modeKey = "document",
+        label = "Document",
+        selectionField = SelectionField.DOCUMENT_FILTER
     )
 }
 
@@ -93,7 +151,8 @@ enum class SelectionField {
     PHOTO_FILTER,
     HUMANISTIC_FILTER,
     PORTRAIT_FILTER,
-    VIDEO_FILTER
+    VIDEO_FILTER,
+    DOCUMENT_FILTER
 }
 
 fun StylePresetFamily.resolveSelectedProfileId(settings: PersistedSettings): String {
@@ -102,6 +161,7 @@ fun StylePresetFamily.resolveSelectedProfileId(settings: PersistedSettings): Str
         SelectionField.HUMANISTIC_FILTER -> settings.photo.defaultHumanisticFilterProfileId
         SelectionField.PORTRAIT_FILTER -> settings.photo.defaultPortraitFilterProfileId
         SelectionField.VIDEO_FILTER -> settings.video.defaultFilterProfileId
+        SelectionField.DOCUMENT_FILTER -> settings.photo.defaultDocumentFilterProfileId
     }
 }
 
@@ -111,6 +171,7 @@ fun StylePresetFamily.createApplyAction(profileId: String): PersistedSettingsAct
         SelectionField.HUMANISTIC_FILTER -> PersistedSettingsAction.UpdateHumanisticFilter(profileId)
         SelectionField.PORTRAIT_FILTER -> PersistedSettingsAction.UpdatePortraitFilter(profileId)
         SelectionField.VIDEO_FILTER -> PersistedSettingsAction.UpdateVideoFilter(profileId)
+        SelectionField.DOCUMENT_FILTER -> PersistedSettingsAction.UpdateDocumentFilter(profileId)
     }
 }
 
@@ -135,7 +196,7 @@ fun FilterRenderSpec.toStylePresetPreview(): StylePresetPreview {
         warmthShift <= -2 || coolBoost > 0.1f -> PreviewWarmth.COOL
         else -> PreviewWarmth.NEUTRAL
     }
-    val moodLabel = deriveMoodLabel(
+    val moodDescriptor = deriveMoodDescriptor(
         monochromeLevel = monochromeLevel,
         saturation = saturation,
         contrast = contrast,
@@ -149,34 +210,49 @@ fun FilterRenderSpec.toStylePresetPreview(): StylePresetPreview {
         warmthDirection = warmthDirection,
         vignetteStrength = vignetteStrength.coerceIn(0f, 1f),
         grainStrength = grainStrength.coerceIn(0f, 1f),
-        derivedMoodLabel = moodLabel
+        moodDescriptor = moodDescriptor,
+        rawSaturation = saturation,
+        rawContrast = contrast,
+        rawBrightnessShift = brightnessShift,
+        rawWarmthShift = warmthShift
     )
 }
 
-private fun deriveMoodLabel(
+private fun deriveMoodDescriptor(
     monochromeLevel: Float,
     saturation: Float,
     contrast: Float,
     warmthDirection: PreviewWarmth,
     grainStrength: Float
-): String {
-    if (saturation <= 0.12f) return "B&W"
-    if (monochromeLevel >= 0.65f) return "Monochrome"
-    val parts = mutableListOf<String>()
+): StyleMoodDescriptor {
+    if (saturation <= 0.12f) return StyleMoodDescriptor(isBw = true)
+    if (monochromeLevel >= 0.65f) return StyleMoodDescriptor(isMonochrome = true)
+    var vivid = false; var muted = false
+    var punchy = false; var soft = false
+    var warm = false; var cool = false
     when {
-        saturation >= 1.12f -> parts.add("Vivid")
-        saturation <= 0.84f -> parts.add("Muted")
+        saturation >= 1.12f -> vivid = true
+        saturation <= 0.84f -> muted = true
     }
     when {
-        contrast >= 1.15f -> parts.add("Punchy")
-        contrast <= 0.96f -> parts.add("Soft")
+        contrast >= 1.15f -> punchy = true
+        contrast <= 0.96f -> soft = true
     }
     when (warmthDirection) {
-        PreviewWarmth.WARM -> parts.add("Warm")
-        PreviewWarmth.COOL -> parts.add("Cool")
+        PreviewWarmth.WARM -> warm = true
+        PreviewWarmth.COOL -> cool = true
         PreviewWarmth.NEUTRAL -> {}
     }
-    if (grainStrength >= 0.06f) parts.add("Film")
-    if (parts.isEmpty()) return "Natural"
-    return parts.joinToString(" ")
+    val film = grainStrength >= 0.06f
+    val isNatural = !vivid && !muted && !punchy && !soft && !warm && !cool && !film
+    return StyleMoodDescriptor(
+        isVivid = vivid,
+        isMuted = muted,
+        isPunchy = punchy,
+        isSoft = soft,
+        isWarm = warm,
+        isCool = cool,
+        isFilm = film,
+        isNatural = isNatural
+    )
 }

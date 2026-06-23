@@ -4,6 +4,7 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.DocumentEffect
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
@@ -174,6 +175,68 @@ class SessionPreviewRenderModelTest {
         normalizedX = 0.5f,
         normalizedY = 0.3f,
         status = status
+    )
+
+    // --- scan guide tests ---
+
+    @Test
+    fun `scan guide present for DOCUMENT mode when scanGuide is true`() {
+        val state = documentModeState(scanGuide = true)
+        val model = previewOverlayRenderModel(state)
+        val guide = assertNotNull(model.scanGuide)
+        assertTrue(guide.isVisible)
+        assertEquals("对准文档", guide.label)
+        assertNull(model.frame)
+        assertTrue(model.isVisible)
+    }
+
+    @Test
+    fun `scan guide absent for DOCUMENT mode when scanGuide is false`() {
+        val state = documentModeState(scanGuide = false)
+        val model = previewOverlayRenderModel(state)
+        assertNull(model.scanGuide)
+        assertNull(model.frame)
+        assertFalse(model.isVisible)
+    }
+
+    @Test
+    fun `scan guide absent when FrameEffect is present alongside DOCUMENT scanGuide`() {
+        val state = documentModeState(scanGuide = true).copy(
+            activeEffectSpec = EffectSpec(listOf(
+                DocumentEffect(autoCrop = true, contrastProfile = "receipt", scanGuide = true),
+                FrameEffect(FrameRatio.RATIO_4_3)
+            ))
+        )
+        val model = previewOverlayRenderModel(state)
+        assertNull(model.scanGuide)
+        assertNotNull(model.frame)
+    }
+
+    private fun documentModeState(scanGuide: Boolean) = SessionState(
+        lifecycle = SessionLifecycle.RUNNING,
+        permissionState = PermissionState(cameraGranted = true, microphoneGranted = true),
+        previewHostAvailable = true,
+        previewStatus = PreviewStatus.ACTIVE,
+        previewStatusDetail = null,
+        activeMode = ModeId.DOCUMENT,
+        availableModes = listOf(ModeId.PHOTO, ModeId.DOCUMENT, ModeId.VIDEO),
+        captureStatus = CaptureStatus.IDLE,
+        recordingStatus = RecordingStatus.IDLE,
+        activeShot = null,
+        modeSnapshot = ModeSnapshot(
+            id = ModeId.DOCUMENT,
+            uiSpec = ModeUiSpec(title = "DOCUMENT", shutterLabel = "Scan"),
+            state = ModeState(headline = "Document mode", detail = "Ready")
+        ),
+        activeDeviceCapabilities = DeviceCapabilities.DEFAULT,
+        activeDeviceGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK,
+            enablePreviewSnapshots = true
+        ),
+        previewMetrics = PreviewMetrics(),
+        activeEffectSpec = EffectSpec(listOf(
+            DocumentEffect(autoCrop = true, contrastProfile = "receipt", scanGuide = scanGuide)
+        ))
     )
 
     private fun defaultSessionState(): SessionState {

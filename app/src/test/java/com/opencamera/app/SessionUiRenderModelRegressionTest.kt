@@ -3,6 +3,7 @@ package com.opencamera.app
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.effect.EffectSpec
+import com.opencamera.core.effect.DocumentEffect
 import com.opencamera.core.effect.FrameEffect
 import com.opencamera.core.device.LensFacing
 import com.opencamera.core.device.StillCaptureOutputSize
@@ -40,6 +41,7 @@ import com.opencamera.core.settings.VideoFrameRate
 import com.opencamera.core.settings.VideoResolution
 import com.opencamera.core.settings.VideoSettings
 import com.opencamera.core.settings.VideoSpec
+import com.opencamera.core.settings.StylePresetPreview
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -433,6 +435,172 @@ class SessionUiRenderModelRegressionTest {
         assertEquals("Switch to Front", model.bottomCockpit.lensButtonLabel)
         assertTrue(model.bottomCockpit.isShutterEnabled)
         assertTrue(model.zoomStrip.isVisible)
+    }
+
+    // ── Cross-package integration tests (06-interaction-regression) ──────
+
+    @Test
+    fun `style entry → rail visible → card click flips selection`() {
+        val state = defaultPhotoState()
+        // Step 1: verify style entry is visible in PHOTO mode
+        val cockpitModel = cameraCockpitRenderModel(state, TestAppTextResolver(), strings)
+        assertTrue(cockpitModel.isStyleEntryVisible,
+            "Style entry should be visible in PHOTO mode")
+
+        // Step 2: verify rail is populated with cards
+        val styleModel = filterLabPageRenderModel(
+            state, TestAppTextResolver(),
+            selectedFamily = FilterLabFamily.PHOTO,
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+        val rail = styleModel.stylePresetCardRail!!
+        assertTrue(rail.cards.isNotEmpty(), "Style rail should have cards")
+        assertTrue(rail.isEnabled, "Style rail should be enabled")
+
+        // Step 3: verify card selection state and apply action exist
+        val selectedCards = rail.cards.filter { it.isSelected }
+        val unselectedCards = rail.cards.filter { !it.isSelected }
+        assertTrue(selectedCards.size + unselectedCards.size == rail.cards.size,
+            "Every card is either selected or unselected")
+        assertTrue(unselectedCards.isNotEmpty(), "Some cards should not be selected")
+        unselectedCards.forEach { card ->
+            assertNotNull(card.applyAction, "Unselected card must have an apply action")
+            assertTrue(card.isEnabled, "Unselected card should be enabled")
+        }
+    }
+
+    @Test
+    fun `document mode shows style entry and ToggleStyleLab opens document presets`() {
+        val docState = defaultPhotoState().copy(activeMode = ModeId.DOCUMENT)
+
+        // Step 1: style entry should be visible so document color presets are reachable.
+        val cockpitModel = cameraCockpitRenderModel(docState, TestAppTextResolver(), strings)
+        assertTrue(cockpitModel.isStyleEntryVisible,
+            "Style entry should be visible in DOCUMENT mode")
+
+        // Step 2: ToggleStyleLab should toggle the shared style panel route.
+        val initial = CockpitPanelUiState()
+        val toggled = nextState(initial, CockpitPanelCommand.ToggleStyleLab)
+        assertEquals(CockpitPanelRoute.StyleLab, toggled.route,
+            "ToggleStyleLab should open StyleLab for document presets")
+        val toggledBack = nextState(toggled, CockpitPanelCommand.ToggleStyleLab)
+        assertEquals(CockpitPanelRoute.None, toggledBack.route,
+            "Second ToggleStyleLab closes the panel")
+    }
+
+    @Test
+    fun `zh locale cards have Chinese title and mood label with non-empty preview`() {
+        val state = defaultPhotoState()
+        val model = filterLabPageRenderModel(
+            state, TestAppTextResolver(),
+            selectedFamily = FilterLabFamily.PHOTO,
+            panelRole = StyleAndColorLabRole.STYLE
+        )
+        val rail = model.stylePresetCardRail!!
+        assertTrue(rail.cards.isNotEmpty(), "Rail should have cards for zh locale check")
+
+        for (card in rail.cards) {
+            // Title must be non-blank
+            assertTrue(card.title.isNotBlank(),
+                "Card ${card.profileId} title must not be blank")
+            // Mood label must be non-blank
+            assertTrue(card.moodLabel.isNotBlank(),
+                "Card ${card.profileId} mood label must not be blank: ${card.moodLabel}")
+
+            // Preview descriptor must be well-formed
+            val preview: StylePresetPreview = card.preview
+            assertTrue(preview.grainStrength in 0f..1f,
+                "Card ${card.profileId} grainStrength out of range: ${preview.grainStrength}")
+            assertTrue(preview.vignetteStrength in 0f..1f,
+                "Card ${card.profileId} vignetteStrength out of range: ${preview.vignetteStrength}")
+            assertNotNull(preview.moodDescriptor,
+                "Card ${card.profileId} must have a mood descriptor")
+        }
+    }
+
+    // --- Same-frame geometry sync regression tests (package 05) ---
+
+    @Test
+    fun `preview overlay render model defaults isGeometryLocked to false`() {
+        val overlay = previewOverlayRenderModel(defaultPhotoState())
+        assertFalse(overlay.isGeometryLocked)
+    }
+
+    @Test
+    fun `preview overlay render model passes isGeometryLocked=true when locked`() {
+        val overlay = previewOverlayRenderModel(
+            defaultPhotoState(),
+            isGeometryLocked = true
+        )
+        assertTrue(overlay.isGeometryLocked)
+    }
+
+    @Test
+    fun `preview overlay render model passes isGeometryLocked=false when unlocked`() {
+        val overlay = previewOverlayRenderModel(
+            defaultPhotoState(),
+            isGeometryLocked = false
+        )
+        assertFalse(overlay.isGeometryLocked)
+    }
+
+    @Test
+    fun `preview overlay render model with geometry locked preserves frame data`() {
+        val graph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK, enablePreviewSnapshots = true, zoomRatio = 3f
+        ).let { spec -> spec.copy(preview = spec.preview.copy(previewZoomRatio = 2f)) }
+        val state = SessionState(
+            lifecycle = SessionLifecycle.RUNNING,
+            permissionState = PermissionState(cameraGranted = true, microphoneGranted = true),
+            previewHostAvailable = true, previewStatus = PreviewStatus.ACTIVE, previewStatusDetail = null,
+            activeMode = ModeId.PHOTO,
+            availableModes = listOf(ModeId.PHOTO, ModeId.CHECK_IN, ModeId.HUMANISTIC, ModeId.VIDEO),
+            captureStatus = CaptureStatus.IDLE, recordingStatus = RecordingStatus.IDLE,
+            activeShot = null,
+            modeSnapshot = ModeSnapshot(
+                id = ModeId.PHOTO,
+                uiSpec = ModeUiSpec(title = "PHOTO", shutterLabel = "Capture PHOTO"),
+                state = ModeState(headline = "PHOTO mode active", detail = "Ready")
+            ),
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT, activeDeviceGraph = graph,
+            previewMetrics = PreviewMetrics(),
+            activeEffectSpec = EffectSpec(listOf(FrameEffect(FrameRatio.RATIO_4_3)))
+        )
+        val frame = assertNotNull(previewOverlayRenderModel(state, isGeometryLocked = true).frame)
+        assertEquals(3f, frame.zoomRatio)
+        assertEquals(2f, frame.previewZoomRatio)
+        assertTrue(previewOverlayRenderModel(state, isGeometryLocked = true).isGeometryLocked)
+    }
+
+    @Test
+    fun `DOCUMENT mode with scanGuide true produces scan guide not frame`() {
+        val state = SessionState(
+            lifecycle = SessionLifecycle.RUNNING,
+            permissionState = PermissionState(cameraGranted = true, microphoneGranted = true),
+            previewHostAvailable = true, previewStatus = PreviewStatus.ACTIVE, previewStatusDetail = null,
+            activeMode = ModeId.DOCUMENT,
+            availableModes = listOf(ModeId.PHOTO, ModeId.DOCUMENT, ModeId.VIDEO),
+            captureStatus = CaptureStatus.IDLE, recordingStatus = RecordingStatus.IDLE,
+            activeShot = null,
+            modeSnapshot = ModeSnapshot(
+                id = ModeId.DOCUMENT,
+                uiSpec = ModeUiSpec(title = "DOCUMENT", shutterLabel = "Scan"),
+                state = ModeState(headline = "Document mode", detail = "Ready")
+            ),
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT,
+            activeDeviceGraph = DeviceGraphSpec.stillCapture(
+                preferredLensFacing = LensFacing.BACK, enablePreviewSnapshots = true
+            ),
+            previewMetrics = PreviewMetrics(),
+            activeEffectSpec = EffectSpec(listOf(
+                DocumentEffect(autoCrop = true, contrastProfile = "receipt", scanGuide = true)
+            ))
+        )
+        val overlay = previewOverlayRenderModel(state)
+        assertNull(overlay.frame, "DOCUMENT mode must not produce a FrameEffect frame")
+        assertNotNull(overlay.scanGuide, "DOCUMENT mode with scanGuide=true must produce a scan guide")
+        assertTrue(overlay.scanGuide!!.isVisible)
+        assertTrue(overlay.isVisible)
     }
 
     private fun defaultPhotoState(

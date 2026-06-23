@@ -13,6 +13,15 @@ import com.opencamera.core.session.SessionIntent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+/**
+ * Mode switch state machine: STABLE → SWITCHING → STABLE.
+ *
+ * During SWITCHING, [isGeometryLocked] is true so the overlay preserves its
+ * last geometry snapshot and the preview view transform stays consistent
+ * until the rebind completes.
+ */
+enum class ModeSwitchState { STABLE, SWITCHING }
+
 class CameraSessionCoordinator(
     private val session: CameraSession,
     private val cameraAdapter: CameraDeviceAdapter,
@@ -24,6 +33,14 @@ class CameraSessionCoordinator(
     private var previewView: PreviewView? = null
     private var attachedMode: ModeId? = null
     private var pendingPreviewBind: PendingPreviewBind? = null
+
+    private var modeSwitchState: ModeSwitchState = ModeSwitchState.STABLE
+
+    /** True when a mode switch rebind is in-flight and overlay geometry must not recompute. */
+    val isGeometryLocked: Boolean get() = modeSwitchState == ModeSwitchState.SWITCHING
+
+    /** Current mode switch state, exposed for testing. */
+    fun currentModeSwitchState(): ModeSwitchState = modeSwitchState
 
     init {
         scope.launch {
@@ -182,6 +199,10 @@ class CameraSessionCoordinator(
             pendingPreviewBind = PendingPreviewBind(modeId, deviceGraph, reason, isRecovery)
             return
         }
+        val isModeSwitch = attachedMode != null && attachedMode != modeId
+        if (isModeSwitch) {
+            modeSwitchState = ModeSwitchState.SWITCHING
+        }
         syncActiveDeviceCapabilities(deviceGraph)
         session.dispatch(
             SessionIntent.PreviewBindingStarted(
@@ -198,8 +219,12 @@ class CameraSessionCoordinator(
         }.onSuccess {
             attachedMode = modeId
             sceneBrightnessSource?.onPreviewStarted()
+            if (isModeSwitch) {
+                modeSwitchState = ModeSwitchState.STABLE
+            }
         }.onFailure { throwable ->
             attachedMode = null
+            modeSwitchState = ModeSwitchState.STABLE
             runtimeIssueMonitor.onPreviewStopped(throwable.message ?: "bind failure")
             session.dispatch(
                 SessionIntent.PreviewRuntimeIssue(

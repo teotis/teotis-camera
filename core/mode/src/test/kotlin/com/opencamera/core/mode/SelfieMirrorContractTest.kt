@@ -163,6 +163,94 @@ class SelfieMirrorContractTest {
         assertEquals(1f, if (notMirroredPolicy.shouldMirrorPreview) -1f else 1f)
     }
 
+    // -- activeLensFacing overload tests --
+
+    @Test
+    fun `activeLensFacing front with enabled mirrors preview`() {
+        val policy = selfieMirrorPolicy(
+            activeLensFacing = LensFacing.FRONT,
+            preferredLensFacing = LensFacing.FRONT,
+            selfieMirrorEnabled = true
+        )
+
+        assertTrue(policy.shouldMirrorPreview)
+        assertTrue(policy.shouldMirrorSavedOutput)
+    }
+
+    @Test
+    fun `activeLensFacing back with preferred front and enabled does not mirror`() {
+        val policy = selfieMirrorPolicy(
+            activeLensFacing = LensFacing.BACK,
+            preferredLensFacing = LensFacing.FRONT,
+            selfieMirrorEnabled = true
+        )
+
+        assertFalse(policy.shouldMirrorPreview)
+        assertFalse(policy.shouldMirrorSavedOutput)
+    }
+
+    @Test
+    fun `activeLensFacing null falls back to preferred front and mirrors when enabled`() {
+        val policy = selfieMirrorPolicy(
+            activeLensFacing = null,
+            preferredLensFacing = LensFacing.FRONT,
+            selfieMirrorEnabled = true
+        )
+
+        assertTrue(policy.shouldMirrorPreview)
+        assertTrue(policy.shouldMirrorSavedOutput)
+    }
+
+    @Test
+    fun `activeLensFacing null falls back to preferred back and does not mirror`() {
+        val policy = selfieMirrorPolicy(
+            activeLensFacing = null,
+            preferredLensFacing = LensFacing.BACK,
+            selfieMirrorEnabled = true
+        )
+
+        assertFalse(policy.shouldMirrorPreview)
+        assertFalse(policy.shouldMirrorSavedOutput)
+    }
+
+    @Test
+    fun `activeLensFacing back preferred front disabled does not mirror`() {
+        val policy = selfieMirrorPolicy(
+            activeLensFacing = LensFacing.BACK,
+            preferredLensFacing = LensFacing.FRONT,
+            selfieMirrorEnabled = false
+        )
+
+        assertFalse(policy.shouldMirrorPreview)
+        assertFalse(policy.shouldMirrorSavedOutput)
+    }
+
+    @Test
+    fun `activePreferred mismatch scenario matrix consistency`() {
+        // Verify all 8 combinations (active x preferred x enabled) are consistent
+        val results = mutableMapOf<Triple<LensFacing?, LensFacing, Boolean>, SelfieMirrorPolicy>()
+        listOf(LensFacing.FRONT, LensFacing.BACK).forEach { active ->
+            listOf(LensFacing.FRONT, LensFacing.BACK).forEach { preferred ->
+                listOf(true, false).forEach { enabled ->
+                    val policy = selfieMirrorPolicy(active, preferred, enabled)
+                    val key = Triple(active, preferred, enabled)
+                    results[key] = policy
+                    assertTrue(
+                        policy.previewMatchesSavedOutput,
+                        "previewMatchesSavedOutput must hold for active=$active preferred=$preferred enabled=$enabled"
+                    )
+                }
+            }
+        }
+        // Active BACK + preferred FRONT + enabled=true => not mirrored
+        assertFalse(results[Triple(LensFacing.BACK, LensFacing.FRONT, true)]!!.shouldMirrorPreview)
+        // Active FRONT + preferred FRONT + enabled=true => mirrored
+        assertTrue(results[Triple(LensFacing.FRONT, LensFacing.FRONT, true)]!!.shouldMirrorPreview)
+        // null active + preferred FRONT + enabled=true => mirrored (fallback)
+        val nullFallback = selfieMirrorPolicy(null, LensFacing.FRONT, true)
+        assertTrue(nullFallback.shouldMirrorPreview)
+    }
+
     // -- Helpers --
 
     private enum class MirrorWorkDecision {

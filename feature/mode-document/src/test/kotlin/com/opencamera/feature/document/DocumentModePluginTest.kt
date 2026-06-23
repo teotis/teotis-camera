@@ -2,6 +2,7 @@ package com.opencamera.feature.document
 
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
+import com.opencamera.core.effect.DocumentColorMode
 import com.opencamera.core.effect.DocumentEffect
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.WatermarkEffect
@@ -82,7 +83,7 @@ class DocumentModePluginTest {
         val snap = controller.snapshot.value
         assertEquals("Document", snap.uiSpec.title)
         assertEquals("Scan Document", snap.uiSpec.shutterLabel)
-        assertEquals("Cycle Scan Style", snap.uiSpec.secondaryActionLabel)
+        assertEquals("切换扫描场景", snap.uiSpec.secondaryActionLabel)
     }
 
     // --- Lifecycle ---
@@ -180,7 +181,7 @@ class DocumentModePluginTest {
         val signal = controller.handle(ModeIntent.SecondaryActionPressed)
 
         assertIs<ModeSignal.ShowHint>(signal)
-        assertTrue(signal.message.startsWith("Scan style:"))
+        assertTrue(signal.message.startsWith("扫描场景:"))
     }
 
     @Test
@@ -476,7 +477,7 @@ class DocumentModePluginTest {
         val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.postProcessSpec
         assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
-        assertEquals("enhanced-scan", postProcess.exifOverrides["ProcessingRendered"])
+        assertEquals("enhanced-scan:color-neutral", postProcess.exifOverrides["ProcessingRendered"])
         assertTrue(postProcess.watermarkText!!.startsWith("DOC Receipt"))
     }
 
@@ -644,7 +645,7 @@ class DocumentModePluginTest {
         val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.postProcessSpec
         assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
-        assertEquals("enhanced-scan", postProcess.exifOverrides["ProcessingRendered"])
+        assertEquals("enhanced-scan:color-neutral", postProcess.exifOverrides["ProcessingRendered"])
         assertEquals("High", postProcess.exifOverrides["Contrast"])
         assertEquals("document-receipt-scan", postProcess.algorithmProfile)
     }
@@ -676,13 +677,14 @@ class DocumentModePluginTest {
     // ── Migration characterization: profile detail text ─────────────────
 
     @Test
-    fun `enhanced profile snapshot detail contains contrast label`() = runTest {
+    fun `enhanced profile snapshot detail contains contrast label and color mode`() = runTest {
         val controller = createController()
         controller.onEnter()
         val detail = controller.snapshot.value.state.detail
         assertTrue(detail.contains("Receipt") || detail.contains("Whiteboard") || detail.contains("Contract"))
         assertTrue(detail.contains("Auto crop"))
         assertTrue(detail.contains("Contrast"))
+        assertTrue(detail.contains("Color:"))
     }
 
     @Test
@@ -692,5 +694,41 @@ class DocumentModePluginTest {
         controller.onEnter()
         val detail = controller.snapshot.value.state.detail
         assertTrue(detail.contains("Basic capture only"))
+    }
+
+    // ── Default color mode: COLOR_NEUTRAL ──────────────────────────────
+
+    @Test
+    fun `default effect spec has COLOR_NEUTRAL`() = runTest {
+        var capturedSpec: EffectSpec? = null
+        val controller = createController(onEffectSpecChanged = { capturedSpec = it })
+        controller.onEnter()
+        val docEffect = capturedSpec!!.find<DocumentEffect>()
+        assertNotNull(docEffect)
+        assertEquals(DocumentColorMode.COLOR_NEUTRAL, docEffect.colorMode)
+    }
+
+    // ── Secondary action hint includes color mode label ────────────────
+
+    @Test
+    fun `secondary action hint includes color mode label`() = runTest {
+        val controller = createController()
+        val signal = controller.handle(ModeIntent.SecondaryActionPressed)
+        val hint = (signal as ModeSignal.ShowHint).message
+        assertTrue(hint.contains("色彩: 原色"), "Hint should contain color label: $hint")
+        assertTrue(hint.startsWith("扫描场景:"), "Hint should start with scan scene prefix: $hint")
+    }
+
+    // ── EXIF ProcessingRendered includes color mode tag ────────────────
+
+    @Test
+    fun `enhanced scan ProcessingRendered includes color mode tag`() = runTest {
+        val controller = createController()
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertTrue(
+            postProcess.exifOverrides["ProcessingRendered"]!!.contains("color-neutral"),
+            "ProcessingRendered should include color tag: ${postProcess.exifOverrides["ProcessingRendered"]}"
+        )
     }
 }

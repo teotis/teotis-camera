@@ -1,10 +1,12 @@
 package com.opencamera.app.camera
 
+import com.opencamera.app.camera.live.LivePhotoMediaStoreWriter
 import com.opencamera.core.media.FrameDescriptor
 import com.opencamera.core.media.LiveBundleStatus
 import com.opencamera.core.media.LiveMotionSource
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaOutputHandle
+import com.opencamera.core.media.MotionPhotoContainerSpec
 import com.opencamera.core.media.temporalNotes
 import com.opencamera.core.settings.LiveSaveFormat
 import kotlinx.coroutines.CancellationException
@@ -27,6 +29,11 @@ internal data class MaterializationBundleResult(
     val extraDiagnostics: List<String>
 )
 
+data class MotionPhotoMaterializationResult(
+    val outputUri: String,
+    val diagnostics: List<String> = emptyList()
+)
+
 internal object LivePhotoAssembler {
 
     fun assembleLivePhoto(
@@ -35,8 +42,9 @@ internal object LivePhotoAssembler {
         saveFormat: LiveSaveFormat,
         motionSourceResult: LiveMotionSourceResult,
         prepareMotionSegment: (List<FrameDescriptor>, String) -> Result<String>,
-        materializeContainer: (String) -> Result<String>,
-        writeContentUriPayload: (String, String) -> Unit
+        materializeContainer: (String) -> Result<MotionPhotoMaterializationResult>,
+        writeContentUriPayload: (String, String) -> Unit,
+        mediaStoreWriter: LivePhotoMediaStoreWriter? = null
     ): LivePhotoOutcome {
         // STILL_JPEG_ONLY: skip motion entirely, return still with diagnostics
         if (saveFormat == LiveSaveFormat.STILL_JPEG_ONLY) {
@@ -62,7 +70,8 @@ internal object LivePhotoAssembler {
             LiveSaveFormat.MOTION_MP4_SIDECAR -> materializeMp4Sidecar(
                 bundle = livePhotoBundle,
                 motionSourceResult = motionSourceResult,
-                prepareMotionSegment = prepareMotionSegment
+                prepareMotionSegment = prepareMotionSegment,
+                mediaStoreWriter = mediaStoreWriter
             )
 
             LiveSaveFormat.STILL_JPEG_ONLY -> error("unreachable: handled above")
@@ -102,6 +111,7 @@ internal object LivePhotoAssembler {
             add("live-motion:status=${
                 when {
                     !materializationResult.materializationSucceeded && motionSourceResult.selectedFrameSet.frames.isNotEmpty() -> "failed"
+                    materializationResult.materializationSucceeded && sidecarResult.isFailure -> "degraded"
                     materializationResult.materializationSucceeded -> "materialized"
                     else -> "missing"
                 }
@@ -138,8 +148,7 @@ internal object LivePhotoAssembler {
                 )
             } else {
                 val sidecarError = sidecarResult.exceptionOrNull()?.message ?: "unknown"
-                add("device:live-sidecar=failed:$sidecarError")
-                add("device:live-photo=still-only-fallback")
+                add("device:live-diagnostic-sidecar=failed:$sidecarError")
             }
 
             // Watermark notes
@@ -147,7 +156,7 @@ internal object LivePhotoAssembler {
         }
 
         return LivePhotoOutcome(
-            livePhotoBundle = if (sidecarResult.isSuccess) finalBundle else null,
+            livePhotoBundle = finalBundle,
             sidecarWriteSuccess = sidecarResult.isSuccess,
             diagnostics = diagnostics
         )
@@ -157,7 +166,7 @@ internal object LivePhotoAssembler {
         bundle: LivePhotoBundle,
         motionSourceResult: LiveMotionSourceResult,
         prepareMotionSegment: (List<FrameDescriptor>, String) -> Result<String>,
-        materialize: (String) -> Result<String>
+        materialize: (String) -> Result<MotionPhotoMaterializationResult>
     ): MaterializationBundleResult {
         val hasSelectedFrames = motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
             motionSourceResult.selectedFrameSet.frames.isNotEmpty()
@@ -185,20 +194,23 @@ internal object LivePhotoAssembler {
         val motionPath = motionSegmentResult.getOrDefault(bundle.motionPath)
         val materializeResult = materialize(motionPath)
         return if (materializeResult.isSuccess) {
-            val outputPath = materializeResult.getOrDefault(bundle.stillPath)
+            val outcome = materializeResult.getOrDefault(
+                MotionPhotoMaterializationResult(outputUri = bundle.stillPath)
+            )
             MaterializationBundleResult(
                 bundle = bundle.copy(
-                    stillPath = outputPath,
+                    stillPath = outcome.outputUri,
                     motionPath = motionPath,
-                    thumbnailPath = outputPath,
-                    thumbnailHandle = MediaOutputHandle(displayPath = outputPath)
+                    thumbnailPath = outcome.outputUri,
+                    thumbnailHandle = MediaOutputHandle(displayPath = outcome.outputUri)
                 ),
                 materializationSucceeded = true,
-                extraDiagnostics = listOf(
-                    "motion-photo:motion-segment=materialized",
-                    "motion-photo:container=google-jpeg",
-                    "motion-photo:xmp=present"
-                )
+                extraDiagnostics = buildList {
+                    add("motion-photo:motion-segment=materialized")
+                    add("motion-photo:container=google-jpeg")
+                    add("motion-photo:xmp=present")
+                    addAll(outcome.diagnostics)
+                }
             )
         } else {
             val reason = materializeResult.exceptionOrNull()?.message ?: "unknown"
@@ -213,7 +225,8 @@ internal object LivePhotoAssembler {
     private fun materializeMp4Sidecar(
         bundle: LivePhotoBundle,
         motionSourceResult: LiveMotionSourceResult,
-        prepareMotionSegment: (List<FrameDescriptor>, String) -> Result<String>
+        prepareMotionSegment: (List<FrameDescriptor>, String) -> Result<String>,
+        mediaStoreWriter: LivePhotoMediaStoreWriter? = null
     ): MaterializationBundleResult {
         val selectedFrames = motionSourceResult.selectedFrameSet.frames
         if (selectedFrames.isEmpty()) {
@@ -225,33 +238,125 @@ internal object LivePhotoAssembler {
         }
 
         val motionSegmentResult = prepareMotionSegment(selectedFrames, bundle.motionPath)
-        return motionSegmentResult.fold(
-            onSuccess = { motionPath ->
-                val mp4File = File(motionPath)
-                MaterializationBundleResult(
-                    bundle = bundle.copy(
-                        motionPath = motionPath,
-                        motionHandle = bundle.motionHandle.copy(
-                            displayPath = motionPath,
-                            filePath = motionPath.takeIf { File(it).isAbsolute }
-                        )
-                    ),
-                    materializationSucceeded = true,
-                    extraDiagnostics = buildList {
-                        add("motion-photo:motion-segment=materialized")
-                        if (mp4File.exists()) {
-                            add("motion-photo:appended-mp4-bytes=${mp4File.length()}")
-                        }
-                    }
+        if (motionSegmentResult.isFailure) {
+            val reason = motionSegmentResult.exceptionOrNull()?.message ?: "unknown"
+            return MaterializationBundleResult(
+                bundle = bundle.copy(bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK),
+                materializationSucceeded = false,
+                extraDiagnostics = listOf("motion-photo:motion-segment=failed:$reason")
+            )
+        }
+
+        val motionPath = motionSegmentResult.getOrDefault(bundle.motionPath)
+        val mp4File = File(motionPath)
+        val mp4Bytes = if (mp4File.exists()) mp4File.readBytes() else null
+
+        if (mp4Bytes == null) {
+            return MaterializationBundleResult(
+                bundle = bundle.copy(
+                    motionPath = motionPath,
+                    bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK
+                ),
+                materializationSucceeded = false,
+                extraDiagnostics = listOf(
+                    "motion-photo:motion-segment=unavailable"
                 )
-            },
-            onFailure = { throwable ->
-                MaterializationBundleResult(
-                    bundle = bundle.copy(bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK),
-                    materializationSucceeded = false,
-                    extraDiagnostics = listOf(
-                        "motion-photo:motion-segment=failed:${throwable.message ?: "unknown"}"
-                    )
+            )
+        }
+
+        val baseName = bundle.stillPath
+            .substringAfterLast('/')
+            .substringBeforeLast('.')
+
+        val insertResult = if (mediaStoreWriter != null) {
+            mediaStoreWriter.insertMotionMp4Sidecar(
+                jpegRelativePath = bundle.stillPath,
+                mp4DisplayNamePrefix = baseName,
+                mp4Bytes = mp4Bytes
+            )
+        } else null
+
+        if (insertResult == null) {
+            return MaterializationBundleResult(
+                bundle = bundle.copy(
+                    motionPath = motionPath,
+                    motionHandle = bundle.motionHandle.copy(
+                        displayPath = motionPath,
+                        filePath = motionPath.takeIf { File(it).isAbsolute }
+                    ),
+                    bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK
+                ),
+                materializationSucceeded = false,
+                extraDiagnostics = buildList {
+                    add("motion-photo:motion-segment=materialized")
+                    add("motion-photo:appended-mp4-bytes=${mp4Bytes.size}")
+                    add("motion-photo:sidecar-mp4=mediastore-skipped")
+                }
+            )
+        }
+
+        if (insertResult.isFailure) {
+            val reason = insertResult.exceptionOrNull()?.message ?: "unknown"
+            return MaterializationBundleResult(
+                bundle = bundle.copy(
+                    motionPath = motionPath,
+                    motionHandle = bundle.motionHandle.copy(
+                        displayPath = motionPath,
+                        filePath = motionPath.takeIf { File(it).isAbsolute }
+                    ),
+                    bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK
+                ),
+                materializationSucceeded = false,
+                extraDiagnostics = buildList {
+                    add("motion-photo:motion-segment=materialized")
+                    add("motion-photo:appended-mp4-bytes=${mp4Bytes.size}")
+                    add("motion-photo:sidecar-mp4=mediastore-failed:$reason")
+                }
+            )
+        }
+
+        val insertedUri = insertResult.getOrThrow()
+        val verifyResult = mediaStoreWriter!!.verifyMotionMp4Sidecar(insertedUri)
+        if (verifyResult.isFailure) {
+            val reason = verifyResult.exceptionOrNull()?.message ?: "unknown"
+            return MaterializationBundleResult(
+                bundle = bundle.copy(
+                    motionPath = motionPath,
+                    motionHandle = bundle.motionHandle.copy(
+                        displayPath = motionPath,
+                        filePath = motionPath.takeIf { File(it).isAbsolute },
+                        contentUri = insertedUri.toString()
+                    ),
+                    bundleStatus = LiveBundleStatus.STILL_ONLY_FALLBACK
+                ),
+                materializationSucceeded = false,
+                extraDiagnostics = buildList {
+                    add("motion-photo:motion-segment=materialized")
+                    add("motion-photo:appended-mp4-bytes=${mp4Bytes.size}")
+                    add("motion-photo:sidecar-mp4=mediastore-failed:verify:$reason")
+                }
+            )
+        }
+
+        val record = verifyResult.getOrThrow()
+        return MaterializationBundleResult(
+            bundle = bundle.copy(
+                motionPath = motionPath,
+                motionHandle = bundle.motionHandle.copy(
+                    displayPath = motionPath,
+                    filePath = motionPath.takeIf { File(it).isAbsolute },
+                    contentUri = insertedUri.toString()
+                )
+            ),
+            materializationSucceeded = true,
+            extraDiagnostics = buildList {
+                add("motion-photo:motion-segment=materialized")
+                add("motion-photo:appended-mp4-bytes=${mp4Bytes.size}")
+                add("motion-photo:sidecar-mp4=mediastore-inserted")
+                add(
+                    "motion-photo:sidecar-mp4=verify:" +
+                        "${record.displayName}|${record.relativePath}|${record.mimeType}|" +
+                        "${record.size}|${record.duration}|${record.isPending}"
                 )
             }
         )

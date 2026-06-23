@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared attrs (defined once, referenced without format) -->
+    <attr name="pc_label" format="string" />
+    <attr name="pc_auto" format="boolean" />
+    <attr name="pc_availability" format="enum">
+        <enum name="supported" value="0" />
+        <enum name="degraded" value="1" />
+        <enum name="unsupported" value="2" />
+    </attr>
+
+    <declare-styleable name="ProControlSliderView">
+        <attr name="pc_label" />
+        <attr name="pc_min_value" format="float" />
+        <attr name="pc_max_value" format="float" />
+        <attr name="pc_current_value" format="float" />
+        <attr name="pc_auto" />
+        <attr name="pc_availability" />
+    </declare-styleable>
+
+    <declare-styleable name="ProControlPickerView">
+        <attr name="pc_label" />
+        <attr name="pc_options" format="reference" />
+        <attr name="pc_current_option" format="string" />
+        <attr name="pc_auto" />
+        <attr name="pc_availability" />
+    </declare-styleable>
+</resources>

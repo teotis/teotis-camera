@@ -43,7 +43,9 @@ data class ModeEffectProfile(
     val usesWatermark: Boolean = false,
     val usesPortraitEffect: Boolean = false,
     val usesDocumentEffect: Boolean = false,
-    val usesFrameEffect: Boolean = false
+    val usesFrameEffect: Boolean = false,
+    val usesDocumentColorMode: Boolean = false,
+    val usesDocumentScanGuide: Boolean = false
 )
 
 fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
@@ -274,7 +276,9 @@ fun ModeId.modeProductDeclaration(): ModeProductDeclaration {
                 )
             ),
             effectProfile = ModeEffectProfile(
-                usesDocumentEffect = true
+                usesDocumentEffect = true,
+                usesDocumentColorMode = true,
+                usesDocumentScanGuide = true
             )
         )
 

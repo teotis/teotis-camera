@@ -42,10 +42,12 @@
     <string name="style_rail_title_humanistic">人文风格</string>
     <string name="style_rail_title_portrait">人像风格</string>
     <string name="style_rail_title_video">视频风格</string>
+    <string name="style_rail_title_document">文档色彩</string>
     <string name="style_rail_supporting_photo">轻触卡片即可应用此风格。</string>
     <string name="style_rail_supporting_humanistic">街拍与生活预设，以人文视角记录。</string>
     <string name="style_rail_supporting_portrait">人像专属色调预设。</string>
     <string name="style_rail_supporting_video">录制前应用的视频风格预设。</string>
+    <string name="style_rail_supporting_document">选择文档色彩模式</string>
     <string name="button_filter_close">关闭色调</string>
     <string name="permission_pending">需要相机权限才能开始预览。</string>
     <string name="permission_granted">相机权限已授予，预览就绪。</string>
@@ -60,6 +62,7 @@
     <string name="output_error_prefix">相机问题：</string>
     <string name="output_preview_prefix">预览缩略图：</string>
     <string name="preview_thumbnail_content_description">最新预览缩略图</string>
+    <string name="preview_thumbnail_empty_content_description">暂无最近照片</string>
     <string name="settings_panel_content_description">相机设置</string>
     <string name="filter_panel_content_description">色调实验室独立默认参数面板</string>
     <string name="settings_section_common">通用</string>
@@ -330,7 +333,7 @@
     <string name="settings_blocked_by_capture">拍摄进行中，无法更改设置</string>
     <string name="settings_not_loaded">设置尚未加载</string>
     <string name="settings_action_unsupported">当前模式不支持此操作</string>
-    <string name="format_color_tone">颜色: %.2f, 色调: %.2f</string>
+    <string name="format_color_tone">颜色: %1$.2f, 色调: %2$.2f</string>
     <string name="status_document_pipeline_ready">文档管线就绪</string>
     <string name="status_document_mode_inactive">文档模式未激活</string>
     <string name="status_document_capture_requested">文档拍摄已请求</string>
@@ -396,6 +399,8 @@
     <string name="filter_lab_hero_summary">%1$s 默认 %2$s • %3$d 个风格已暂存</string>
     <string name="filter_lab_current_default">当前默认 %s</string>
     <string name="filter_lab_selected_default"> | 已选默认</string>
+    <string name="filter_lab_color_summary">色彩实验室会在当前模式上叠加一层可预览的综合色彩：左右控制冷暖与偏色，上下控制明亮或加深。</string>
+    <string name="filter_lab_color_hint">水平滑动微调冷暖/洋红绿，垂直滑动控制轻盈提亮或深色对比。</string>
     <string name="filter_lab_light_palette_hint">水平滑动选择颜色，垂直滑动选择色调。</string>
     <string name="filter_lab_drag_to_create_custom">拖动调色板将保存为自定义</string>
     <string name="filter_lab_next_look">下一个 %s 风格</string>
@@ -441,13 +446,12 @@
     <string name="settings_page_portrait_support">打开配置、美颜与散景调节</string>
     <string name="settings_page_watermark_support">打开选择器与逐模板调节；%d 个模板</string>
     <string name="settings_page_live_support">仅保存默认值；%1$d ms 包 | 动态水印 %2$s</string>
+    <string name="settings_page_live_photo_default_support">切换默认开关；%d ms 动态包</string>
     <string name="settings_page_degraded_resolution">已保存为 %1$s，活跃图使用 %2$s</string>
     <string name="settings_page_degraded_framerate">已保存为 %1$s，活跃图使用 %2$s</string>
     <string name="settings_page_degraded_dynamic_fps">已保存为 %1$s，活跃图使用 %2$s</string>
     <string name="settings_page_degraded_audio">已保存为 %1$s，活跃图使用 %2$s</string>
     <string name="settings_page_video_filter_seed">已保存滤镜种子；%d 个外观已暂存</string>
-    <string name="settings_page_catalog_footer_1">静态照片水印模板现已集成到元数据和照片渲染中。</string>
-    <string name="settings_page_catalog_footer_2">手动草稿和实况/视频默认值仍在同一设置主干中暂存。</string>
     <string name="settings_page_pro_manual_prefix"> | 人文手动草稿</string>
 
     <!-- Watermark selector -->
@@ -465,7 +469,7 @@
     <string name="watermark_detail_supporting_not_selected">此模板尚不是当前默认。请先在此调整，准备就绪后从选择器页面切换。</string>
     <string name="watermark_detail_footer_frame">边框渲染对静态照片导出已激活。</string>
     <string name="watermark_detail_footer_overlay">经典叠加保持在源图像内，不扩展边框。</string>
-    <string name="watermark_detail_footer_pure_text">纯文字直接叠加在源图像上，无任何边框或背景容器。</string>
+    <string name="watermark_detail_footer_pure_text">半透明蓝调底栏保持在源图像内，配合左侧暖色透光标记承载文字信息。</string>
     <string name="watermark_detail_tokens_prefix">标记：</string>
 
     <!-- Watermark attribute prefixes for hero summary -->
@@ -475,12 +479,12 @@
     <string name="watermark_attr_background_prefix">背景</string>
     <string name="watermark_template_expanded_frame">扩展边框</string>
     <string name="watermark_template_classic_overlay">经典叠加</string>
-    <string name="watermark_template_pure_text">纯文字</string>
+    <string name="watermark_template_pure_text">透光底栏</string>
     <string name="watermark_template_blur_four_border">模糊四边框</string>
     <string name="watermark_template_travel_polaroid">旅行拍立得</string>
     <string name="watermark_template_retro_frame">复古边框</string>
-    <string name="watermark_template_professional_bottom_bar">专业底栏</string>
-    <string name="watermark_template_night_street">夜间街拍</string>
+    <string name="watermark_template_van_gogh_starry">梵高星月</string>
+    <string name="watermark_template_blue_hour">蓝调时刻</string>
     <string name="watermark_placement_top_left">左上</string>
     <string name="watermark_placement_top_right">右上</string>
     <string name="watermark_placement_bottom_left">左下</string>
@@ -515,6 +519,10 @@
     <string name="filter_profile_portrait_original">原色人像</string>
     <string name="filter_profile_portrait_chasing_light">追光人像</string>
     <string name="filter_profile_portrait_rich">浓郁人像</string>
+    <string name="filter_profile_doc_color_neutral">原色</string>
+    <string name="filter_profile_doc_color_enhanced">增强彩色</string>
+    <string name="filter_profile_doc_grayscale">灰度</string>
+    <string name="filter_profile_doc_bw">黑白</string>
     <string name="filter_profile_receipt">收据</string>
     <string name="filter_profile_whiteboard">白板</string>
     <string name="filter_profile_contract">合同</string>
@@ -528,6 +536,40 @@
     <string name="filter_profile_night">夜景</string>
     <string name="filter_profile_contrast">对比</string>
     <string name="filter_profile_low_light">弱光</string>
+
+    <!-- Style card mood labels -->
+    <string name="style_mood_bw">黑白</string>
+    <string name="style_mood_monochrome">单色</string>
+    <string name="style_mood_natural">自然</string>
+    <string name="style_mood_vivid">鲜明</string>
+    <string name="style_mood_muted">柔和</string>
+    <string name="style_mood_punchy">明快</string>
+    <string name="style_mood_soft">柔焦</string>
+    <string name="style_mood_warm">暖色</string>
+    <string name="style_mood_cool">冷色</string>
+    <string name="style_mood_film">胶片</string>
+    <string name="style_mood_separator"></string>
+    <string name="style_mood_vivid_warm">鲜明暖色</string>
+    <string name="style_mood_vivid_cool">鲜明冷色</string>
+    <string name="style_mood_vivid_film">鲜明胶片</string>
+    <string name="style_mood_vivid_punchy">鲜明明快</string>
+    <string name="style_mood_vivid_punchy_warm">鲜明明快暖色</string>
+    <string name="style_mood_vivid_punchy_cool">鲜明明快冷色</string>
+    <string name="style_mood_vivid_punchy_film">鲜明明快胶片</string>
+    <string name="style_mood_vivid_warm_film">鲜明暖色胶片</string>
+    <string name="style_mood_vivid_cool_film">鲜明冷色胶片</string>
+    <string name="style_mood_muted_soft">柔和柔焦</string>
+    <string name="style_mood_muted_cool">柔和冷色</string>
+    <string name="style_mood_muted_soft_cool">柔和柔焦冷色</string>
+    <string name="style_mood_punchy_warm">明快暖色</string>
+    <string name="style_mood_punchy_cool">明快冷色</string>
+    <string name="style_mood_punchy_film">明快胶片</string>
+    <string name="style_mood_punchy_warm_film">明快暖色胶片</string>
+    <string name="style_mood_soft_cool">柔焦冷色</string>
+    <string name="style_mood_soft_warm">柔焦暖色</string>
+    <string name="style_mood_soft_film">柔焦胶片</string>
+    <string name="style_mood_warm_film">暖色胶片</string>
+    <string name="style_mood_cool_film">冷色胶片</string>
     <string name="contrast_label_high">高</string>
     <string name="contrast_label_balanced">平衡</string>
     <string name="contrast_label_natural">自然</string>
@@ -553,7 +595,23 @@
     <string name="document_batch_crop_skipped">未裁边</string>
     <string name="document_batch_crop_failed">裁边失败</string>
     <string name="document_batch_rail_page_description">第 %d 页</string>
+    <string name="document_batch_rail_overview_description">查看批次</string>
     <string name="button_document_batch_organizer_close">关闭</string>
+    <string name="button_document_batch_continue_shooting">继续拍摄</string>
+    <string name="button_document_batch_crop_edit">进入裁边</string>
+    <string name="button_document_batch_crop_edit_coming_soon">裁边编辑即将上线</string>
+    <string name="document_crop_edit_title">裁边编辑</string>
+    <string name="document_crop_edit_confirm">确认裁边</string>
+    <string name="document_crop_edit_cancel">放弃</string>
+    <string name="document_crop_edit_page_format">第 %d 页</string>
+    <string name="document_crop_edit_marked_manual">已标记手动裁边</string>
+    <string name="button_document_batch_export">导出本轮</string>
+    <string name="document_export_progress">正在导出 %1$d/%2$d 页</string>
+    <string name="document_export_success">导出成功，共 %d 页</string>
+    <string name="document_export_failed">导出失败</string>
+    <string name="button_document_export_return">返回拍摄</string>
+    <string name="button_document_export_retry">重试</string>
+    <string name="document_batch_empty_hint">暂无拍摄页面，点击「继续拍摄」开始</string>
     <string name="button_reset_defaults">重置为默认</string>
     <string name="status_processing_photo_keep_open">照片处理中，请勿退出 OpenCamera。</string>
 
@@ -620,7 +678,7 @@
     <string name="checkin_scenario_portrait">人像</string>
     <string name="checkin_scenario_people_place">人景</string>
     <string name="checkin_scenario_object_place">物景</string>
-    <string name="checkin_scenario_clarity">超清</string>
+    <string name="checkin_scenario_clarity">全清</string>
     <string name="checkin_scenario_desc_portrait">人像特写，突出人物表情与姿态</string>
     <string name="checkin_scenario_desc_people_place">人物与环境结合，记录场景氛围</string>
     <string name="checkin_scenario_desc_object_place">物品与环境，记录细节与空间</string>

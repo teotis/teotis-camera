@@ -301,7 +301,7 @@ class CheckInStylePanelRenderModelTest {
                 R.string.watermark_selector_edit_attrs_classic -> "位置、大小、透明度"
                 R.string.watermark_template_classic_overlay -> "经典叠加"
                 R.string.watermark_template_expanded_frame -> "扩展边框"
-                R.string.watermark_template_pure_text -> "纯文字"
+                R.string.watermark_template_pure_text -> "透光底栏"
                 R.string.watermark_template_blur_four_border -> "模糊四边框"
                 R.string.watermark_template_travel_polaroid -> "旅行拍立得"
                 R.string.watermark_template_retro_frame -> "复古边框"

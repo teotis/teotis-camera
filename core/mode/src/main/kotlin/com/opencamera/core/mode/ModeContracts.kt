@@ -93,19 +93,14 @@ fun ModeContext.captureAidMetadataTags(): Map<String, String> {
     val persisted = settingsSnapshot.persisted
     val lensFacing = runtimeState().lensFacing
     val selfieMirrorEnabled = persisted.common.selfieMirrorEnabled
+    val policy = selfieMirrorPolicy(lensFacing, selfieMirrorEnabled)
     return buildMap {
         put(
             "captureLensFacing",
             lensFacing.name.lowercase()
         )
         put("selfieMirrorEnabled", if (selfieMirrorEnabled) "on" else "off")
-        put(
-            "selfieMirrorApply",
-            (
-                lensFacing == LensFacing.FRONT &&
-                    selfieMirrorEnabled
-                ).toString()
-        )
+        put("selfieMirrorApply", policy.shouldMirrorSavedOutput.toString())
         put("shutterSoundEnabled", if (persisted.common.shutterSoundEnabled) "on" else "off")
         put("stillQuality", runtimeState().stillCaptureQuality.tagValue)
         runtimeState().stillCaptureOutputSize?.let { size ->
@@ -264,6 +259,17 @@ fun selfieMirrorPolicy(
     return SelfieMirrorPolicy(
         shouldMirrorPreview = apply,
         shouldMirrorSavedOutput = apply
+    )
+}
+
+fun selfieMirrorPolicy(
+    activeLensFacing: LensFacing?,
+    preferredLensFacing: LensFacing,
+    selfieMirrorEnabled: Boolean
+): SelfieMirrorPolicy {
+    return selfieMirrorPolicy(
+        lensFacing = activeLensFacing ?: preferredLensFacing,
+        selfieMirrorEnabled = selfieMirrorEnabled
     )
 }
 

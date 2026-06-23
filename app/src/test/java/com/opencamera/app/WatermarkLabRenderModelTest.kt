@@ -51,7 +51,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WatermarkLabRenderModelTest {
@@ -68,6 +67,10 @@ class WatermarkLabRenderModelTest {
             val classic = model.items.first { it.templateId == "classic-overlay" }
             val pureText = model.items.first { it.templateId == "pure-text" }
             val blurBorder = model.items.first { it.templateId == "blur-four-border" }
+            val vanGoghStarry = model.items.first { it.templateId == "van-gogh-starry" }
+            val blueHour = model.items.first { it.templateId == "blue-hour" }
+            assertFalse(model.items.any { it.templateId == "professional-bottom-bar" })
+            assertFalse(model.items.any { it.templateId == "night-street" })
             assertTrue(selected.isSelected)
             assertEquals(null, selected.useAction)
             assertTrue(selected.supportingText.contains("Current default"))
@@ -77,9 +80,13 @@ class WatermarkLabRenderModelTest {
                 classic.useAction
             )
             assertTrue(classic.supportingText.contains("Classic overlay"))
-            assertTrue(pureText.supportingText.contains("Pure text", ignoreCase = true))
+            assertTrue(pureText.supportingText.contains("Translucent Bottom Bar", ignoreCase = true))
             assertTrue(blurBorder.supportingText.contains("Blur four border", ignoreCase = true))
-            assertTrue(model.footer.contains("Pure Text shows no frame"))
+            assertEquals("Van Gogh Starry", vanGoghStarry.title)
+            assertEquals("Blue Hour", blueHour.title)
+            assertTrue(vanGoghStarry.supportingText.contains("Expanded frame"))
+            assertTrue(blueHour.supportingText.contains("Expanded frame"))
+            assertTrue(model.footer.contains("reversible original JPEG archive"))
         }
 
 
@@ -164,12 +171,12 @@ class WatermarkLabRenderModelTest {
                 text = TestAppTextResolver()
             )
 
-            assertEquals("Pure text", model.headline)
+            assertEquals("Translucent Bottom Bar", model.headline)
             assertEquals(null, model.frameBackgroundControl)
             assertNotNull(model.placementControl.nextAction)
             assertNotNull(model.textScaleControl.nextAction)
             assertNotNull(model.textOpacityControl.nextAction)
-            assertTrue(model.footer.contains("Clean text sits directly on the source image"))
+            assertTrue(model.footer.contains("translucent blue bottom bar", ignoreCase = true))
         }
 
 
@@ -256,95 +263,6 @@ class WatermarkLabRenderModelTest {
         }
 
 
-
-        @Test
-        fun `professional bottom bar detail shows frame background and bottom only placements`() {
-            val model = watermarkLabDetailRenderModel(
-                state = defaultSessionState(),
-                templateId = "professional-bottom-bar",
-                text = TestAppTextResolver()
-            )
-
-            assertNotNull(model.frameBackgroundControl)
-            val placementAction = assertNotNull(model.placementControl.nextAction)
-            assertTrue(placementAction is PersistedSettingsAction.UpdateWatermarkTextPlacement)
-            assertEquals("professional-bottom-bar", placementAction.templateId)
-            val backgroundAction = assertNotNull(model.frameBackgroundControl?.nextAction)
-            assertTrue(backgroundAction is PersistedSettingsAction.UpdateWatermarkFrameBackground)
-        }
-
-        @Test
-        fun `night-street selector item shows expanded frame label and supports frame border`() {
-            val model = watermarkLabSelectorRenderModel(defaultSessionState(), TestAppTextResolver())
-            val nightStreetItem = model.items.first { it.templateId == "night-street" }
-
-            assertEquals("Night Street", nightStreetItem.title)
-            assertFalse(nightStreetItem.isSelected)
-            assertNotNull(nightStreetItem.useAction)
-            assertTrue(nightStreetItem.supportingText.contains("Expanded frame") ||
-                nightStreetItem.supportingText.contains("night-street"))
-        }
-
-        @Test
-        fun `night-street detail render model shows frame background and bottom only placements`() {
-            val model = watermarkLabDetailRenderModel(
-                state = defaultSessionState(),
-                templateId = "night-street",
-                text = TestAppTextResolver()
-            )
-
-            assertEquals("Night Street", model.headline)
-            assertNotNull(model.frameBackgroundControl)
-            val placementAction = assertNotNull(model.placementControl.nextAction)
-            assertTrue(placementAction is PersistedSettingsAction.UpdateWatermarkTextPlacement)
-            assertEquals("night-street", placementAction.templateId)
-            assertTrue(
-                placementAction.placement in setOf(
-                    WatermarkTextPlacement.BOTTOM_LEFT,
-                    WatermarkTextPlacement.BOTTOM_CENTER,
-                    WatermarkTextPlacement.BOTTOM_RIGHT
-                ),
-                "Expected bottom-only placement but got ${placementAction.placement}"
-            )
-        }
-
-        @Test
-        fun `night-street cycles only dark and blur backgrounds`() {
-            val model = watermarkLabDetailRenderModel(
-                state = defaultSessionState(),
-                templateId = "night-street",
-                text = TestAppTextResolver()
-            )
-
-            val action = assertNotNull(model.frameBackgroundControl?.nextAction)
-            assertTrue(action is PersistedSettingsAction.UpdateWatermarkFrameBackground)
-            assertTrue(
-                action.background in setOf(
-                    WatermarkFrameBackground.DARK,
-                    WatermarkFrameBackground.SOURCE_BLUR,
-                    WatermarkFrameBackground.SOURCE_VIVID_BLUR
-                ),
-                "Expected dark/blur background but got ${action.background}"
-            )
-        }
-
-        @Test
-        fun `night-street selector shows current default when selected`() {
-            val state = defaultSessionState(
-                persistedPhotoSettings = PhotoSettings(
-                    defaultFilterProfileId = "portrait-retro",
-                    defaultHumanisticFilterProfileId = "humanistic-street",
-                    defaultPortraitFilterProfileId = "portrait-original",
-                    defaultWatermarkTemplateId = "night-street"
-                )
-            )
-            val model = watermarkLabSelectorRenderModel(state, TestAppTextResolver())
-            val nightStreetItem = model.items.first { it.templateId == "night-street" }
-
-            assertTrue(nightStreetItem.isSelected)
-            assertNull(nightStreetItem.useAction)
-            assertTrue(nightStreetItem.supportingText.contains("Current default"))
-        }
 
         private fun defaultSessionState(
             activeDeviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,

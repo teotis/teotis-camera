@@ -70,13 +70,20 @@ interface SessionTrace {
     fun end(handle: TraceHandle, detail: String = "")
 
     fun snapshot(): List<SessionTraceEvent>
+
+    fun snapshotForDisplay(window: Int = 1000): List<SessionTraceEvent> =
+        snapshot().takeLast(window)
 }
 
+@Suppress("DEPRECATION")
 class InMemorySessionTrace(
-    private val maxEvents: Int = 1000
+    @Deprecated("Use memoryRetention instead", ReplaceWith("memoryRetention(maxEvents)"))
+    private val maxEvents: Int = 1000,
+    private val memoryRetention: Int = maxEvents,
+    private val displayWindow: Int = 1000,
 ) : SessionTrace {
     private val sequence = AtomicInteger(0)
-    private val events = mutableListOf<SessionTraceEvent>()
+    private val events = ArrayDeque<SessionTraceEvent>()
 
     override fun record(name: String, detail: String) {
         synchronized(events) {
@@ -86,8 +93,8 @@ class InMemorySessionTrace(
                 detail = detail,
                 timestampMillis = System.currentTimeMillis()
             )
-            if (events.size > maxEvents) {
-                events.removeAt(0)
+            if (events.size > memoryRetention) {
+                events.removeFirst()
             }
         }
     }
@@ -101,8 +108,8 @@ class InMemorySessionTrace(
                 detail = "",
                 timestampMillis = System.currentTimeMillis()
             )
-            if (events.size > maxEvents) {
-                events.removeAt(0)
+            if (events.size > memoryRetention) {
+                events.removeFirst()
             }
         }
         return TraceHandle(name, System.nanoTime(), seq)
@@ -122,13 +129,21 @@ class InMemorySessionTrace(
                 detail = detailWithTiming,
                 timestampMillis = System.currentTimeMillis()
             )
-            if (events.size > maxEvents) {
-                events.removeAt(0)
+            if (events.size > memoryRetention) {
+                events.removeFirst()
             }
         }
     }
 
     override fun snapshot(): List<SessionTraceEvent> {
         return synchronized(events) { events.toList() }
+    }
+
+    override fun snapshotForDisplay(window: Int): List<SessionTraceEvent> {
+        val effectiveWindow = window.coerceAtMost(displayWindow)
+        return synchronized(events) {
+            val start = (events.size - effectiveWindow).coerceAtLeast(0)
+            events.toList().subList(start, events.size)
+        }
     }
 }

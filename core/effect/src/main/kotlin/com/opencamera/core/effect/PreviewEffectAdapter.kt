@@ -12,6 +12,7 @@ import com.opencamera.core.media.SceneMaskQuality
  */
 private const val COLOR_WHITE: Int = -1 // 0xFFFFFFFF
 private val COLOR_BAR_DARK: Int = 0xFE000000.toInt() // 0xFE000000
+private val COLOR_TRANSLUCENT_BOTTOM_BAR: Int = 0xCC071321.toInt()
 
 class PreviewEffectAdapter {
 
@@ -115,27 +116,64 @@ class PreviewEffectAdapter {
         return WatermarkHintSpec(
             templateId = effect.templateId,
             placement = effect.style.textPlacement,
-            previewText = effect.tokens["watermarkModel"] ?: "Watermark",
+            previewText = resolvePreviewText(effect),
             opacity = effect.style.textOpacity.alphaFraction * 0.6f,
             shape = resolveWatermarkShape(effect.templateId),
             textScale = effect.style.textScale.multiplier,
             previewLabels = buildPreviewLabels(effect),
-            barBackground = resolveBarBackground(effect)
+            barBackground = resolveBarBackground(effect),
+            decoration = resolveWatermarkDecoration(effect.templateId)
         )
     }
 
     private fun resolveWatermarkShape(templateId: String): WatermarkPreviewShape {
         return when (templateId) {
-            "pure-text" -> WatermarkPreviewShape.TEXT_ONLY
+            "pure-text" -> WatermarkPreviewShape.BOTTOM_BAR
             "blur-four-border" -> WatermarkPreviewShape.FOUR_BORDER
             "professional-bottom-bar" -> WatermarkPreviewShape.BOTTOM_BAR
-            "travel-polaroid", "retro-frame" -> WatermarkPreviewShape.EXPANDED_FRAME
+            "travel-polaroid",
+            "retro-frame",
+            "night-street",
+            "van-gogh-starry",
+            "blue-hour" -> WatermarkPreviewShape.EXPANDED_FRAME
             else -> WatermarkPreviewShape.BACKED_TEXT
         }
     }
 
+    private fun resolveWatermarkDecoration(templateId: String): WatermarkPreviewDecoration {
+        return when (templateId) {
+            "travel-polaroid" -> WatermarkPreviewDecoration.TRAVEL_MAP
+            "retro-frame" -> WatermarkPreviewDecoration.ARCHIVAL_PAPER
+            "night-street" -> WatermarkPreviewDecoration.NIGHT_MEMORY
+            "van-gogh-starry" -> WatermarkPreviewDecoration.STARRY_MOON
+            "blue-hour" -> WatermarkPreviewDecoration.BLUE_HOUR
+            "blur-four-border" -> WatermarkPreviewDecoration.IMPRESSION_CHROMA
+            else -> WatermarkPreviewDecoration.NONE
+        }
+    }
+
+    private fun resolvePreviewText(effect: WatermarkEffect): String {
+        return when (effect.templateId) {
+            "blue-hour" -> "BLUE HOUR"
+            "van-gogh-starry" -> metadataPreviewLabels(effect).joinToString(" · ")
+                .ifBlank { "Watermark" }
+            else -> effect.tokens["watermarkModel"] ?: "Watermark"
+        }
+    }
+
     private fun buildPreviewLabels(effect: WatermarkEffect): List<String> {
-        if (effect.templateId != "professional-bottom-bar") return emptyList()
+        if (
+            effect.templateId != "professional-bottom-bar" &&
+            effect.templateId != "pure-text" &&
+            effect.templateId != "blur-four-border" &&
+            effect.templateId != "van-gogh-starry" &&
+            effect.templateId != "blue-hour"
+        ) {
+            return emptyList()
+        }
+        if (effect.templateId == "van-gogh-starry" || effect.templateId == "blue-hour") {
+            return metadataPreviewLabels(effect)
+        }
         val labels = mutableListOf<String>()
         effect.tokens["watermarkModel"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }
         effect.tokens["datetime"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }
@@ -143,7 +181,16 @@ class PreviewEffectAdapter {
         return labels.ifEmpty { listOf("Watermark") }
     }
 
+    private fun metadataPreviewLabels(effect: WatermarkEffect): List<String> {
+        val labels = mutableListOf<String>()
+        effect.tokens["datetime"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }
+        effect.tokens["location"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }
+        effect.tokens["camera-params"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }
+        return labels.ifEmpty { listOf("Watermark") }
+    }
+
     private fun resolveBarBackground(effect: WatermarkEffect): Int {
+        if (effect.templateId == "pure-text") return COLOR_TRANSLUCENT_BOTTOM_BAR
         if (effect.templateId != "professional-bottom-bar") return 0
         return when (effect.style.frameBackground) {
             com.opencamera.core.settings.WatermarkFrameBackground.DARK -> COLOR_BAR_DARK

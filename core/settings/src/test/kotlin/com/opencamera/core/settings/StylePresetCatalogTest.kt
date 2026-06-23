@@ -199,7 +199,8 @@ class StylePresetCatalogTest {
         val preview = StylePresetCatalog.previewForProfile(testCatalog, "photo-bw")
         assertNotNull(preview)
         assertEquals(1.0f, preview.monochromeLevel)
-        assertEquals("B&W", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isBw)
+        assertEquals("B&W", preview.moodDescriptor.legacyLabel())
     }
 
     @Test
@@ -209,7 +210,8 @@ class StylePresetCatalogTest {
         assertEquals(PreviewTier.NEUTRAL, preview.contrastTier)
         assertEquals(PreviewTier.NEUTRAL, preview.brightnessTier)
         assertEquals(PreviewWarmth.NEUTRAL, preview.warmthDirection)
-        assertEquals("Natural", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isNatural)
+        assertEquals("Natural", preview.moodDescriptor.legacyLabel())
     }
 
     @Test
@@ -245,7 +247,7 @@ class StylePresetCatalogTest {
         val preview = presets.first().preview
         assertEquals(0f, preview.monochromeLevel)
         assertEquals(PreviewTier.NEUTRAL, preview.contrastTier)
-        assertEquals("Natural", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isNatural)
     }
 
     // --- applyAction ---
@@ -358,39 +360,57 @@ class StylePresetCatalogTest {
     // --- mood label derivation ---
 
     @Test
-    fun `mood label vivid for high saturation`() {
+    fun `mood descriptor vivid for high saturation`() {
         val preview = FilterRenderSpec(saturation = 1.2f).toStylePresetPreview()
-        assertEquals("Vivid", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isVivid)
+        assertEquals("Vivid", preview.moodDescriptor.legacyLabel())
     }
 
     @Test
-    fun `mood label film for grain`() {
+    fun `mood descriptor film for grain`() {
         val preview = FilterRenderSpec(grainStrength = 0.1f).toStylePresetPreview()
-        assertEquals("Film", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isFilm)
+        assertEquals("Film", preview.moodDescriptor.legacyLabel())
     }
 
     @Test
-    fun `mood label combines vivid and warm`() {
+    fun `mood descriptor combines vivid and warm`() {
         val preview = FilterRenderSpec(saturation = 1.2f, warmthShift = 5).toStylePresetPreview()
-        assertEquals("Vivid Warm", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isVivid)
+        assertTrue(preview.moodDescriptor.isWarm)
+        assertEquals("Vivid Warm", preview.moodDescriptor.legacyLabel())
     }
 
     @Test
-    fun `mood label monochrome for high monochromeMix`() {
+    fun `mood descriptor monochrome for high monochromeMix`() {
         val preview = FilterRenderSpec(monochromeMix = 0.8f).toStylePresetPreview()
-        assertEquals("Monochrome", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isMonochrome)
+        assertEquals("Monochrome", preview.moodDescriptor.legacyLabel())
     }
 
     @Test
-    fun `mood label punchy for high contrast`() {
+    fun `mood descriptor punchy for high contrast`() {
         val preview = FilterRenderSpec(contrast = 1.2f).toStylePresetPreview()
-        assertEquals("Punchy", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isPunchy)
+        assertEquals("Punchy", preview.moodDescriptor.legacyLabel())
     }
 
     @Test
-    fun `mood label soft for low contrast`() {
+    fun `mood descriptor soft for low contrast`() {
         val preview = FilterRenderSpec(contrast = 0.9f).toStylePresetPreview()
-        assertEquals("Soft", preview.derivedMoodLabel)
+        assertTrue(preview.moodDescriptor.isSoft)
+        assertEquals("Soft", preview.moodDescriptor.legacyLabel())
+    }
+
+    @Test
+    fun `mood descriptor has correct flags for muted soft cool`() {
+        val preview = FilterRenderSpec(saturation = 0.8f, contrast = 0.9f, warmthShift = -5).toStylePresetPreview()
+        assertTrue(preview.moodDescriptor.isMuted)
+        assertTrue(preview.moodDescriptor.isSoft)
+        assertTrue(preview.moodDescriptor.isCool)
+        assertFalse(preview.moodDescriptor.isVivid)
+        assertFalse(preview.moodDescriptor.isPunchy)
+        assertFalse(preview.moodDescriptor.isWarm)
     }
 
     // --- preset does not duplicate persisted selection ---

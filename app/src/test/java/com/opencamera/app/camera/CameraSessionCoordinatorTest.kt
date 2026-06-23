@@ -1289,4 +1289,190 @@ class CameraSessionCoordinatorTest {
         override val lifecycle: Lifecycle
             get() = delegateLifecycle
     }
+
+    // --- Mode switch state machine tests ---
+
+    @Test
+    fun `mode switch state machine transitions STABLE to SWITCHING to STABLE`() = runTest {
+        val photoGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK, enablePreviewSnapshots = true
+        )
+        val checkInGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.FRONT, enablePreviewSnapshots = true
+        )
+        val session = FakeCameraSession(
+            initialState = defaultSessionState(
+                activeMode = ModeId.PHOTO, modeId = ModeId.PHOTO, deviceGraph = photoGraph
+            )
+        )
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        val coordinator = CameraSessionCoordinator(
+            session = session, cameraAdapter = adapter, scope = coordinatorScope
+        )
+        val lifecycleOwner = TestLifecycleOwner()
+        val previewView = allocateInstance(PreviewView::class.java)
+        advanceUntilIdle()
+
+        // Initial bind - stays STABLE
+        assertEquals(ModeSwitchState.STABLE, coordinator.currentModeSwitchState())
+
+        coordinator.attachPreviewHost(lifecycleOwner, previewView)
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.PHOTO, deviceGraph = photoGraph,
+                reason = "initial attach", isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+        assertEquals(ModeSwitchState.STABLE, coordinator.currentModeSwitchState())
+
+        // Mode switch - enters SWITCHING then back to STABLE
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.CHECK_IN, deviceGraph = checkInGraph,
+                reason = "switch to check-in", isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+        // After completion, state should be STABLE again
+        assertEquals(ModeSwitchState.STABLE, coordinator.currentModeSwitchState())
+        assertFalse(coordinator.isGeometryLocked)
+    }
+
+    @Test
+    fun `bindPreview isGeometryLocked is true during mode switch rebind`() = runTest {
+        val photoGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK, enablePreviewSnapshots = true
+        )
+        val checkInGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.FRONT, enablePreviewSnapshots = true
+        )
+        val session = FakeCameraSession(
+            initialState = defaultSessionState(
+                activeMode = ModeId.PHOTO, modeId = ModeId.PHOTO, deviceGraph = photoGraph
+            )
+        )
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        val coordinator = CameraSessionCoordinator(
+            session = session, cameraAdapter = adapter, scope = coordinatorScope
+        )
+        val lifecycleOwner = TestLifecycleOwner()
+        val previewView = allocateInstance(PreviewView::class.java)
+        advanceUntilIdle()
+
+        coordinator.attachPreviewHost(lifecycleOwner, previewView)
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.PHOTO, deviceGraph = photoGraph,
+                reason = "initial attach", isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+
+        assertFalse(coordinator.isGeometryLocked)
+
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.CHECK_IN, deviceGraph = checkInGraph,
+                reason = "mode switch", isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+        assertFalse(coordinator.isGeometryLocked)
+    }
+
+    @Test
+    fun `mode switch on binding failure resets state to STABLE`() = runTest {
+        val photoGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK, enablePreviewSnapshots = true
+        )
+        val checkInGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.FRONT, enablePreviewSnapshots = true
+        )
+        val session = FakeCameraSession(
+            initialState = defaultSessionState(
+                activeMode = ModeId.PHOTO, modeId = ModeId.PHOTO, deviceGraph = photoGraph
+            )
+        )
+        val adapter = FakeCameraDeviceAdapter(
+            bindResults = ArrayDeque(listOf(BindResult.Success, BindResult.Failure("mode switch failed")))
+        )
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        val coordinator = CameraSessionCoordinator(
+            session = session, cameraAdapter = adapter, scope = coordinatorScope
+        )
+        val lifecycleOwner = TestLifecycleOwner()
+        val previewView = allocateInstance(PreviewView::class.java)
+        advanceUntilIdle()
+
+        coordinator.attachPreviewHost(lifecycleOwner, previewView)
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.PHOTO, deviceGraph = photoGraph,
+                reason = "initial attach", isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.CHECK_IN, deviceGraph = checkInGraph,
+                reason = "mode switch that will fail", isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(ModeSwitchState.STABLE, coordinator.currentModeSwitchState())
+        assertFalse(coordinator.isGeometryLocked)
+    }
+
+    @Test
+    fun `same mode rebind with different graph does not trigger mode switch`() = runTest {
+        val initialGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK, enablePreviewSnapshots = true
+        )
+        val updatedGraph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK, enablePreviewSnapshots = true,
+            resolutionOption = com.opencamera.core.media.StillCaptureResolutionOption(
+                tagValue = "48mp", label = "48MP",
+                targetWidth = 8000, targetHeight = 6000
+            )
+        )
+        val session = FakeCameraSession(
+            initialState = defaultSessionState(
+                activeMode = ModeId.PHOTO, modeId = ModeId.PHOTO, deviceGraph = initialGraph
+            )
+        )
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        val coordinator = CameraSessionCoordinator(
+            session = session, cameraAdapter = adapter, scope = coordinatorScope
+        )
+        val lifecycleOwner = TestLifecycleOwner()
+        val previewView = allocateInstance(PreviewView::class.java)
+        advanceUntilIdle()
+
+        coordinator.attachPreviewHost(lifecycleOwner, previewView)
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.PHOTO, deviceGraph = initialGraph,
+                reason = "initial attach", isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+        assertEquals(ModeSwitchState.STABLE, coordinator.currentModeSwitchState())
+
+        // Same mode, different graph - should NOT trigger mode switch
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.PHOTO, deviceGraph = updatedGraph,
+                reason = "resolution changed", isRecovery = false
+            )
+        )
+        advanceUntilIdle()
+        assertEquals(ModeSwitchState.STABLE, coordinator.currentModeSwitchState())
+        assertFalse(coordinator.isGeometryLocked)
+    }
 }

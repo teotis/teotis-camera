@@ -362,4 +362,47 @@ class EffectBridgeTest {
         val tags = EffectBridge.toMetadataTags(EffectSpec(listOf(filter)))
         assertFalse(tags.containsKey("stillResolution"))
     }
+
+    @Test
+    fun `toMetadataTags maps DocumentEffect with colorMode and scanGuide`() {
+        val effect = DocumentEffect(
+            autoCrop = true,
+            contrastProfile = "high",
+            colorMode = DocumentColorMode.GRAYSCALE,
+            scanGuide = true
+        )
+        val spec = EffectSpec(listOf(effect))
+
+        val tags = EffectBridge.toMetadataTags(spec)
+
+        assertEquals("document", tags["mode"])
+        assertEquals("true", tags["autoCrop"])
+        assertEquals("high", tags["contrastProfile"])
+        assertEquals("grayscale", tags["documentColorMode"])
+        assertEquals("true", tags["documentScanGuide"])
+    }
+
+    @Test
+    fun `toMetadataTags omits documentColorMode when null`() {
+        val effect = DocumentEffect(autoCrop = true, contrastProfile = "high")
+        val spec = EffectSpec(listOf(effect))
+
+        val tags = EffectBridge.toMetadataTags(spec)
+
+        assertNull(tags["documentColorMode"])
+        assertEquals("false", tags["documentScanGuide"])
+    }
+
+    @Test
+    fun `toMetadataTags emits all color modes`() {
+        for (mode in DocumentColorMode.entries) {
+            val effect = DocumentEffect(
+                autoCrop = false,
+                contrastProfile = null,
+                colorMode = mode
+            )
+            val tags = EffectBridge.toMetadataTags(EffectSpec(listOf(effect)))
+            assertEquals(mode.tagValue, tags["documentColorMode"])
+        }
+    }
 }

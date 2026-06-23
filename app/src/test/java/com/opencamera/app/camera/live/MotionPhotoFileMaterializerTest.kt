@@ -89,6 +89,53 @@ class MotionPhotoFileMaterializerTest {
         }
     }
 
+    @Test
+    fun `materialize output contains GCamera prefix and 4-byte trailer`() {
+        val tempDir = Files.createTempDirectory("motion-photo-verify").toFile()
+        try {
+            val stillFile = File(tempDir, "capture.jpg").apply {
+                writeBytes(makeMinimalJpeg())
+            }
+            val motionFile = File(tempDir, "capture.mp4").apply {
+                writeBytes(makeFakeMp4())
+            }
+            val outputFile = File(tempDir, "capture_MP.jpg")
+
+            val materializer = MotionPhotoFileMaterializer()
+            val result = materializer.materialize(
+                stillPath = stillFile.absolutePath,
+                motionPath = motionFile.absolutePath,
+                outputPath = outputFile.absolutePath,
+                spec = MotionPhotoContainerSpec(motionLengthBytes = motionFile.length())
+            )
+
+            assertTrue(result.isSuccess)
+            val outputBytes = outputFile.readBytes()
+            val outputStr = String(outputBytes, Charsets.UTF_8)
+
+            // XMP must use GCamera: prefix
+            assertTrue("Output must contain GCamera:MotionPhoto", outputStr.contains("GCamera:MotionPhoto=\"1\""))
+            assertFalse("Output must not use old Camera: prefix", outputStr.contains("xmlns:Camera="))
+
+            // Last 4 bytes = motion offset trailer pointing to motion payload start
+            assertTrue("Output must have at least 4-byte trailer", outputBytes.size >= makeFakeMp4().size + 4)
+            val last4 = outputBytes.copyOfRange(outputBytes.size - 4, outputBytes.size)
+            val trailerOffset = ((last4[0].toInt() and 0xFF) shl 24) or
+                ((last4[1].toInt() and 0xFF) shl 16) or
+                ((last4[2].toInt() and 0xFF) shl 8) or
+                (last4[3].toInt() and 0xFF)
+            assertTrue("Trailer offset must be > 0", trailerOffset > 0)
+
+            // Primary Item:Length must be non-zero (equals JPEG part bytes)
+            val primaryPattern = Regex("Item:Semantic=\"Primary\" Item:Length=\"(\\d+)\"")
+            val primaryMatch = primaryPattern.find(outputStr)
+            assertNotNull("Primary Item:Length must be present", primaryMatch)
+            assertTrue("Primary Item:Length must be > 0", primaryMatch!!.groupValues[1].toLong() > 0)
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
     private fun makeMinimalJpeg(): ByteArray {
         return byteArrayOf(
             0xFF.toByte(), 0xD8.toByte(), // SOI

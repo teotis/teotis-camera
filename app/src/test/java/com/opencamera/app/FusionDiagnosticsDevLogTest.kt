@@ -63,21 +63,22 @@ class FusionDiagnosticsDevLogTest {
                 "merge:motion-policy=lowest-score=0.12"
             )
         )
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = baseEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            resourceDiagnostics = resourceDiag
+            linkEvents = emptyList(),
+            resourceDiagnostics = resourceDiag,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertTrue(model.exportContent.contains("merge:applied=true"),
+        assertTrue(exportContent.contains("merge:applied=true"),
             "Dev log should surface merge:applied=true")
-        assertTrue(model.exportContent.contains("merge:strategy=pixel-average"),
+        assertTrue(exportContent.contains("merge:strategy=pixel-average"),
             "Dev log should surface merge strategy")
-        assertTrue(model.exportContent.contains("merge:inputs=3"),
+        assertTrue(exportContent.contains("merge:inputs=3"),
             "Dev log should surface input frame count")
-        assertTrue(model.exportContent.contains("merge:reference-frame=2"),
+        assertTrue(exportContent.contains("merge:reference-frame=2"),
             "Dev log should surface reference frame index")
     }
 
@@ -98,33 +99,35 @@ class FusionDiagnosticsDevLogTest {
                 "degraded:multi-frame-fusion"
             )
         )
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = baseEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            resourceDiagnostics = resourceDiag
+            linkEvents = emptyList(),
+            resourceDiagnostics = resourceDiag,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertTrue(model.exportContent.contains("merge:applied=false"),
+        assertTrue(exportContent.contains("merge:applied=false"),
             "Dev log should surface merge:applied=false")
-        assertTrue(model.exportContent.contains("degraded:multi-frame-fusion"),
+        assertTrue(exportContent.contains("degraded:multi-frame-fusion"),
             "Dev log should surface degradation label")
-        assertTrue(model.exportContent.contains("merge:skipped=insufficient-valid-frames"),
+        assertTrue(exportContent.contains("merge:skipped=insufficient-valid-frames"),
             "Dev log should surface skip reason")
     }
 
     @Test
     fun `dev log omits fusion notes when resource diagnostics is null`() {
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = baseEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            resourceDiagnostics = null
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertFalse(model.exportContent.contains("merge:"),
+        assertFalse(exportContent.contains("merge:"),
             "No merge notes should appear without resource diagnostics")
     }
 
@@ -145,17 +148,18 @@ class FusionDiagnosticsDevLogTest {
                 "merge:pixel-averaged=6-frames"
             )
         )
-        val model = devLogRenderModel(
+        val exportContent = buildDevLogExportContent(
             state = defaultTestSessionState(),
             traceEvents = baseEvents,
-            isDebugBuild = true,
-            selectedTab = DevLogTab.ALL,
-            text = TestAppTextResolver(),
-            resourceDiagnostics = resourceDiag
+            linkEvents = emptyList(),
+            resourceDiagnostics = resourceDiag,
+            deviceProbeSummary = null,
+            pipelineNotes = emptyList(),
+            clearCutoffs = DevLogClearCutoffs()
         )
-        assertTrue(model.exportContent.contains("merge:pixel-average-frames=6"),
+        assertTrue(exportContent.contains("merge:pixel-average-frames=6"),
             "Dev log should show pixel average frame count")
-        assertTrue(model.exportContent.contains("merge:pixel-average-max-dim=1600"),
+        assertTrue(exportContent.contains("merge:pixel-average-max-dim=1600"),
             "Dev log should show pixel average max dimension")
     }
 

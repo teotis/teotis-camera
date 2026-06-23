@@ -537,8 +537,8 @@ class VideoModePluginTest {
         assertFalse(metadata.containsKey("stillQuality"))
         assertFalse(metadata.containsKey("watermarkTemplate"))
         assertFalse(metadata.containsKey("watermarkModel"))
-        // frameRatio is present (16:9) as a preview/capture aspect guide — honest video metadata
-        assertEquals("16:9", metadata["frameRatio"])
+        // frameRatio is present as the preview/capture aspect guide; video starts from the shared 4:3 frame.
+        assertEquals("4:3", metadata["frameRatio"])
         assertFalse(metadata.containsKey("stillResolution"))
         assertFalse(metadata.containsKey("photoLowLightStrategy"))
         assertFalse(metadata.containsKey("checkInScenario"))
@@ -563,14 +563,14 @@ class VideoModePluginTest {
     }
 
     @Test
-    fun `char video effect spec has FilterEffect and FrameEffect 16-9 but no watermark`() = runTest {
+    fun `char video effect spec has FilterEffect and default FrameEffect 4-3 but no watermark`() = runTest {
         var capturedSpec: EffectSpec? = null
         val controller = createController(onEffectSpecChanged = { capturedSpec = it })
         controller.onEnter()
         assertNotNull(capturedSpec!!.find<FilterEffect>())
         assertNull(capturedSpec!!.find<com.opencamera.core.effect.WatermarkEffect>())
         val frameEffect = assertNotNull(capturedSpec!!.find<FrameEffect>())
-        assertEquals(FrameRatio.RATIO_16_9, frameEffect.ratio)
+        assertEquals(FrameRatio.RATIO_4_3, frameEffect.ratio)
     }
 
     @Test

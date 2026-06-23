@@ -4,6 +4,7 @@ import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.settings.WatermarkStyleSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -114,6 +115,48 @@ class EffectCapabilityResolverTest {
         val degraded = report.results[0].entry as DocumentEffect
         assertEquals(false, degraded.autoCrop)
         assertNull(degraded.contrastProfile)
+    }
+
+    @Test
+    fun `document effect degraded resets colorMode to null and scanGuide to false`() {
+        val document = DocumentEffect(
+            autoCrop = true,
+            contrastProfile = "high",
+            colorMode = DocumentColorMode.BLACK_AND_WHITE,
+            scanGuide = true
+        )
+        val spec = EffectSpec(listOf(document))
+        val resolver = EffectCapabilityResolver(
+            FakeEffectCapabilityQuery(documentGeometry = false)
+        )
+
+        val report = resolver.resolve(spec)
+
+        assertEquals(EffectSupport.DEGRADED, report.results[0].support)
+        val degraded = report.results[0].entry as DocumentEffect
+        assertNull(degraded.colorMode)
+        assertFalse(degraded.scanGuide)
+        assertEquals(false, degraded.autoCrop)
+        assertNull(degraded.contrastProfile)
+    }
+
+    @Test
+    fun `document effect supported preserves colorMode and scanGuide`() {
+        val document = DocumentEffect(
+            autoCrop = true,
+            contrastProfile = "high",
+            colorMode = DocumentColorMode.COLOR_ENHANCED,
+            scanGuide = true
+        )
+        val spec = EffectSpec(listOf(document))
+        val resolver = EffectCapabilityResolver(FakeEffectCapabilityQuery())
+
+        val report = resolver.resolve(spec)
+
+        assertEquals(EffectSupport.SUPPORTED, report.results[0].support)
+        val entry = report.results[0].entry as DocumentEffect
+        assertEquals(DocumentColorMode.COLOR_ENHANCED, entry.colorMode)
+        assertTrue(entry.scanGuide)
     }
 
     @Test
