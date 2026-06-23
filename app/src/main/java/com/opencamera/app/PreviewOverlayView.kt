@@ -419,7 +419,7 @@ class PreviewOverlayView @JvmOverloads constructor(
         val previousTextColor = watermarkHintPaint.color
         watermarkHintPaint.color = when (spec.decoration) {
             WatermarkPreviewDecoration.TRAVEL_MAP -> Color.rgb(42, 82, 61)
-            WatermarkPreviewDecoration.ARCHIVAL_PAPER -> Color.rgb(96, 80, 58)
+            WatermarkPreviewDecoration.ARCHIVAL_PAPER -> Color.rgb(224, 205, 154)
             WatermarkPreviewDecoration.NIGHT_MEMORY -> Color.rgb(226, 232, 240)
             WatermarkPreviewDecoration.STARRY_MOON -> Color.rgb(232, 205, 146)
             WatermarkPreviewDecoration.BLUE_HOUR -> Color.rgb(196, 218, 246)
@@ -429,17 +429,17 @@ class PreviewOverlayView @JvmOverloads constructor(
         val rect = activeFrameRectOrFullView()
         val paperAlpha = expandedFramePaperAlpha(spec.templateId, spec.opacity)
         watermarkPaperPaint.color = when (spec.templateId) {
-            "retro-frame" -> Color.argb(paperAlpha, 250, 242, 221)
+            "retro-frame" -> Color.argb((spec.opacity * 184).toInt().coerceIn(0, 184), 14, 36, 29)
             "night-street" -> Color.argb((spec.opacity * 210).toInt().coerceIn(0, 210), 7, 14, 36)
             "van-gogh-starry" -> Color.argb((spec.opacity * 218).toInt().coerceIn(0, 218), 5, 18, 48)
-            "blue-hour" -> Color.argb((spec.opacity * 206).toInt().coerceIn(0, 206), 4, 24, 46)
+            "blue-hour" -> Color.argb((spec.opacity * 226).toInt().coerceIn(0, 226), 4, 24, 46)
             else -> Color.argb(paperAlpha, 252, 246, 229)
         }
         watermarkHairlinePaint.color = when (spec.templateId) {
-            "retro-frame" -> Color.argb((spec.opacity * 92).toInt().coerceIn(0, 92), 130, 104, 70)
+            "retro-frame" -> Color.argb((spec.opacity * 148).toInt().coerceIn(0, 148), 218, 190, 126)
             "night-street" -> Color.argb((spec.opacity * 88).toInt().coerceIn(0, 88), 168, 178, 198)
             "van-gogh-starry" -> Color.argb((spec.opacity * 126).toInt().coerceIn(0, 126), 218, 170, 84)
-            "blue-hour" -> Color.argb((spec.opacity * 118).toInt().coerceIn(0, 118), 156, 194, 232)
+            "blue-hour" -> Color.argb((spec.opacity * 156).toInt().coerceIn(0, 156), 156, 204, 250)
             else -> Color.argb((spec.opacity * 72).toInt().coerceIn(0, 72), 96, 68, 42)
         }
         val sideBand = (rect.width() * 0.035f).coerceIn(10f * density, 28f * density)
@@ -456,7 +456,7 @@ class PreviewOverlayView @JvmOverloads constructor(
         if (topFrameBand > 0f) {
             canvas.drawRect(rect.left - leftBand, rect.top - topFrameBand, rect.right + rightBand, rect.top, watermarkPaperPaint)
         }
-        val bottomRect = expandedFrameBottomBandRect(rect, height, density)
+        val bottomRect = expandedFrameBottomBandRect(rect, height, density, spec.templateId)
         if (bottomRect != null) {
             canvas.drawRect(
                 bottomRect.left - leftBand,
@@ -609,15 +609,15 @@ class PreviewOverlayView @JvmOverloads constructor(
         opacity: Float
     ) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(132, 104, 66)
-            alpha = (opacity * 128).toInt().coerceIn(0, 128)
+            color = Color.rgb(218, 190, 126)
+            alpha = (opacity * 164).toInt().coerceIn(0, 164)
             style = Paint.Style.STROKE
             strokeWidth = 1.0f * density
             strokeCap = Paint.Cap.SQUARE
         }
         val finePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(182, 146, 92)
-            alpha = (opacity * 72).toInt().coerceIn(0, 72)
+            color = Color.rgb(122, 98, 58)
+            alpha = (opacity * 104).toInt().coerceIn(0, 104)
             style = Paint.Style.STROKE
             strokeWidth = 0.75f * density
         }
@@ -776,9 +776,9 @@ class PreviewOverlayView @JvmOverloads constructor(
     ) {
         val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(158, 202, 238)
-            alpha = (opacity * 132).toInt().coerceIn(0, 132)
+            alpha = (opacity * 178).toInt().coerceIn(0, 178)
             style = Paint.Style.STROKE
-            strokeWidth = 0.85f * density
+            strokeWidth = 1.05f * density
             strokeCap = Paint.Cap.ROUND
         }
         val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -801,6 +801,34 @@ class PreviewOverlayView @JvmOverloads constructor(
             radius,
             linePaint
         )
+        val innerPaint = Paint(linePaint).apply {
+            alpha = (opacity * 118).toInt().coerceIn(0, 118)
+            strokeWidth = 0.7f * density
+        }
+        canvas.drawRoundRect(
+            RectF(
+                frameRect.left + inset * 2.0f,
+                frameRect.top + inset * 1.8f,
+                frameRect.right - inset * 2.0f,
+                (bottomRect?.bottom ?: frameRect.bottom) - inset * 1.8f
+            ),
+            radius * 0.72f,
+            radius * 0.72f,
+            innerPaint
+        )
+        repeat(5) { index ->
+            val y = frameRect.top + inset * (1.05f + index * 0.34f)
+            canvas.drawLine(
+                frameRect.left + inset * (1.2f + index * 0.25f),
+                y,
+                frameRect.right - inset * (1.4f + index * 0.12f),
+                y + density * 1.2f,
+                Paint(linePaint).apply {
+                    alpha = (opacity * (62 + index * 15)).toInt().coerceIn(0, 142)
+                    strokeWidth = 0.55f * density
+                }
+            )
+        }
         bottomRect?.let { band ->
             val x = band.right - 58f * density
             val y = band.top + band.height() * 0.48f
@@ -1373,9 +1401,14 @@ internal fun orientedFrameRatio(
 internal fun expandedFrameBottomBandRect(
     rect: RectF,
     viewHeight: Int,
-    density: Float
+    density: Float,
+    templateId: String? = null
 ): RectF? {
-    val bottomBand = (rect.height() * 0.15f).coerceIn(56f * density, 150f * density)
+    val bottomBand = if (templateId == "retro-frame") {
+        (rect.height() * 0.095f).coerceIn(42f * density, 104f * density)
+    } else {
+        (rect.height() * 0.15f).coerceIn(56f * density, 150f * density)
+    }
     val bottomFrameBand = bottomBand.coerceAtMost(viewHeight - rect.bottom)
     if (bottomFrameBand <= 0f) return null
     return RectF(rect.left, rect.bottom, rect.right, rect.bottom + bottomFrameBand)
@@ -1385,7 +1418,7 @@ internal fun expandedFramePaperAlpha(
     templateId: String,
     previewOpacity: Float
 ): Int {
-    val maxAlpha = if (templateId == "retro-frame") 120 else 160
+    val maxAlpha = if (templateId == "retro-frame") 150 else 160
     return (previewOpacity.coerceIn(0f, 1f) * maxAlpha).toInt().coerceIn(0, maxAlpha)
 }
 

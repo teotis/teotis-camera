@@ -313,6 +313,7 @@
     <string name="disabled_frame_ratio_unsupported_mode">当前模式不支持画幅</string>
     <string name="disabled_frame_ratio_active_shot">等待当前拍摄完成后才能切换画幅</string>
     <string name="disabled_frame_ratio_countdown">倒计时结束后才能切换画幅</string>
+    <string name="disabled_live_photo_unsupported_mode">当前模式不支持实况</string>
     <string name="status_recording_starting">启动录制中…</string>
     <string name="status_recording_active">录制中</string>
     <string name="status_recording_saving">保存中…</string>

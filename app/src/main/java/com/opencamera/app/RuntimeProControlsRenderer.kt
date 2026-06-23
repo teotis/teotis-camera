@@ -29,13 +29,19 @@ internal class RuntimeProControlsRenderer(
 
         views.chips.removeAllViews()
         model.controls.forEach { control ->
-            val chip = Button(context, null, 0, R.style.Widget_OpenCamera_CompactButton).apply {
+            val isAutoValue = control.value.isAutoValue()
+            val chip = Button(context, null, 0, R.style.Widget_OpenCamera_TopActionChip).apply {
                 text = control.compactLabel()
                 contentDescription = control.accessibilityLabel()
+                background = ContextCompat.getDrawable(context, R.drawable.bg_pro_glass_chip)
+                backgroundTintList = null
                 isAllCaps = false
                 maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
-                minWidth = 58.dp
+                minWidth = context.resources.getDimensionPixelSize(R.dimen.pro_glass_chip_min_width)
+                minHeight = 44.dp
+                includeFontPadding = false
+                setPadding(10.dp, 4.dp, 10.dp, 4.dp)
                 isEnabled = control.isInteractive
                 alpha = when {
                     control.isInteractive -> 1f
@@ -44,13 +50,14 @@ internal class RuntimeProControlsRenderer(
                 }
                 setTextColor(
                     when {
+                        control.isInteractive && !isAutoValue -> ContextCompat.getColor(context, R.color.oc_accent)
                         control.isInteractive -> ContextCompat.getColor(context, R.color.oc_text_primary)
                         control.availability == SettingsControlAvailability.DEGRADED ->
                             ContextCompat.getColor(context, R.color.oc_text_secondary)
                         else -> ContextCompat.getColor(context, R.color.oc_text_muted)
                     }
                 )
-                setTypeface(null, if (control.value.isAutoValue()) Typeface.NORMAL else Typeface.BOLD)
+                setTypeface(null, if (isAutoValue) Typeface.NORMAL else Typeface.BOLD)
                 setOnClickListener { onApplyControl(control) }
             }
             views.chips.addView(

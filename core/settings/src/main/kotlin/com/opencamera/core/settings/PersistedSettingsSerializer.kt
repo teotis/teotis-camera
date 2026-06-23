@@ -43,6 +43,14 @@ object PersistedSettingsSerializer {
     private const val KEY_PHOTO_WATERMARK_NIGHT_STREET_SCALE = "photo.watermark.nightStreet.scale"
     private const val KEY_PHOTO_WATERMARK_NIGHT_STREET_OPACITY = "photo.watermark.nightStreet.opacity"
     private const val KEY_PHOTO_WATERMARK_NIGHT_STREET_BACKGROUND = "photo.watermark.nightStreet.background"
+    private const val KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_POSITION = "photo.watermark.vanGoghStarry.position"
+    private const val KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_SCALE = "photo.watermark.vanGoghStarry.scale"
+    private const val KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_OPACITY = "photo.watermark.vanGoghStarry.opacity"
+    private const val KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_BACKGROUND = "photo.watermark.vanGoghStarry.background"
+    private const val KEY_PHOTO_WATERMARK_BLUE_HOUR_POSITION = "photo.watermark.blueHour.position"
+    private const val KEY_PHOTO_WATERMARK_BLUE_HOUR_SCALE = "photo.watermark.blueHour.scale"
+    private const val KEY_PHOTO_WATERMARK_BLUE_HOUR_OPACITY = "photo.watermark.blueHour.opacity"
+    private const val KEY_PHOTO_WATERMARK_BLUE_HOUR_BACKGROUND = "photo.watermark.blueHour.background"
     private const val KEY_PHOTO_LIVE_DEFAULT = "photo.livePhotoEnabledByDefault"
     private const val KEY_PHOTO_LIVE_SAVE_FORMAT = "photo.live.saveFormat"
     private const val KEY_PHOTO_COUNTDOWN = "photo.countdownDuration"
@@ -103,6 +111,14 @@ object PersistedSettingsSerializer {
             KEY_PHOTO_WATERMARK_NIGHT_STREET_SCALE to settings.photo.nightStreetWatermarkStyle.textScale.storageKey,
             KEY_PHOTO_WATERMARK_NIGHT_STREET_OPACITY to settings.photo.nightStreetWatermarkStyle.textOpacity.storageKey,
             KEY_PHOTO_WATERMARK_NIGHT_STREET_BACKGROUND to settings.photo.nightStreetWatermarkStyle.frameBackground.storageKey,
+            KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_POSITION to settings.photo.vanGoghStarryWatermarkStyle.textPlacement.storageKey,
+            KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_SCALE to settings.photo.vanGoghStarryWatermarkStyle.textScale.storageKey,
+            KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_OPACITY to settings.photo.vanGoghStarryWatermarkStyle.textOpacity.storageKey,
+            KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_BACKGROUND to settings.photo.vanGoghStarryWatermarkStyle.frameBackground.storageKey,
+            KEY_PHOTO_WATERMARK_BLUE_HOUR_POSITION to settings.photo.blueHourWatermarkStyle.textPlacement.storageKey,
+            KEY_PHOTO_WATERMARK_BLUE_HOUR_SCALE to settings.photo.blueHourWatermarkStyle.textScale.storageKey,
+            KEY_PHOTO_WATERMARK_BLUE_HOUR_OPACITY to settings.photo.blueHourWatermarkStyle.textOpacity.storageKey,
+            KEY_PHOTO_WATERMARK_BLUE_HOUR_BACKGROUND to settings.photo.blueHourWatermarkStyle.frameBackground.storageKey,
             KEY_PHOTO_LIVE_DEFAULT to settings.photo.livePhotoEnabledByDefault.toString(),
             KEY_PHOTO_LIVE_SAVE_FORMAT to settings.photo.liveSaveFormat.storageKey,
             KEY_PHOTO_COUNTDOWN to settings.photo.countdownDuration.storageKey,
@@ -266,6 +282,34 @@ object PersistedSettingsSerializer {
                     frameBackground = WatermarkFrameBackground.fromStorageKey(
                         values[KEY_PHOTO_WATERMARK_NIGHT_STREET_BACKGROUND]
                     ) ?: defaults.photo.nightStreetWatermarkStyle.frameBackground
+                ),
+                vanGoghStarryWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_POSITION]
+                    ) ?: defaults.photo.vanGoghStarryWatermarkStyle.textPlacement,
+                    textScale = WatermarkTextScale.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_SCALE]
+                    ) ?: defaults.photo.vanGoghStarryWatermarkStyle.textScale,
+                    textOpacity = WatermarkTextOpacity.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_OPACITY]
+                    ) ?: defaults.photo.vanGoghStarryWatermarkStyle.textOpacity,
+                    frameBackground = WatermarkFrameBackground.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_VAN_GOGH_STARRY_BACKGROUND]
+                    ) ?: defaults.photo.vanGoghStarryWatermarkStyle.frameBackground
+                ),
+                blueHourWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_BLUE_HOUR_POSITION]
+                    ) ?: defaults.photo.blueHourWatermarkStyle.textPlacement,
+                    textScale = WatermarkTextScale.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_BLUE_HOUR_SCALE]
+                    ) ?: defaults.photo.blueHourWatermarkStyle.textScale,
+                    textOpacity = WatermarkTextOpacity.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_BLUE_HOUR_OPACITY]
+                    ) ?: defaults.photo.blueHourWatermarkStyle.textOpacity,
+                    frameBackground = WatermarkFrameBackground.fromStorageKey(
+                        values[KEY_PHOTO_WATERMARK_BLUE_HOUR_BACKGROUND]
+                    ) ?: defaults.photo.blueHourWatermarkStyle.frameBackground
                 ),
                 livePhotoEnabledByDefault = parseBoolean(
                     values[KEY_PHOTO_LIVE_DEFAULT],

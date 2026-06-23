@@ -30,6 +30,7 @@ import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.outputPathOrNull
+import com.opencamera.core.media.renderUriOrNull
 import com.opencamera.core.mode.ModeContext
 import com.opencamera.core.mode.ModeController
 import com.opencamera.core.mode.ModeId
@@ -213,6 +214,26 @@ class DefaultCameraSession(
                     outputPath = outputPath
                 ),
                 lastAction = "Capture feedback ready"
+            )
+        }
+
+        override fun updateDocumentBatchPreviewItem(shot: ShotRequest, outputPath: String) {
+            val source = ThumbnailSource.PreviewSnapshot(outputPath)
+            val previewItem = DocumentBatchItem(
+                itemId = shot.shotId,
+                shotId = shot.shotId,
+                orderIndex = _state.value.presentation.documentBatch.items.size,
+                outputPath = null,
+                renderUri = source.renderUriOrNull() ?: source.outputPathOrNull(),
+                thumbnailSource = source,
+                profileId = shot.saveRequest.metadata.customTags["profile"],
+                scanMode = shot.saveRequest.metadata.customTags["scanMode"],
+                cropStatus = DocumentBatchCropStatus.NOT_REQUESTED,
+                pipelineNotes = listOf("document:preview-feedback")
+            )
+            updateState(
+                documentBatch = _state.value.presentation.documentBatch.upsertPreviewItem(previewItem),
+                lastAction = "Document page preview ready"
             )
         }
 

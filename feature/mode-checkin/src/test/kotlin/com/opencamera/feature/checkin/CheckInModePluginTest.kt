@@ -78,6 +78,21 @@ class CheckInModePluginTest {
     }
 
     @Test
+    fun `clarity onEnter still emits watermark preview effect`(): Unit = runBlocking {
+        val effects = mutableListOf<EffectSpec>()
+        val controller = createController(
+            initialScenarioId = "clarity",
+            onEffectSpecChanged = { effects += it }
+        )
+
+        controller.onEnter()
+
+        val spec = effects.single()
+        assertTrue(spec.find<WatermarkEffect>() != null, "Clarity preview should retain WatermarkEffect")
+        assertTrue(spec.find<FrameEffect>() != null, "Clarity preview should retain FrameEffect")
+    }
+
+    @Test
     fun `onExit emits checkin exit and updates snapshot`(): Unit = runBlocking {
         val events = mutableListOf<String>()
         val controller = createController(eventSink = { events += it })
@@ -496,6 +511,20 @@ class CheckInModePluginTest {
     }
 
     @Test
+    fun `clarity multi frame capture keeps watermark post process`() = runBlocking {
+        val controller = createController(
+            initialScenarioId = "clarity",
+            supportsNightMultiFrame = true
+        )
+
+        val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
+
+        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Check-in 全清"))
+        assertEquals("classic-overlay", signal.strategy.saveRequest.metadata.customTags["watermarkTemplate"])
+        assertEquals("Check-in", signal.strategy.saveRequest.metadata.customTags["watermarkModeName"])
+    }
+
+    @Test
     fun `clarity shutter pressed returns SingleFrame fallback when multi-frame is unsupported`(): Unit = runBlocking {
         val controller = createController(
             initialScenarioId = "clarity",
@@ -511,6 +540,20 @@ class CheckInModePluginTest {
         assertEquals("clarity", metadata["checkInScenario"])
         assertEquals("single-frame", metadata["captureStrategyFallback"])
         assertEquals("multi-frame-unsupported", metadata["degradationReason"])
+    }
+
+    @Test
+    fun `clarity single frame fallback keeps watermark post process`() = runBlocking {
+        val controller = createController(
+            initialScenarioId = "clarity",
+            supportsNightMultiFrame = false
+        )
+
+        val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
+
+        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Check-in 全清"))
+        assertEquals("classic-overlay", signal.strategy.saveRequest.metadata.customTags["watermarkTemplate"])
+        assertEquals("Check-in", signal.strategy.saveRequest.metadata.customTags["watermarkModeName"])
     }
 
     @Test

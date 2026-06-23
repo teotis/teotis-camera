@@ -148,7 +148,8 @@ class AppContainer(
         livePreviewFrameSource = livePreviewFrameSource,
         linkRecorder = linkRecorder,
         extensionSelectorResolver = extensionSelectorResolver,
-        sceneMaskSource = sceneMaskSource
+        sceneMaskSource = sceneMaskSource,
+        postProcessScope = applicationScope
     )
 
     val effectCapabilityResolver = EffectCapabilityResolver(

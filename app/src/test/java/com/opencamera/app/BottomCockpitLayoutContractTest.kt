@@ -12,6 +12,7 @@ import org.w3c.dom.Element
 class BottomCockpitLayoutContractTest {
     private val layout = parseXml(resourceFile("layout/activity_main.xml"))
     private val dimens = parseDimens(resourceFile("values/dimens.xml"))
+    private val themes = parseXml(resourceFile("values/themes.xml"))
 
     @Test
     fun `preview content uses end aligned aspect fit above bottom cockpit`() {
@@ -80,20 +81,47 @@ class BottomCockpitLayoutContractTest {
     }
 
     @Test
-    fun `mode specific controls stay inside bottom cockpit with mode track`() {
+    fun `mode specific capture controls stay inside bottom cockpit while mode action lives on right rail`() {
         val bottomSheet = layout.elementByAndroidId("bottomSheet")
         val bottomSheetChildren = bottomSheet.childElementsByAndroidId()
 
         assertTrue("modeTrackScroll" in bottomSheetChildren)
         assertTrue("focalLengthSlider" in bottomSheetChildren)
+        assertFalse("buttonModeAction" in bottomSheetChildren)
 
         val floatingToolLayer = layout.elementByAndroidId("floatingToolLayer")
         val floatingChildren = floatingToolLayer.childElementsByAndroidId()
 
         assertTrue("filterStripScroll" in floatingChildren)
         assertTrue("runtimeProControlsScroll" in floatingChildren)
-        assertTrue("buttonModeAction" in floatingChildren)
+        assertFalse("buttonModeAction" in floatingChildren)
         assertFalse("focalLengthSlider" in floatingChildren)
+
+        val floatingUtilityGroup = layout.elementByAndroidId("floatingUtilityGroup")
+        val rightRailChildren = floatingUtilityGroup.childElementsByAndroidId()
+
+        assertTrue("buttonModeAction" in rightRailChildren)
+    }
+
+    @Test
+    fun `right rail buttons use semi transparent surface background`() {
+        val style = themes.styleByName("Widget.OpenCamera.RightRailButton")
+
+        assertEquals("@color/oc_surface_scrim_light", style.itemByName("backgroundTint").textContent)
+    }
+
+    @Test
+    fun `runtime pro controls use floating glass strip instead of opaque black bar`() {
+        val proControls = layout.elementByAndroidId("runtimeProControlsScroll")
+
+        assertEquals("@drawable/bg_pro_glass_strip", proControls.androidAttr("background"))
+        assertEquals("@dimen/space_16", proControls.androidAttr("layout_marginHorizontal"))
+        assertEquals("@dimen/pro_glass_strip_min_height", proControls.androidAttr("minHeight"))
+        assertEquals("@dimen/space_4", proControls.androidAttr("paddingVertical"))
+        assertFalse(
+            proControls.androidAttr("background") == "@color/oc_root_background",
+            "Runtime pro controls must not regress to the opaque black camera-root background"
+        )
     }
 
     @Test
@@ -195,6 +223,24 @@ class BottomCockpitLayoutContractTest {
             if (element.getAttribute("android:id") in targetValues) return element
         }
         error("Missing Android id $id")
+    }
+
+    private fun Document.styleByName(name: String): Element {
+        val nodes = getElementsByTagName("style")
+        for (index in 0 until nodes.length) {
+            val element = nodes.item(index) as Element
+            if (element.getAttribute("name") == name) return element
+        }
+        error("Missing style $name")
+    }
+
+    private fun Element.itemByName(name: String): Element {
+        val nodes = getElementsByTagName("item")
+        for (index in 0 until nodes.length) {
+            val element = nodes.item(index) as Element
+            if (element.getAttribute("name") == name) return element
+        }
+        error("Missing item $name")
     }
 
     private fun Element.childElementsByAndroidId(): Set<String> = buildSet {
@@ -334,10 +380,14 @@ class BottomCockpitLayoutContractTest {
 
         assertTrue("filterStripScroll" in floatingChildren)
         assertTrue("runtimeProControlsScroll" in floatingChildren)
-        assertTrue("buttonModeAction" in floatingChildren)
+        assertFalse("buttonModeAction" in floatingChildren)
         assertFalse("stylePresetCardRail" in floatingChildren)
         assertFalse("focalLengthSlider" in floatingChildren)
         assertTrue("recordingIndicator" in floatingChildren)
+
+        val floatingUtilityGroup = layout.elementByAndroidId("floatingUtilityGroup")
+        val rightRailChildren = floatingUtilityGroup.childElementsByAndroidId()
+        assertTrue("buttonModeAction" in rightRailChildren)
     }
 
     @Test

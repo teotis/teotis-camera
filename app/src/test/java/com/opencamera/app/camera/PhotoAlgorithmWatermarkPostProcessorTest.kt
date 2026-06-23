@@ -91,6 +91,16 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
             kotlin.math.abs(Color.blue(a) - Color.blue(b))
     }
 
+    private fun countPixels(bitmap: Bitmap, predicate: (Int) -> Boolean): Int {
+        var count = 0
+        for (y in 0 until bitmap.height) {
+            for (x in 0 until bitmap.width) {
+                if (predicate(bitmap.getPixel(x, y))) count++
+            }
+        }
+        return count
+    }
+
     private fun decodeJpeg(file: File): Bitmap {
         return requireNotNull(BitmapFactory.decodeFile(file.absolutePath)) {
             "processed JPEG must decode"
@@ -239,6 +249,146 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
             } finally {
                 inputFile.delete()
             }
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `complex watermark templates render visible final design ink`() = runTest {
+        val expectations = mapOf(
+            "van-gogh-starry" to { pixel: Int ->
+                Color.red(pixel) > 185 && Color.green(pixel) > 138 && Color.blue(pixel) < 125
+            },
+            "blue-hour" to { pixel: Int ->
+                Color.blue(pixel) > 178 && Color.green(pixel) > 145 && Color.red(pixel) < 185
+            }
+        )
+
+        expectations.forEach { (templateId, accentPredicate) ->
+            val inputFile = writeJpegToTempFile(createSyntheticJpeg(640, 480))
+            try {
+                val processor = PhotoWatermarkPostProcessor(
+                    AndroidPhotoWatermarkEditor(appContext)
+                )
+                val metadata = MediaMetadata(
+                    watermarkText = "OpenCamera",
+                    customTags = mapOf(
+                        privateTemplateKey to templateId,
+                        "watermarkDatetime" to "2026.06.22 19:41",
+                        "watermarkLocation" to "CITY NIGHT",
+                        "watermarkCameraParams" to "24mm"
+                    )
+                )
+                val result = processor.process(
+                    ShotResult(
+                        shotId = "complex-watermark-$templateId",
+                        mediaType = MediaType.PHOTO,
+                        outputPath = inputFile.absolutePath,
+                        outputHandle = MediaOutputHandle(
+                            displayPath = inputFile.absolutePath,
+                            filePath = inputFile.absolutePath
+                        ),
+                        saveRequest = SaveRequest.photoLibrary(metadata = metadata),
+                        thumbnailSource = ThumbnailSource.SavedMedia(
+                            outputPath = inputFile.absolutePath,
+                            renderUri = null
+                        ),
+                        metadata = metadata
+                    )
+                )
+
+                assertTrue(
+                    result.pipelineNotes.any { it.contains("watermark:rendered:$templateId") },
+                    "$templateId must render through its own final-output branch, got: ${result.pipelineNotes}"
+                )
+
+                val bitmap = decodeJpeg(inputFile)
+                try {
+                    assertTrue(
+                        bitmap.width > 640 && bitmap.height > 480,
+                        "$templateId must produce an expanded-frame final JPEG, got ${bitmap.width}x${bitmap.height}"
+                    )
+                    val darkFramePixels = countPixels(bitmap) { pixel ->
+                        Color.red(pixel) < 28 && Color.green(pixel) < 42 && Color.blue(pixel) < 78
+                    }
+                    assertTrue(
+                        darkFramePixels > bitmap.width * bitmap.height * 0.16f,
+                        "$templateId should have a substantial dark frame, darkFramePixels=$darkFramePixels " +
+                            "size=${bitmap.width}x${bitmap.height}"
+                    )
+                    val accentPixels = countPixels(bitmap, accentPredicate)
+                    assertTrue(
+                        accentPixels > bitmap.width * bitmap.height * 0.012f,
+                        "$templateId should preserve visible theme decoration ink, accentPixels=$accentPixels " +
+                            "size=${bitmap.width}x${bitmap.height}"
+                    )
+                } finally {
+                    bitmap.recycle()
+                }
+            } finally {
+                inputFile.delete()
+            }
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `explicit complex template renders even when watermark text is absent`() = runTest {
+        val inputFile = writeJpegToTempFile(createSyntheticJpeg(640, 480))
+        try {
+            val processor = PhotoWatermarkPostProcessor(
+                AndroidPhotoWatermarkEditor(appContext)
+            )
+            val metadata = MediaMetadata(
+                customTags = mapOf(
+                    privateTemplateKey to "van-gogh-starry",
+                    "watermarkDatetime" to "2026.06.22 19:41",
+                    "watermarkLocation" to "CITY NIGHT",
+                    "watermarkCameraParams" to "24mm"
+                )
+            )
+            val result = processor.process(
+                ShotResult(
+                    shotId = "complex-watermark-no-title",
+                    mediaType = MediaType.PHOTO,
+                    outputPath = inputFile.absolutePath,
+                    outputHandle = MediaOutputHandle(
+                        displayPath = inputFile.absolutePath,
+                        filePath = inputFile.absolutePath
+                    ),
+                    saveRequest = SaveRequest.photoLibrary(metadata = metadata),
+                    thumbnailSource = ThumbnailSource.SavedMedia(
+                        outputPath = inputFile.absolutePath,
+                        renderUri = null
+                    ),
+                    metadata = metadata
+                )
+            )
+
+            assertTrue(
+                result.pipelineNotes.any { it.contains("watermark:rendered:van-gogh-starry") },
+                "explicit complex template must render without requiring watermarkText, got: ${result.pipelineNotes}"
+            )
+
+            val bitmap = decodeJpeg(inputFile)
+            try {
+                assertTrue(
+                    bitmap.width > 640 && bitmap.height > 480,
+                    "van-gogh-starry must produce an expanded-frame final JPEG, got ${bitmap.width}x${bitmap.height}"
+                )
+                val accentPixels = countPixels(bitmap) { pixel ->
+                    Color.red(pixel) > 185 && Color.green(pixel) > 138 && Color.blue(pixel) < 125
+                }
+                assertTrue(
+                    accentPixels > bitmap.width * bitmap.height * 0.012f,
+                    "van-gogh-starry should keep visible starry decoration without title text, " +
+                        "accentPixels=$accentPixels size=${bitmap.width}x${bitmap.height}"
+                )
+            } finally {
+                bitmap.recycle()
+            }
+        } finally {
+            inputFile.delete()
         }
     }
 

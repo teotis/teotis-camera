@@ -98,7 +98,10 @@ class PhotoWatermarkPostProcessorTest {
             result = PhotoWatermarkApplied()
         )
         val processor = PhotoWatermarkPostProcessor(editor)
-        val input = photoResult(watermarkText = null)
+        val input = photoResult(
+            watermarkText = null,
+            watermarkTemplate = "classic-overlay"
+        )
         val result = processor.process(input)
 
         assertEquals(0, editor.invocations.size)
@@ -391,7 +394,7 @@ class PhotoWatermarkPostProcessorTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun `retro frame uses archival paper treatment without a heavy center emblem`() {
+    fun `retro frame uses narrow grand tour scholar band`() {
         val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.rgb(176, 160, 136))
         }
@@ -407,14 +410,6 @@ class PhotoWatermarkPostProcessorTest {
         )
 
         val bmp = renderPhotoWatermarkBitmap(source, template).bitmap
-        val centerX = bmp.width / 2
-        val centerEmblemPixels = countPixelsDifferentFromReference(
-            bitmap = bmp,
-            left = centerX - 24,
-            top = bmp.height - 34,
-            right = centerX + 24,
-            bottom = bmp.height - 10
-        )
         val archivalCornerPixels = countSepiaInk(
             bitmap = bmp,
             left = 10,
@@ -422,14 +417,25 @@ class PhotoWatermarkPostProcessorTest {
             right = 92,
             bottom = 92
         )
+        val grandTourGreenPixels = countGreenInk(
+            bitmap = bmp,
+            left = 0,
+            top = source.height + 18,
+            right = bmp.width,
+            bottom = bmp.height
+        )
 
         assertTrue(
-            centerEmblemPixels < 10,
-            "retro frame should not depend on a prominent center emblem, count=$centerEmblemPixels"
+            bmp.height <= source.height + 88,
+            "retro frame bottom band should stay narrow enough for a real watermark, height=${bmp.height}"
         )
         assertTrue(
-            archivalCornerPixels > 10,
-            "retro frame should keep a subtle sepia paper corner treatment, count=$archivalCornerPixels"
+            archivalCornerPixels > 18,
+            "retro frame should keep a brass scholar corner treatment, count=$archivalCornerPixels"
+        )
+        assertTrue(
+            grandTourGreenPixels > 220,
+            "retro frame should use the deep green grand-tour field, count=$grandTourGreenPixels"
         )
         bmp.recycle(); source.recycle()
     }
@@ -518,7 +524,7 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
-    fun `blue hour default title is fixed and uses common params`() {
+    fun `blue hour default title uses blue-hour identity and common params`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "blue-hour",
             watermarkText = "Ignored text",
@@ -532,7 +538,7 @@ class PhotoWatermarkPostProcessorTest {
             preservedExif = emptyMap()
         )
 
-        assertEquals("BLUE HOUR", resolved.title)
+        assertEquals("蓝调时刻", resolved.title)
         assertEquals(listOf("2026.06.22 19:41 • CITY NIGHT", "24mm"), resolved.supportingLines)
         assertEquals(WatermarkFrameBackground.DARK, resolved.frameBackground)
     }
@@ -618,13 +624,13 @@ class PhotoWatermarkPostProcessorTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun `blue hour renders fixed title band and lower right warm icon`() {
+    fun `blue hour renders localized title band and lower right warm icon`() {
         val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.rgb(18, 54, 102))
         }
         val template = ResolvedPhotoWatermarkTemplate(
             templateId = "blue-hour",
-            title = "BLUE HOUR",
+            title = "蓝调时刻",
             supportingLines = listOf("2026.06.22 19:41 • CITY NIGHT", "24mm"),
             frameBackground = WatermarkFrameBackground.DARK,
             usesExpandedFrame = true,
@@ -649,7 +655,7 @@ class PhotoWatermarkPostProcessorTest {
 
         assertTrue(bmp.width > source.width, "blue-hour should add side borders")
         assertTrue(bmp.height > source.height, "blue-hour should add a bottom band")
-        assertTrue(titleInk > 90, "blue-hour should draw a pale BLUE HOUR title, count=$titleInk")
+        assertTrue(titleInk > 90, "blue-hour should draw a pale localized title, count=$titleInk")
         assertTrue(warmIconInk > 18, "blue-hour should draw a warm lower-right icon, count=$warmIconInk")
         bmp.recycle(); source.recycle()
     }
@@ -662,7 +668,7 @@ class PhotoWatermarkPostProcessorTest {
         }
         val template = ResolvedPhotoWatermarkTemplate(
             templateId = "blue-hour",
-            title = "BLUE HOUR",
+            title = "蓝调时刻",
             supportingLines = listOf("2026.06.22 19:41 • CITY NIGHT", "24mm"),
             frameBackground = WatermarkFrameBackground.DARK,
             usesExpandedFrame = true,
@@ -687,8 +693,8 @@ class PhotoWatermarkPostProcessorTest {
             bottom = bmp.height
         )
 
-        assertTrue(topTexture > 120, "blue-hour overlay should texture the top border, count=$topTexture")
-        assertTrue(lowerRightTexture > 120, "blue-hour overlay should decorate the lower-right band, count=$lowerRightTexture")
+        assertTrue(topTexture > 260, "blue-hour overlay should richly texture the top border, count=$topTexture")
+        assertTrue(lowerRightTexture > 220, "blue-hour overlay should decorate the lower-right band, count=$lowerRightTexture")
         bmp.recycle(); source.recycle()
     }
 

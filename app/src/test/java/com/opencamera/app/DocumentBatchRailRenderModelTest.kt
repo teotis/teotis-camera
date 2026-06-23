@@ -208,7 +208,7 @@ class DocumentBatchRailRenderModelTest {
     }
 
     @Test
-    fun `crop status labels match text resolver`() {
+    fun `crop status labels are hidden because document mode keeps originals`() {
         val batchState = DocumentBatchState(
             batchId = "batch-1",
             status = DocumentBatchStatus.ACTIVE,
@@ -224,9 +224,9 @@ class DocumentBatchRailRenderModelTest {
         val model = documentBatchRailRenderModel(state, text)
 
         assertNull(model.items[0].statusLabel)
-        assertEquals("Cropped", model.items[1].statusLabel)
-        assertEquals("Not cropped", model.items[2].statusLabel)
-        assertEquals("Crop failed", model.items[3].statusLabel)
+        assertNull(model.items[1].statusLabel)
+        assertNull(model.items[2].statusLabel)
+        assertNull(model.items[3].statusLabel)
     }
 
     @Test
@@ -298,7 +298,7 @@ class DocumentBatchRailRenderModelTest {
         assertTrue(model.isSlimShooting)
         assertEquals("2 pages", model.countText)
         assertEquals("/images/item-2.jpg", model.latestThumbnailUri)
-        assertEquals("查看批次", model.overviewLabel)
+        assertEquals("Export Batch", model.overviewLabel)
     }
 
     @Test

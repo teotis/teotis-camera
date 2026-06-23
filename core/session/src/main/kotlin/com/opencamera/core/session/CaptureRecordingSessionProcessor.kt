@@ -356,8 +356,8 @@ internal class CaptureRecordingSessionProcessor(
 
     private fun canRearmOnDataReceived(shot: ShotRequest): Boolean {
         if (shot.mediaType != MediaType.PHOTO) return false
-        if (shot.livePhotoSpec != null) return false
-        return shot.shotKind == ShotKind.STILL_CAPTURE
+        return shot.shotKind == ShotKind.STILL_CAPTURE ||
+            shot.shotKind == ShotKind.LIVE_PHOTO
     }
 
     private suspend fun handleDataReceived(shotId: String, mediaType: MediaType) {
@@ -460,9 +460,10 @@ internal class CaptureRecordingSessionProcessor(
     private suspend fun handleShotCompleted(result: ShotResult) {
         if (result.shotId in forceReleasedShotIds) {
             trace.record(
-                "shot.completed.force-released.stale",
+                "shot.completed.force-released.hydrated",
                 "result=${result.shotId}"
             )
+            hydrateForceReleasedDocumentBatchItem(result)
             return
         }
         if (result.shotId in conservativeForceReleasedShotIds) {
@@ -562,10 +563,10 @@ internal class CaptureRecordingSessionProcessor(
                         val currentBatch = s.presentation.documentBatch
                         val cropStatus = documentCropStatusFrom(result.pipelineNotes)
                         val cropSuffix = when (cropStatus) {
-                            DocumentBatchCropStatus.APPLIED -> " • auto-cropped"
-                            DocumentBatchCropStatus.APPLIED_MANUAL -> " • manually cropped"
-                            DocumentBatchCropStatus.SKIPPED -> " • original kept"
-                            DocumentBatchCropStatus.FAILED -> " • processing degraded"
+                            DocumentBatchCropStatus.APPLIED -> ""
+                            DocumentBatchCropStatus.APPLIED_MANUAL -> ""
+                            DocumentBatchCropStatus.SKIPPED -> ""
+                            DocumentBatchCropStatus.FAILED -> ""
                             DocumentBatchCropStatus.NOT_REQUESTED -> ""
                         }
                         val newItem = DocumentBatchItem(
@@ -580,8 +581,16 @@ internal class CaptureRecordingSessionProcessor(
                             cropStatus = cropStatus,
                             pipelineNotes = result.pipelineNotes
                         )
+                        val existingIndex = currentBatch.items.indexOfFirst { it.shotId == result.shotId }
+                        val updatedItems = if (existingIndex >= 0) {
+                            currentBatch.items.mapIndexed { index, item ->
+                                if (index == existingIndex) newItem.copy(orderIndex = item.orderIndex) else item
+                            }
+                        } else {
+                            currentBatch.items + newItem
+                        }
                         currentBatch.copy(
-                            items = currentBatch.items + newItem,
+                            items = updatedItems,
                             latestItemId = newItem.itemId,
                             lastMessage = "Page added$cropSuffix"
                         )
@@ -1051,7 +1060,7 @@ internal class CaptureRecordingSessionProcessor(
             val updatedItems = if (existingItem != null) {
                 currentBatch.items.map { item ->
                     if (item.shotId == shotId) item.copy(
-                        cropStatus = DocumentBatchCropStatus.FAILED,
+                        cropStatus = DocumentBatchCropStatus.NOT_REQUESTED,
                         pipelineNotes = item.pipelineNotes + "document:liveness:force-released"
                     ) else item
                 }
@@ -1065,7 +1074,7 @@ internal class CaptureRecordingSessionProcessor(
                     thumbnailSource = ThumbnailSource.Pending,
                     profileId = null,
                     scanMode = null,
-                    cropStatus = DocumentBatchCropStatus.FAILED,
+                    cropStatus = DocumentBatchCropStatus.NOT_REQUESTED,
                     pipelineNotes = listOf("document:liveness:force-released")
                 )
                 currentBatch.items + newItem
@@ -1089,6 +1098,55 @@ internal class CaptureRecordingSessionProcessor(
             )
         }
         cancelDocumentBatchWatchdog(shotId)
+    }
+
+    private fun hydrateForceReleasedDocumentBatchItem(result: ShotResult) {
+        if (result.mediaType != MediaType.PHOTO) return
+        val cropStatus = documentCropStatusFrom(result.pipelineNotes)
+        updateState.update { s ->
+            val currentBatch = s.presentation.documentBatch
+            if (currentBatch.status != DocumentBatchStatus.ACTIVE) return@update s
+            val existingIndex = currentBatch.items.indexOfFirst { it.shotId == result.shotId }
+            val hydratedItem = DocumentBatchItem(
+                itemId = result.shotId,
+                shotId = result.shotId,
+                orderIndex = if (existingIndex >= 0) {
+                    currentBatch.items[existingIndex].orderIndex
+                } else {
+                    currentBatch.items.size
+                },
+                outputPath = result.outputPath,
+                renderUri = result.thumbnailSource.renderUriOrNull(),
+                thumbnailSource = result.thumbnailSource,
+                profileId = result.metadata.customTags["profile"],
+                scanMode = result.metadata.customTags["scanMode"],
+                cropStatus = cropStatus,
+                pipelineNotes = result.pipelineNotes + "document:liveness:late-result-hydrated"
+            )
+            val updatedItems = if (existingIndex >= 0) {
+                currentBatch.items.mapIndexed { index, item ->
+                    if (index == existingIndex) hydratedItem else item
+                }
+            } else {
+                currentBatch.items + hydratedItem
+            }
+            s.copy(
+                presentation = s.presentation.copy(
+                    previewThumbnailPath = result.thumbnailSource.outputPathOrNull()
+                        ?: s.presentation.previewThumbnailPath,
+                    latestThumbnailSource = result.thumbnailSource,
+                    latestCapturePath = result.outputPath,
+                    latestSavedMediaType = SavedMediaType.PHOTO,
+                    latestPipelineNotes = result.pipelineNotes,
+                    documentBatch = currentBatch.copy(
+                        items = updatedItems,
+                        latestItemId = hydratedItem.itemId,
+                        lastMessage = "Page image ready"
+                    ),
+                    lastError = result.postProcessFailureSummary()
+                )
+            )
+        }
     }
 
     internal fun documentBatchLivenessForTest(): PostProcessLivenessDeadline? = documentBatchLiveness
@@ -1129,11 +1187,11 @@ internal class CaptureRecordingSessionProcessor(
      * Document mode is owned by [maybeStartDocumentBatchWatchdog]; video is owned by
      * [startRecordingWatchdog]. This watchdog covers the post-process window for:
      *
-     * - Ordinary still captures: protects the DATA_RECEIVED → ShotCompleted gap when
-     *   [activeShot] has already been cleared by rearm but [PendingPostprocessUiState]
-     *   is still set. On deadline, clears pendingPostprocess + captureReadiness and
-     *   emits [PostProcessLivenessEvent.DeadlineExpired].
-     * - Conservative kinds (live photo / multi-frame): protects the ShotStarted →
+     * - Re-armable still captures (ordinary still / live photo): protects the
+     *   DATA_RECEIVED → ShotCompleted gap when [activeShot] has already been cleared
+     *   by rearm but [PendingPostprocessUiState] is still set. On deadline, clears
+     *   pendingPostprocess + captureReadiness and emits [PostProcessLivenessEvent.DeadlineExpired].
+     * - Conservative kinds (multi-frame): protects the ShotStarted →
      *   ShotCompleted gap during which [activeShot] stays set. On deadline, emits a
      *   cooperative-cancel trace, waits [conservativeLivenessGraceMs], and if the shot
      *   is still active force-releases [activeShot] + pendingPostprocess and emits
@@ -1152,7 +1210,7 @@ internal class CaptureRecordingSessionProcessor(
         postProcessLivenessShot = shot
         postProcessLivenessConfigSnapshot = buildShotConfigSnapshot(shot)
         postProcessLivenessJob?.cancel()
-        val isConservative = shot.shotKind != ShotKind.STILL_CAPTURE
+        val isConservative = !canRearmOnDataReceived(shot)
         val shotForWatchdog = shot
         postProcessLivenessJob = launchRecordingTimer {
             delay(deadline.budgetMillis)
@@ -1333,11 +1391,7 @@ internal class CaptureRecordingSessionProcessor(
         postProcessLivenessConfigSnapshot
 }
 
+@Suppress("UNUSED_PARAMETER")
 internal fun documentCropStatusFrom(notes: List<String>): DocumentBatchCropStatus {
-    for (note in notes) {
-        if (note == "document:auto-crop:applied") return DocumentBatchCropStatus.APPLIED
-        if (note.startsWith("document:auto-crop:skipped:")) return DocumentBatchCropStatus.SKIPPED
-        if (note.startsWith("document:auto-crop:failed:")) return DocumentBatchCropStatus.FAILED
-    }
     return DocumentBatchCropStatus.NOT_REQUESTED
 }

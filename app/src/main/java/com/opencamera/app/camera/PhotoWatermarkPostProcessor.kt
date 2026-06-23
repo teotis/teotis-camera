@@ -96,13 +96,15 @@ internal fun decidePhotoWatermarkWork(result: ShotResult): PhotoWatermarkWork {
             return PhotoWatermarkWork.DiagnosticSkip("unsupported-mime")
         PhotoJpegInput.EDITABLE -> Unit
     }
-    val watermarkText = result.metadata.watermarkText
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
-        ?: return PhotoWatermarkWork.None
     val templateId = resolveWatermarkTemplateId(
         result.metadata.customTags[PHOTO_WATERMARK_TEMPLATE_KEY]
     )
+    if (!metadataRequestsPhotoWatermark(result.metadata)) {
+        return PhotoWatermarkWork.None
+    }
+    val watermarkText = result.metadata.watermarkText
+        ?.trim()
+        .orEmpty()
 
     val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return PhotoWatermarkWork.DiagnosticSkip(
@@ -116,6 +118,17 @@ internal fun decidePhotoWatermarkWork(result: ShotResult): PhotoWatermarkWork {
         watermarkText = watermarkText,
         templateId = templateId
     )
+}
+
+internal fun metadataRequestsPhotoWatermark(metadata: MediaMetadata): Boolean {
+    if (!metadata.watermarkText.isNullOrBlank()) {
+        return true
+    }
+    val explicitTemplateId = metadata.customTags[PHOTO_WATERMARK_TEMPLATE_KEY]
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+        ?: return false
+    return explicitTemplateId != TEMPLATE_CLASSIC_OVERLAY
 }
 
 private const val TAG = "PhotoWatermarkPP"
@@ -623,14 +636,14 @@ internal fun renderPhotoWatermarkBitmap(
         PhotoWatermarkTemplateType.RETRO_FRAME -> drawExpandedFrame(
             source = bitmap,
             template = template,
-            titleTextSize = titleTextSize * 0.96f,
-            detailTextSize = detailTextSize,
+            titleTextSize = titleTextSize * 0.84f,
+            detailTextSize = detailTextSize * 0.9f,
             padding = padding,
-            sideBorderScale = 1.05f,
-            topBorderScale = 0.92f,
-            bottomBandScale = 4.2f,
-            titleColor = Color.argb(255, 88, 72, 52),
-            detailColor = Color.argb(235, 132, 108, 78),
+            sideBorderScale = 0.88f,
+            topBorderScale = 0.74f,
+            bottomBandScale = 2.6f,
+            titleColor = Color.argb(250, 224, 205, 154),
+            detailColor = Color.argb(220, 188, 166, 118),
             centered = true,
             decoration = ExpandedFrameDecoration.ARCHIVAL_PAPER
         )
@@ -838,7 +851,11 @@ private fun drawExpandedFrame(
     val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(framedBitmap)
     val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
-    drawFrameBackground(canvas, source, fullRect, template.frameBackground)
+    if (decoration == ExpandedFrameDecoration.ARCHIVAL_PAPER) {
+        drawGrandTourFrameBackground(canvas, fullRect, topBorder + source.height)
+    } else {
+        drawFrameBackground(canvas, source, fullRect, template.frameBackground)
+    }
     canvas.drawBitmap(source, sideBorder, topBorder, null)
     if (decoration == ExpandedFrameDecoration.NIGHT_MEMORY) {
         drawNightMemoryFrameWash(
@@ -865,6 +882,9 @@ private fun drawExpandedFrame(
             template.placement == WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
             else -> Paint.Align.LEFT
         }
+        if (decoration == ExpandedFrameDecoration.ARCHIVAL_PAPER) {
+            typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+        }
     }
     val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = detailColor
@@ -875,6 +895,10 @@ private fun drawExpandedFrame(
             centered || template.placement == WatermarkTextPlacement.BOTTOM_CENTER -> Paint.Align.CENTER
             template.placement == WatermarkTextPlacement.BOTTOM_RIGHT -> Paint.Align.RIGHT
             else -> Paint.Align.LEFT
+        }
+        if (decoration == ExpandedFrameDecoration.ARCHIVAL_PAPER) {
+            typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+            letterSpacing = 0.06f
         }
     }
     val titleMetrics = titlePaint.fontMetrics
@@ -951,9 +975,9 @@ private fun drawVanGoghStarryFrame(
     detailTextSize: Float,
     padding: Float
 ): PhotoWatermarkBitmapRenderResult {
-    val sideBorder = (padding * 0.95f).coerceAtLeast(MIN_PADDING_PX * 0.7f)
-    val topBorder = (padding * 0.82f).coerceAtLeast(MIN_PADDING_PX * 0.65f)
-    val bottomBandHeight = maxOf(detailTextSize * 4.1f, source.height * 0.18f)
+    val sideBorder = (padding * 1.75f).coerceAtLeast(MIN_PADDING_PX * 1.15f)
+    val topBorder = (padding * 1.55f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
+    val bottomBandHeight = maxOf(detailTextSize * 5.8f, source.height * 0.24f)
     return drawComplexWatermarkFrame(
         source = source,
         template = template,
@@ -991,9 +1015,9 @@ private fun drawBlueHourFrame(
     detailTextSize: Float,
     padding: Float
 ): PhotoWatermarkBitmapRenderResult {
-    val sideBorder = (padding * 0.86f).coerceAtLeast(MIN_PADDING_PX * 0.68f)
-    val topBorder = (padding * 0.75f).coerceAtLeast(MIN_PADDING_PX * 0.62f)
-    val bottomBandHeight = maxOf(titleTextSize * 3.75f, source.height * 0.18f)
+    val sideBorder = (padding * 1.58f).coerceAtLeast(MIN_PADDING_PX * 1.05f)
+    val topBorder = (padding * 1.38f).coerceAtLeast(MIN_PADDING_PX * 0.95f)
+    val bottomBandHeight = maxOf(titleTextSize * 5.25f, source.height * 0.25f)
     return drawComplexWatermarkFrame(
         source = source,
         template = template,
@@ -1006,12 +1030,12 @@ private fun drawBlueHourFrame(
         val contentLeft = layout.sideBorder + layout.padding
         val contentRight = layout.framedWidth - layout.sideBorder - layout.padding
         val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb((255 * template.textOpacity).toInt().coerceIn(0, 255), 196, 220, 248)
+            color = Color.argb((255 * template.textOpacity).toInt().coerceIn(0, 255), 224, 238, 255)
             textSize = titleTextSize
             style = Paint.Style.FILL
             textAlign = Paint.Align.LEFT
             typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
-            setShadowLayer(titleTextSize * 0.16f, 0f, titleTextSize * 0.04f, Color.argb(142, 0, 4, 16))
+            setShadowLayer(titleTextSize * 0.22f, 0f, titleTextSize * 0.05f, Color.argb(172, 0, 4, 16))
         }
         val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb((224 * template.textOpacity).toInt().coerceIn(0, 224), 162, 190, 220)
@@ -1023,13 +1047,13 @@ private fun drawBlueHourFrame(
         val titleMetrics = titlePaint.fontMetrics
         val titleBaseline =
             layout.bandTop + layout.bottomBandHeight * 0.36f - (titleMetrics.ascent + titleMetrics.descent) / 2f
-        canvas.drawText("BLUE HOUR", contentLeft, titleBaseline, titlePaint)
+        canvas.drawText(template.title, contentLeft, titleBaseline, titlePaint)
 
         val metadata = blueHourMetadata(template.supportingLines)
         if (metadata.isNotBlank()) {
             val detailBaseline = titleBaseline + (titleMetrics.descent - titleMetrics.ascent) * 0.74f
             canvas.drawText(
-                fitText(metadata, detailPaint, (contentRight - contentLeft) * 0.66f),
+                fitText(metadata, detailPaint, (contentRight - contentLeft) * 0.72f),
                 contentLeft,
                 detailBaseline,
                 detailPaint
@@ -1127,8 +1151,8 @@ private fun drawComplexOverlayFrameTexture(
     val sourceRect = layout.sourceRect
     val bottomBandRect = layout.bottomBandRect
     val bandWashColor = when (overlayStyle) {
-        ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(72, 10, 32, 74)
-        ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(58, 18, 48, 82)
+        ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(122, 10, 34, 82)
+        ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(136, 12, 44, 82)
     }
     canvas.drawRect(bottomBandRect, Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = bandWashColor
@@ -1137,11 +1161,11 @@ private fun drawComplexOverlayFrameTexture(
 
     val sourceEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(58, 226, 178, 84)
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(72, 156, 202, 238)
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(128, 232, 184, 88)
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(198, 142, 204, 250)
         }
         style = Paint.Style.STROKE
-        strokeWidth = maxOf(1f, layout.framedWidth * 0.0014f)
+        strokeWidth = maxOf(1.8f, layout.framedWidth * 0.0024f)
     }
     val sourceInset = maxOf(2f, layout.framedWidth * 0.0032f)
     canvas.drawRect(
@@ -1154,11 +1178,11 @@ private fun drawComplexOverlayFrameTexture(
 
     val separatorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(88, 226, 178, 84)
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(82, 156, 202, 238)
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(178, 232, 184, 88)
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(214, 142, 204, 250)
         }
         style = Paint.Style.STROKE
-        strokeWidth = maxOf(0.9f, layout.framedWidth * 0.0014f)
+        strokeWidth = maxOf(1.6f, layout.framedWidth * 0.0022f)
         strokeCap = Paint.Cap.ROUND
     }
     canvas.drawLine(
@@ -1188,8 +1212,8 @@ private fun drawComplexOverlayFrameTexture(
         style = Paint.Style.FILL
     }
     val speckleCount = when (overlayStyle) {
-        ComplexWatermarkOverlayStyle.STARRY_MOON -> 150
-        ComplexWatermarkOverlayStyle.BLUE_HOUR -> 86
+        ComplexWatermarkOverlayStyle.STARRY_MOON -> 260
+        ComplexWatermarkOverlayStyle.BLUE_HOUR -> 280
     }
     repeat(speckleCount) { index ->
         val region = index % 5
@@ -1212,12 +1236,12 @@ private fun drawComplexOverlayFrameTexture(
             coolPaint
         }
         paint.alpha = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> (46 + frameNoise(index * 53 + 1) * 64f).toInt()
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> (28 + frameNoise(index * 53 + 1) * 42f).toInt()
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> (92 + frameNoise(index * 53 + 1) * 96f).toInt()
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> (86 + frameNoise(index * 53 + 1) * 98f).toInt()
         }
         val radius = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> layout.padding * (0.018f + frameNoise(index * 59 + 4) * 0.028f)
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> layout.padding * (0.012f + frameNoise(index * 59 + 4) * 0.02f)
+            ComplexWatermarkOverlayStyle.STARRY_MOON -> layout.padding * (0.026f + frameNoise(index * 59 + 4) * 0.05f)
+            ComplexWatermarkOverlayStyle.BLUE_HOUR -> layout.padding * (0.024f + frameNoise(index * 59 + 4) * 0.044f)
         }.coerceAtLeast(0.7f)
         canvas.drawCircle(x, y, radius, paint)
     }
@@ -1743,6 +1767,42 @@ private fun drawFrameBackground(
     }
 }
 
+private fun drawGrandTourFrameBackground(
+    canvas: Canvas,
+    destination: RectF,
+    bandTop: Float
+) {
+    val basePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(14, 36, 29)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(destination, basePaint)
+
+    val upperWash = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(74, 52, 78, 56)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(destination.left, destination.top, destination.right, bandTop, upperWash)
+
+    val bandWash = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(146, 8, 24, 20)
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(destination.left, bandTop, destination.right, destination.bottom, bandWash)
+
+    val paperGrain = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(26, 226, 205, 154)
+        style = Paint.Style.STROKE
+        strokeWidth = 0.7f
+    }
+    val step = maxOf(9f, destination.width() * 0.035f)
+    var x = destination.left - step
+    while (x < destination.right + step) {
+        canvas.drawLine(x, destination.top, x + step * 0.7f, destination.bottom, paperGrain)
+        x += step
+    }
+}
+
 private fun drawTravelMapDecoration(
     canvas: Canvas,
     framedWidth: Int,
@@ -1826,7 +1886,7 @@ private fun drawNightMemoryFrameWash(
     sourceHeight: Int
 ) {
     val nightWashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(218, 9, 12, 24)
+        color = Color.argb(238, 5, 12, 32)
         style = Paint.Style.FILL
     }
     canvas.drawRect(0f, 0f, framedWidth.toFloat(), topBorder, nightWashPaint)
@@ -1920,25 +1980,25 @@ private fun drawStarryMoonFrameDecoration(
     padding: Float
 ) {
     val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(172, 226, 178, 84)
+        color = Color.argb(244, 232, 184, 88)
         style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.1f, framedWidth * 0.0021f)
+        strokeWidth = maxOf(3.0f, framedWidth * 0.0052f)
         strokeCap = Paint.Cap.ROUND
     }
     val coolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(116, 38, 130, 218)
+        color = Color.argb(180, 54, 142, 224)
         style = Paint.Style.STROKE
-        strokeWidth = maxOf(0.9f, framedWidth * 0.0017f)
+        strokeWidth = maxOf(1.8f, framedWidth * 0.0032f)
         strokeCap = Paint.Cap.ROUND
     }
     val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(220, 242, 206, 126)
+        color = Color.argb(252, 246, 206, 104)
         style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.0f, framedWidth * 0.0019f)
+        strokeWidth = maxOf(2.2f, framedWidth * 0.0039f)
         strokeCap = Paint.Cap.ROUND
     }
     val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(235, 248, 220, 154)
+        color = Color.argb(255, 250, 218, 108)
         style = Paint.Style.FILL
     }
     val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1948,7 +2008,7 @@ private fun drawStarryMoonFrameDecoration(
 
     val moonX = sideBorder + padding * 0.65f
     val moonY = topBorder + padding * 0.68f
-    val moonRadius = maxOf(9f, padding * 0.42f)
+    val moonRadius = maxOf(14f, padding * 0.74f)
     canvas.drawCircle(moonX, moonY, moonRadius, fillPaint)
     canvas.drawCircle(moonX + moonRadius * 0.46f, moonY - moonRadius * 0.08f, moonRadius * 0.92f, maskPaint)
 
@@ -1968,28 +2028,37 @@ private fun drawStarryMoonFrameDecoration(
     }
     val topStart = sideBorder + padding * 2.7f
     val topEnd = framedWidth - sideBorder - padding * 0.65f
-    repeat(4) { index ->
-        val y = topBorder * 0.42f + padding * (0.48f + index * 0.16f)
-        drawWave(topStart, topEnd, y, padding * (0.38f + index * 0.04f), if (index % 2 == 0) warmPaint else coolPaint)
+    repeat(8) { index ->
+        val y = topBorder * 0.3f + padding * (0.45f + index * 0.12f)
+        drawWave(topStart, topEnd, y, padding * (0.46f + index * 0.05f), if (index % 2 == 0) warmPaint else coolPaint)
     }
-    repeat(4) { index ->
-        val y = bandTop + padding * (0.58f + index * 0.18f)
-        drawWave(sideBorder + padding * 0.4f, framedWidth - sideBorder - padding * 0.45f, y, padding * 0.34f, if (index % 2 == 0) coolPaint else warmPaint)
+    repeat(8) { index ->
+        val y = bandTop + padding * (0.48f + index * 0.15f)
+        drawWave(sideBorder + padding * 0.4f, framedWidth - sideBorder - padding * 0.45f, y, padding * 0.42f, if (index % 2 == 0) coolPaint else warmPaint)
     }
     drawWave(sideBorder * 0.48f, sideBorder + padding * 0.38f, topBorder + sourceHeight * 0.18f, padding * 0.5f, warmPaint)
     drawWave(framedWidth - sideBorder - padding * 0.3f, framedWidth - sideBorder * 0.34f, topBorder + sourceHeight * 0.35f, padding * 0.44f, coolPaint)
 
     val starPositions = listOf(
         sideBorder * 0.78f to topBorder + sourceHeight * 0.18f,
+        sideBorder * 0.62f to topBorder + sourceHeight * 0.42f,
+        sideBorder * 0.88f to topBorder + sourceHeight * 0.76f,
         framedWidth - sideBorder * 0.55f to topBorder + sourceHeight * 0.12f,
+        framedWidth - sideBorder * 0.72f to topBorder + sourceHeight * 0.33f,
         framedWidth - sideBorder * 0.82f to topBorder + sourceHeight * 0.52f,
         sideBorder + sourceWidth * 0.08f to bandTop + padding * 0.95f,
+        sideBorder + sourceWidth * 0.24f to bandTop + padding * 1.55f,
+        sideBorder + sourceWidth * 0.42f to bandTop + padding * 0.82f,
         framedWidth - sideBorder - sourceWidth * 0.08f to bandTop + padding * 1.35f,
+        framedWidth - sideBorder - sourceWidth * 0.28f to bandTop + padding * 0.92f,
+        framedWidth - sideBorder - sourceWidth * 0.46f to bandTop + padding * 1.78f,
         framedWidth * 0.74f to framedHeight - padding * 0.68f,
-        framedWidth * 0.23f to framedHeight - padding * 0.72f
+        framedWidth * 0.23f to framedHeight - padding * 0.72f,
+        framedWidth * 0.5f to framedHeight - padding * 0.48f
     )
     starPositions.forEachIndexed { index, (x, y) ->
-        val radius = padding * if (index % 3 == 0) 0.16f else 0.11f
+        val radius = padding * if (index % 3 == 0) 0.22f else 0.15f
+        canvas.drawCircle(x, y, radius * 0.34f, fillPaint)
         canvas.drawLine(x - radius, y, x + radius, y, starPaint)
         canvas.drawLine(x, y - radius, x, y + radius, starPaint)
     }
@@ -2007,9 +2076,9 @@ private fun drawBlueHourFrameDecoration(
     padding: Float
 ) {
     val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(190, 196, 220, 248)
+        color = Color.argb(244, 142, 204, 250)
         style = Paint.Style.STROKE
-        strokeWidth = maxOf(1f, framedWidth * 0.0018f)
+        strokeWidth = maxOf(2.2f, framedWidth * 0.0036f)
         strokeCap = Paint.Cap.ROUND
     }
     val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -2035,8 +2104,33 @@ private fun drawBlueHourFrameDecoration(
         topBorder - inset,
         sideBorder + sourceWidth + inset,
         topBorder + sourceHeight + inset,
-        Paint(linePaint).apply { alpha = 78 }
+        Paint(linePaint).apply { alpha = 116 }
     )
+    val innerPaint = Paint(linePaint).apply {
+        alpha = 148
+        strokeWidth = maxOf(1.1f, framedWidth * 0.0017f)
+    }
+    val innerInset = inset + padding * 0.34f
+    canvas.drawRoundRect(
+        RectF(
+            innerInset,
+            innerInset,
+            framedWidth - innerInset,
+            framedHeight - innerInset
+        ),
+        padding * 0.2f,
+        padding * 0.2f,
+        innerPaint
+    )
+    repeat(6) { index ->
+        val y = topBorder * (0.34f + index * 0.11f)
+        val start = sideBorder + padding * (0.35f + index * 0.08f)
+        val end = framedWidth - sideBorder - padding * (0.65f - index * 0.04f)
+        canvas.drawLine(start, y, end, y + padding * 0.06f, Paint(linePaint).apply {
+            alpha = 58 + index * 14
+            strokeWidth = maxOf(0.9f, framedWidth * 0.0014f)
+        })
+    }
 
     val iconX = framedWidth - sideBorder - padding * 2.1f
     val iconY = bandTop + padding * 1.35f
@@ -2088,19 +2182,19 @@ private fun drawArchivalPaperBorder(
     sourceWidth: Int,
     sourceHeight: Int
 ) {
-    val frameColor = Color.argb(128, 132, 104, 66)
-    val innerColor = Color.argb(58, 184, 146, 94)
+    val frameColor = Color.argb(188, 218, 190, 126)
+    val innerColor = Color.argb(116, 122, 98, 58)
     val outerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = frameColor
         style = Paint.Style.STROKE
-        strokeWidth = 1.2f
+        strokeWidth = maxOf(1.2f, framedWidth * 0.0026f)
     }
     val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = innerColor
         style = Paint.Style.STROKE
-        strokeWidth = 0.8f
+        strokeWidth = maxOf(0.8f, framedWidth * 0.0017f)
     }
-    val outerInset = maxOf(4f, minOf(framedWidth, framedHeight) * 0.01f)
+    val outerInset = maxOf(4f, minOf(framedWidth, framedHeight) * 0.012f)
     canvas.drawRect(
         outerInset,
         outerInset,
@@ -2109,21 +2203,28 @@ private fun drawArchivalPaperBorder(
         outerPaint
     )
 
-    val inset = 5f
+    val inset = 4f
     canvas.drawRect(
         sideBorder - inset, topBorder - inset,
         sideBorder + sourceWidth + inset, topBorder + sourceHeight + inset,
         innerPaint
     )
     val accentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(58, 132, 104, 66)
+        color = Color.argb(150, 218, 190, 126)
         style = Paint.Style.STROKE
-        strokeWidth = 1.0f
+        strokeWidth = maxOf(1.0f, framedWidth * 0.002f)
         strokeCap = Paint.Cap.SQUARE
     }
-    val lineY = topBorder + sourceHeight + inset + 3f
-    val lineMargin = sideBorder + 8f
+    val lineY = topBorder + sourceHeight + inset + 2f
+    val lineMargin = sideBorder + 10f
     canvas.drawLine(lineMargin, lineY, framedWidth - lineMargin, lineY, accentPaint)
+    canvas.drawLine(
+        lineMargin + framedWidth * 0.12f,
+        framedHeight - maxOf(10f, topBorder * 0.72f),
+        framedWidth - lineMargin - framedWidth * 0.12f,
+        framedHeight - maxOf(10f, topBorder * 0.72f),
+        Paint(accentPaint).apply { alpha = 92 }
+    )
 
     val step = maxOf(8f, minOf(framedWidth, framedHeight) * 0.028f)
     fun drawCorner(left: Boolean, top: Boolean) {
@@ -2133,6 +2234,20 @@ private fun drawArchivalPaperBorder(
         val yDirection = if (top) 1f else -1f
         canvas.drawLine(xEdge, yEdge, xEdge + xDirection * step * 2.2f, yEdge, outerPaint)
         canvas.drawLine(xEdge, yEdge, xEdge, yEdge + yDirection * step * 2.2f, outerPaint)
+        val arcRight = xEdge + xDirection * step * 1.35f
+        val arcBottom = yEdge + yDirection * step * 1.35f
+        canvas.drawArc(
+            RectF(
+                minOf(xEdge, arcRight),
+                minOf(yEdge, arcBottom),
+                maxOf(xEdge, arcRight),
+                maxOf(yEdge, arcBottom)
+            ),
+            if (left && top) 180f else if (!left && top) 270f else if (left) 90f else 0f,
+            90f,
+            false,
+            Paint(innerPaint).apply { alpha = 122 }
+        )
         canvas.drawLine(
             xEdge + xDirection * step * 0.55f,
             yEdge + yDirection * step * 0.38f,
@@ -2289,7 +2404,7 @@ private fun resolveWatermarkTitle(
     val modeName = customTags[PHOTO_WATERMARK_MODE_NAME_KEY]
     val profileName = customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY]
     if (templateType == PhotoWatermarkTemplateType.BLUE_HOUR) {
-        return "BLUE HOUR"
+        return "蓝调时刻"
     }
     if (modeName != null) {
         val title = buildString {

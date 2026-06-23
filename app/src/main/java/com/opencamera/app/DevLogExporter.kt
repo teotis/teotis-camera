@@ -202,6 +202,9 @@ internal fun buildDevLogExportContent(
         appendLine("=== LINK EVENTS ===")
         appendLine(formatLinkEvents(visibleLinkEvents))
         appendLine("=== SHOT PIPELINE ===")
+        postProcessTimingBreakdown(pipelineNotes)?.let { breakdown ->
+            appendLine(breakdown)
+        }
         pipelineNotes.forEach { note -> appendLine(note) }
         appendLine("=== ERROR EVENTS ===")
         appendLine(formatEvents(errorEvents))

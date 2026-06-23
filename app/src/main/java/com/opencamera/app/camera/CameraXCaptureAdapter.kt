@@ -122,9 +122,11 @@ import com.opencamera.core.media.StillCaptureQualityPreference
 import com.opencamera.core.media.StillCaptureResolutionPreset
 import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -146,6 +148,31 @@ import com.opencamera.core.session.PerformanceLinkRecorder
 
 private const val TAG = "CameraXCaptureAdapter"
 private const val VIDEO_COVER_THUMBNAIL_SIZE = 512
+
+internal class CameraXCaptureWorkScopes(
+    private val callbackDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
+    private val postProcessScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+    private val postProcessDispatcher: CoroutineDispatcher = Dispatchers.Default
+) {
+    private var callbackJob: Job = SupervisorJob()
+    private var callbackScope: CoroutineScope = CoroutineScope(callbackJob + callbackDispatcher)
+
+    fun activeCallbackScope(): CoroutineScope {
+        if (!callbackJob.isActive) {
+            callbackJob = SupervisorJob()
+            callbackScope = CoroutineScope(callbackJob + callbackDispatcher)
+        }
+        return callbackScope
+    }
+
+    fun cancelCallbackScope() {
+        callbackJob.cancel()
+    }
+
+    fun launchPostProcess(block: suspend CoroutineScope.() -> Unit): Job {
+        return postProcessScope.launch(postProcessDispatcher, block = block)
+    }
+}
 
 /**
  * Resolves an extension-enabled CameraSelector for a requested extension mode and lens facing.
@@ -201,14 +228,17 @@ class CameraXCaptureAdapter(
     private val linkRecorder: com.opencamera.core.session.PerformanceLinkRecorder? = null,
     private val extensionSelectorResolver: ExtensionSelectorResolver? = null,
     private val sceneMaskSource: PreviewSceneMaskSource? = null,
-    private val captureOutputFactory: CaptureOutputFactory = CaptureOutputFactory(context)
+    private val captureOutputFactory: CaptureOutputFactory = CaptureOutputFactory(context),
+    postProcessScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 ) : CameraDeviceAdapter {
     private val stillCaptureExecutor = StillCaptureExecutor(
         context = context,
         captureOutputFactory = captureOutputFactory,
         multiFrameExecutionPlanner = multiFrameExecutionPlanner
     )
-    private val adapterScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val workScopes = CameraXCaptureWorkScopes(
+        postProcessScope = postProcessScope
+    )
     @Volatile private var captureCommittedArmedShotId: String? = null
     @Volatile private var captureCommittedArmedMediaType: MediaType? = null
     @Volatile private var captureCommittedElapsedMs: Long? = null
@@ -293,6 +323,7 @@ class CameraXCaptureAdapter(
         previewView: PreviewView,
         deviceGraph: DeviceGraphSpec
     ) {
+        workScopes.activeCallbackScope()
         runCatching {
             _bindingController.bind(lifecycleOwner, previewView, deviceGraph)
         }.getOrElse { throwable ->
@@ -402,7 +433,7 @@ class CameraXCaptureAdapter(
 
     override suspend fun release() {
         withContext(Dispatchers.Main.immediate) {
-            adapterScope.cancel()
+            workScopes.cancelCallbackScope()
             if (activeRecording != null) {
                 recordingController.release()
                 recordingController.outcomes.toList().forEach { outcome ->
@@ -551,14 +582,15 @@ class CameraXCaptureAdapter(
                     deviceCaptureStartedAtElapsedMillis = execution.deviceCaptureStartedAtElapsedMillis,
                     deviceCaptureCompletedAtElapsedMillis = execution.deviceCaptureCompletedAtElapsedMillis
                 )
-                if (plan.request.shotKind == ShotKind.STILL_CAPTURE) {
-                    // Ordinary still capture: postprocess and ShotCompleted delivery
+                if (plan.request.shotKind == ShotKind.STILL_CAPTURE ||
+                    plan.request.shotKind == ShotKind.LIVE_PHOTO
+                ) {
+                    // Re-armable still captures: postprocess and ShotCompleted delivery
                     // run off the critical path so the session can re-arm the shutter
                     // after DataReceived without waiting for postprocess.
                     // Move postprocess off Dispatchers.Main.immediate to avoid main-thread
                     // contention during UI-heavy capture feedback (P6 latency phase).
-                    adapterScope.launch(Dispatchers.Default) {
-                        if (!adapterScope.isActive) return@launch
+                    workScopes.launchPostProcess {
                         runCatching {
                             emitShotCompleted(
                                 plan = shotCompletedParams.plan,
@@ -804,8 +836,8 @@ class CameraXCaptureAdapter(
                         ))
                         activeRecording = null
 
-                        adapterScope.launch {
-                            if (!adapterScope.isActive) return@launch
+                        workScopes.activeCallbackScope().launch {
+                            if (!isActive) return@launch
                             recordingController.outcomes.toList().let { recentOutcomes ->
                                 recordingController.outcomes.clear()
                                 recentOutcomes.forEach { outcome ->
@@ -977,8 +1009,8 @@ class CameraXCaptureAdapter(
 
     private fun captureCaptureFeedbackSnapshot(shotId: String) {
         val previewView = _bindingController.currentBoundPreviewView ?: return
-        adapterScope.launch {
-            if (!adapterScope.isActive) return@launch
+        workScopes.activeCallbackScope().launch {
+            if (!isActive) return@launch
             val bitmap = awaitPreviewBitmap(previewView) ?: return@launch
             try {
                 runCatching {

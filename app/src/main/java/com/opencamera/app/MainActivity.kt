@@ -211,7 +211,11 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.DOWN))
             },
             onOverviewRequested = {
-                reducePanel(CockpitPanelCommand.NavigateToBatchOverview)
+                val pageCount = latestSessionState?.presentation?.documentBatch?.items?.size ?: 0
+                reducePanel(CockpitPanelCommand.NavigateToExport)
+                reducePanel(CockpitPanelCommand.StartExport)
+                reducePanel(CockpitPanelCommand.UpdateExportProgress(currentPage = 0, totalPages = pageCount))
+                renderAfterPanelChange()
             }
         )
         documentBatchOrganizerRenderer = DocumentBatchOrganizerRenderer(
@@ -1218,7 +1222,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             placement = style.textPlacement,
             previewText = when (templateId) {
                 "van-gogh-starry" -> previewLabels.joinToString(" · ")
-                "blue-hour" -> "BLUE HOUR"
+                "blue-hour" -> "蓝调时刻"
                 else -> templateId
             },
             opacity = style.textOpacity.alphaFraction * 0.6f,

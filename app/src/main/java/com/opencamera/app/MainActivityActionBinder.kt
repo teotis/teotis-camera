@@ -188,10 +188,12 @@ internal class MainActivityActionBinder(
             callbacks.applySettingsAction(PersistedSettingsAction.UpdatePhotoWatermarkTemplate(nextTemplateId))
         }
         views.quickPanel.livePhoto.setOnHapticClickListener {
-            val settings = snapshot().sessionState?.settings?.persisted ?: return@setOnHapticClickListener
-            callbacks.applySettingsAction(PersistedSettingsAction.UpdateLivePhotoDefault(
-                !settings.photo.livePhotoEnabledByDefault
-            ))
+            val snap = snapshot()
+            val action = quickLivePhotoToggleAction(
+                state = snap.sessionState,
+                sheet = snap.quickPanelSheet
+            ) ?: return@setOnHapticClickListener
+            callbacks.applySettingsAction(action)
         }
         views.quickPanel.timer.setOnClickListener {
             val state = snapshot().sessionState ?: return@setOnClickListener

@@ -155,7 +155,7 @@ internal object ShotGraphBuilder {
                 )
             )
         }
-        if (spec.watermarkText != null) {
+        if (request.requestsWatermarkPostprocess()) {
             algorithmNodes.add(
                 AlgorithmNode(
                     id = "${request.shotId}:alg:watermark",
@@ -186,5 +186,16 @@ internal object ShotGraphBuilder {
             algorithmNodes = algorithmNodes,
             outputNodes = outputNodes
         )
+    }
+
+    private fun ShotRequest.requestsWatermarkPostprocess(): Boolean {
+        if (!postProcessSpec.watermarkText.isNullOrBlank()) {
+            return true
+        }
+        val explicitTemplateId = saveRequest.metadata.customTags["watermarkTemplate"]
+            ?.trim()
+            ?.takeIf(String::isNotEmpty)
+            ?: return false
+        return explicitTemplateId != "classic-overlay"
     }
 }

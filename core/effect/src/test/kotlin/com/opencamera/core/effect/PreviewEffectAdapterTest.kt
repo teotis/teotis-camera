@@ -386,7 +386,7 @@ class PreviewEffectAdapterTest {
     }
 
     @Test
-    fun `blue hour watermark hint uses fixed title with common params`() {
+    fun `blue hour watermark hint uses blue hour title with common params`() {
         val model = adapter.adapt(
             EffectSpec(listOf(
                 WatermarkEffect(
@@ -406,7 +406,7 @@ class PreviewEffectAdapterTest {
 
         assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
         assertEquals(WatermarkPreviewDecoration.BLUE_HOUR, model.watermarkHint?.decoration)
-        assertEquals("BLUE HOUR", model.watermarkHint?.previewText)
+        assertEquals("蓝调时刻", model.watermarkHint?.previewText)
         assertEquals(
             listOf("2026.06.22 19:41", "CITY NIGHT", "24mm"),
             model.watermarkHint?.previewLabels

@@ -112,6 +112,52 @@ internal fun formatTimestamp(timestampMillis: Long): String {
     return "%02d:%02d:%02d.%03d".format(hours, minutes, seconds, millis)
 }
 
+internal fun postProcessTimingBreakdown(notes: List<String>): String? {
+    val timings = linkedMapOf<String, Long>()
+    notes.forEach { note ->
+        when {
+            note.startsWith("timing:postprocess:") -> {
+                val name = note.substringAfter("timing:postprocess:").substringBefore("=")
+                note.millisAfter("=")?.let { timings["postprocess.$name"] = it }
+            }
+            note.startsWith("timing:") -> {
+                val name = note.substringAfter("timing:").substringBefore("=")
+                note.millisAfter("=")?.let { timings[name] = it }
+            }
+            note.contains(":timing:") -> {
+                val stage = note.substringBefore(":timing:")
+                note.keyedMillis().forEach { (key, value) ->
+                    timings["$stage.$key"] = value
+                }
+            }
+        }
+    }
+    if (timings.isEmpty()) return null
+
+    val priority = listOf("total", "device", "save-io", "postprocess")
+    val orderedKeys = priority.filter { it in timings } +
+        timings.keys.filterNot { it in priority }
+    return "Postprocess timing breakdown: " + orderedKeys.joinToString(", ") { key ->
+        "$key=${timings.getValue(key)}ms"
+    }
+}
+
+private fun String.millisAfter(marker: String): Long? {
+    val valueStart = indexOf(marker).takeIf { it >= 0 }?.plus(marker.length) ?: return null
+    val valueEnd = indexOf("ms", valueStart).takeIf { it >= 0 } ?: length
+    return substring(valueStart, valueEnd).trim().toLongOrNull()
+}
+
+private fun String.keyedMillis(): List<Pair<String, Long>> {
+    return split(" ")
+        .mapNotNull { token ->
+            val key = token.substringBefore("=", missingDelimiterValue = "")
+            val value = token.substringAfter("=", missingDelimiterValue = "")
+            if (key.isBlank() || !value.endsWith("ms")) return@mapNotNull null
+            value.removeSuffix("ms").toLongOrNull()?.let { key to it }
+        }
+}
+
 internal fun devLogRenderModel(
     state: SessionState,
     traceEvents: List<SessionTraceEvent>,
@@ -232,6 +278,9 @@ internal fun devLogRenderModel(
             add(SectionHeaderItem(deviceProbeBlock()))
         } else if (selectedTab == DevLogTab.ALL && latestPipelineNotes.isNotEmpty()) {
             add(SectionHeaderItem("--- Pipeline Notes ---"))
+            postProcessTimingBreakdown(latestPipelineNotes)?.let { breakdown ->
+                add(SectionHeaderItem(breakdown))
+            }
             latestPipelineNotes.forEach { note -> add(SectionHeaderItem(note)) }
         }
     }

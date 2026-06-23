@@ -165,6 +165,15 @@
             android:layout_marginTop="@dimen/right_rail_gap"
             android:text="@string/button_quick_launcher" />
 
+        <!-- Mode action: Pro (Humanistic) / Atmosphere-Clarity (Check-in). -->
+        <Button
+            android:id="@+id/buttonModeAction"
+            style="@style/Widget.OpenCamera.RightRailButton"
+            android:layout_width="@dimen/touch_target_min"
+            android:layout_height="@dimen/touch_target_min"
+            android:layout_marginTop="@dimen/right_rail_gap"
+            android:visibility="gone" />
+
         <Button
             android:id="@+id/buttonLowLightNightPrompt"
             style="@style/Widget.OpenCamera.RightRailButton"
@@ -1647,12 +1656,14 @@
             android:id="@+id/runtimeProControlsScroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:minHeight="@dimen/pro_glass_strip_min_height"
             android:layout_marginTop="44dp"
-            android:background="@color/oc_root_background"
+            android:layout_marginHorizontal="@dimen/space_16"
+            android:background="@drawable/bg_pro_glass_strip"
             android:clipToPadding="false"
             android:fadeScrollbars="false"
-            android:paddingHorizontal="@dimen/space_12"
-            android:paddingVertical="@dimen/space_8"
+            android:paddingHorizontal="@dimen/space_8"
+            android:paddingVertical="@dimen/space_4"
             android:scrollbars="none"
             android:visibility="gone">
 
@@ -1663,16 +1674,6 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal" />
         </HorizontalScrollView>
-
-        <!-- Mode action: Pro (Humanistic) / Atmosphere-Clarity (Check-in). -->
-        <Button
-            android:id="@+id/buttonModeAction"
-            style="@style/Widget.OpenCamera.ModeTrackButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="2dp"
-            android:visibility="gone" />
 
         <!-- Recording elapsed indicator -->
         <TextView

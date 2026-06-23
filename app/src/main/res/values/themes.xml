@@ -121,7 +121,7 @@
         <item name="android:textAllCaps">false</item>
         <item name="android:textColor">@color/oc_text_primary</item>
         <item name="android:textSize">@dimen/text_size_right_rail</item>
-        <item name="backgroundTint">@color/oc_surface_scrim</item>
+        <item name="backgroundTint">@color/oc_surface_scrim_light</item>
         <item name="cornerRadius">@dimen/radius_small_button</item>
         <item name="android:minWidth">0dp</item>
         <item name="android:minHeight">0dp</item>

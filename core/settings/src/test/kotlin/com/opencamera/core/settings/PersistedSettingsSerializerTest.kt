@@ -53,6 +53,18 @@ class PersistedSettingsSerializerTest {
                     textOpacity = WatermarkTextOpacity.SOLID,
                     frameBackground = WatermarkFrameBackground.SOURCE_VIVID_BLUR
                 ),
+                vanGoghStarryWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+                    textScale = WatermarkTextScale.LARGE,
+                    textOpacity = WatermarkTextOpacity.SOLID,
+                    frameBackground = WatermarkFrameBackground.DARK
+                ),
+                blueHourWatermarkStyle = WatermarkStyleSettings(
+                    textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+                    textScale = WatermarkTextScale.NORMAL,
+                    textOpacity = WatermarkTextOpacity.SOLID,
+                    frameBackground = WatermarkFrameBackground.DARK
+                ),
                 livePhotoEnabledByDefault = true,
                 countdownDuration = CountdownDuration.SECONDS_3
             ),
@@ -86,6 +98,8 @@ class PersistedSettingsSerializerTest {
         assertEquals("top-right", serialized["photo.watermark.pureText.position"])
         assertEquals("subtle", serialized["photo.watermark.pureText.opacity"])
         assertEquals("source-vivid-blur", serialized["photo.watermark.blurFourBorder.background"])
+        assertEquals("large", serialized["photo.watermark.vanGoghStarry.scale"])
+        assertEquals("solid", serialized["photo.watermark.blueHour.opacity"])
     }
 
     @Test
@@ -570,6 +584,26 @@ class PersistedSettingsSerializerTest {
             initial.photo.professionalBottomBarWatermarkStyle,
             reduced.photo.professionalBottomBarWatermarkStyle
         )
+    }
+
+    @Test
+    fun `reducer updates complex night styles independently`() {
+        val initial = PersistedSettings()
+        val reduced = initial.reduce(
+            PersistedSettingsAction.UpdateWatermarkTextOpacity(
+                templateId = "blue-hour",
+                opacity = WatermarkTextOpacity.SUBTLE
+            )
+        ).reduce(
+            PersistedSettingsAction.UpdateWatermarkTextScale(
+                templateId = "van-gogh-starry",
+                scale = WatermarkTextScale.LARGE
+            )
+        )
+
+        assertEquals(WatermarkTextOpacity.SUBTLE, reduced.photo.blueHourWatermarkStyle.textOpacity)
+        assertEquals(WatermarkTextScale.LARGE, reduced.photo.vanGoghStarryWatermarkStyle.textScale)
+        assertEquals(initial.photo.nightStreetWatermarkStyle, reduced.photo.nightStreetWatermarkStyle)
     }
 
     @Test

@@ -1700,7 +1700,7 @@ class DefaultCameraSessionTest {
         assertEquals("bottom-center", shot.saveRequest.metadata.customTags["watermarkPosition"])
         assertEquals("1.0", shot.saveRequest.metadata.customTags["watermarkTextScale"])
         assertEquals("0.8", shot.saveRequest.metadata.customTags["watermarkTextOpacity"])
-        assertEquals("white", shot.saveRequest.metadata.customTags["watermarkFrameBackground"])
+        assertEquals("dark", shot.saveRequest.metadata.customTags["watermarkFrameBackground"])
         assertEquals("photo-rich", shot.postProcessSpec.algorithmProfile)
     }
 
@@ -2262,7 +2262,7 @@ class DefaultCameraSessionTest {
     }
 
     @Test
-    fun `live photo does not rearm on DataReceived keeps activeShot until ShotCompleted`() = runTest {
+    fun `live photo rearms on DataReceived while postprocess continues`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
             trace = trace,
@@ -2290,11 +2290,10 @@ class DefaultCameraSessionTest {
         session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
         runCurrent()
         assertEquals(CaptureStatus.DATA_RECEIVED, session.state.value.captureStatus)
-        // Conservative capture: activeShot stays set, shutter remains blocked
-        assertNotNull(session.state.value.activeShot)
-        assertEquals(shot.shotId, session.state.value.activeShot?.shotId)
+        assertNull(session.state.value.activeShot)
+        assertEquals(shot.shotId, session.state.value.presentation.pendingPostprocess?.shotId)
 
-        // ShotCompleted clears activeShot
+        // ShotCompleted clears pending postprocess and publishes final media.
         session.dispatch(
             SessionIntent.ShotCompleted(
                 ShotResult(
@@ -2319,6 +2318,7 @@ class DefaultCameraSessionTest {
         )
         advanceUntilIdle()
         assertNull(session.state.value.activeShot)
+        assertNull(session.state.value.presentation.pendingPostprocess)
     }
 
     @Test

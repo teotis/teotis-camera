@@ -1,8 +1,9 @@
 package com.opencamera.app
 
 import com.opencamera.app.i18n.AppTextResolver
+import com.opencamera.core.media.outputPathOrNull
+import com.opencamera.core.media.renderUriOrNull
 import com.opencamera.core.mode.ModeId
-import com.opencamera.core.session.DocumentBatchCropStatus
 import com.opencamera.core.session.DocumentBatchStatus
 import com.opencamera.core.session.SessionState
 
@@ -54,8 +55,9 @@ internal fun documentBatchRailRenderModel(
         DocumentBatchRailItemRenderModel(
             itemId = item.itemId,
             pageNumber = index + 1,
-            renderUri = item.renderUri ?: item.outputPath,
-            statusLabel = item.cropStatus.toLabel(text),
+            renderUri = item.renderUri ?: item.thumbnailSource.renderUriOrNull()
+                ?: item.thumbnailSource.outputPathOrNull() ?: item.outputPath,
+            statusLabel = null,
             isLatest = item.itemId == batch.latestItemId,
             removeContentDescription = text.get(R.string.document_batch_remove),
             canMoveUp = index > 0,
@@ -74,18 +76,8 @@ internal fun documentBatchRailRenderModel(
         organizeEnabled = items.isNotEmpty(),
         latestThumbnailUri = latestItem?.renderUri,
         isSlimShooting = isSlimShooting,
-        overviewLabel = text.get(R.string.document_batch_rail_overview_description),
+        overviewLabel = text.get(R.string.button_document_batch_export),
         moveUpLabel = text.get(R.string.document_batch_move_up),
         moveDownLabel = text.get(R.string.document_batch_move_down)
     )
-}
-
-private fun DocumentBatchCropStatus.toLabel(text: AppTextResolver): String? {
-    return when (this) {
-        DocumentBatchCropStatus.NOT_REQUESTED -> null
-        DocumentBatchCropStatus.APPLIED -> text.get(R.string.document_batch_crop_applied)
-        DocumentBatchCropStatus.APPLIED_MANUAL -> text.get(R.string.document_batch_crop_applied)
-        DocumentBatchCropStatus.SKIPPED -> text.get(R.string.document_batch_crop_skipped)
-        DocumentBatchCropStatus.FAILED -> text.get(R.string.document_batch_crop_failed)
-    }
 }

@@ -203,10 +203,10 @@ class SettingsDefaultsTest {
     }
 
     @Test
-    fun `retro frame default style uses calm paper background`() {
+    fun `retro frame default style uses scholar dark background`() {
         val style = PhotoSettings().retroFrameWatermarkStyle
 
         assertEquals(WatermarkTextPlacement.BOTTOM_CENTER, style.textPlacement)
-        assertEquals(WatermarkFrameBackground.WHITE, style.frameBackground)
+        assertEquals(WatermarkFrameBackground.DARK, style.frameBackground)
     }
 }

@@ -315,6 +315,60 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `mode action is scoped to humanistic with compact pro label`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.HUMANISTIC,
+            modeSnapshot = ModeSnapshot(
+                id = ModeId.HUMANISTIC,
+                uiSpec = ModeUiSpec(
+                    title = "Humanistic",
+                    shutterLabel = "Capture Humanistic",
+                    proActionLabel = "Professional on"
+                ),
+                state = ModeState(
+                    headline = "Humanistic mode active",
+                    detail = "Ready",
+                    isProActionEnabled = true,
+                    isProVariantActive = true
+                )
+            )
+        )
+
+        val model = modeActionRenderModel(state)
+
+        assertTrue(model.isVisible)
+        assertEquals("Pro", model.label)
+        assertTrue(model.isActive)
+    }
+
+    @Test
+    fun `mode action is scoped to check-in and hidden for mismatched snapshots`() {
+        val checkInState = defaultSessionState(
+            activeMode = ModeId.CHECK_IN,
+            modeSnapshot = ModeSnapshot(
+                id = ModeId.CHECK_IN,
+                uiSpec = ModeUiSpec(
+                    title = "Check-in",
+                    shutterLabel = "Capture Check-in",
+                    proActionLabel = "全清"
+                ),
+                state = ModeState(
+                    headline = "Check-in mode active",
+                    detail = "Ready",
+                    isProActionEnabled = true
+                )
+            )
+        )
+        val mismatchedState = checkInState.copy(
+            activeMode = ModeId.PHOTO
+        )
+
+        assertEquals("全清", modeActionRenderModel(checkInState).label)
+        assertTrue(modeActionRenderModel(checkInState).isVisible)
+        assertFalse(modeActionRenderModel(mismatchedState).isVisible)
+    }
+
+    @Test
     fun `mode directory render model includes humanistic entry and uses product order`() {
         val state = defaultSessionState(
             activeMode = ModeId.HUMANISTIC,
@@ -1385,7 +1439,7 @@ class SessionCockpitRenderModelTest {
 
     @Test
     fun `shutter disabled reason blocks DATA_RECEIVED before rearm for conservative capture`() {
-        // Conservative capture (multi-frame, live photo) keeps activeShot until ShotCompleted.
+        // Conservative capture (multi-frame) keeps activeShot until ShotCompleted.
         // Shutter must stay blocked.
         val state = defaultSessionState(
             activeShot = ShotRequest(
@@ -1585,22 +1639,12 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `shutter disabled reason blocks LIVE_PHOTO with activeShot at DATA_RECEIVED`() {
-        // Live photo is a conservative capture kind: activeShot stays set until ShotCompleted.
-        // Shutter must stay blocked even at DATA_RECEIVED — same policy as multi-frame.
-        val shot = ShotRequest(
-            shotId = "live-block-1",
-            shotKind = ShotKind.LIVE_PHOTO,
-            mediaType = MediaType.PHOTO,
-            saveRequest = SaveRequest.photoLibrary(),
-            thumbnailPolicy = ThumbnailPolicy.NONE,
-            postProcessSpec = PostProcessSpec(),
-            captureProfile = CaptureProfile()
-        )
-        val state = defaultSessionState(activeShot = shot)
-            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
-        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
-        assertEquals(ShutterVisualState.SAVING, shutterVisualState(state))
+    fun `shutter stays enabled for live photo after DataReceived rearm`() {
+        val state = defaultSessionState()
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED, activeShot = null)
+
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
     }
 
     @Test

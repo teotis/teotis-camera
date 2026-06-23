@@ -248,6 +248,16 @@ class AlgorithmProcessorBridgesTest {
     }
 
     @Test
+    fun `watermark canProcess true with explicit non default template`() {
+        val processor = RecordingWatermarkEditor().let {
+            PhotoWatermarkPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertTrue(processor.canProcess(sampleRequest(
+            customTags = mapOf("watermarkTemplate" to "van-gogh-starry")
+        )))
+    }
+
+    @Test
     fun `watermark canProcess false without watermarkText`() {
         val processor = RecordingWatermarkEditor().let {
             PhotoWatermarkPostProcessor(it).toAlgorithmProcessor()

@@ -197,7 +197,7 @@ private class DocumentModeController(
     override suspend fun handleTertiaryAction(): ModeSignal = ModeSignal.None
 
     override suspend fun handleFrameRatioSelected(ratio: FrameRatio): ModeSignal =
-        ModeSignal.ShowHint("文档模式使用自动裁边，无需选择画幅比例")
+        ModeSignal.ShowHint("文档模式保留原图，可在左侧调整本轮顺序")
 
     // ── Capability coercion ───────────────────────────────────────────
 
@@ -223,7 +223,7 @@ private class DocumentModeController(
     private fun profileSummary(profile: DocumentProfile): String {
         val colorLabel = resolveColorModeLabel()
         return if (enhancementEnabled()) {
-            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Auto crop ${profile.autoCrop} | Contrast ${profile.contrastLabel} | Color: $colorLabel | Output optimized for scanned documents."
+            "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Contrast ${profile.contrastLabel} | Color: $colorLabel | Output optimized for document archiving."
         } else {
             "Style ${profile.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Basic capture only (document enhancement is unavailable)."
         }
@@ -273,14 +273,14 @@ private class DocumentModeController(
             DocumentProfile(
                 id = "receipt",
                 label = "Receipt",
-                autoCrop = true,
+                autoCrop = false,
                 contrastLabel = "High",
                 algorithmProfile = "document-receipt-scan"
             ),
             DocumentProfile(
                 id = "whiteboard",
                 label = "Whiteboard",
-                autoCrop = true,
+                autoCrop = false,
                 contrastLabel = "Balanced",
                 algorithmProfile = "document-whiteboard-scan"
             ),

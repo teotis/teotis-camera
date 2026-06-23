@@ -90,7 +90,7 @@ internal fun PhotoWatermarkPostProcessor.toAlgorithmProcessor(): AlgorithmProces
     return toAlgorithmProcessorBridge(
         algorithmType = AlgorithmType.WATERMARK_RENDER,
         canDecide = { req ->
-            req.metadata.watermarkText != null
+            metadataRequestsPhotoWatermark(req.metadata)
         },
         extractNotes = { result, _ -> extractNotesWithPrefix(result, "watermark:") }
     )

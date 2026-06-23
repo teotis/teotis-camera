@@ -716,6 +716,67 @@ class DevLogRenderModelTest {
     }
 
     @Test
+    fun `all tab summarizes latest shot timing breakdown from pipeline notes`() {
+        val pipelineNotes = listOf(
+            "timing:device=598ms",
+            "timing:save-io=598ms",
+            "timing:postprocess=2653ms",
+            "timing:total=3281ms",
+            "timing:postprocess:PhotoAlgorithm=1200ms",
+            "timing:postprocess:PhotoWatermark=900ms",
+            "algorithm-render:timing:humanistic size=3000x4000 decode=80ms render=700ms encode=250ms total=1030ms",
+            "watermark:timing:blue-hour size=3000x4000 decode=40ms render=420ms encode=180ms total=640ms"
+        )
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            isDebugBuild = true,
+            selectedTab = DevLogTab.ALL,
+            text = TestAppTextResolver(),
+            latestPipelineNotes = pipelineNotes
+        )
+
+        val breakdown = model.visibleEvents
+            .map { it.displayText }
+            .single { it.startsWith("Postprocess timing breakdown:") }
+        assertTrue(breakdown.contains("total=3281ms"))
+        assertTrue(breakdown.contains("device=598ms"))
+        assertTrue(breakdown.contains("save-io=598ms"))
+        assertTrue(breakdown.contains("postprocess=2653ms"))
+        assertTrue(breakdown.contains("postprocess.PhotoAlgorithm=1200ms"))
+        assertTrue(breakdown.contains("postprocess.PhotoWatermark=900ms"))
+        assertTrue(breakdown.contains("algorithm-render.total=1030ms"))
+        assertTrue(breakdown.contains("watermark.total=640ms"))
+    }
+
+    @Test
+    fun `dev log export includes shot timing breakdown when pipeline timings exist`() {
+        val pipelineNotes = listOf(
+            "timing:device=872ms",
+            "timing:postprocess=2963ms",
+            "timing:total=3870ms",
+            "timing:postprocess:PhotoAlgorithm=1400ms",
+            "combined-render:timing:humanistic+blue-hour algorithm=900ms watermark=800ms encode=300ms total=2000ms"
+        )
+
+        val exportContent = buildDevLogExportContent(
+            state = defaultTestSessionState(),
+            traceEvents = sampleTraceEvents,
+            linkEvents = emptyList(),
+            resourceDiagnostics = null,
+            deviceProbeSummary = null,
+            pipelineNotes = pipelineNotes,
+            clearCutoffs = DevLogClearCutoffs()
+        )
+
+        assertTrue(exportContent.contains("Postprocess timing breakdown:"))
+        assertTrue(exportContent.contains("total=3870ms"))
+        assertTrue(exportContent.contains("postprocess=2963ms"))
+        assertTrue(exportContent.contains("postprocess.PhotoAlgorithm=1400ms"))
+        assertTrue(exportContent.contains("combined-render.total=2000ms"))
+    }
+
+    @Test
     fun `all tab without pipeline notes does not show pipeline header`() {
         val model = devLogRenderModel(
             state = defaultTestSessionState(),

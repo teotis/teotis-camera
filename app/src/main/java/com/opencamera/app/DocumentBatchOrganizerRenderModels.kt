@@ -1,8 +1,9 @@
 package com.opencamera.app
 
 import com.opencamera.app.i18n.AppTextResolver
+import com.opencamera.core.media.outputPathOrNull
+import com.opencamera.core.media.renderUriOrNull
 import com.opencamera.core.mode.ModeId
-import com.opencamera.core.session.DocumentBatchCropStatus
 import com.opencamera.core.session.DocumentBatchStatus
 import com.opencamera.core.session.SessionState
 
@@ -55,18 +56,17 @@ internal fun documentBatchOrganizerRenderModel(
         )
     }
 
-    val items = batch.items.mapIndexed { index, item ->
+    val sortedItems = batch.items.sortedBy { it.orderIndex }
+    val items = sortedItems.mapIndexed { index, item ->
         DocumentBatchOrganizerItemRenderModel(
             itemId = item.itemId,
             pageNumber = index + 1,
-            renderUri = item.renderUri ?: item.outputPath,
-            cropStatusLabel = item.cropStatus.toLabel(text),
+            renderUri = item.renderUri ?: item.thumbnailSource.renderUriOrNull()
+                ?: item.thumbnailSource.outputPathOrNull() ?: item.outputPath,
+            cropStatusLabel = null,
             canMoveUp = index > 0,
-            canMoveDown = index < batch.items.lastIndex,
-            cropEditLabel = when (item.cropStatus) {
-                DocumentBatchCropStatus.APPLIED, DocumentBatchCropStatus.APPLIED_MANUAL -> null
-                else -> text.get(R.string.button_document_batch_crop_edit)
-            }
+            canMoveDown = index < sortedItems.lastIndex,
+            cropEditLabel = null
         )
     }
 
@@ -80,14 +80,4 @@ internal fun documentBatchOrganizerRenderModel(
         showExport = items.isNotEmpty(),
         emptyHint = text.get(R.string.document_batch_empty_hint)
     )
-}
-
-private fun DocumentBatchCropStatus.toLabel(text: AppTextResolver): String? {
-    return when (this) {
-        DocumentBatchCropStatus.NOT_REQUESTED -> null
-        DocumentBatchCropStatus.APPLIED -> text.get(R.string.document_batch_crop_applied)
-        DocumentBatchCropStatus.SKIPPED -> text.get(R.string.document_batch_crop_skipped)
-        DocumentBatchCropStatus.FAILED -> text.get(R.string.document_batch_crop_failed)
-        DocumentBatchCropStatus.APPLIED_MANUAL -> text.get(R.string.document_batch_crop_applied)
-    }
 }

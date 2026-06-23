@@ -105,6 +105,23 @@ fun DocumentBatchState.removeItem(itemId: String): DocumentBatchState {
     )
 }
 
+fun DocumentBatchState.upsertPreviewItem(previewItem: DocumentBatchItem): DocumentBatchState {
+    if (status != DocumentBatchStatus.ACTIVE) return this
+    val existingIndex = items.indexOfFirst { it.shotId == previewItem.shotId }
+    val updatedItems = if (existingIndex >= 0) {
+        items.mapIndexed { index, item ->
+            if (index == existingIndex) previewItem.copy(orderIndex = item.orderIndex) else item
+        }
+    } else {
+        items + previewItem.copy(orderIndex = items.size)
+    }
+    return copy(
+        items = updatedItems,
+        latestItemId = previewItem.itemId,
+        lastMessage = "Page preview ready"
+    )
+}
+
 fun DocumentBatchState.updateItemCropStatus(
     itemId: String,
     cropStatus: DocumentBatchCropStatus,

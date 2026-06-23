@@ -170,7 +170,7 @@ data class PhotoSettings(
         textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
         textScale = WatermarkTextScale.NORMAL,
         textOpacity = WatermarkTextOpacity.SOFT,
-        frameBackground = WatermarkFrameBackground.WHITE
+        frameBackground = WatermarkFrameBackground.DARK
     ),
     val pureTextWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
         textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
@@ -194,6 +194,18 @@ data class PhotoSettings(
         textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
         textScale = WatermarkTextScale.NORMAL,
         textOpacity = WatermarkTextOpacity.SOFT,
+        frameBackground = WatermarkFrameBackground.DARK
+    ),
+    val vanGoghStarryWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
+        textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+        textScale = WatermarkTextScale.NORMAL,
+        textOpacity = WatermarkTextOpacity.SOLID,
+        frameBackground = WatermarkFrameBackground.DARK
+    ),
+    val blueHourWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
+        textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+        textScale = WatermarkTextScale.NORMAL,
+        textOpacity = WatermarkTextOpacity.SOLID,
         frameBackground = WatermarkFrameBackground.DARK
     ),
     val livePhotoEnabledByDefault: Boolean = false,

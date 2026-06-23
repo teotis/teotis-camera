@@ -87,6 +87,21 @@ class ShotGraphBuilderTest {
     }
 
     @Test
+    fun `watermark algorithm is present for explicit non default template without text`() {
+        val request = baseRequest.copy(
+            saveRequest = SaveRequest.photoLibrary(
+                metadata = MediaMetadata(
+                    customTags = mapOf("watermarkTemplate" to "van-gogh-starry")
+                )
+            )
+        )
+        val graph = ShotGraphBuilder.build(request)
+        val watermarkNode = graph.algorithmNodes.firstOrNull { it.type == AlgorithmType.WATERMARK_RENDER }
+        assertNotNull(watermarkNode)
+        assertEquals(listOf("test-shot:primary"), watermarkNode.inputs)
+    }
+
+    @Test
     fun `thumbnail algorithm uses primaryCaptureNodeId as input`() {
         val request = baseRequest.copy(thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME)
         val graph = ShotGraphBuilder.build(request)

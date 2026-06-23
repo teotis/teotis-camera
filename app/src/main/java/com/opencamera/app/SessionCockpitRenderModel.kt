@@ -264,6 +264,11 @@ private val stillModesWithFrameRatio = setOf(
     ModeId.HUMANISTIC
 )
 
+private val livePhotoCapableModes = setOf(
+    ModeId.PHOTO,
+    ModeId.HUMANISTIC
+)
+
 internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): QuickBrightnessRenderModel {
     val isBrightnessCapableMode = state.activeMode in BRIGHTNESS_CAPABLE_MODES
     val isPreviewActive = state.previewStatus == PreviewStatus.ACTIVE
@@ -388,7 +393,14 @@ internal fun quickPanelSheetRenderModel(
     val gridValue = text.gridModeLabel(settings.common.gridMode)
     val gridEnabled = !stillBusy
 
-    val liveEnabled = supportsStillCapture && !stillBusy
+    val liveModeSupported = state.activeMode in livePhotoCapableModes && stillTemplate
+    val liveEnabled = liveModeSupported && supportsStillCapture && !stillBusy
+    val liveDisabledReason = when {
+        !liveModeSupported -> text.get(R.string.disabled_live_photo_unsupported_mode)
+        state.activeShot != null -> text.get(R.string.disabled_saving_photo)
+        state.countdownRemainingSeconds != null -> text.get(R.string.disabled_countdown)
+        else -> null
+    }
     val liveValue = text.onOff(settings.photo.livePhotoEnabledByDefault)
     val liveSelected = settings.photo.livePhotoEnabledByDefault
 
@@ -462,6 +474,7 @@ internal fun quickPanelSheetRenderModel(
             title = text.get(R.string.button_quick_live),
             value = liveValue,
             isEnabled = liveEnabled,
+            disabledReason = liveDisabledReason,
             controlKind = QuickControlKind.TOGGLE,
             isSelected = liveSelected
         ),
@@ -473,6 +486,16 @@ internal fun quickPanelSheetRenderModel(
         ),
         hasQuickUserAdjustments = false,
         resetQuickAction = null
+    )
+}
+
+internal fun quickLivePhotoToggleAction(
+    state: SessionState?,
+    sheet: QuickPanelSheetRenderModel?
+): PersistedSettingsAction.UpdateLivePhotoDefault? {
+    if (state == null || sheet?.liveRow?.isEnabled != true) return null
+    return PersistedSettingsAction.UpdateLivePhotoDefault(
+        enabled = !state.settings.persisted.photo.livePhotoEnabledByDefault
     )
 }
 

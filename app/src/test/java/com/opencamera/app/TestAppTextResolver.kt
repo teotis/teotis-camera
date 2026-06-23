@@ -110,6 +110,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
         R.string.disabled_frame_ratio_active_shot -> "Wait for current capture to finish"
         R.string.disabled_frame_ratio_countdown -> "Wait for countdown to finish"
         R.string.disabled_frame_ratio_unsupported_mode -> "Frame ratio not supported in current mode"
+        R.string.disabled_live_photo_unsupported_mode -> "Live photo is not supported in current mode"
         R.string.disabled_permission -> "Camera permission required"
         R.string.disabled_preparing_recording -> "Preparing to record"
         R.string.disabled_preset_switching_recording -> "Preset switching unavailable during recording"

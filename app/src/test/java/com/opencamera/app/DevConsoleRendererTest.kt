@@ -3,6 +3,7 @@ package com.opencamera.app
 import android.view.ContextThemeWrapper
 import android.widget.Button
 import android.widget.TextView
+import androidx.core.view.isVisible
 import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
@@ -10,6 +11,7 @@ import com.google.android.material.card.MaterialCardView
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
@@ -33,6 +35,30 @@ class DevConsoleRendererTest {
         DevConsoleRenderer(context, devConsoleViews(context, recycler))
 
         assertNotNull(recycler.layoutManager)
+    }
+
+    @Test
+    fun `renderer shows summary text on first dev panel render`() {
+        val context = ContextThemeWrapper(
+            ApplicationProvider.getApplicationContext(),
+            R.style.Theme_OpenCamera
+        )
+        val recycler = RecyclerView(context)
+        val views = devConsoleViews(context, recycler)
+        val renderer = DevConsoleRenderer(context, views)
+
+        renderer.render(
+            DevLogRenderModel(
+                isAvailable = true,
+                selectedTab = DevLogTab.ALL,
+                title = "全部事件",
+                summaryText = "状态:ACTIVE | 模式:PHOTO | 拍摄:IDLE",
+                visibleEvents = emptyList()
+            )
+        )
+
+        assertEquals("状态:ACTIVE | 模式:PHOTO | 拍摄:IDLE", views.summary.text.toString())
+        assertTrue(views.summary.isVisible)
     }
 
     private fun devConsoleViews(

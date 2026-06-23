@@ -2,6 +2,7 @@ package com.opencamera.core.session
 
 import com.opencamera.core.device.PreviewMeteringPoint
 import com.opencamera.core.device.PreviewMeteringResult
+import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ThumbnailSource
 
 /**
@@ -20,6 +21,7 @@ internal interface PreviewSessionMutations {
     fun updatePreviewStopped(reason: String)
     fun updatePreviewThumbnail(source: ThumbnailSource, generation: Int)
     fun updateCaptureFeedback(shotId: String, outputPath: String)
+    fun updateDocumentBatchPreviewItem(shot: ShotRequest, outputPath: String)
     fun updatePreviewMeteringRequested(requestId: String, point: PreviewMeteringPoint)
     fun updatePreviewMeteringCompleted(result: PreviewMeteringResult)
     fun clearPreviewMeteringFeedback(requestId: String)

@@ -3,6 +3,13 @@ package com.opencamera.core.session
 import com.opencamera.core.device.PreviewMeteringPoint
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
+import com.opencamera.core.media.CaptureProfile
+import com.opencamera.core.media.MediaType
+import com.opencamera.core.media.PostProcessSpec
+import com.opencamera.core.media.SaveRequest
+import com.opencamera.core.media.ShotKind
+import com.opencamera.core.media.ShotRequest
+import com.opencamera.core.media.ThumbnailPolicy
 import com.opencamera.core.media.ThumbnailSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -45,6 +52,10 @@ class PreviewSessionMutationsTest {
 
         override fun updateCaptureFeedback(shotId: String, outputPath: String) {
             calls.add("feedback:$shotId,$outputPath")
+        }
+
+        override fun updateDocumentBatchPreviewItem(shot: ShotRequest, outputPath: String) {
+            calls.add("documentPreview:${shot.shotId},$outputPath")
         }
 
         override fun updatePreviewMeteringRequested(requestId: String, point: PreviewMeteringPoint) {
@@ -149,6 +160,13 @@ class PreviewSessionMutationsTest {
     }
 
     @Test
+    fun `updateDocumentBatchPreviewItem records shot and path`() {
+        val mutations = RecordingMutations()
+        mutations.updateDocumentBatchPreviewItem(testShotRequest("doc-1"), "/tmp/doc-preview.jpg")
+        assertEquals(listOf("documentPreview:doc-1,/tmp/doc-preview.jpg"), mutations.calls)
+    }
+
+    @Test
     fun `updatePreviewMeteringRequested records request and point`() {
         val mutations = RecordingMutations()
         mutations.updatePreviewMeteringRequested(
@@ -210,7 +228,7 @@ class PreviewSessionMutationsTest {
     }
 
     @Test
-    fun `all fifteen methods are callable through interface`() {
+    fun `all sixteen methods are callable through interface`() {
         val mutations: PreviewSessionMutations = RecordingMutations()
 
         mutations.updatePreviewBlocked("r")
@@ -220,6 +238,7 @@ class PreviewSessionMutationsTest {
         mutations.updatePreviewStopped("r")
         mutations.updatePreviewThumbnail(ThumbnailSource.None, 0)
         mutations.updateCaptureFeedback("s", "o")
+        mutations.updateDocumentBatchPreviewItem(testShotRequest("s"), "o")
         mutations.updatePreviewMeteringRequested("id", PreviewMeteringPoint(0f, 0f))
         mutations.updatePreviewMeteringCompleted(
             PreviewMeteringResult("id", PreviewMeteringPoint(0f, 0f), PreviewMeteringResultStatus.FAILED)
@@ -231,6 +250,17 @@ class PreviewSessionMutationsTest {
         mutations.updatePreviewRuntimeError("error", "action")
         mutations.updatePreviewMetrics(PreviewMetrics())
 
-        assertEquals(15, (mutations as RecordingMutations).calls.size)
+        assertEquals(16, (mutations as RecordingMutations).calls.size)
     }
+
+    private fun testShotRequest(shotId: String): ShotRequest =
+        ShotRequest(
+            shotId = shotId,
+            shotKind = ShotKind.STILL_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.KEEP_PREVIEW_FRAME,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile()
+        )
 }

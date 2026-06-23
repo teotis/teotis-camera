@@ -17,6 +17,8 @@
     <dimen name="mode_track_height">32dp</dimen>
     <dimen name="zoom_chip_min_width">36dp</dimen>
     <dimen name="zoom_chip_min_height">26dp</dimen>
+    <dimen name="pro_glass_chip_min_width">58dp</dimen>
+    <dimen name="pro_glass_strip_min_height">58dp</dimen>
 
     <!-- Zoom strip layout -->
     <dimen name="zoom_strip_container_height">32dp</dimen>

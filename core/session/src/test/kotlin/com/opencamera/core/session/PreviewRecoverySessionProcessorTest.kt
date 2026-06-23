@@ -170,6 +170,10 @@ class PreviewRecoverySessionProcessorTest {
             calls.add("feedback:$shotId,$outputPath")
         }
 
+        override fun updateDocumentBatchPreviewItem(shot: ShotRequest, outputPath: String) {
+            calls.add("documentPreview:${shot.shotId},$outputPath")
+        }
+
         override fun updatePreviewMeteringRequested(requestId: String, point: PreviewMeteringPoint) {
             calls.add("meteringRequested:$requestId")
         }
@@ -532,6 +536,23 @@ class PreviewRecoverySessionProcessorTest {
         harness.dispatch(SessionIntent.CaptureFeedbackSnapshotUpdated("shot-1", "/tmp/feedback.jpg"))
 
         assertTrue(harness.mutations.calls.contains("feedback:shot-1,/tmp/feedback.jpg"))
+    }
+
+    @Test
+    fun `CaptureFeedbackSnapshotUpdated updates document batch preview item in document mode`() = runTest {
+        val shot = testShotRequest("doc-shot-1")
+        val harness = Harness(runningState().copy(
+            activeMode = ModeId.DOCUMENT,
+            availableModes = listOf(ModeId.DOCUMENT),
+            activeShot = shot,
+            presentation = SessionPresentationState(
+                documentBatch = DocumentBatchState.active("batch-1")
+            )
+        ))
+
+        harness.dispatch(SessionIntent.CaptureFeedbackSnapshotUpdated("doc-shot-1", "/tmp/doc-preview.jpg"))
+
+        assertTrue(harness.mutations.calls.contains("documentPreview:doc-shot-1,/tmp/doc-preview.jpg"))
     }
 
     @Test

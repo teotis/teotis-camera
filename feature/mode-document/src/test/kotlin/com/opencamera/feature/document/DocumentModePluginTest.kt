@@ -202,13 +202,14 @@ class DocumentModePluginTest {
     }
 
     @Test
-    fun `frame ratio selected returns auto-crop hint`() = runTest {
+    fun `frame ratio selected returns original-frame order hint`() = runTest {
         val controller = createController()
         val signal = controller.handle(ModeIntent.FrameRatioSelected(
             com.opencamera.core.media.FrameRatio.RATIO_4_3
         ))
         assertIs<ModeSignal.ShowHint>(signal)
-        assertTrue(signal.message.contains("裁边"))
+        assertTrue(signal.message.contains("保留原图"))
+        assertTrue(signal.message.contains("左侧"))
     }
 
     @Test
@@ -299,7 +300,7 @@ class DocumentModePluginTest {
     }
 
     @Test
-    fun `effect spec contains document effect with auto crop`() = runTest {
+    fun `effect spec keeps original document frame without auto crop`() = runTest {
         var capturedSpec: EffectSpec? = null
         val controller = createController(
             onEffectSpecChanged = { capturedSpec = it }
@@ -309,8 +310,7 @@ class DocumentModePluginTest {
 
         val docEffect = capturedSpec!!.find<DocumentEffect>()
         assertNotNull(docEffect)
-        // Default first enhanced profile (receipt) has autoCrop = true
-        assertTrue(docEffect.autoCrop)
+        assertFalse(docEffect.autoCrop)
     }
 
     @Test
@@ -455,7 +455,7 @@ class DocumentModePluginTest {
         val controller = createController()
         val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.saveRequest.metadata.customTags
-        assertEquals("true", metadata["autoCrop"])
+        assertEquals("false", metadata["autoCrop"])
         assertEquals("document", metadata["mode"])
     }
 
@@ -682,7 +682,7 @@ class DocumentModePluginTest {
         controller.onEnter()
         val detail = controller.snapshot.value.state.detail
         assertTrue(detail.contains("Receipt") || detail.contains("Whiteboard") || detail.contains("Contract"))
-        assertTrue(detail.contains("Auto crop"))
+        assertFalse(detail.contains("Auto crop"))
         assertTrue(detail.contains("Contrast"))
         assertTrue(detail.contains("Color:"))
     }

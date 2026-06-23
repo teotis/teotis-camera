@@ -329,7 +329,7 @@ class DocumentBatchOrganizerRenderModelTest {
     }
 
     @Test
-    fun `each item has crop edit label in batch overview mode`() {
+    fun `items do not expose crop edit labels because document mode keeps originals`() {
         val batchState = DocumentBatchState(
             batchId = "batch-1",
             status = DocumentBatchStatus.ACTIVE,
@@ -342,7 +342,7 @@ class DocumentBatchOrganizerRenderModelTest {
 
         val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
-        assertTrue(model.items.all { it.cropEditLabel != null })
+        assertTrue(model.items.all { it.cropEditLabel == null })
     }
 
     private fun documentBatchSessionState(batchState: DocumentBatchState): SessionState {

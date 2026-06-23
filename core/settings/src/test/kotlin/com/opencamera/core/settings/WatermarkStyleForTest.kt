@@ -88,6 +88,48 @@ class WatermarkStyleForTest {
     }
 
     @Test
+    fun `watermarkStyleFor van-gogh-starry returns dedicated starry style`() {
+        val settings = PhotoSettings(
+            nightStreetWatermarkStyle = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_RIGHT,
+                textOpacity = WatermarkTextOpacity.SUBTLE
+            ),
+            vanGoghStarryWatermarkStyle = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_CENTER,
+                textOpacity = WatermarkTextOpacity.SOLID,
+                frameBackground = WatermarkFrameBackground.DARK
+            )
+        )
+
+        val style = settings.watermarkStyleFor("van-gogh-starry")
+
+        assertEquals(WatermarkTextPlacement.BOTTOM_CENTER, style.textPlacement)
+        assertEquals(WatermarkTextOpacity.SOLID, style.textOpacity)
+        assertEquals(WatermarkFrameBackground.DARK, style.frameBackground)
+    }
+
+    @Test
+    fun `watermarkStyleFor blue-hour returns dedicated blue hour style`() {
+        val settings = PhotoSettings(
+            nightStreetWatermarkStyle = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_RIGHT,
+                textOpacity = WatermarkTextOpacity.SUBTLE
+            ),
+            blueHourWatermarkStyle = WatermarkStyleSettings(
+                textPlacement = WatermarkTextPlacement.BOTTOM_LEFT,
+                textOpacity = WatermarkTextOpacity.SOLID,
+                frameBackground = WatermarkFrameBackground.DARK
+            )
+        )
+
+        val style = settings.watermarkStyleFor("blue-hour")
+
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, style.textPlacement)
+        assertEquals(WatermarkTextOpacity.SOLID, style.textOpacity)
+        assertEquals(WatermarkFrameBackground.DARK, style.frameBackground)
+    }
+
+    @Test
     fun `watermarkStyleFor professional-bottom-bar returns professionalBottomBarWatermarkStyle`() {
         val settings = PhotoSettings(
             professionalBottomBarWatermarkStyle = WatermarkStyleSettings(

@@ -8,8 +8,10 @@ import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.device.displayReason
 import com.opencamera.core.device.photoLowLightStrategySupport
 import com.opencamera.core.device.recoveryReason
+import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.media.outputPathOrNull
+import com.opencamera.core.mode.ModeId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -238,6 +240,13 @@ internal class PreviewRecoverySessionProcessor(
         if (activeShot == null || activeShot.shotId != shotId) {
             trace.record("capture.feedback.snapshot.skipped", "shotId=$shotId,active=${activeShot?.shotId}")
             return
+        }
+        if (activeShot.mediaType == MediaType.PHOTO &&
+            state.value.activeMode == ModeId.DOCUMENT &&
+            state.value.presentation.documentBatch.status == DocumentBatchStatus.ACTIVE
+        ) {
+            mutations.updateDocumentBatchPreviewItem(activeShot, outputPath)
+            trace.record("document.batch.preview.item.updated", "shotId=$shotId")
         }
         if (captureFeedbackPolicyFor(activeShot) == CaptureFeedbackPolicy.SUPPRESS_UNTIL_SAVED_MEDIA) {
             trace.record("capture.feedback.snapshot.suppressed", "shotId=$shotId,reason=final-output-postprocess")

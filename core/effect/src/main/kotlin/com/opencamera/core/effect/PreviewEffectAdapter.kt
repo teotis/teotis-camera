@@ -154,7 +154,7 @@ class PreviewEffectAdapter {
 
     private fun resolvePreviewText(effect: WatermarkEffect): String {
         return when (effect.templateId) {
-            "blue-hour" -> "BLUE HOUR"
+            "blue-hour" -> "蓝调时刻"
             "van-gogh-starry" -> metadataPreviewLabels(effect).joinToString(" · ")
                 .ifBlank { "Watermark" }
             else -> effect.tokens["watermarkModel"] ?: "Watermark"

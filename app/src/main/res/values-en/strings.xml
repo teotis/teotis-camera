@@ -309,6 +309,7 @@
     <string name="disabled_frame_ratio_unsupported_mode">Frame ratio not supported in current mode</string>
     <string name="disabled_frame_ratio_active_shot">Wait for current capture to finish</string>
     <string name="disabled_frame_ratio_countdown">Wait for countdown to finish</string>
+    <string name="disabled_live_photo_unsupported_mode">Live photo is not supported in current mode</string>
     <string name="status_recording_starting">Starting…</string>
     <string name="status_recording_active">Recording</string>
     <string name="status_recording_saving">Saving…</string>

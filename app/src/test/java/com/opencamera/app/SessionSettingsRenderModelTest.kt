@@ -369,6 +369,22 @@ class SessionSettingsRenderModelTest {
             assertTrue(sheet.frameRatioOptions.all { !it.isEnabled })
         }
 
+        @Test
+        fun `quick panel live toggle is disabled for video mode`() {
+            val state = defaultSessionState(
+                activeMode = ModeId.VIDEO,
+                activeDeviceGraph = DeviceGraphSpec.videoRecording(
+                    preferredLensFacing = LensFacing.BACK,
+                    enablePreviewSnapshots = true
+                )
+            )
+            val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+            assertFalse(sheet.liveRow.isEnabled)
+            assertEquals("Live photo is not supported in current mode", sheet.liveRow.disabledReason)
+            assertNull(quickLivePhotoToggleAction(state, sheet))
+        }
+
 
 
         @Test
@@ -422,6 +438,27 @@ class SessionSettingsRenderModelTest {
             )
             val sheetOff = quickPanelSheetRenderModel(stateOff, TestAppTextResolver(), strings)
             assertFalse(sheetOff.liveRow.isSelected)
+        }
+
+        @Test
+        fun `quick panel live toggle action only emits when row enabled`() {
+            val enabledState = defaultSessionState(
+                persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                    livePhotoEnabledByDefault = true
+                )
+            )
+            val enabledSheet = quickPanelSheetRenderModel(enabledState, TestAppTextResolver(), strings)
+
+            assertEquals(
+                PersistedSettingsAction.UpdateLivePhotoDefault(false),
+                quickLivePhotoToggleAction(enabledState, enabledSheet)
+            )
+
+            val disabledSheet = enabledSheet.copy(
+                liveRow = enabledSheet.liveRow.copy(isEnabled = false)
+            )
+
+            assertNull(quickLivePhotoToggleAction(enabledState, disabledSheet))
         }
 
         @Test

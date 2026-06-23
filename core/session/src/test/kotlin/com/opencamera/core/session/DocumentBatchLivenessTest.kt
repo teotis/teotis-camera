@@ -181,7 +181,7 @@ class DocumentBatchLivenessTest {
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(1, batch.items.size)
         assertEquals("doc-shot-1", batch.items[0].shotId)
-        assertEquals(DocumentBatchCropStatus.FAILED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
         assertTrue(batch.items[0].pipelineNotes.contains("document:liveness:force-released"))
         assertTrue(
             harness.trace.snapshot().any { it.name == "liveness.document.force-release" }
@@ -211,7 +211,7 @@ class DocumentBatchLivenessTest {
     }
 
     @Test
-    fun `late ShotCompleted after force-release is rejected as stale`() = runTest {
+    fun `late ShotCompleted after force-release hydrates failed placeholder item`() = runTest {
         val harness = Harness()
         val shot = documentShotRequest("doc-shot-1")
         harness.process(SessionIntent.ShotStarted(shot))
@@ -223,15 +223,19 @@ class DocumentBatchLivenessTest {
 
         val batchBeforeLate = harness.state.value.presentation.documentBatch
         assertEquals(1, batchBeforeLate.items.size)
-        assertEquals(DocumentBatchCropStatus.FAILED, batchBeforeLate.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batchBeforeLate.items[0].cropStatus)
 
         harness.process(SessionIntent.ShotCompleted(documentShotResult("doc-shot-1")))
 
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(1, batch.items.size)
-        assertEquals(DocumentBatchCropStatus.FAILED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
+        assertEquals("/sdcard/doc.jpg", batch.items[0].outputPath)
+        assertEquals("file:/sdcard/doc.jpg", batch.items[0].renderUri)
+        assertTrue(batch.items[0].pipelineNotes.contains("document:liveness:late-result-hydrated"))
+        assertEquals("doc-shot-1", batch.latestItemId)
         assertTrue(
-            harness.trace.snapshot().any { it.name == "shot.completed.force-released.stale" }
+            harness.trace.snapshot().any { it.name == "shot.completed.force-released.hydrated" }
         )
     }
 
@@ -280,7 +284,7 @@ class DocumentBatchLivenessTest {
         assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(1, batch.items.size)
-        assertEquals(DocumentBatchCropStatus.FAILED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
         assertTrue(
             harness.trace.snapshot().any { it.name == "liveness.document.force-release" }
         )
@@ -299,7 +303,7 @@ class DocumentBatchLivenessTest {
 
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(1, batch.items.size)
-        assertEquals(DocumentBatchCropStatus.FAILED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
         assertNull(batch.items[0].outputPath)
         assertTrue(
             harness.trace.snapshot().any { it.name == "liveness.document.force-release" }
@@ -320,14 +324,14 @@ class DocumentBatchLivenessTest {
         assertNull(harness.state.value.activeShot)
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(1, batch.items.size)
-        assertEquals(DocumentBatchCropStatus.FAILED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
         assertTrue(
             harness.trace.snapshot().any { it.name == "liveness.document.force-release" }
         )
     }
 
     @Test
-    fun `normal document photo completion path is preserved`() = runTest {
+    fun `normal document photo completion keeps original frame`() = runTest {
         val harness = Harness()
         val shot = documentShotRequest("doc-shot-1")
         harness.process(SessionIntent.ShotStarted(shot))
@@ -339,7 +343,7 @@ class DocumentBatchLivenessTest {
 
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(1, batch.items.size)
-        assertEquals(DocumentBatchCropStatus.APPLIED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
         assertEquals("/sdcard/doc.jpg", batch.items[0].outputPath)
         assertFalse(harness.trace.snapshot().any { it.name == "liveness.document.force-release" })
     }
@@ -415,7 +419,7 @@ class DocumentBatchLivenessTest {
         assertEquals("doc-shot-0", batch.items[0].shotId)
         assertEquals(DocumentBatchCropStatus.APPLIED, batch.items[0].cropStatus)
         assertEquals("doc-shot-1", batch.items[1].shotId)
-        assertEquals(DocumentBatchCropStatus.FAILED, batch.items[1].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[1].cropStatus)
         assertEquals(1, batch.items[1].orderIndex)
     }
 

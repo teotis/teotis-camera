@@ -98,7 +98,10 @@ private class CheckInModeController(
 
     override fun buildEffectSpec(): EffectSpec {
         if (currentScenario().captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) {
-            return EffectSpec(listOf(FrameEffect(currentFrameRatio())))
+            return EffectSpec(listOf(
+                checkInWatermarkEffect(),
+                FrameEffect(currentFrameRatio())
+            ))
         }
         val style = currentStyle()
         val portraitSettings = portraitSettings()
@@ -112,9 +115,6 @@ private class CheckInModeController(
         val adjustedRenderSpec = pipelineResult?.finalRenderSpec
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
-        val selectedWatermarkTemplate = selectedWatermarkTemplate()
-        val watermarkStyle = context.settingsSnapshot.persisted.photo
-            .watermarkStyleFor(selectedWatermarkTemplate.id)
         return EffectSpec(listOf(
             FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
             PortraitEffect(
@@ -125,11 +125,7 @@ private class CheckInModeController(
                 bokehEffect = portraitSettings.portraitBokehEffect.storageKey,
                 depthStrength = portraitSettings.portraitDepthStrength
             ),
-            WatermarkEffect(
-                templateId = selectedWatermarkTemplate.id,
-                tokens = watermarkTokens(),
-                style = watermarkStyle
-            ),
+            checkInWatermarkEffect(),
             FrameEffect(currentFrameRatio())
         ))
     }
@@ -255,10 +251,27 @@ private class CheckInModeController(
     // ── Capture strategies ────────────────────────────────────────────
 
     private fun buildClarityStrategy(scenario: CheckInScenario): ModeSignal.SubmitCapture {
+        val style = currentStyle()
+        val effectSpec = buildEffectSpec()
+        val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
+        val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
+        val postProcessSpec = basePostProcess.copy(
+            watermarkText = resolvedWatermarkText(scenario, style),
+            exifOverrides = basePostProcess.exifOverrides + mapOf(
+                "SceneCaptureType" to "Check-in Clarity",
+                "CheckInScenario" to scenario.label,
+                "CompatSceneCaptureType" to "Clarity Assist"
+            ),
+            algorithmProfile = "checkin-clarity-best-frame-v1"
+        )
         val metadataTags = buildMap {
+            putAll(bridgeTags)
             put("mode", "check-in")
             put("checkInScenario", scenario.id)
             put("compatMode", "clarity-assist")
+            put("style", style.id)
+            put("watermarkModeName", "Check-in")
+            put("watermarkProfileName", style.label)
             put("focus-bracket-capture", "V1")
             put("best-frame-clarity-assist", "V1")
             put("degradation-policy", "multi-frame-best-frame")
@@ -272,14 +285,7 @@ private class CheckInModeController(
                         fileNamePrefix = "OpenCamera_CHECKIN",
                         metadata = MediaMetadata(customTags = metadataTags)
                     ),
-                    postProcessSpec = PostProcessSpec(
-                        algorithmProfile = "checkin-clarity-best-frame-v1",
-                        exifOverrides = mapOf(
-                            "SceneCaptureType" to "Check-in Clarity",
-                            "CheckInScenario" to scenario.label,
-                            "CompatSceneCaptureType" to "Clarity Assist"
-                        )
-                    ),
+                    postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         frameCount = 3,
                         stillCaptureQuality = runtimeState().stillCaptureQuality,
@@ -301,14 +307,7 @@ private class CheckInModeController(
                         fileNamePrefix = "OpenCamera_CHECKIN",
                         metadata = MediaMetadata(customTags = fallbackTags)
                     ),
-                    postProcessSpec = PostProcessSpec(
-                        algorithmProfile = "checkin-clarity-best-frame-v1",
-                        exifOverrides = mapOf(
-                            "SceneCaptureType" to "Check-in Clarity",
-                            "CheckInScenario" to scenario.label,
-                            "CompatSceneCaptureType" to "Clarity Assist"
-                        )
-                    ),
+                    postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
                         stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
@@ -475,6 +474,17 @@ private class CheckInModeController(
 
     private fun supportsMultiFrameCapture(): Boolean =
         runtimeState().deviceCapabilities.supportsNightMultiFrame
+
+    private fun checkInWatermarkEffect(): WatermarkEffect {
+        val selectedWatermarkTemplate = selectedWatermarkTemplate()
+        val watermarkStyle = context.settingsSnapshot.persisted.photo
+            .watermarkStyleFor(selectedWatermarkTemplate.id)
+        return WatermarkEffect(
+            templateId = selectedWatermarkTemplate.id,
+            tokens = watermarkTokens(),
+            style = watermarkStyle
+        )
+    }
 
     private fun resolvedEnterHeadline(): String {
         val scenario = currentScenario()

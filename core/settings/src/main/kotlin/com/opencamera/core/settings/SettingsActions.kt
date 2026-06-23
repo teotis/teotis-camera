@@ -210,10 +210,8 @@ fun PhotoSettings.watermarkStyleFor(
         "blur-four-border" -> blurFourBorderWatermarkStyle
         "professional-bottom-bar" -> professionalBottomBarWatermarkStyle
         "night-street" -> nightStreetWatermarkStyle
-        "van-gogh-starry" -> nightStreetWatermarkStyle.copy(
-            textPlacement = WatermarkTextPlacement.BOTTOM_CENTER
-        )
-        "blue-hour" -> nightStreetWatermarkStyle
+        "van-gogh-starry" -> vanGoghStarryWatermarkStyle
+        "blue-hour" -> blueHourWatermarkStyle
         else -> classicOverlayWatermarkStyle
     }
 }
@@ -252,12 +250,10 @@ private fun PhotoSettings.updateWatermarkStyle(
             nightStreetWatermarkStyle = transform(nightStreetWatermarkStyle)
         )
         "van-gogh-starry" -> copy(
-            nightStreetWatermarkStyle = transform(
-                nightStreetWatermarkStyle.copy(textPlacement = WatermarkTextPlacement.BOTTOM_CENTER)
-            )
+            vanGoghStarryWatermarkStyle = transform(vanGoghStarryWatermarkStyle)
         )
         "blue-hour" -> copy(
-            nightStreetWatermarkStyle = transform(nightStreetWatermarkStyle)
+            blueHourWatermarkStyle = transform(blueHourWatermarkStyle)
         )
         else -> copy(
             classicOverlayWatermarkStyle = transform(classicOverlayWatermarkStyle)

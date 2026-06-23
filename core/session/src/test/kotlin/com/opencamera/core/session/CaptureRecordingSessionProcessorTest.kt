@@ -429,13 +429,14 @@ class CaptureRecordingSessionProcessorTest {
     }
 
     @Test
-    fun `handleDataReceived for live photo keeps activeShot blocked`() = runTest {
+    fun `handleDataReceived for live photo rearms shutter with pending postprocess`() = runTest {
         val shot = livePhotoShotRequest("shot-live-1")
         val harness = Harness(runningState().copy(activeShot = shot))
         harness.process(SessionIntent.DataReceived("shot-live-1", MediaType.PHOTO))
 
         assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
-        assertEquals(shot, harness.state.value.activeShot)
+        assertNull(harness.state.value.activeShot)
+        assertEquals("shot-live-1", harness.state.value.presentation.pendingPostprocess?.shotId)
     }
 
     @Test
@@ -603,21 +604,21 @@ class CaptureRecordingSessionProcessorTest {
     // ── Document Crop Status Parsing ──────────────────────────────────
 
     @Test
-    fun `documentCropStatusFrom returns APPLIED for applied note`() {
+    fun `documentCropStatusFrom ignores applied note now that document mode keeps originals`() {
         val notes = listOf("document:auto-crop:applied", "document:auto-crop:bounds=10,20,300,400")
-        assertEquals(DocumentBatchCropStatus.APPLIED, documentCropStatusFrom(notes))
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, documentCropStatusFrom(notes))
     }
 
     @Test
-    fun `documentCropStatusFrom returns SKIPPED for skipped note`() {
+    fun `documentCropStatusFrom ignores skipped note now that document mode keeps originals`() {
         val notes = listOf("document:auto-crop:skipped:unsupported-mime")
-        assertEquals(DocumentBatchCropStatus.SKIPPED, documentCropStatusFrom(notes))
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, documentCropStatusFrom(notes))
     }
 
     @Test
-    fun `documentCropStatusFrom returns FAILED for failed note`() {
+    fun `documentCropStatusFrom ignores failed note now that document mode keeps originals`() {
         val notes = listOf("document:auto-crop:failed:decode-failed")
-        assertEquals(DocumentBatchCropStatus.FAILED, documentCropStatusFrom(notes))
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, documentCropStatusFrom(notes))
     }
 
     @Test
@@ -632,9 +633,9 @@ class CaptureRecordingSessionProcessorTest {
     }
 
     @Test
-    fun `documentCropStatusFrom prefers APPLIED over later notes`() {
+    fun `documentCropStatusFrom ignores mixed crop notes now that document mode keeps originals`() {
         val notes = listOf("document:auto-crop:applied", "document:auto-crop:skipped:reason")
-        assertEquals(DocumentBatchCropStatus.APPLIED, documentCropStatusFrom(notes))
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, documentCropStatusFrom(notes))
     }
 
     // ── Document Batch Capture Integration ────────────────────────────
@@ -668,9 +669,9 @@ class CaptureRecordingSessionProcessorTest {
         assertEquals("doc-shot-1", batch.items[0].shotId)
         assertEquals("receipt", batch.items[0].profileId)
         assertEquals("enhanced", batch.items[0].scanMode)
-        assertEquals(DocumentBatchCropStatus.APPLIED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
         assertEquals("doc-shot-1", batch.latestItemId)
-        assertTrue(batch.lastMessage?.contains("auto-cropped") == true)
+        assertEquals("Page added", batch.lastMessage)
     }
 
     // ── Pending Postprocess UI State Tests ────────────────────────────
@@ -751,14 +752,14 @@ class CaptureRecordingSessionProcessorTest {
     }
 
     @Test
-    fun `live photo DataReceived does not set pendingPostprocess`() = runTest {
+    fun `live photo DataReceived sets pendingPostprocess after rearm`() = runTest {
         val shot = livePhotoShotRequest("shot-live-1")
         val harness = Harness(runningState().copy(activeShot = shot))
         harness.process(SessionIntent.DataReceived("shot-live-1", MediaType.PHOTO))
 
         assertEquals(CaptureStatus.DATA_RECEIVED, harness.state.value.captureStatus)
-        assertEquals(shot, harness.state.value.activeShot)
-        assertNull(harness.state.value.presentation.pendingPostprocess)
+        assertNull(harness.state.value.activeShot)
+        assertEquals("shot-live-1", harness.state.value.presentation.pendingPostprocess?.shotId)
     }
 
     @Test
@@ -996,14 +997,14 @@ class CaptureRecordingSessionProcessorTest {
         assertNull(harness.state.value.presentation.pendingPostprocess)
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(1, batch.items.size)
-        assertEquals(DocumentBatchCropStatus.FAILED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
         assertTrue(
             harness.trace.snapshot().any { it.name == "liveness.document.force-release" }
         )
     }
 
     @Test
-    fun `document batch normal auto-crop path unchanged when watchdog does not fire`() = runTest {
+    fun `document batch normal completion keeps original frame when watchdog does not fire`() = runTest {
         val documentState = runningState().copy(
             activeMode = ModeId.DOCUMENT,
             presentation = SessionPresentationState(
@@ -1024,7 +1025,7 @@ class CaptureRecordingSessionProcessorTest {
 
         val batch = harness.state.value.presentation.documentBatch
         assertEquals(1, batch.items.size)
-        assertEquals(DocumentBatchCropStatus.APPLIED, batch.items[0].cropStatus)
+        assertEquals(DocumentBatchCropStatus.NOT_REQUESTED, batch.items[0].cropStatus)
         assertEquals("doc-shot-1", batch.latestItemId)
         assertFalse(harness.trace.snapshot().any { it.name == "liveness.document.force-release" })
         assertNull(harness.processor.documentBatchLivenessForTest())

@@ -7,6 +7,7 @@ import com.opencamera.core.media.StillCaptureResolutionPreset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -117,5 +118,46 @@ class CameraXCaptureAdapterLifecycleTest {
         // Double-cancel should not throw
         job.cancel()
         assertTrue(job.isCancelled)
+    }
+
+    @Test
+    fun `callback scope restarts after release for next preview bind`() {
+        val scopes = CameraXCaptureWorkScopes(
+            callbackDispatcher = Dispatchers.Default,
+            postProcessScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            postProcessDispatcher = Dispatchers.Default
+        )
+        val firstScope = scopes.activeCallbackScope()
+
+        scopes.cancelCallbackScope()
+        val restartedScope = scopes.activeCallbackScope()
+
+        assertTrue(firstScope.coroutineContext.job.isCancelled)
+        assertFalse(restartedScope.coroutineContext.job.isCancelled)
+        assertNotSame(firstScope, restartedScope)
+        scopes.cancelCallbackScope()
+    }
+
+    @Test
+    fun `postprocess scope survives callback release cancellation`() {
+        val postProcessJob = SupervisorJob()
+        val scopes = CameraXCaptureWorkScopes(
+            callbackDispatcher = Dispatchers.Default,
+            postProcessScope = CoroutineScope(postProcessJob + Dispatchers.Default),
+            postProcessDispatcher = Dispatchers.Default
+        )
+        val latch = CountDownLatch(1)
+
+        scopes.cancelCallbackScope()
+        scopes.launchPostProcess {
+            latch.countDown()
+        }
+
+        assertTrue(
+            latch.await(2, TimeUnit.SECONDS),
+            "Final-output postprocess must keep running after preview callback release"
+        )
+        scopes.cancelCallbackScope()
+        postProcessJob.cancel()
     }
 }

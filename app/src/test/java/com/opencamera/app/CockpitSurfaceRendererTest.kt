@@ -28,6 +28,8 @@ import org.robolectric.RobolectricTestRunner
 import org.junit.runner.RunWith
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 
 @RunWith(RobolectricTestRunner::class)
 class CockpitSurfaceRendererTest {
@@ -115,6 +117,64 @@ class CockpitSurfaceRendererTest {
         assertEquals(-1f, previewView.scaleX)
     }
 
+    @Test
+    fun `renderModeAction keeps right rail glass background`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val previewView = PreviewView(context)
+        val modeAction = Button(context).apply {
+            setBackgroundResource(R.drawable.bg_right_rail_button)
+        }
+        val renderer = createRenderer(previewView, modeAction = modeAction)
+
+        renderer.renderModeAction(
+            ModeActionRenderModel(
+                isVisible = true,
+                label = "Pro",
+                isActive = false
+            )
+        )
+        assertNotNull(modeAction.background)
+
+        renderer.renderModeAction(
+            ModeActionRenderModel(
+                isVisible = true,
+                label = "Pro",
+                isActive = true
+            )
+        )
+        assertNotNull(modeAction.background)
+
+        renderer.renderModeAction(
+            ModeActionRenderModel(
+                isVisible = true,
+                label = "Pro",
+                isActive = false
+            )
+        )
+        assertNotNull(modeAction.background)
+    }
+
+    @Test
+    fun `renderModeAction does not replace styled right rail background`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val previewView = PreviewView(context)
+        val modeAction = Button(context).apply {
+            setBackgroundResource(R.drawable.bg_right_rail_button)
+        }
+        val styledBackground = modeAction.background
+        val renderer = createRenderer(previewView, modeAction = modeAction)
+
+        renderer.renderModeAction(
+            ModeActionRenderModel(
+                isVisible = true,
+                label = "全清",
+                isActive = true
+            )
+        )
+
+        assertSame(styledBackground, modeAction.background)
+    }
+
     private fun sessionState(
         lensFacing: LensFacing = LensFacing.BACK,
         selfieMirrorEnabled: Boolean = true
@@ -151,7 +211,10 @@ class CockpitSurfaceRendererTest {
         presentation = SessionPresentationState()
     )
 
-    private fun createRenderer(previewView: PreviewView): CockpitSurfaceRenderer {
+    private fun createRenderer(
+        previewView: PreviewView,
+        modeAction: Button = allocateInstance(Button::class.java)
+    ): CockpitSurfaceRenderer {
         val context = org.robolectric.RuntimeEnvironment.getApplication()
         return CockpitSurfaceRenderer(
             context = context,
@@ -194,7 +257,7 @@ class CockpitSurfaceRendererTest {
                 video = allocateInstance(Button::class.java),
                 document = allocateInstance(Button::class.java),
                 humanistic = allocateInstance(Button::class.java),
-                modeAction = allocateInstance(Button::class.java)
+                modeAction = modeAction
             ),
             filterStrip = FilterStripViews(
                 scroll = allocateInstance(HorizontalScrollView::class.java),
