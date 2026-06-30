@@ -79,11 +79,10 @@ internal class CameraXLivePreviewFrameSource(
     }
 
     fun onAnalyzeFrame(image: ImageProxy, rotationDegrees: Int) {
-        if (!_isActive.get()) {
+        if (!_isActive.get() || buffer == null) {
+            image.close()
             return
         }
-
-        if (buffer == null) return
 
         try {
             frameCounter++
@@ -101,6 +100,8 @@ internal class CameraXLivePreviewFrameSource(
             appendCapturedFrame(image.toCapturedPreviewYuvFrame(descriptor))
         } catch (throwable: Throwable) {
             Log.w(TAG, "Failed to capture live preview frame", throwable)
+        } finally {
+            image.close()
         }
     }
 

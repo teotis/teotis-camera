@@ -7,6 +7,7 @@ import com.opencamera.core.effect.PreviewEffectRenderModel
 import com.opencamera.core.effect.PreviewSceneMaskSnapshot
 import com.opencamera.core.effect.WatermarkHintSpec
 import com.opencamera.core.media.FrameRatio
+import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewMeteringFeedback
 import com.opencamera.core.session.PreviewMeteringFeedbackStatus
@@ -84,8 +85,11 @@ internal fun previewOverlayRenderModel(
             PreviewStatus.RECOVERING
         )
     val countdownLabel = state.countdownRemainingSeconds?.let { "${it}s" }
+    val watermarkPreviewSupported = state.activeMode in watermarkPreviewCapableModes
     val adaptedEffectModel = effectAdapter?.adapt(state.activeEffectSpec, resolvedSnapshot)
     val effectModel = when {
+        !watermarkPreviewSupported ->
+            adaptedEffectModel.withoutWatermarkHint()
         stagedWatermarkHint != null && adaptedEffectModel != null ->
             adaptedEffectModel.copy(watermarkHint = stagedWatermarkHint)
         stagedWatermarkHint != null ->
@@ -134,6 +138,17 @@ internal fun previewOverlayRenderModel(
         isGeometryLocked = isGeometryLocked,
         scanGuide = scanGuide
     )
+}
+
+private val watermarkPreviewCapableModes = setOf(
+    ModeId.PHOTO,
+    ModeId.CHECK_IN,
+    ModeId.HUMANISTIC
+)
+
+private fun PreviewEffectRenderModel?.withoutWatermarkHint(): PreviewEffectRenderModel? {
+    val stripped = this?.copy(watermarkHint = null) ?: return null
+    return stripped.takeUnless { it == PreviewEffectRenderModel.EMPTY }
 }
 
 internal fun previewRatioToContentAspect(ratio: PreviewRatio): PreviewContentAspect? = when (ratio) {

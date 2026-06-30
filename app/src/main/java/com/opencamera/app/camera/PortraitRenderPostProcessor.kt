@@ -7,6 +7,16 @@ import android.util.Log
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
+import com.opencamera.core.media.ContentPlacementAvoidanceCandidate
+import com.opencamera.core.media.ContentRegionRole
+import com.opencamera.core.media.ContentSavedPhotoAdaptationProfile
+import com.opencamera.core.media.ContentSubjectHint
+import com.opencamera.core.media.ContentSubjectHintMatch
+import com.opencamera.core.media.ContentUnderstandingCandidateLabels
+import com.opencamera.core.media.ContentUnderstandingConsumerFamilyLabels
+import com.opencamera.core.media.ContentUnderstandingConsumerSkipLabels
+import com.opencamera.core.media.ContentUnderstandingFamily
+import com.opencamera.core.media.ContentUnderstandingSnapshot
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.ProcessorEditorResult
@@ -36,7 +46,9 @@ import kotlin.math.sqrt
 
 internal data class PortraitRenderPayload(
     val target: ProcessorTarget,
-    val spec: PortraitRenderSpec
+    val spec: PortraitRenderSpec,
+    val pipelineNotes: List<String> = emptyList(),
+    val metadataTags: Map<String, String> = emptyMap()
 )
 
 internal enum class PortraitRenderMode {
@@ -68,7 +80,9 @@ internal data class PortraitRenderSpec(
     val subjectLift: Float,
     val subjectSaturationBoost: Float,
     val highlightBloom: Float,
-    val backgroundBloom: Float
+    val backgroundBloom: Float,
+    val subjectCenterXFraction: Float? = null,
+    val subjectCenterYFraction: Float? = null
 )
 
 internal data class PortraitRenderApplied(
@@ -88,7 +102,7 @@ internal fun supportsPortraitRenderMetadata(tags: Map<String, String>): Boolean 
         tags["compatMode"] == "portrait" ||
         (
             tags["mode"] == "check-in" &&
-                tags["checkInScenario"] in setOf("portrait", "people-place", "object-place")
+                effectiveCheckInScenario(tags) in setOf("portrait", "people-place", "object-place")
             )
 }
 
@@ -113,7 +127,7 @@ internal fun decidePortraitRenderWork(result: ShotResult): ProcessorWork<Portrai
     val subjectTracking = tags["subjectTracking"] == "true"
     val depthStrength = tags["portraitDepthStrength"]?.toIntOrNull() ?: 50
     val defaults = PhotoSettings()
-    val spec = resolvePortraitRenderSpec(
+    val baseSpec = resolvePortraitRenderSpec(
         renderPath = renderPath,
         bokehStrength = bokehStrength,
         subjectTracking = subjectTracking,
@@ -127,11 +141,226 @@ internal fun decidePortraitRenderWork(result: ShotResult): ProcessorWork<Portrai
             ?: defaults.portraitBokehEffect,
         depthStrength = depthStrength
     ) ?: return ProcessorWork.DiagnosticSkip("unsupported-render-path")
+    val contentAdaptation = applyContentPortraitHints(result.contentUnderstanding, baseSpec)
 
     val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
-    return ProcessorWork.Execute(PortraitRenderPayload(target, spec))
+    return ProcessorWork.Execute(
+        PortraitRenderPayload(
+            target = target,
+            spec = contentAdaptation.spec,
+            pipelineNotes = contentAdaptation.pipelineNotes,
+            metadataTags = contentAdaptation.metadataTags
+        )
+    )
 }
+
+private data class ContentPortraitAdaptation(
+    val spec: PortraitRenderSpec,
+    val pipelineNotes: List<String>,
+    val metadataTags: Map<String, String> = emptyMap()
+)
+
+private fun applyContentPortraitHints(
+    snapshot: ContentUnderstandingSnapshot?,
+    spec: PortraitRenderSpec
+): ContentPortraitAdaptation {
+    if (snapshot == null) {
+        return ContentPortraitAdaptation(
+            spec = spec,
+            pipelineNotes = listOf(
+                "portrait-render:content-skipped:${ContentUnderstandingConsumerSkipLabels.MISSING_CONTENT}"
+            ),
+            metadataTags = mapOf("portraitContentSkipped" to ContentUnderstandingConsumerSkipLabels.MISSING_CONTENT)
+        )
+    }
+    if (!snapshot.isReadyForSavedPhotoAdaptation()) {
+        return ContentPortraitAdaptation(
+            spec = spec,
+            pipelineNotes = snapshot.toPortraitContentNotReadyNotes(),
+            metadataTags = snapshot.toPortraitContentNotReadyMetadataTags()
+        )
+    }
+    val subjectHint = snapshot.savedPhotoAdaptationDecisions().portraitSubject
+        ?: return ContentPortraitAdaptation(
+            spec = spec,
+            pipelineNotes = snapshot.toPortraitNoSubjectHintNotes(),
+            metadataTags = snapshot.toPortraitNoSubjectHintMetadataTags()
+        )
+    val subjectCandidate = snapshot.placementAvoidanceCandidates(ContentSavedPhotoAdaptationProfile.DEFAULT)
+        .firstOrNull { it.role in subjectHint.protectedRegionRoles() }
+    val subjectRenderGeometry = subjectCandidate?.toSubjectGeometry()
+
+    return when (subjectHint.hint) {
+        ContentSubjectHint.FACE -> ContentPortraitAdaptation(
+            spec = spec.copy(
+                subjectTracking = true,
+                focusRadiusXFraction = subjectRenderGeometry.expandFocusRadiusX(
+                    fallback = (spec.focusRadiusXFraction * 0.9f).coerceAtLeast(0.14f)
+                ),
+                focusRadiusYFraction = subjectRenderGeometry.expandFocusRadiusY(
+                    fallback = (spec.focusRadiusYFraction * 0.92f).coerceAtLeast(0.2f)
+                ),
+                edgeSoftness = (spec.edgeSoftness + 0.03f).coerceAtMost(0.42f),
+                subjectLift = max(spec.subjectLift, 0.03f),
+                subjectCenterXFraction = subjectRenderGeometry?.centerX ?: spec.subjectCenterXFraction,
+                subjectCenterYFraction = subjectRenderGeometry?.centerY ?: spec.subjectCenterYFraction
+            ),
+            pipelineNotes = subjectHint.toPortraitContentNotes(subjectCandidate),
+            metadataTags = subjectHint.toPortraitContentMetadataTags(subjectCandidate)
+        )
+
+        ContentSubjectHint.PERSON -> ContentPortraitAdaptation(
+            spec = spec.copy(
+                subjectTracking = true,
+                focusRadiusXFraction = subjectRenderGeometry.expandFocusRadiusX(
+                    fallback = (spec.focusRadiusXFraction * 0.94f).coerceAtLeast(0.14f)
+                ),
+                focusRadiusYFraction = subjectRenderGeometry.expandFocusRadiusY(
+                    fallback = (spec.focusRadiusYFraction * 0.95f).coerceAtLeast(0.2f)
+                ),
+                edgeSoftness = (spec.edgeSoftness + 0.02f).coerceAtMost(0.42f),
+                subjectCenterXFraction = subjectRenderGeometry?.centerX ?: spec.subjectCenterXFraction,
+                subjectCenterYFraction = subjectRenderGeometry?.centerY ?: spec.subjectCenterYFraction
+            ),
+            pipelineNotes = subjectHint.toPortraitContentNotes(subjectCandidate),
+            metadataTags = subjectHint.toPortraitContentMetadataTags(subjectCandidate)
+        )
+
+        ContentSubjectHint.FOREGROUND -> ContentPortraitAdaptation(
+            spec = spec.copy(
+                subjectTracking = true,
+                edgeSoftness = (spec.edgeSoftness + 0.015f).coerceAtMost(0.42f),
+                focusRadiusXFraction = subjectRenderGeometry.expandFocusRadiusX(spec.focusRadiusXFraction),
+                focusRadiusYFraction = subjectRenderGeometry.expandFocusRadiusY(spec.focusRadiusYFraction),
+                subjectCenterXFraction = subjectRenderGeometry?.centerX ?: spec.subjectCenterXFraction,
+                subjectCenterYFraction = subjectRenderGeometry?.centerY ?: spec.subjectCenterYFraction
+            ),
+            pipelineNotes = subjectHint.toPortraitContentNotes(subjectCandidate),
+            metadataTags = subjectHint.toPortraitContentMetadataTags(subjectCandidate)
+        )
+
+        else -> ContentPortraitAdaptation(spec, emptyList())
+    }
+}
+
+private data class PortraitSubjectGeometry(
+    val centerX: Float,
+    val centerY: Float,
+    val width: Float,
+    val height: Float
+)
+
+private fun ContentPlacementAvoidanceCandidate.toSubjectGeometry(): PortraitSubjectGeometry =
+    PortraitSubjectGeometry(
+        centerX = ((bounds.left + bounds.right) / 2f).coerceIn(0f, 1f),
+        centerY = ((bounds.top + bounds.bottom) / 2f).coerceIn(0f, 1f),
+        width = (bounds.right - bounds.left).coerceIn(0f, 1f),
+        height = (bounds.bottom - bounds.top).coerceIn(0f, 1f)
+    )
+
+private fun PortraitSubjectGeometry?.expandFocusRadiusX(fallback: Float): Float =
+    max(fallback, this?.let { it.width * SUBJECT_SIZE_RADIUS_PADDING } ?: 0f)
+        .coerceIn(0.14f, 0.36f)
+
+private fun PortraitSubjectGeometry?.expandFocusRadiusY(fallback: Float): Float =
+    max(fallback, this?.let { it.height * SUBJECT_SIZE_RADIUS_PADDING } ?: 0f)
+        .coerceIn(0.2f, 0.46f)
+
+private fun ContentSubjectHintMatch.toPortraitContentNotes(
+    subjectCandidate: ContentPlacementAvoidanceCandidate?
+): List<String> =
+    listOfNotNull(
+        "portrait-render:content-adapted:subject=${ContentUnderstandingCandidateLabels.subjectHint(this)}",
+        "portrait-render:content-source=${ContentUnderstandingCandidateLabels.subjectSource(this)}",
+        "portrait-render:content-confidence=${ContentUnderstandingCandidateLabels.subjectConfidence(this)}",
+        subjectCandidate?.let {
+            "portrait-render:content-subject-center=${ContentUnderstandingCandidateLabels.placementCenter(it)}"
+        },
+        subjectCandidate?.let {
+            "portrait-render:content-subject-size=${ContentUnderstandingCandidateLabels.placementSize(it)}"
+        }
+    )
+
+private fun ContentSubjectHintMatch.toPortraitContentMetadataTags(
+    subjectCandidate: ContentPlacementAvoidanceCandidate?
+): Map<String, String> = buildMap {
+    put("portraitContentSubject", ContentUnderstandingCandidateLabels.subjectHint(this@toPortraitContentMetadataTags))
+    put("portraitContentSubjectSource", ContentUnderstandingCandidateLabels.subjectSource(this@toPortraitContentMetadataTags))
+    put(
+        "portraitContentSubjectConfidence",
+        ContentUnderstandingCandidateLabels.subjectConfidence(this@toPortraitContentMetadataTags)
+    )
+    subjectCandidate?.let {
+        put("portraitContentSubjectCenter", ContentUnderstandingCandidateLabels.placementCenter(it))
+        put("portraitContentSubjectSize", ContentUnderstandingCandidateLabels.placementSize(it))
+    }
+}
+
+private fun ContentSubjectHintMatch.protectedRegionRoles(): Set<ContentRegionRole> = when (hint) {
+    ContentSubjectHint.FACE -> setOf(ContentRegionRole.FACE)
+    ContentSubjectHint.PERSON -> setOf(ContentRegionRole.PERSON_SUBJECT, ContentRegionRole.FOREGROUND)
+    ContentSubjectHint.FOREGROUND -> setOf(ContentRegionRole.FOREGROUND)
+    ContentSubjectHint.OBJECT -> setOf(ContentRegionRole.OBJECT)
+}
+
+private fun ContentUnderstandingSnapshot.toPortraitContentNotReadyNotes(): List<String> = buildList {
+    add("portrait-render:content-skipped:${ContentUnderstandingConsumerSkipLabels.NOT_READY}")
+    add("portrait-render:content-quality=${quality.name.lowercase()}")
+    capabilitySummary().reason?.let { add("portrait-render:content-reason=$it") }
+}
+
+private fun ContentUnderstandingSnapshot.toPortraitContentNotReadyMetadataTags(): Map<String, String> = buildMap {
+    put("portraitContentSkipped", ContentUnderstandingConsumerSkipLabels.NOT_READY)
+    put("portraitContentSkippedQuality", quality.name.lowercase())
+    capabilitySummary().reason?.let { put("portraitContentSkippedReason", it) }
+}
+
+private fun ContentUnderstandingSnapshot.toPortraitNoSubjectHintNotes(): List<String> {
+    val lowConfidenceSubject = savedPhotoAdaptationDecisions(
+        ContentSavedPhotoAdaptationProfile.LOW_CONFIDENCE_REVIEW
+    ).portraitSubject
+    if (lowConfidenceSubject != null) {
+        return listOf(
+            "portrait-render:content-skipped:${ContentUnderstandingConsumerSkipLabels.LOW_CONFIDENCE_SUBJECT_HINT}",
+            "portrait-render:content-source=${ContentUnderstandingCandidateLabels.subjectSource(lowConfidenceSubject)}",
+            "portrait-render:content-confidence=${ContentUnderstandingCandidateLabels.subjectConfidence(lowConfidenceSubject)}"
+        )
+    }
+    val capability = capabilitySummary()
+    return listOf("portrait-render:content-skipped:${ContentUnderstandingConsumerSkipLabels.NO_SUBJECT_HINT}") +
+        ContentUnderstandingConsumerFamilyLabels.supportNotes(
+            prefix = "portrait-render",
+            capability = capability,
+            families = listOf(ContentUnderstandingFamily.SUBJECT, ContentUnderstandingFamily.FACE_LANDMARKS)
+        )
+}
+
+private fun ContentUnderstandingSnapshot.toPortraitNoSubjectHintMetadataTags(): Map<String, String> {
+    val lowConfidenceSubject = savedPhotoAdaptationDecisions(
+        ContentSavedPhotoAdaptationProfile.LOW_CONFIDENCE_REVIEW
+    ).portraitSubject
+    if (lowConfidenceSubject != null) {
+        return mapOf(
+            "portraitContentSkipped" to ContentUnderstandingConsumerSkipLabels.LOW_CONFIDENCE_SUBJECT_HINT,
+            "portraitContentSkippedSubject" to ContentUnderstandingCandidateLabels.subjectHint(lowConfidenceSubject),
+            "portraitContentSkippedSource" to ContentUnderstandingCandidateLabels.subjectSource(lowConfidenceSubject),
+            "portraitContentSkippedConfidence" to ContentUnderstandingCandidateLabels.subjectConfidence(lowConfidenceSubject)
+        )
+    }
+    val capability = capabilitySummary()
+    return mapOf(
+        "portraitContentSkipped" to ContentUnderstandingConsumerSkipLabels.NO_SUBJECT_HINT
+    ) + ContentUnderstandingConsumerFamilyLabels.supportMetadataTags(
+        capability = capability,
+        keysByFamily = mapOf(
+            ContentUnderstandingFamily.SUBJECT to "portraitContentSkippedSubjectRegions",
+            ContentUnderstandingFamily.FACE_LANDMARKS to "portraitContentSkippedFaceLandmarks"
+        )
+    )
+}
+
+private const val SUBJECT_SIZE_RADIUS_PADDING = 0.58f
 
 internal fun resolvePortraitRenderSpec(
     renderPath: String,
@@ -425,11 +654,16 @@ internal class PortraitRenderPostProcessor(
                     "portrait-render:applied:${payload.spec.mode.name.lowercase()}",
                     lightSpotLayerNote
                 )
+                notes.addAll(payload.pipelineNotes)
                 if (renderResult.warning != null) {
                     notes += "portrait-render:warning:${renderResult.warning}"
                 }
                 notes.addAll(renderResult.lightSpotNotes)
-                result.addPipelineNotes(*notes.toTypedArray())
+                result.copy(
+                    metadata = result.metadata.copy(
+                        customTags = result.metadata.customTags + payload.metadataTags
+                    )
+                ).addPipelineNotes(*notes.toTypedArray())
             }
 
             is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
@@ -593,8 +827,8 @@ internal class AndroidPortraitRenderEditor(
 
         val width = bitmap.width
         val height = bitmap.height
-        val focusCenterX = width * 0.5f
-        val focusCenterY = height * if (spec.subjectTracking) 0.42f else 0.46f
+        val focusCenterX = width * (spec.subjectCenterXFraction ?: 0.5f)
+        val focusCenterY = height * (spec.subjectCenterYFraction ?: if (spec.subjectTracking) 0.42f else 0.46f)
         val radiusX = max(1f, width * spec.focusRadiusXFraction)
         val radiusY = max(1f, height * spec.focusRadiusYFraction)
 

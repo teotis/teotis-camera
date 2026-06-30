@@ -369,6 +369,11 @@ internal class CaptureRecordingSessionProcessor(
             )
             return
         }
+        val matchedShot = state.value.activeShot
+            ?.takeIf { it.shotId == shotId && mediaType == MediaType.PHOTO }
+        val shotKind = matchedShot?.shotKind
+        val canRearm = matchedShot != null && canRearmOnDataReceived(matchedShot)
+        val readinessBefore = state.value.presentation.captureReadiness
         updateState.update { s ->
             val activeShot = s.activeShot ?: return@update s
             if (activeShot.shotId != shotId || mediaType != MediaType.PHOTO) return@update s
@@ -398,6 +403,22 @@ internal class CaptureRecordingSessionProcessor(
             }
         }
         trace.record("capture.data.received", "shotId=$shotId")
+        if (shotKind != null) {
+            val readinessAfter = state.value.presentation.captureReadiness
+            if (canRearm) {
+                if (readinessBefore == null && readinessAfter != null) {
+                    trace.record(
+                        "capture.readiness.set",
+                        "shotId=$shotId,shotKind=$shotKind,source=DeviceEvent.DataReceived,boundary=data-received"
+                    )
+                }
+            } else {
+                trace.record(
+                    "capture.readiness.suppressed",
+                    "shotId=$shotId,shotKind=$shotKind,boundary=data-received,reason=conservative-kind"
+                )
+            }
+        }
         // Record link event for data received
         activeShotSpans[shotId]?.let { _ ->
             linkRecorder.recordEvent(
@@ -428,6 +449,10 @@ internal class CaptureRecordingSessionProcessor(
         source: String,
         elapsedTimestampMs: Long?
     ) {
+        val matchedShot = state.value.activeShot
+            ?.takeIf { it.shotId == shotId && mediaType == MediaType.PHOTO }
+        val shotKind = matchedShot?.shotKind
+        val canSignal = matchedShot != null && canSignalReadinessOnCaptureCommitted(matchedShot)
         updateState.update { s ->
             val activeShot = s.activeShot ?: return@update s
             if (activeShot.shotId != shotId || mediaType != MediaType.PHOTO) return@update s
@@ -455,6 +480,19 @@ internal class CaptureRecordingSessionProcessor(
             }
         }
         trace.record("capture.committed", "shotId=$shotId,source=$source")
+        if (shotKind != null) {
+            if (canSignal) {
+                trace.record(
+                    "capture.readiness.set",
+                    "shotId=$shotId,shotKind=$shotKind,source=$source,boundary=capture-committed"
+                )
+            } else {
+                trace.record(
+                    "capture.readiness.suppressed",
+                    "shotId=$shotId,shotKind=$shotKind,boundary=capture-committed,reason=conservative-kind"
+                )
+            }
+        }
     }
 
     private suspend fun handleShotCompleted(result: ShotResult) {
@@ -483,34 +521,59 @@ internal class CaptureRecordingSessionProcessor(
             return
         }
         val currentActiveShot = state.value.activeShot
-        if (currentActiveShot != null && currentActiveShot.shotId != result.shotId) {
+        val backgroundActiveShotId = currentActiveShot?.shotId?.takeIf { it != result.shotId }
+        val isBackgroundCompletion = backgroundActiveShotId != null
+        if (isBackgroundCompletion) {
             trace.record(
-                "shot.completed.stale",
-                "result=${result.shotId},active=${currentActiveShot.shotId}"
+                "shot.completed.background",
+                "result=${result.shotId},active=$backgroundActiveShotId"
             )
-            return
         }
-        currentController().onSessionEvent(ModeSessionEvent.ShotCompleted(result))
-        recordingElapsedJob?.cancel()
-        recordingElapsedJob = null
+        if (!isBackgroundCompletion) {
+            currentController().onSessionEvent(ModeSessionEvent.ShotCompleted(result))
+            recordingElapsedJob?.cancel()
+            recordingElapsedJob = null
+        }
+        val focusStackRetakePrompt = focusStackRetakePrompt(result.pipelineNotes)
         updateState.update { s ->
             s.copy(
-                captureStatus = if (result.mediaType == MediaType.PHOTO) {
+                captureStatus = if (isBackgroundCompletion) {
+                    s.captureStatus
+                } else if (result.mediaType == MediaType.PHOTO) {
                     CaptureStatus.COMPLETED
                 } else {
                     CaptureStatus.IDLE
                 },
-                recordingStatus = RecordingStatus.IDLE,
-                activeShot = null,
-                modeSnapshot = currentController().snapshot.value,
+                recordingStatus = if (isBackgroundCompletion) s.recordingStatus else RecordingStatus.IDLE,
+                activeShot = if (isBackgroundCompletion) s.activeShot else null,
+                modeSnapshot = if (isBackgroundCompletion) s.modeSnapshot else currentController().snapshot.value,
                 activeDeviceCapabilities = s.activeDeviceCapabilities,
                 activeDeviceGraph = resolvedActiveDeviceGraph(),
                 presentation = s.presentation.copy(
                     countdownRemainingSeconds = null,
-                    recordingStartedAtElapsedMillis = null,
-                    recordingElapsedMillis = null,
-                    pendingPostprocess = null,
-                    captureReadiness = null,
+                    recordingStartedAtElapsedMillis = if (isBackgroundCompletion) {
+                        s.presentation.recordingStartedAtElapsedMillis
+                    } else {
+                        null
+                    },
+                    recordingElapsedMillis = if (isBackgroundCompletion) {
+                        s.presentation.recordingElapsedMillis
+                    } else {
+                        null
+                    },
+                    pendingPostprocess = if (
+                        isBackgroundCompletion &&
+                        s.presentation.pendingPostprocess?.shotId != result.shotId
+                    ) {
+                        s.presentation.pendingPostprocess
+                    } else {
+                        null
+                    },
+                    captureReadiness = if (isBackgroundCompletion) {
+                        s.presentation.captureReadiness
+                    } else {
+                        null
+                    },
                     previewThumbnailPath = result.thumbnailSource.outputPathOrNull()
                         ?: s.presentation.previewThumbnailPath,
                     latestThumbnailSource = when (result.thumbnailSource) {
@@ -524,9 +587,12 @@ internal class CaptureRecordingSessionProcessor(
                         }
                         else -> result.thumbnailSource
                     },
-                    lastAction = if (result.mediaType == MediaType.PHOTO) {
+                    lastAction = if (isBackgroundCompletion && result.mediaType == MediaType.PHOTO) {
+                        "Previous photo saved"
+                    } else if (result.mediaType == MediaType.PHOTO) {
                         val hasFailures = result.hasPostProcessFailures()
                         when {
+                            focusStackRetakePrompt != null -> "Full Clear needs guided retake"
                             result.livePhotoBundle?.bundleStatus == LiveBundleStatus.STILL_ONLY_FALLBACK ->
                                 "Live photo saved (still only)"
                             result.livePhotoBundle?.isTemporalMedia() == true ->
@@ -555,7 +621,7 @@ internal class CaptureRecordingSessionProcessor(
                     },
                     latestPipelineNotes = result.pipelineNotes,
                     pendingCaptureFeedback = null,
-                    lastError = result.postProcessFailureSummary(),
+                    lastError = focusStackRetakePrompt ?: result.postProcessFailureSummary(),
                     documentBatch = if (s.activeMode == ModeId.DOCUMENT &&
                         s.presentation.documentBatch.status == DocumentBatchStatus.ACTIVE &&
                         result.mediaType == MediaType.PHOTO
@@ -606,7 +672,7 @@ internal class CaptureRecordingSessionProcessor(
         )
         // Complete capture/recording link span
         activeShotSpans.remove(result.shotId)?.let { span ->
-            val hasFailures = result.hasPostProcessFailures()
+            val hasFailures = result.hasPostProcessFailures() || focusStackRetakePrompt != null
             val linkStatus = when {
                 hasFailures -> LinkEventStatus.DEGRADED
                 else -> LinkEventStatus.COMPLETED
@@ -614,7 +680,7 @@ internal class CaptureRecordingSessionProcessor(
             linkRecorder.completeSpan(
                 span,
                 status = linkStatus,
-                detail = result.postProcessFailureSummary()
+                detail = focusStackRetakePrompt ?: result.postProcessFailureSummary()
             )
         }
         val t = result.timing
@@ -687,6 +753,24 @@ internal class CaptureRecordingSessionProcessor(
         } else {
             state.value.presentation.latestLivePhotoBundle
         }
+    }
+
+    private fun focusStackRetakePrompt(pipelineNotes: List<String>): String? {
+        val reason = pipelineNotes
+            .firstOrNull { it.startsWith("focus-stack:skipped=") }
+            ?.removePrefix("focus-stack:skipped=")
+            ?: return null
+        val detail = when (reason) {
+            "missing-near-far" -> "missing near/far frames"
+            "no-frame-bundle" -> "missing focus-stack frame bundle"
+            "missing-pixels" -> "missing near/far image data"
+            "decode-failed" -> "near/far frames could not be decoded"
+            "invalid-dimensions" -> "near/far frames were invalid"
+            "output-write-failed" -> "focus-stack output could not be written"
+            "not-focus-stack" -> return null
+            else -> reason.replace('-', ' ')
+        }
+        return "Full Clear could not combine near and far focus ($detail). Tap the near subject and far background, then retake."
     }
 
     private suspend fun handleShotFailed(

@@ -833,7 +833,7 @@ class SessionCockpitRenderModelTest {
         assertEquals("Size", sheet.resolutionRow.title)
         assertEquals("Frame", sheet.frameRatioRow.title)
         assertEquals("Watermark", sheet.watermarkRow.title)
-        assertEquals("Travel Polaroid", sheet.watermarkRow.value)
+        assertEquals("Off", sheet.watermarkRow.value)
         assertTrue(sheet.watermarkRow.isEnabled)
         assertEquals("Live", sheet.liveRow.title)
         assertEquals("Timer", sheet.timerRow.title)
@@ -976,6 +976,17 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `quick panel live row is enabled for check-in mode`() {
+        val state = defaultSessionState(activeMode = ModeId.CHECK_IN)
+
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(sheet.liveRow.isEnabled)
+        assertNull(sheet.liveRow.disabledReason)
+        assertNotNull(quickLivePhotoToggleAction(state, sheet))
+    }
+
+    @Test
     fun `quick panel rows show disabled reason when present`() {
         val state = defaultSessionState(
             activeShot = ShotRequest(
@@ -995,8 +1006,23 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `quick panel watermark row shows current template label`() {
+    fun `quick panel watermark row shows off by default`() {
         val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals("Watermark", sheet.watermarkRow.title)
+        assertEquals("Off", sheet.watermarkRow.value)
+        assertTrue(sheet.watermarkRow.isEnabled)
+        assertNull(sheet.watermarkRow.disabledReason)
+    }
+
+    @Test
+    fun `quick panel watermark row shows current template label when enabled`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                photoWatermarkEnabledByDefault = true
+            )
+        )
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Watermark", sheet.watermarkRow.title)
@@ -1006,12 +1032,29 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
-    fun `quick panel watermark row cycles to next template`() {
+    fun `quick panel watermark row enables watermark when off`() {
         val state = defaultSessionState()
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertEquals(PersistedSettingsAction.UpdatePhotoWatermarkEnabled(true), sheet.watermarkAction)
+        assertNull(sheet.watermarkNextTemplateId)
+    }
+
+    @Test
+    fun `quick panel watermark row cycles to next template when enabled`() {
+        val state = defaultSessionState(
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                photoWatermarkEnabledByDefault = true
+            )
+        )
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertNotNull(sheet.watermarkNextTemplateId)
         assertNotEquals(state.settings.persisted.photo.defaultWatermarkTemplateId, sheet.watermarkNextTemplateId)
+        assertEquals(
+            PersistedSettingsAction.UpdatePhotoWatermarkTemplate(sheet.watermarkNextTemplateId!!),
+            sheet.watermarkAction
+        )
     }
 
     @Test
@@ -1019,6 +1062,7 @@ class SessionCockpitRenderModelTest {
         // With only one template, there is no next
         val state = defaultSessionState(
             persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                photoWatermarkEnabledByDefault = true,
                 defaultWatermarkTemplateId = "classic-overlay"
             )
         )
@@ -1037,6 +1081,16 @@ class SessionCockpitRenderModelTest {
                 )
             )
         )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertFalse(sheet.watermarkRow.isEnabled)
+        assertNotNull(sheet.watermarkRow.disabledReason)
+        assertNull(sheet.watermarkNextTemplateId)
+    }
+
+    @Test
+    fun `quick panel watermark row disabled in document mode`() {
+        val state = defaultSessionState(activeMode = ModeId.DOCUMENT)
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertFalse(sheet.watermarkRow.isEnabled)
@@ -1080,7 +1134,11 @@ class SessionCockpitRenderModelTest {
 
     @Test
     fun `quick panel watermark row uses localized label not raw template id`() {
-        val state = defaultSessionState()
+        val state = defaultSessionState(
+            persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                photoWatermarkEnabledByDefault = true
+            )
+        )
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         // The watermark value should be the localized label, not the raw id
@@ -1092,6 +1150,7 @@ class SessionCockpitRenderModelTest {
     fun `quick panel watermark row uses localized label for classic overlay`() {
         val state = defaultSessionState(
             persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                photoWatermarkEnabledByDefault = true,
                 defaultWatermarkTemplateId = "classic-overlay"
             )
         )
@@ -1105,6 +1164,7 @@ class SessionCockpitRenderModelTest {
     fun `quick panel watermark row falls back to raw id for unknown template`() {
         val state = defaultSessionState(
             persistedPhotoSettings = defaultSessionState().settings.persisted.photo.copy(
+                photoWatermarkEnabledByDefault = true,
                 defaultWatermarkTemplateId = "unknown-template"
             )
         )
@@ -1639,6 +1699,79 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `shutter stays blocked for multi-frame capture in DATA_RECEIVED without readiness`() {
+        // Multi-frame capture never sets captureReadiness (truthful no-sound).
+        // The shutter must remain blocked so the user cannot fire a new shot
+        // (and so no shutter sound is eligible) until the multi-frame pipeline
+        // completes via ShotCompleted.
+        val shot = ShotRequest(
+            shotId = "mf-no-readiness",
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(
+                algorithmProfile = "night-multiframe-tripod"
+            ),
+            captureProfile = CaptureProfile(frameCount = 12)
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.DATA_RECEIVED)
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertNotEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter enabled for live photo when readiness set at DataReceived boundary`() {
+        // Live photo re-arms at DataReceived: activeShot is cleared and
+        // captureReadiness is set. The shutter must be enabled (sound eligible)
+        // because the still + motion segment are already secured.
+        val shot = ShotRequest(
+            shotId = "live-readiness",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile(),
+            livePhotoSpec = com.opencamera.core.media.LivePhotoCaptureSpec()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.REQUESTED)
+            .copy(
+                presentation = SessionPresentationState(
+                    captureReadiness = CaptureReadiness(
+                        shotId = "live-readiness",
+                        mediaType = MediaType.PHOTO,
+                        source = "DeviceEvent.DataReceived"
+                    )
+                )
+            )
+        assertNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
+    }
+
+    @Test
+    fun `shutter blocked for live photo before DataReceived without readiness`() {
+        // Before DataReceived, live photo has not yet secured the motion segment.
+        // captureReadiness is null, so the shutter must stay blocked (no sound).
+        val shot = ShotRequest(
+            shotId = "live-pre-receive",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.NONE,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile(),
+            livePhotoSpec = com.opencamera.core.media.LivePhotoCaptureSpec()
+        )
+        val state = defaultSessionState(activeShot = shot)
+            .copy(captureStatus = CaptureStatus.SAVING)
+        assertNotNull(shutterDisabledReason(state, TestAppTextResolver()))
+        assertNotEquals(ShutterVisualState.PHOTO_READY, shutterVisualState(state))
+    }
+
+    @Test
     fun `shutter stays enabled for live photo after DataReceived rearm`() {
         val state = defaultSessionState()
             .copy(captureStatus = CaptureStatus.DATA_RECEIVED, activeShot = null)
@@ -2049,6 +2182,18 @@ class SessionCockpitRenderModelTest {
     }
 
     @Test
+    fun `brightness row is visible in document mode`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.DOCUMENT,
+            previewStatus = PreviewStatus.ACTIVE
+        )
+        val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
+
+        assertTrue(sheet.brightnessRow.isVisible, "Brightness should be visible in Document mode")
+        assertTrue(sheet.brightnessRow.isInteractive, "Brightness should be interactive in Document mode")
+    }
+
+    @Test
     fun `brightness row is interactive when preview active and Humanistic mode`() {
         val state = defaultSessionState(
             activeMode = ModeId.HUMANISTIC,
@@ -2070,6 +2215,41 @@ class SessionCockpitRenderModelTest {
 
         assertTrue(model.isVisible, "Brightness should still be visible when preview is recovering")
         assertFalse(model.isInteractive, "Brightness should not be interactive when preview is recovering")
+        assertEquals(
+            "Wait for preview to become ready",
+            model.disabledReason,
+            "Brightness should report preview-inactive reason when not interactive"
+        )
+    }
+
+    @Test
+    fun `brightness row reports preview inactive reason in video mode when preview not active`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            previewStatus = PreviewStatus.RECOVERING
+        )
+        val model = brightnessRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.isVisible, "Brightness should be visible in video mode even when preview is recovering")
+        assertFalse(model.isInteractive, "Brightness should not be interactive when preview is recovering in video mode")
+        assertEquals(
+            "Wait for preview to become ready",
+            model.disabledReason,
+            "Video brightness should report preview-inactive reason"
+        )
+    }
+
+    @Test
+    fun `brightness row has no disabled reason when video preview is active`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.VIDEO,
+            previewStatus = PreviewStatus.ACTIVE
+        )
+        val model = brightnessRenderModel(state, TestAppTextResolver())
+
+        assertTrue(model.isVisible)
+        assertTrue(model.isInteractive)
+        assertNull(model.disabledReason, "Brightness should have no disabled reason when interactive")
     }
 
     @Test
@@ -2119,6 +2299,21 @@ class SessionCockpitRenderModelTest {
         assertEquals("Switch to Back", model.lensFacingButtonLabel)
         assertTrue(model.lensFacingEnabled)
         assertEquals(2f, model.zoomCapsules.firstOrNull { it.isActive }?.ratio)
+    }
+
+    @Test
+    fun `controls model hides lens switch in document mode`() {
+        val state = defaultSessionState(
+            activeMode = ModeId.DOCUMENT,
+            activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                availableLensFacings = setOf(LensFacing.BACK, LensFacing.FRONT)
+            )
+        )
+
+        val model = sessionControlsRenderModel(state, strings, TestAppTextResolver())
+
+        assertFalse(model.lensFacingVisible)
+        assertFalse(model.lensFacingEnabled)
     }
 
     @Test

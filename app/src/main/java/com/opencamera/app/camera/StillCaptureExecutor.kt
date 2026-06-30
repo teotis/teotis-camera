@@ -14,6 +14,7 @@ import com.opencamera.core.device.DeviceShotRequest
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlan
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlanner
 import com.opencamera.core.device.MultiFrameOutputRole
+import com.opencamera.core.device.MultiFrameCaptureStep
 import com.opencamera.core.device.MultiFrameTemporaryOutputTracker
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.FrameBundle
@@ -107,7 +108,8 @@ internal class StillCaptureExecutor(
     suspend fun captureMultiFrame(
         capture: ImageCapture,
         plan: ShotPlan,
-        deviceRequest: DeviceShotRequest
+        deviceRequest: DeviceShotRequest,
+        beforeFrameCapture: suspend (MultiFrameCaptureStep) -> List<String> = { emptyList() }
     ): PhotoCaptureOutcome {
         val executionPlan = multiFrameExecutionPlanner.plan(deviceRequest)
         val temporaryOutputs = MultiFrameTemporaryOutputTracker()
@@ -116,9 +118,11 @@ internal class StillCaptureExecutor(
         var finalOutputHandle: MediaOutputHandle? = null
         var firstFrameDeviceCaptureStartedAt: Long = 0L
         var lastFrameDeviceCaptureCompletedAt: Long = 0L
+        val framePreparationDiagnostics = mutableListOf<String>()
 
         try {
             executionPlan.steps.forEachIndexed { stepIndex, step ->
+                framePreparationDiagnostics += beforeFrameCapture(step)
                 val request = when (step.outputRole) {
                     MultiFrameOutputRole.TEMPORARY -> captureOutputFactory.createTemporaryPhotoOutputRequest(
                         shotId = plan.request.shotId,
@@ -150,6 +154,7 @@ internal class StillCaptureExecutor(
                                 MultiFrameOutputRole.FINAL_OUTPUT -> FrameRole.FUSION_ANCHOR
                                 MultiFrameOutputRole.TEMPORARY -> FrameRole.FUSION_SUPPLEMENT
                             },
+                            focusStackRole = step.focusStackRole,
                             noiseModel = NoiseModel.Unknown,
                             motionScore = MotionScore.Unknown,
                             isDegraded = true,
@@ -189,7 +194,9 @@ internal class StillCaptureExecutor(
         return PhotoCaptureOutcome.Success(
             outputPath = resolvedFinalOutputPath,
             outputHandle = resolvedFinalOutputHandle,
-            diagnostics = executionPlan.toExecutionDiagnostics() + bundle.diagnostics,
+            diagnostics = executionPlan.toExecutionDiagnostics() +
+                framePreparationDiagnostics +
+                bundle.diagnostics,
             intermediateOutputPaths = temporaryOutputs.outputPaths(),
             frameBundle = bundle,
             deviceCaptureStartedAtElapsedMillis = firstFrameDeviceCaptureStartedAt,

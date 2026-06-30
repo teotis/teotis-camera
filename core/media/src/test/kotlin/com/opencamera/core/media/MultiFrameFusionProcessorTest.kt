@@ -93,6 +93,48 @@ class MultiFrameFusionProcessorTest {
     }
 
     @Test
+    fun `skips ordinary merge for focus stack captures`() = runTest {
+        val tempDir = createTempDir(prefix = "fusion-focus-stack-skip-")
+        try {
+            val near = createSyntheticJpeg(tempDir, "near.jpg", baseRgb = 0x404040)
+            val far = createSyntheticJpeg(tempDir, "far.jpg", baseRgb = 0x808080)
+            val bundle = createBundle(frames = listOf(
+                FrameBundleFrame(
+                    frameIndex = 1,
+                    pixelReference = PixelReference.File(near.absolutePath),
+                    focusStackRole = FocusStackFrameRole.NEAR
+                ),
+                FrameBundleFrame(
+                    frameIndex = 2,
+                    pixelReference = PixelReference.File(far.absolutePath),
+                    focusStackRole = FocusStackFrameRole.FAR
+                )
+            ))
+            val result = ShotResult(
+                shotId = "focus-stack",
+                mediaType = MediaType.PHOTO,
+                outputPath = File(tempDir, "out.jpg").absolutePath,
+                saveRequest = SaveRequest.photoLibrary(),
+                thumbnailSource = ThumbnailSource.None,
+                captureProfile = CaptureProfile(
+                    frameCount = 2,
+                    focusStackSpec = FocusStackCaptureSpec.automaticNearFar()
+                ),
+                metadata = MediaMetadata(),
+                frameBundle = bundle
+            )
+
+            val processed = MultiFrameFusionProcessor().process(result)
+
+            assertTrue(processed.pipelineNotes.any { it == "merge:skipped=focus-stack-owner" })
+            assertFalse(processed.pipelineNotes.any { it == "merge:strategy=best-frame" })
+            assertFalse(processed.pipelineNotes.any { it == "merge:applied=true" })
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `skips when fewer than two valid frames`() = runTest {
         val tempDir = createTempDir(prefix = "fusion-skip-")
         try {

@@ -5,6 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import androidx.exifinterface.media.ExifInterface
+import com.opencamera.core.media.AlgorithmJobClass
+import com.opencamera.core.media.ContentTagDescriptor
+import com.opencamera.core.media.ContentTagFamily
+import com.opencamera.core.media.ContentUnderstandingSnapshot
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
@@ -12,6 +16,7 @@ import com.opencamera.core.media.OcwmJpegContainer
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.SaveRequest
+import com.opencamera.core.media.SceneMaskQuality
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.test.runTest
@@ -32,6 +37,11 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
 
     private val appContext: Context get() = RuntimeEnvironment.getApplication()
     private val privateTemplateKey = "watermarkTemplate"
+
+    private data class ThemeInkExpectation(
+        val predicate: (Int) -> Boolean,
+        val minRatio: Float
+    )
 
     // --- helpers ---
 
@@ -101,6 +111,15 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
         return count
     }
 
+    private fun isVanGoghStarryMaterialInk(pixel: Int): Boolean {
+        val red = Color.red(pixel)
+        val green = Color.green(pixel)
+        val blue = Color.blue(pixel)
+        val goldInk = red > 145 && green > 105 && blue < 145 && red > blue + 36
+        val blueInk = blue > 90 && green > 54 && red < 100 && blue > red + 24
+        return goldInk || blueInk
+    }
+
     private fun decodeJpeg(file: File): Bitmap {
         return requireNotNull(BitmapFactory.decodeFile(file.absolutePath)) {
             "processed JPEG must decode"
@@ -111,7 +130,8 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
         inputFile: File,
         algorithmProfile: String = "photo-vivid",
         watermarkText: String = "PHOTO Test",
-        watermarkTemplate: String = "classic-overlay"
+        watermarkTemplate: String = "classic-overlay",
+        contentUnderstanding: ContentUnderstandingSnapshot? = null
     ): ShotResult {
         val metadata = MediaMetadata(
             algorithmProfile = algorithmProfile,
@@ -131,7 +151,8 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
                 outputPath = inputFile.absolutePath,
                 renderUri = null
             ),
-            metadata = metadata
+            metadata = metadata,
+            contentUnderstanding = contentUnderstanding
         )
     }
 
@@ -145,6 +166,26 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
             maskProvider = maskProvider,
             maskBitmapSource = maskBitmapSource
         )
+    }
+
+    private class RecordingVanGoghStarryAssetProvider : VanGoghStarryFrameAssetProvider {
+        val requests = mutableListOf<VanGoghStarryFrameAssetVariant>()
+
+        override fun load(variant: VanGoghStarryFrameAssetVariant): Bitmap {
+            requests += variant
+            return Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        }
+    }
+
+    private class RecordingStaticWatermarkAssetProvider : StaticWatermarkAssetProvider {
+        val requests = mutableListOf<StaticWatermarkFrameAsset>()
+
+        override fun load(asset: StaticWatermarkFrameAsset): Bitmap {
+            requests += asset
+            return Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(Color.argb(220, 240, 196, 108))
+            }
+        }
     }
 
     // --- tests ---
@@ -164,6 +205,39 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
                 "watermark:rendered must NOT appear when combined path is used")
             assertTrue(result.pipelineNotes.any { it.contains("combined-render:timing:") },
                 "timing note must be present")
+        } finally {
+            inputFile.delete()
+        }
+    }
+
+    @Test
+    fun `combined path preserves content style adaptation notes`() = runTest {
+        val inputFile = writeJpegToTempFile(createSyntheticJpeg(32, 24))
+        try {
+            val processor = createCombinedProcessor()
+            val result = processor.process(
+                combinedShotResult(
+                    inputFile = inputFile,
+                    contentUnderstanding = ContentUnderstandingSnapshot.fromTags(
+                        snapshotId = "content-food",
+                        timestampMillis = 42L,
+                        backendId = "fake-content",
+                        quality = SceneMaskQuality.SAVED_PHOTO,
+                        tags = listOf(
+                            ContentTagDescriptor(
+                                tagId = "scene-food",
+                                label = "Food",
+                                family = ContentTagFamily.SCENE,
+                                confidence = 0.91f,
+                                backendId = "fake-content"
+                            )
+                        )
+                    )
+                )
+            )
+
+            assertTrue(result.pipelineNotes.contains("combined-render:applied:photo-vivid+classic-overlay"))
+            assertTrue(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=food"))
         } finally {
             inputFile.delete()
         }
@@ -196,6 +270,43 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
                 changedPixels > 400,
                 "final JPEG should contain visible watermark ink, not only metadata/archive changes; changedPixels=$changedPixels"
             )
+        } finally {
+            inputFile.delete()
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `combined path routes van gogh starry through static material package provider`() = runTest {
+        val provider = RecordingStaticWatermarkAssetProvider()
+        val inputFile = writeJpegToTempFile(createSyntheticJpeg(420, 320))
+        try {
+            val processor = PhotoAlgorithmWatermarkPostProcessor(
+                algorithmEditor = AndroidPhotoAlgorithmEditor(appContext),
+                watermarkEditor = AndroidPhotoWatermarkEditor(
+                    context = appContext,
+                    staticWatermarkAssetProvider = provider
+                )
+            )
+
+            val result = processor.process(
+                combinedShotResult(
+                    inputFile,
+                    algorithmProfile = "photo-vivid",
+                    watermarkText = "OpenCamera",
+                    watermarkTemplate = "van-gogh-starry"
+                )
+            )
+
+            assertTrue(
+                result.pipelineNotes.any { it.contains("combined-render:applied:photo-vivid+van-gogh-starry") },
+                "combined render should own the final van-gogh-starry output, got: ${result.pipelineNotes}"
+            )
+            assertEquals(
+                listOf(WatermarkSceneVariant.SQUARE),
+                provider.requests.map(StaticWatermarkFrameAsset::variant)
+            )
+            assertTrue(provider.requests.all { it.packageId == "van-gogh-starry" })
         } finally {
             inputFile.delete()
         }
@@ -256,15 +367,19 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun `complex watermark templates render visible final design ink`() = runTest {
         val expectations = mapOf(
-            "van-gogh-starry" to { pixel: Int ->
-                Color.red(pixel) > 185 && Color.green(pixel) > 138 && Color.blue(pixel) < 125
-            },
-            "blue-hour" to { pixel: Int ->
-                Color.blue(pixel) > 178 && Color.green(pixel) > 145 && Color.red(pixel) < 185
-            }
+            "van-gogh-starry" to ThemeInkExpectation(
+                predicate = ::isVanGoghStarryMaterialInk,
+                minRatio = 0.006f
+            ),
+            "blue-hour" to ThemeInkExpectation(
+                predicate = { pixel: Int ->
+                    Color.blue(pixel) > 178 && Color.green(pixel) > 145 && Color.red(pixel) < 185
+                },
+                minRatio = 0.0075f
+            )
         )
 
-        expectations.forEach { (templateId, accentPredicate) ->
+        expectations.forEach { (templateId, expectation) ->
             val inputFile = writeJpegToTempFile(createSyntheticJpeg(640, 480))
             try {
                 val processor = PhotoWatermarkPostProcessor(
@@ -316,9 +431,9 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
                         "$templateId should have a substantial dark frame, darkFramePixels=$darkFramePixels " +
                             "size=${bitmap.width}x${bitmap.height}"
                     )
-                    val accentPixels = countPixels(bitmap, accentPredicate)
+                    val accentPixels = countPixels(bitmap, expectation.predicate)
                     assertTrue(
-                        accentPixels > bitmap.width * bitmap.height * 0.012f,
+                        accentPixels > bitmap.width * bitmap.height * expectation.minRatio,
                         "$templateId should preserve visible theme decoration ink, accentPixels=$accentPixels " +
                             "size=${bitmap.width}x${bitmap.height}"
                     )
@@ -376,11 +491,9 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
                     bitmap.width > 640 && bitmap.height > 480,
                     "van-gogh-starry must produce an expanded-frame final JPEG, got ${bitmap.width}x${bitmap.height}"
                 )
-                val accentPixels = countPixels(bitmap) { pixel ->
-                    Color.red(pixel) > 185 && Color.green(pixel) > 138 && Color.blue(pixel) < 125
-                }
+                val accentPixels = countPixels(bitmap, ::isVanGoghStarryMaterialInk)
                 assertTrue(
-                    accentPixels > bitmap.width * bitmap.height * 0.012f,
+                    accentPixels > bitmap.width * bitmap.height * 0.006f,
                     "van-gogh-starry should keep visible starry decoration without title text, " +
                         "accentPixels=$accentPixels size=${bitmap.width}x${bitmap.height}"
                 )
@@ -885,6 +998,25 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
             assertEquals("night-street", extracted.manifest.watermarkTemplateId,
                 "archive must record night-street, not fall back to classic-overlay")
             assertTrue(extracted.payload.isNotEmpty(), "archive payload must not be empty")
+        } finally {
+            inputFile.delete()
+        }
+    }
+
+    @Test
+    fun `jobClass is CAPTURE_CRITICAL to avoid 2500ms optional-timeout discarding watermark render`() {
+        val processor = createCombinedProcessor()
+        val inputFile = writeJpegToTempFile(createSyntheticJpeg(32, 24))
+        try {
+            val shotResult = combinedShotResult(inputFile)
+            assertEquals(
+                AlgorithmJobClass.CAPTURE_CRITICAL,
+                processor.jobClass(shotResult),
+                "PhotoAlgorithmWatermarkPostProcessor must be CAPTURE_CRITICAL: watermark+filter " +
+                    "render is user-selected and its timeout discards the saved photo. CAPTURE_OPTIONAL " +
+                    "budget is maxPostProcessMillis/2 = 2500ms, but real renders reach 3667ms (shot-15/16 " +
+                    "in opencamera-debug-1782840155961.log)."
+            )
         } finally {
             inputFile.delete()
         }

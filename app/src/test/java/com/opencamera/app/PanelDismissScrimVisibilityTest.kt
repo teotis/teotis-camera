@@ -138,13 +138,15 @@ class PanelDismissScrimVisibilityTest {
                 rail = LinearLayout(context),
                 chip = TextView(context),
                 thumbnail = allocateInstance(ImageView::class.java),
+                itemScroll = NestedScrollView(context),
                 itemList = LinearLayout(context),
                 moveUpButton = Button(context),
                 moveDownButton = Button(context),
                 overviewButton = Button(context)
             ),
             documentBatchOrganizer = DocumentBatchOrganizerViews(
-                panel = NestedScrollView(context),
+                panel = LinearLayout(context),
+                scroll = NestedScrollView(context),
                 title = TextView(context),
                 count = TextView(context),
                 itemList = LinearLayout(context),
@@ -152,7 +154,8 @@ class PanelDismissScrimVisibilityTest {
                 emptyHint = TextView(context),
                 footer = LinearLayout(context),
                 continueShooting = Button(context),
-                exportButton = Button(context)
+                exportButton = Button(context),
+                status = TextView(context)
             ),
             filterStrip = FilterStripViews(
                 scroll = HorizontalScrollView(context),

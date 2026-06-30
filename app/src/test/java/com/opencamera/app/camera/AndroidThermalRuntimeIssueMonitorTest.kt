@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class AndroidThermalRuntimeIssueMonitorTest {
     @Test
-    fun `attach registers backend and emits current severe thermal status once`() = runTest {
+    fun `attach registers backend and ignores current severe thermal status`() = runTest {
         val backend = FakeThermalStatusBackend(
             currentStatus = PowerManager.THERMAL_STATUS_SEVERE
         )
@@ -32,10 +32,7 @@ class AndroidThermalRuntimeIssueMonitorTest {
         advanceUntilIdle()
 
         assertTrue(backend.started)
-        assertEquals(
-            listOf("THERMAL_CRITICAL:thermal status severe:false"),
-            recordedIssues
-        )
+        assertEquals(emptyList(), recordedIssues)
         collectionJob.cancel()
     }
 
@@ -93,12 +90,13 @@ class AndroidThermalRuntimeIssueMonitorTest {
     }
 
     @Test
-    fun `thermal mapping marks severe states as non recoverable critical issues`() {
+    fun `thermal mapping only marks critical and above as non recoverable issues`() {
         val issue = thermalRuntimeIssueFor(PowerManager.THERMAL_STATUS_EMERGENCY)
 
         assertEquals(DeviceRuntimeIssueKind.THERMAL_CRITICAL, issue?.kind)
         assertEquals("thermal status emergency", issue?.reason)
         assertFalse(issue?.isRecoverable ?: true)
+        assertEquals(null, thermalRuntimeIssueFor(PowerManager.THERMAL_STATUS_SEVERE))
         assertEquals(null, thermalRuntimeIssueFor(PowerManager.THERMAL_STATUS_LIGHT))
     }
 

@@ -1,6 +1,7 @@
 package com.opencamera.app.camera
 
 import android.graphics.Bitmap
+import com.opencamera.core.media.ContentUnderstandingSnapshot
 import com.opencamera.core.media.SceneMaskDescriptor
 import com.opencamera.core.media.SceneMaskPayload
 import com.opencamera.core.media.SceneMaskQuality
@@ -79,6 +80,20 @@ internal data class SavedPhotoMaskPixels(
         return result
     }
 }
+
+internal fun SavedPhotoMaskPixels.toContentUnderstandingSnapshot(
+    maskId: String,
+    sourceWidth: Int,
+    sourceHeight: Int,
+    timestampMillis: Long
+): ContentUnderstandingSnapshot = ContentUnderstandingSnapshot.fromSceneMask(
+    descriptor = toDescriptor(
+        maskId = maskId,
+        sourceWidth = sourceWidth,
+        sourceHeight = sourceHeight
+    ),
+    timestampMillis = timestampMillis
+)
 
 internal class SceneMaskCoordinateMapper(
     private val maskWidth: Int,

@@ -25,6 +25,24 @@ class CameraExtensionProbeTest {
     }
 
     @Test
+    fun `image quality summary maps back hdr and night support to scene decisions`() {
+        val client = FakeCameraExtensionProbeClient(
+            supported = setOf(
+                CameraExtensionLensFacing.BACK to CameraExtensionMode.NIGHT,
+                CameraExtensionLensFacing.BACK to CameraExtensionMode.HDR
+            )
+        )
+
+        val report = CameraExtensionProbe.probe(client)
+
+        assertEquals(
+            "image-quality-ext: blue-hour-hdr=supported low-light-night=supported",
+            report.imageQualitySummaryLine()
+        )
+        assertTrue(report.toProbeText().contains("image-quality-ext: blue-hour-hdr=supported"))
+    }
+
+    @Test
     fun `selector creation failure is reported without throwing`() {
         val client = FakeCameraExtensionProbeClient(
             supported = setOf(CameraExtensionLensFacing.BACK to CameraExtensionMode.NIGHT),

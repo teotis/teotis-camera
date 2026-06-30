@@ -1,6 +1,7 @@
 package com.opencamera.core.device
 
 import com.opencamera.core.media.ShotKind
+import com.opencamera.core.media.FocusStackFrameRole
 
 enum class MultiFrameOutputRole {
     TEMPORARY,
@@ -9,7 +10,8 @@ enum class MultiFrameOutputRole {
 
 data class MultiFrameCaptureStep(
     val frameIndex: Int,
-    val outputRole: MultiFrameOutputRole
+    val outputRole: MultiFrameOutputRole,
+    val focusStackRole: FocusStackFrameRole = FocusStackFrameRole.NONE
 )
 
 data class MultiFrameCaptureExecutionPlan(
@@ -41,7 +43,10 @@ class MultiFrameCaptureExecutionPlanner {
                         MultiFrameOutputRole.FINAL_OUTPUT
                     } else {
                         MultiFrameOutputRole.TEMPORARY
-                    }
+                    },
+                    focusStackRole = request.focusStackFrameRoles
+                        .getOrNull(frameIndex - 1)
+                        ?: FocusStackFrameRole.NONE
                 )
             },
             interFrameDelayMillis = request.interFrameDelayMillis.coerceAtLeast(0L)

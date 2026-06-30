@@ -84,6 +84,7 @@
     <string name="disabled_brightness_unsupported">Brightness unavailable</string>
     <string name="disabled_brightness_countdown">Wait for countdown to finish</string>
     <string name="disabled_brightness_active_shot">Wait for current capture to finish</string>
+    <string name="disabled_brightness_preview_inactive">Wait for preview to become ready</string>
     <string name="button_low_light_night_prompt">Night</string>
     <string name="button_low_light_night_prompt_enabled">Night assist on</string>
     <string name="button_low_light_night_prompt_disabled">Night assist off</string>
@@ -596,7 +597,7 @@
     <string name="document_batch_crop_skipped">Not cropped</string>
     <string name="document_batch_crop_failed">Crop failed</string>
     <string name="document_batch_rail_page_description">Page %d</string>
-    <string name="document_batch_rail_overview_description">View batch</string>
+    <string name="document_batch_rail_overview_description">Export files</string>
     <string name="button_document_batch_organizer_close">Close</string>
     <string name="button_reset_defaults">Reset to defaults</string>
     <string name="status_processing_photo_keep_open">Processing photo, do not exit OpenCamera.</string>

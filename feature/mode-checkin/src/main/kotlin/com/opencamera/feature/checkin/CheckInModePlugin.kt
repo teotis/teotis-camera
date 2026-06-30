@@ -1,6 +1,7 @@
 package com.opencamera.feature.checkin
 
 import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectEntry
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
 import com.opencamera.core.effect.FrameEffect
@@ -8,6 +9,7 @@ import com.opencamera.core.effect.PortraitEffect
 import com.opencamera.core.effect.WatermarkEffect
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.CaptureStrategy
+import com.opencamera.core.media.FocusStackCaptureSpec
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.PostProcessSpec
 import com.opencamera.core.media.SaveRequest
@@ -30,6 +32,7 @@ import com.opencamera.core.settings.FilterRenderSpec
 import com.opencamera.core.settings.PersistedSettingsAction
 import com.opencamera.core.settings.defaultFilterRenderSpecOrNull
 import com.opencamera.core.settings.filterProfilesFor
+import com.opencamera.core.settings.liveWatermarkMetadataTags
 import com.opencamera.core.settings.renderStyleColorSpecWithRecipe
 import com.opencamera.core.settings.watermarkStyleFor
 import com.opencamera.core.device.DeviceCapabilities
@@ -70,9 +73,21 @@ enum class CheckInScenario(
         filterCategory = FilterProfileCategory.PORTRAIT,
         captureStrategyType = StrategyType.SINGLE_FRAME
     ),
+    // Label downgraded from "全清" (Full Clear / all-clear) to "清晰辅助" (Clarity Assist)
+    // because the current capture path does not produce a true all-in-focus output:
+    //   (1) Focus bracketing uses FocusMeteringAction at two preview points, not a
+    //       controlled lens focus distance (focusDistanceDiopters stays null per frame).
+    //   (2) On real devices the focus-stack fusion processor previously skipped with
+    //       decode-failed when the FAR anchor frame was saved via MediaStore (relative
+    //       display path did not resolve on the filesystem); see
+    //       AndroidFocusStackFusionProcessor.decodeFrame fallback.
+    //   (3) Even with fusion running, the local-contrast strategy is a per-pixel
+    //       near/far selection without alignment or smoothing, which is an assist, not
+    //       a guarantee of full clarity.
+    // The scenario id stays "clarity" so persisted settings and metadata remain stable.
     CLARITY(
         id = "clarity",
-        label = "全清",
+        label = "清晰辅助",
         filterCategory = FilterProfileCategory.PORTRAIT,
         captureStrategyType = StrategyType.MULTI_FRAME
     );
@@ -98,10 +113,12 @@ private class CheckInModeController(
 
     override fun buildEffectSpec(): EffectSpec {
         if (currentScenario().captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) {
-            return EffectSpec(listOf(
-                checkInWatermarkEffect(),
-                FrameEffect(currentFrameRatio())
-            ))
+            val effects = mutableListOf<EffectEntry>()
+            if (photoWatermarkEnabled()) {
+                effects += checkInWatermarkEffect()
+            }
+            effects += FrameEffect(currentFrameRatio())
+            return EffectSpec(effects)
         }
         val style = currentStyle()
         val portraitSettings = portraitSettings()
@@ -115,7 +132,7 @@ private class CheckInModeController(
         val adjustedRenderSpec = pipelineResult?.finalRenderSpec
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
-        return EffectSpec(listOf(
+        val effects = mutableListOf<EffectEntry>(
             FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
             PortraitEffect(
                 profileId = portraitSettings.portraitProfile.storageKey,
@@ -124,10 +141,13 @@ private class CheckInModeController(
                 beautyStrength = portraitSettings.portraitBeautyStrength.storageKey,
                 bokehEffect = portraitSettings.portraitBokehEffect.storageKey,
                 depthStrength = portraitSettings.portraitDepthStrength
-            ),
-            checkInWatermarkEffect(),
-            FrameEffect(currentFrameRatio())
-        ))
+            )
+        )
+        if (photoWatermarkEnabled()) {
+            effects += checkInWatermarkEffect()
+        }
+        effects += FrameEffect(currentFrameRatio())
+        return EffectSpec(effects)
     }
 
     override fun buildCaptureStrategy(
@@ -256,14 +276,16 @@ private class CheckInModeController(
         val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
         val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
         val postProcessSpec = basePostProcess.copy(
-            watermarkText = resolvedWatermarkText(scenario, style),
+            watermarkText = if (photoWatermarkEnabled()) resolvedWatermarkText(scenario, style) else null,
             exifOverrides = basePostProcess.exifOverrides + mapOf(
-                "SceneCaptureType" to "Check-in Clarity",
+                "SceneCaptureType" to "Check-in Clarity Assist",
                 "CheckInScenario" to scenario.label,
-                "CompatSceneCaptureType" to "Clarity Assist"
+                "CompatSceneCaptureType" to "Clarity Assist",
+                "ClarityPromise" to "assist-not-all-clear"
             ),
-            algorithmProfile = "checkin-clarity-best-frame-v1"
+            algorithmProfile = "checkin-clarity-focus-stack-v1"
         )
+        val focusStackSpec = FocusStackCaptureSpec.automaticNearFar()
         val metadataTags = buildMap {
             putAll(bridgeTags)
             put("mode", "check-in")
@@ -271,10 +293,15 @@ private class CheckInModeController(
             put("compatMode", "clarity-assist")
             put("style", style.id)
             put("watermarkModeName", "Check-in")
-            put("watermarkProfileName", style.label)
-            put("focus-bracket-capture", "V1")
-            put("best-frame-clarity-assist", "V1")
-            put("degradation-policy", "multi-frame-best-frame")
+            put("watermarkProfileName", if (photoWatermarkEnabled()) style.label else "Off")
+            put("livePhotoDefault", if (livePhotoEnabled()) "on" else "off")
+            if (livePhotoEnabled()) {
+                putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
+            }
+            put("focus-bracket-capture", "auto-near-far-v1")
+            put("focusStackRoles", "near,far")
+            put("focusStackGuidance", "automatic")
+            put("degradation-policy", "focus-stack-auto-near-far")
             putAll(context.captureAidMetadataTags())
         }
         return if (supportsMultiFrameCapture()) {
@@ -287,7 +314,8 @@ private class CheckInModeController(
                     ),
                     postProcessSpec = postProcessSpec,
                     captureProfile = CaptureProfile(
-                        frameCount = 3,
+                        frameCount = 2,
+                        focusStackSpec = focusStackSpec,
                         stillCaptureQuality = runtimeState().stillCaptureQuality,
                         stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
                     ),
@@ -324,38 +352,54 @@ private class CheckInModeController(
         val bridgeTags = EffectBridge.toMetadataTags(effectSpec)
         val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
         val postProcessSpec = basePostProcess.copy(
-            watermarkText = resolvedWatermarkText(scenario, style),
+            watermarkText = if (photoWatermarkEnabled()) resolvedWatermarkText(scenario, style) else null,
             exifOverrides = basePostProcess.exifOverrides + checkInExifOverrides(scenario, style, portraitSettings),
             algorithmProfile = resolvedAlgorithmProfile(style.id)
         )
-        return ModeSignal.SubmitCapture(
-            CaptureStrategy.SingleFrame(
-                saveRequest = SaveRequest.photoLibrary(
-                    relativePath = "Pictures/OpenCamera/Check-in",
-                    fileNamePrefix = "OpenCamera_CHECKIN",
-                    metadata = MediaMetadata(
-                        customTags = buildMap {
-                            putAll(bridgeTags)
-                            put("mode", "check-in")
-                            put("checkInScenario", scenario.id)
-                            put("compatMode", "portrait")
-                            put("style", style.id)
-                            put("subjectTracking", style.subjectTracking.toString())
-                            put("watermarkModeName", "Check-in")
-                            put("watermarkProfileName", style.label)
-                            put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
-                            put("modeVariant", "standard")
-                            putAll(context.captureAidMetadataTags())
-                            style.bokehStrength?.let { put("bokehStrength", it.toString()) }
-                        }
-                    )
-                ),
-                postProcessSpec = postProcessSpec,
-                captureProfile = CaptureProfile(
-                    stillCaptureQuality = runtimeState().stillCaptureQuality,
-                    stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
-                )
+        val saveRequest = SaveRequest.photoLibrary(
+            relativePath = "Pictures/OpenCamera/Check-in",
+            fileNamePrefix = "OpenCamera_CHECKIN",
+            metadata = MediaMetadata(
+                customTags = buildMap {
+                    putAll(bridgeTags)
+                    put("mode", "check-in")
+                    put("checkInScenario", scenario.id)
+                    put("compatMode", "portrait")
+                    put("style", style.id)
+                    put("subjectTracking", style.subjectTracking.toString())
+                    put("watermarkModeName", "Check-in")
+                    put("watermarkProfileName", if (photoWatermarkEnabled()) style.label else "Off")
+                    put("livePhotoDefault", if (livePhotoEnabled()) "on" else "off")
+                    if (livePhotoEnabled()) {
+                        putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
+                    }
+                    put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
+                    put("modeVariant", "standard")
+                    putAll(context.captureAidMetadataTags())
+                    style.bokehStrength?.let { put("bokehStrength", it.toString()) }
+                }
             )
+        )
+        val captureProfile = CaptureProfile(
+            stillCaptureQuality = runtimeState().stillCaptureQuality,
+            stillCaptureResolutionPreset = runtimeState().stillCaptureResolutionPreset
+        )
+        val strategy = if (livePhotoEnabled()) {
+            CaptureStrategy.LivePhoto(
+                saveRequest = saveRequest,
+                postProcessSpec = postProcessSpec,
+                captureProfile = captureProfile,
+                livePhotoSpec = toCaptureSpec(context.settingsSnapshot.persisted.photo.liveSaveFormat)
+            )
+        } else {
+            CaptureStrategy.SingleFrame(
+                saveRequest = saveRequest,
+                postProcessSpec = postProcessSpec,
+                captureProfile = captureProfile
+            )
+        }
+        return ModeSignal.SubmitCapture(
+            strategy
         )
     }
 
@@ -460,7 +504,11 @@ private class CheckInModeController(
             append(" | Bokeh ${portraitSettings.portraitBokehEffect.label}")
         }
         val clarityHint = if (scenario.captureStrategyType == CheckInScenario.StrategyType.MULTI_FRAME) {
-            " | 超清增强: 多帧最佳帧选择，点击远近可对焦区域可辅助清晰度"
+            if (supportsMultiFrameCapture()) {
+                " | 清晰辅助: 两帧近远焦点合成 (辅助增强, 非保证全清)"
+            } else {
+                " | 清晰辅助: 设备不支持多帧，无法进行近远景焦点堆栈合成"
+            }
         } else ""
         return if (depthEffectEnabled()) {
             "Style ${style.label} | $commonSummary | Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Timer ${countdownDuration().label} | Frame ${currentFrameRatio().label} | Portrait depth rendering active.$clarityHint"

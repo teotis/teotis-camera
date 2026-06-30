@@ -61,6 +61,7 @@ internal class CockpitSurfaceRenderer(
         bottomCockpit.shutter.isEnabled = isShutterEnabled
         bottomCockpit.lensFacing.text = controls.lensFacingButtonLabel
         bottomCockpit.lensFacing.isEnabled = controls.lensFacingEnabled
+        bottomCockpit.lensFacing.isVisible = controls.lensFacingVisible
     }
 
     fun renderCaptureOutput(text: String) {

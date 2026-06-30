@@ -46,6 +46,7 @@ internal data class FocalLengthSliderRenderModel(
 internal data class SessionControlsRenderModel(
     val lensFacingButtonLabel: String,
     val lensFacingEnabled: Boolean,
+    val lensFacingVisible: Boolean,
     val zoomCapsules: List<ZoomCapsuleRenderModel>,
     val isZoomCapsuleRowVisible: Boolean,
     val focalLengthSlider: FocalLengthSliderRenderModel,
@@ -122,6 +123,7 @@ internal data class QuickPanelSheetRenderModel(
     val frameRatioDisabledReason: String?,
     val watermarkRow: QuickPanelRowRenderModel,
     val watermarkNextTemplateId: String?,
+    val watermarkAction: PersistedSettingsAction?,
     val liveRow: QuickPanelRowRenderModel,
     val timerRow: QuickPanelRowRenderModel,
     val hasQuickUserAdjustments: Boolean = false,
@@ -237,10 +239,12 @@ internal fun sessionControlsRenderModel(
     val sliderDisabledReason = if (capability.isSwitchingSupported && !sliderEnabled) {
         zoomDisabledReasonText(state, capability.support, text)
     } else null
+    val lensFacingVisible = state.activeMode != ModeId.DOCUMENT
 
     return SessionControlsRenderModel(
         lensFacingButtonLabel = lensFacingButtonLabel(state, strings),
-        lensFacingEnabled = state.activeDeviceCapabilities.availableLensFacings.size > 1,
+        lensFacingEnabled = lensFacingVisible && state.activeDeviceCapabilities.availableLensFacings.size > 1,
+        lensFacingVisible = lensFacingVisible,
         zoomCapsules = zoomCapsuleModels(state),
         isZoomCapsuleRowVisible = capability.isSwitchingSupported,
         focalLengthSlider = FocalLengthSliderRenderModel(
@@ -266,6 +270,13 @@ private val stillModesWithFrameRatio = setOf(
 
 private val livePhotoCapableModes = setOf(
     ModeId.PHOTO,
+    ModeId.CHECK_IN,
+    ModeId.HUMANISTIC
+)
+
+private val watermarkCapableModes = setOf(
+    ModeId.PHOTO,
+    ModeId.CHECK_IN,
     ModeId.HUMANISTIC
 )
 
@@ -294,6 +305,7 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
         !isBrightnessCapableMode -> null
         isUnsupported -> text.get(R.string.disabled_brightness_unsupported)
         isBusy -> text.get(R.string.disabled_brightness_active_shot)
+        !isPreviewActive -> text.get(R.string.disabled_brightness_preview_inactive)
         else -> null
     }
 
@@ -312,6 +324,7 @@ internal fun brightnessRenderModel(state: SessionState, text: AppTextResolver): 
 private val BRIGHTNESS_CAPABLE_MODES = setOf(
     ModeId.PHOTO,
     ModeId.HUMANISTIC,
+    ModeId.DOCUMENT,
     ModeId.CHECK_IN,
     ModeId.VIDEO
 )
@@ -411,22 +424,35 @@ internal fun quickPanelSheetRenderModel(
     val watermarkTemplates = catalog.watermarkTemplates
     val currentTemplateId = settings.photo.defaultWatermarkTemplateId
     val currentTemplate = watermarkTemplates.firstOrNull { it.id == currentTemplateId }
-    val watermarkEnabled = stillTemplate && !stillBusy && supportsStillCapture && watermarkTemplates.isNotEmpty()
+    val watermarkModeSupported = state.activeMode in watermarkCapableModes
+    val watermarkControlEnabled = watermarkModeSupported && stillTemplate && !stillBusy && supportsStillCapture && watermarkTemplates.isNotEmpty()
+    val watermarkSelected = settings.photo.photoWatermarkEnabledByDefault
     val watermarkDisabledReason = when {
+        !watermarkModeSupported -> text.get(R.string.watermark_unsupported)
         !supportsStillCapture -> null
         !stillTemplate -> null
         stillBusy -> text.get(R.string.disabled_saving_photo)
         watermarkTemplates.isEmpty() -> text.get(R.string.error_no_watermark_templates)
         else -> null
     }
-    val nextTemplateId = if (watermarkEnabled && watermarkTemplates.size > 1) {
+    val nextTemplateId = if (watermarkControlEnabled && watermarkSelected && watermarkTemplates.size > 1) {
         val currentIndex = watermarkTemplates.indexOfFirst { it.id == currentTemplateId }
         val nextIndex = if (currentIndex >= 0) (currentIndex + 1) % watermarkTemplates.size else 0
         watermarkTemplates[nextIndex].id
     } else {
         null
     }
-    val watermarkLabel = currentTemplate?.localizedLabel(text) ?: currentTemplateId
+    val watermarkLabel = if (watermarkSelected) {
+        currentTemplate?.localizedLabel(text) ?: currentTemplateId
+    } else {
+        text.onOff(false)
+    }
+    val watermarkAction = when {
+        !watermarkControlEnabled -> null
+        !watermarkSelected -> PersistedSettingsAction.UpdatePhotoWatermarkEnabled(true)
+        nextTemplateId != null -> PersistedSettingsAction.UpdatePhotoWatermarkTemplate(nextTemplateId)
+        else -> null
+    }
 
     val currentRatio = state.activeEffectSpec.find<FrameEffect>()?.ratio ?: FrameRatio.RATIO_4_3
     val entries = FrameRatio.entries
@@ -465,11 +491,13 @@ internal fun quickPanelSheetRenderModel(
         watermarkRow = QuickPanelRowRenderModel(
             title = text.get(R.string.button_quick_watermark),
             value = watermarkLabel,
-            isEnabled = watermarkEnabled,
+            isEnabled = watermarkControlEnabled,
             disabledReason = watermarkDisabledReason,
-            controlKind = QuickControlKind.CYCLE
+            controlKind = QuickControlKind.CYCLE,
+            isSelected = watermarkSelected
         ),
         watermarkNextTemplateId = nextTemplateId,
+        watermarkAction = watermarkAction,
         liveRow = QuickPanelRowRenderModel(
             title = text.get(R.string.button_quick_live),
             value = liveValue,

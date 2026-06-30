@@ -97,6 +97,8 @@ internal fun resolveLiveMotionSource(
                 add("live:source=metadata-only")
                 add("live:degraded=no-frames-near-shutter")
                 add("frame-source:active=true")
+                addAll(selectedFrameSet.diagnostics)
+                frameSource.lastStartReason?.let { add("frame-source:last-start-reason=$it") }
             }
         )
     }

@@ -33,3 +33,9 @@ internal val CockpitPanelRoute.isSettingsOpen: Boolean
 
 internal val CockpitPanelRoute.isAnyPanelOpen: Boolean
     get() = this !is CockpitPanelRoute.None
+
+internal val CockpitPanelRoute.isDocumentWorkflowRoute: Boolean
+    get() = this is CockpitPanelRoute.DocumentBatchOrganizer ||
+        this is CockpitPanelRoute.BatchOverview ||
+        this is CockpitPanelRoute.CropEdit ||
+        this is CockpitPanelRoute.Export

@@ -26,7 +26,10 @@ import com.opencamera.core.mode.ModeIntent
 import com.opencamera.core.mode.ModeSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.mode.ModeSnapshot
+import com.opencamera.core.settings.AudioProfile
+import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.VideoSpec
+import com.opencamera.core.settings.VideoSpecConstraints
 import com.opencamera.core.settings.VideoResolution
 import com.opencamera.core.settings.VideoFrameRate
 import kotlinx.coroutines.test.runTest
@@ -453,7 +456,90 @@ class VideoModePluginTest {
         assertIs<DeviceGraphSpec>(graph)
     }
 
+    // --- Requested vs resolved video spec truth ---
+
+    @Test
+    fun `recording metadata includes degraded flags when device cannot honor requested 4K spec`() = runTest {
+        val controller = createController(deviceCapabilities = fhdOnlyDeviceCapabilities())
+        controller.onEnter()
+
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+
+        // Requested 4K 25fps cannot be honored on an FHD-only device.
+        assertEquals("4k", metadata["defaultVideoResolution"])
+        assertEquals("25", metadata["defaultVideoFrameRate"])
+        assertEquals("1080p", metadata["resolvedVideoResolution"])
+        assertEquals("30", metadata["resolvedVideoFrameRate"])
+        assertEquals("true", metadata["videoSpecDegraded"])
+        val degradedFields = metadata["videoSpecDegradedFields"]
+        assertNotNull(degradedFields)
+        assertTrue(degradedFields.contains("resolution"), "degraded fields should include resolution: $degradedFields")
+        assertTrue(degradedFields.contains("framerate"), "degraded fields should include framerate: $degradedFields")
+    }
+
+    @Test
+    fun `recording metadata marks non-degraded when device honors requested 4K spec`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+
+        val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.saveRequest.metadata.customTags
+
+        assertEquals("4k", metadata["defaultVideoResolution"])
+        assertEquals("25", metadata["defaultVideoFrameRate"])
+        assertEquals("4k", metadata["resolvedVideoResolution"])
+        assertEquals("25", metadata["resolvedVideoFrameRate"])
+        assertEquals("false", metadata["videoSpecDegraded"])
+        assertEquals("", metadata["videoSpecDegradedFields"])
+    }
+
+    @Test
+    fun `mode detail surfaces fallback label when resolved spec differs from requested`() = runTest {
+        val controller = createController(deviceCapabilities = fhdOnlyDeviceCapabilities())
+        controller.onEnter()
+
+        val detail = controller.snapshot.value.state.detail
+
+        assertTrue(detail.contains("fallback"), "detail should mention fallback when degraded: $detail")
+        assertTrue(detail.contains("1080p"), "detail should mention resolved resolution: $detail")
+    }
+
+    @Test
+    fun `mode detail omits fallback label when resolved spec matches requested`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+
+        val detail = controller.snapshot.value.state.detail
+
+        assertFalse(detail.contains("fallback"), "detail should not mention fallback when not degraded: $detail")
+    }
+
+    @Test
+    fun `cycle quality hint has no active suffix when spec is fully supported`() = runTest {
+        val controller = createController()
+        controller.onEnter()
+
+        val signal = controller.handle(ModeIntent.TertiaryActionPressed) as ModeSignal.ShowHint
+
+        assertTrue(signal.message.startsWith("Video quality:"))
+        assertFalse(signal.message.contains("(active"), "hint should not have active suffix when not degraded: ${signal.message}")
+    }
+
     // --- Helpers ---
+
+    private fun fhdOnlyDeviceCapabilities(): DeviceCapabilities {
+        return DeviceCapabilities.DEFAULT.copy(
+            videoSpecConstraints = VideoSpecConstraints(
+                supportedFrameRatesByResolution = linkedMapOf(
+                    VideoResolution.FHD_1080P to setOf(VideoFrameRate.FPS_30),
+                    VideoResolution.HD_720P to setOf(VideoFrameRate.FPS_30)
+                ),
+                dynamicPolicies = setOf(DynamicVideoFpsPolicy.LOCKED),
+                audioProfiles = setOf(AudioProfile.STANDARD)
+            )
+        )
+    }
 
     private fun createController(
         deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,

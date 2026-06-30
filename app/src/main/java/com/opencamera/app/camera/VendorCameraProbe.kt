@@ -86,7 +86,19 @@ object VendorCameraProbe {
     }
 
     fun summary(context: Context): String {
-        return CameraExtensionProbe.probe(context).summaryLine()
+        return CameraExtensionProbe.probe(context).diagnosticSummary()
+    }
+
+    fun summaryFromProbeText(content: String): String? {
+        return content.lineSequence()
+            .map { it.trim() }
+            .filter { line ->
+                line.startsWith("extensions: ") ||
+                    line.startsWith("image-quality-ext: ")
+            }
+            .distinct()
+            .joinToString(separator = "\n")
+            .takeIf { it.isNotBlank() }
     }
 
     private fun appendCameraProbe(
@@ -630,6 +642,10 @@ internal fun appendCameraExtensionProbe(
     report: CameraExtensionProbeReport
 ) {
     sb.append(report.toProbeText())
+}
+
+private fun CameraExtensionProbeReport.diagnosticSummary(): String {
+    return listOf(summaryLine(), imageQualitySummaryLine()).joinToString(separator = "\n")
 }
 
 internal fun formatPhysicalSensorSize(physicalSize: SizeF): String {

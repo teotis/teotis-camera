@@ -153,6 +153,7 @@ data class PhotoSettings(
     val portraitBeautyStrength: PortraitBeautyStrength = PortraitBeautyStrength.SOFT,
     val portraitBokehEffect: PortraitBokehEffect = PortraitBokehEffect.NATURAL,
     val portraitDepthStrength: Int = 50,
+    val photoWatermarkEnabledByDefault: Boolean = false,
     val defaultWatermarkTemplateId: String = "classic-overlay",
     val classicOverlayWatermarkStyle: WatermarkStyleSettings = WatermarkStyleSettings(
         textPlacement = WatermarkTextPlacement.BOTTOM_RIGHT,

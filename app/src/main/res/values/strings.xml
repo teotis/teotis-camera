@@ -86,6 +86,7 @@
     <string name="disabled_brightness_unsupported">亮度调节不可用</string>
     <string name="disabled_brightness_countdown">倒计时结束后才能调节亮度</string>
     <string name="disabled_brightness_active_shot">等待当前拍摄完成后才能调节亮度</string>
+    <string name="disabled_brightness_preview_inactive">预览就绪后才能调节亮度</string>
     <string name="button_low_light_night_prompt">夜</string>
     <string name="button_low_light_night_prompt_enabled">夜景辅助已开启</string>
     <string name="button_low_light_night_prompt_disabled">夜景辅助已关闭</string>
@@ -596,7 +597,7 @@
     <string name="document_batch_crop_skipped">未裁边</string>
     <string name="document_batch_crop_failed">裁边失败</string>
     <string name="document_batch_rail_page_description">第 %d 页</string>
-    <string name="document_batch_rail_overview_description">查看批次</string>
+    <string name="document_batch_rail_overview_description">导出文件</string>
     <string name="button_document_batch_organizer_close">关闭</string>
     <string name="button_document_batch_continue_shooting">继续拍摄</string>
     <string name="button_document_batch_crop_edit">进入裁边</string>

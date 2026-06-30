@@ -10,7 +10,14 @@ import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.roundToInt
+
+private const val PALETTE_GRID_COLUMNS = 17
+private const val PALETTE_GRID_ROWS = 9
+private const val PALETTE_DOT_SNAP_FRACTION = 0.4f
+private const val PALETTE_ORIGIN_SNAP_FRACTION = 1f
 
 internal data class PaletteAxes(
     val colorAxis: Float,
@@ -22,6 +29,11 @@ internal data class PalettePoint(
     val yFraction: Float
 )
 
+private data class PalettePixelPoint(
+    val x: Float,
+    val y: Float
+)
+
 internal fun paletteAxesFromPoint(
     x: Float,
     y: Float,
@@ -29,9 +41,14 @@ internal fun paletteAxesFromPoint(
     height: Int
 ): PaletteAxes {
     if (width <= 0 || height <= 0) return PaletteAxes(0f, 0f)
+    val clampedX = x.coerceIn(0f, width.toFloat())
+    val clampedY = y.coerceIn(0f, height.toFloat())
+    val snappedPoint = snappedPalettePoint(clampedX, clampedY, width, height)
+    val mappedX = snappedPoint?.x ?: clampedX
+    val mappedY = snappedPoint?.y ?: clampedY
     return PaletteAxes(
-        colorAxis = (x / width.toFloat() * 2f - 1f).coerceIn(-1f, 1f),
-        toneAxis = (1f - y / height.toFloat() * 2f).coerceIn(-1f, 1f)
+        colorAxis = (mappedX / width.toFloat() * 2f - 1f).coerceIn(-1f, 1f),
+        toneAxis = (1f - mappedY / height.toFloat() * 2f).coerceIn(-1f, 1f)
     )
 }
 
@@ -43,6 +60,38 @@ internal fun palettePointFromAxes(
         xFraction = ((colorAxis.coerceIn(-1f, 1f) + 1f) / 2f).coerceIn(0f, 1f),
         yFraction = ((1f - toneAxis.coerceIn(-1f, 1f)) / 2f).coerceIn(0f, 1f)
     )
+}
+
+private fun snappedPalettePoint(
+    x: Float,
+    y: Float,
+    width: Int,
+    height: Int
+): PalettePixelPoint? {
+    val xStep = width / (PALETTE_GRID_COLUMNS + 1f)
+    val yStep = height / (PALETTE_GRID_ROWS + 1f)
+    val centerX = ((PALETTE_GRID_COLUMNS + 1) / 2f) * xStep
+    val centerY = ((PALETTE_GRID_ROWS + 1) / 2f) * yStep
+
+    if (
+        abs(x - centerX) <= xStep * PALETTE_ORIGIN_SNAP_FRACTION &&
+        abs(y - centerY) <= yStep * PALETTE_ORIGIN_SNAP_FRACTION
+    ) {
+        return PalettePixelPoint(centerX, centerY)
+    }
+
+    val nearestColumn = (x / xStep).roundToInt().coerceIn(1, PALETTE_GRID_COLUMNS)
+    val nearestRow = (y / yStep).roundToInt().coerceIn(1, PALETTE_GRID_ROWS)
+    val dotX = nearestColumn * xStep
+    val dotY = nearestRow * yStep
+    return if (
+        abs(x - dotX) <= xStep * PALETTE_DOT_SNAP_FRACTION &&
+        abs(y - dotY) <= yStep * PALETTE_DOT_SNAP_FRACTION
+    ) {
+        PalettePixelPoint(dotX, dotY)
+    } else {
+        null
+    }
 }
 
 class FilterPaletteView @JvmOverloads constructor(
@@ -169,8 +218,8 @@ class FilterPaletteView @JvmOverloads constructor(
     }
 
     private fun drawPaletteDotGrid(canvas: Canvas) {
-        val columns = 17
-        val rows = 9
+        val columns = PALETTE_GRID_COLUMNS
+        val rows = PALETTE_GRID_ROWS
         val xStep = width / (columns + 1f)
         val yStep = height / (rows + 1f)
         val radius = (min(width, height) * 0.0065f)

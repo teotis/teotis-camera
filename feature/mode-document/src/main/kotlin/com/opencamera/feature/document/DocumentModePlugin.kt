@@ -4,6 +4,7 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.effect.DocumentColorMode
 import com.opencamera.core.effect.DocumentEffect
 import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectEntry
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.WatermarkEffect
 import com.opencamera.core.media.CaptureProfile
@@ -22,7 +23,6 @@ import com.opencamera.core.mode.ModeSnapshot
 import com.opencamera.core.mode.ModeState
 import com.opencamera.core.mode.ModeUiSpec
 import com.opencamera.core.mode.StillShotSessionEventText
-import com.opencamera.core.settings.SessionSettingsSnapshot
 import com.opencamera.core.settings.StylePresetCatalog
 import com.opencamera.core.settings.StylePresetFamily
 import com.opencamera.core.settings.watermarkStyleFor
@@ -61,23 +61,31 @@ private class DocumentModeController(
 
     override fun buildEffectSpec(): EffectSpec {
         val profile = currentProfile()
-        val selectedWatermarkTemplate = selectedWatermarkTemplate()
-        val watermarkStyle = context.settingsSnapshot.persisted.photo
-            .watermarkStyleFor(selectedWatermarkTemplate.id)
         val colorMode = resolveDocumentColorMode()
-        return EffectSpec(listOf(
+        val effects = mutableListOf<EffectEntry>(
             DocumentEffect(
                 autoCrop = profile.autoCrop,
                 contrastProfile = if (enhancementEnabled()) profile.contrastLabel else null,
                 colorMode = colorMode,
                 scanGuide = enhancementEnabled()
-            ),
-            WatermarkEffect(
-                templateId = selectedWatermarkTemplate.id,
-                tokens = watermarkTokens(runtimeState().stillCaptureResolutionPreset.label),
+            )
+        )
+        if (photoWatermarkEnabled()) {
+            val template = selectedWatermarkTemplate()
+            val watermarkStyle = context.settingsSnapshot.persisted.photo.watermarkStyleFor(template.id)
+            effects += WatermarkEffect(
+                templateId = template.id,
+                tokens = watermarkTokens(
+                    cameraParams = watermarkCameraParams(
+                        "Document",
+                        profile.label,
+                        resolveColorModeLabel()
+                    )
+                ),
                 style = watermarkStyle
             )
-        ))
+        }
+        return EffectSpec(effects)
     }
 
     override suspend fun handleShutterPressed(): ModeSignal {
@@ -95,11 +103,6 @@ private class DocumentModeController(
         val profile = currentProfile()
         val basePostProcess = EffectBridge.toPostProcessSpec(effectSpec)
         val postProcessSpec = basePostProcess.copy(
-            watermarkText = if (enhancementEnabled()) {
-                "DOC ${profile.label}"
-            } else {
-                "DOC Basic ${profile.label}"
-            },
             exifOverrides = basePostProcess.exifOverrides + buildMap {
                 put("SceneCaptureType", "Document")
                 put("ProcessingRendered", if (enhancementEnabled()) "enhanced-scan:${resolveColorModeTag()}" else "basic-archive")

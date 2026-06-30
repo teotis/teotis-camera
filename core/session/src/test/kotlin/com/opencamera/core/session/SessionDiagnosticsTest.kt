@@ -193,9 +193,9 @@ class SessionDiagnosticsTest {
         assertEquals(1200L, previewStartWatchdogMillis("camera permission granted"))
         assertEquals(1200L, previewStartWatchdogMillis("recover after preview host detached: Activity moved to background"))
         assertEquals(1500L, previewStartWatchdogMillis("recover after provider failure: provider restarted"))
-        assertEquals(1000L, previewStartWatchdogMillis("mode switched to video"))
-        assertEquals(1000L, previewStartWatchdogMillis("lens switched to front"))
-        assertEquals(1000L, previewStartWatchdogMillis("session settings updated"))
+        assertEquals(1500L, previewStartWatchdogMillis("mode switched to video"))
+        assertEquals(1500L, previewStartWatchdogMillis("lens switched to front"))
+        assertEquals(1500L, previewStartWatchdogMillis("session settings updated"))
         assertEquals(1200L, previewStartWatchdogMillis("unknown reason"))
         assertEquals(1200L, previewStartWatchdogMillis(null))
     }

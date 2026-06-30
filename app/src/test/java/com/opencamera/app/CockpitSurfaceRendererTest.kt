@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import android.view.View
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -28,6 +29,7 @@ import org.robolectric.RobolectricTestRunner
 import org.junit.runner.RunWith
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 
@@ -175,6 +177,26 @@ class CockpitSurfaceRendererTest {
         assertSame(styledBackground, modeAction.background)
     }
 
+    @Test
+    fun `renderShutter hides lens button when lens switch is invisible`() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        val previewView = PreviewView(context)
+        val shutterButton = Button(context)
+        val lensButton = Button(context)
+        val renderer = createRenderer(previewView, shutter = shutterButton, lensFacing = lensButton)
+        val state = sessionState()
+        val text = TestAppTextResolver()
+        val controls = sessionControlsRenderModel(state, text.sessionUiStrings(), text).copy(
+            lensFacingEnabled = false,
+            lensFacingVisible = false
+        )
+
+        renderer.renderShutter(state, controls)
+
+        assertFalse(lensButton.isShown)
+        assertEquals(View.GONE, lensButton.visibility)
+    }
+
     private fun sessionState(
         lensFacing: LensFacing = LensFacing.BACK,
         selfieMirrorEnabled: Boolean = true
@@ -213,7 +235,9 @@ class CockpitSurfaceRendererTest {
 
     private fun createRenderer(
         previewView: PreviewView,
-        modeAction: Button = allocateInstance(Button::class.java)
+        modeAction: Button = allocateInstance(Button::class.java),
+        shutter: Button = allocateInstance(Button::class.java),
+        lensFacing: Button = allocateInstance(Button::class.java)
     ): CockpitSurfaceRenderer {
         val context = org.robolectric.RuntimeEnvironment.getApplication()
         return CockpitSurfaceRenderer(
@@ -244,8 +268,8 @@ class CockpitSurfaceRendererTest {
                 lowLightNightPrompt = allocateInstance(Button::class.java)
             ),
             bottomCockpit = BottomCockpitViews(
-                shutter = allocateInstance(Button::class.java),
-                lensFacing = allocateInstance(Button::class.java),
+                shutter = shutter,
+                lensFacing = lensFacing,
                 focalLengthSlider = allocateInstance(FocalLengthSliderView::class.java),
                 recordingIndicator = allocateInstance(TextView::class.java),
                 stylePresetCardRail = allocateInstance(StylePresetCardRailView::class.java)

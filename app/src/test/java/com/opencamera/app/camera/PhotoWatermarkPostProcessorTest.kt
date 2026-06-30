@@ -1,7 +1,9 @@
 package com.opencamera.app.camera
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.test.core.app.ApplicationProvider
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
@@ -524,6 +526,189 @@ class PhotoWatermarkPostProcessorTest {
     }
 
     @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `van gogh starry material assets load for every supported output shape`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).vanGoghStarryFrameAssetProvider
+
+        VanGoghStarryFrameAssetVariant.entries.forEach { variant ->
+            val bitmap = provider.load(variant)
+            assertTrue(bitmap != null, "asset should load for $variant")
+            assertTrue(bitmap!!.width > 900, "asset width should be production-sized for $variant")
+            assertTrue(bitmap.height > 900, "asset height should be production-sized for $variant")
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `blue hour material assets load for every supported output shape`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
+
+        StaticHighDesignWatermarkPackages.BLUE_HOUR.frameAssets.values.forEach { asset ->
+            val bitmap = provider.load(asset)
+            assertTrue(bitmap != null, "asset should load for ${asset.variant}")
+            assertTrue(bitmap!!.width > 900, "asset width should be production-sized for ${asset.variant}")
+            assertTrue(bitmap.height > 900, "asset height should be production-sized for ${asset.variant}")
+        }
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `scheme three material assets expose transparent photo windows with painted edge overlays`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
+        val assets = StaticHighDesignWatermarkPackages.BLUE_HOUR.frameAssets.values +
+            StaticHighDesignWatermarkPackages.VAN_GOGH_STARRY.frameAssets.values
+
+        assets.forEach { asset ->
+            val bitmap = provider.load(asset)
+            assertTrue(bitmap != null, "scheme 3 asset should load for ${asset.packageId}:${asset.variant}")
+            bitmap!!
+
+            val centerAlpha = Color.alpha(bitmap.getPixel(bitmap.width / 2, bitmap.height / 2))
+            val topOverlayInk = countNonTransparentPixels(
+                bitmap = bitmap,
+                left = (bitmap.width * 0.05f).toInt(),
+                top = (bitmap.height * 0.07f).toInt(),
+                right = (bitmap.width * 0.95f).toInt(),
+                bottom = (bitmap.height * 0.15f).toInt()
+            )
+            val lowerOverlayInk = countNonTransparentPixels(
+                bitmap = bitmap,
+                left = 0,
+                top = (bitmap.height * 0.80f).toInt(),
+                right = bitmap.width,
+                bottom = bitmap.height
+            )
+            val textSafeInk = countTextSafeAssetInk(bitmap, asset.packageId)
+            val chromaResidue = countChromaKeyResidue(bitmap)
+
+            assertEquals(0, centerAlpha, "scheme 3 asset must not bake the reference photo center")
+            if (asset.packageId == "blue-hour") {
+                assertTrue(
+                    textSafeInk > bitmap.width * 2,
+                    "blue-hour asset should soften the title area without cutting a transparent block in ${asset.variant}, count=$textSafeInk"
+                )
+            } else {
+                assertTrue(
+                    textSafeInk > bitmap.width,
+                    "van-gogh-starry asset should preserve subtle texture behind metadata instead of cutting a black text block"
+                )
+            }
+            assertTrue(
+                chromaResidue <= 4,
+                "scheme 3 asset must not retain visible green-screen pixels in ${asset.packageId}:${asset.variant}, count=$chromaResidue"
+            )
+            val minimumTopInk = if (asset.packageId == "blue-hour") bitmap.width * 5 else bitmap.width * 8
+            assertTrue(
+                topOverlayInk > minimumTopInk,
+                "scheme 3 asset should retain ${asset.packageId} top-edge overlay ink, count=$topOverlayInk"
+            )
+            assertTrue(
+                lowerOverlayInk > bitmap.width * 24,
+                "scheme 3 asset should retain painted lower-edge overlay ink, count=$lowerOverlayInk"
+            )
+        }
+    }
+
+    @Test
+    fun `static high design packages declare only supported scene layers and output variants`() {
+        assertEquals(
+            WatermarkSceneVariant.entries.toSet(),
+            StaticHighDesignWatermarkPackages.VAN_GOGH_STARRY.frameAssets.keys
+        )
+        assertEquals(
+            WatermarkSceneVariant.entries.toSet(),
+            StaticHighDesignWatermarkPackages.BLUE_HOUR.frameAssets.keys
+        )
+        assertEquals(
+            "watermarks/blue_hour_portrait.png",
+            StaticHighDesignWatermarkPackages.BLUE_HOUR.frameAssets.getValue(WatermarkSceneVariant.PORTRAIT).assetPath
+        )
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `van gogh starry chooses portrait square and landscape material assets by output shape`() {
+        val provider = RecordingVanGoghStarryAssetProvider()
+        val template = starryMoonTemplate()
+
+        renderPhotoWatermarkBitmap(
+            Bitmap.createBitmap(300, 520, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(Color.rgb(16, 42, 86))
+            },
+            template,
+            provider
+        ).bitmap.recycle()
+        renderPhotoWatermarkBitmap(
+            Bitmap.createBitmap(420, 320, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(Color.rgb(16, 42, 86))
+            },
+            template,
+            provider
+        ).bitmap.recycle()
+        renderPhotoWatermarkBitmap(
+            Bitmap.createBitmap(620, 240, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(Color.rgb(16, 42, 86))
+            },
+            template,
+            provider
+        ).bitmap.recycle()
+
+        assertEquals(
+            listOf(
+                VanGoghStarryFrameAssetVariant.PORTRAIT,
+                VanGoghStarryFrameAssetVariant.SQUARE,
+                VanGoghStarryFrameAssetVariant.LANDSCAPE
+            ),
+            provider.requests
+        )
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `static scene renderer chooses portrait square and landscape package assets by output shape`() {
+        val provider = RecordingStaticWatermarkAssetProvider()
+        val template = ResolvedPhotoWatermarkTemplate(
+            templateId = "blue-hour",
+            title = "BLUE HOUR",
+            supportingLines = listOf("2026.06.22 19:41 • CITY NIGHT", "24mm"),
+            frameBackground = WatermarkFrameBackground.DARK,
+            usesExpandedFrame = true,
+            placement = WatermarkTextPlacement.BOTTOM_LEFT,
+            textScale = 1f,
+            textOpacity = 1f
+        )
+
+        renderPhotoWatermarkBitmap(
+            bitmap = Bitmap.createBitmap(300, 520, Bitmap.Config.ARGB_8888),
+            template = template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap.recycle()
+        renderPhotoWatermarkBitmap(
+            bitmap = Bitmap.createBitmap(420, 320, Bitmap.Config.ARGB_8888),
+            template = template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap.recycle()
+        renderPhotoWatermarkBitmap(
+            bitmap = Bitmap.createBitmap(620, 240, Bitmap.Config.ARGB_8888),
+            template = template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap.recycle()
+
+        assertEquals(
+            listOf(
+                WatermarkSceneVariant.PORTRAIT,
+                WatermarkSceneVariant.SQUARE,
+                WatermarkSceneVariant.LANDSCAPE
+            ),
+            provider.requests.map(StaticWatermarkFrameAsset::variant)
+        )
+        assertTrue(provider.requests.all { it.packageId == "blue-hour" })
+    }
+
+    @Test
     fun `blue hour default title uses blue-hour identity and common params`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "blue-hour",
@@ -538,29 +723,115 @@ class PhotoWatermarkPostProcessorTest {
             preservedExif = emptyMap()
         )
 
-        assertEquals("蓝调时刻", resolved.title)
+        assertEquals("BLUE HOUR", resolved.title)
         assertEquals(listOf("2026.06.22 19:41 • CITY NIGHT", "24mm"), resolved.supportingLines)
         assertEquals(WatermarkFrameBackground.DARK, resolved.frameBackground)
     }
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `van gogh starry material overlay frames all sides without covering the photo center`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).vanGoghStarryFrameAssetProvider
+        val sourceColor = Color.rgb(32, 72, 118)
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(sourceColor)
+        }
+
+        val bmp = renderPhotoWatermarkBitmap(
+            source,
+            starryMoonTemplate(),
+            provider
+        ).bitmap
+        val center = bmp.getPixel(bmp.width / 2, (bmp.height * 0.44f).toInt())
+        val topInk = countWarmMemoryInkInRect(
+            bitmap = bmp,
+            left = 0,
+            top = 0,
+            right = bmp.width,
+            bottom = (bmp.height * 0.14f).toInt()
+        )
+        val leftInk = countWarmMemoryInkInRect(
+            bitmap = bmp,
+            left = 0,
+            top = (bmp.height * 0.12f).toInt(),
+            right = (bmp.width * 0.16f).toInt(),
+            bottom = (bmp.height * 0.82f).toInt()
+        )
+        val rightInk = countWarmMemoryInkInRect(
+            bitmap = bmp,
+            left = (bmp.width * 0.84f).toInt(),
+            top = (bmp.height * 0.12f).toInt(),
+            right = bmp.width,
+            bottom = (bmp.height * 0.82f).toInt()
+        )
+        val bottomInk = countWarmMemoryInkInRect(
+            bitmap = bmp,
+            left = 0,
+            top = (bmp.height * 0.76f).toInt(),
+            right = bmp.width,
+            bottom = bmp.height
+        )
+
+        assertTrue(colorDistance(center, sourceColor) < 12.0, "photo center should remain unobscured, pixel=$center")
+        assertTrue(topInk > 180, "scheme 3 starry asset should paint a warm top frame, count=$topInk")
+        assertTrue(leftInk > 24, "scheme 3 starry asset should paint a discontinuous left frame, count=$leftInk")
+        assertTrue(rightInk > 24, "scheme 3 starry asset should paint a discontinuous right frame, count=$rightInk")
+        assertTrue(bottomInk > 420, "scheme 3 starry asset should paint the lower flowing band, count=$bottomInk")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `scheme three static overlay paints into photo edge while preserving photo center`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
+        val sourceColor = Color.rgb(94, 96, 92)
+        val source = Bitmap.createBitmap(420, 620, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(sourceColor)
+        }
+        val template = starryMoonTemplate()
+
+        val bmp = renderPhotoWatermarkBitmap(
+            source,
+            template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap
+        val sourceTop = findFirstSourceLikeRow(bmp, sourceColor)
+        val center = bmp.getPixel(bmp.width / 2, sourceTop + source.height / 2)
+        val paintedTopEdge = countPixelsFarFromColor(
+            bitmap = bmp,
+            reference = sourceColor,
+            left = (bmp.width * 0.08f).toInt(),
+            top = sourceTop,
+            right = (bmp.width * 0.92f).toInt(),
+            bottom = sourceTop + (source.height * 0.08f).toInt()
+        )
+
+        assertTrue(colorDistance(center, sourceColor) < 12, "photo center should remain unobscured")
+        assertTrue(
+            paintedTopEdge > 180,
+            "scheme 3 material should overlay painted strokes into the photo edge, count=$paintedTopEdge"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun `van gogh starry renders starry frame and avoids a large bottom title`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
         val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.rgb(16, 42, 86))
         }
-        val template = ResolvedPhotoWatermarkTemplate(
-            templateId = "van-gogh-starry",
-            title = "Night Street",
-            supportingLines = listOf("2026.06.22 19:41", "CITY NIGHT • 24mm"),
-            frameBackground = WatermarkFrameBackground.DARK,
-            usesExpandedFrame = true,
-            placement = WatermarkTextPlacement.BOTTOM_CENTER,
-            textScale = 1f,
-            textOpacity = 1f
-        )
+        val template = starryMoonTemplate(title = "Night Street")
 
-        val bmp = renderPhotoWatermarkBitmap(source, template).bitmap
+        val bmp = renderPhotoWatermarkBitmap(
+            source,
+            template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap
         val starryPixels = countWarmMemoryInk(
             bitmap = bmp,
             top = 0,
@@ -586,7 +857,35 @@ class PhotoWatermarkPostProcessorTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun `van gogh starry complex overlay adds dense edge texture outside the photo`() {
+    fun `van gogh starry without material assets records explicit missing asset warning`() {
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(16, 42, 86))
+        }
+        val template = starryMoonTemplate()
+
+        val result = renderPhotoWatermarkBitmap(
+            bitmap = source,
+            template = template,
+            vanGoghStarryFrameAssetProvider = object : VanGoghStarryFrameAssetProvider {
+                override fun load(variant: VanGoghStarryFrameAssetVariant): Bitmap? = null
+            }
+        )
+        val bmp = result.bitmap
+
+        assertTrue(
+            result.warning?.contains("static-asset-missing:van-gogh-starry") == true,
+            "missing material asset should be explicit, warning=${result.warning}"
+        )
+        assertTrue(bmp.width > source.width, "fallback should still reserve side borders")
+        assertTrue(bmp.height > source.height, "fallback should still reserve a bottom band")
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `van gogh starry static asset package adds dense edge texture outside the photo`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
         val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.rgb(16, 42, 86))
         }
@@ -601,7 +900,11 @@ class PhotoWatermarkPostProcessorTest {
             textOpacity = 1f
         )
 
-        val bmp = renderPhotoWatermarkBitmap(source, template).bitmap
+        val bmp = renderPhotoWatermarkBitmap(
+            source,
+            template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap
         val topTexture = countPixelsDifferentFromReference(
             bitmap = bmp,
             left = 0,
@@ -625,12 +928,15 @@ class PhotoWatermarkPostProcessorTest {
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun `blue hour renders localized title band and lower right warm icon`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
+        val sourceColor = Color.rgb(18, 54, 102)
         val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
-            eraseColor(Color.rgb(18, 54, 102))
+            eraseColor(sourceColor)
         }
         val template = ResolvedPhotoWatermarkTemplate(
             templateId = "blue-hour",
-            title = "蓝调时刻",
+            title = "BLUE HOUR",
             supportingLines = listOf("2026.06.22 19:41 • CITY NIGHT", "24mm"),
             frameBackground = WatermarkFrameBackground.DARK,
             usesExpandedFrame = true,
@@ -639,7 +945,11 @@ class PhotoWatermarkPostProcessorTest {
             textOpacity = 1f
         )
 
-        val bmp = renderPhotoWatermarkBitmap(source, template).bitmap
+        val bmp = renderPhotoWatermarkBitmap(
+            source,
+            template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap
         val titleInk = countCoolLightInk(
             bitmap = bmp,
             left = 0,
@@ -647,28 +957,42 @@ class PhotoWatermarkPostProcessorTest {
             right = (bmp.width * 0.62f).toInt(),
             bottom = bmp.height - 18
         )
-        val warmIconInk = countWarmMemoryInk(
+        val sourceTop = findFirstSourceLikeRow(bmp, sourceColor)
+        val bottomBandRatio = (bmp.height - sourceTop - source.height).toFloat() / bmp.height
+        val paintedTopEdge = countPixelsFarFromColor(
             bitmap = bmp,
-            top = source.height + 18,
-            bottom = bmp.height
+            reference = sourceColor,
+            left = (bmp.width * 0.08f).toInt(),
+            top = sourceTop,
+            right = (bmp.width * 0.92f).toInt(),
+            bottom = sourceTop + (source.height * 0.08f).toInt()
         )
 
         assertTrue(bmp.width > source.width, "blue-hour should add side borders")
         assertTrue(bmp.height > source.height, "blue-hour should add a bottom band")
+        assertTrue(
+            bottomBandRatio <= 0.19f,
+            "blue-hour should keep the photo dominant with a compact information band, ratio=$bottomBandRatio"
+        )
         assertTrue(titleInk > 90, "blue-hour should draw a pale localized title, count=$titleInk")
-        assertTrue(warmIconInk > 18, "blue-hour should draw a warm lower-right icon, count=$warmIconInk")
+        assertTrue(
+            paintedTopEdge > 60,
+            "blue-hour scheme 3 asset should overlay cool painted strokes into the photo edge, count=$paintedTopEdge"
+        )
         bmp.recycle(); source.recycle()
     }
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun `blue hour complex overlay keeps visible cool border texture separate from title text`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
         val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.rgb(18, 54, 102))
         }
         val template = ResolvedPhotoWatermarkTemplate(
             templateId = "blue-hour",
-            title = "蓝调时刻",
+            title = "BLUE HOUR",
             supportingLines = listOf("2026.06.22 19:41 • CITY NIGHT", "24mm"),
             frameBackground = WatermarkFrameBackground.DARK,
             usesExpandedFrame = true,
@@ -677,13 +1001,20 @@ class PhotoWatermarkPostProcessorTest {
             textOpacity = 1f
         )
 
-        val bmp = renderPhotoWatermarkBitmap(source, template).bitmap
-        val topTexture = countPixelsDifferentFromReference(
+        val bmp = renderPhotoWatermarkBitmap(
+            source,
+            template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap
+        val sourceColor = Color.rgb(18, 54, 102)
+        val sourceTop = findFirstSourceLikeRow(bmp, sourceColor)
+        val topTexture = countPixelsFarFromColor(
             bitmap = bmp,
-            left = 0,
-            top = 0,
-            right = bmp.width,
-            bottom = 14
+            reference = sourceColor,
+            left = (bmp.width * 0.08f).toInt(),
+            top = sourceTop,
+            right = (bmp.width * 0.92f).toInt(),
+            bottom = sourceTop + (source.height * 0.08f).toInt()
         )
         val lowerRightTexture = countPixelsDifferentFromReference(
             bitmap = bmp,
@@ -693,9 +1024,143 @@ class PhotoWatermarkPostProcessorTest {
             bottom = bmp.height
         )
 
-        assertTrue(topTexture > 260, "blue-hour overlay should richly texture the top border, count=$topTexture")
-        assertTrue(lowerRightTexture > 220, "blue-hour overlay should decorate the lower-right band, count=$lowerRightTexture")
+        assertTrue(topTexture > 60, "blue-hour scheme 3 overlay should paint into the photo edge, count=$topTexture")
+        assertTrue(lowerRightTexture > 180, "blue-hour overlay should decorate the lower band, count=$lowerRightTexture")
         bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `blue hour complex overlay does not expose neutral black frame gaps`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(20, 64, 118))
+        }
+        val template = ResolvedPhotoWatermarkTemplate(
+            templateId = "blue-hour",
+            title = "BLUE HOUR",
+            supportingLines = listOf("2026-06-25 16:28 • 12MP • 4:3 • Flash Off"),
+            frameBackground = WatermarkFrameBackground.DARK,
+            usesExpandedFrame = true,
+            placement = WatermarkTextPlacement.BOTTOM_LEFT,
+            textScale = 1f,
+            textOpacity = 1f
+        )
+
+        val bmp = renderPhotoWatermarkBitmap(
+            source,
+            template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap
+        val blackGapRatio = countNeutralBlackPixels(
+            bitmap = bmp,
+            left = 0,
+            top = 0,
+            right = bmp.width,
+            bottom = bmp.height
+        ).toFloat() / bmp.width / bmp.height
+
+        assertTrue(bmp.height > source.height, "blue-hour should preserve an expanded frame around the photo")
+        assertTrue(
+            blackGapRatio < 0.03f,
+            "blue-hour frame should use a cool fused wash instead of exposed neutral black gaps, ratio=$blackGapRatio"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `van gogh starry metadata rests on textured blue art instead of a hard black block`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(34, 62, 94))
+        }
+        val template = ResolvedPhotoWatermarkTemplate(
+            templateId = "van-gogh-starry",
+            title = "Ignored",
+            supportingLines = listOf("2026-06-25 16:29 • 12MP • 4:3 • Flash Off"),
+            frameBackground = WatermarkFrameBackground.DARK,
+            usesExpandedFrame = true,
+            placement = WatermarkTextPlacement.BOTTOM_CENTER,
+            textScale = 1f,
+            textOpacity = 1f
+        )
+
+        val bmp = renderPhotoWatermarkBitmap(
+            source,
+            template,
+            staticWatermarkAssetProvider = provider
+        ).bitmap
+        val metadataBandTop = source.height + findFirstSourceLikeRow(bmp, Color.rgb(34, 62, 94))
+        val neutralBlackInTextBand = countNeutralBlackPixels(
+            bitmap = bmp,
+            left = (bmp.width * 0.18f).toInt(),
+            top = metadataBandTop,
+            right = (bmp.width * 0.82f).toInt(),
+            bottom = bmp.height
+        )
+        val textBandArea = ((bmp.width * 0.64f).toInt() * (bmp.height - metadataBandTop).coerceAtLeast(1))
+        val blackBlockRatio = neutralBlackInTextBand.toFloat() / textBandArea
+
+        assertTrue(
+            blackBlockRatio < 0.10f,
+            "starry metadata band should stay blue/textured, not a hard neutral black block, ratio=$blackBlockRatio"
+        )
+        bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `scheme three omits the precise continuous inner photo frame inside the outer art`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
+        val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(28, 72, 118))
+        }
+
+        listOf(
+            ResolvedPhotoWatermarkTemplate(
+                templateId = "blue-hour",
+                title = "BLUE HOUR",
+                supportingLines = listOf("2026-06-25 16:28 • 12MP • 4:3 • Flash Off"),
+                frameBackground = WatermarkFrameBackground.DARK,
+                usesExpandedFrame = true,
+                placement = WatermarkTextPlacement.BOTTOM_LEFT,
+                textScale = 1f,
+                textOpacity = 1f
+            ),
+            ResolvedPhotoWatermarkTemplate(
+                templateId = "van-gogh-starry",
+                title = "Ignored",
+                supportingLines = listOf("2026-06-25 16:29 • 12MP • 4:3 • Flash Off"),
+                frameBackground = WatermarkFrameBackground.DARK,
+                usesExpandedFrame = true,
+                placement = WatermarkTextPlacement.BOTTOM_CENTER,
+                textScale = 1f,
+                textOpacity = 1f
+            )
+        ).forEach { template ->
+            val bmp = renderPhotoWatermarkBitmap(
+                source.copy(Bitmap.Config.ARGB_8888, false),
+                template,
+                staticWatermarkAssetProvider = provider
+            ).bitmap
+            val frameCoverage = preciseInnerFrameCoverage(
+                bitmap = bmp,
+                sourceWidth = source.width,
+                sourceHeight = source.height,
+                templateId = template.templateId
+            )
+
+            assertTrue(
+                frameCoverage < 0.16f,
+                "${template.templateId} should not render a continuous precise inner photo frame, coverage=$frameCoverage"
+            )
+            bmp.recycle()
+        }
+        source.recycle()
     }
 
     @Test
@@ -1088,6 +1553,39 @@ class PhotoWatermarkPostProcessorTest {
         textOpacity = 1f
     )
 
+    private fun starryMoonTemplate(
+        title: String = "Ignored"
+    ) = ResolvedPhotoWatermarkTemplate(
+        templateId = "van-gogh-starry",
+        title = title,
+        supportingLines = listOf("2026.06.22 19:41", "CITY NIGHT", "24mm"),
+        frameBackground = WatermarkFrameBackground.DARK,
+        usesExpandedFrame = true,
+        placement = WatermarkTextPlacement.BOTTOM_CENTER,
+        textScale = 1f,
+        textOpacity = 1f
+    )
+
+    private class RecordingVanGoghStarryAssetProvider : VanGoghStarryFrameAssetProvider {
+        val requests = mutableListOf<VanGoghStarryFrameAssetVariant>()
+
+        override fun load(variant: VanGoghStarryFrameAssetVariant): Bitmap {
+            requests += variant
+            return Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        }
+    }
+
+    private class RecordingStaticWatermarkAssetProvider : StaticWatermarkAssetProvider {
+        val requests = mutableListOf<StaticWatermarkFrameAsset>()
+
+        override fun load(asset: StaticWatermarkFrameAsset): Bitmap {
+            requests += asset
+            return Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(Color.argb(220, 152, 206, 250))
+            }
+        }
+    }
+
     private fun horizontalLumaStdDev(
         bitmap: Bitmap,
         y: Int,
@@ -1106,6 +1604,16 @@ class PhotoWatermarkPostProcessorTest {
         return kotlin.math.abs(Color.red(first) - Color.red(second)) +
             kotlin.math.abs(Color.green(first) - Color.green(second)) +
             kotlin.math.abs(Color.blue(first) - Color.blue(second))
+    }
+
+    private fun findFirstSourceLikeRow(bitmap: Bitmap, sourceColor: Int): Int {
+        val x = bitmap.width / 2
+        for (y in 0 until bitmap.height) {
+            if (colorDistance(bitmap.getPixel(x, y), sourceColor) < 8) {
+                return y
+            }
+        }
+        return 0
     }
 
     // ── Structured failure mapping ──────────────────────────────────────────
@@ -1382,6 +1890,164 @@ class PhotoWatermarkPostProcessorTest {
         return count
     }
 
+    private fun countPixelsFarFromColor(
+        bitmap: Bitmap,
+        reference: Int,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int
+    ): Int {
+        var count = 0
+        for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(bitmap.height)) {
+            for (x in left.coerceAtLeast(0) until right.coerceAtMost(bitmap.width)) {
+                val pixel = bitmap.getPixel(x, y)
+                val distance =
+                    kotlin.math.abs(Color.red(pixel) - Color.red(reference)) +
+                        kotlin.math.abs(Color.green(pixel) - Color.green(reference)) +
+                        kotlin.math.abs(Color.blue(pixel) - Color.blue(reference))
+                if (distance > 18) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
+    private fun countNeutralBlackPixels(
+        bitmap: Bitmap,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int
+    ): Int {
+        var count = 0
+        for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(bitmap.height)) {
+            for (x in left.coerceAtLeast(0) until right.coerceAtMost(bitmap.width)) {
+                val pixel = bitmap.getPixel(x, y)
+                val red = Color.red(pixel)
+                val green = Color.green(pixel)
+                val blue = Color.blue(pixel)
+                if (red <= 34 && green <= 34 && blue <= 36 && blue <= red + 10) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
+    private fun preciseInnerFrameCoverage(
+        bitmap: Bitmap,
+        sourceWidth: Int,
+        sourceHeight: Int,
+        templateId: String
+    ): Float {
+        val left = 18
+        val top = maxOf(18, (sourceHeight * 0.083f).toInt())
+        val right = left + sourceWidth
+        val bottom = top + sourceHeight
+        val samples = mutableListOf<Boolean>()
+        for (x in left until right) {
+            samples += hasPreciseInnerFrameInk(bitmap, x, top - 2, x + 1, top + 3, templateId)
+            samples += hasPreciseInnerFrameInk(bitmap, x, bottom - 3, x + 1, bottom + 2, templateId)
+        }
+        for (y in top until bottom) {
+            samples += hasPreciseInnerFrameInk(bitmap, left - 2, y, left + 3, y + 1, templateId)
+            samples += hasPreciseInnerFrameInk(bitmap, right - 3, y, right + 2, y + 1, templateId)
+        }
+        return samples.count { it }.toFloat() / samples.size
+    }
+
+    private fun hasPreciseInnerFrameInk(
+        bitmap: Bitmap,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+        templateId: String
+    ): Boolean {
+        for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(bitmap.height)) {
+            for (x in left.coerceAtLeast(0) until right.coerceAtMost(bitmap.width)) {
+                val pixel = bitmap.getPixel(x, y)
+                val red = Color.red(pixel)
+                val green = Color.green(pixel)
+                val blue = Color.blue(pixel)
+                val matches = if (templateId == "van-gogh-starry") {
+                    red > 145 && green > 110 && blue < 125
+                } else {
+                    red > 110 && green > 145 && blue > 178 && blue >= red + 18
+                }
+                if (matches) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun countTextSafeAssetInk(bitmap: Bitmap, packageId: String): Int {
+        val bounds = if (packageId == "blue-hour") {
+            listOf(
+                (bitmap.width * 0.035f).toInt(),
+                (bitmap.height * 0.878f).toInt(),
+                (bitmap.width * 0.62f).toInt(),
+                (bitmap.height * 0.982f).toInt()
+            )
+        } else {
+            listOf(
+                (bitmap.width * 0.20f).toInt(),
+                (bitmap.height * 0.918f).toInt(),
+                (bitmap.width * 0.80f).toInt(),
+                (bitmap.height * 0.965f).toInt()
+            )
+        }
+        return countNonTransparentPixels(
+            bitmap = bitmap,
+            left = bounds[0],
+            top = bounds[1],
+            right = bounds[2],
+            bottom = bounds[3],
+            minAlpha = 20
+        )
+    }
+
+    private fun countChromaKeyResidue(bitmap: Bitmap): Int {
+        var count = 0
+        for (y in 0 until bitmap.height) {
+            for (x in 0 until bitmap.width) {
+                val pixel = bitmap.getPixel(x, y)
+                if (
+                    Color.alpha(pixel) > 20 &&
+                    Color.green(pixel) > 170 &&
+                    Color.green(pixel) > Color.red(pixel) + 45 &&
+                    Color.green(pixel) > Color.blue(pixel) + 45
+                ) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
+    private fun countNonTransparentPixels(
+        bitmap: Bitmap,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+        minAlpha: Int = 40
+    ): Int {
+        var count = 0
+        for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(bitmap.height)) {
+            for (x in left.coerceAtLeast(0) until right.coerceAtMost(bitmap.width)) {
+                if (Color.alpha(bitmap.getPixel(x, y)) > minAlpha) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
     private fun countNightStreetNeonPixels(
         bitmap: Bitmap,
         top: Int,
@@ -1423,6 +2089,56 @@ class PhotoWatermarkPostProcessorTest {
             }
         }
         return count
+    }
+
+    private fun countWarmMemoryInkInRect(
+        bitmap: Bitmap,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int
+    ): Int {
+        var count = 0
+        for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(bitmap.height)) {
+            for (x in left.coerceAtLeast(0) until right.coerceAtMost(bitmap.width)) {
+                val pixel = bitmap.getPixel(x, y)
+                if (
+                    Color.alpha(pixel) > 60 &&
+                    Color.red(pixel) > Color.blue(pixel) + 30 &&
+                    Color.green(pixel) > Color.blue(pixel) + 8 &&
+                    Color.red(pixel) > 150
+                ) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
+    private fun maxWarmMemoryInkColumnInRect(
+        bitmap: Bitmap,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int
+    ): Int {
+        var maxColumn = 0
+        for (x in left.coerceAtLeast(0) until right.coerceAtMost(bitmap.width)) {
+            var count = 0
+            for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(bitmap.height)) {
+                val pixel = bitmap.getPixel(x, y)
+                if (
+                    Color.alpha(pixel) > 60 &&
+                    Color.red(pixel) > Color.blue(pixel) + 30 &&
+                    Color.green(pixel) > Color.blue(pixel) + 8 &&
+                    Color.red(pixel) > 150
+                ) {
+                    count += 1
+                }
+            }
+            maxColumn = maxOf(maxColumn, count)
+        }
+        return maxColumn
     }
 
     private fun countVeryLightPixels(

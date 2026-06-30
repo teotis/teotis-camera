@@ -1426,6 +1426,7 @@ class DefaultCameraSessionTest {
                     persisted = PersistedSettings(
                         photo = PhotoSettings(
                             defaultFilterProfileId = "photo-rich",
+                            photoWatermarkEnabledByDefault = true,
                             defaultWatermarkTemplateId = "travel-polaroid"
                         )
                     )
@@ -1641,7 +1642,7 @@ class DefaultCameraSessionTest {
         assertEquals(FlashMode.AUTO, shot.captureProfile.flashMode)
         assertEquals("auto", shot.saveRequest.metadata.customTags["flash"])
         assertEquals("photo-original", shot.saveRequest.metadata.customTags["filterProfile"])
-        assertEquals("PHOTO", shot.postProcessSpec.watermarkText)
+        assertEquals(null, shot.postProcessSpec.watermarkText)
         assertEquals("photo-original", shot.postProcessSpec.algorithmProfile)
         assertEquals("Photo capture requested", session.state.value.lastAction)
         assertEquals("Still capture requested", session.state.value.modeSnapshot.state.headline)
@@ -1658,6 +1659,7 @@ class DefaultCameraSessionTest {
                 persisted = PersistedSettings(
                     photo = PhotoSettings(
                         defaultFilterProfileId = "photo-rich",
+                        photoWatermarkEnabledByDefault = true,
                         defaultWatermarkTemplateId = "retro-frame",
                         livePhotoEnabledByDefault = true
                     )
@@ -1866,6 +1868,7 @@ class DefaultCameraSessionTest {
             settingsSnapshot = SessionSettingsSnapshot(
                 persisted = PersistedSettings(
                     photo = PhotoSettings(
+                        photoWatermarkEnabledByDefault = true,
                         defaultWatermarkTemplateId = "travel-polaroid",
                         travelPolaroidWatermarkStyle = WatermarkStyleSettings(
                             textPlacement = WatermarkTextPlacement.TOP_RIGHT,
@@ -1949,7 +1952,7 @@ class DefaultCameraSessionTest {
         val shot = assertNotNull(session.state.value.activeShot)
         assertEquals(FlashMode.OFF, shot.captureProfile.flashMode)
         assertEquals("off", shot.saveRequest.metadata.customTags["flash"])
-        assertEquals("PHOTO", shot.postProcessSpec.watermarkText)
+        assertEquals(null, shot.postProcessSpec.watermarkText)
     }
 
     @Test
@@ -3424,6 +3427,42 @@ class DefaultCameraSessionTest {
         assertEquals(0.4f, meteringEffect.request.point.normalizedY)
         assertEquals(PreviewMeteringFeedbackStatus.REQUESTED, session.state.value.presentation.previewMeteringFeedback?.status)
         assertTrue(trace.snapshot().any { it.name == "preview.metering.requested" })
+
+        effectCollector.cancel()
+    }
+
+    @Test
+    fun `humanistic mode EV draft change dispatches ApplyPreviewBrightness effect`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.SwitchMode(ModeId.HUMANISTIC))
+        advanceUntilIdle()
+        effects.clear()
+
+        val baseSnapshot = session.state.value.settings
+        val newSnapshot = baseSnapshot.copy(
+            catalog = baseSnapshot.catalog.copy(
+                manualCaptureDraft = baseSnapshot.catalog.manualCaptureDraft.copy(
+                    exposureCompensationSteps = 2
+                )
+            )
+        )
+        session.dispatch(SessionIntent.SettingsUpdated(newSnapshot))
+        advanceUntilIdle()
+
+        val brightnessEffect = effects.filterIsInstance<SessionEffect.ApplyPreviewBrightness>().single()
+        assertEquals(2, brightnessEffect.request.exposureCompensationSteps)
 
         effectCollector.cancel()
     }
@@ -5666,6 +5705,257 @@ class DefaultCameraSessionTest {
         assertNull(session.state.value.activeShot)
     }
 
+    // ── Per-shot-kind readiness/sound boundary tests ────────────────────
+
+    @Test
+    fun `DataReceived sets readiness for live photo capture`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        val livePhotoShot = ShotRequest(
+            shotId = "shot-live-readiness",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile(),
+            livePhotoSpec = LivePhotoCaptureSpec()
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(livePhotoShot))
+        runCurrent()
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        session.dispatch(SessionIntent.DataReceived(livePhotoShot.shotId, MediaType.PHOTO))
+        runCurrent()
+
+        val readiness = assertNotNull(session.state.value.presentation.captureReadiness)
+        assertEquals(livePhotoShot.shotId, readiness.shotId)
+        assertEquals(MediaType.PHOTO, readiness.mediaType)
+        assertEquals("DeviceEvent.DataReceived", readiness.source)
+        assertNull(
+            session.state.value.activeShot,
+            "Live photo should re-arm at DataReceived after still + motion segment are secured"
+        )
+    }
+
+    @Test
+    fun `DataReceived does not set readiness for multi-frame capture`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        val multiFrameShot = ShotRequest(
+            shotId = "shot-mf-readiness",
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = PostProcessSpec(
+                algorithmProfile = "night-multiframe-tripod"
+            ),
+            captureProfile = CaptureProfile(frameCount = 12)
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(multiFrameShot))
+        runCurrent()
+        assertNull(session.state.value.presentation.captureReadiness)
+
+        session.dispatch(SessionIntent.DataReceived(multiFrameShot.shotId, MediaType.PHOTO))
+        runCurrent()
+
+        assertNull(
+            session.state.value.presentation.captureReadiness,
+            "Multi-frame capture must NOT set readiness (truthful no-sound)"
+        )
+        assertNotNull(
+            session.state.value.activeShot,
+            "Multi-frame keeps activeShot until ShotCompleted (conservative)"
+        )
+        assertEquals(CaptureStatus.DATA_RECEIVED, session.state.value.captureStatus)
+    }
+
+    @Test
+    fun `readiness set trace emitted for ordinary still at CaptureCommitted boundary`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+
+        val readinessTrace = trace.snapshot().firstOrNull {
+            it.name == "capture.readiness.set" && it.detail.contains("boundary=capture-committed")
+        }
+        assertNotNull(readinessTrace, "readiness.set trace must be emitted at CaptureCommitted boundary")
+        assertTrue(readinessTrace.detail.contains("shotKind=STILL_CAPTURE"))
+    }
+
+    @Test
+    fun `readiness set trace emitted for live photo at DataReceived boundary`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        val livePhotoShot = ShotRequest(
+            shotId = "shot-live-trace",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile(),
+            livePhotoSpec = LivePhotoCaptureSpec()
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(livePhotoShot))
+        runCurrent()
+
+        session.dispatch(SessionIntent.DataReceived(livePhotoShot.shotId, MediaType.PHOTO))
+        runCurrent()
+
+        val readinessTrace = trace.snapshot().firstOrNull {
+            it.name == "capture.readiness.set" && it.detail.contains("boundary=data-received")
+        }
+        assertNotNull(readinessTrace, "readiness.set trace must be emitted at DataReceived for live photo")
+        assertTrue(readinessTrace.detail.contains("shotKind=LIVE_PHOTO"))
+    }
+
+    @Test
+    fun `readiness suppressed trace emitted for multi-frame at DataReceived boundary`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        val multiFrameShot = ShotRequest(
+            shotId = "shot-mf-trace",
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = PostProcessSpec(
+                algorithmProfile = "night-multiframe-tripod"
+            ),
+            captureProfile = CaptureProfile(frameCount = 12)
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(multiFrameShot))
+        runCurrent()
+
+        session.dispatch(SessionIntent.DataReceived(multiFrameShot.shotId, MediaType.PHOTO))
+        runCurrent()
+
+        val suppressedTrace = trace.snapshot().firstOrNull {
+            it.name == "capture.readiness.suppressed" && it.detail.contains("boundary=data-received")
+        }
+        assertNotNull(
+            suppressedTrace,
+            "readiness.suppressed trace must be emitted for multi-frame at DataReceived"
+        )
+        assertTrue(suppressedTrace.detail.contains("shotKind=MULTI_FRAME_CAPTURE"))
+    }
+
+    @Test
+    fun `readiness set trace not re-emitted at DataReceived for ordinary still`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        session.dispatch(SessionIntent.ShutterPressed)
+        runCurrent()
+        val shot = assertNotNull(session.state.value.activeShot)
+        session.dispatch(SessionIntent.ShotStarted(shot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = shot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 450L
+            )
+        )
+        runCurrent()
+
+        session.dispatch(SessionIntent.DataReceived(shot.shotId, MediaType.PHOTO))
+        runCurrent()
+
+        val setDataTraces = trace.snapshot().filter {
+            it.name == "capture.readiness.set" && it.detail.contains("boundary=data-received")
+        }
+        assertTrue(
+            setDataTraces.isEmpty(),
+            "readiness.set trace must NOT be re-emitted at DataReceived for ordinary still (already set at CaptureCommitted)"
+        )
+    }
+
+    @Test
+    fun `readiness suppressed trace emitted for live photo at CaptureCommitted boundary`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+
+        val livePhotoShot = ShotRequest(
+            shotId = "shot-live-suppressed",
+            shotKind = ShotKind.LIVE_PHOTO,
+            mediaType = MediaType.PHOTO,
+            saveRequest = SaveRequest.photoLibrary(),
+            thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
+            postProcessSpec = PostProcessSpec(),
+            captureProfile = CaptureProfile(),
+            livePhotoSpec = LivePhotoCaptureSpec()
+        )
+
+        session.dispatch(SessionIntent.ShotStarted(livePhotoShot))
+        runCurrent()
+
+        session.dispatch(
+            SessionIntent.CaptureCommitted(
+                shotId = livePhotoShot.shotId,
+                mediaType = MediaType.PHOTO,
+                source = "camera2:onCaptureCompleted",
+                elapsedTimestampMs = 600L
+            )
+        )
+        runCurrent()
+
+        val suppressedTrace = trace.snapshot().firstOrNull {
+            it.name == "capture.readiness.suppressed" && it.detail.contains("boundary=capture-committed")
+        }
+        assertNotNull(
+            suppressedTrace,
+            "readiness.suppressed trace must be emitted for live photo at CaptureCommitted"
+        )
+        assertTrue(suppressedTrace.detail.contains("shotKind=LIVE_PHOTO"))
+    }
+
     // ── CheckIn mode session-level metadata assertions ──────────────────────
 
     @Test
@@ -5713,10 +6003,15 @@ class DefaultCameraSessionTest {
         assertEquals("check-in", shot.saveRequest.metadata.customTags["mode"])
         assertEquals("clarity", shot.saveRequest.metadata.customTags["checkInScenario"])
         assertEquals("clarity-assist", shot.saveRequest.metadata.customTags["compatMode"])
-        assertEquals("checkin-clarity-best-frame-v1", shot.postProcessSpec.algorithmProfile)
+        assertEquals("focus-stack-auto-near-far", shot.saveRequest.metadata.customTags["degradation-policy"])
+        assertEquals("automatic", shot.saveRequest.metadata.customTags["focusStackGuidance"])
+        assertEquals("near,far", shot.saveRequest.metadata.customTags["focusStackRoles"])
+        assertEquals("checkin-clarity-focus-stack-v1", shot.postProcessSpec.algorithmProfile)
         assertEquals("Check-in Clarity", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
         assertEquals("Clarity Assist", shot.postProcessSpec.exifOverrides["CompatSceneCaptureType"])
-        assertEquals(3, shot.captureProfile.frameCount)
+        assertEquals(2, shot.captureProfile.frameCount)
+        assertEquals("focus-stack:auto-near-far-v1", shot.captureProfile.focusStackSpec?.algorithmProfile)
+        assertEquals(false, shot.captureProfile.focusStackSpec?.userGuidanceRequired)
     }
 
     @Test
@@ -5751,7 +6046,7 @@ class DefaultCameraSessionTest {
         assertEquals("single-frame", shot.saveRequest.metadata.customTags["captureStrategyFallback"])
         assertEquals("multi-frame-unsupported", shot.saveRequest.metadata.customTags["degradationReason"])
         assertEquals("single-frame-best-frame", shot.saveRequest.metadata.customTags["degradation-policy"])
-        assertEquals("checkin-clarity-best-frame-v1", shot.postProcessSpec.algorithmProfile)
+        assertEquals("checkin-clarity-focus-stack-v1", shot.postProcessSpec.algorithmProfile)
         assertEquals(1, shot.captureProfile.frameCount)
     }
 
@@ -5804,6 +6099,7 @@ class DefaultCameraSessionTest {
             settingsSnapshot = SessionSettingsSnapshot(
                 persisted = PersistedSettings(
                     photo = PhotoSettings(
+                        photoWatermarkEnabledByDefault = true,
                         defaultWatermarkTemplateId = "classic-overlay"
                     )
                 )

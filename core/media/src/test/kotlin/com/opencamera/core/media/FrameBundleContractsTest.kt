@@ -137,8 +137,42 @@ class FrameBundleContractsTest {
         )
         assertEquals(0, frame.frameIndex)
         assertEquals(FrameRole.FUSION_SUPPLEMENT, frame.frameRole)
+        assertEquals(FocusStackFrameRole.NONE, frame.focusStackRole)
         assertEquals("image/jpeg", frame.outputFormat)
         assertFalse(frame.isDegraded)
+    }
+
+    @Test
+    fun `FrameBundleFrame stores focus stack role and focus distance`() {
+        val frame = FrameBundleFrame(
+            frameIndex = 1,
+            pixelReference = PixelReference.File("/tmp/near.jpg"),
+            focusStackRole = FocusStackFrameRole.NEAR,
+            focusDistanceDiopters = 3.25f
+        )
+
+        assertEquals(FocusStackFrameRole.NEAR, frame.focusStackRole)
+        assertEquals(3.25f, frame.focusDistanceDiopters)
+    }
+
+    @Test
+    fun `guided near far focus stack spec requires near and far roles`() {
+        val spec = FocusStackCaptureSpec.guidedNearFar()
+
+        assertEquals(FocusStackCaptureMode.GUIDED_NEAR_FAR, spec.mode)
+        assertEquals(listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR), spec.requiredFrameRoles)
+        assertEquals("focus-stack:guided-near-far-v1", spec.algorithmProfile)
+        assertTrue(spec.userGuidanceRequired)
+    }
+
+    @Test
+    fun `automatic near far focus stack spec does not require hidden user guidance`() {
+        val spec = FocusStackCaptureSpec.automaticNearFar()
+
+        assertEquals(FocusStackCaptureMode.AUTO_NEAR_FAR, spec.mode)
+        assertEquals(listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR), spec.requiredFrameRoles)
+        assertEquals("focus-stack:auto-near-far-v1", spec.algorithmProfile)
+        assertFalse(spec.userGuidanceRequired)
     }
 
     @Test

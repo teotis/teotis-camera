@@ -3,6 +3,7 @@ package com.opencamera.feature.video
 import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.LensFacing
+import com.opencamera.core.device.ResolvedVideoSpec
 import com.opencamera.core.device.nextQuickVideoSpec
 import com.opencamera.core.device.quickLabel
 import com.opencamera.core.device.resolveVideoSpec
@@ -169,13 +170,20 @@ private class VideoModeController(
             stopRecording()
         } else {
             context.eventSink("video.recording.start.requested.torch-${torchTag()}")
-            val resolvedVideoSpec = resolvedVideoSpec()
+            val resolvedInfo = resolvedVideoSpecInfo()
+            val resolvedVideoSpec = resolvedInfo.applied
             val activeGraph = currentDeviceGraph()
             val effectSpec = buildEffectSpec()
             mutableSnapshot.value = buildSnapshot(
                 headline = "Recording requested",
                 detail = "Waiting for Session Kernel to start the ${resolvedVideoSpec.summaryLabel} recording task."
             )
+            val degradedFields = buildList {
+                if (resolvedInfo.resolutionDegraded) add("resolution")
+                if (resolvedInfo.frameRateDegraded) add("framerate")
+                if (resolvedInfo.dynamicPolicyDegraded) add("dynamicFps")
+                if (resolvedInfo.audioProfileDegraded) add("audio")
+            }
             val modeTags = mapOf(
                 "mode" to "video",
                 "torch" to torchTag(),
@@ -187,7 +195,9 @@ private class VideoModeController(
                 "resolvedVideoResolution" to resolvedVideoSpec.resolution.storageKey,
                 "resolvedVideoFrameRate" to resolvedVideoSpec.frameRate.storageKey,
                 "resolvedDynamicFpsPolicy" to resolvedVideoSpec.dynamicFpsPolicy.storageKey,
-                "resolvedAudioProfile" to resolvedVideoSpec.audioProfile.storageKey
+                "resolvedAudioProfile" to resolvedVideoSpec.audioProfile.storageKey,
+                "videoSpecDegraded" to resolvedInfo.isDegraded.toString(),
+                "videoSpecDegradedFields" to degradedFields.joinToString(",")
             )
             val composedTags = CaptureMetadataLayers(
                 effectTags = EffectBridge.toMetadataTags(effectSpec),
@@ -270,10 +280,8 @@ private class VideoModeController(
         )
         val activeVideoSpec = resolvedVideoSpec()
         val requestedLabel = requestedVideoSpec.quickLabel()
-        val suffix = if (
-            activeVideoSpec.resolution != requestedVideoSpec.resolution ||
-            activeVideoSpec.frameRate != requestedVideoSpec.frameRate
-        ) {
+        val resolvedInfo = resolvedVideoSpecInfo()
+        val suffix = if (resolvedInfo.isDegraded) {
             " (active ${activeVideoSpec.quickLabel()})"
         } else {
             ""
@@ -393,10 +401,11 @@ private class VideoModeController(
         )
     }
 
-    private fun resolvedVideoSpec() = runtimeState()
+    private fun resolvedVideoSpecInfo(): ResolvedVideoSpec = runtimeState()
         .deviceCapabilities
         .resolveVideoSpec(requestedVideoSpec)
-        .applied
+
+    private fun resolvedVideoSpec() = resolvedVideoSpecInfo().applied
 
     private fun VideoSpec.quickLabel(): String = summaryLabel
 }

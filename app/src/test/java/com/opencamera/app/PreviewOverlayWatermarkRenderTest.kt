@@ -272,6 +272,82 @@ class PreviewOverlayWatermarkRenderTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `van gogh starry preview uses material-like painted texture around frame`() {
+        val preview = drawExpandedFramePreviewWithFrame(
+            templateId = "van-gogh-starry",
+            decoration = WatermarkPreviewDecoration.STARRY_MOON,
+            placement = WatermarkTextPlacement.BOTTOM_CENTER
+        )
+        val bitmap = preview.bitmap
+        val frame = preview.frame
+        val bottomBand = expandedFrameBottomBandRect(frame, viewHeight = 1920, density = preview.density, templateId = "van-gogh-starry")
+
+        val topTexture = countPixelsDifferentFromReference(
+            bitmap = bitmap,
+            left = frame.left.toInt() + 12,
+            top = frame.top.toInt(),
+            right = frame.right.toInt() - 12,
+            bottom = (frame.top + 96f * preview.density).toInt()
+        )
+        val bottomTexture = countPixelsDifferentFromReference(
+            bitmap = bitmap,
+            left = frame.left.toInt() + 12,
+            top = (bottomBand?.top ?: frame.bottom).toInt(),
+            right = frame.right.toInt() - 12,
+            bottom = (bottomBand?.bottom ?: frame.bottom).toInt()
+        )
+
+        assertTrue(
+            topTexture > 3_200,
+            "starry preview should show dense painted top-edge texture like the saved output, count=$topTexture"
+        )
+        assertTrue(
+            bottomTexture > 5_200,
+            "starry preview should show dense painted lower-band texture like the saved output, count=$bottomTexture"
+        )
+        bitmap.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `blue hour preview uses material-like cool paint at photo edge and lower band`() {
+        val preview = drawExpandedFramePreviewWithFrame(
+            templateId = "blue-hour",
+            decoration = WatermarkPreviewDecoration.BLUE_HOUR,
+            placement = WatermarkTextPlacement.BOTTOM_LEFT
+        )
+        val bitmap = preview.bitmap
+        val frame = preview.frame
+        val bottomBand = expandedFrameBottomBandRect(frame, viewHeight = 1920, density = preview.density, templateId = "blue-hour")
+
+        val topTexture = countPixelsDifferentFromReference(
+            bitmap = bitmap,
+            left = frame.left.toInt() + 12,
+            top = frame.top.toInt(),
+            right = frame.right.toInt() - 12,
+            bottom = (frame.top + 96f * preview.density).toInt()
+        )
+        val bottomTexture = countPixelsDifferentFromReference(
+            bitmap = bitmap,
+            left = frame.left.toInt() + 12,
+            top = (bottomBand?.top ?: frame.bottom).toInt(),
+            right = frame.right.toInt() - 12,
+            bottom = (bottomBand?.bottom ?: frame.bottom).toInt()
+        )
+
+        assertTrue(
+            topTexture > 2_400,
+            "blue-hour preview should show cool painted strokes into the photo edge, count=$topTexture"
+        )
+        assertTrue(
+            bottomTexture > 4_800,
+            "blue-hour preview should show dense lower-band material texture like the saved output, count=$bottomTexture"
+        )
+        bitmap.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun `impression preview uses balanced chroma edge instead of orange cast`() {
         val bitmap = drawFourBorderPreview(
             templateId = "blur-four-border",
@@ -303,7 +379,19 @@ class PreviewOverlayWatermarkRenderTest {
         templateId: String,
         decoration: WatermarkPreviewDecoration,
         placement: WatermarkTextPlacement
-    ): Bitmap {
+    ): Bitmap = drawExpandedFramePreviewWithFrame(templateId, decoration, placement).bitmap
+
+    private data class ExpandedFramePreview(
+        val bitmap: Bitmap,
+        val frame: RectF,
+        val density: Float
+    )
+
+    private fun drawExpandedFramePreviewWithFrame(
+        templateId: String,
+        decoration: WatermarkPreviewDecoration,
+        placement: WatermarkTextPlacement
+    ): ExpandedFramePreview {
         val view = PreviewOverlayView(ApplicationProvider.getApplicationContext())
         view.layout(0, 0, 1080, 1920)
         view.render(
@@ -332,9 +420,14 @@ class PreviewOverlayWatermarkRenderTest {
                 )
             )
         )
+        val frame = requireNotNull(view.currentActiveFrameRectOrNull())
         val bitmap = Bitmap.createBitmap(1080, 1920, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
-        return bitmap
+        return ExpandedFramePreview(
+            bitmap = bitmap,
+            frame = frame,
+            density = view.resources.displayMetrics.density
+        )
     }
 
     private fun drawFourBorderPreview(

@@ -29,6 +29,122 @@ class CompositeMediaPostProcessorTest {
     }
 
     @Test
+    fun `optional throwing processor degrades and allows downstream processor`() = runTest {
+        val first = NoteAppendingProcessor("first:applied")
+        val optional = ThrowingProcessor(
+            RuntimeException("optional filter failed"),
+            jobClass = AlgorithmJobClass.CAPTURE_OPTIONAL
+        )
+        val third = NoteAppendingProcessor("third:applied")
+        val composite = CompositeMediaPostProcessor(listOf(first, optional, third))
+
+        val result = composite.process(baseResult())
+
+        assertTrue(result.pipelineNotes.contains("first:applied"))
+        assertTrue(result.pipelineNotes.contains("third:applied"))
+        assertTrue(
+            result.pipelineNotes.any { it == "resource:optional-degraded:ThrowingProcessor" },
+            "Optional failure should be recorded as a degradation: ${result.pipelineNotes}"
+        )
+        assertTrue(
+            result.structuredPostProcessFailures.any {
+                it.processorName == "ThrowingProcessor" &&
+                    it.disposition == PostProcessFailureDisposition.RECOVERABLE
+            },
+            "Optional failure should remain visible in structured failures"
+        )
+    }
+
+    @Test
+    fun `optional processor timeout degrades and allows downstream processor`() = runTest {
+        val slowOptional = object : MediaPostProcessor {
+            override fun jobClass(result: ShotResult): AlgorithmJobClass =
+                AlgorithmJobClass.CAPTURE_OPTIONAL
+
+            override suspend fun process(result: ShotResult): ShotResult {
+                kotlinx.coroutines.delay(100L)
+                return result.addPipelineNotes("optional:should-not-finish")
+            }
+        }
+        val downstream = NoteAppendingProcessor("downstream:applied")
+        val composite = CompositeMediaPostProcessor(
+            processors = listOf(slowOptional, downstream),
+            resourceBudget = CameraResourceBudget(maxPostProcessMillis = 20L)
+        )
+
+        val result = composite.processWithLiveness(
+            PostProcessRequest(result = baseResult(), liveness = null),
+            PostProcessTimeSource { testScheduler.currentTime }
+        )
+
+        assertFalse(result.pipelineNotes.contains("optional:should-not-finish"))
+        assertTrue(result.pipelineNotes.contains("downstream:applied"))
+        assertTrue(
+            result.pipelineNotes.any { it.startsWith("resource:optional-timeout=") },
+            "Optional timeout should be visible as a degradation: ${result.pipelineNotes}"
+        )
+    }
+
+    @Test
+    fun `critical processor without liveness is not capped by optional resource budget`() = runTest {
+        val slowCritical = object : MediaPostProcessor {
+            override suspend fun process(result: ShotResult): ShotResult {
+                kotlinx.coroutines.delay(100L)
+                return result.addPipelineNotes("critical:finished")
+            }
+        }
+        val composite = CompositeMediaPostProcessor(
+            processors = listOf(slowCritical),
+            resourceBudget = CameraResourceBudget(maxPostProcessMillis = 20L)
+        )
+
+        val result = composite.processWithLiveness(
+            PostProcessRequest(result = baseResult(), liveness = null),
+            PostProcessTimeSource { testScheduler.currentTime }
+        )
+
+        assertTrue(result.pipelineNotes.contains("critical:finished"))
+        assertFalse(
+            result.pipelineNotes.any { it.startsWith("resource:optional-timeout=") },
+            "Critical processors should keep legacy no-liveness behavior: ${result.pipelineNotes}"
+        )
+    }
+
+    @Test
+    fun `optional cancellation still propagates and skips downstream processor`() = runTest {
+        val optionalCancel = ThrowingProcessor(
+            kotlinx.coroutines.CancellationException("optional cancelled"),
+            jobClass = AlgorithmJobClass.CAPTURE_OPTIONAL
+        )
+        val downstream = NoteAppendingProcessor("downstream:should-not-run")
+        val composite = CompositeMediaPostProcessor(listOf(optionalCancel, downstream))
+
+        try {
+            composite.process(baseResult())
+            fail("Expected CancellationException to propagate")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            assertEquals("optional cancelled", e.message)
+        }
+    }
+
+    @Test
+    fun `optional fatal error still propagates and skips downstream processor`() = runTest {
+        val optionalError = ThrowingProcessor(
+            OutOfMemoryError("optional fatal"),
+            jobClass = AlgorithmJobClass.CAPTURE_OPTIONAL
+        )
+        val downstream = NoteAppendingProcessor("downstream:should-not-run")
+        val composite = CompositeMediaPostProcessor(listOf(optionalError, downstream))
+
+        try {
+            composite.process(baseResult())
+            fail("Expected OutOfMemoryError to propagate")
+        } catch (e: OutOfMemoryError) {
+            assertEquals("optional fatal", e.message)
+        }
+    }
+
+    @Test
     fun `throwing processor preserves output path and handle`() = runTest {
         val throwing = ThrowingProcessor(RuntimeException("bitmap too large"))
         val composite = CompositeMediaPostProcessor(listOf(throwing))
@@ -473,7 +589,12 @@ class CompositeMediaPostProcessorTest {
         }
     }
 
-    private class ThrowingProcessor(private val error: Throwable) : MediaPostProcessor {
+    private class ThrowingProcessor(
+        private val error: Throwable,
+        private val jobClass: AlgorithmJobClass = AlgorithmJobClass.CAPTURE_CRITICAL
+    ) : MediaPostProcessor {
+        override fun jobClass(result: ShotResult): AlgorithmJobClass = jobClass
+
         override suspend fun process(result: ShotResult): ShotResult {
             throw error
         }

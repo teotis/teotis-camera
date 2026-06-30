@@ -66,8 +66,21 @@ class HumanisticModePluginTest {
         assertEquals(1, effects.size)
         val spec = effects[0]
         assertTrue(spec.find<FilterEffect>() != null, "EffectSpec should contain FilterEffect")
-        assertTrue(spec.find<WatermarkEffect>() != null, "EffectSpec should contain WatermarkEffect")
+        assertEquals(null, spec.find<WatermarkEffect>(), "EffectSpec should not contain WatermarkEffect by default")
         assertTrue(spec.find<FrameEffect>() != null, "EffectSpec should contain FrameEffect")
+    }
+
+    @Test
+    fun `onEnter includes watermark effect when watermark is enabled`(): Unit = runBlocking {
+        val effects = mutableListOf<EffectSpec>()
+        val controller = createController(
+            watermarkEnabled = true,
+            onEffectSpecChanged = { effects += it }
+        )
+
+        controller.onEnter()
+
+        assertTrue(effects.single().find<WatermarkEffect>() != null)
     }
 
     @Test
@@ -137,14 +150,14 @@ class HumanisticModePluginTest {
         assertEquals("humanistic", metadata["modeDisplay"])
         assertTrue(metadata.containsKey("style"))
         assertTrue(metadata.containsKey("algorithmProfile"))
-        assertTrue(metadata.containsKey("watermarkTemplate"))
+        assertFalse(metadata.containsKey("watermarkTemplate"))
         assertTrue(metadata.containsKey("stillResolution"))
         assertTrue(metadata.containsKey("modeVariant"))
     }
 
     @Test
     fun `shutter pressed post process has humanistic exif overrides`(): Unit = runBlocking {
-        val controller = createController()
+        val controller = createController(watermarkEnabled = true)
 
         val signal = controller.handle(ModeIntent.ShutterPressed)
 
@@ -240,7 +253,7 @@ class HumanisticModePluginTest {
 
     @Test
     fun `pro variant watermark text includes professional label`(): Unit = runBlocking {
-        val controller = createController()
+        val controller = createController(watermarkEnabled = true)
 
         controller.handle(ModeIntent.ProActionPressed)
         val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
@@ -343,7 +356,8 @@ class HumanisticModePluginTest {
         deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         eventSink: suspend (String) -> Unit = {},
         onEffectSpecChanged: suspend (EffectSpec) -> Unit = {},
-        livePhotoEnabled: Boolean = false
+        livePhotoEnabled: Boolean = false,
+        watermarkEnabled: Boolean = false
     ): ModeController {
         val context = ModeContext(
             deviceCapabilities = deviceCapabilities,
@@ -363,7 +377,8 @@ class HumanisticModePluginTest {
                 SessionSettingsSnapshot(
                     persisted = com.opencamera.core.settings.PersistedSettings(
                         photo = com.opencamera.core.settings.PhotoSettings(
-                            livePhotoEnabledByDefault = livePhotoEnabled
+                            livePhotoEnabledByDefault = livePhotoEnabled,
+                            photoWatermarkEnabledByDefault = watermarkEnabled
                         )
                     )
                 )
@@ -411,13 +426,13 @@ class HumanisticModePluginTest {
             .strategy.saveRequest.metadata.customTags
         assertEquals("humanistic", metadata["mode"])
         assertEquals("pro", metadata["modeVariant"])
-        assertTrue(metadata.containsKey("watermarkTemplate"))
+        assertFalse(metadata.containsKey("watermarkTemplate"))
         assertTrue(metadata.containsKey("stillResolution"))
     }
 
     @Test
     fun `char standard capture post process exif`(): Unit = runBlocking {
-        val controller = createController()
+        val controller = createController(watermarkEnabled = true)
         val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.postProcessSpec
         assertEquals("Humanistic", postProcess.exifOverrides["SceneCaptureType"])

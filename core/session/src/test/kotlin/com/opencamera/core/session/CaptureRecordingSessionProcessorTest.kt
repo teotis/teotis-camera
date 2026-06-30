@@ -295,6 +295,29 @@ class CaptureRecordingSessionProcessorTest {
     }
 
     @Test
+    fun `handleShotCompleted surfaces focus stack skip as guided retake prompt`() = runTest {
+        val harness = Harness(runningState().copy(
+            activeShot = multiFrameShotRequest("focus-stack-shot")
+        ))
+        val result = testShotResult("focus-stack-shot", MediaType.PHOTO).copy(
+            pipelineNotes = listOf(
+                "focus-stack:skipped=missing-near-far",
+                "merge:skipped=focus-stack-owner"
+            )
+        )
+
+        harness.process(SessionIntent.ShotCompleted(result))
+
+        assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
+        assertEquals("Full Clear needs guided retake", harness.state.value.presentation.lastAction)
+        assertEquals(
+            "Full Clear could not combine near and far focus (missing near/far frames). Tap the near subject and far background, then retake.",
+            harness.state.value.presentation.lastError
+        )
+        assertEquals(result.pipelineNotes, harness.state.value.presentation.latestPipelineNotes)
+    }
+
+    @Test
     fun `handleShotCompleted updates thumbnail source for saved media`() = runTest {
         val harness = Harness(runningState().copy(
             activeShot = testShotRequest("shot-1", MediaType.PHOTO)
@@ -854,7 +877,7 @@ class CaptureRecordingSessionProcessorTest {
     // ── DFS-02: Stale ShotCompleted guard test ───────────────────────
 
     @Test
-    fun `DFS-02 stale ShotCompleted for different active shot is rejected`() = runTest {
+    fun `DFS-02 completed previous shot is applied without clearing newer active shot`() = runTest {
         val activeShot2 = testShotRequest("shot-2", MediaType.PHOTO)
         val harness = Harness(runningState().copy(
             activeShot = activeShot2,
@@ -864,11 +887,15 @@ class CaptureRecordingSessionProcessorTest {
 
         harness.process(SessionIntent.ShotCompleted(staleResult))
 
-        // State must not change - stale completion is rejected
+        // The earlier shot still saved successfully, but it must not steal the active slot
+        // from the newer capture that is still in progress.
         assertEquals(CaptureStatus.SAVING, harness.state.value.captureStatus)
         assertEquals(activeShot2, harness.state.value.activeShot)
-        assertNull(harness.state.value.presentation.latestCapturePath)
-        assertTrue(harness.trace.snapshot().any { it.name == "shot.completed.stale" })
+        assertEquals("/sdcard/stale.jpg", harness.state.value.presentation.latestCapturePath)
+        assertEquals("Previous photo saved", harness.state.value.presentation.lastAction)
+        assertEquals(emptyList(), harness.modeController.sessionEvents)
+        assertTrue(harness.trace.snapshot().any { it.name == "shot.completed.background" })
+        assertFalse(harness.trace.snapshot().any { it.name == "shot.completed.stale" })
     }
 
     @Test

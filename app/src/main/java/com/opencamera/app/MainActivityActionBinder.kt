@@ -88,8 +88,7 @@ internal class MainActivityActionBinder(
             callbacks.renderAfterPanelChange()
         }
         views.documentBatchRail.overviewButton.setOnClickListener {
-            callbacks.reducePanel(CockpitPanelCommand.NavigateToBatchOverview)
-            callbacks.renderAfterPanelChange()
+            callbacks.startDocumentBatchExport()
         }
         views.documentBatchOrganizer.close.setOnClickListener {
             callbacks.reducePanel(CockpitPanelCommand.CloseDocumentBatchOrganizer)
@@ -100,8 +99,7 @@ internal class MainActivityActionBinder(
             callbacks.renderAfterPanelChange()
         }
         views.documentBatchOrganizer.exportButton.setOnClickListener {
-            callbacks.reducePanel(CockpitPanelCommand.NavigateToExport)
-            callbacks.renderAfterPanelChange()
+            callbacks.startDocumentBatchExport()
         }
     }
 
@@ -184,8 +182,8 @@ internal class MainActivityActionBinder(
             callbacks.dispatch(SessionIntent.FrameRatioSelected(nextRatio))
         }
         views.quickPanel.watermark.setOnClickListener {
-            val nextTemplateId = snapshot().quickPanelSheet?.watermarkNextTemplateId ?: return@setOnClickListener
-            callbacks.applySettingsAction(PersistedSettingsAction.UpdatePhotoWatermarkTemplate(nextTemplateId))
+            val action = snapshot().quickPanelSheet?.watermarkAction ?: return@setOnClickListener
+            callbacks.applySettingsAction(action)
         }
         views.quickPanel.livePhoto.setOnHapticClickListener {
             val snap = snapshot()

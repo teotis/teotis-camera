@@ -1,5 +1,7 @@
 package com.opencamera.app.camera
 
+import com.opencamera.core.media.ContentRegionRole
+import com.opencamera.core.media.SceneMaskQuality
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -96,5 +98,28 @@ class SceneMaskPayloadTest {
         assertTrue(edgeAlpha > cornerAlpha, "Edge should be higher than corner, edge=$edgeAlpha corner=$cornerAlpha")
         assertTrue(edgeAlpha > 0.05f, "Edge should have some non-trivial alpha for smoothness, edge=$edgeAlpha")
         assertTrue(edgeAlpha < 0.95f, "Edge should not be fully opaque, edge=$edgeAlpha")
+    }
+
+    @Test
+    fun `saved photo mask exports content understanding snapshot`() {
+        val mask = SceneMaskTestUtils.createUniformMask(16, 12, 0.8f)
+
+        val snapshot = mask.toContentUnderstandingSnapshot(
+            maskId = "saved-mask-1",
+            sourceWidth = 4000,
+            sourceHeight = 3000,
+            timestampMillis = 2000L
+        )
+
+        assertTrue(snapshot.isAvailable)
+        assertEquals(SceneMaskQuality.SAVED_PHOTO, snapshot.quality)
+        assertEquals("mlkit-selfie", snapshot.backendId)
+        assertTrue(snapshot.hasRegion(ContentRegionRole.PERSON_SUBJECT))
+        val subject = snapshot.primaryRegion(ContentRegionRole.PERSON_SUBJECT)
+        assertEquals("saved-mask-1", subject?.regionId)
+        assertEquals(16, subject?.transform?.maskWidth)
+        assertEquals(12, subject?.transform?.maskHeight)
+        assertEquals(4000, subject?.transform?.sourceWidth)
+        assertEquals(3000, subject?.transform?.sourceHeight)
     }
 }

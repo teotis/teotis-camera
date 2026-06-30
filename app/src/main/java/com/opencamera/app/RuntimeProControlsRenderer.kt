@@ -30,6 +30,7 @@ internal class RuntimeProControlsRenderer(
         views.chips.removeAllViews()
         model.controls.forEach { control ->
             val isAutoValue = control.value.isAutoValue()
+            val isToggleOff = control.isToggleOn == false
             val chip = Button(context, null, 0, R.style.Widget_OpenCamera_TopActionChip).apply {
                 text = control.compactLabel()
                 contentDescription = control.accessibilityLabel()
@@ -44,12 +45,15 @@ internal class RuntimeProControlsRenderer(
                 setPadding(10.dp, 4.dp, 10.dp, 4.dp)
                 isEnabled = control.isInteractive
                 alpha = when {
+                    isToggleOff && control.isInteractive -> 0.6f
                     control.isInteractive -> 1f
                     control.availability == SettingsControlAvailability.DEGRADED -> 0.7f
                     else -> 0.48f
                 }
                 setTextColor(
                     when {
+                        isToggleOff && control.isInteractive ->
+                            ContextCompat.getColor(context, R.color.oc_text_muted)
                         control.isInteractive && !isAutoValue -> ContextCompat.getColor(context, R.color.oc_accent)
                         control.isInteractive -> ContextCompat.getColor(context, R.color.oc_text_primary)
                         control.availability == SettingsControlAvailability.DEGRADED ->
@@ -57,7 +61,7 @@ internal class RuntimeProControlsRenderer(
                         else -> ContextCompat.getColor(context, R.color.oc_text_muted)
                     }
                 )
-                setTypeface(null, if (isAutoValue) Typeface.NORMAL else Typeface.BOLD)
+                setTypeface(null, if (isAutoValue || isToggleOff) Typeface.NORMAL else Typeface.BOLD)
                 setOnClickListener { onApplyControl(control) }
             }
             views.chips.addView(

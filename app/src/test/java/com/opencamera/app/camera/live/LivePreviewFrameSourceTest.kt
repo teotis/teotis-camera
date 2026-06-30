@@ -4,6 +4,7 @@ import androidx.camera.core.ImageProxy
 import com.opencamera.core.media.*
 import org.junit.Assert.*
 import org.junit.Test
+import java.nio.ByteBuffer
 
 class LivePreviewFrameSourceTest {
 
@@ -113,23 +114,57 @@ class LivePreviewFrameSourceTest {
     }
 
     @Test
-    fun `CameraXLivePreviewFrameSource onAnalyzeFrame does not close when not started`() {
+    fun `CameraXLivePreviewFrameSource onAnalyzeFrame closes image when not started`() {
         val source = CameraXLivePreviewFrameSource()
-        var closeCount = 0
-        val proxy = object : ImageProxy {
-            override fun close() { closeCount++ }
-            override fun getImage() = null
-            override fun getPlanes() = emptyArray<ImageProxy.PlaneProxy>()
-            override fun getWidth() = 0
-            override fun getHeight() = 0
-            override fun getImageInfo() = throw UnsupportedOperationException()
-            override fun getFormat() = 0
-            override fun getCropRect() = throw UnsupportedOperationException()
-            override fun setCropRect(rect: android.graphics.Rect?) {}
-        }
+        val proxy = FakeImageProxy(planes = emptyArray())
 
         source.onAnalyzeFrame(proxy, 0)
-        assertEquals(0, closeCount)
+
+        assertEquals(1, proxy.closeCount)
+    }
+
+    @Test
+    fun `CameraXLivePreviewFrameSource onAnalyzeFrame closes image after consuming when active`() {
+        val source = CameraXLivePreviewFrameSource()
+        source.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+        val proxy = yuvImageProxy(width = 4, height = 4)
+
+        source.onAnalyzeFrame(proxy, 0)
+
+        assertEquals(1, proxy.closeCount)
+        val selected = source.selectForLive(
+            shutterTimestampNanos = System.nanoTime(),
+            spec = LivePhotoCaptureSpec()
+        )
+        assertTrue(selected.frames.isNotEmpty())
+    }
+
+    @Test
+    fun `CameraXLivePreviewFrameSource onAnalyzeFrame closes image when plane copy throws`() {
+        val source = CameraXLivePreviewFrameSource()
+        source.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+        // Planes array has fewer than 3 entries -> toCapturedPreviewYuvFrame requires >= 3
+        val proxy = FakeImageProxy(
+            width = 4,
+            height = 4,
+            planes = arrayOf(FakePlaneProxy(ByteArray(0), 0, 0))
+        )
+
+        source.onAnalyzeFrame(proxy, 0)
+
+        assertEquals(1, proxy.closeCount)
+    }
+
+    @Test
+    fun `CameraXLivePreviewFrameSource onAnalyzeFrame closes image after stop`() {
+        val source = CameraXLivePreviewFrameSource()
+        source.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+        source.stop("unbind")
+        val proxy = yuvImageProxy(width = 4, height = 4)
+
+        source.onAnalyzeFrame(proxy, 0)
+
+        assertEquals(1, proxy.closeCount)
     }
 
     @Test
@@ -197,5 +232,47 @@ class LivePreviewFrameSourceTest {
             encodedFrameIds = frames.map { it.descriptor.frameId }
             return Result.success(outputPath)
         }
+    }
+
+    private fun yuvImageProxy(width: Int = 4, height: Int = 4): FakeImageProxy {
+        val ySize = width * height
+        val chromaSize = (width / 2) * (height / 2)
+        val yPlane = FakePlaneProxy(ByteArray(ySize) { it.toByte() }, rowStride = width, pixelStride = 1)
+        val uPlane = FakePlaneProxy(ByteArray(chromaSize) { (it + 1).toByte() }, rowStride = width / 2, pixelStride = 1)
+        val vPlane = FakePlaneProxy(ByteArray(chromaSize) { (it + 2).toByte() }, rowStride = width / 2, pixelStride = 1)
+        return FakeImageProxy(
+            width = width,
+            height = height,
+            planes = arrayOf(yPlane, uPlane, vPlane)
+        )
+    }
+
+    private class FakeImageProxy(
+        private val width: Int = 0,
+        private val height: Int = 0,
+        private val planes: Array<ImageProxy.PlaneProxy> = emptyArray()
+    ) : ImageProxy {
+        var closeCount: Int = 0
+            private set
+
+        override fun close() { closeCount++ }
+        override fun getImage() = null
+        override fun getPlanes() = planes
+        override fun getWidth() = width
+        override fun getHeight() = height
+        override fun getImageInfo() = throw UnsupportedOperationException()
+        override fun getFormat() = 0
+        override fun getCropRect() = throw UnsupportedOperationException()
+        override fun setCropRect(rect: android.graphics.Rect?) {}
+    }
+
+    private class FakePlaneProxy(
+        private val data: ByteArray,
+        private val rowStride: Int,
+        private val pixelStride: Int
+    ) : ImageProxy.PlaneProxy {
+        override fun getBuffer(): ByteBuffer = ByteBuffer.wrap(data)
+        override fun getPixelStride(): Int = pixelStride
+        override fun getRowStride(): Int = rowStride
     }
 }

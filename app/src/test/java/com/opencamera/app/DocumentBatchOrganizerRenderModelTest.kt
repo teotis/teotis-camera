@@ -23,6 +23,7 @@ import com.opencamera.core.settings.SessionSettingsSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DocumentBatchOrganizerRenderModelTest {
@@ -343,6 +344,39 @@ class DocumentBatchOrganizerRenderModelTest {
         val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
 
         assertTrue(model.items.all { it.cropEditLabel == null })
+    }
+
+    @Test
+    fun `status message surfaces batch last message after a move`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(
+                batchItem("item-1", 0),
+                batchItem("item-2", 1)
+            ),
+            lastMessage = "Item moved"
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertEquals("Item moved", model.statusMessage)
+    }
+
+    @Test
+    fun `status message is null when batch has no last message`() {
+        val batchState = DocumentBatchState(
+            batchId = "batch-1",
+            status = DocumentBatchStatus.ACTIVE,
+            items = listOf(batchItem("item-1", 0)),
+            lastMessage = null
+        )
+        val state = documentBatchSessionState(batchState)
+
+        val model = documentBatchOrganizerRenderModel(state, text, CockpitPanelRoute.BatchOverview)
+
+        assertNull(model.statusMessage)
     }
 
     private fun documentBatchSessionState(batchState: DocumentBatchState): SessionState {

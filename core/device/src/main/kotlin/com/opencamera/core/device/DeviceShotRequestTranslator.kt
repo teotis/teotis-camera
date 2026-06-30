@@ -2,6 +2,7 @@ package com.opencamera.core.device
 
 import com.opencamera.core.media.CaptureLatencyPriority
 import com.opencamera.core.media.FlashMode
+import com.opencamera.core.media.FocusStackFrameRole
 import com.opencamera.core.media.ShotKind
 import com.opencamera.core.media.ShotPlan
 import com.opencamera.core.media.StillCaptureResolutionPreset
@@ -21,6 +22,7 @@ data class DeviceShotRequest(
         DeviceCapabilities.DEFAULT.resolvedManualControlCapabilities,
     val frameCount: Int = 1,
     val interFrameDelayMillis: Long = 0L,
+    val focusStackFrameRoles: List<FocusStackFrameRole> = emptyList(),
     val latencyPriority: CaptureLatencyPriority = CaptureLatencyPriority.DEFAULT,
     val diagnostics: List<String> = emptyList()
 )
@@ -185,6 +187,7 @@ class DefaultDeviceShotRequestTranslator(
             latencyPriority = resolvedLatencyPriority,
             frameCount = normalizedFrameCount,
             interFrameDelayMillis = interFrameDelayMillis,
+            focusStackFrameRoles = captureProfile.focusStackSpec?.requiredFrameRoles.orEmpty(),
             diagnostics = buildList {
                 add("device:template=still-capture")
                 add("device:graph=capture-topology")
@@ -198,6 +201,28 @@ class DefaultDeviceShotRequestTranslator(
                 )
                 add("device:frame-count=$normalizedFrameCount")
                 add("device:inter-frame-delay=${interFrameDelayMillis}ms")
+                captureProfile.focusStackSpec?.let { spec ->
+                    add(
+                        "device:focus-stack=" + when (spec.mode) {
+                            com.opencamera.core.media.FocusStackCaptureMode.AUTO_NEAR_FAR ->
+                                "auto-near-far"
+                            com.opencamera.core.media.FocusStackCaptureMode.GUIDED_NEAR_FAR ->
+                                "guided-near-far"
+                            com.opencamera.core.media.FocusStackCaptureMode.SCENE_SEGMENTED ->
+                                "scene-segmented"
+                        }
+                    )
+                    add("device:focus-stack-roles=${spec.requiredFrameRoles.joinToString(",") { it.name.lowercase() }}")
+                    add(
+                        "device:focus-stack-guidance=" +
+                            if (spec.userGuidanceRequired) {
+                                "user-guided"
+                            } else {
+                                "automatic"
+                            }
+                    )
+                    add("device:focus-stack-profile=${spec.algorithmProfile}")
+                }
                 captureProfile.longExposureMillis?.let { add("device:long-exposure=${it}ms") }
                 add(
                     "device:stability=" +

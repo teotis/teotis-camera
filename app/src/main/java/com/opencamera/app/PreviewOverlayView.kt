@@ -1,6 +1,8 @@
 package com.opencamera.app
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrixColorFilter
@@ -123,6 +125,10 @@ class PreviewOverlayView @JvmOverloads constructor(
         color = Color.WHITE
         style = Paint.Style.FILL
     }
+    private val highDesignWatermarkPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+        isDither = true
+    }
+    private val highDesignWatermarkAssetCache = mutableMapOf<String, Bitmap?>()
     private val outsideFramePath = android.graphics.Path()
     private val drawReusableRect = RectF()
 
@@ -467,24 +473,35 @@ class PreviewOverlayView @JvmOverloads constructor(
             )
         }
         canvas.drawRect(rect, watermarkHairlinePaint)
-        when (spec.decoration) {
-            WatermarkPreviewDecoration.TRAVEL_MAP -> {
-                bottomRect?.let { drawTravelMapPreviewDecoration(canvas, it, spec.opacity) }
+        val drewHighDesignMaterial = drawHighDesignWatermarkPreviewMaterial(
+            canvas = canvas,
+            spec = spec,
+            frameRect = rect,
+            bottomRect = bottomRect,
+            leftBand = leftBand,
+            rightBand = rightBand,
+            topFrameBand = topFrameBand
+        )
+        if (!drewHighDesignMaterial) {
+            when (spec.decoration) {
+                WatermarkPreviewDecoration.TRAVEL_MAP -> {
+                    bottomRect?.let { drawTravelMapPreviewDecoration(canvas, it, spec.opacity) }
+                }
+                WatermarkPreviewDecoration.ARCHIVAL_PAPER -> {
+                    drawArchivalPaperPreviewDecoration(canvas, rect, spec.opacity)
+                }
+                WatermarkPreviewDecoration.NIGHT_MEMORY -> {
+                    drawNightMemoryPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
+                }
+                WatermarkPreviewDecoration.STARRY_MOON -> {
+                    drawStarryMoonPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
+                }
+                WatermarkPreviewDecoration.BLUE_HOUR -> {
+                    drawBlueHourPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
+                }
+                WatermarkPreviewDecoration.IMPRESSION_CHROMA,
+                WatermarkPreviewDecoration.NONE -> Unit
             }
-            WatermarkPreviewDecoration.ARCHIVAL_PAPER -> {
-                drawArchivalPaperPreviewDecoration(canvas, rect, spec.opacity)
-            }
-            WatermarkPreviewDecoration.NIGHT_MEMORY -> {
-                drawNightMemoryPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
-            }
-            WatermarkPreviewDecoration.STARRY_MOON -> {
-                drawStarryMoonPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
-            }
-            WatermarkPreviewDecoration.BLUE_HOUR -> {
-                drawBlueHourPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
-            }
-            WatermarkPreviewDecoration.IMPRESSION_CHROMA,
-            WatermarkPreviewDecoration.NONE -> Unit
         }
 
         if (bottomRect != null && spec.decoration == WatermarkPreviewDecoration.STARRY_MOON) {
@@ -534,6 +551,53 @@ class PreviewOverlayView @JvmOverloads constructor(
         }
         canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
         watermarkHintPaint.color = previousTextColor
+    }
+
+    private fun drawHighDesignWatermarkPreviewMaterial(
+        canvas: Canvas,
+        spec: WatermarkHintSpec,
+        frameRect: RectF,
+        bottomRect: RectF?,
+        leftBand: Float,
+        rightBand: Float,
+        topFrameBand: Float
+    ): Boolean {
+        val assetPath = highDesignWatermarkPreviewAssetPath(spec.templateId, frameRect) ?: return false
+        val asset = highDesignWatermarkAsset(assetPath) ?: return false
+        val bottom = bottomRect?.bottom ?: frameRect.bottom
+        val destination = RectF(
+            frameRect.left - leftBand,
+            frameRect.top - topFrameBand,
+            frameRect.right + rightBand,
+            bottom
+        )
+        if (destination.width() <= 0f || destination.height() <= 0f) return false
+        highDesignWatermarkPaint.alpha = (spec.opacity * 255).toInt().coerceIn(72, 235)
+        canvas.drawBitmap(asset, null, destination, highDesignWatermarkPaint)
+        highDesignWatermarkPaint.alpha = 255
+        return true
+    }
+
+    private fun highDesignWatermarkPreviewAssetPath(templateId: String, frameRect: RectF): String? {
+        val aspect = frameRect.width() / frameRect.height().coerceAtLeast(1f)
+        val suffix = when {
+            aspect < 0.78f -> "portrait"
+            aspect > 1.22f -> "landscape"
+            else -> "square"
+        }
+        return when (templateId) {
+            "van-gogh-starry" -> "watermarks/van_gogh_starry_$suffix.png"
+            "blue-hour" -> "watermarks/blue_hour_$suffix.png"
+            else -> null
+        }
+    }
+
+    private fun highDesignWatermarkAsset(assetPath: String): Bitmap? {
+        return highDesignWatermarkAssetCache.getOrPut(assetPath) {
+            runCatching {
+                context.assets.open(assetPath).use(BitmapFactory::decodeStream)
+            }.getOrNull()
+        }
     }
 
     private fun drawTravelMapPreviewDecoration(

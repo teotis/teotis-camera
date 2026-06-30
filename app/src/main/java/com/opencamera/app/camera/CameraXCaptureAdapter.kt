@@ -77,6 +77,7 @@ import com.opencamera.core.device.PreviewStreamAspect
 import com.opencamera.core.device.PhysicalStillCaptureOutputProbe
 import com.opencamera.core.device.ManualControlSupport
 import com.opencamera.core.device.MultiFrameCaptureExecutionPlanner
+import com.opencamera.core.device.MultiFrameCaptureStep
 import com.opencamera.core.device.RecordingQualityPreset
 import com.opencamera.core.device.StillCaptureCameraProbe
 import com.opencamera.core.device.StillCaptureOutputSize
@@ -101,6 +102,7 @@ import com.opencamera.core.settings.VideoSpec
 import com.opencamera.core.settings.VideoSpecConstraints
 import com.opencamera.core.media.CompositeMediaPostProcessor
 import com.opencamera.core.media.FrameBundle
+import com.opencamera.core.media.FocusStackFrameRole
 import com.opencamera.core.media.withSaveIoTiming
 import com.opencamera.core.media.LivePhotoBundle
 import com.opencamera.core.media.MediaType
@@ -148,6 +150,8 @@ import com.opencamera.core.session.PerformanceLinkRecorder
 
 private const val TAG = "CameraXCaptureAdapter"
 private const val VIDEO_COVER_THUMBNAIL_SIZE = 512
+private const val FOCUS_STACK_METERING_POINT_SIZE = 0.18f
+private const val FOCUS_STACK_METERING_AUTO_CANCEL_MILLIS = 1_500L
 
 internal class CameraXCaptureWorkScopes(
     private val callbackDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
@@ -220,6 +224,7 @@ class CameraXCaptureAdapter(
         { VideoSceneSignal() },
     private val mediaPostProcessor: MediaPostProcessor = CompositeMediaPostProcessor(
         listOf(
+            AndroidFocusStackFusionProcessor(context),
             MultiFrameFusionProcessor(),
             PipelineMetadataPostProcessor()
         )
@@ -522,7 +527,10 @@ class CameraXCaptureAdapter(
                 stillCaptureExecutor.captureMultiFrame(
                     capture = capture,
                     plan = plan,
-                    deviceRequest = deviceRequest
+                    deviceRequest = deviceRequest,
+                    beforeFrameCapture = { step ->
+                        applyFocusStackFramePreparation(step)
+                    }
                 )
             }
 
@@ -647,6 +655,79 @@ class CameraXCaptureAdapter(
                     }
                 }
             }
+        }
+    }
+
+    private suspend fun applyFocusStackFramePreparation(
+        step: MultiFrameCaptureStep
+    ): List<String> {
+        val role = step.focusStackRole
+        if (role == FocusStackFrameRole.NONE) return emptyList()
+
+        return withContext(Dispatchers.Main.immediate) {
+            val camera = _bindingController.currentBoundCamera
+            val previewView = _bindingController.currentBoundPreviewView
+            if (camera == null || previewView == null || previewView.width <= 0 || previewView.height <= 0) {
+                return@withContext listOf(
+                    "device:focus-stack-metering=${role.name.lowercase()}:failed-preview-unbound"
+                )
+            }
+
+            val normalized = when (role) {
+                FocusStackFrameRole.NEAR -> 0.50f to 0.58f
+                FocusStackFrameRole.FAR -> 0.50f to 0.28f
+                FocusStackFrameRole.MID -> 0.50f to 0.45f
+                FocusStackFrameRole.NONE -> 0.50f to 0.50f
+            }
+            val meteringPoint = previewView.meteringPointFactory.createPoint(
+                previewView.width * normalized.first,
+                previewView.height * normalized.second,
+                FOCUS_STACK_METERING_POINT_SIZE
+            )
+            val focusAndAeAction = FocusMeteringAction.Builder(
+                meteringPoint,
+                FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+            )
+                .setAutoCancelDuration(FOCUS_STACK_METERING_AUTO_CANCEL_MILLIS, TimeUnit.MILLISECONDS)
+                .build()
+            val aeOnlyAction = FocusMeteringAction.Builder(
+                meteringPoint,
+                FocusMeteringAction.FLAG_AE
+            )
+                .setAutoCancelDuration(FOCUS_STACK_METERING_AUTO_CANCEL_MILLIS, TimeUnit.MILLISECONDS)
+                .build()
+
+            val selected = when {
+                camera.cameraInfo.isFocusMeteringSupported(focusAndAeAction) ->
+                    focusAndAeAction to "af-ae"
+                camera.cameraInfo.isFocusMeteringSupported(aeOnlyAction) ->
+                    aeOnlyAction to "ae-only"
+                else -> null
+            }
+                ?: return@withContext listOf(
+                    "device:focus-stack-metering=${role.name.lowercase()}:unsupported"
+                )
+
+            runCatching {
+                camera.cameraControl.startFocusAndMetering(selected.first).await()
+            }.fold(
+                onSuccess = { result ->
+                    val status = if (selected.second == "af-ae" && !result.isFocusSuccessful) {
+                        "af-not-confirmed"
+                    } else {
+                        selected.second
+                    }
+                    listOf(
+                        "device:focus-stack-metering=${role.name.lowercase()}:$status",
+                        "device:focus-stack-metering-point=${role.name.lowercase()}:${normalized.first},${normalized.second}"
+                    )
+                },
+                onFailure = { throwable ->
+                    listOf(
+                        "device:focus-stack-metering=${role.name.lowercase()}:failed:${throwable.message ?: "unknown"}"
+                    )
+                }
+            )
         }
     }
 

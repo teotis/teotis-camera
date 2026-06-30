@@ -14,6 +14,8 @@ import com.opencamera.core.media.CaptureNode
 import com.opencamera.core.media.CaptureNodeRole
 import com.opencamera.core.media.CaptureProfile
 import com.opencamera.core.media.FlashMode
+import com.opencamera.core.media.FocusStackCaptureSpec
+import com.opencamera.core.media.FocusStackFrameRole
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.MediaSaveTask
@@ -152,6 +154,76 @@ class StillCaptureExecutorTest {
         assertTrue(success.diagnostics.any { it.contains("device:burst-bundle-frames=3") })
     }
 
+    @Test
+    fun `captureMultiFrame preserves focus stack roles in frame bundle`() = runBlocking {
+        val executor = createExecutor()
+        val callCount = AtomicInteger(0)
+        val capture = mockImageCapture { callback ->
+            callCount.getAndIncrement()
+            val results = mock(ImageCapture.OutputFileResults::class.java)
+            `when`(results.savedUri).thenReturn(null)
+            callback.onImageSaved(results)
+        }
+        val plan = createMultiFrameShotPlan(
+            shotId = "focus-stack",
+            frameCount = 2,
+            focusStackSpec = FocusStackCaptureSpec.guidedNearFar()
+        )
+        val deviceRequest = DeviceShotRequest(
+            shotId = "focus-stack",
+            template = CaptureTemplate.STILL_CAPTURE,
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            frameCount = 2,
+            focusStackFrameRoles = listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR)
+        )
+
+        val outcome = executor.captureMultiFrame(capture, plan, deviceRequest)
+
+        assertTrue(outcome is PhotoCaptureOutcome.Success)
+        val frames = (outcome as PhotoCaptureOutcome.Success).frameBundle!!.frames
+        assertEquals(FocusStackFrameRole.NEAR, frames[0].focusStackRole)
+        assertEquals(FocusStackFrameRole.FAR, frames[1].focusStackRole)
+    }
+
+    @Test
+    fun `captureMultiFrame invokes before frame hook and carries diagnostics`() = runBlocking {
+        val executor = createExecutor()
+        val visitedSteps = mutableListOf<Int>()
+        val capture = mockImageCapture { callback ->
+            val results = mock(ImageCapture.OutputFileResults::class.java)
+            `when`(results.savedUri).thenReturn(null)
+            callback.onImageSaved(results)
+        }
+        val plan = createMultiFrameShotPlan(
+            shotId = "focus-stack-hook",
+            frameCount = 2,
+            focusStackSpec = FocusStackCaptureSpec.guidedNearFar()
+        )
+        val deviceRequest = DeviceShotRequest(
+            shotId = "focus-stack-hook",
+            template = CaptureTemplate.STILL_CAPTURE,
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            frameCount = 2,
+            focusStackFrameRoles = listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR)
+        )
+
+        val outcome = executor.captureMultiFrame(
+            capture = capture,
+            plan = plan,
+            deviceRequest = deviceRequest,
+            beforeFrameCapture = { step ->
+                visitedSteps += step.frameIndex
+                listOf("test:before-frame=${step.frameIndex}:${step.focusStackRole.name.lowercase()}")
+            }
+        )
+
+        assertTrue(outcome is PhotoCaptureOutcome.Success)
+        val success = outcome as PhotoCaptureOutcome.Success
+        assertEquals(listOf(1, 2), visitedSteps)
+        assertTrue(success.diagnostics.contains("test:before-frame=1:near"))
+        assertTrue(success.diagnostics.contains("test:before-frame=2:far"))
+    }
+
     // --- captureMultiFrame intermediate failure cleanup ---
 
     @Test
@@ -243,7 +315,11 @@ class StillCaptureExecutorTest {
         )
     }
 
-    private fun createMultiFrameShotPlan(shotId: String, frameCount: Int): ShotPlan {
+    private fun createMultiFrameShotPlan(
+        shotId: String,
+        frameCount: Int,
+        focusStackSpec: FocusStackCaptureSpec? = null
+    ): ShotPlan {
         val saveRequest = SaveRequest.photoLibrary()
         val request = ShotRequest(
             shotId = shotId,
@@ -252,7 +328,7 @@ class StillCaptureExecutorTest {
             saveRequest = saveRequest,
             thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
             postProcessSpec = PostProcessSpec(),
-            captureProfile = CaptureProfile(frameCount = frameCount)
+            captureProfile = CaptureProfile(frameCount = frameCount, focusStackSpec = focusStackSpec)
         )
         val graph = ShotGraph(
             shotId = shotId,
@@ -281,7 +357,7 @@ class StillCaptureExecutorTest {
                 saveRequest = saveRequest,
                 thumbnailPolicy = ThumbnailPolicy.USE_SAVED_MEDIA,
                 postProcessSpec = PostProcessSpec(),
-                captureProfile = CaptureProfile(frameCount = frameCount)
+                captureProfile = CaptureProfile(frameCount = frameCount, focusStackSpec = focusStackSpec)
             ),
             graph = graph
         )

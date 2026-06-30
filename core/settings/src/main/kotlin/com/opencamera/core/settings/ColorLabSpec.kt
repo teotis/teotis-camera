@@ -105,8 +105,8 @@ fun renderStyleColorSpec(
     styleStrength: Float
 ): FilterRenderSpec? {
     val base = baseRenderSpec ?: return null
-    return StyleColorPipeline.render(
-        StyleColorPipelineRequest(
+    return ColorIntentEngine.resolve(
+        ColorIntentRequest(
             styleProfileId = profileId,
             baseRenderSpec = base,
             colorLabSpec = colorLabSpec,
@@ -127,18 +127,17 @@ fun renderStyleColorSpecWithRecipe(
     styleStrength: Float
 ): StyleColorRecipeResult? {
     val base = baseRenderSpec ?: return null
-    val pipelineResult = StyleColorPipeline.render(
-        StyleColorPipelineRequest(
+    val plan = ColorIntentEngine.resolve(
+        ColorIntentRequest(
             styleProfileId = profileId,
             baseRenderSpec = base,
             colorLabSpec = colorLabSpec,
             styleStrength = styleStrength
         )
     )
-    val recipe = colorLabSpec.toRecipe(pipelineResult.colorScience)
     return StyleColorRecipeResult(
-        finalRenderSpec = pipelineResult.finalRenderSpec,
-        recipe = recipe
+        finalRenderSpec = plan.finalRenderSpec,
+        recipe = plan.recipe
     )
 }
 

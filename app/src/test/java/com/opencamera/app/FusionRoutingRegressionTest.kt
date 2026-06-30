@@ -166,7 +166,12 @@ class FusionRoutingRegressionTest {
         val metadata = signal.strategy.saveRequest.metadata.customTags
         assertEquals("check-in", metadata["mode"])
         assertEquals("clarity", metadata["checkInScenario"])
-        assertEquals("multi-frame-best-frame", metadata["degradation-policy"])
+        assertEquals(2, signal.strategy.captureProfile.frameCount)
+        assertEquals("focus-stack:auto-near-far-v1", signal.strategy.captureProfile.focusStackSpec?.algorithmProfile)
+        assertEquals(false, signal.strategy.captureProfile.focusStackSpec?.userGuidanceRequired)
+        assertEquals("focus-stack-auto-near-far", metadata["degradation-policy"])
+        assertEquals("automatic", metadata["focusStackGuidance"])
+        assertEquals("near,far", metadata["focusStackRoles"])
     }
 
     @Test

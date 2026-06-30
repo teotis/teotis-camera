@@ -23,6 +23,7 @@ import com.opencamera.core.mode.ModeRuntimeState
 import com.opencamera.core.mode.ModeSessionEvent
 import com.opencamera.core.mode.ModeSignal
 import com.opencamera.core.settings.SessionSettingsSnapshot
+import com.opencamera.core.settings.FeatureCatalog
 import com.opencamera.core.media.ShotRequest
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ShotKind
@@ -72,8 +73,47 @@ class PhotoModePluginTest {
         assertEquals(1, effects.size)
         val spec = effects[0]
         assertTrue(spec.find<FilterEffect>() != null, "EffectSpec should contain FilterEffect")
-        assertTrue(spec.find<WatermarkEffect>() != null, "EffectSpec should contain WatermarkEffect")
+        assertEquals(
+            "photo-original",
+            spec.find<FilterEffect>()?.profileId,
+            "Photo mode should default to the natural/original color profile"
+        )
+        assertEquals(null, spec.find<WatermarkEffect>(), "Photo mode should not enable watermark by default")
         assertTrue(spec.find<FrameEffect>() != null, "EffectSpec should contain FrameEffect")
+    }
+
+    @Test
+    fun `onEnter includes watermark effect when watermark is enabled`(): Unit = runBlocking {
+        val effects = mutableListOf<EffectSpec>()
+        val controller = createController(
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings(
+                    photo = com.opencamera.core.settings.PhotoSettings(
+                        photoWatermarkEnabledByDefault = true
+                    )
+                )
+            ),
+            onEffectSpecChanged = { effects += it }
+        )
+
+        controller.onEnter()
+
+        assertTrue(effects.single().find<WatermarkEffect>() != null)
+    }
+
+    @Test
+    fun `missing catalog default falls back to natural original profile`(): Unit = runBlocking {
+        val effects = mutableListOf<EffectSpec>()
+        val controller = createController(
+            settingsSnapshot = SessionSettingsSnapshot(
+                catalog = FeatureCatalog(filterProfiles = emptyList())
+            ),
+            onEffectSpecChanged = { effects += it }
+        )
+
+        controller.onEnter()
+
+        assertEquals("photo-original", effects.single().find<FilterEffect>()?.profileId)
     }
 
     @Test
@@ -259,6 +299,7 @@ class PhotoModePluginTest {
         deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         eventSink: suspend (String) -> Unit = {},
         onEffectSpecChanged: suspend (EffectSpec) -> Unit = {},
+        settingsSnapshot: SessionSettingsSnapshot = SessionSettingsSnapshot(),
         lowLightState: PhotoLowLightRuntimeState = PhotoLowLightRuntimeState(
             settingEnabled = false,
             sceneSignal = PhotoSceneSignal(),
@@ -279,7 +320,7 @@ class PhotoModePluginTest {
             },
             eventSink = eventSink,
             onEffectSpecChanged = onEffectSpecChanged,
-            settingsSnapshotProvider = { SessionSettingsSnapshot() },
+            settingsSnapshotProvider = { settingsSnapshot },
             photoLowLightRuntimeStateProvider = { lowLightState }
         )
         return PhotoModePlugin().create(context)
@@ -374,7 +415,7 @@ class PhotoModePluginTest {
         assertEquals("multi-frame", metadata["photoLowLightStrategy"])
         assertEquals("0.2", metadata["photoLowLightBrightnessScore"])
         assertTrue(metadata.containsKey("filterProfile"))
-        assertTrue(metadata.containsKey("watermarkTemplate"))
+        assertFalse(metadata.containsKey("watermarkTemplate"))
     }
 
     @Test
@@ -434,8 +475,24 @@ class PhotoModePluginTest {
     }
 
     @Test
-    fun `char normal capture post process has watermark text with flash label`(): Unit = runBlocking {
+    fun `char normal capture post process has no watermark text by default`(): Unit = runBlocking {
         val controller = createController()
+        val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
+            .strategy.postProcessSpec
+        assertEquals(null, postProcess.watermarkText)
+    }
+
+    @Test
+    fun `char enabled watermark capture post process has watermark text`(): Unit = runBlocking {
+        val controller = createController(
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings(
+                    photo = com.opencamera.core.settings.PhotoSettings(
+                        photoWatermarkEnabledByDefault = true
+                    )
+                )
+            )
+        )
         val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.postProcessSpec
         assertEquals("PHOTO", postProcess.watermarkText)
@@ -444,7 +501,16 @@ class PhotoModePluginTest {
     @Test
     fun `char watermark datetime format in photo effect spec`(): Unit = runBlocking {
         var capturedSpec: EffectSpec? = null
-        val controller = createController(onEffectSpecChanged = { capturedSpec = it })
+        val controller = createController(
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = com.opencamera.core.settings.PersistedSettings(
+                    photo = com.opencamera.core.settings.PhotoSettings(
+                        photoWatermarkEnabledByDefault = true
+                    )
+                )
+            ),
+            onEffectSpecChanged = { capturedSpec = it }
+        )
         controller.onEnter()
         val watermark = capturedSpec!!.find<WatermarkEffect>()!!
         val datetime = watermark.tokens["watermarkDatetime"]!!

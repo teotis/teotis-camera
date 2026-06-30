@@ -165,7 +165,6 @@ private class AndroidPowerManagerThermalStatusBackend(
 
 internal fun thermalRuntimeIssueFor(status: Int): DeviceRuntimeIssue? {
     val reason = when (status) {
-        PowerManager.THERMAL_STATUS_SEVERE -> "thermal status severe"
         PowerManager.THERMAL_STATUS_CRITICAL -> "thermal status critical"
         PowerManager.THERMAL_STATUS_EMERGENCY -> "thermal status emergency"
         PowerManager.THERMAL_STATUS_SHUTDOWN -> "thermal status shutdown"

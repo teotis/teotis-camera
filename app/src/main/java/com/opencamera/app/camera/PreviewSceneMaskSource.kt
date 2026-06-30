@@ -1,6 +1,7 @@
 package com.opencamera.app.camera
 
 import androidx.camera.core.ImageProxy
+import com.opencamera.core.media.ContentUnderstandingSnapshot
 import com.opencamera.core.media.SceneMaskDescriptor
 import com.opencamera.core.media.SceneMaskQuality
 import com.opencamera.core.media.SceneMaskRole
@@ -100,6 +101,32 @@ fun PreviewSceneMaskPayload?.toSnapshot(
         backendId = descriptor.backendId,
         quality = if (isStale) SceneMaskQuality.DEGRADED else descriptor.quality,
         isAvailable = !isStale
+    )
+}
+
+fun PreviewSceneMaskPayload?.toContentUnderstandingSnapshot(
+    nowMillis: Long = System.currentTimeMillis(),
+    staleThresholdMs: Long = 500
+): ContentUnderstandingSnapshot {
+    if (this == null) {
+        return ContentUnderstandingSnapshot.unavailable(
+            timestampMillis = nowMillis,
+            backendId = "none",
+            reason = "preview-mask-unavailable"
+        )
+    }
+    val descriptor = toDescriptor()
+    val age = nowMillis - timestampMillis
+    if (age > staleThresholdMs) {
+        return ContentUnderstandingSnapshot.unavailable(
+            timestampMillis = timestampMillis,
+            backendId = descriptor.backendId,
+            reason = "stale-preview-mask:age=${age}ms:threshold=${staleThresholdMs}ms"
+        )
+    }
+    return ContentUnderstandingSnapshot.fromSceneMask(
+        descriptor = descriptor,
+        timestampMillis = timestampMillis
     )
 }
 

@@ -472,6 +472,23 @@ class AlgorithmProcessorBridgesTest {
     }
 
     @Test
+    fun `checkin content people place scenario triggers portrait bridge when render path exists`() {
+        val processor = RecordingPortraitEditor().let {
+            PortraitRenderPostProcessor(it).toAlgorithmProcessor()
+        }
+        assertTrue(processor.canProcess(sampleRequest(
+            customTags = mapOf(
+                "mode" to "check-in",
+                "checkInScenario" to "clarity",
+                "checkInContentScenario" to "people-place",
+                "checkInOriginalScenario" to "clarity",
+                "compatMode" to "clarity-assist",
+                "renderPath" to "depth"
+            )
+        )))
+    }
+
+    @Test
     fun `checkin people-place scenario triggers portrait bridge`() {
         val processor = RecordingPortraitEditor().let {
             PortraitRenderPostProcessor(it).toAlgorithmProcessor()

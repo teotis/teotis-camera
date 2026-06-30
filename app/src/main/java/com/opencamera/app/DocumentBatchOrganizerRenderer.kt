@@ -20,9 +20,13 @@ internal class DocumentBatchOrganizerRenderer(
     private val onExport: () -> Unit = {}
 ) {
     private var lastModel: DocumentBatchOrganizerRenderModel? = null
+    private var selectedItemId: String? = null
 
     fun render(model: DocumentBatchOrganizerRenderModel) {
         lastModel = model
+        selectedItemId = selectedItemId
+            ?.takeIf { selected -> model.items.any { it.itemId == selected } }
+            ?: model.items.lastOrNull()?.itemId
         views.panel.isVisible = model.visible
         if (!model.visible) return
 
@@ -30,6 +34,7 @@ internal class DocumentBatchOrganizerRenderer(
         views.count.text = model.countText
 
         renderItems(model)
+        renderStatus(model)
         renderFooter(model)
     }
 
@@ -46,9 +51,15 @@ internal class DocumentBatchOrganizerRenderer(
         val context = views.itemList.context
 
         model.items.forEach { item ->
-            val itemView = createItemView(context, item)
+            val itemView = createItemView(context, item, item.itemId == selectedItemId)
             views.itemList.addView(itemView)
         }
+    }
+
+    private fun renderStatus(model: DocumentBatchOrganizerRenderModel) {
+        val message = model.statusMessage
+        views.status.text = message
+        views.status.isVisible = !message.isNullOrBlank()
     }
 
     private fun renderFooter(model: DocumentBatchOrganizerRenderModel) {
@@ -59,12 +70,12 @@ internal class DocumentBatchOrganizerRenderer(
 
     private fun createItemView(
         context: Context,
-        item: DocumentBatchOrganizerItemRenderModel
+        item: DocumentBatchOrganizerItemRenderModel,
+        isSelected: Boolean
     ): View {
         val rowPadding = 4.dp(context)
         val itemMargin = 3.dp(context)
         val thumbnailSize = 80.dp(context)
-        val buttonHeight = 24.dp(context)
 
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -76,7 +87,12 @@ internal class DocumentBatchOrganizerRenderer(
             ).apply {
                 topMargin = itemMargin
             }
+            alpha = if (isSelected) 1f else 0.78f
             setBackgroundResource(R.drawable.bg_settings_card)
+            setOnClickListener {
+                selectedItemId = item.itemId
+                lastModel?.let(::render)
+            }
         }
 
         // Top row: page number, thumbnail, status label, action buttons
@@ -92,10 +108,10 @@ internal class DocumentBatchOrganizerRenderer(
         // Page number
         val pageLabel = TextView(context).apply {
             text = "${item.pageNumber}"
-            textSize = 11f
-            setTextColor(0xCCFFFFFF.toInt())
+            textSize = if (isSelected) 13f else 11f
+            setTextColor(if (isSelected) 0xFFFFFFFF.toInt() else 0xCCFFFFFF.toInt())
             layoutParams = LinearLayout.LayoutParams(
-                20.dp(context),
+                if (isSelected) 24.dp(context) else 20.dp(context),
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
@@ -136,7 +152,7 @@ internal class DocumentBatchOrganizerRenderer(
             rightSide.addView(statusLabel)
         }
 
-        // Move up/down + remove buttons
+        // Action buttons row.
         val actions = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -148,21 +164,19 @@ internal class DocumentBatchOrganizerRenderer(
             }
         }
 
-        val moveUpButton = createTextAction(context, "▲", buttonHeight).apply {
-            isEnabled = item.canMoveUp
-            alpha = if (item.canMoveUp) 1f else 0.3f
-            setOnClickListener { onMoveUpItemClick(item.itemId) }
+        // Move controls appear only on the selected row, with larger touch targets.
+        if (isSelected) {
+            val moveUpButton = createMoveAction(context, "▲", item.itemId, "up", item.canMoveUp) {
+                onMoveUpItemClick(item.itemId)
+            }
+            actions.addView(moveUpButton)
+            val moveDownButton = createMoveAction(context, "▼", item.itemId, "down", item.canMoveDown) {
+                onMoveDownItemClick(item.itemId)
+            }
+            actions.addView(moveDownButton)
         }
-        actions.addView(moveUpButton)
 
-        val moveDownButton = createTextAction(context, "▼", buttonHeight).apply {
-            isEnabled = item.canMoveDown
-            alpha = if (item.canMoveDown) 1f else 0.3f
-            setOnClickListener { onMoveDownItemClick(item.itemId) }
-        }
-        actions.addView(moveDownButton)
-
-        val removeButton = createTextAction(context, "✕", buttonHeight).apply {
+        val removeButton = createTextAction(context, "✕", if (isSelected) 36.dp(context) else 24.dp(context)).apply {
             setOnClickListener { onRemoveItemClick(item.itemId) }
         }
         actions.addView(removeButton)
@@ -193,6 +207,36 @@ internal class DocumentBatchOrganizerRenderer(
         }
 
         return row
+    }
+
+    private fun createMoveAction(
+        context: Context,
+        label: String,
+        itemId: String,
+        direction: String,
+        enabled: Boolean,
+        onClick: () -> Unit
+    ): Button {
+        val height = 40.dp(context)
+        val width = 44.dp(context)
+        return Button(context).apply {
+            text = label
+            textSize = 16f
+            setTextColor(0xFFFFFFFF.toInt())
+            minimumWidth = 0
+            minimumHeight = 0
+            setPadding(6.dp(context), 0, 6.dp(context), 0)
+            layoutParams = LinearLayout.LayoutParams(width, height).apply {
+                marginStart = 2.dp(context)
+            }
+            background = context.getDrawable(R.drawable.bg_panel_row)
+            tag = "move_$direction" + "_$itemId"
+            isEnabled = enabled
+            alpha = if (enabled) 1f else 0.35f
+            setOnClickListener {
+                if (isEnabled) onClick()
+            }
+        }
     }
 
     private fun createTextAction(context: Context, label: String, heightPx: Int): Button {

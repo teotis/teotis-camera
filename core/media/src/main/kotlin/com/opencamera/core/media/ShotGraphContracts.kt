@@ -33,6 +33,7 @@ enum class AlgorithmType {
     FILTER_RENDER,
     WATERMARK_RENDER,
     MULTI_FRAME_MERGE,
+    FOCUS_STACK_FUSION,
     NIGHT_ENHANCE,
     PORTRAIT_RENDER,
     DOCUMENT_ENHANCE,
@@ -121,8 +122,9 @@ fun ShotGraph.validateConsistency(shotKind: ShotKind): List<String> {
             if (temporaryFrameNode() == null) {
                 errors.add("MULTI_FRAME_CAPTURE requires TEMPORARY_FRAME node")
             }
-            if (!requiresAlgorithm(AlgorithmType.MULTI_FRAME_MERGE)) {
-                errors.add("MULTI_FRAME_CAPTURE requires MULTI_FRAME_MERGE algorithm")
+            if (!requiresAlgorithm(AlgorithmType.MULTI_FRAME_MERGE) &&
+                !requiresAlgorithm(AlgorithmType.FOCUS_STACK_FUSION)) {
+                errors.add("MULTI_FRAME_CAPTURE requires MULTI_FRAME_MERGE or FOCUS_STACK_FUSION algorithm")
             }
         }
         ShotKind.LIVE_PHOTO -> {

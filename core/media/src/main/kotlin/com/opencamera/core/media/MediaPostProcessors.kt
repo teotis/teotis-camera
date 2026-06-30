@@ -10,7 +10,8 @@ private val logger = Logger.getLogger("MediaPostProcessors")
 
 class CompositeMediaPostProcessor(
     private val processors: List<MediaPostProcessor>,
-    private val onProcessorTimed: ((name: String, elapsedMs: Long) -> Unit)? = null
+    private val onProcessorTimed: ((name: String, elapsedMs: Long) -> Unit)? = null,
+    private val resourceBudget: CameraResourceBudget = defaultBudgetFor(CameraPerformanceClass.UNKNOWN)
 ) : MediaPostProcessor {
     override suspend fun process(result: ShotResult): ShotResult {
         return processWithLiveness(
@@ -63,10 +64,11 @@ class CompositeMediaPostProcessor(
             if (!processor.isApplicable(current)) {
                 continue
             }
+            val jobClass = processor.jobClass(current)
+            val name = processor.diagnosticName()
 
             // Check deadline before starting this processor
             if (liveness != null && liveness.isExpired(timeSource.elapsedMillis())) {
-                val name = processor.diagnosticName()
                 val failure = PostProcessFailure(
                     stage = PostProcessFailureStage.COMPOSITE,
                     cause = PostProcessFailureCause.TIMEOUT,
@@ -84,9 +86,9 @@ class CompositeMediaPostProcessor(
             // Execute processor with remaining budget as deadline
             val processorTimeoutMs = if (liveness != null) {
                 val remaining = liveness.deadlineElapsedMillis - timeSource.elapsedMillis()
-                remaining.coerceAtLeast(1L)
+                timeoutForProcessor(jobClass, remaining.coerceAtLeast(1L))
             } else {
-                Long.MAX_VALUE
+                timeoutForProcessor(jobClass, Long.MAX_VALUE)
             }
 
             current = try {
@@ -95,7 +97,6 @@ class CompositeMediaPostProcessor(
                 }
                 if (result == null) {
                     // Deadline fired — our watchdog, not cooperative cancel
-                    val name = processor.diagnosticName()
                     val failure = PostProcessFailure(
                         stage = PostProcessFailureStage.COMPOSITE,
                         cause = PostProcessFailureCause.TIMEOUT,
@@ -103,47 +104,55 @@ class CompositeMediaPostProcessor(
                         disposition = PostProcessFailureDisposition.RECOVERABLE,
                         processorName = name
                     )
-                    return current
+                    val timedOut = current
                         .addPipelineNotes("liveness:postprocess-timeout=$name")
                         .addStructuredPostProcessFailure(failure)
+                    if (jobClass == AlgorithmJobClass.CAPTURE_OPTIONAL || jobClass == AlgorithmJobClass.REALTIME_PREVIEW) {
+                        timedOut.addPipelineNotes("resource:optional-timeout=$name")
+                    } else {
+                        return timedOut
+                    }
+                } else {
+                    result
                 }
-                result
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Error) {
                 throw e
             } catch (e: Throwable) {
-                val name = processor.diagnosticName()
                 val failure = classifyExceptionForRecovery(e, name)
                 val action = evaluateRecoveryPolicy(failure)
                 logger.log(Level.SEVERE, "PostProcessor '$name' failed [${failure.cause}] action=$action", e)
                 current = current.addStructuredPostProcessFailure(failure)
-                when (action) {
-                    RecoveryAction.STOP_POSTPROCESS -> {
-                        val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
-                        stopped = true
-                        current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
-                    }
-                    RecoveryAction.TERMINATE -> {
-                        val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
-                        current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
-                        return current
-                    }
-                    RecoveryAction.PROPAGATE -> throw e
-                    RecoveryAction.CONTINUE -> {
-                        val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
-                        current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
-                    }
-                    RecoveryAction.RECOVER_RELEASE -> {
-                        val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
-                        current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
-                        return current
+                if (jobClass == AlgorithmJobClass.CAPTURE_OPTIONAL && action != RecoveryAction.PROPAGATE) {
+                    current.addPipelineNotes("resource:optional-degraded:$name")
+                } else {
+                    when (action) {
+                        RecoveryAction.STOP_POSTPROCESS -> {
+                            val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                            stopped = true
+                            current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                        }
+                        RecoveryAction.TERMINATE -> {
+                            val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                            current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                            return current
+                        }
+                        RecoveryAction.PROPAGATE -> throw e
+                        RecoveryAction.CONTINUE -> {
+                            val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                            current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                        }
+                        RecoveryAction.RECOVER_RELEASE -> {
+                            val errorMessage = (e.message ?: e.javaClass.simpleName).take(120)
+                            current.addPipelineNotes("postprocess:failed:$name:$errorMessage")
+                            return current
+                        }
                     }
                 }
             }
             if (stopped) break
             val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L
-            val name = processor.diagnosticName()
             processorTimings.add(name to elapsedMs)
             onProcessorTimed?.invoke(name, elapsedMs)
         }
@@ -155,6 +164,17 @@ class CompositeMediaPostProcessor(
         } else {
             current
         }
+    }
+
+    private fun timeoutForProcessor(
+        jobClass: AlgorithmJobClass,
+        remainingLivenessMillis: Long
+    ): Long {
+        if (jobClass != AlgorithmJobClass.CAPTURE_OPTIONAL) {
+            return remainingLivenessMillis
+        }
+        return minOf(remainingLivenessMillis, timeoutForJobClass(jobClass, resourceBudget))
+            .coerceAtLeast(1L)
     }
 }
 private fun MediaPostProcessor.diagnosticName(): String {

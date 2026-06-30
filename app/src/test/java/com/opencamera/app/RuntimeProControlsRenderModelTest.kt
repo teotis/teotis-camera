@@ -95,6 +95,77 @@ class RuntimeProControlsRenderModelTest {
 
 
         @Test
+        fun `raw control isToggleOn reflects draft rawEnabled when raw is applicable`() {
+            val baseline = defaultSessionState(
+                activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                    manualControlCapabilities = ManualControlCapabilityMatrix(
+                        raw = ManualControlSupport.APPLY,
+                        iso = ManualControlSupport.APPLY,
+                        shutter = ManualControlSupport.APPLY,
+                        exposureCompensation = ManualControlSupport.APPLY,
+                        focusDistance = ManualControlSupport.APPLY,
+                        aperture = ManualControlSupport.APPLY,
+                        whiteBalance = ManualControlSupport.APPLY
+                    )
+                )
+            )
+            val stateOff = baseline.copy(
+                activeMode = ModeId.HUMANISTIC,
+                modeSnapshot = baseline.modeSnapshot.copy(
+                    id = ModeId.HUMANISTIC,
+                    state = baseline.modeSnapshot.state.copy(isProVariantActive = true)
+                )
+            )
+
+            val modelOff = runtimeProControlsRenderModel(stateOff, TestAppTextResolver())
+
+            assertEquals(false, modelOff.rawControl.isToggleOn)
+            assertNull(modelOff.isoControl.isToggleOn)
+
+            val stateOn = stateOff.copy(
+                settings = stateOff.settings.copy(
+                    catalog = stateOff.settings.catalog.copy(
+                        manualCaptureDraft = stateOff.settings.catalog.manualCaptureDraft.copy(
+                            rawEnabled = true
+                        )
+                    )
+                )
+            )
+
+            val modelOn = runtimeProControlsRenderModel(stateOn, TestAppTextResolver())
+
+            assertEquals(true, modelOn.rawControl.isToggleOn)
+        }
+
+        @Test
+        fun `raw control isToggleOn is null when raw is saved only`() {
+            val baseline = defaultSessionState(
+                activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                    manualControlCapabilities = ManualControlCapabilityMatrix(
+                        raw = ManualControlSupport.SAVED_ONLY,
+                        iso = ManualControlSupport.APPLY,
+                        shutter = ManualControlSupport.APPLY,
+                        exposureCompensation = ManualControlSupport.APPLY,
+                        focusDistance = ManualControlSupport.APPLY,
+                        aperture = ManualControlSupport.APPLY,
+                        whiteBalance = ManualControlSupport.APPLY
+                    )
+                )
+            )
+            val state = baseline.copy(
+                activeMode = ModeId.HUMANISTIC,
+                modeSnapshot = baseline.modeSnapshot.copy(
+                    id = ModeId.HUMANISTIC,
+                    state = baseline.modeSnapshot.state.copy(isProVariantActive = true)
+                )
+            )
+
+            val model = runtimeProControlsRenderModel(state, TestAppTextResolver())
+
+            assertNull(model.rawControl.isToggleOn)
+        }
+
+        @Test
         fun `runtime pro controls degrade to saved only on devices without manual support`() {
             val baseline = defaultSessionState(
                 activeDeviceCapabilities = DeviceCapabilities.DEFAULT.copy(

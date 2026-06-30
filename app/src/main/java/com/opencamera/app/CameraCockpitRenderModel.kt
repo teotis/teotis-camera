@@ -60,6 +60,7 @@ internal data class BottomCockpitRenderModel(
     val isRecording: Boolean,
     val lensButtonLabel: String,
     val lensButtonEnabled: Boolean,
+    val lensButtonVisible: Boolean,
     val recordingIndicator: RecordingIndicatorRenderModel,
     val shutterVisualState: ShutterVisualState = ShutterVisualState.PHOTO_READY,
     val disabledReason: String? = null
@@ -143,6 +144,7 @@ internal fun cameraCockpitRenderModel(
             isRecording = state.recordingStatus != com.opencamera.core.session.RecordingStatus.IDLE,
             lensButtonLabel = controls.lensFacingButtonLabel,
             lensButtonEnabled = controls.lensFacingEnabled,
+            lensButtonVisible = controls.lensFacingVisible,
             recordingIndicator = recordingIndicatorRenderModel(state, text),
             shutterVisualState = shutterVisualState(state),
             disabledReason = shutterDisabledReason(state, text)

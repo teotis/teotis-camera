@@ -13,6 +13,7 @@
 package com.opencamera.core.device
 
 import com.opencamera.core.media.ShotKind
+import com.opencamera.core.media.FocusStackFrameRole
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -25,13 +26,15 @@ class MultiFrameCaptureExecutionPlannerTest {
     private fun makeRequest(
         shotKind: ShotKind = ShotKind.MULTI_FRAME_CAPTURE,
         frameCount: Int = 1,
-        interFrameDelayMillis: Long = 0L
+        interFrameDelayMillis: Long = 0L,
+        focusStackFrameRoles: List<FocusStackFrameRole> = emptyList()
     ) = DeviceShotRequest(
         shotId = "test",
         template = CaptureTemplate.STILL_CAPTURE,
         shotKind = shotKind,
         frameCount = frameCount,
-        interFrameDelayMillis = interFrameDelayMillis
+        interFrameDelayMillis = interFrameDelayMillis,
+        focusStackFrameRoles = focusStackFrameRoles
     )
 
     @Test
@@ -111,6 +114,19 @@ class MultiFrameCaptureExecutionPlannerTest {
         assertEquals(1, plan.steps[0].frameIndex)
         assertEquals(2, plan.steps[1].frameIndex)
         assertEquals(3, plan.steps[2].frameIndex)
+    }
+
+    @Test
+    fun `focus stack roles are assigned to matching frame steps`() {
+        val plan = planner.plan(
+            makeRequest(
+                frameCount = 2,
+                focusStackFrameRoles = listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR)
+            )
+        )
+
+        assertEquals(FocusStackFrameRole.NEAR, plan.steps[0].focusStackRole)
+        assertEquals(FocusStackFrameRole.FAR, plan.steps[1].focusStackRole)
     }
 
     @Test

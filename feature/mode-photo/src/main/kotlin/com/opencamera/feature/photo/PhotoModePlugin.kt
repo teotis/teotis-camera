@@ -4,6 +4,7 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.ExtensionCaptureStrategy
 import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectEntry
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
 import com.opencamera.core.effect.FrameEffect
@@ -90,22 +91,34 @@ private class PhotoModeController(
         )
         val adjustedRenderSpec = pipelineResult?.finalRenderSpec
         val recipe = pipelineResult?.recipe ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
-        val tmpl = selectedWatermarkTemplate()
-        val watermarkStyle = context.settingsSnapshot.persisted.photo.watermarkStyleFor(tmpl.id)
-        return EffectSpec(listOf(
-            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe),
-            WatermarkEffect(tmpl.id, mapOf(
-                "watermarkModel" to "OpenCamera",
-                "watermarkDatetime" to watermarkDateTime(),
-                "watermarkCameraParams" to watermarkCameraParams("Flash ${flashMode.label}")
-            ), style = watermarkStyle),
-            FrameEffect(currentFrameRatio())
-        ))
+        val effects = mutableListOf<EffectEntry>(
+            FilterEffect(filter.id, adjustedRenderSpec, recipe = recipe)
+        )
+        if (photoSettings.photoWatermarkEnabledByDefault) {
+            val tmpl = selectedWatermarkTemplate()
+            val watermarkStyle = photoSettings.watermarkStyleFor(tmpl.id)
+            effects += WatermarkEffect(
+                tmpl.id,
+                mapOf(
+                    "watermarkModel" to "OpenCamera",
+                    "watermarkDatetime" to watermarkDateTime(),
+                    "watermarkCameraParams" to watermarkCameraParams("Flash ${flashMode.label}")
+                ),
+                style = watermarkStyle
+            )
+        }
+        effects += FrameEffect(currentFrameRatio())
+        return EffectSpec(effects)
     }
 
     override fun buildCaptureStrategy(effectSpec: EffectSpec, countdownSeconds: Int): ModeSignal.SubmitCapture {
         val flashMode = currentFlashMode()
-        val postProcessSpec = EffectBridge.toPostProcessSpec(effectSpec).copy(watermarkText = "PHOTO")
+        val bridgePostProcessSpec = EffectBridge.toPostProcessSpec(effectSpec)
+        val postProcessSpec = if (effectSpec.find<WatermarkEffect>() != null) {
+            bridgePostProcessSpec.copy(watermarkText = "PHOTO")
+        } else {
+            bridgePostProcessSpec
+        }
         val lowLight = context.photoLowLightRuntimeState
 
         val strategy = when {
@@ -153,7 +166,12 @@ private class PhotoModeController(
 
     override fun buildDefaultDetail(): String {
         val flash = if (flashSupported()) "Flash ${currentFlashMode().label}" else "Flash control unavailable."
-        return "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark ${selectedWatermarkTemplate().label} | Live ${onOffLabel(livePhotoEnabled())} | Timer ${countdownDuration().label} | $flash | Frame ${currentFrameRatio().label} | Press shutter to request still capture."
+        val watermarkLabel = if (context.settingsSnapshot.persisted.photo.photoWatermarkEnabledByDefault) {
+            selectedWatermarkTemplate().label
+        } else {
+            "Off"
+        }
+        return "Still ${runtimeState().stillCaptureQuality.label} | Size ${runtimeState().stillCaptureResolutionPreset.label} | Filter ${selectedFilter.label} | Watermark $watermarkLabel | Live ${onOffLabel(livePhotoEnabled())} | Timer ${countdownDuration().label} | $flash | Frame ${currentFrameRatio().label} | Press shutter to request still capture."
     }
 
     private fun flashSupported() = runtimeState().deviceCapabilities.supportsFlashControl
@@ -172,7 +190,10 @@ private class PhotoModeController(
         SaveRequest.photoLibrary(metadata = MediaMetadata(customTags = buildMap {
             put("mode", "photo"); put("flash", flashMode.name.lowercase())
             put("livePhotoDefault", liveTag); put("watermarkModeName", "Photo")
-            put("watermarkProfileName", flashMode.name.lowercase().replaceFirstChar { it.titlecase() })
+            put(
+                "watermarkProfileName",
+                if (photoWatermarkEnabled()) selectedWatermarkTemplate().label else "Off"
+            )
             if (liveTag == "on") putAll(context.settingsSnapshot.catalog.liveMediaBundleDraft.liveWatermarkMetadataTags())
             put("stillResolution", runtimeState().stillCaptureResolutionPreset.tagValue)
             putAll(captureMetadataTags(effectSpec = effectSpec, modeTags = this))
@@ -230,7 +251,7 @@ private class PhotoModeController(
         context.settingsSnapshot.persisted.photo.defaultFilterProfileId) ?: DEFAULT_PHOTO_FILTER
 
     companion object {
-        private val DEFAULT_PHOTO_FILTER = FilterProfile("photo-vivid", "Vivid", FilterProfileCategory.PHOTO,
-            renderSpec = com.opencamera.core.settings.defaultFilterRenderSpecOrNull("photo-vivid"))
+        private val DEFAULT_PHOTO_FILTER = FilterProfile("photo-original", "Original", FilterProfileCategory.PHOTO,
+            renderSpec = com.opencamera.core.settings.defaultFilterRenderSpecOrNull("photo-original"))
     }
 }

@@ -67,7 +67,8 @@ internal fun runtimeProControlsRenderModel(
             availabilityLabel = text.availabilityLabel(manualCapabilities.raw.toSettingsAvailability()),
             supportLabel = manualCapabilities.raw.manualSupportLabel(text),
             nextAction = FeatureCatalogAction.UpdateManualRawEnabled(!draft.rawEnabled)
-                .takeIf { isVisible && editingEnabled }
+                .takeIf { isVisible && editingEnabled },
+            isToggleOn = if (manualCapabilities.raw == ManualControlSupport.SAVED_ONLY) null else draft.rawEnabled
         ),
         isoControl = FeatureCatalogControlRenderModel(
             label = text.get(R.string.label_iso),

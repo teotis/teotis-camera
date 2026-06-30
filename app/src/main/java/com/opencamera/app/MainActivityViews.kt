@@ -182,6 +182,7 @@ internal data class DocumentBatchRailViews(
     val rail: LinearLayout,
     val chip: android.widget.TextView,
     val thumbnail: android.widget.ImageView,
+    val itemScroll: NestedScrollView,
     val itemList: LinearLayout,
     val moveUpButton: Button,
     val moveDownButton: Button,
@@ -199,7 +200,8 @@ internal data class RuntimeProControlsViews(
 )
 
 internal data class DocumentBatchOrganizerViews(
-    val panel: NestedScrollView,
+    val panel: LinearLayout,
+    val scroll: NestedScrollView,
     val title: TextView,
     val count: TextView,
     val itemList: LinearLayout,
@@ -207,7 +209,8 @@ internal data class DocumentBatchOrganizerViews(
     val emptyHint: TextView,
     val footer: LinearLayout,
     val continueShooting: Button,
-    val exportButton: Button
+    val exportButton: Button,
+    val status: TextView
 )
 
 internal data class BottomCockpitViews(
@@ -399,13 +402,16 @@ internal data class MainActivityViews(
                 rail = activity.findViewById(R.id.documentBatchRail),
                 chip = activity.findViewById(R.id.documentBatchRailChip),
                 thumbnail = activity.findViewById(R.id.documentBatchRailThumbnail),
+                itemScroll = activity.findViewById(R.id.documentBatchRailItemScroll),
                 itemList = activity.findViewById(R.id.documentBatchRailItemList),
                 moveUpButton = activity.findViewById(R.id.documentBatchRailMoveUpButton),
                 moveDownButton = activity.findViewById(R.id.documentBatchRailMoveDownButton),
                 overviewButton = activity.findViewById(R.id.documentBatchRailOverviewButton)
             )
+            documentBatchRail.itemScroll.setNestedScrollingEnabled(true)
             val documentBatchOrganizer = DocumentBatchOrganizerViews(
                 panel = activity.findViewById(R.id.documentBatchOrganizerPanel),
+                scroll = activity.findViewById(R.id.documentBatchOrganizerScroll),
                 title = activity.findViewById(R.id.documentBatchOrganizerTitle),
                 count = activity.findViewById(R.id.documentBatchOrganizerCount),
                 itemList = activity.findViewById(R.id.documentBatchOrganizerItemList),
@@ -413,7 +419,8 @@ internal data class MainActivityViews(
                 emptyHint = activity.findViewById(R.id.documentBatchOrganizerEmptyHint),
                 footer = activity.findViewById(R.id.documentBatchOrganizerFooter),
                 continueShooting = activity.findViewById(R.id.buttonDocumentBatchContinueShooting),
-                exportButton = activity.findViewById(R.id.buttonDocumentBatchExport)
+                exportButton = activity.findViewById(R.id.buttonDocumentBatchExport),
+                status = activity.findViewById(R.id.documentBatchOrganizerStatus)
             )
             val filterStrip = FilterStripViews(
                 scroll = activity.findViewById(R.id.filterStripScroll),

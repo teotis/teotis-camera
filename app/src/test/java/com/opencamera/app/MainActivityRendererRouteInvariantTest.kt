@@ -12,6 +12,8 @@ import androidx.core.view.isVisible
 import androidx.core.widget.NestedScrollView
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
+import com.opencamera.core.settings.FilterRenderSpec
+import com.opencamera.core.settings.toStylePresetPreview
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -127,6 +129,41 @@ class MainActivityRendererRouteInvariantTest {
         assertFalse(views.filterLab.panel.isVisible)
     }
 
+    @Test
+    fun `eager style model render cannot reveal style rail outside StyleLab route`() {
+        val views = createViews()
+        val renderer = createRenderer(views)
+        val filterRenderer = FilterLabPanelRenderer(
+            context = org.robolectric.RuntimeEnvironment.getApplication(),
+            views = views.filterLab,
+            cardRail = views.bottomCockpit.stylePresetCardRail
+        )
+
+        renderer.renderPanelVisibility(CockpitPanelRoute.None)
+        filterRenderer.renderPage(stylePageWithCardRail())
+
+        assertFalse(
+            "stylePresetCardRail visibility must remain route-owned; eager style refreshes from other switches must not flash it",
+            views.bottomCockpit.stylePresetCardRail.isVisible
+        )
+    }
+
+    @Test
+    fun `eager style model render preserves visible rail under StyleLab route`() {
+        val views = createViews()
+        val renderer = createRenderer(views)
+        val filterRenderer = FilterLabPanelRenderer(
+            context = org.robolectric.RuntimeEnvironment.getApplication(),
+            views = views.filterLab,
+            cardRail = views.bottomCockpit.stylePresetCardRail
+        )
+
+        renderer.renderPanelVisibility(CockpitPanelRoute.StyleLab)
+        filterRenderer.renderPage(stylePageWithCardRail())
+
+        assertTrue(views.bottomCockpit.stylePresetCardRail.isVisible)
+    }
+
     private fun createViews(): MainActivityViews {
         val context = org.robolectric.RuntimeEnvironment.getApplication()
         return MainActivityViews(
@@ -165,13 +202,15 @@ class MainActivityRendererRouteInvariantTest {
                 rail = LinearLayout(context),
                 chip = TextView(context),
                 thumbnail = allocateInstance(ImageView::class.java),
+                itemScroll = NestedScrollView(context),
                 itemList = LinearLayout(context),
                 moveUpButton = Button(context),
                 moveDownButton = Button(context),
                 overviewButton = Button(context)
             ),
             documentBatchOrganizer = DocumentBatchOrganizerViews(
-                panel = NestedScrollView(context),
+                panel = LinearLayout(context),
+                scroll = NestedScrollView(context),
                 title = TextView(context),
                 count = TextView(context),
                 itemList = LinearLayout(context),
@@ -179,7 +218,8 @@ class MainActivityRendererRouteInvariantTest {
                 emptyHint = TextView(context),
                 footer = LinearLayout(context),
                 continueShooting = Button(context),
-                exportButton = Button(context)
+                exportButton = Button(context),
+                status = TextView(context)
             ),
             filterStrip = FilterStripViews(
                 scroll = HorizontalScrollView(context),
@@ -325,6 +365,73 @@ class MainActivityRendererRouteInvariantTest {
                 stylePresetCardRail = StylePresetCardRailView(context)
             ),
             panelDismissScrim = View(context)
+        )
+    }
+
+    private fun stylePageWithCardRail(): FilterLabPageRenderModel {
+        val spec = FilterRenderSpec(contrast = 1.1f, saturation = 1.08f)
+        val tab = FilterLabTabRenderModel(FilterLabFamily.PHOTO, "Photo", isSelected = true)
+        return FilterLabPageRenderModel(
+            headline = "Style",
+            supportingText = "Choose a style",
+            heroSummary = "",
+            currentFilterSummary = "Portrait Retro",
+            rosterText = "",
+            editingEnabled = true,
+            editingHint = "",
+            showAdjustmentPanel = false,
+            photoTab = tab,
+            humanisticTab = FilterLabTabRenderModel(FilterLabFamily.HUMANISTIC, "Humanistic", isSelected = false),
+            portraitTab = FilterLabTabRenderModel(FilterLabFamily.PORTRAIT, "Portrait", isSelected = false),
+            videoTab = FilterLabTabRenderModel(FilterLabFamily.VIDEO, "Video", isSelected = false),
+            documentTab = FilterLabTabRenderModel(FilterLabFamily.DOCUMENT, "Document", isSelected = false),
+            filterItems = emptyList(),
+            adjustControl = FilterLabAdjustRenderModel(
+                buttonLabel = "Adjust",
+                family = FilterLabFamily.PHOTO,
+                sourceProfileId = "photo-retro",
+                isEnabled = true,
+                willCreateCustomCopy = false
+            ),
+            adjustmentPanel = FilterAdjustmentPanelRenderModel(
+                isVisible = false,
+                mode = FilterAdjustmentMode.LIGHT,
+                selectedProfileId = "photo-retro",
+                selectedProfileLabel = "Portrait Retro",
+                renderSpec = spec,
+                modeToggleLabel = "Advanced",
+                lightPalette = FilterLightPaletteRenderModel("", ""),
+                advancedControls = FilterAdvancedControl.entries.map { control ->
+                    FilterAdvancedControlRenderModel(control, control.name)
+                }
+            ),
+            cycleControl = SettingsControlRenderModel("Style", "Portrait Retro"),
+            saveCustomControl = FilterLabSaveCustomRenderModel(
+                buttonLabel = "Save",
+                family = FilterLabFamily.PHOTO,
+                sourceProfileId = "photo-retro",
+                isEnabled = true
+            ),
+            footer = "",
+            stylePresetCardRail = StylePresetRailRenderModel(
+                title = "Photo Styles",
+                activeFamily = FilterLabFamily.PHOTO,
+                cards = listOf(
+                    StylePresetCardRenderModel(
+                        profileId = "photo-retro",
+                        title = "Retro",
+                        family = FilterLabFamily.PHOTO,
+                        preview = spec.toStylePresetPreview(),
+                        isSelected = true,
+                        isEnabled = true,
+                        applyAction = null,
+                        moodLabel = "Warm",
+                        spec = spec
+                    )
+                ),
+                isEnabled = true,
+                supportingText = "Tap to apply"
+            )
         )
     }
 

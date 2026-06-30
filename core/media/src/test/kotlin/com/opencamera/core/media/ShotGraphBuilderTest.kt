@@ -136,6 +136,25 @@ class ShotGraphBuilderTest {
     }
 
     @Test
+    fun `MULTI_FRAME_CAPTURE with focus stack spec requires focus stack fusion algorithm`() {
+        val request = baseRequest.copy(
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            captureProfile = CaptureProfile(
+                frameCount = 2,
+                focusStackSpec = FocusStackCaptureSpec.guidedNearFar()
+            )
+        )
+
+        val graph = ShotGraphBuilder.build(request)
+        val focusStackNode = graph.algorithmNodes.firstOrNull { it.type == AlgorithmType.FOCUS_STACK_FUSION }
+
+        assertNotNull(focusStackNode)
+        assertEquals(listOf("test-shot:temp-frames"), focusStackNode.inputs)
+        assertEquals("test-shot:primary", focusStackNode.output)
+        assertTrue(graph.validateConsistency(ShotKind.MULTI_FRAME_CAPTURE).isEmpty())
+    }
+
+    @Test
     fun `LIVE_PHOTO has three capture nodes and requires live assemble algorithm`() {
         val graph = ShotGraphBuilder.build(
             baseRequest.copy(

@@ -10,6 +10,8 @@ import com.opencamera.app.i18n.AppTextResolver
 
 internal enum class DevLogTab { KEY, CORE, ERROR, ALL }
 
+internal fun initialDevLogTab(): DevLogTab = DevLogTab.ALL
+
 internal data class DevLogClearCutoffs(
     val keySequence: Int = 0,
     val coreSequence: Int = 0,
@@ -112,4 +114,3 @@ internal data class DevLogRenderModel(
     val domainTabs: List<DomainTabCount> = emptyList(),
     val selectedDomain: TraceEventDomain? = null
 )
-

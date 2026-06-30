@@ -1,6 +1,12 @@
 package com.opencamera.app.camera
 
 import android.graphics.Bitmap
+import com.opencamera.core.media.ContentRegionBounds
+import com.opencamera.core.media.ContentRegionDescriptor
+import com.opencamera.core.media.ContentRegionRole
+import com.opencamera.core.media.ContentTagDescriptor
+import com.opencamera.core.media.ContentTagFamily
+import com.opencamera.core.media.ContentUnderstandingSnapshot
 import com.opencamera.core.media.MediaMetadata
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
@@ -14,6 +20,8 @@ import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.SaveRequest
 import com.opencamera.core.media.SceneMaskPayload
+import com.opencamera.core.media.SceneMaskQuality
+import com.opencamera.core.media.SceneMaskTransform
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ThumbnailSource
 import com.opencamera.core.settings.FilterRenderSpec
@@ -267,6 +275,7 @@ class PhotoAlgorithmPostProcessorTest {
         val night = resolvePhotoAlgorithmSpec("night-fallback-warm")
         val pro = resolvePhotoAlgorithmSpec("pro-assisted-contrast")
         val checkInClarity = resolvePhotoAlgorithmSpec("checkin-clarity-best-frame-v1")
+        val checkInFocusStack = resolvePhotoAlgorithmSpec("checkin-clarity-focus-stack-v1")
         val humanisticProfessional = resolvePhotoAlgorithmSpec("photo-vivid-pro")
 
         assertNotNull(photo)
@@ -276,10 +285,14 @@ class PhotoAlgorithmPostProcessorTest {
         assertNotNull(night)
         assertNotNull(pro)
         assertNotNull(checkInClarity)
+        assertNotNull(checkInFocusStack)
         assertNotNull(humanisticProfessional)
         assertEquals("checkin-clarity-best-frame-v1", checkInClarity.profile)
+        assertEquals("checkin-clarity-focus-stack-v1", checkInFocusStack.profile)
         assertEquals("photo-vivid-pro", humanisticProfessional.profile)
         assertTrue(checkInClarity.sharpnessBoost > 0f)
+        assertTrue(checkInFocusStack.sharpnessBoost > 0f)
+        assertTrue(checkInFocusStack.sharpnessBoost < checkInClarity.sharpnessBoost)
         assertTrue(humanisticProfessional.saturation > 1f)
     }
 
@@ -303,6 +316,28 @@ class PhotoAlgorithmPostProcessorTest {
         assertEquals("checkin-clarity-best-frame-v1", editor.invocations.single().spec.profile)
         assertTrue(editor.invocations.single().spec.sharpnessBoost > 0f)
         assertTrue(result.pipelineNotes.contains("algorithm-render:applied:checkin-clarity-best-frame-v1"))
+    }
+
+    @Test
+    fun `checkin focus stack clarity profile keeps clarity rendering applied`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(
+            result = PhotoAlgorithmApplied()
+        )
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "checkin-clarity-focus-stack-v1",
+                outputHandle = MediaOutputHandle(
+                    displayPath = "/tmp/checkin-clarity-focus-stack.jpg",
+                    filePath = "/tmp/checkin-clarity-focus-stack.jpg"
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        assertEquals("checkin-clarity-focus-stack-v1", editor.invocations.single().spec.profile)
+        assertTrue(editor.invocations.single().spec.sharpnessBoost > 0f)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:checkin-clarity-focus-stack-v1"))
     }
 
     @Test
@@ -347,6 +382,428 @@ class PhotoAlgorithmPostProcessorTest {
         assertEquals(1.1945403f, inv.spec.saturation)
         assertEquals(2, inv.spec.warmthShift)
         assertTrue(result.pipelineNotes.contains("algorithm-render:applied:custom-vivid-1"))
+    }
+
+    @Test
+    fun `content scene tags adapt generic vivid style`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = ContentUnderstandingSnapshot.fromTags(
+                    snapshotId = "content-style-food",
+                    timestampMillis = 42L,
+                    backendId = "fake-content",
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    tags = listOf(
+                        ContentTagDescriptor(
+                            tagId = "scene-food",
+                            label = "Food",
+                            family = ContentTagFamily.SCENE,
+                            confidence = 0.92f,
+                            backendId = "fake-content"
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals("photo-vivid", inv.spec.profile)
+        assertTrue(inv.spec.saturation > baseSpec.saturation)
+        assertTrue(inv.spec.warmBoost > baseSpec.warmBoost)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-source=tag:scene-food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-confidence=0.92"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:photo-vivid"))
+        assertEquals("food", result.metadata.customTags["styleContentScene"])
+        assertEquals("tag:scene-food", result.metadata.customTags["styleContentSceneSource"])
+        assertEquals("0.92", result.metadata.customTags["styleContentSceneConfidence"])
+    }
+
+    @Test
+    fun `content region roles adapt generic vivid style when scene tags are absent`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = ContentUnderstandingSnapshot(
+                    snapshotId = "content-style-food-region",
+                    timestampMillis = 42L,
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    backendId = "fake-content",
+                    regions = listOf(
+                        ContentRegionDescriptor(
+                            regionId = "food-0",
+                            role = ContentRegionRole.FOOD,
+                            quality = SceneMaskQuality.SAVED_PHOTO,
+                            backendId = "fake-content",
+                            confidence = 0.89f,
+                            transform = contentTransform()
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals("photo-vivid", inv.spec.profile)
+        assertTrue(inv.spec.saturation > baseSpec.saturation)
+        assertTrue(inv.spec.warmBoost > baseSpec.warmBoost)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:photo-vivid"))
+    }
+
+    @Test
+    fun `large sky regions strengthen background style adaptation`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = ContentUnderstandingSnapshot(
+                    snapshotId = "content-large-sky-region",
+                    timestampMillis = 42L,
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    backendId = "fake-content",
+                    regions = listOf(
+                        ContentRegionDescriptor(
+                            regionId = "sky-0",
+                            role = ContentRegionRole.SKY,
+                            quality = SceneMaskQuality.SAVED_PHOTO,
+                            backendId = "fake-content",
+                            confidence = 0.9f,
+                            transform = contentTransform(),
+                            bounds = ContentRegionBounds(
+                                left = 0.0f,
+                                top = 0.0f,
+                                right = 1.0f,
+                                bottom = 0.58f
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertTrue(inv.spec.coolBoost > baseSpec.coolBoost + 0.1f)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=sky-water"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-background-adjusted:role=sky"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-background-source=region:sky-0"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-background-area=0.58"))
+        assertEquals("sky", result.metadata.customTags["styleContentBackgroundRole"])
+        assertEquals("region:sky-0", result.metadata.customTags["styleContentBackgroundSource"])
+        assertEquals("0.58", result.metadata.customTags["styleContentBackgroundArea"])
+    }
+
+    @Test
+    fun `preview approximate content does not adapt saved photo style`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = ContentUnderstandingSnapshot.fromTags(
+                    snapshotId = "content-preview-style-food",
+                    timestampMillis = 42L,
+                    backendId = "preview-content",
+                    quality = SceneMaskQuality.PREVIEW_APPROXIMATE,
+                    tags = listOf(
+                        ContentTagDescriptor(
+                            tagId = "scene-food",
+                            label = "Food",
+                            family = ContentTagFamily.SCENE,
+                            confidence = 0.92f,
+                            backendId = "preview-content"
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals(baseSpec.saturation, inv.spec.saturation)
+        assertEquals(baseSpec.warmBoost, inv.spec.warmBoost)
+        assertFalse(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:photo-vivid"))
+    }
+
+    @Test
+    fun `missing content explains why style adaptation is skipped`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = null
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals(baseSpec.saturation, inv.spec.saturation)
+        assertEquals(baseSpec.warmBoost, inv.spec.warmBoost)
+        assertFalse(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-skipped:missing-content"))
+        assertEquals("missing-content", result.metadata.customTags["styleContentSkipped"])
+    }
+
+    @Test
+    fun `not ready content explains why style adaptation is skipped`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = ContentUnderstandingSnapshot.unavailable(
+                    timestampMillis = 42L,
+                    backendId = "fake-content",
+                    reason = "no-recognition-backend"
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals(baseSpec.saturation, inv.spec.saturation)
+        assertEquals(baseSpec.warmBoost, inv.spec.warmBoost)
+        assertFalse(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-skipped:not-ready"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-quality=unavailable"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-reason=no-recognition-backend"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:photo-vivid"))
+        assertEquals("not-ready", result.metadata.customTags["styleContentSkipped"])
+        assertEquals("unavailable", result.metadata.customTags["styleContentSkippedQuality"])
+        assertEquals("no-recognition-backend", result.metadata.customTags["styleContentSkippedReason"])
+    }
+
+    @Test
+    fun `ready content without scene hint explains why style adaptation is skipped`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = ContentUnderstandingSnapshot(
+                    snapshotId = "content-style-face-only",
+                    timestampMillis = 42L,
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    backendId = "fake-content",
+                    regions = listOf(
+                        ContentRegionDescriptor(
+                            regionId = "face-0",
+                            role = ContentRegionRole.FACE,
+                            quality = SceneMaskQuality.SAVED_PHOTO,
+                            backendId = "fake-content",
+                            confidence = 0.93f,
+                            transform = contentTransform()
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals(baseSpec.saturation, inv.spec.saturation)
+        assertEquals(baseSpec.warmBoost, inv.spec.warmBoost)
+        assertFalse(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-skipped:no-scene-hint"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:scene-tags=unsupported"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:semantic-regions=unsupported"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:photo-vivid"))
+        assertEquals("no-scene-hint", result.metadata.customTags["styleContentSkipped"])
+        assertEquals("unsupported", result.metadata.customTags["styleContentSkippedSceneTags"])
+        assertEquals("unsupported", result.metadata.customTags["styleContentSkippedSemanticRegions"])
+    }
+
+    @Test
+    fun `bounded subject content protects strong style rendering`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = ContentUnderstandingSnapshot(
+                    snapshotId = "content-style-face-bounds",
+                    timestampMillis = 42L,
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    backendId = "fake-content",
+                    regions = listOf(
+                        ContentRegionDescriptor(
+                            regionId = "face-0",
+                            role = ContentRegionRole.FACE,
+                            quality = SceneMaskQuality.SAVED_PHOTO,
+                            backendId = "fake-content",
+                            confidence = 0.94f,
+                            transform = contentTransform(),
+                            bounds = ContentRegionBounds(
+                                left = 0.18f,
+                                top = 0.12f,
+                                right = 0.48f,
+                                bottom = 0.62f
+                            )
+                        )
+                    )
+                ),
+                saveRequest = SaveRequest.photoLibrary(
+                    metadata = MediaMetadata(
+                        algorithmProfile = "photo-vivid",
+                        customTags = FilterRenderSpec(
+                            haloStrength = 0.24f,
+                            grainStrength = 0.09f
+                        ).toMetadataTags() + mapOf(
+                            "filterProfile" to "photo-vivid"
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals(0.12f, inv.spec.haloStrength)
+        assertEquals(0.04f, inv.spec.grainStrength)
+        assertTrue(
+            result.pipelineNotes.contains(
+                "algorithm-render:content-subject-protected:source=region:face-0"
+            )
+        )
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-subject-confidence=0.94"))
+        assertEquals("true", result.metadata.customTags["styleContentSubjectProtected"])
+        assertEquals("region:face-0", result.metadata.customTags["styleContentSubjectSource"])
+        assertEquals("face", result.metadata.customTags["styleContentSubjectRole"])
+        assertEquals("0.94", result.metadata.customTags["styleContentSubjectConfidence"])
+    }
+
+    @Test
+    fun `low confidence scene hint explains why style adaptation is skipped`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "photo-vivid",
+                contentUnderstanding = ContentUnderstandingSnapshot.fromTags(
+                    snapshotId = "content-style-low-food",
+                    timestampMillis = 42L,
+                    backendId = "fake-content",
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    tags = listOf(
+                        ContentTagDescriptor(
+                            tagId = "scene-food",
+                            label = "Food",
+                            family = ContentTagFamily.SCENE,
+                            confidence = 0.62f,
+                            backendId = "fake-content"
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals(baseSpec.saturation, inv.spec.saturation)
+        assertEquals(baseSpec.warmBoost, inv.spec.warmBoost)
+        assertFalse(result.pipelineNotes.contains("algorithm-render:content-adapted:scene=food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-skipped:low-confidence-scene-hint"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-source=tag:scene-food"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:content-confidence=0.62"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:photo-vivid"))
+        assertEquals("low-confidence-scene-hint", result.metadata.customTags["styleContentSkipped"])
+        assertEquals("food", result.metadata.customTags["styleContentSkippedScene"])
+        assertEquals("tag:scene-food", result.metadata.customTags["styleContentSkippedSource"])
+        assertEquals("0.62", result.metadata.customTags["styleContentSkippedConfidence"])
+    }
+
+    @Test
+    fun `check in content people place adapts algorithm render for subject friendly output`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("checkin-photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "checkin-photo-vivid",
+                saveRequest = SaveRequest.photoLibrary(
+                    metadata = MediaMetadata(
+                        algorithmProfile = "checkin-photo-vivid",
+                        customTags = mapOf(
+                            "mode" to "check-in",
+                            "checkInScenario" to "clarity",
+                            "checkInContentScenario" to "people-place",
+                            "checkInContentConfidence" to "0.91"
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals("checkin-photo-vivid", inv.spec.profile)
+        assertTrue(inv.spec.highlightCompression > baseSpec.highlightCompression)
+        assertTrue(inv.spec.shadowLift > baseSpec.shadowLift)
+        assertTrue(inv.spec.softGlowStrength > baseSpec.softGlowStrength)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:checkin-content-adapted:scenario=people-place"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:checkin-photo-vivid"))
+    }
+
+    @Test
+    fun `check in content object place adapts algorithm render for texture clarity`() = runTest {
+        val editor = FakePhotoAlgorithmEditor(PhotoAlgorithmApplied())
+        val processor = PhotoAlgorithmPostProcessor(editor)
+        val baseSpec = resolvePhotoAlgorithmSpec("checkin-photo-vivid")!!
+
+        val result = processor.process(
+            photoResult(
+                algorithmProfile = "checkin-photo-vivid",
+                saveRequest = SaveRequest.photoLibrary(
+                    metadata = MediaMetadata(
+                        algorithmProfile = "checkin-photo-vivid",
+                        customTags = mapOf(
+                            "mode" to "check-in",
+                            "checkInScenario" to "portrait",
+                            "checkInContentScenario" to "object-place",
+                            "checkInContentConfidence" to "0.88"
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val inv = editor.invocations.single()
+        assertEquals("checkin-photo-vivid", inv.spec.profile)
+        assertTrue(inv.spec.contrast > baseSpec.contrast)
+        assertTrue(inv.spec.sharpnessBoost > baseSpec.sharpnessBoost)
+        assertTrue(inv.spec.saturation > baseSpec.saturation)
+        assertTrue(result.pipelineNotes.contains("algorithm-render:checkin-content-adapted:scenario=object-place"))
+        assertTrue(result.pipelineNotes.contains("algorithm-render:applied:checkin-photo-vivid"))
     }
 
     @Test
@@ -744,6 +1201,7 @@ class PhotoAlgorithmPostProcessorTest {
             filePath = "/tmp/photo-style.jpg"
         ),
         mediaType: MediaType = MediaType.PHOTO,
+        contentUnderstanding: ContentUnderstandingSnapshot? = null,
         saveRequest: SaveRequest = SaveRequest.photoLibrary(
             metadata = MediaMetadata(
                 algorithmProfile = algorithmProfile
@@ -760,9 +1218,18 @@ class PhotoAlgorithmPostProcessorTest {
                 outputPath = outputHandle.displayPath,
                 renderUri = outputHandle.contentUri
             ),
-            metadata = saveRequest.metadata
+            metadata = saveRequest.metadata,
+            contentUnderstanding = contentUnderstanding
         )
     }
+
+    private fun contentTransform(): SceneMaskTransform = SceneMaskTransform(
+        sourceWidth = 4000,
+        sourceHeight = 3000,
+        maskWidth = 4000,
+        maskHeight = 3000,
+        rotationDegrees = 0
+    )
 
     private class FakePhotoAlgorithmEditor(
         private val result: ProcessorEditorResult

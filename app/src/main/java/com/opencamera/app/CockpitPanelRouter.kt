@@ -1,5 +1,7 @@
 package com.opencamera.app
 
+import com.opencamera.core.mode.ModeId
+import com.opencamera.core.session.DocumentBatchStatus
 import com.opencamera.core.session.DocumentWorkflowPhase
 
 internal data class CockpitPanelUiState(
@@ -72,6 +74,32 @@ internal fun workflowPhaseToRoute(phase: DocumentWorkflowPhase): CockpitPanelRou
     DocumentWorkflowPhase.BatchOverview -> CockpitPanelRoute.BatchOverview
     DocumentWorkflowPhase.CropEdit -> CockpitPanelRoute.CropEdit
     DocumentWorkflowPhase.Export -> CockpitPanelRoute.Export
+}
+
+internal fun documentBatchStartExportCommands(totalPages: Int): List<CockpitPanelCommand> {
+    return listOf(
+        CockpitPanelCommand.StartExport,
+        CockpitPanelCommand.UpdateExportProgress(
+            currentPage = 0,
+            totalPages = totalPages.coerceAtLeast(0)
+        )
+    )
+}
+
+internal fun shouldCloseDocumentWorkflowRoute(
+    route: CockpitPanelRoute,
+    activeMode: ModeId,
+    batchStatus: DocumentBatchStatus
+): Boolean {
+    if (!route.isDocumentWorkflowRoute) return false
+    if (activeMode != ModeId.DOCUMENT) return true
+    return when (route) {
+        is CockpitPanelRoute.DocumentBatchOrganizer,
+        is CockpitPanelRoute.BatchOverview,
+        is CockpitPanelRoute.CropEdit -> batchStatus != DocumentBatchStatus.ACTIVE
+        is CockpitPanelRoute.Export -> batchStatus == DocumentBatchStatus.INACTIVE
+        else -> false
+    }
 }
 
 internal fun nextState(

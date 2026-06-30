@@ -2,6 +2,8 @@ package com.opencamera.app.camera
 
 import androidx.camera.core.ImageProxy
 import com.opencamera.core.effect.SubjectMaskPreviewDescriptor
+import com.opencamera.core.media.ContentRegionRole
+import com.opencamera.core.media.SceneMaskQuality
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -184,6 +186,54 @@ class PreviewSceneMaskSourceTest {
             com.opencamera.core.media.SceneMaskSupport.UNSUPPORTED,
             PreviewSceneMaskCapability.UNSUPPORTED.toCoreSupport()
         )
+    }
+
+    @Test
+    fun `preview payload exports content understanding snapshot`() {
+        val payload = PreviewSceneMaskPayload(
+            width = 8,
+            height = 6,
+            confidenceMask = ByteArray(48) { 180.toByte() },
+            rotationDegrees = 90,
+            timestampMillis = 1000L,
+            sourceWidth = 640,
+            sourceHeight = 480,
+            diagnostics = listOf("mode=stream")
+        )
+
+        val snapshot = payload.toContentUnderstandingSnapshot(
+            nowMillis = 1100L,
+            staleThresholdMs = 500L
+        )
+
+        assertTrue(snapshot.isAvailable)
+        assertEquals(SceneMaskQuality.PREVIEW_APPROXIMATE, snapshot.quality)
+        assertEquals("mlkit-selfie", snapshot.backendId)
+        assertEquals(1000L, snapshot.timestampMillis)
+        assertTrue(snapshot.hasRegion(ContentRegionRole.PERSON_SUBJECT))
+        assertEquals(listOf("mode=stream"), snapshot.diagnostics)
+    }
+
+    @Test
+    fun `stale preview payload exports unavailable content understanding snapshot`() {
+        val payload = PreviewSceneMaskPayload(
+            width = 8,
+            height = 6,
+            confidenceMask = ByteArray(48) { 180.toByte() },
+            rotationDegrees = 0,
+            timestampMillis = 1000L
+        )
+
+        val snapshot = payload.toContentUnderstandingSnapshot(
+            nowMillis = 1700L,
+            staleThresholdMs = 500L
+        )
+
+        assertFalse(snapshot.isAvailable)
+        assertEquals(SceneMaskQuality.UNAVAILABLE, snapshot.quality)
+        assertEquals("mlkit-selfie", snapshot.backendId)
+        assertTrue(snapshot.diagnostics.contains("content-understanding:unavailable"))
+        assertTrue(snapshot.diagnostics.any { it.startsWith("content-understanding:reason=stale-preview-mask") })
     }
 
     @Test

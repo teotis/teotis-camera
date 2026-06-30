@@ -8,6 +8,18 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import com.opencamera.core.effect.RenderRecipe
+import com.opencamera.core.media.AlgorithmJobClass
+import com.opencamera.core.media.ContentPlacementAvoidanceCandidate
+import com.opencamera.core.media.ContentRegionBounds
+import com.opencamera.core.media.ContentRegionRole
+import com.opencamera.core.media.ContentSceneHint
+import com.opencamera.core.media.ContentSceneHintMatch
+import com.opencamera.core.media.ContentSavedPhotoAdaptationProfile
+import com.opencamera.core.media.ContentUnderstandingCandidateLabels
+import com.opencamera.core.media.ContentUnderstandingConsumerFamilyLabels
+import com.opencamera.core.media.ContentUnderstandingConsumerSkipLabels
+import com.opencamera.core.media.ContentUnderstandingFamily
+import com.opencamera.core.media.ContentUnderstandingSnapshot
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.PostProcessFailure
@@ -50,7 +62,9 @@ internal sealed class MaskResolveResult {
 
 internal data class PhotoAlgorithmPayload(
     val target: ProcessorTarget,
-    val spec: PhotoAlgorithmSpec
+    val spec: PhotoAlgorithmSpec,
+    val pipelineNotes: List<String> = emptyList(),
+    val metadataTags: Map<String, String> = emptyMap()
 )
 
 internal data class PhotoAlgorithmSpec(
@@ -117,16 +131,310 @@ internal fun decidePhotoAlgorithmWork(result: ShotResult): ProcessorWork<PhotoAl
     }
 
     val finalSpec = applyDocumentColorModeOverride(result.metadata.customTags, spec)
+    val checkInContentAdaptation = applyCheckInContentStyleHints(result.metadata.customTags, finalSpec)
+    val contentAdaptation = applyContentStyleHints(
+        result.contentUnderstanding,
+        checkInContentAdaptation.spec
+    )
+    val backgroundRegionAdaptation = applyContentBackgroundRegionHints(
+        result.contentUnderstanding,
+        contentAdaptation.spec
+    )
+    val subjectProtectionAdaptation = applyContentSubjectProtectionHints(
+        result.contentUnderstanding,
+        backgroundRegionAdaptation.spec
+    )
+    val pipelineNotes = checkInContentAdaptation.pipelineNotes +
+        contentAdaptation.pipelineNotes +
+        backgroundRegionAdaptation.pipelineNotes +
+        subjectProtectionAdaptation.pipelineNotes
+    val metadataTags = checkInContentAdaptation.metadataTags +
+        contentAdaptation.metadataTags +
+        backgroundRegionAdaptation.metadataTags +
+        subjectProtectionAdaptation.metadataTags
 
-    if (isKnownNearNeutralProfile(finalSpec)) {
-        return ProcessorWork.DiagnosticSkip("near-neutral:${finalSpec.profile}")
+    if (isKnownNearNeutralProfile(subjectProtectionAdaptation.spec)) {
+        return ProcessorWork.DiagnosticSkip("near-neutral:${subjectProtectionAdaptation.spec.profile}")
     }
 
     val target = result.outputHandle.toProcessorTargetOrNull()
         ?: return ProcessorWork.DiagnosticSkip("missing-output-handle")
 
-    return ProcessorWork.Execute(PhotoAlgorithmPayload(target, finalSpec))
+    return ProcessorWork.Execute(
+        PhotoAlgorithmPayload(
+            target = target,
+            spec = subjectProtectionAdaptation.spec,
+            pipelineNotes = pipelineNotes,
+            metadataTags = metadataTags
+        )
+    )
 }
+
+private data class ContentStyleAdaptation(
+    val spec: PhotoAlgorithmSpec,
+    val pipelineNotes: List<String>,
+    val metadataTags: Map<String, String> = emptyMap()
+)
+
+private fun applyCheckInContentStyleHints(
+    customTags: Map<String, String>,
+    spec: PhotoAlgorithmSpec
+): ContentStyleAdaptation {
+    if (customTags["mode"] != "check-in") return ContentStyleAdaptation(spec, emptyList())
+    val scenario = customTags["checkInContentScenario"]
+        ?.takeIf { it in setOf("people-place", "object-place") }
+        ?: return ContentStyleAdaptation(spec, emptyList())
+    val confidence = customTags["checkInContentConfidence"]?.toFloatOrNull() ?: 1f
+    if (confidence < 0.7f) return ContentStyleAdaptation(spec, emptyList())
+
+    return when (scenario) {
+        "people-place" -> ContentStyleAdaptation(
+            spec = spec.copy(
+                highlightCompression = maxOf(spec.highlightCompression, 0.06f),
+                shadowLift = maxOf(spec.shadowLift, 0.05f),
+                softGlowStrength = (spec.softGlowStrength + 0.04f).coerceAtMost(0.16f),
+                saturation = (spec.saturation - 0.02f).coerceAtLeast(0.98f)
+            ),
+            pipelineNotes = listOf("algorithm-render:checkin-content-adapted:scenario=people-place")
+        )
+        "object-place" -> ContentStyleAdaptation(
+            spec = spec.copy(
+                contrast = (spec.contrast + 0.03f).coerceAtMost(1.2f),
+                saturation = (spec.saturation + 0.03f).coerceAtMost(1.25f),
+                sharpnessBoost = (spec.sharpnessBoost + 0.06f).coerceAtMost(0.18f),
+                highlightCompression = maxOf(spec.highlightCompression, 0.04f)
+            ),
+            pipelineNotes = listOf("algorithm-render:checkin-content-adapted:scenario=object-place")
+        )
+        else -> ContentStyleAdaptation(spec, emptyList())
+    }
+}
+
+private fun applyContentStyleHints(
+    snapshot: ContentUnderstandingSnapshot?,
+    spec: PhotoAlgorithmSpec
+): ContentStyleAdaptation {
+    if (snapshot == null) {
+        return ContentStyleAdaptation(
+            spec = spec,
+            pipelineNotes = listOf(
+                "algorithm-render:content-skipped:${ContentUnderstandingConsumerSkipLabels.MISSING_CONTENT}"
+            ),
+            metadataTags = mapOf("styleContentSkipped" to ContentUnderstandingConsumerSkipLabels.MISSING_CONTENT)
+        )
+    }
+    if (!snapshot.isReadyForSavedPhotoAdaptation()) {
+        return ContentStyleAdaptation(
+            spec = spec,
+            pipelineNotes = snapshot.toAlgorithmContentNotReadyNotes(),
+            metadataTags = snapshot.toAlgorithmContentNotReadyMetadataTags()
+        )
+    }
+    val sceneHint = snapshot.savedPhotoAdaptationDecisions().styleScene
+        ?: return ContentStyleAdaptation(
+            spec = spec,
+            pipelineNotes = snapshot.toAlgorithmNoSceneHintNotes(),
+            metadataTags = snapshot.toAlgorithmNoSceneHintMetadataTags()
+        )
+    if (!spec.profile.supportsContentStyleHints()) return ContentStyleAdaptation(spec, emptyList())
+
+    return when (sceneHint.hint) {
+        ContentSceneHint.FOOD -> ContentStyleAdaptation(
+            spec = spec.copy(
+                saturation = (spec.saturation + 0.05f).coerceAtMost(1.28f),
+                warmBoost = (spec.warmBoost + 0.08f).coerceAtMost(0.3f),
+                highlightCompression = maxOf(spec.highlightCompression, 0.04f)
+            ),
+            pipelineNotes = sceneHint.toAlgorithmContentNotes(),
+            metadataTags = sceneHint.toAlgorithmContentMetadataTags()
+        )
+        ContentSceneHint.SKY_WATER -> ContentStyleAdaptation(
+            spec = spec.copy(
+                saturation = (spec.saturation + 0.03f).coerceAtMost(1.24f),
+                coolBoost = (spec.coolBoost + 0.08f).coerceAtMost(0.3f),
+                highlightCompression = maxOf(spec.highlightCompression, 0.06f)
+            ),
+            pipelineNotes = sceneHint.toAlgorithmContentNotes(),
+            metadataTags = sceneHint.toAlgorithmContentMetadataTags()
+        )
+        ContentSceneHint.LOW_LIGHT -> ContentStyleAdaptation(
+            spec = spec.copy(
+                shadowLift = maxOf(spec.shadowLift, 0.08f),
+                highlightCompression = maxOf(spec.highlightCompression, 0.08f),
+                grainStrength = (spec.grainStrength + 0.02f).coerceAtMost(0.1f)
+            ),
+            pipelineNotes = sceneHint.toAlgorithmContentNotes(),
+            metadataTags = sceneHint.toAlgorithmContentMetadataTags()
+        )
+    }
+}
+
+private fun ContentSceneHintMatch.toAlgorithmContentNotes(): List<String> =
+    listOf(
+        "algorithm-render:content-adapted:scene=${ContentUnderstandingCandidateLabels.sceneHint(this)}",
+        "algorithm-render:content-source=${ContentUnderstandingCandidateLabels.sceneSource(this)}",
+        "algorithm-render:content-confidence=${ContentUnderstandingCandidateLabels.sceneConfidence(this)}"
+    )
+
+private fun ContentSceneHintMatch.toAlgorithmContentMetadataTags(): Map<String, String> = mapOf(
+    "styleContentScene" to ContentUnderstandingCandidateLabels.sceneHint(this),
+    "styleContentSceneSource" to ContentUnderstandingCandidateLabels.sceneSource(this),
+    "styleContentSceneConfidence" to ContentUnderstandingCandidateLabels.sceneConfidence(this)
+)
+
+private fun applyContentBackgroundRegionHints(
+    snapshot: ContentUnderstandingSnapshot?,
+    spec: PhotoAlgorithmSpec
+): ContentStyleAdaptation {
+    if (snapshot == null || !snapshot.isReadyForSavedPhotoAdaptation()) {
+        return ContentStyleAdaptation(spec, emptyList())
+    }
+    if (!spec.profile.supportsContentStyleHints()) return ContentStyleAdaptation(spec, emptyList())
+    val backgroundCandidate = snapshot.placementAvoidanceCandidates(ContentSavedPhotoAdaptationProfile.DEFAULT)
+        .firstOrNull { candidate ->
+            candidate.role in BACKGROUND_STYLE_REGION_ROLES &&
+                candidate.bounds.normalizedArea() >= LARGE_BACKGROUND_REGION_AREA_THRESHOLD
+        }
+        ?: return ContentStyleAdaptation(spec, emptyList())
+
+    return ContentStyleAdaptation(
+        spec = spec.copy(
+            coolBoost = (spec.coolBoost + 0.06f).coerceAtMost(0.34f),
+            highlightCompression = max(spec.highlightCompression, 0.1f)
+        ),
+        pipelineNotes = backgroundCandidate.toAlgorithmBackgroundRegionNotes(),
+        metadataTags = backgroundCandidate.toAlgorithmBackgroundRegionMetadataTags()
+    )
+}
+
+private fun ContentPlacementAvoidanceCandidate.toAlgorithmBackgroundRegionNotes(): List<String> =
+    listOf(
+        "algorithm-render:content-background-adjusted:role=${ContentUnderstandingCandidateLabels.placementRole(this)}",
+        "algorithm-render:content-background-source=${ContentUnderstandingCandidateLabels.placementSource(this)}",
+        "algorithm-render:content-background-area=${ContentUnderstandingCandidateLabels.placementArea(this)}"
+    )
+
+private fun ContentPlacementAvoidanceCandidate.toAlgorithmBackgroundRegionMetadataTags(): Map<String, String> = mapOf(
+    "styleContentBackgroundRole" to ContentUnderstandingCandidateLabels.placementRole(this),
+    "styleContentBackgroundSource" to ContentUnderstandingCandidateLabels.placementSource(this),
+    "styleContentBackgroundArea" to ContentUnderstandingCandidateLabels.placementArea(this)
+)
+
+private fun ContentRegionBounds.normalizedArea(): Float =
+    ((right - left).coerceIn(0f, 1f) * (bottom - top).coerceIn(0f, 1f)).coerceIn(0f, 1f)
+
+private fun applyContentSubjectProtectionHints(
+    snapshot: ContentUnderstandingSnapshot?,
+    spec: PhotoAlgorithmSpec
+): ContentStyleAdaptation {
+    if (snapshot == null || !snapshot.isReadyForSavedPhotoAdaptation()) {
+        return ContentStyleAdaptation(spec, emptyList())
+    }
+    val subjectCandidate = snapshot.placementAvoidanceCandidates(ContentSavedPhotoAdaptationProfile.DEFAULT)
+        .firstOrNull { it.role in SUBJECT_PROTECTION_REGION_ROLES }
+        ?: return ContentStyleAdaptation(spec, emptyList())
+    val protectedSpec = spec.copy(
+        haloStrength = min(spec.haloStrength, SUBJECT_PROTECTED_HALO_CAP),
+        grainStrength = min(spec.grainStrength, SUBJECT_PROTECTED_GRAIN_CAP)
+    )
+    if (protectedSpec == spec) return ContentStyleAdaptation(spec, emptyList())
+    return ContentStyleAdaptation(
+        spec = protectedSpec,
+        pipelineNotes = subjectCandidate.toAlgorithmSubjectProtectionNotes(),
+        metadataTags = subjectCandidate.toAlgorithmSubjectProtectionMetadataTags()
+    )
+}
+
+private fun ContentPlacementAvoidanceCandidate.toAlgorithmSubjectProtectionNotes(): List<String> =
+    listOf(
+        "algorithm-render:content-subject-protected:source=${ContentUnderstandingCandidateLabels.placementSource(this)}",
+        "algorithm-render:content-subject-role=${ContentUnderstandingCandidateLabels.placementRole(this)}",
+        "algorithm-render:content-subject-confidence=${ContentUnderstandingCandidateLabels.placementConfidence(this)}"
+    )
+
+private fun ContentPlacementAvoidanceCandidate.toAlgorithmSubjectProtectionMetadataTags(): Map<String, String> = mapOf(
+    "styleContentSubjectProtected" to "true",
+    "styleContentSubjectSource" to ContentUnderstandingCandidateLabels.placementSource(this),
+    "styleContentSubjectRole" to ContentUnderstandingCandidateLabels.placementRole(this),
+    "styleContentSubjectConfidence" to ContentUnderstandingCandidateLabels.placementConfidence(this)
+)
+
+private fun ContentUnderstandingSnapshot.toAlgorithmContentNotReadyNotes(): List<String> = buildList {
+    add("algorithm-render:content-skipped:${ContentUnderstandingConsumerSkipLabels.NOT_READY}")
+    add("algorithm-render:content-quality=${quality.name.lowercase()}")
+    capabilitySummary().reason?.let { add("algorithm-render:content-reason=$it") }
+}
+
+private fun ContentUnderstandingSnapshot.toAlgorithmContentNotReadyMetadataTags(): Map<String, String> = buildMap {
+    put("styleContentSkipped", ContentUnderstandingConsumerSkipLabels.NOT_READY)
+    put("styleContentSkippedQuality", quality.name.lowercase())
+    capabilitySummary().reason?.let { put("styleContentSkippedReason", it) }
+}
+
+private fun ContentUnderstandingSnapshot.toAlgorithmNoSceneHintNotes(): List<String> {
+    val lowConfidenceScene = savedPhotoAdaptationDecisions(
+        ContentSavedPhotoAdaptationProfile.LOW_CONFIDENCE_REVIEW
+    ).styleScene
+    if (lowConfidenceScene != null) {
+        return listOf(
+            "algorithm-render:content-skipped:${ContentUnderstandingConsumerSkipLabels.LOW_CONFIDENCE_SCENE_HINT}",
+            "algorithm-render:content-source=${ContentUnderstandingCandidateLabels.sceneSource(lowConfidenceScene)}",
+            "algorithm-render:content-confidence=${ContentUnderstandingCandidateLabels.sceneConfidence(lowConfidenceScene)}"
+        )
+    }
+    val capability = capabilitySummary()
+    return listOf("algorithm-render:content-skipped:${ContentUnderstandingConsumerSkipLabels.NO_SCENE_HINT}") +
+        ContentUnderstandingConsumerFamilyLabels.supportNotes(
+            prefix = "algorithm-render",
+            capability = capability,
+            families = listOf(ContentUnderstandingFamily.SCENE_TAGS, ContentUnderstandingFamily.SEMANTIC_REGIONS)
+        )
+}
+
+private fun ContentUnderstandingSnapshot.toAlgorithmNoSceneHintMetadataTags(): Map<String, String> {
+    val lowConfidenceScene = savedPhotoAdaptationDecisions(
+        ContentSavedPhotoAdaptationProfile.LOW_CONFIDENCE_REVIEW
+    ).styleScene
+    if (lowConfidenceScene != null) {
+        return mapOf(
+            "styleContentSkipped" to ContentUnderstandingConsumerSkipLabels.LOW_CONFIDENCE_SCENE_HINT,
+            "styleContentSkippedScene" to ContentUnderstandingCandidateLabels.sceneHint(lowConfidenceScene),
+            "styleContentSkippedSource" to ContentUnderstandingCandidateLabels.sceneSource(lowConfidenceScene),
+            "styleContentSkippedConfidence" to ContentUnderstandingCandidateLabels.sceneConfidence(lowConfidenceScene)
+        )
+    }
+    val capability = capabilitySummary()
+    return mapOf(
+        "styleContentSkipped" to ContentUnderstandingConsumerSkipLabels.NO_SCENE_HINT
+    ) + ContentUnderstandingConsumerFamilyLabels.supportMetadataTags(
+        capability = capability,
+        keysByFamily = mapOf(
+            ContentUnderstandingFamily.SCENE_TAGS to "styleContentSkippedSceneTags",
+            ContentUnderstandingFamily.SEMANTIC_REGIONS to "styleContentSkippedSemanticRegions"
+        )
+    )
+}
+
+private fun String.supportsContentStyleHints(): Boolean =
+    this == "photo-default" ||
+        this == "photo-vivid" ||
+        this == "photo-original" ||
+        this == "photo-rich"
+
+private val SUBJECT_PROTECTION_REGION_ROLES = setOf(
+    ContentRegionRole.FACE,
+    ContentRegionRole.PERSON_SUBJECT,
+    ContentRegionRole.FOREGROUND
+)
+
+private val BACKGROUND_STYLE_REGION_ROLES = setOf(
+    ContentRegionRole.SKY,
+    ContentRegionRole.WATER
+)
+
+private const val SUBJECT_PROTECTED_HALO_CAP = 0.12f
+private const val SUBJECT_PROTECTED_GRAIN_CAP = 0.04f
+private const val LARGE_BACKGROUND_REGION_AREA_THRESHOLD = 0.35f
 
 private fun applyDocumentColorModeOverride(
     customTags: Map<String, String>,
@@ -221,6 +529,9 @@ internal class PhotoAlgorithmPostProcessor(
     private val maskBitmapSource: ((ProcessorTarget) -> android.graphics.Bitmap?)? = null
 ) : MediaPostProcessor {
     override fun isApplicable(result: ShotResult): Boolean = result.mediaType == MediaType.PHOTO
+
+    override fun jobClass(result: ShotResult): AlgorithmJobClass =
+        AlgorithmJobClass.CAPTURE_OPTIONAL
 
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoAlgorithmWork(result)) {
@@ -375,10 +686,15 @@ internal class PhotoAlgorithmPostProcessor(
         return when (renderResult) {
             is PhotoAlgorithmApplied -> {
                 val notes = mutableListOf<String>()
+                notes.addAll(payload.pipelineNotes)
                 notes.add("algorithm-render:applied:${payload.spec.profile}")
                 renderResult.warning?.let { notes.add("algorithm-render:warning:$it") }
                 renderResult.timingNote?.let { notes.add(it) }
-                result.addPipelineNotes(*notes.toTypedArray())
+                result.copy(
+                    metadata = result.metadata.copy(
+                        customTags = result.metadata.customTags + payload.metadataTags
+                    )
+                ).addPipelineNotes(*notes.toTypedArray())
             }
 
             is ProcessorEditorResult.Skipped -> result.addPipelineNotes(
@@ -1139,6 +1455,15 @@ internal fun resolvePhotoAlgorithmSpec(
             shadowLift = 0.04f
         )
 
+        "clarity-focus-stack-v1" -> PhotoAlgorithmSpec(
+            profile = profile,
+            contrast = 1.06f,
+            saturation = 1.02f,
+            sharpnessBoost = 0.10f,
+            highlightCompression = 0.06f,
+            shadowLift = 0.04f
+        )
+
         "pro-manual-neutral" -> PhotoAlgorithmSpec(
             profile = profile,
             contrast = 1.01f,
@@ -1188,6 +1513,7 @@ private fun canonicalPhotoAlgorithmProfile(profile: String): String {
         .removeSuffix("-pro")
     return when {
         variantBase == "checkin-clarity-best-frame-v1" -> "clarity-best-frame-v1"
+        variantBase == "checkin-clarity-focus-stack-v1" -> "clarity-focus-stack-v1"
         variantBase.startsWith("checkin-") -> variantBase.removePrefix("checkin-")
         else -> variantBase
     }
@@ -1275,6 +1601,18 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
     private val maskProvider: SavedPhotoSceneMaskProvider? = null,
     private val maskBitmapSource: ((ProcessorTarget) -> Bitmap?)? = null
 ) : MediaPostProcessor {
+    // CAPTURE_CRITICAL, not CAPTURE_OPTIONAL: this processor renders the user-selected
+    // filter+watermark combination and writes the final bytes to disk. Under
+    // CAPTURE_OPTIONAL the composite watchdog budget is maxPostProcessMillis/2 = 2500ms
+    // (see AlgorithmJobScheduler.timeoutForJobClass), but real renders can take 3.4–3.7s
+    // on hot devices. When the optional watchdog fires, withTimeoutOrNull returns null
+    // and processCombined is cancelled mid-flight — the file write is skipped and the
+    // photo disappears from the gallery even though capture.saved was emitted.
+    // CAPTURE_CRITICAL raises the budget to maxPostProcessMillis (5000ms) and, on
+    // timeout, stops the pipeline instead of silently continuing.
+    override fun jobClass(result: ShotResult): AlgorithmJobClass =
+        AlgorithmJobClass.CAPTURE_CRITICAL
+
     override suspend fun process(result: ShotResult): ShotResult {
         val algorithmWork = decidePhotoAlgorithmWork(result)
         val watermarkWork = decidePhotoWatermarkWork(result)
@@ -1360,7 +1698,12 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
 
             val t2 = System.currentTimeMillis()
 
-            val renderResult = renderPhotoWatermarkBitmap(workingBitmap, template)
+            val renderResult = renderPhotoWatermarkBitmap(
+                bitmap = workingBitmap,
+                template = template,
+                vanGoghStarryFrameAssetProvider = watermarkEditor.vanGoghStarryFrameAssetProvider,
+                staticWatermarkAssetProvider = watermarkEditor.staticWatermarkAssetProvider
+            )
             finalBitmap = renderResult.bitmap
             val t3 = System.currentTimeMillis()
 
@@ -1401,7 +1744,7 @@ internal class PhotoAlgorithmWatermarkPostProcessor(
                 .takeIf { it.isNotEmpty() }
                 ?.joinToString(",")
 
-            val baseNotes = listOfNotNull(
+            val baseNotes = algorithmPayload.pipelineNotes + listOfNotNull(
                 "combined-render:applied:${algorithmPayload.spec.profile}+${watermarkWork.templateId}",
                 timingNote,
                 warnings?.let { "combined-render:warning:$it" }

@@ -90,7 +90,8 @@ internal data class FeatureCatalogControlRenderModel(
     val availability: SettingsControlAvailability = SettingsControlAvailability.SUPPORTED,
     val availabilityLabel: String = "",
     val supportLabel: String? = null,
-    val nextAction: FeatureCatalogAction? = null
+    val nextAction: FeatureCatalogAction? = null,
+    val isToggleOn: Boolean? = null
 ) {
     val isInteractive: Boolean
         get() = nextAction != null

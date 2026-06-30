@@ -237,7 +237,7 @@ fun previewStartWatchdogMillis(lastStartReason: String?): Long {
         PreviewStartCategory.COLD_START -> 1200L
         PreviewStartCategory.FOREGROUND_RESUME -> 1200L
         PreviewStartCategory.RECOVERY -> 1500L
-        PreviewStartCategory.RECONFIGURE -> 1000L
+        PreviewStartCategory.RECONFIGURE -> 1500L
         PreviewStartCategory.UNKNOWN -> 1200L
     }
 }

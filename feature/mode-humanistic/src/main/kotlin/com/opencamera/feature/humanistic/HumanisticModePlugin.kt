@@ -1,6 +1,7 @@
 package com.opencamera.feature.humanistic
 
 import com.opencamera.core.effect.EffectBridge
+import com.opencamera.core.effect.EffectEntry
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.FilterEffect
 import com.opencamera.core.effect.FrameEffect
@@ -108,11 +109,13 @@ private class HumanisticModeController(
         val adjustedRenderSpec = pipelineResult?.finalRenderSpec
         val recipe = pipelineResult?.recipe
             ?: com.opencamera.core.settings.PerceptualColorRecipe.NEUTRAL
-        val tmpl = selectedWatermarkTemplate()
-        val watermarkStyle = context.settingsSnapshot.persisted.photo.watermarkStyleFor(tmpl.id)
-        return EffectSpec(listOf(
-            FilterEffect(style.id, adjustedRenderSpec, recipe = recipe),
-            WatermarkEffect(
+        val effects = mutableListOf<EffectEntry>(
+            FilterEffect(style.id, adjustedRenderSpec, recipe = recipe)
+        )
+        if (photoWatermarkEnabled()) {
+            val tmpl = selectedWatermarkTemplate()
+            val watermarkStyle = context.settingsSnapshot.persisted.photo.watermarkStyleFor(tmpl.id)
+            effects += WatermarkEffect(
                 templateId = tmpl.id,
                 tokens = watermarkTokens(
                     cameraParams = buildString {
@@ -122,9 +125,10 @@ private class HumanisticModeController(
                     }
                 ),
                 style = watermarkStyle
-            ),
-            FrameEffect(currentFrameRatio())
-        ))
+            )
+        }
+        effects += FrameEffect(currentFrameRatio())
+        return EffectSpec(effects)
     }
 
     // ── CaptureStrategy ───────────────────────────────────────────────
@@ -155,7 +159,9 @@ private class HumanisticModeController(
                 put("modeDisplay", "humanistic")
                 put("style", style.id)
                 put("algorithmProfile", style.algorithmProfile)
-                put("watermarkTemplate", selectedWatermarkTemplate().id)
+                if (photoWatermarkEnabled()) {
+                    put("watermarkTemplate", selectedWatermarkTemplate().id)
+                }
                 put(
                     "livePhotoDefault",
                     if (livePhotoEnabled()) "on" else "off"
@@ -232,7 +238,8 @@ private class HumanisticModeController(
         val defaultDetail = buildString {
             append("默认风格 ${style.label}")
             append(" | 尺寸 ${runtimeState().stillCaptureResolutionPreset.label}")
-            append(" | 水印 ${selectedWatermarkTemplate().label}")
+            val watermarkLabel = if (photoWatermarkEnabled()) selectedWatermarkTemplate().label else "Off"
+            append(" | 水印 $watermarkLabel")
             append(" | 动态照片 ${onOffLabel(livePhotoEnabled())}")
             append(" | 定时 ${countdownDuration().label}")
             append(" | 画幅 ${currentFrameRatio().label}")

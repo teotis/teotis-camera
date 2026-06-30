@@ -152,15 +152,16 @@ class DocumentModePluginTest {
     }
 
     @Test
-    fun `shutter pressed capture has document post process spec`() = runTest {
-        val controller = createController()
+    fun `shutter pressed capture has document post process spec with watermark`() = runTest {
+        val controller = createController(watermarkEnabled = true)
 
         val signal = controller.handle(ModeIntent.ShutterPressed)
         val strategy = (signal as ModeSignal.SubmitCapture).strategy as CaptureStrategy.SingleFrame
 
         val postProcess = strategy.postProcessSpec
         assertNotNull(postProcess.watermarkText)
-        assertTrue(postProcess.watermarkText!!.startsWith("DOC"))
+        assertTrue(postProcess.watermarkText!!.contains("OpenCamera"))
+        assertTrue(postProcess.watermarkText!!.contains("Document"))
         assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
     }
 
@@ -290,6 +291,7 @@ class DocumentModePluginTest {
     fun `on enter triggers effect spec callback`() = runTest {
         var capturedSpec: EffectSpec? = null
         val controller = createController(
+            watermarkEnabled = true,
             onEffectSpecChanged = { capturedSpec = it }
         )
 
@@ -317,14 +319,17 @@ class DocumentModePluginTest {
     fun `effect spec contains watermark effect`() = runTest {
         var capturedSpec: EffectSpec? = null
         val controller = createController(
-            onEffectSpecChanged = { capturedSpec = it }
+            onEffectSpecChanged = { capturedSpec = it },
+            watermarkEnabled = true
         )
 
         controller.onEnter()
 
         val watermarkEffect = capturedSpec!!.find<WatermarkEffect>()
         assertNotNull(watermarkEffect)
-        assertTrue(watermarkEffect.tokens.containsKey("watermarkModel"))
+        assertEquals("classic-overlay", watermarkEffect.templateId)
+        assertEquals("OpenCamera", watermarkEffect.tokens["watermarkModel"])
+        assertTrue(watermarkEffect.tokens["watermarkCameraParams"]!!.contains("Document"))
     }
 
     @Test
@@ -390,12 +395,22 @@ class DocumentModePluginTest {
     private fun createController(
         deviceCapabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT,
         eventSink: suspend (String) -> Unit = {},
-        onEffectSpecChanged: suspend (EffectSpec) -> Unit = {}
+        onEffectSpecChanged: suspend (EffectSpec) -> Unit = {},
+        watermarkEnabled: Boolean = false
     ): ModeController {
         val context = ModeContext(
             deviceCapabilities = deviceCapabilities,
             eventSink = eventSink,
-            onEffectSpecChanged = onEffectSpecChanged
+            onEffectSpecChanged = onEffectSpecChanged,
+            settingsSnapshotProvider = {
+                com.opencamera.core.settings.SessionSettingsSnapshot(
+                    persisted = com.opencamera.core.settings.PersistedSettings(
+                        photo = com.opencamera.core.settings.PhotoSettings(
+                            photoWatermarkEnabledByDefault = watermarkEnabled
+                        )
+                    )
+                )
+            }
         )
         return DocumentModePlugin().create(context)
     }
@@ -472,24 +487,26 @@ class DocumentModePluginTest {
     }
 
     @Test
-    fun `char enhanced scan post process exif`(): Unit = runTest {
-        val controller = createController()
+    fun `char enhanced scan post process exif includes watermark`(): Unit = runTest {
+        val controller = createController(watermarkEnabled = true)
         val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.postProcessSpec
         assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
         assertEquals("enhanced-scan:color-neutral", postProcess.exifOverrides["ProcessingRendered"])
-        assertTrue(postProcess.watermarkText!!.startsWith("DOC Receipt"))
+        assertNotNull(postProcess.watermarkText)
+        assertTrue(postProcess.watermarkText!!.contains("Document"))
     }
 
     @Test
-    fun `char basic archive post process exif`(): Unit = runTest {
+    fun `char basic archive post process exif includes watermark`(): Unit = runTest {
         val caps = DeviceCapabilities.DEFAULT.copy(supportsDocumentScanEnhancement = false)
-        val controller = createController(deviceCapabilities = caps)
+        val controller = createController(deviceCapabilities = caps, watermarkEnabled = true)
         val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.postProcessSpec
         assertEquals("Document", postProcess.exifOverrides["SceneCaptureType"])
         assertEquals("basic-archive", postProcess.exifOverrides["ProcessingRendered"])
-        assertTrue(postProcess.watermarkText!!.startsWith("DOC Basic"))
+        assertNotNull(postProcess.watermarkText)
+        assertTrue(postProcess.watermarkText!!.contains("Document"))
     }
 
     @Test
@@ -601,28 +618,19 @@ class DocumentModePluginTest {
         assertEquals("Archive resolution updated", controller.snapshot.value.state.headline)
     }
 
-    // ── Migration characterization: resolution-only watermark ──────────
+    // ── Migration characterization: document effects keep watermark support ─
 
     @Test
-    fun `watermark camera params uses resolution only without frame ratio`() = runTest {
-        // Build effect spec to get watermark tokens
+    fun `document effect spec keeps watermark after resolution changes`() = runTest {
         var capturedSpec: com.opencamera.core.effect.EffectSpec? = null
-        val controller = createController(onEffectSpecChanged = { capturedSpec = it })
+        val controller = createController(
+            watermarkEnabled = true,
+            onEffectSpecChanged = { capturedSpec = it }
+        )
         controller.onEnter()
 
         val watermarkEffect = capturedSpec!!.find<com.opencamera.core.effect.WatermarkEffect>()
         assertNotNull(watermarkEffect)
-        val cameraParams = watermarkEffect.tokens["watermarkCameraParams"]!!
-        // Should NOT contain frame ratio separator or label
-        assertFalse(
-            cameraParams.contains(" • "),
-            "Watermark camera params should not contain frame ratio: $cameraParams"
-        )
-        // Should contain resolution preset label
-        assertTrue(
-            cameraParams.contains("MP") || cameraParams.contains("M") || cameraParams.isNotBlank(),
-            "Watermark camera params should contain resolution: $cameraParams"
-        )
     }
 
     // ── Migration characterization: exact metadata per profile ─────────

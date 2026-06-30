@@ -3,6 +3,7 @@ package com.opencamera.app.camera
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Log
 import android.graphics.Canvas
 import android.graphics.Color
@@ -16,6 +17,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import androidx.exifinterface.media.ExifInterface
+import com.opencamera.core.media.AlgorithmJobClass
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MediaType
@@ -74,6 +76,155 @@ internal data class PhotoWatermarkBitmapRenderResult(
     val bitmap: Bitmap,
     val warning: String? = null
 )
+
+internal enum class WatermarkSceneVariant(
+    val referenceAspect: Float
+) {
+    PORTRAIT(1080f / 1660f),
+    SQUARE(1f),
+    LANDSCAPE(1660f / 1080f);
+
+    companion object {
+        fun closestTo(aspect: Float): WatermarkSceneVariant =
+            entries.minBy { kotlin.math.abs(it.referenceAspect - aspect) }
+    }
+}
+
+internal data class StaticWatermarkFrameAsset(
+    val packageId: String,
+    val variant: WatermarkSceneVariant,
+    val assetPath: String,
+    val referenceAspect: Float
+)
+
+internal data class StaticWatermarkAssetPackage(
+    val templateId: String,
+    val frameAssets: Map<WatermarkSceneVariant, StaticWatermarkFrameAsset>
+) {
+    fun frameAssetFor(aspect: Float): StaticWatermarkFrameAsset {
+        val variant = WatermarkSceneVariant.closestTo(aspect)
+        return frameAssets.getValue(variant)
+    }
+}
+
+internal object StaticHighDesignWatermarkPackages {
+    val VAN_GOGH_STARRY = staticPackage(
+        templateId = TEMPLATE_VAN_GOGH_STARRY,
+        portraitPath = "watermarks/van_gogh_starry_portrait.png",
+        squarePath = "watermarks/van_gogh_starry_square.png",
+        landscapePath = "watermarks/van_gogh_starry_landscape.png"
+    )
+    val BLUE_HOUR = staticPackage(
+        templateId = TEMPLATE_BLUE_HOUR,
+        portraitPath = "watermarks/blue_hour_portrait.png",
+        squarePath = "watermarks/blue_hour_square.png",
+        landscapePath = "watermarks/blue_hour_landscape.png"
+    )
+
+    fun forTemplate(templateId: String): StaticWatermarkAssetPackage? =
+        when (templateId) {
+            TEMPLATE_VAN_GOGH_STARRY -> VAN_GOGH_STARRY
+            TEMPLATE_BLUE_HOUR -> BLUE_HOUR
+            else -> null
+        }
+
+    private fun staticPackage(
+        templateId: String,
+        portraitPath: String,
+        squarePath: String,
+        landscapePath: String
+    ): StaticWatermarkAssetPackage {
+        return StaticWatermarkAssetPackage(
+            templateId = templateId,
+            frameAssets = WatermarkSceneVariant.entries.associateWith { variant ->
+                StaticWatermarkFrameAsset(
+                    packageId = templateId,
+                    variant = variant,
+                    assetPath = when (variant) {
+                        WatermarkSceneVariant.PORTRAIT -> portraitPath
+                        WatermarkSceneVariant.SQUARE -> squarePath
+                        WatermarkSceneVariant.LANDSCAPE -> landscapePath
+                    },
+                    referenceAspect = variant.referenceAspect
+                )
+            }
+        )
+    }
+}
+
+internal interface StaticWatermarkAssetProvider {
+    fun load(asset: StaticWatermarkFrameAsset): Bitmap?
+}
+
+internal data class WatermarkScene(
+    val templateId: String,
+    val outputWidth: Int,
+    val outputHeight: Int,
+    val photoSlot: RectF,
+    val safeArea: RectF,
+    val variant: WatermarkSceneVariant,
+    val layers: List<WatermarkSceneLayer>
+)
+
+internal sealed interface WatermarkSceneLayer {
+    data class SolidBackground(
+        val frameBackground: WatermarkFrameBackground
+    ) : WatermarkSceneLayer
+
+    data object PhotoSlot : WatermarkSceneLayer
+
+    data class BorderAsset(
+        val asset: StaticWatermarkFrameAsset,
+        val destination: RectF,
+        val mask: WatermarkSceneMask = WatermarkSceneMask.NONE
+    ) : WatermarkSceneLayer
+
+    data class TextSlot(
+        val text: String,
+        val bounds: RectF,
+        val style: WatermarkTextSlotStyle,
+        val alignment: Paint.Align,
+        val textSize: Float
+    ) : WatermarkSceneLayer
+}
+
+internal enum class WatermarkSceneMask {
+    NONE,
+    CLEAR_PHOTO_SLOT
+}
+
+internal enum class WatermarkTextSlotStyle {
+    STARRY_METADATA,
+    BLUE_HOUR_TITLE,
+    BLUE_HOUR_METADATA
+}
+
+internal enum class VanGoghStarryFrameAssetVariant(
+    val assetPath: String,
+    val referenceAspect: Float
+) {
+    PORTRAIT(
+        assetPath = "watermarks/van_gogh_starry_portrait.png",
+        referenceAspect = 1080f / 1660f
+    ),
+    SQUARE(
+        assetPath = "watermarks/van_gogh_starry_square.png",
+        referenceAspect = 1f
+    ),
+    LANDSCAPE(
+        assetPath = "watermarks/van_gogh_starry_landscape.png",
+        referenceAspect = 1660f / 1080f
+    );
+
+    companion object {
+        fun closestTo(aspect: Float): VanGoghStarryFrameAssetVariant =
+            entries.minBy { kotlin.math.abs(it.referenceAspect - aspect) }
+    }
+}
+
+internal interface VanGoghStarryFrameAssetProvider {
+    fun load(variant: VanGoghStarryFrameAssetVariant): Bitmap?
+}
 
 internal data class PhotoWatermarkApplied(
     val warning: String? = null,
@@ -137,6 +288,9 @@ internal class PhotoWatermarkPostProcessor(
     private val editor: PhotoWatermarkEditor
 ) : MediaPostProcessor {
     override fun isApplicable(result: ShotResult): Boolean = result.mediaType == MediaType.PHOTO
+
+    override fun jobClass(result: ShotResult): AlgorithmJobClass =
+        AlgorithmJobClass.CAPTURE_OPTIONAL
 
     override suspend fun process(result: ShotResult): ShotResult {
         return when (val work = decidePhotoWatermarkWork(result)) {
@@ -203,7 +357,11 @@ internal fun watermarkFailureMapping(reason: String): Pair<PostProcessFailureCau
     }
 
 internal class AndroidPhotoWatermarkEditor(
-    context: Context
+    context: Context,
+    internal val vanGoghStarryFrameAssetProvider: VanGoghStarryFrameAssetProvider =
+        AndroidVanGoghStarryFrameAssetProvider(context.applicationContext),
+    internal val staticWatermarkAssetProvider: StaticWatermarkAssetProvider =
+        AndroidStaticWatermarkAssetProvider(context.applicationContext)
 ) : PhotoWatermarkEditor {
     private val appContext = context.applicationContext
     private val contentResolver: ContentResolver = appContext.contentResolver
@@ -248,7 +406,9 @@ internal class AndroidPhotoWatermarkEditor(
             )
             val renderResult = renderPhotoWatermarkBitmap(
                 bitmap = mutableBitmap,
-                template = resolvedTemplate
+                template = resolvedTemplate,
+                vanGoghStarryFrameAssetProvider = vanGoghStarryFrameAssetProvider,
+                staticWatermarkAssetProvider = staticWatermarkAssetProvider
             )
             renderedBitmap = renderResult.bitmap
             val t2 = System.currentTimeMillis()
@@ -327,6 +487,50 @@ internal class AndroidPhotoWatermarkEditor(
     }
 }
 
+private class AndroidVanGoghStarryFrameAssetProvider(
+    context: Context
+) : VanGoghStarryFrameAssetProvider {
+    private val appContext = context.applicationContext
+    private val cache = mutableMapOf<VanGoghStarryFrameAssetVariant, Bitmap>()
+
+    override fun load(variant: VanGoghStarryFrameAssetVariant): Bitmap? {
+        cache[variant]?.let { return it }
+        return try {
+            appContext.assets.open(variant.assetPath).use { input ->
+                BitmapFactory.decodeStream(input)
+            }?.also { decoded ->
+                cache[variant] = decoded
+            }
+        } catch (e: Throwable) {
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Unable to load Van Gogh starry frame asset: ${variant.assetPath}", e)
+            null
+        }
+    }
+}
+
+private class AndroidStaticWatermarkAssetProvider(
+    context: Context
+) : StaticWatermarkAssetProvider {
+    private val appContext = context.applicationContext
+    private val cache = mutableMapOf<String, Bitmap>()
+
+    override fun load(asset: StaticWatermarkFrameAsset): Bitmap? {
+        cache[asset.assetPath]?.let { return it }
+        return try {
+            appContext.assets.open(asset.assetPath).use { input ->
+                BitmapFactory.decodeStream(input)
+            }?.also { decoded ->
+                cache[asset.assetPath] = decoded
+            }
+        } catch (e: Throwable) {
+            e.rethrowIfCancellationOrFatal()
+            Log.w(TAG, "Unable to load static watermark asset: ${asset.assetPath}", e)
+            null
+        }
+    }
+}
+
 internal fun buildWatermarkArchive(
     originalBytes: ByteArray,
     visibleBytes: ByteArray,
@@ -387,14 +591,7 @@ private enum class ExpandedFrameDecoration {
     NONE,
     TRAVEL_MAP,
     ARCHIVAL_PAPER,
-    NIGHT_MEMORY,
-    STARRY_MOON,
-    BLUE_HOUR
-}
-
-private enum class ComplexWatermarkOverlayStyle {
-    STARRY_MOON,
-    BLUE_HOUR
+    NIGHT_MEMORY
 }
 
 private data class ComplexWatermarkFrameLayout(
@@ -574,7 +771,9 @@ internal fun usesComplexWatermarkOverlay(templateId: String?): Boolean {
 
 internal fun renderPhotoWatermarkBitmap(
     bitmap: Bitmap,
-    template: ResolvedPhotoWatermarkTemplate
+    template: ResolvedPhotoWatermarkTemplate,
+    vanGoghStarryFrameAssetProvider: VanGoghStarryFrameAssetProvider? = null,
+    staticWatermarkAssetProvider: StaticWatermarkAssetProvider? = null
 ): PhotoWatermarkBitmapRenderResult {
     val minEdge = minOf(bitmap.width, bitmap.height).toFloat()
     val titleTextSize = (
@@ -683,7 +882,9 @@ internal fun renderPhotoWatermarkBitmap(
             source = bitmap,
             template = template,
             detailTextSize = detailTextSize,
-            padding = padding
+            padding = padding,
+            frameAssetProvider = vanGoghStarryFrameAssetProvider,
+            staticWatermarkAssetProvider = staticWatermarkAssetProvider
         )
 
         PhotoWatermarkTemplateType.BLUE_HOUR -> drawBlueHourFrame(
@@ -691,7 +892,8 @@ internal fun renderPhotoWatermarkBitmap(
             template = template,
             titleTextSize = titleTextSize * 1.12f,
             detailTextSize = detailTextSize,
-            padding = padding
+            padding = padding,
+            staticWatermarkAssetProvider = staticWatermarkAssetProvider
         )
     }
 }
@@ -958,8 +1160,6 @@ private fun drawExpandedFrame(
             padding = padding
         )
 
-        ExpandedFrameDecoration.STARRY_MOON,
-        ExpandedFrameDecoration.BLUE_HOUR,
         ExpandedFrameDecoration.NONE -> Unit
     }
 
@@ -973,39 +1173,43 @@ private fun drawVanGoghStarryFrame(
     source: Bitmap,
     template: ResolvedPhotoWatermarkTemplate,
     detailTextSize: Float,
-    padding: Float
+    padding: Float,
+    frameAssetProvider: VanGoghStarryFrameAssetProvider?,
+    staticWatermarkAssetProvider: StaticWatermarkAssetProvider?
 ): PhotoWatermarkBitmapRenderResult {
-    val sideBorder = (padding * 1.75f).coerceAtLeast(MIN_PADDING_PX * 1.15f)
-    val topBorder = (padding * 1.55f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
-    val bottomBandHeight = maxOf(detailTextSize * 5.8f, source.height * 0.24f)
-    return drawComplexWatermarkFrame(
+    val sideBorder = (source.width * 0.027f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
+    val topBorder = (source.height * 0.083f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
+    val bottomBandHeight = maxOf(detailTextSize * 4.0f, source.height * 0.128f)
+    val metadata = starryMoonMetadata(template.supportingLines)
+    val textSlot = metadata.takeIf(String::isNotBlank)?.let {
+        HighDesignTextSlotSpec(
+            text = it,
+            style = WatermarkTextSlotStyle.STARRY_METADATA,
+            alignment = Paint.Align.CENTER,
+            textSize = (detailTextSize * 0.98f).coerceAtLeast(MIN_DETAIL_TEXT_SIZE_PX),
+            boundsResolver = { layout ->
+                RectF(
+                    layout.sideBorder + layout.padding,
+                    layout.bandTop + layout.bottomBandHeight * 0.22f,
+                    layout.framedWidth - layout.sideBorder - layout.padding,
+                    layout.bandTop + layout.bottomBandHeight * 0.88f
+                )
+            }
+        )
+    }
+    val provider = staticWatermarkAssetProvider
+        ?: frameAssetProvider?.let(::VanGoghStaticWatermarkAssetProvider)
+    return drawStaticHighDesignWatermarkFrame(
         source = source,
         template = template,
         sideBorder = sideBorder,
         topBorder = topBorder,
         bottomBandHeight = bottomBandHeight,
         padding = padding,
-        overlayStyle = ComplexWatermarkOverlayStyle.STARRY_MOON
-    ) { canvas, layout ->
-        val metadata = starryMoonMetadata(template.supportingLines)
-        if (metadata.isBlank()) return@drawComplexWatermarkFrame
-        val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb((228 * template.textOpacity).toInt().coerceIn(0, 228), 224, 198, 142)
-            textSize = (detailTextSize * 0.98f).coerceAtLeast(MIN_DETAIL_TEXT_SIZE_PX)
-            style = Paint.Style.FILL
-            textAlign = Paint.Align.CENTER
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-            setShadowLayer(detailTextSize * 0.18f, 0f, detailTextSize * 0.04f, Color.argb(132, 0, 0, 0))
-        }
-        val metrics = detailPaint.fontMetrics
-        val baseline = layout.bandTop + layout.bottomBandHeight * 0.57f - (metrics.ascent + metrics.descent) / 2f
-        canvas.drawText(
-            fitText(metadata, detailPaint, layout.framedWidth - layout.sideBorder * 2f - layout.padding * 2f),
-            layout.framedWidth / 2f,
-            baseline,
-            detailPaint
-        )
-    }
+        assetPackage = StaticHighDesignWatermarkPackages.VAN_GOGH_STARRY,
+        assetProvider = provider,
+        textSlots = listOfNotNull(textSlot)
+    )
 }
 
 private fun drawBlueHourFrame(
@@ -1013,64 +1217,86 @@ private fun drawBlueHourFrame(
     template: ResolvedPhotoWatermarkTemplate,
     titleTextSize: Float,
     detailTextSize: Float,
-    padding: Float
+    padding: Float,
+    staticWatermarkAssetProvider: StaticWatermarkAssetProvider? = null
 ): PhotoWatermarkBitmapRenderResult {
-    val sideBorder = (padding * 1.58f).coerceAtLeast(MIN_PADDING_PX * 1.05f)
-    val topBorder = (padding * 1.38f).coerceAtLeast(MIN_PADDING_PX * 0.95f)
-    val bottomBandHeight = maxOf(titleTextSize * 5.25f, source.height * 0.25f)
-    return drawComplexWatermarkFrame(
+    val sideBorder = (source.width * 0.027f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
+    val topBorder = (source.height * 0.083f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
+    val bottomBandHeight = maxOf(titleTextSize * 2.2f, source.height * 0.128f, padding * 2.8f)
+    val titleSlot = HighDesignTextSlotSpec(
+        text = template.title,
+        style = WatermarkTextSlotStyle.BLUE_HOUR_TITLE,
+        alignment = Paint.Align.LEFT,
+        textSize = titleTextSize,
+        boundsResolver = { layout ->
+            RectF(
+                layout.sideBorder + layout.padding,
+                layout.bandTop + layout.bottomBandHeight * 0.10f,
+                layout.framedWidth - layout.sideBorder - layout.padding,
+                layout.bandTop + layout.bottomBandHeight * 0.58f
+            )
+        }
+    )
+    val metadataSlot = blueHourMetadata(template.supportingLines).takeIf(String::isNotBlank)?.let {
+        HighDesignTextSlotSpec(
+            text = it,
+            style = WatermarkTextSlotStyle.BLUE_HOUR_METADATA,
+            alignment = Paint.Align.LEFT,
+            textSize = detailTextSize,
+            boundsResolver = { layout ->
+                RectF(
+                    layout.sideBorder + layout.padding,
+                    layout.bandTop + layout.bottomBandHeight * 0.48f,
+                    layout.framedWidth - layout.sideBorder - layout.padding,
+                    layout.bandTop + layout.bottomBandHeight * 0.86f
+                )
+            }
+        )
+    }
+    return drawStaticHighDesignWatermarkFrame(
         source = source,
         template = template,
         sideBorder = sideBorder,
         topBorder = topBorder,
         bottomBandHeight = bottomBandHeight,
         padding = padding,
-        overlayStyle = ComplexWatermarkOverlayStyle.BLUE_HOUR
-    ) { canvas, layout ->
-        val contentLeft = layout.sideBorder + layout.padding
-        val contentRight = layout.framedWidth - layout.sideBorder - layout.padding
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb((255 * template.textOpacity).toInt().coerceIn(0, 255), 224, 238, 255)
-            textSize = titleTextSize
-            style = Paint.Style.FILL
-            textAlign = Paint.Align.LEFT
-            typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
-            setShadowLayer(titleTextSize * 0.22f, 0f, titleTextSize * 0.05f, Color.argb(172, 0, 4, 16))
-        }
-        val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb((224 * template.textOpacity).toInt().coerceIn(0, 224), 162, 190, 220)
-            textSize = detailTextSize
-            style = Paint.Style.FILL
-            textAlign = Paint.Align.LEFT
-            typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-        }
-        val titleMetrics = titlePaint.fontMetrics
-        val titleBaseline =
-            layout.bandTop + layout.bottomBandHeight * 0.36f - (titleMetrics.ascent + titleMetrics.descent) / 2f
-        canvas.drawText(template.title, contentLeft, titleBaseline, titlePaint)
+        assetPackage = StaticHighDesignWatermarkPackages.BLUE_HOUR,
+        assetProvider = staticWatermarkAssetProvider,
+        textSlots = listOfNotNull(titleSlot, metadataSlot)
+    )
+}
 
-        val metadata = blueHourMetadata(template.supportingLines)
-        if (metadata.isNotBlank()) {
-            val detailBaseline = titleBaseline + (titleMetrics.descent - titleMetrics.ascent) * 0.74f
-            canvas.drawText(
-                fitText(metadata, detailPaint, (contentRight - contentLeft) * 0.72f),
-                contentLeft,
-                detailBaseline,
-                detailPaint
-            )
+private data class HighDesignTextSlotSpec(
+    val text: String,
+    val style: WatermarkTextSlotStyle,
+    val alignment: Paint.Align,
+    val textSize: Float,
+    val boundsResolver: (ComplexWatermarkFrameLayout) -> RectF
+)
+
+private class VanGoghStaticWatermarkAssetProvider(
+    private val delegate: VanGoghStarryFrameAssetProvider
+) : StaticWatermarkAssetProvider {
+    override fun load(asset: StaticWatermarkFrameAsset): Bitmap? {
+        val variant = when (asset.variant) {
+            WatermarkSceneVariant.PORTRAIT -> VanGoghStarryFrameAssetVariant.PORTRAIT
+            WatermarkSceneVariant.SQUARE -> VanGoghStarryFrameAssetVariant.SQUARE
+            WatermarkSceneVariant.LANDSCAPE -> VanGoghStarryFrameAssetVariant.LANDSCAPE
         }
+        return delegate.load(variant)
     }
 }
 
-private fun drawComplexWatermarkFrame(
+private fun drawStaticHighDesignWatermarkFrame(
     source: Bitmap,
     template: ResolvedPhotoWatermarkTemplate,
     sideBorder: Float,
     topBorder: Float,
     bottomBandHeight: Float,
     padding: Float,
-    overlayStyle: ComplexWatermarkOverlayStyle,
-    drawTextBlock: (Canvas, ComplexWatermarkFrameLayout) -> Unit
+    assetPackage: StaticWatermarkAssetPackage,
+    assetProvider: StaticWatermarkAssetProvider?,
+    textSlots: List<HighDesignTextSlotSpec>
 ): PhotoWatermarkBitmapRenderResult {
     val framedWidth = (source.width + sideBorder * 2f).toInt()
     val framedHeight = (source.height + topBorder + bottomBandHeight).toInt()
@@ -1084,172 +1310,193 @@ private fun drawComplexWatermarkFrame(
         sourceHeight = source.height,
         padding = padding
     )
-    val framedBitmap = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
+    val aspect = framedWidth.toFloat() / framedHeight.toFloat()
+    val frameAsset = assetPackage.frameAssetFor(aspect)
+    val scene = WatermarkScene(
+        templateId = template.templateId,
+        outputWidth = framedWidth,
+        outputHeight = framedHeight,
+        photoSlot = layout.sourceRect,
+        safeArea = RectF(
+            layout.sideBorder + layout.padding,
+            layout.topBorder + layout.padding,
+            layout.framedWidth - layout.sideBorder - layout.padding,
+            layout.framedHeight - layout.padding
+        ),
+        variant = frameAsset.variant,
+        layers = buildList {
+            add(WatermarkSceneLayer.SolidBackground(template.frameBackground))
+            add(WatermarkSceneLayer.PhotoSlot)
+            add(
+                WatermarkSceneLayer.BorderAsset(
+                    asset = frameAsset,
+                    destination = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
+                )
+            )
+            textSlots.forEach { slot ->
+                add(
+                    WatermarkSceneLayer.TextSlot(
+                        text = slot.text,
+                        bounds = slot.boundsResolver(layout),
+                        style = slot.style,
+                        alignment = slot.alignment,
+                        textSize = slot.textSize
+                    )
+                )
+            }
+        }
+    )
+    val warning = if (assetProvider == null) {
+        "static-asset-provider-unavailable:${assetPackage.templateId}"
+    } else {
+        null
+    }
+    return renderStaticWatermarkScene(
+        source = source,
+        scene = scene,
+        template = template,
+        assetProvider = assetProvider,
+        warning = mergeWarnings(template.warning, warning)
+    )
+}
+
+private fun renderStaticWatermarkScene(
+    source: Bitmap,
+    scene: WatermarkScene,
+    template: ResolvedPhotoWatermarkTemplate,
+    assetProvider: StaticWatermarkAssetProvider?,
+    warning: String?
+): PhotoWatermarkBitmapRenderResult {
+    val framedBitmap = Bitmap.createBitmap(scene.outputWidth, scene.outputHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(framedBitmap)
-    val fullRect = RectF(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat())
-    drawFrameBackground(canvas, source, fullRect, template.frameBackground)
-    canvas.drawBitmap(source, sideBorder, topBorder, null)
-    drawComplexWatermarkOverlayLayer(canvas, layout, overlayStyle)
-    drawTextBlock(canvas, layout)
+    var sceneWarning = warning
+    scene.layers.forEach { layer ->
+        when (layer) {
+            is WatermarkSceneLayer.SolidBackground -> {
+                drawStaticHighDesignFrameBackground(
+                    canvas = canvas,
+                    source = source,
+                    destination = RectF(0f, 0f, scene.outputWidth.toFloat(), scene.outputHeight.toFloat()),
+                    background = layer.frameBackground,
+                    templateId = scene.templateId
+                )
+            }
+
+            is WatermarkSceneLayer.BorderAsset -> {
+                val asset = assetProvider?.load(layer.asset)
+                if (asset != null && !asset.isRecycled) {
+                    val checkpoint = canvas.save()
+                    if (layer.mask == WatermarkSceneMask.CLEAR_PHOTO_SLOT) {
+                        val maskPath = Path().apply {
+                            fillType = Path.FillType.EVEN_ODD
+                            addRect(layer.destination, Path.Direction.CW)
+                            addRect(scene.photoSlot, Path.Direction.CW)
+                        }
+                        canvas.clipPath(maskPath)
+                    }
+                    drawBitmapFill(asset, layer.destination, canvas)
+                    canvas.restoreToCount(checkpoint)
+                    drawStaticHighDesignThemeWash(
+                        canvas = canvas,
+                        templateId = scene.templateId,
+                        destination = layer.destination,
+                        photoSlot = scene.photoSlot
+                    )
+                } else {
+                    sceneWarning = mergeWarnings(
+                        sceneWarning,
+                        "static-asset-missing:${layer.asset.packageId}:${layer.asset.variant.name.lowercase(Locale.US)}"
+                    )
+                }
+            }
+
+            WatermarkSceneLayer.PhotoSlot -> {
+                canvas.drawBitmap(source, scene.photoSlot.left, scene.photoSlot.top, null)
+            }
+
+            is WatermarkSceneLayer.TextSlot -> {
+                drawWatermarkSceneTextSlot(canvas, layer, template)
+            }
+        }
+    }
     return PhotoWatermarkBitmapRenderResult(
         bitmap = framedBitmap,
-        warning = template.warning
+        warning = sceneWarning
     )
 }
 
-private fun drawComplexWatermarkOverlayLayer(
+private fun drawWatermarkSceneTextSlot(
     canvas: Canvas,
-    layout: ComplexWatermarkFrameLayout,
-    overlayStyle: ComplexWatermarkOverlayStyle
+    slot: WatermarkSceneLayer.TextSlot,
+    template: ResolvedPhotoWatermarkTemplate
 ) {
-    val overlayBitmap = Bitmap.createBitmap(layout.framedWidth, layout.framedHeight, Bitmap.Config.ARGB_8888)
-    val overlayCanvas = Canvas(overlayBitmap)
-    drawNightMemoryFrameWash(
-        canvas = overlayCanvas,
-        framedWidth = layout.framedWidth,
-        framedHeight = layout.framedHeight,
-        bandTop = layout.bandTop,
-        sideBorder = layout.sideBorder,
-        topBorder = layout.topBorder,
-        sourceWidth = layout.sourceWidth,
-        sourceHeight = layout.sourceHeight
-    )
-    drawComplexOverlayFrameTexture(overlayCanvas, layout, overlayStyle)
-    when (overlayStyle) {
-        ComplexWatermarkOverlayStyle.STARRY_MOON -> drawStarryMoonFrameDecoration(
-            canvas = overlayCanvas,
-            framedWidth = layout.framedWidth,
-            framedHeight = layout.framedHeight,
-            bandTop = layout.bandTop,
-            sideBorder = layout.sideBorder,
-            topBorder = layout.topBorder,
-            sourceWidth = layout.sourceWidth,
-            sourceHeight = layout.sourceHeight,
-            padding = layout.padding
-        )
-        ComplexWatermarkOverlayStyle.BLUE_HOUR -> drawBlueHourFrameDecoration(
-            canvas = overlayCanvas,
-            framedWidth = layout.framedWidth,
-            framedHeight = layout.framedHeight,
-            bandTop = layout.bandTop,
-            sideBorder = layout.sideBorder,
-            topBorder = layout.topBorder,
-            sourceWidth = layout.sourceWidth,
-            sourceHeight = layout.sourceHeight,
-            padding = layout.padding
-        )
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        textAlign = slot.alignment
+        textSize = slot.textSize
+        when (slot.style) {
+            WatermarkTextSlotStyle.STARRY_METADATA -> {
+                color = Color.argb((228 * template.textOpacity).toInt().coerceIn(0, 228), 224, 198, 142)
+                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+                setShadowLayer(slot.textSize * 0.18f, 0f, slot.textSize * 0.04f, Color.argb(132, 0, 0, 0))
+            }
+            WatermarkTextSlotStyle.BLUE_HOUR_TITLE -> {
+                color = Color.argb((255 * template.textOpacity).toInt().coerceIn(0, 255), 224, 238, 255)
+                typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+                setShadowLayer(slot.textSize * 0.22f, 0f, slot.textSize * 0.05f, Color.argb(172, 0, 4, 16))
+            }
+            WatermarkTextSlotStyle.BLUE_HOUR_METADATA -> {
+                color = Color.argb((224 * template.textOpacity).toInt().coerceIn(0, 224), 162, 190, 220)
+                typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+            }
+        }
     }
-    canvas.drawBitmap(overlayBitmap, 0f, 0f, null)
-    overlayBitmap.recycle()
+    val metrics = paint.fontMetrics
+    val baseline = slot.bounds.centerY() - (metrics.ascent + metrics.descent) / 2f
+    val x = when (slot.alignment) {
+        Paint.Align.LEFT -> slot.bounds.left
+        Paint.Align.RIGHT -> slot.bounds.right
+        Paint.Align.CENTER -> slot.bounds.centerX()
+    }
+    canvas.drawText(
+        fitText(slot.text, paint, slot.bounds.width()),
+        x,
+        baseline,
+        paint
+    )
 }
 
-private fun drawComplexOverlayFrameTexture(
+private fun drawStaticHighDesignThemeWash(
     canvas: Canvas,
-    layout: ComplexWatermarkFrameLayout,
-    overlayStyle: ComplexWatermarkOverlayStyle
+    templateId: String,
+    destination: RectF,
+    photoSlot: RectF
 ) {
-    val sourceRect = layout.sourceRect
-    val bottomBandRect = layout.bottomBandRect
-    val bandWashColor = when (overlayStyle) {
-        ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(122, 10, 34, 82)
-        ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(136, 12, 44, 82)
+    val washColor = when (templateId) {
+        TEMPLATE_VAN_GOGH_STARRY -> Color.argb(78, 10, 42, 96)
+        TEMPLATE_BLUE_HOUR -> Color.argb(126, 5, 44, 92)
+        else -> return
     }
-    canvas.drawRect(bottomBandRect, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = bandWashColor
+    val checkpoint = canvas.save()
+    val outsidePhotoPath = Path().apply {
+        fillType = Path.FillType.EVEN_ODD
+        addRect(destination, Path.Direction.CW)
+        addRect(photoSlot, Path.Direction.CW)
+    }
+    canvas.clipPath(outsidePhotoPath)
+    canvas.drawRect(destination, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = washColor
         style = Paint.Style.FILL
     })
-
-    val sourceEdgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(128, 232, 184, 88)
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(198, 142, 204, 250)
-        }
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.8f, layout.framedWidth * 0.0024f)
-    }
-    val sourceInset = maxOf(2f, layout.framedWidth * 0.0032f)
-    canvas.drawRect(
-        sourceRect.left - sourceInset,
-        sourceRect.top - sourceInset,
-        sourceRect.right + sourceInset,
-        sourceRect.bottom + sourceInset,
-        sourceEdgePaint
-    )
-
-    val separatorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.argb(178, 232, 184, 88)
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.argb(214, 142, 204, 250)
-        }
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.6f, layout.framedWidth * 0.0022f)
-        strokeCap = Paint.Cap.ROUND
-    }
-    canvas.drawLine(
-        layout.sideBorder + layout.padding * 0.18f,
-        layout.bandTop + layout.padding * 0.2f,
-        layout.framedWidth - layout.sideBorder - layout.padding * 0.18f,
-        layout.bandTop + layout.padding * 0.16f,
-        separatorPaint
-    )
-    canvas.drawLine(
-        layout.sideBorder + layout.padding * 0.32f,
-        layout.framedHeight - layout.padding * 0.34f,
-        layout.framedWidth - layout.sideBorder - layout.padding * 0.32f,
-        layout.framedHeight - layout.padding * 0.38f,
-        Paint(separatorPaint).apply { alpha = (separatorPaint.alpha * 0.64f).toInt() }
-    )
-
-    val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(236, 198, 122)
-        style = Paint.Style.FILL
-    }
-    val coolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> Color.rgb(54, 139, 218)
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> Color.rgb(158, 202, 238)
-        }
-        style = Paint.Style.FILL
-    }
-    val speckleCount = when (overlayStyle) {
-        ComplexWatermarkOverlayStyle.STARRY_MOON -> 260
-        ComplexWatermarkOverlayStyle.BLUE_HOUR -> 280
-    }
-    repeat(speckleCount) { index ->
-        val region = index % 5
-        val x = when (region) {
-            0 -> frameNoise(index * 17 + 3) * layout.framedWidth
-            1 -> frameNoise(index * 19 + 7) * layout.framedWidth
-            2 -> frameNoise(index * 23 + 11) * layout.sideBorder
-            3 -> layout.framedWidth - layout.sideBorder + frameNoise(index * 29 + 13) * layout.sideBorder
-            else -> frameNoise(index * 31 + 17) * layout.framedWidth
-        }
-        val y = when (region) {
-            0 -> frameNoise(index * 37 + 5) * layout.topBorder
-            1 -> layout.bandTop + frameNoise(index * 41 + 9) * layout.bottomBandHeight
-            2, 3 -> layout.topBorder + frameNoise(index * 43 + 15) * layout.sourceHeight
-            else -> layout.framedHeight - layout.padding * (0.3f + frameNoise(index * 47 + 21) * 1.7f)
-        }
-        val paint = if (overlayStyle == ComplexWatermarkOverlayStyle.STARRY_MOON && index % 3 != 0) {
-            warmPaint
-        } else {
-            coolPaint
-        }
-        paint.alpha = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> (92 + frameNoise(index * 53 + 1) * 96f).toInt()
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> (86 + frameNoise(index * 53 + 1) * 98f).toInt()
-        }
-        val radius = when (overlayStyle) {
-            ComplexWatermarkOverlayStyle.STARRY_MOON -> layout.padding * (0.026f + frameNoise(index * 59 + 4) * 0.05f)
-            ComplexWatermarkOverlayStyle.BLUE_HOUR -> layout.padding * (0.024f + frameNoise(index * 59 + 4) * 0.044f)
-        }.coerceAtLeast(0.7f)
-        canvas.drawCircle(x, y, radius, paint)
-    }
+    canvas.restoreToCount(checkpoint)
 }
 
-private fun frameNoise(seed: Int): Float {
-    val mixed = seed * 1103515245 + 12345
-    return ((mixed ushr 8) and 0x3ff) / 1023f
+private fun drawBitmapFill(bitmap: Bitmap, destination: RectF, canvas: Canvas) {
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        isFilterBitmap = true
+        isDither = true
+    }
+    canvas.drawBitmap(bitmap, null, destination, paint)
 }
 
 private fun drawBlurFourBorderFrame(
@@ -1767,6 +2014,59 @@ private fun drawFrameBackground(
     }
 }
 
+private fun drawStaticHighDesignFrameBackground(
+    canvas: Canvas,
+    source: Bitmap,
+    destination: RectF,
+    background: WatermarkFrameBackground,
+    templateId: String
+) {
+    when (templateId) {
+        TEMPLATE_BLUE_HOUR -> {
+            canvas.drawRect(destination, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(8, 38, 72)
+                style = Paint.Style.FILL
+            })
+            val lowerWash = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(130, 18, 74, 128)
+                style = Paint.Style.FILL
+            }
+            canvas.drawRect(
+                destination.left,
+                destination.top + destination.height() * 0.72f,
+                destination.right,
+                destination.bottom,
+                lowerWash
+            )
+            val veil = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(46, 190, 218, 235)
+                style = Paint.Style.FILL
+            }
+            canvas.drawRect(destination, veil)
+        }
+
+        TEMPLATE_VAN_GOGH_STARRY -> {
+            canvas.drawRect(destination, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(8, 28, 66)
+                style = Paint.Style.FILL
+            })
+            val lowerWash = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(122, 14, 48, 102)
+                style = Paint.Style.FILL
+            }
+            canvas.drawRect(
+                destination.left,
+                destination.top + destination.height() * 0.78f,
+                destination.right,
+                destination.bottom,
+                lowerWash
+            )
+        }
+
+        else -> drawFrameBackground(canvas, source, destination, background)
+    }
+}
+
 private fun drawGrandTourFrameBackground(
     canvas: Canvas,
     destination: RectF,
@@ -1968,197 +2268,6 @@ private fun drawNightMemoryDecoration(
     )
 }
 
-private fun drawStarryMoonFrameDecoration(
-    canvas: Canvas,
-    framedWidth: Int,
-    framedHeight: Int,
-    bandTop: Float,
-    sideBorder: Float,
-    topBorder: Float,
-    sourceWidth: Int,
-    sourceHeight: Int,
-    padding: Float
-) {
-    val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(244, 232, 184, 88)
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(3.0f, framedWidth * 0.0052f)
-        strokeCap = Paint.Cap.ROUND
-    }
-    val coolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(180, 54, 142, 224)
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.8f, framedWidth * 0.0032f)
-        strokeCap = Paint.Cap.ROUND
-    }
-    val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(252, 246, 206, 104)
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(2.2f, framedWidth * 0.0039f)
-        strokeCap = Paint.Cap.ROUND
-    }
-    val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(255, 250, 218, 108)
-        style = Paint.Style.FILL
-    }
-    val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(255, 9, 12, 24)
-        style = Paint.Style.FILL
-    }
-
-    val moonX = sideBorder + padding * 0.65f
-    val moonY = topBorder + padding * 0.68f
-    val moonRadius = maxOf(14f, padding * 0.74f)
-    canvas.drawCircle(moonX, moonY, moonRadius, fillPaint)
-    canvas.drawCircle(moonX + moonRadius * 0.46f, moonY - moonRadius * 0.08f, moonRadius * 0.92f, maskPaint)
-
-    fun drawWave(startX: Float, endX: Float, y: Float, amplitude: Float, paint: Paint) {
-        val path = Path().apply {
-            moveTo(startX, y)
-            cubicTo(
-                startX + (endX - startX) * 0.28f,
-                y - amplitude,
-                startX + (endX - startX) * 0.58f,
-                y + amplitude,
-                endX,
-                y - amplitude * 0.22f
-            )
-        }
-        canvas.drawPath(path, paint)
-    }
-    val topStart = sideBorder + padding * 2.7f
-    val topEnd = framedWidth - sideBorder - padding * 0.65f
-    repeat(8) { index ->
-        val y = topBorder * 0.3f + padding * (0.45f + index * 0.12f)
-        drawWave(topStart, topEnd, y, padding * (0.46f + index * 0.05f), if (index % 2 == 0) warmPaint else coolPaint)
-    }
-    repeat(8) { index ->
-        val y = bandTop + padding * (0.48f + index * 0.15f)
-        drawWave(sideBorder + padding * 0.4f, framedWidth - sideBorder - padding * 0.45f, y, padding * 0.42f, if (index % 2 == 0) coolPaint else warmPaint)
-    }
-    drawWave(sideBorder * 0.48f, sideBorder + padding * 0.38f, topBorder + sourceHeight * 0.18f, padding * 0.5f, warmPaint)
-    drawWave(framedWidth - sideBorder - padding * 0.3f, framedWidth - sideBorder * 0.34f, topBorder + sourceHeight * 0.35f, padding * 0.44f, coolPaint)
-
-    val starPositions = listOf(
-        sideBorder * 0.78f to topBorder + sourceHeight * 0.18f,
-        sideBorder * 0.62f to topBorder + sourceHeight * 0.42f,
-        sideBorder * 0.88f to topBorder + sourceHeight * 0.76f,
-        framedWidth - sideBorder * 0.55f to topBorder + sourceHeight * 0.12f,
-        framedWidth - sideBorder * 0.72f to topBorder + sourceHeight * 0.33f,
-        framedWidth - sideBorder * 0.82f to topBorder + sourceHeight * 0.52f,
-        sideBorder + sourceWidth * 0.08f to bandTop + padding * 0.95f,
-        sideBorder + sourceWidth * 0.24f to bandTop + padding * 1.55f,
-        sideBorder + sourceWidth * 0.42f to bandTop + padding * 0.82f,
-        framedWidth - sideBorder - sourceWidth * 0.08f to bandTop + padding * 1.35f,
-        framedWidth - sideBorder - sourceWidth * 0.28f to bandTop + padding * 0.92f,
-        framedWidth - sideBorder - sourceWidth * 0.46f to bandTop + padding * 1.78f,
-        framedWidth * 0.74f to framedHeight - padding * 0.68f,
-        framedWidth * 0.23f to framedHeight - padding * 0.72f,
-        framedWidth * 0.5f to framedHeight - padding * 0.48f
-    )
-    starPositions.forEachIndexed { index, (x, y) ->
-        val radius = padding * if (index % 3 == 0) 0.22f else 0.15f
-        canvas.drawCircle(x, y, radius * 0.34f, fillPaint)
-        canvas.drawLine(x - radius, y, x + radius, y, starPaint)
-        canvas.drawLine(x, y - radius, x, y + radius, starPaint)
-    }
-}
-
-private fun drawBlueHourFrameDecoration(
-    canvas: Canvas,
-    framedWidth: Int,
-    framedHeight: Int,
-    bandTop: Float,
-    sideBorder: Float,
-    topBorder: Float,
-    sourceWidth: Int,
-    sourceHeight: Int,
-    padding: Float
-) {
-    val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(244, 142, 204, 250)
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(2.2f, framedWidth * 0.0036f)
-        strokeCap = Paint.Cap.ROUND
-    }
-    val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(206, 230, 184, 104)
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.2f, framedWidth * 0.0021f)
-        strokeCap = Paint.Cap.ROUND
-    }
-    val inset = maxOf(4f, minOf(framedWidth, framedHeight) * 0.008f)
-    canvas.drawRoundRect(
-        RectF(
-            inset,
-            inset,
-            framedWidth - inset,
-            framedHeight - inset
-        ),
-        padding * 0.28f,
-        padding * 0.28f,
-        linePaint
-    )
-    canvas.drawRect(
-        sideBorder - inset,
-        topBorder - inset,
-        sideBorder + sourceWidth + inset,
-        topBorder + sourceHeight + inset,
-        Paint(linePaint).apply { alpha = 116 }
-    )
-    val innerPaint = Paint(linePaint).apply {
-        alpha = 148
-        strokeWidth = maxOf(1.1f, framedWidth * 0.0017f)
-    }
-    val innerInset = inset + padding * 0.34f
-    canvas.drawRoundRect(
-        RectF(
-            innerInset,
-            innerInset,
-            framedWidth - innerInset,
-            framedHeight - innerInset
-        ),
-        padding * 0.2f,
-        padding * 0.2f,
-        innerPaint
-    )
-    repeat(6) { index ->
-        val y = topBorder * (0.34f + index * 0.11f)
-        val start = sideBorder + padding * (0.35f + index * 0.08f)
-        val end = framedWidth - sideBorder - padding * (0.65f - index * 0.04f)
-        canvas.drawLine(start, y, end, y + padding * 0.06f, Paint(linePaint).apply {
-            alpha = 58 + index * 14
-            strokeWidth = maxOf(0.9f, framedWidth * 0.0014f)
-        })
-    }
-
-    val iconX = framedWidth - sideBorder - padding * 2.1f
-    val iconY = bandTop + padding * 1.35f
-    val moonRadius = padding * 0.28f
-    canvas.drawArc(
-        RectF(iconX, iconY - moonRadius, iconX + moonRadius * 1.8f, iconY + moonRadius * 0.8f),
-        85f,
-        220f,
-        false,
-        warmPaint
-    )
-    val lampX = iconX + padding * 1.34f
-    val lampTop = iconY + padding * 0.22f
-    val lampBottom = framedHeight - padding * 0.82f
-    canvas.drawLine(lampX, lampTop, lampX, lampBottom, warmPaint)
-    canvas.drawLine(lampX - padding * 0.26f, lampBottom, lampX + padding * 0.26f, lampBottom, warmPaint)
-    canvas.drawLine(lampX - padding * 0.18f, lampTop + padding * 0.3f, lampX + padding * 0.18f, lampTop + padding * 0.3f, warmPaint)
-    val cameraLeft = iconX + padding * 0.1f
-    val cameraTop = iconY + padding * 0.68f
-    canvas.drawRoundRect(
-        RectF(cameraLeft, cameraTop, cameraLeft + padding * 0.78f, cameraTop + padding * 0.52f),
-        padding * 0.08f,
-        padding * 0.08f,
-        warmPaint
-    )
-    canvas.drawCircle(cameraLeft + padding * 0.39f, cameraTop + padding * 0.26f, padding * 0.13f, warmPaint)
-}
-
 private fun starryMoonMetadata(lines: List<String>): String {
     return lines
         .map(String::trim)
@@ -2299,6 +2408,8 @@ private const val PHOTO_WATERMARK_DATETIME_KEY = "watermarkDatetime"
 private const val PHOTO_WATERMARK_LOCATION_KEY = "watermarkLocation"
 private const val PHOTO_WATERMARK_CAMERA_PARAMS_KEY = "watermarkCameraParams"
 private const val PHOTO_WATERMARK_POSITION_KEY = "watermarkPosition"
+private const val CHECK_IN_CONTENT_WATERMARK_PLACEMENT_KEY = "checkInContentWatermarkPlacement"
+private const val CHECK_IN_CONTENT_WATERMARK_DENSITY_KEY = "checkInContentWatermarkDensity"
 private const val PHOTO_WATERMARK_TEXT_SCALE_KEY = "watermarkTextScale"
 private const val PHOTO_WATERMARK_TEXT_OPACITY_KEY = "watermarkTextOpacity"
 private const val PHOTO_WATERMARK_MODE_NAME_KEY = "watermarkModeName"
@@ -2343,14 +2454,18 @@ internal fun resolvePhotoWatermarkTemplate(
         ?: formatExifLocation(preservedExif)
     val cameraParams = metadata.customTags[PHOTO_WATERMARK_CAMERA_PARAMS_KEY]
         ?: formatCameraParams(preservedExif)
-    val profileName = metadata.customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY]
+    val profileName = contentAwareCheckInProfileName(
+        metadata.customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY],
+        metadata.customTags
+    )
     val tokenValues = mapOf(
         PhotoWatermarkMetadataToken.DATETIME to datetime,
         PhotoWatermarkMetadataToken.LOCATION to location,
         PhotoWatermarkMetadataToken.CAMERA_PARAMS to cameraParams,
         PhotoWatermarkMetadataToken.PROFILE_NAME to profileName
     )
-    val supportedTokens = templateType.metadataTokens.mapNotNull(tokenValues::get)
+    val supportedTokens = templateType.resolveMetadataTokens(metadata.customTags)
+        .mapNotNull(tokenValues::get)
     return ResolvedPhotoWatermarkTemplate(
         templateId = templateType.storageKey,
         title = resolveWatermarkTitle(templateType, watermarkText, metadata.customTags, model),
@@ -2361,9 +2476,7 @@ internal fun resolvePhotoWatermarkTemplate(
             )
         ),
         usesExpandedFrame = templateType.usesExpandedFrame,
-        placement = WatermarkTextPlacement.fromStorageKey(
-            metadata.customTags[PHOTO_WATERMARK_POSITION_KEY]
-        ) ?: templateType.defaultPlacement,
+        placement = resolvePhotoWatermarkPlacement(templateType, metadata.customTags),
         textScale = metadata.customTags[PHOTO_WATERMARK_TEXT_SCALE_KEY]
             ?.toFloatOrNull()
             ?.coerceIn(0.75f, 1.4f)
@@ -2378,6 +2491,35 @@ internal fun resolvePhotoWatermarkTemplate(
             ?: 1f,
         warning = warning
     )
+}
+
+private fun resolvePhotoWatermarkPlacement(
+    templateType: PhotoWatermarkTemplateType,
+    customTags: Map<String, String>
+): WatermarkTextPlacement {
+    val contentPlacement = if (customTags["mode"] == "check-in") {
+        WatermarkTextPlacement.fromStorageKey(customTags[CHECK_IN_CONTENT_WATERMARK_PLACEMENT_KEY])
+    } else {
+        null
+    }
+    return contentPlacement
+        ?: WatermarkTextPlacement.fromStorageKey(customTags[PHOTO_WATERMARK_POSITION_KEY])
+        ?: templateType.defaultPlacement
+}
+
+private fun PhotoWatermarkTemplateType.resolveMetadataTokens(
+    customTags: Map<String, String>
+): List<PhotoWatermarkMetadataToken> {
+    if (customTags["mode"] != "check-in") return metadataTokens
+    return when (customTags[CHECK_IN_CONTENT_WATERMARK_DENSITY_KEY]) {
+        "compact" -> emptyList()
+        "balanced" -> metadataTokens.filter { token ->
+            token == PhotoWatermarkMetadataToken.PROFILE_NAME ||
+                token == PhotoWatermarkMetadataToken.LOCATION
+        }
+        "detailed" -> metadataTokens
+        else -> metadataTokens
+    }
 }
 
 private val SUPPORTED_BLUR_BACKGROUNDS = setOf(
@@ -2402,9 +2544,12 @@ private fun resolveWatermarkTitle(
     deviceModel: String
 ): String {
     val modeName = customTags[PHOTO_WATERMARK_MODE_NAME_KEY]
-    val profileName = customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY]
+    val profileName = contentAwareCheckInProfileName(
+        customTags[PHOTO_WATERMARK_PROFILE_NAME_KEY],
+        customTags
+    )
     if (templateType == PhotoWatermarkTemplateType.BLUE_HOUR) {
-        return "蓝调时刻"
+        return "BLUE HOUR"
     }
     if (modeName != null) {
         val title = buildString {

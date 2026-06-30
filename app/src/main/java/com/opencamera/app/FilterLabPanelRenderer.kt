@@ -32,9 +32,8 @@ internal class FilterLabPanelRenderer(
         cardRail?.let { rail ->
             if (hasCardRail) {
                 rail.renderCards(model.stylePresetCardRail!!.cards, onApplyStyle)
-                rail.isVisible = true
             } else {
-                rail.isVisible = false
+                rail.renderCards(emptyList(), onApplyStyle)
             }
         }
         views.currentSummary.text = model.currentFilterSummary

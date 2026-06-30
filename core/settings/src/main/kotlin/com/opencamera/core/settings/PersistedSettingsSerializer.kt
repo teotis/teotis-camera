@@ -14,6 +14,7 @@ object PersistedSettingsSerializer {
     private const val KEY_PORTRAIT_BEAUTY_STRENGTH = "photo.portrait.beautyStrength"
     private const val KEY_PORTRAIT_BOKEH_EFFECT = "photo.portrait.bokehEffect"
     private const val KEY_PORTRAIT_DEPTH_STRENGTH = "photo.portrait.depthStrength"
+    private const val KEY_PHOTO_WATERMARK_ENABLED = "photo.watermark.enabledByDefault"
     private const val KEY_PHOTO_WATERMARK_TEMPLATE = "photo.defaultWatermarkTemplateId"
     private const val KEY_PHOTO_WATERMARK_CLASSIC_POSITION = "photo.watermark.classicOverlay.position"
     private const val KEY_PHOTO_WATERMARK_CLASSIC_SCALE = "photo.watermark.classicOverlay.scale"
@@ -82,6 +83,7 @@ object PersistedSettingsSerializer {
             KEY_PORTRAIT_BEAUTY_STRENGTH to settings.photo.portraitBeautyStrength.storageKey,
             KEY_PORTRAIT_BOKEH_EFFECT to settings.photo.portraitBokehEffect.storageKey,
             KEY_PORTRAIT_DEPTH_STRENGTH to settings.photo.portraitDepthStrength.toString(),
+            KEY_PHOTO_WATERMARK_ENABLED to settings.photo.photoWatermarkEnabledByDefault.toString(),
             KEY_PHOTO_WATERMARK_TEMPLATE to settings.photo.defaultWatermarkTemplateId,
             KEY_PHOTO_WATERMARK_CLASSIC_POSITION to settings.photo.classicOverlayWatermarkStyle.textPlacement.storageKey,
             KEY_PHOTO_WATERMARK_CLASSIC_SCALE to settings.photo.classicOverlayWatermarkStyle.textScale.storageKey,
@@ -179,6 +181,10 @@ object PersistedSettingsSerializer {
                 ) ?: defaults.photo.portraitBokehEffect,
                 portraitDepthStrength = values[KEY_PORTRAIT_DEPTH_STRENGTH]?.toIntOrNull()
                     ?.coerceIn(0, 100) ?: defaults.photo.portraitDepthStrength,
+                photoWatermarkEnabledByDefault = parseBoolean(
+                    values[KEY_PHOTO_WATERMARK_ENABLED],
+                    defaults.photo.photoWatermarkEnabledByDefault
+                ),
                 defaultWatermarkTemplateId = values[KEY_PHOTO_WATERMARK_TEMPLATE]
                     ?.takeIf { value ->
                         value.isNotBlank() &&

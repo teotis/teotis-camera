@@ -106,6 +106,7 @@ open class TestAppTextResolver : AppTextResolver(null) {
         R.string.disabled_brightness_active_shot -> "Wait for current capture to finish"
         R.string.disabled_brightness_countdown -> "Wait for countdown to finish"
         R.string.disabled_brightness_unsupported -> "Brightness unavailable"
+        R.string.disabled_brightness_preview_inactive -> "Wait for preview to become ready"
         R.string.disabled_countdown -> "Countdown in progress"
         R.string.disabled_frame_ratio_active_shot -> "Wait for current capture to finish"
         R.string.disabled_frame_ratio_countdown -> "Wait for countdown to finish"

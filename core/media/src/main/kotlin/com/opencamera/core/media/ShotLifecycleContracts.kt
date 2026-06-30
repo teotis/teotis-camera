@@ -10,7 +10,8 @@ data class CaptureProfile(
     val torchEnabled: Boolean = false,
     val manualCaptureParams: com.opencamera.core.settings.ManualCaptureParams? = null,
     val stillCaptureQuality: StillCaptureQualityPreference? = null,
-    val stillCaptureResolutionPreset: StillCaptureResolutionPreset? = null
+    val stillCaptureResolutionPreset: StillCaptureResolutionPreset? = null,
+    val focusStackSpec: FocusStackCaptureSpec? = null
 )
 
 sealed interface CaptureStrategy {
@@ -121,6 +122,7 @@ data class ShotResult(
     val metadata: MediaMetadata,
     val livePhotoBundle: LivePhotoBundle? = null,
     val frameBundle: FrameBundle? = null,
+    val contentUnderstanding: ContentUnderstandingSnapshot? = null,
     val intermediateOutputPaths: List<String> = emptyList(),
     val pipelineNotes: List<String> = emptyList(),
     val structuredPostProcessFailures: List<PostProcessFailure> = emptyList(),

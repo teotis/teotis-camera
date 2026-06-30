@@ -33,6 +33,55 @@ enum class FrameRole {
 }
 
 /**
+ * Role of a frame inside a focus-stack capture. This is separate from [FrameRole]
+ * so ordinary burst/fusion frames and near/far focus planes can be represented together.
+ */
+enum class FocusStackFrameRole {
+    NONE,
+    NEAR,
+    FAR,
+    MID
+}
+
+enum class FocusStackCaptureMode {
+    AUTO_NEAR_FAR,
+    GUIDED_NEAR_FAR,
+    SCENE_SEGMENTED
+}
+
+data class FocusStackCaptureSpec(
+    val mode: FocusStackCaptureMode,
+    val requiredFrameRoles: List<FocusStackFrameRole>,
+    val algorithmProfile: String,
+    val userGuidanceRequired: Boolean = true
+) {
+    init {
+        require(requiredFrameRoles.contains(FocusStackFrameRole.NEAR)) {
+            "Focus stack capture requires a NEAR frame"
+        }
+        require(requiredFrameRoles.contains(FocusStackFrameRole.FAR)) {
+            "Focus stack capture requires a FAR frame"
+        }
+    }
+
+    companion object {
+        fun guidedNearFar(): FocusStackCaptureSpec = FocusStackCaptureSpec(
+            mode = FocusStackCaptureMode.GUIDED_NEAR_FAR,
+            requiredFrameRoles = listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR),
+            algorithmProfile = "focus-stack:guided-near-far-v1",
+            userGuidanceRequired = true
+        )
+
+        fun automaticNearFar(): FocusStackCaptureSpec = FocusStackCaptureSpec(
+            mode = FocusStackCaptureMode.AUTO_NEAR_FAR,
+            requiredFrameRoles = listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR),
+            algorithmProfile = "focus-stack:auto-near-far-v1",
+            userGuidanceRequired = false
+        )
+    }
+}
+
+/**
  * Noise model metadata for a frame. UNKNOWN indicates the device or algorithm
  * could not determine a reliable model; consumers must treat the frame conservatively.
  */
@@ -78,6 +127,8 @@ data class FrameBundleFrame(
     val frameIndex: Int,
     val pixelReference: PixelReference,
     val frameRole: FrameRole = FrameRole.FUSION_SUPPLEMENT,
+    val focusStackRole: FocusStackFrameRole = FocusStackFrameRole.NONE,
+    val focusDistanceDiopters: Float? = null,
     val exposureTimeNanos: Long? = null,
     val isoSensitivity: Int? = null,
     val timestampNanos: Long? = null,

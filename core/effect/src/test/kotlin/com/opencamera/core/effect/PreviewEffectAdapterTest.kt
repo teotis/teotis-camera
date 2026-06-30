@@ -406,7 +406,7 @@ class PreviewEffectAdapterTest {
 
         assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
         assertEquals(WatermarkPreviewDecoration.BLUE_HOUR, model.watermarkHint?.decoration)
-        assertEquals("蓝调时刻", model.watermarkHint?.previewText)
+        assertEquals("BLUE HOUR", model.watermarkHint?.previewText)
         assertEquals(
             listOf("2026.06.22 19:41", "CITY NIGHT", "24mm"),
             model.watermarkHint?.previewLabels

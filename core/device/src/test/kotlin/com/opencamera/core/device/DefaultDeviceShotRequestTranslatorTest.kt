@@ -280,6 +280,55 @@ class DefaultDeviceShotRequestTranslatorTest {
     }
 
     @Test
+    fun `focus stack multi frame shot carries near far roles in device request`() {
+        val plan = ShotExecutor(idGenerator = { "shot-focus-stack" }).plan(
+            CaptureStrategy.MultiFrame(
+                captureProfile = CaptureProfile(
+                    frameCount = 2,
+                    focusStackSpec = com.opencamera.core.media.FocusStackCaptureSpec.guidedNearFar()
+                )
+            )
+        )
+
+        val request = translator.translate(plan)
+
+        assertEquals(2, request.frameCount)
+        assertEquals(
+            listOf(
+                com.opencamera.core.media.FocusStackFrameRole.NEAR,
+                com.opencamera.core.media.FocusStackFrameRole.FAR
+            ),
+            request.focusStackFrameRoles
+        )
+        assertTrue("device:focus-stack=guided-near-far" in request.diagnostics)
+    }
+
+    @Test
+    fun `automatic focus stack emits automatic guidance diagnostics`() {
+        val plan = ShotExecutor(idGenerator = { "shot-auto-focus-stack" }).plan(
+            CaptureStrategy.MultiFrame(
+                captureProfile = CaptureProfile(
+                    frameCount = 2,
+                    focusStackSpec = com.opencamera.core.media.FocusStackCaptureSpec.automaticNearFar()
+                )
+            )
+        )
+
+        val request = translator.translate(plan)
+
+        assertEquals(
+            listOf(
+                com.opencamera.core.media.FocusStackFrameRole.NEAR,
+                com.opencamera.core.media.FocusStackFrameRole.FAR
+            ),
+            request.focusStackFrameRoles
+        )
+        assertTrue("device:focus-stack=auto-near-far" in request.diagnostics)
+        assertTrue("device:focus-stack-guidance=automatic" in request.diagnostics)
+        assertTrue("device:focus-stack-profile=focus-stack:auto-near-far-v1" in request.diagnostics)
+    }
+
+    @Test
     fun `live photo keeps still template with live bundle diagnostics`() {
         val plan = ShotExecutor(idGenerator = { "shot-live" }).plan(
             CaptureStrategy.LivePhoto(

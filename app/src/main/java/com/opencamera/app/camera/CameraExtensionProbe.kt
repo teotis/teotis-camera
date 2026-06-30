@@ -71,10 +71,23 @@ internal data class CameraExtensionProbeReport(
         return "extensions: ${lensSummaries.joinToString(" | ")}"
     }
 
+    fun imageQualitySummaryLine(): String {
+        val backHdr = entry(CameraExtensionLensFacing.BACK, CameraExtensionMode.HDR)
+            ?.support
+            ?.label
+            ?: "unknown"
+        val backNight = entry(CameraExtensionLensFacing.BACK, CameraExtensionMode.NIGHT)
+            ?.support
+            ?.label
+            ?: "unknown"
+        return "image-quality-ext: blue-hour-hdr=$backHdr low-light-night=$backNight"
+    }
+
     fun toProbeText(): String {
         return buildString {
             appendLine("  [camera-extensions]")
             appendLine("    ${summaryLine()}")
+            appendLine("    ${imageQualitySummaryLine()}")
             CameraExtensionLensFacing.entries.forEach { lens ->
                 appendLine("    ${lens.label}:")
                 CameraExtensionMode.entries.forEach { mode ->

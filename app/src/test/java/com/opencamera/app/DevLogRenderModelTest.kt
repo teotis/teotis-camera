@@ -873,6 +873,23 @@ class DevLogRenderModelTest {
     }
 
     @Test
+    fun `initial dev log tab shows existing ordinary events on first open`() {
+        val ordinaryEvents = (1..20).map { i ->
+            SessionTraceEvent(i, "event.$i", "detail=$i", i.toLong())
+        }
+        val model = devLogRenderModel(
+            state = defaultTestSessionState(),
+            traceEvents = ordinaryEvents,
+            isDebugBuild = true,
+            selectedTab = initialDevLogTab(),
+            text = TestAppTextResolver()
+        )
+
+        assertEquals(20, model.visibleEvents.size)
+        assertTrue(model.visibleEvents.any { it.displayText.contains("event.20") })
+    }
+
+    @Test
     fun `visibleEvents item type is TraceEventItem for regular events`() {
         val model = devLogRenderModel(
             state = defaultTestSessionState(),

@@ -15,7 +15,8 @@ internal data class DocumentBatchOrganizerRenderModel(
     val isBatchOverviewMode: Boolean = false,
     val showContinueShooting: Boolean = false,
     val showExport: Boolean = false,
-    val emptyHint: String = ""
+    val emptyHint: String = "",
+    val statusMessage: String? = null
 )
 
 internal data class DocumentBatchOrganizerItemRenderModel(
@@ -78,6 +79,7 @@ internal fun documentBatchOrganizerRenderModel(
         isBatchOverviewMode = true,
         showContinueShooting = true,
         showExport = items.isNotEmpty(),
-        emptyHint = text.get(R.string.document_batch_empty_hint)
+        emptyHint = text.get(R.string.document_batch_empty_hint),
+        statusMessage = batch.lastMessage
     )
 }

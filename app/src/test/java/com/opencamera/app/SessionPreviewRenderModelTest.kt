@@ -323,6 +323,28 @@ class SessionPreviewRenderModelTest {
     }
 
     @Test
+    fun `document mode suppresses staged watermark preview hint`() {
+        val baseline = defaultSessionState().copy(activeMode = ModeId.DOCUMENT)
+        val stagedHint = WatermarkHintSpec(
+            templateId = "professional-bottom-bar",
+            placement = WatermarkTextPlacement.BOTTOM_CENTER,
+            previewText = "professional-bottom-bar",
+            opacity = 0.6f,
+            shape = WatermarkPreviewShape.BOTTOM_BAR,
+            textScale = 1f,
+            previewLabels = listOf("OpenCamera", "2026-05-28"),
+            barBackground = 0xFE000000.toInt()
+        )
+
+        val model = previewOverlayRenderModel(
+            baseline,
+            stagedWatermarkHint = stagedHint
+        )
+
+        assertNull(model.effectModel?.watermarkHint)
+    }
+
+    @Test
     fun `null staged hint preserves existing watermark hint`() {
         val baseline = defaultSessionState()
         val model = previewOverlayRenderModel(

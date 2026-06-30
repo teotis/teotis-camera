@@ -199,7 +199,7 @@
     <LinearLayout
         android:id="@+id/documentBatchRail"
         android:layout_width="104dp"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_marginStart="@dimen/space_8"
         android:layout_marginTop="88dp"
         android:background="@drawable/document_batch_rail_chip_bg"
@@ -209,6 +209,8 @@
         android:paddingTop="6dp"
         android:paddingBottom="@dimen/space_8"
         android:visibility="gone"
+        app:layout_constrainedHeight="true"
+        app:layout_constraintBottom_toBottomOf="@id/previewBottomGuide"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
@@ -233,13 +235,24 @@
             android:background="#20FFFFFF"
             android:visibility="gone" />
 
-        <LinearLayout
-            android:id="@+id/documentBatchRailItemList"
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/documentBatchRailItemScroll"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:layout_marginTop="2dp"
-            android:orientation="vertical"
-            android:visibility="gone" />
+            android:fadeScrollbars="false"
+            android:fillViewport="false"
+            android:overScrollMode="ifContentScrolls"
+            android:scrollbars="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/documentBatchRailItemList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </androidx.core.widget.NestedScrollView>
 
         <Button
             android:id="@+id/documentBatchRailMoveUpButton"
@@ -1284,8 +1297,10 @@
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Document batch overview panel (dedicated overlay for reviewing all captured pages) -->
-    <androidx.core.widget.NestedScrollView
+    <!-- Document batch overview panel (dedicated overlay for reviewing all captured pages).
+         The panel is a vertical LinearLayout so the footer (export) stays sticky below the
+         scroll area and is never clipped by a long item list. -->
+    <LinearLayout
         android:id="@+id/documentBatchOrganizerPanel"
         android:layout_width="0dp"
         android:layout_height="0dp"
@@ -1293,7 +1308,7 @@
         android:background="@drawable/bg_settings_panel"
         android:contentDescription="@string/document_batch_organizer_title"
         android:elevation="8dp"
-        android:fillViewport="true"
+        android:orientation="vertical"
         android:padding="0dp"
         android:visibility="gone"
         app:layout_constrainedHeight="true"
@@ -1304,104 +1319,126 @@
         app:layout_constraintHeight_default="percent"
         app:layout_constraintHeight_percent="0.55">
 
-        <LinearLayout
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/documentBatchOrganizerScroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
+            android:scrollbars="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/panel_padding"
+                android:paddingVertical="10dp">
+
+                <!-- Compact header row: title + count + close button -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/documentBatchOrganizerTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/oc_text_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/documentBatchOrganizerCount"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="8dp"
+                        android:textColor="@color/oc_text_secondary"
+                        android:textSize="@dimen/text_size_status" />
+
+                    <Button
+                        android:id="@+id/buttonCloseDocumentBatchOrganizer"
+                        style="@style/Widget.OpenCamera.PillButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:paddingHorizontal="12dp"
+                        android:text="@string/button_document_batch_organizer_close"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- Empty state hint (shown when no items) -->
+                <TextView
+                    android:id="@+id/documentBatchOrganizerEmptyHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:text="@string/document_batch_empty_hint"
+                    android:textColor="@color/oc_text_secondary"
+                    android:textSize="@dimen/text_size_status"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/documentBatchOrganizerItemList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+        <!-- Sticky status line: surfaces the last batch action (e.g. "Item moved"). -->
+        <TextView
+            android:id="@+id/documentBatchOrganizerStatus"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
             android:paddingHorizontal="@dimen/panel_padding"
-            android:paddingVertical="10dp">
+            android:paddingTop="4dp"
+            android:textColor="@color/oc_text_secondary"
+            android:textSize="@dimen/text_size_status"
+            android:visibility="gone" />
 
-            <!-- Compact header row: title + count + close button -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+        <!-- Footer actions row (sticky: always reachable, never clipped by scroll). -->
+        <LinearLayout
+            android:id="@+id/documentBatchOrganizerFooter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingHorizontal="@dimen/panel_padding"
+            android:paddingBottom="10dp"
+            android:visibility="gone">
 
-                <TextView
-                    android:id="@+id/documentBatchOrganizerTitle"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/oc_text_primary"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
+            <Button
+                android:id="@+id/buttonDocumentBatchContinueShooting"
+                style="@style/Widget.OpenCamera.PillButton"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="@string/button_document_batch_continue_shooting"
+                android:textSize="12sp" />
 
-                <TextView
-                    android:id="@+id/documentBatchOrganizerCount"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:textColor="@color/oc_text_secondary"
-                    android:textSize="@dimen/text_size_status" />
-
-                <Button
-                    android:id="@+id/buttonCloseDocumentBatchOrganizer"
-                    style="@style/Widget.OpenCamera.PillButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="28dp"
-                    android:minWidth="0dp"
-                    android:minHeight="0dp"
-                    android:paddingHorizontal="12dp"
-                    android:text="@string/button_document_batch_organizer_close"
-                    android:textSize="11sp" />
-            </LinearLayout>
-
-            <!-- Empty state hint (shown when no items) -->
-            <TextView
-                android:id="@+id/documentBatchOrganizerEmptyHint"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:gravity="center"
-                android:text="@string/document_batch_empty_hint"
-                android:textColor="@color/oc_text_secondary"
-                android:textSize="@dimen/text_size_status"
-                android:visibility="gone" />
-
-            <LinearLayout
-                android:id="@+id/documentBatchOrganizerItemList"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:orientation="vertical" />
-
-            <!-- Footer actions row -->
-            <LinearLayout
-                android:id="@+id/documentBatchOrganizerFooter"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:gravity="center"
-                android:orientation="horizontal"
-                android:visibility="gone">
-
-                <Button
-                    android:id="@+id/buttonDocumentBatchContinueShooting"
-                    style="@style/Widget.OpenCamera.PillButton"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="4dp"
-                    android:minWidth="0dp"
-                    android:minHeight="0dp"
-                    android:text="@string/button_document_batch_continue_shooting"
-                    android:textSize="11sp" />
-
-                <Button
-                    android:id="@+id/buttonDocumentBatchExport"
-                    style="@style/Widget.OpenCamera.PillButton"
-                    android:layout_width="0dp"
-                    android:layout_height="32dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="4dp"
-                    android:minWidth="0dp"
-                    android:minHeight="0dp"
-                    android:text="@string/button_document_batch_export"
-                    android:textSize="11sp" />
-            </LinearLayout>
+            <Button
+                android:id="@+id/buttonDocumentBatchExport"
+                style="@style/Widget.OpenCamera.PillButton"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:text="@string/button_document_batch_export"
+                android:textSize="12sp" />
         </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
 
     <!-- Dev console overlay -->
     <com.google.android.material.card.MaterialCardView

@@ -125,6 +125,55 @@ class BottomCockpitLayoutContractTest {
     }
 
     @Test
+    fun `document batch rail is capped above the preview bottom guide and scrolls its page list`() {
+        val rail = layout.elementByAndroidId("documentBatchRail")
+        val itemScroll = layout.elementByAndroidId("documentBatchRailItemScroll")
+        val itemList = layout.elementByAndroidId("documentBatchRailItemList")
+
+        assertEquals("0dp", rail.androidAttr("layout_height"))
+        assertEquals("@id/previewBottomGuide", rail.appAttr("layout_constraintBottom_toBottomOf"))
+        assertEquals("true", rail.appAttr("layout_constrainedHeight"))
+
+        assertEquals("androidx.core.widget.NestedScrollView", itemScroll.tagName)
+        assertEquals("0dp", itemScroll.androidAttr("layout_height"))
+        assertEquals("1", itemScroll.androidAttr("layout_weight"))
+        assertEquals("vertical", itemScroll.androidAttr("scrollbars"))
+        assertEquals("wrap_content", itemList.androidAttr("layout_height"))
+    }
+
+    @Test
+    fun `document batch organizer footer stays sticky outside scrollable content`() {
+        val panel = layout.elementByAndroidId("documentBatchOrganizerPanel")
+        val panelChildren = panel.childElementsByAndroidId()
+
+        assertEquals("LinearLayout", panel.tagName,
+            "Organizer panel must be a LinearLayout so the footer can stick below the scroll area")
+        assertTrue("documentBatchOrganizerScroll" in panelChildren,
+            "Organizer panel must contain a dedicated scroll view for the item list")
+        assertTrue("documentBatchOrganizerFooter" in panelChildren,
+            "Footer must be a direct child of the panel so the export button is never clipped by scroll")
+
+        val scroll = layout.elementByAndroidId("documentBatchOrganizerScroll")
+        val scrollChildren = scroll.childElementsByAndroidId()
+        assertFalse("documentBatchOrganizerFooter" in scrollChildren,
+            "Footer must not live inside the scrollable content")
+    }
+
+    @Test
+    fun `nested scroll views do not configure nested scrolling from xml`() {
+        val nestedScrollViews = layout.getElementsByTagName("androidx.core.widget.NestedScrollView")
+
+        for (index in 0 until nestedScrollViews.length) {
+            val view = nestedScrollViews.item(index) as Element
+
+            assertFalse(
+                view.hasAttribute("android:nestedScrollingEnabled"),
+                "NestedScrollView ${view.androidIdOrNull()} must configure nested scrolling after construction"
+            )
+        }
+    }
+
+    @Test
     fun `constraint layout references stay within direct sibling scope`() {
         val constraintLayouts =
             layout.getElementsByTagName("androidx.constraintlayout.widget.ConstraintLayout")

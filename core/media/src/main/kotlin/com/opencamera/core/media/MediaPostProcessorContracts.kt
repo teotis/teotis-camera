@@ -5,6 +5,8 @@ import java.io.File
 interface MediaPostProcessor {
     fun isApplicable(result: ShotResult): Boolean = true
 
+    fun jobClass(result: ShotResult): AlgorithmJobClass = AlgorithmJobClass.CAPTURE_CRITICAL
+
     suspend fun process(result: ShotResult): ShotResult
 }
 

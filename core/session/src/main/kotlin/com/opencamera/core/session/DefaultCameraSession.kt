@@ -608,6 +608,7 @@ class DefaultCameraSession(
         }
 
         val wasRunning = _state.value.lifecycle == SessionLifecycle.RUNNING
+        val previousEvSteps = runtimeConfiguration.settings.catalog.manualCaptureDraft.exposureCompensationSteps
         runtimeConfiguration = runtimeConfiguration.copy(settings = snapshot)
         if (wasRunning) {
             currentController.onEnter()
@@ -631,6 +632,11 @@ class DefaultCameraSession(
             }
         )
         previewRecoveryProcessor.requestPreviewBinding(reason = "session settings updated")
+
+        val currentEvSteps = snapshot.catalog.manualCaptureDraft.exposureCompensationSteps
+        if (previousEvSteps != currentEvSteps && _state.value.activeMode == ModeId.HUMANISTIC) {
+            handleApplyPreviewBrightness(currentEvSteps ?: 0)
+        }
     }
 
     private suspend fun handleLensFacingToggled() {
@@ -1422,8 +1428,8 @@ class DefaultCameraSession(
     }
 
     private suspend fun handleApplyPreviewBrightness(targetSteps: Int) {
-        if (_state.value.activeMode != ModeId.PHOTO) {
-            updateState(lastAction = "Brightness is only available in photo mode")
+        if (_state.value.activeMode != ModeId.PHOTO && _state.value.activeMode != ModeId.HUMANISTIC) {
+            updateState(lastAction = "Brightness is only available in photo or humanistic mode")
             return
         }
         if (_state.value.previewStatus != PreviewStatus.ACTIVE) {

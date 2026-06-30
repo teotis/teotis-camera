@@ -1,9 +1,17 @@
 package com.opencamera.app.camera
 
+import com.opencamera.core.media.ContentRegionBounds
+import com.opencamera.core.media.ContentRegionDescriptor
+import com.opencamera.core.media.ContentRegionRole
+import com.opencamera.core.media.ContentTagDescriptor
+import com.opencamera.core.media.ContentTagFamily
+import com.opencamera.core.media.ContentUnderstandingSnapshot
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaOutputHandle
 import com.opencamera.core.media.MediaType
 import com.opencamera.core.media.SaveRequest
+import com.opencamera.core.media.SceneMaskQuality
+import com.opencamera.core.media.SceneMaskTransform
 import com.opencamera.core.media.ShotResult
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
@@ -92,6 +100,365 @@ class PortraitRenderPostProcessorTest {
         assertEquals(PortraitRenderMode.FOCUS, editor.invocations.single().spec.mode)
         assertEquals(PortraitProfile.LUMINOUS, editor.invocations.single().spec.portraitProfile)
         assertTrue(result.pipelineNotes.contains("portrait-render:applied:focus"))
+    }
+
+    @Test
+    fun `content face region adapts check in portrait render`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val baseSpec = resolvePortraitRenderSpec(
+            renderPath = "focus",
+            bokehStrength = null,
+            subjectTracking = false,
+            portraitProfile = PortraitProfile.NATIVE,
+            beautyPreset = PortraitBeautyPreset.AUTHENTIC,
+            beautyStrength = PortraitBeautyStrength.SOFT,
+            bokehEffect = PortraitBokehEffect.NATURAL
+        )!!
+
+        val result = processor.process(
+            photoResult(
+                mode = "check-in",
+                contentUnderstanding = ContentUnderstandingSnapshot(
+                    snapshotId = "content-checkin-face",
+                    timestampMillis = 42L,
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    backendId = "fake-content",
+                    regions = listOf(
+                        ContentRegionDescriptor(
+                            regionId = "face-0",
+                            role = ContentRegionRole.FACE,
+                            quality = SceneMaskQuality.SAVED_PHOTO,
+                            backendId = "fake-content",
+                            confidence = 0.93f,
+                            transform = SceneMaskTransform(
+                                sourceWidth = 4000,
+                                sourceHeight = 3000,
+                                maskWidth = 4000,
+                                maskHeight = 3000,
+                                rotationDegrees = 0
+                            ),
+                            bounds = ContentRegionBounds(
+                                left = 0.34f,
+                                top = 0.18f,
+                                right = 0.62f,
+                                bottom = 0.66f
+                            )
+                        )
+                    )
+                ),
+                saveRequest = portraitSaveRequest(
+                    "mode" to "check-in",
+                    "checkInScenario" to "people-place",
+                    "compatMode" to "portrait",
+                    "renderPath" to "focus",
+                    "subjectTracking" to "false",
+                    "portraitProfile" to PortraitProfile.NATIVE.storageKey,
+                    "portraitBeautyPreset" to PortraitBeautyPreset.AUTHENTIC.storageKey,
+                    "portraitBeautyStrength" to PortraitBeautyStrength.SOFT.storageKey,
+                    "portraitBokehEffect" to PortraitBokehEffect.NATURAL.storageKey
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val spec = editor.invocations.single().spec
+        assertEquals(PortraitRenderMode.FOCUS, spec.mode)
+        assertTrue(spec.subjectTracking)
+        assertTrue(spec.focusRadiusXFraction < baseSpec.focusRadiusXFraction)
+        assertTrue(spec.focusRadiusYFraction < baseSpec.focusRadiusYFraction)
+        assertEquals(0.48f, spec.subjectCenterXFraction ?: -1f, 0.0001f)
+        assertEquals(0.42f, spec.subjectCenterYFraction ?: -1f, 0.0001f)
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-adapted:subject=face"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-source=region:face"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-confidence=0.93"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-subject-center=0.48,0.42"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:applied:focus"))
+    }
+
+    @Test
+    fun `large person content bounds expand portrait focus radius`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val baseSpec = resolvePortraitRenderSpec(
+            renderPath = "focus",
+            bokehStrength = null,
+            subjectTracking = false,
+            portraitProfile = PortraitProfile.NATIVE,
+            beautyPreset = PortraitBeautyPreset.AUTHENTIC,
+            beautyStrength = PortraitBeautyStrength.SOFT,
+            bokehEffect = PortraitBokehEffect.NATURAL
+        )!!
+
+        val result = processor.process(
+            photoResult(
+                mode = "portrait",
+                renderPath = "focus",
+                subjectTracking = false,
+                contentUnderstanding = ContentUnderstandingSnapshot(
+                    snapshotId = "content-large-person",
+                    timestampMillis = 42L,
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    backendId = "fake-content",
+                    regions = listOf(
+                        ContentRegionDescriptor(
+                            regionId = "person-0",
+                            role = ContentRegionRole.PERSON_SUBJECT,
+                            quality = SceneMaskQuality.SAVED_PHOTO,
+                            backendId = "fake-content",
+                            confidence = 0.91f,
+                            transform = SceneMaskTransform(
+                                sourceWidth = 4000,
+                                sourceHeight = 3000,
+                                maskWidth = 4000,
+                                maskHeight = 3000,
+                                rotationDegrees = 0
+                            ),
+                            bounds = ContentRegionBounds(
+                                left = 0.18f,
+                                top = 0.10f,
+                                right = 0.82f,
+                                bottom = 0.88f
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val spec = editor.invocations.single().spec
+        assertTrue(spec.focusRadiusXFraction > baseSpec.focusRadiusXFraction)
+        assertTrue(spec.focusRadiusYFraction > baseSpec.focusRadiusYFraction)
+        assertEquals(0.50f, spec.subjectCenterXFraction ?: -1f, 0.0001f)
+        assertEquals(0.49f, spec.subjectCenterYFraction ?: -1f, 0.0001f)
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-subject-size=0.64,0.78"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-subject-center=0.50,0.49"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-source=region:person-subject"))
+        assertEquals("person-subject", result.metadata.customTags["portraitContentSubject"])
+        assertEquals("region:person-subject", result.metadata.customTags["portraitContentSubjectSource"])
+        assertEquals("0.91", result.metadata.customTags["portraitContentSubjectConfidence"])
+        assertEquals("0.50,0.49", result.metadata.customTags["portraitContentSubjectCenter"])
+        assertEquals("0.64,0.78", result.metadata.customTags["portraitContentSubjectSize"])
+    }
+
+    @Test
+    fun `preview approximate content does not adapt saved portrait render`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val baseSpec = resolvePortraitRenderSpec(
+            renderPath = "focus",
+            bokehStrength = null,
+            subjectTracking = false,
+            portraitProfile = PortraitProfile.NATIVE,
+            beautyPreset = PortraitBeautyPreset.AUTHENTIC,
+            beautyStrength = PortraitBeautyStrength.SOFT,
+            bokehEffect = PortraitBokehEffect.NATURAL
+        )!!
+
+        val result = processor.process(
+            photoResult(
+                mode = "portrait",
+                renderPath = "focus",
+                subjectTracking = false,
+                contentUnderstanding = ContentUnderstandingSnapshot(
+                    snapshotId = "content-preview-face",
+                    timestampMillis = 42L,
+                    quality = SceneMaskQuality.PREVIEW_APPROXIMATE,
+                    backendId = "preview-content",
+                    regions = listOf(
+                        ContentRegionDescriptor(
+                            regionId = "face-0",
+                            role = ContentRegionRole.FACE,
+                            quality = SceneMaskQuality.PREVIEW_APPROXIMATE,
+                            backendId = "preview-content",
+                            confidence = 0.93f,
+                            transform = SceneMaskTransform(
+                                sourceWidth = 4000,
+                                sourceHeight = 3000,
+                                maskWidth = 4000,
+                                maskHeight = 3000,
+                                rotationDegrees = 0
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val spec = editor.invocations.single().spec
+        assertEquals(baseSpec.subjectTracking, spec.subjectTracking)
+        assertEquals(baseSpec.focusRadiusXFraction, spec.focusRadiusXFraction)
+        assertEquals(baseSpec.focusRadiusYFraction, spec.focusRadiusYFraction)
+        assertFalse(result.pipelineNotes.contains("portrait-render:content-adapted:subject=face"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:applied:focus"))
+    }
+
+    @Test
+    fun `not ready content explains why portrait adaptation is skipped`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val baseSpec = resolvePortraitRenderSpec(
+            renderPath = "focus",
+            bokehStrength = null,
+            subjectTracking = false,
+            portraitProfile = PortraitProfile.NATIVE,
+            beautyPreset = PortraitBeautyPreset.AUTHENTIC,
+            beautyStrength = PortraitBeautyStrength.SOFT,
+            bokehEffect = PortraitBokehEffect.NATURAL
+        )!!
+
+        val result = processor.process(
+            photoResult(
+                mode = "portrait",
+                renderPath = "focus",
+                subjectTracking = false,
+                contentUnderstanding = ContentUnderstandingSnapshot.unavailable(
+                    timestampMillis = 42L,
+                    backendId = "fake-content",
+                    reason = "no-recognition-backend"
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val spec = editor.invocations.single().spec
+        assertEquals(baseSpec.subjectTracking, spec.subjectTracking)
+        assertEquals(baseSpec.focusRadiusXFraction, spec.focusRadiusXFraction)
+        assertEquals(baseSpec.focusRadiusYFraction, spec.focusRadiusYFraction)
+        assertFalse(result.pipelineNotes.contains("portrait-render:content-adapted:subject=face"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-skipped:not-ready"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-quality=unavailable"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-reason=no-recognition-backend"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:applied:focus"))
+        assertEquals("not-ready", result.metadata.customTags["portraitContentSkipped"])
+        assertEquals("unavailable", result.metadata.customTags["portraitContentSkippedQuality"])
+        assertEquals("no-recognition-backend", result.metadata.customTags["portraitContentSkippedReason"])
+    }
+
+    @Test
+    fun `ready content without subject hint explains why portrait adaptation is skipped`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val baseSpec = resolvePortraitRenderSpec(
+            renderPath = "focus",
+            bokehStrength = null,
+            subjectTracking = false,
+            portraitProfile = PortraitProfile.NATIVE,
+            beautyPreset = PortraitBeautyPreset.AUTHENTIC,
+            beautyStrength = PortraitBeautyStrength.SOFT,
+            bokehEffect = PortraitBokehEffect.NATURAL
+        )!!
+
+        val result = processor.process(
+            photoResult(
+                mode = "portrait",
+                renderPath = "focus",
+                subjectTracking = false,
+                contentUnderstanding = ContentUnderstandingSnapshot.fromTags(
+                    snapshotId = "content-portrait-scene-only",
+                    timestampMillis = 42L,
+                    backendId = "fake-content",
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    tags = listOf(
+                        ContentTagDescriptor(
+                            tagId = "scene-sky",
+                            label = "Sky",
+                            family = ContentTagFamily.SCENE,
+                            confidence = 0.91f,
+                            backendId = "fake-content"
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val spec = editor.invocations.single().spec
+        assertEquals(baseSpec.subjectTracking, spec.subjectTracking)
+        assertEquals(baseSpec.focusRadiusXFraction, spec.focusRadiusXFraction)
+        assertEquals(baseSpec.focusRadiusYFraction, spec.focusRadiusYFraction)
+        assertFalse(result.pipelineNotes.contains("portrait-render:content-adapted:subject=face"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-skipped:no-subject-hint"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:subject=unsupported"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:face-landmarks=unsupported"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:applied:focus"))
+        assertEquals("no-subject-hint", result.metadata.customTags["portraitContentSkipped"])
+        assertEquals("unsupported", result.metadata.customTags["portraitContentSkippedSubjectRegions"])
+        assertEquals("unsupported", result.metadata.customTags["portraitContentSkippedFaceLandmarks"])
+    }
+
+    @Test
+    fun `low confidence subject hint explains why portrait adaptation is skipped`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val baseSpec = resolvePortraitRenderSpec(
+            renderPath = "focus",
+            bokehStrength = null,
+            subjectTracking = false,
+            portraitProfile = PortraitProfile.NATIVE,
+            beautyPreset = PortraitBeautyPreset.AUTHENTIC,
+            beautyStrength = PortraitBeautyStrength.SOFT,
+            bokehEffect = PortraitBokehEffect.NATURAL
+        )!!
+
+        val result = processor.process(
+            photoResult(
+                mode = "portrait",
+                renderPath = "focus",
+                subjectTracking = false,
+                contentUnderstanding = ContentUnderstandingSnapshot(
+                    snapshotId = "content-portrait-low-face",
+                    timestampMillis = 42L,
+                    quality = SceneMaskQuality.SAVED_PHOTO,
+                    backendId = "fake-content",
+                    regions = listOf(
+                        ContentRegionDescriptor(
+                            regionId = "face-0",
+                            role = ContentRegionRole.FACE,
+                            quality = SceneMaskQuality.SAVED_PHOTO,
+                            backendId = "fake-content",
+                            confidence = 0.62f,
+                            transform = SceneMaskTransform(
+                                sourceWidth = 4000,
+                                sourceHeight = 3000,
+                                maskWidth = 4000,
+                                maskHeight = 3000,
+                                rotationDegrees = 0
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val spec = editor.invocations.single().spec
+        assertEquals(baseSpec.subjectTracking, spec.subjectTracking)
+        assertEquals(baseSpec.focusRadiusXFraction, spec.focusRadiusXFraction)
+        assertEquals(baseSpec.focusRadiusYFraction, spec.focusRadiusYFraction)
+        assertFalse(result.pipelineNotes.contains("portrait-render:content-adapted:subject=face"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-skipped:low-confidence-subject-hint"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-source=region:face"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-confidence=0.62"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:applied:focus"))
+        assertEquals("low-confidence-subject-hint", result.metadata.customTags["portraitContentSkipped"])
+        assertEquals("face", result.metadata.customTags["portraitContentSkippedSubject"])
+        assertEquals("region:face", result.metadata.customTags["portraitContentSkippedSource"])
+        assertEquals("0.62", result.metadata.customTags["portraitContentSkippedConfidence"])
     }
 
     @Test
@@ -669,6 +1036,41 @@ class PortraitRenderPostProcessorTest {
         assertTrue(result.pipelineNotes.contains("portrait-render:fallback-focus"))
     }
 
+    @Test
+    fun `missing content explains why portrait adaptation is skipped`() = runTest {
+        val editor = FakePortraitRenderEditor(
+            result = PortraitRenderApplied()
+        )
+        val processor = PortraitRenderPostProcessor(editor)
+        val baseSpec = resolvePortraitRenderSpec(
+            renderPath = "focus",
+            bokehStrength = null,
+            subjectTracking = false,
+            portraitProfile = PortraitProfile.NATIVE,
+            beautyPreset = PortraitBeautyPreset.AUTHENTIC,
+            beautyStrength = PortraitBeautyStrength.SOFT,
+            bokehEffect = PortraitBokehEffect.NATURAL
+        )!!
+
+        val result = processor.process(
+            photoResult(
+                mode = "portrait",
+                renderPath = "focus",
+                subjectTracking = false,
+                contentUnderstanding = null
+            )
+        )
+
+        assertEquals(1, editor.invocations.size)
+        val spec = editor.invocations.single().spec
+        assertEquals(baseSpec.subjectTracking, spec.subjectTracking)
+        assertEquals(baseSpec.focusRadiusXFraction, spec.focusRadiusXFraction)
+        assertEquals(baseSpec.focusRadiusYFraction, spec.focusRadiusYFraction)
+        assertFalse(result.pipelineNotes.contains("portrait-render:content-adapted:subject=face"))
+        assertTrue(result.pipelineNotes.contains("portrait-render:content-skipped:missing-content"))
+        assertEquals("missing-content", result.metadata.customTags["portraitContentSkipped"])
+    }
+
     private fun photoResult(
         mode: String = "portrait",
         renderPath: String = "depth",
@@ -683,6 +1085,7 @@ class PortraitRenderPostProcessorTest {
             filePath = "/tmp/portrait.jpg"
         ),
         mediaType: MediaType = MediaType.PHOTO,
+        contentUnderstanding: ContentUnderstandingSnapshot? = null,
         saveRequest: SaveRequest = SaveRequest.photoLibrary(
             metadata = MediaMetadata(
                 customTags = buildMap {
@@ -708,7 +1111,8 @@ class PortraitRenderPostProcessorTest {
                 outputPath = outputHandle.displayPath,
                 renderUri = outputHandle.contentUri
             ),
-            metadata = saveRequest.metadata
+            metadata = saveRequest.metadata,
+            contentUnderstanding = contentUnderstanding
         )
     }
 

@@ -94,6 +94,50 @@ class PhotoWatermarkTemplateResolverTest {
     }
 
     @Test
+    fun `check in content placement overrides default watermark position`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "classic-overlay",
+            watermarkText = "Check-in 人景",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "mode" to "check-in",
+                    "watermarkPosition" to "bottom-left",
+                    "checkInContentWatermarkPlacement" to "bottom-right"
+                )
+            ),
+            preservedExif = emptyMap()
+        )
+
+        assertEquals(WatermarkTextPlacement.BOTTOM_RIGHT, resolved.placement)
+    }
+
+    @Test
+    fun `check in compact content density removes auxiliary detail lines`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "classic-overlay",
+            watermarkText = "Check-in 人景",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "mode" to "check-in",
+                    "watermarkModeName" to "Check-in",
+                    "watermarkProfileName" to "人景 Vintage",
+                    "watermarkDatetime" to "2026-06-07 10:00",
+                    "watermarkCameraParams" to "1/50s • f/1.8 • ISO 320",
+                    "checkInContentScenario" to "people-place",
+                    "checkInContentWatermarkDensity" to "compact"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "OpenCamera DevKit"
+            )
+        )
+
+        assertEquals("OpenCamera DevKit · Check-in 人景 Vintage", resolved.title)
+        assertFalse(resolved.supportingLines.any { it.contains("2026-06-07") })
+        assertFalse(resolved.supportingLines.any { it.contains("ISO 320") })
+    }
+
+    @Test
     fun `humanistic professional variant does not render standalone pro mode name`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "professional-bottom-bar",
@@ -304,6 +348,60 @@ class PhotoWatermarkTemplateResolverTest {
         )
 
         assertEquals("OpenCamera DevKit · Check-in 超清 Best Frame", resolved.title)
+        assertTrue(resolved.supportingLines.any { it.contains("2026-06-07 14:30") })
+        assertTrue(resolved.supportingLines.any { it.contains("12MP") })
+    }
+
+    @Test
+    fun `check in content scenario updates structured title while preserving style detail`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "professional-bottom-bar",
+            watermarkText = "Check-in 超清 Best Frame",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Check-in",
+                    "watermarkProfileName" to "超清 Best Frame",
+                    "watermarkDatetime" to "2026-06-07 14:30",
+                    "watermarkCameraParams" to "12MP • 4:3",
+                    "checkInScenario" to "clarity",
+                    "checkInContentScenario" to "people-place",
+                    "checkInOriginalScenario" to "clarity",
+                    "compatMode" to "clarity-assist"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "OpenCamera DevKit"
+            )
+        )
+
+        assertEquals("OpenCamera DevKit · Check-in 人景 Best Frame", resolved.title)
+        assertTrue(resolved.supportingLines.any { it.contains("2026-06-07 14:30") })
+        assertTrue(resolved.supportingLines.any { it.contains("12MP") })
+    }
+
+    @Test
+    fun `check in content clarity scenario updates structured title while preserving style detail`() {
+        val resolved = resolvePhotoWatermarkTemplate(
+            templateId = "professional-bottom-bar",
+            watermarkText = "Check-in 物景 Texture",
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Check-in",
+                    "watermarkProfileName" to "物景 Texture",
+                    "watermarkDatetime" to "2026-06-07 14:30",
+                    "watermarkCameraParams" to "12MP • 4:3",
+                    "checkInScenario" to "object-place",
+                    "checkInContentScenario" to "clarity",
+                    "checkInOriginalScenario" to "object-place",
+                    "compatMode" to "clarity-assist"
+                )
+            ),
+            preservedExif = mapOf(
+                ExifInterface.TAG_MODEL to "OpenCamera DevKit"
+            )
+        )
+
+        assertEquals("OpenCamera DevKit · Check-in 全清 Texture", resolved.title)
         assertTrue(resolved.supportingLines.any { it.contains("2026-06-07 14:30") })
         assertTrue(resolved.supportingLines.any { it.contains("12MP") })
     }

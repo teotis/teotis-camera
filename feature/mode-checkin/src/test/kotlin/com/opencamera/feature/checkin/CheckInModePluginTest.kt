@@ -321,7 +321,7 @@ class CheckInModePluginTest {
     // ── Full Clear / Clarity scenario tests ──
 
     @Test
-    fun `clarity scenario shutter pressed returns MultiFrame with best-frame metadata`(): Unit = runBlocking {
+    fun `clarity scenario shutter pressed returns MultiFrame with focus stack metadata`(): Unit = runBlocking {
         val controller = createController(initialScenarioId = "clarity")
 
         val signal = controller.handle(ModeIntent.ShutterPressed)
@@ -331,6 +331,10 @@ class CheckInModePluginTest {
         val metadata = signal.strategy.saveRequest.metadata.customTags
         assertEquals("clarity", metadata["checkInScenario"])
         assertEquals("clarity-assist", metadata["compatMode"])
+        assertEquals("focus-stack-auto-near-far", metadata["degradation-policy"])
+        assertEquals("near,far", metadata["focusStackRoles"])
+        assertEquals("automatic", metadata["focusStackGuidance"])
+        assertEquals("focus-stack:auto-near-far-v1", signal.strategy.captureProfile.focusStackSpec?.algorithmProfile)
     }
 
     @Test
@@ -342,6 +346,39 @@ class CheckInModePluginTest {
         val metadata = signal.strategy.saveRequest.metadata.customTags
         assertEquals("portrait", metadata["checkInScenario"])
         assertEquals("portrait", metadata["compatMode"])
+    }
+
+    @Test
+    fun `portrait scenario shutter pressed returns LivePhoto when live photo is enabled`(): Unit = runBlocking {
+        val controller = createController(livePhotoEnabled = true)
+
+        val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
+
+        assertIs<CaptureStrategy.LivePhoto>(signal.strategy)
+        val metadata = signal.strategy.saveRequest.metadata.customTags
+        assertEquals("portrait", metadata["checkInScenario"])
+        assertEquals("portrait", metadata["compatMode"])
+        assertEquals("on", metadata["livePhotoDefault"])
+        assertEquals("Check-in", metadata["watermarkModeName"])
+        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Check-in 人像"))
+    }
+
+    @Test
+    fun `clarity scenario keeps multi frame priority when live photo is enabled`(): Unit = runBlocking {
+        val controller = createController(
+            initialScenarioId = "clarity",
+            livePhotoEnabled = true
+        )
+
+        val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
+
+        assertIs<CaptureStrategy.MultiFrame>(signal.strategy)
+        val metadata = signal.strategy.saveRequest.metadata.customTags
+        assertEquals("clarity", metadata["checkInScenario"])
+        assertEquals("clarity-assist", metadata["compatMode"])
+        assertEquals("on", metadata["livePhotoDefault"])
+        assertEquals("focus-stack-auto-near-far", metadata["degradation-policy"])
+        assertEquals("automatic", metadata["focusStackGuidance"])
     }
 
     @Test
@@ -507,7 +544,9 @@ class CheckInModePluginTest {
         val metadata = signal.strategy.saveRequest.metadata.customTags
         assertEquals("clarity-assist", metadata["compatMode"])
         assertEquals("clarity", metadata["checkInScenario"])
-        assertEquals(3, signal.strategy.captureProfile.frameCount)
+        assertEquals(2, signal.strategy.captureProfile.frameCount)
+        assertEquals("focus-stack:auto-near-far-v1", signal.strategy.captureProfile.focusStackSpec?.algorithmProfile)
+        assertEquals(false, signal.strategy.captureProfile.focusStackSpec?.userGuidanceRequired)
     }
 
     @Test
@@ -519,7 +558,7 @@ class CheckInModePluginTest {
 
         val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
 
-        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Check-in 全清"))
+        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Check-in 清晰辅助"))
         assertEquals("classic-overlay", signal.strategy.saveRequest.metadata.customTags["watermarkTemplate"])
         assertEquals("Check-in", signal.strategy.saveRequest.metadata.customTags["watermarkModeName"])
     }
@@ -551,7 +590,7 @@ class CheckInModePluginTest {
 
         val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
 
-        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Check-in 全清"))
+        assertTrue(signal.strategy.postProcessSpec.watermarkText!!.contains("Check-in 清晰辅助"))
         assertEquals("classic-overlay", signal.strategy.saveRequest.metadata.customTags["watermarkTemplate"])
         assertEquals("Check-in", signal.strategy.saveRequest.metadata.customTags["watermarkModeName"])
     }
@@ -592,7 +631,7 @@ class CheckInModePluginTest {
 
         val signal = controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture
 
-        assertEquals("checkin-clarity-best-frame-v1", signal.strategy.postProcessSpec.algorithmProfile)
+        assertEquals("checkin-clarity-focus-stack-v1", signal.strategy.postProcessSpec.algorithmProfile)
     }
 
     @Test
@@ -606,7 +645,7 @@ class CheckInModePluginTest {
 
         val headline = controller.snapshot.value.state.headline
         assertTrue(headline.contains("single-frame fallback"), "Headline should indicate single-frame fallback, got: $headline")
-        assertTrue(headline.contains("全清"), "Headline should mention 全清, got: $headline")
+        assertTrue(headline.contains("清晰辅助"), "Headline should mention 清晰辅助, got: $headline")
     }
 
     @Test
@@ -618,7 +657,8 @@ class CheckInModePluginTest {
 
         val detail = controller.snapshot.value.state.detail
         assertTrue(detail.contains("降级"), "Detail should mention 降级, got: $detail")
-        assertTrue(detail.contains("超清"), "Detail should mention 超清, got: $detail")
+        assertTrue(detail.contains("清晰辅助"), "Detail should mention 清晰辅助, got: $detail")
+        assertTrue(detail.contains("无法进行近远景焦点堆栈合成"), "Detail should explain focus-stack fallback, got: $detail")
     }
 
     @Test
@@ -693,7 +733,8 @@ class CheckInModePluginTest {
         settingsActionSink: suspend (PersistedSettingsAction) -> Unit = {},
         supportsPortraitDepthEffect: Boolean = true,
         supportsNightMultiFrame: Boolean = true,
-        initialScenarioId: String = "portrait"
+        initialScenarioId: String = "portrait",
+        livePhotoEnabled: Boolean = false
     ): ModeController {
         val context = ModeContext(
             deviceCapabilities = deviceCapabilities,
@@ -716,7 +757,11 @@ class CheckInModePluginTest {
             settingsSnapshotProvider = {
                 SessionSettingsSnapshot(
                     persisted = PersistedSettings(
-                        photo = PhotoSettings(defaultCheckInScenario = initialScenarioId)
+                        photo = PhotoSettings(
+                            defaultCheckInScenario = initialScenarioId,
+                            livePhotoEnabledByDefault = livePhotoEnabled,
+                            photoWatermarkEnabledByDefault = true
+                        )
                     )
                 )
             }
@@ -734,10 +779,10 @@ class CheckInModePluginTest {
         assertEquals("check-in", metadata["mode"])
         assertEquals("clarity", metadata["checkInScenario"])
         assertEquals("clarity-assist", metadata["compatMode"])
-        assertEquals("V1", metadata["focus-bracket-capture"])
-        assertEquals("V1", metadata["best-frame-clarity-assist"])
-        assertFalse(metadata.containsKey("focus-stack-fusion"), "Must not claim focus-stack-fusion — true fusion is not implemented")
-        assertEquals("multi-frame-best-frame", metadata["degradation-policy"])
+        assertEquals("auto-near-far-v1", metadata["focus-bracket-capture"])
+        assertEquals("near,far", metadata["focusStackRoles"])
+        assertEquals("automatic", metadata["focusStackGuidance"])
+        assertEquals("focus-stack-auto-near-far", metadata["degradation-policy"])
         assertEquals("Pictures/OpenCamera/Check-in",
             (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
                 .strategy.saveRequest.relativePath)
@@ -761,8 +806,9 @@ class CheckInModePluginTest {
     fun `char clarity degraded fallback preserves quality and algorithm profile`(): Unit = runBlocking {
         val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = false)
         val strategy = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture).strategy
-        assertEquals("checkin-clarity-best-frame-v1", strategy.postProcessSpec.algorithmProfile)
-        assertEquals("Check-in Clarity", strategy.postProcessSpec.exifOverrides["SceneCaptureType"])
+        assertEquals("checkin-clarity-focus-stack-v1", strategy.postProcessSpec.algorithmProfile)
+        assertEquals("Check-in Clarity Assist", strategy.postProcessSpec.exifOverrides["SceneCaptureType"])
+        assertEquals("assist-not-all-clear", strategy.postProcessSpec.exifOverrides["ClarityPromise"])
     }
 
     @Test
@@ -784,7 +830,9 @@ class CheckInModePluginTest {
         val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = true)
         val captureProfile = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.captureProfile
-        assertEquals(3, captureProfile.frameCount)
+        assertEquals(2, captureProfile.frameCount)
+        assertEquals("focus-stack:auto-near-far-v1", captureProfile.focusStackSpec?.algorithmProfile)
+        assertEquals(false, captureProfile.focusStackSpec?.userGuidanceRequired)
     }
 
     @Test
@@ -792,9 +840,10 @@ class CheckInModePluginTest {
         val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = true)
         val postProcess = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.postProcessSpec
-        assertEquals("checkin-clarity-best-frame-v1", postProcess.algorithmProfile)
-        assertEquals("Check-in Clarity", postProcess.exifOverrides["SceneCaptureType"])
+        assertEquals("checkin-clarity-focus-stack-v1", postProcess.algorithmProfile)
+        assertEquals("Check-in Clarity Assist", postProcess.exifOverrides["SceneCaptureType"])
         assertEquals("Clarity Assist", postProcess.exifOverrides["CompatSceneCaptureType"])
+        assertEquals("assist-not-all-clear", postProcess.exifOverrides["ClarityPromise"])
     }
 
     @Test
@@ -816,17 +865,18 @@ class CheckInModePluginTest {
         assertEquals("portrait", metadata["compatMode"])
     }
 
-    // ── Honesty guard: must never claim true focus-stack fusion ──
+    // ── Honesty guard: use explicit focus-stack metadata, not boolean claims ──
 
     @Test
-    fun `guard clarity multi frame must not contain focus-stack-fusion`(): Unit = runBlocking {
+    fun `guard clarity multi frame uses explicit focus stack profile instead of boolean flag`(): Unit = runBlocking {
         val controller = createController(initialScenarioId = "clarity", supportsNightMultiFrame = true)
         val metadata = (controller.handle(ModeIntent.ShutterPressed) as ModeSignal.SubmitCapture)
             .strategy.saveRequest.metadata.customTags
         assertFalse(
             metadata.containsKey("focus-stack-fusion"),
-            "Clarity multi-frame path must not emit focus-stack-fusion=true — real fusion is not implemented"
+            "Clarity multi-frame path should expose focus-stack profile and roles instead of a vague boolean"
         )
+        assertEquals("near,far", metadata["focusStackRoles"])
     }
 
     @Test
@@ -836,7 +886,7 @@ class CheckInModePluginTest {
             .strategy.saveRequest.metadata.customTags
         assertFalse(
             metadata.containsKey("focus-stack-fusion"),
-            "Clarity single-frame fallback must not emit focus-stack-fusion=true — real fusion is not implemented"
+            "Clarity single-frame fallback must not emit vague focus-stack boolean claims"
         )
     }
 

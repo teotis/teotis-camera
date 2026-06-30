@@ -522,6 +522,31 @@ class CameraXCaptureAdapterLivePhotoTest {
     }
 
     @Test
+    fun `resolveLiveMotionSource propagates frame-buffer diagnostics when no frames near shutter`() {
+        val frameSource = FakeLivePreviewFrameSource()
+        frameSource.start(FrameBufferPolicy.LIVE_PREVIEW_DEFAULT)
+
+        // Add a frame far from shutter so selectForLive returns empty with frame-buffer diagnostics
+        frameSource.addFrame(makeDescriptor("f1", timestampNanos = 100_000_000L))
+
+        val result = resolveLiveMotionSource(
+            frameSource = frameSource,
+            shutterTimestampNanos = 5_000_000_000L,
+            spec = LivePhotoCaptureSpec()
+        )
+
+        assertEquals(LiveMotionSource.METADATA_ONLY, result.source)
+        // Top-level diagnostics must surface the truthful fallback reason
+        assertTrue(result.diagnostics.any { it == "live:degraded=no-frames-near-shutter" })
+        assertTrue(result.diagnostics.any { it == "frame-source:active=true" })
+        assertTrue(result.diagnostics.any { it.startsWith("frame-buffer:selected=") })
+        assertTrue(result.diagnostics.any { it.startsWith("frame-buffer:window=") })
+        assertTrue(result.diagnostics.any { it == "frame-buffer:degraded=no-frames-near-shutter" })
+        // lastStartReason should be surfaced so real-device logs can correlate start time with shutter
+        assertTrue(result.diagnostics.any { it.startsWith("frame-source:last-start-reason=") })
+    }
+
+    @Test
     fun `motion photo materialization failure does not claim google container success`() {
         val shutterNanos = 2_000_000_000L
         val motionSource = LiveMotionSourceResult(

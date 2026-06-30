@@ -51,10 +51,20 @@ internal object ShotGraphBuilder {
                         requiredFormat = imageFormat
                     )
                 )
+                val fusionAlgorithmType = if (request.captureProfile.focusStackSpec != null) {
+                    AlgorithmType.FOCUS_STACK_FUSION
+                } else {
+                    AlgorithmType.MULTI_FRAME_MERGE
+                }
+                val fusionAlgorithmId = if (fusionAlgorithmType == AlgorithmType.FOCUS_STACK_FUSION) {
+                    "focus-stack"
+                } else {
+                    "merge"
+                }
                 algorithmNodes.add(
                     AlgorithmNode(
-                        id = "${request.shotId}:alg:merge",
-                        type = AlgorithmType.MULTI_FRAME_MERGE,
+                        id = "${request.shotId}:alg:$fusionAlgorithmId",
+                        type = fusionAlgorithmType,
                         inputs = listOf("${request.shotId}:temp-frames"),
                         output = primaryCaptureNodeId,
                         requirement = AlgorithmRequirement.REQUIRED,

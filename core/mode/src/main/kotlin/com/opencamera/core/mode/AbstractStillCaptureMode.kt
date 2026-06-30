@@ -268,6 +268,9 @@ abstract class AbstractStillCaptureMode(
     protected fun livePhotoEnabled(): Boolean =
         context.settingsSnapshot.persisted.photo.livePhotoEnabledByDefault
 
+    protected fun photoWatermarkEnabled(): Boolean =
+        context.settingsSnapshot.persisted.photo.photoWatermarkEnabledByDefault
+
     protected fun runtimeState(): ModeRuntimeState = context.runtimeState()
 
     protected fun selectedWatermarkTemplate(): WatermarkTemplate {

@@ -1,11 +1,15 @@
 package com.opencamera.app
 
 import android.Manifest
+import android.content.ContentResolver
+import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaActionSound
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.widget.Toast
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -44,6 +48,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InputStream
 
 @Suppress("EXPOSED_PARAMETER_TYPE")
 class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
@@ -63,7 +68,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         get() = panelRouter.state
     private val activePanelRoute: CockpitPanelRoute
         get() = panelState.route
-    private var selectedDevLogTab = DevLogTab.KEY
+    private var selectedDevLogTab = initialDevLogTab()
     private var latestDevLogRenderModel: DevLogRenderModel? = null
     private var latestStorageSummary: StorageSummary? = null
     private var devLogClearCutoffs = DevLogClearCutoffs()
@@ -95,6 +100,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private lateinit var actionBinder: MainActivityActionBinder
     private lateinit var documentBatchRailRenderer: DocumentBatchRailRenderer
     private lateinit var documentBatchOrganizerRenderer: DocumentBatchOrganizerRenderer
+    private lateinit var documentBatchZipExporter: DocumentBatchZipExporter
     private lateinit var runtimeProControlsRenderer: RuntimeProControlsRenderer
     private lateinit var cropEditOverlay: DocumentCropEditOverlay
     private lateinit var exportOverlay: DocumentExportOverlay
@@ -123,6 +129,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         views = MainActivityViews.bind(this)
         initRenderers()
         devLogExporter = DevLogExporter(this)
+        documentBatchZipExporter = DocumentBatchZipExporter(documentExportDirectory())
         permissionRequestHistory = PermissionRequestHistory(
             getSharedPreferences("permission_request_history", MODE_PRIVATE)
         )
@@ -210,13 +217,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             onMoveDownItemClick = { itemId ->
                 dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.DOWN))
             },
-            onOverviewRequested = {
-                val pageCount = latestSessionState?.presentation?.documentBatch?.items?.size ?: 0
-                reducePanel(CockpitPanelCommand.NavigateToExport)
-                reducePanel(CockpitPanelCommand.StartExport)
-                reducePanel(CockpitPanelCommand.UpdateExportProgress(currentPage = 0, totalPages = pageCount))
-                renderAfterPanelChange()
-            }
+            onExportRequested = ::startDocumentBatchExport
         )
         documentBatchOrganizerRenderer = DocumentBatchOrganizerRenderer(
             views = views.documentBatchOrganizer,
@@ -233,7 +234,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 renderAfterPanelChange()
             },
             onContinueShooting = { reducePanel(CockpitPanelCommand.CloseBatchOverview) },
-            onExport = { reducePanel(CockpitPanelCommand.NavigateToExport) }
+            onExport = ::startDocumentBatchExport
         )
         runtimeProControlsRenderer = RuntimeProControlsRenderer(
             context = this,
@@ -277,8 +278,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 renderAfterPanelChange()
             },
             onRetry = {
-                reducePanel(CockpitPanelCommand.StartExport)
-                renderAfterPanelChange()
+                startDocumentBatchExport()
             }
         )
         rootLayout.addView(exportOverlay, android.widget.FrameLayout.LayoutParams(
@@ -291,7 +291,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 
     private fun applyControlRotationForDisplay() {
-        val rotation = display?.rotation ?: android.view.Surface.ROTATION_0
+        val rotation = runCatching { display?.rotation }.getOrNull()
+            ?: @Suppress("DEPRECATION") windowManager.defaultDisplay.rotation
         val orientationModel = orientationRenderModel(rotation)
         val degrees = orientationModel.controlRotationDegrees
         listOf(
@@ -368,6 +369,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
     private fun render(state: SessionState) {
         latestSessionState = state
+        normalizeDocumentWorkflowRoute(state)
         applyLocale(state.settings.persisted)
         val text = AppTextResolver(this)
         val controls = sessionControlsRenderModel(state, text.sessionUiStrings(), text)
@@ -559,9 +561,6 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     override fun selectDevLogTab(tab: DevLogTab) {
         selectedDevLogTab = tab
         refreshDevLogModel()
-        latestDevLogRenderModel?.let {
-            Toast.makeText(this, it.title, Toast.LENGTH_SHORT).show()
-        }
     }
 
     override fun refreshDevLogModel() {
@@ -1003,6 +1002,9 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
         mainRenderer.renderPanelVisibility(activePanelRoute, latestSessionState?.let { styleSurfaceRole(it.activeMode) != StyleSurfaceRole.HIDDEN } ?: true)
         devConsoleRenderer.renderVisibility(activePanelRoute)
+        if (activePanelRoute is CockpitPanelRoute.DevConsole) {
+            refreshDevLogModel()
+        }
         if (activePanelRoute.isSettingsOpen) {
             renderLatestSettingsSurfaces()
         }
@@ -1036,6 +1038,87 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         val galleryLauncher = GalleryLauncher(this)
         if (!galleryLauncher.open(target)) {
             Toast.makeText(this, R.string.gallery_open_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun startDocumentBatchExport() {
+        val batch = latestSessionState?.presentation?.documentBatch ?: return
+        val pageCount = batch.items.size
+        if (pageCount == 0) {
+            Toast.makeText(this, R.string.document_batch_empty_hint, Toast.LENGTH_SHORT).show()
+            return
+        }
+        panelRouter.reduce(CockpitPanelCommand.StartExport)
+        panelRouter.reduce(CockpitPanelCommand.UpdateExportProgress(0, pageCount))
+        renderAfterPanelChange()
+
+        lifecycleScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    documentBatchZipExporter.export(batch = batch) { item ->
+                        openDocumentBatchInput(item)
+                    }
+                }
+            }
+
+            result.onSuccess { exportResult ->
+                panelRouter.reduce(CockpitPanelCommand.UpdateExportProgress(exportResult.exportedPages, pageCount))
+                if (exportResult.exportedPages > 0) {
+                    panelRouter.reduce(CockpitPanelCommand.CompleteExport)
+                    Toast.makeText(
+                        this@MainActivity,
+                        "导出文件：${exportResult.file.absolutePath}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    panelRouter.reduce(CockpitPanelCommand.FailExport)
+                    Toast.makeText(this@MainActivity, R.string.document_export_failed, Toast.LENGTH_SHORT).show()
+                }
+                renderAfterPanelChange()
+            }.onFailure {
+                panelRouter.reduce(CockpitPanelCommand.FailExport)
+                renderAfterPanelChange()
+                Toast.makeText(this@MainActivity, R.string.document_export_failed, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun documentExportDirectory(): File {
+        return getExternalFilesDir("document-exports")
+            ?: File(filesDir, "document-exports")
+    }
+
+    private fun openDocumentBatchInput(item: com.opencamera.core.session.DocumentBatchItem): InputStream? {
+        val candidates = listOfNotNull(item.renderUri, item.outputPath).distinct()
+        for (candidate in candidates) {
+            val stream = openDocumentBatchInput(candidate)
+            if (stream != null) return stream
+        }
+        return null
+    }
+
+    private fun openDocumentBatchInput(source: String): InputStream? {
+        if (source.startsWith("content://") || source.startsWith("file://")) {
+            return runCatching { contentResolver.openInputStream(Uri.parse(source)) }.getOrNull()
+        }
+
+        val file = File(source)
+        if (file.isAbsolute && file.isFile) {
+            return runCatching { file.inputStream() }.getOrNull()
+        }
+
+        val mediaStoreUri = contentResolver.resolveDocumentImageUri(source) ?: return null
+        return runCatching { contentResolver.openInputStream(mediaStoreUri) }.getOrNull()
+    }
+
+    private fun normalizeDocumentWorkflowRoute(state: SessionState) {
+        if (shouldCloseDocumentWorkflowRoute(
+                route = activePanelRoute,
+                activeMode = state.activeMode,
+                batchStatus = state.presentation.documentBatch.status
+            )
+        ) {
+            panelRouter.reduce(CockpitPanelCommand.DismissAll)
         }
     }
 
@@ -1074,9 +1157,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
                 val content = withContext(Dispatchers.IO) {
                     com.opencamera.app.camera.VendorCameraProbe.probe(this@MainActivity)
                 }
-                latestDeviceProbeSummary = content.lineSequence()
-                    .firstOrNull { it.trimStart().startsWith("extensions: ") }
-                    ?.trim()
+                latestDeviceProbeSummary = com.opencamera.app.camera.VendorCameraProbe
+                    .summaryFromProbeText(content)
                     ?: withContext(Dispatchers.IO) {
                         com.opencamera.app.camera.VendorCameraProbe.summary(this@MainActivity)
                     }
@@ -1222,7 +1304,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             placement = style.textPlacement,
             previewText = when (templateId) {
                 "van-gogh-starry" -> previewLabels.joinToString(" · ")
-                "blue-hour" -> "蓝调时刻"
+                "blue-hour" -> "BLUE HOUR"
                 else -> templateId
             },
             opacity = style.textOpacity.alphaFraction * 0.6f,
@@ -1247,4 +1329,47 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             else -> null
         }
     }
+}
+
+private fun ContentResolver.resolveDocumentImageUri(outputPath: String): Uri? {
+    val displayName = outputPath.substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
+    val relativePath = outputPath.substringBeforeLast('/', missingDelimiterValue = "")
+        .takeIf { it.isNotBlank() }
+    val projection = arrayOf(MediaStore.Images.Media._ID)
+    val pathUri = if (relativePath != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val relativePathWithSlash = if (relativePath.endsWith('/')) relativePath else "$relativePath/"
+        queryDocumentImageUri(
+            projection = projection,
+            selection = "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND " +
+                "(${MediaStore.MediaColumns.RELATIVE_PATH}=? OR ${MediaStore.MediaColumns.RELATIVE_PATH}=?)",
+            selectionArgs = arrayOf(displayName, relativePath, relativePathWithSlash)
+        )
+    } else {
+        null
+    }
+    return pathUri ?: queryDocumentImageUri(
+        projection = projection,
+        selection = "${MediaStore.MediaColumns.DISPLAY_NAME}=?",
+        selectionArgs = arrayOf(displayName)
+    )
+}
+
+private fun ContentResolver.queryDocumentImageUri(
+    projection: Array<String>,
+    selection: String,
+    selectionArgs: Array<String>
+): Uri? {
+    return runCatching {
+        query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
+            "${MediaStore.Images.Media._ID} DESC"
+        )?.use { cursor ->
+            if (!cursor.moveToFirst()) return@use null
+            val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
+            ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+        }
+    }.getOrNull()
 }

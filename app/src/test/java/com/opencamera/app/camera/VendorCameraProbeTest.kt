@@ -57,6 +57,24 @@ class VendorCameraProbeTest {
 
         assertTrue(output.toString().contains("[camera-extensions]"))
         assertTrue(output.toString().contains("extensions: BACK night=supported"))
+        assertTrue(output.toString().contains("image-quality-ext: blue-hour-hdr=unsupported low-light-night=supported"))
+    }
+
+    @Test
+    fun `summary from probe text keeps extension matrix and image quality decision lines`() {
+        val content = """
+            ===== VENDOR CAMERA PROBE =====
+              [camera-extensions]
+                extensions: BACK night=supported hdr=unsupported bokeh=unsupported auto=unsupported face-retouch=unsupported
+                image-quality-ext: blue-hour-hdr=unsupported low-light-night=supported
+            ===== PROBE COMPLETE =====
+        """.trimIndent()
+
+        assertEquals(
+            "extensions: BACK night=supported hdr=unsupported bokeh=unsupported auto=unsupported face-retouch=unsupported\n" +
+                "image-quality-ext: blue-hour-hdr=unsupported low-light-night=supported",
+            VendorCameraProbe.summaryFromProbeText(content)
+        )
     }
 
     @Test

@@ -22,6 +22,7 @@ class PersistedSettingsSerializerTest {
                 portraitBeautyPreset = PortraitBeautyPreset.RADIANT,
                 portraitBeautyStrength = PortraitBeautyStrength.ELEVATED,
                 portraitBokehEffect = PortraitBokehEffect.DREAMY,
+                photoWatermarkEnabledByDefault = true,
                 defaultWatermarkTemplateId = "travel-polaroid",
                 classicOverlayWatermarkStyle = WatermarkStyleSettings(
                     textPlacement = WatermarkTextPlacement.TOP_RIGHT,
@@ -91,6 +92,7 @@ class PersistedSettingsSerializerTest {
         assertEquals("dreamy", serialized["photo.portrait.bokehEffect"])
         assertEquals("4k", serialized["video.defaultVideoResolution"])
         assertEquals("concert", serialized["video.defaultVideoAudioProfile"])
+        assertEquals("true", serialized["photo.watermark.enabledByDefault"])
         assertEquals("travel-polaroid", serialized["photo.defaultWatermarkTemplateId"])
         assertEquals("top-right", serialized["photo.watermark.classicOverlay.position"])
         assertEquals("compact", serialized["photo.watermark.travelPolaroid.scale"])
@@ -429,6 +431,16 @@ class PersistedSettingsSerializerTest {
     fun `default live save format is google motion photo jpeg`() {
         val settings = PhotoSettings()
         assertEquals(LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG, settings.liveSaveFormat)
+    }
+
+    @Test
+    fun `photo watermark is disabled by default`() {
+        assertFalse(PhotoSettings().photoWatermarkEnabledByDefault)
+        assertFalse(PersistedSettings().photo.photoWatermarkEnabledByDefault)
+        assertEquals(
+            "false",
+            PersistedSettingsSerializer.toMap(PersistedSettings())["photo.watermark.enabledByDefault"]
+        )
     }
 
     @Test

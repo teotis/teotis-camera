@@ -7,13 +7,23 @@ import com.opencamera.app.camera.AndroidPhotoSelfieMirrorEditor
 import com.opencamera.app.camera.AndroidPortraitRenderEditor
 import com.opencamera.app.camera.AndroidPhotoWatermarkEditor
 import com.opencamera.app.camera.AndroidPhotoAlgorithmEditor
+import com.opencamera.app.camera.AndroidFocusStackFusionProcessor
+import com.opencamera.app.camera.AndroidMlKitFaceDetectionClient
+import com.opencamera.app.camera.AndroidMlKitImageLabelClient
+import com.opencamera.app.camera.AndroidMlKitObjectDetectionClient
 import com.opencamera.app.camera.BoundedMaskBitmapDecoder
 import com.opencamera.app.camera.MlKitSelfiePreviewSceneMaskSource
 import com.opencamera.app.camera.NoOpPreviewSceneMaskSource
 import com.opencamera.app.camera.MlKitSavedPhotoSceneMaskProvider
+import com.opencamera.app.camera.MlKitSavedPhotoContentAnalyzer
 import com.opencamera.app.camera.NoOpSavedPhotoSceneMaskProvider
+import com.opencamera.app.camera.NoOpSavedPhotoContentAnalyzer
 import com.opencamera.app.camera.PreviewSceneMaskSource
+import com.opencamera.app.camera.CompositeSavedPhotoContentAnalyzer
+import com.opencamera.app.camera.SavedPhotoContentAnalyzer
+import com.opencamera.app.camera.SavedPhotoBitmapSource
 import com.opencamera.app.camera.SavedPhotoSceneMaskProvider
+import com.opencamera.app.camera.SceneMaskSavedPhotoContentAnalyzer
 import com.opencamera.app.camera.toSnapshot
 import com.opencamera.app.camera.AndroidThermalRuntimeIssueMonitor
 import com.opencamera.app.camera.CameraSessionCoordinator
@@ -23,6 +33,8 @@ import com.opencamera.app.camera.PreviewSceneBrightnessMonitor
 import com.opencamera.app.camera.toSignalSource
 import com.opencamera.app.camera.live.CameraXLivePreviewFrameSource
 import com.opencamera.app.camera.CompositeRuntimeIssueMonitor
+import com.opencamera.app.camera.ContentUnderstandingPostProcessor
+import com.opencamera.app.camera.CheckInContentDecisionPostProcessor
 import com.opencamera.app.camera.DocumentAutoCropPostProcessor
 import com.opencamera.app.camera.PhotoFrameRatioPostProcessor
 import com.opencamera.app.camera.PhotoSelfieMirrorPostProcessor
@@ -37,6 +49,7 @@ import com.opencamera.core.effect.PreviewEffectAdapter
 import com.opencamera.core.effect.PreviewSceneMaskSnapshot
 import com.opencamera.core.media.MediaProcessorAvailability
 import com.opencamera.core.media.CompositeMediaPostProcessor
+import com.opencamera.core.media.MediaPostProcessor
 import com.opencamera.core.media.MultiFrameFusionProcessor
 import com.opencamera.core.media.PipelineMetadataPostProcessor
 import com.opencamera.core.media.ShotExecutor
@@ -76,24 +89,47 @@ class AppContainer(
     } catch (_: Throwable) {
         NoOpSavedPhotoSceneMaskProvider()
     }
+    internal val savedPhotoContentAnalyzer: SavedPhotoContentAnalyzer = try {
+        CompositeSavedPhotoContentAnalyzer(
+            backends = listOf(
+                SceneMaskSavedPhotoContentAnalyzer(savedMaskProvider),
+                MlKitSavedPhotoContentAnalyzer(
+                    imageLabelClient = AndroidMlKitImageLabelClient(),
+                    objectClient = AndroidMlKitObjectDetectionClient(),
+                    faceClient = AndroidMlKitFaceDetectionClient()
+                )
+            )
+        )
+    } catch (_: Throwable) {
+        NoOpSavedPhotoContentAnalyzer()
+    }
 
     private val mediaPostProcessor = CompositeMediaPostProcessor(
-        processors = listOf(
-            MultiFrameFusionProcessor(),
-            DocumentAutoCropPostProcessor(
+        processors = createProductionMediaPostProcessors(
+            focusStackFusionProcessor = AndroidFocusStackFusionProcessor(appContext),
+            multiFrameFusionProcessor = MultiFrameFusionProcessor(),
+            documentAutoCropPostProcessor = DocumentAutoCropPostProcessor(
                 AndroidDocumentAutoCropEditor(appContext)
             ),
-            PhotoFrameRatioPostProcessor(
+            photoFrameRatioPostProcessor = PhotoFrameRatioPostProcessor(
                 AndroidPhotoFrameRatioEditor(appContext)
             ),
-            PortraitRenderPostProcessor(
+            contentUnderstandingPostProcessor = ContentUnderstandingPostProcessor(
+                savedPhotoContentAnalyzer,
+                bitmapSource = object : SavedPhotoBitmapSource {
+                    override suspend fun decode(target: com.opencamera.core.media.ProcessorTarget) =
+                        BoundedMaskBitmapDecoder.decode(target, appContext.contentResolver)
+                }
+            ),
+            checkInContentDecisionPostProcessor = CheckInContentDecisionPostProcessor(),
+            portraitRenderPostProcessor = PortraitRenderPostProcessor(
                 AndroidPortraitRenderEditor(appContext),
                 savedMaskProvider,
                 maskBitmapSource = { target ->
                     BoundedMaskBitmapDecoder.decode(target, appContext.contentResolver)
                 }
             ),
-            PhotoAlgorithmWatermarkPostProcessor(
+            photoAlgorithmWatermarkPostProcessor = PhotoAlgorithmWatermarkPostProcessor(
                 AndroidPhotoAlgorithmEditor(appContext),
                 AndroidPhotoWatermarkEditor(appContext),
                 savedMaskProvider,
@@ -101,10 +137,10 @@ class AppContainer(
                     BoundedMaskBitmapDecoder.decode(target, appContext.contentResolver)
                 }
             ),
-            PhotoSelfieMirrorPostProcessor(
+            photoSelfieMirrorPostProcessor = PhotoSelfieMirrorPostProcessor(
                 AndroidPhotoSelfieMirrorEditor(appContext)
             ),
-            PipelineMetadataPostProcessor()
+            pipelineMetadataPostProcessor = PipelineMetadataPostProcessor()
         ),
         onProcessorTimed = { name, elapsedMs ->
             linkRecorder.recordEvent(PerformanceLinkEvent(
@@ -193,6 +229,30 @@ class AppContainer(
         sceneBrightnessSource = PreviewSceneBrightnessMonitor(applicationScope).toSignalSource()
     )
 }
+
+internal fun createProductionMediaPostProcessors(
+    focusStackFusionProcessor: MediaPostProcessor,
+    multiFrameFusionProcessor: MediaPostProcessor,
+    documentAutoCropPostProcessor: MediaPostProcessor,
+    photoFrameRatioPostProcessor: MediaPostProcessor,
+    contentUnderstandingPostProcessor: MediaPostProcessor,
+    checkInContentDecisionPostProcessor: MediaPostProcessor,
+    portraitRenderPostProcessor: MediaPostProcessor,
+    photoAlgorithmWatermarkPostProcessor: MediaPostProcessor,
+    photoSelfieMirrorPostProcessor: MediaPostProcessor,
+    pipelineMetadataPostProcessor: MediaPostProcessor
+): List<MediaPostProcessor> = listOf(
+    focusStackFusionProcessor,
+    multiFrameFusionProcessor,
+    documentAutoCropPostProcessor,
+    photoFrameRatioPostProcessor,
+    contentUnderstandingPostProcessor,
+    checkInContentDecisionPostProcessor,
+    portraitRenderPostProcessor,
+    photoAlgorithmWatermarkPostProcessor,
+    photoSelfieMirrorPostProcessor,
+    pipelineMetadataPostProcessor
+)
 
 internal const val PRODUCTION_TRACE_MEMORY_RETENTION = 10_000
 internal const val PRODUCTION_TRACE_DISPLAY_WINDOW = 5_000

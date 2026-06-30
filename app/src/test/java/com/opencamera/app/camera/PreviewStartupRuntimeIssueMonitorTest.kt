@@ -70,6 +70,38 @@ class PreviewStartupRuntimeIssueMonitorTest {
     }
 
     @Test
+    fun `reconfigure bind waits for conservative watchdog before reporting stall`() = runTest {
+        val monitorScope = TestScope(StandardTestDispatcher(testScheduler))
+        val monitor = PreviewStartupRuntimeIssueMonitor(monitorScope)
+        val recordedIssues = mutableListOf<String>()
+        val collectionJob = monitorScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            monitor.runtimeIssues.collect { issue ->
+                recordedIssues += "${issue.kind}:${issue.reason}:${issue.isRecoverable}"
+            }
+        }
+
+        monitor.onPreviewHostAttached()
+        monitor.onPreviewBindingStarted(
+            reason = "mode switched to humanistic",
+            isRecovery = false
+        )
+        monitorScope.advanceTimeBy(1499)
+        monitorScope.runCurrent()
+        assertTrue(recordedIssues.isEmpty())
+
+        monitorScope.advanceTimeBy(1)
+        monitorScope.advanceUntilIdle()
+
+        assertEquals(
+            listOf(
+                "PREVIEW_STALL:first frame timed out after 1500 ms (Reconfigure): mode switched to humanistic:true"
+            ),
+            recordedIssues
+        )
+        collectionJob.cancel()
+    }
+
+    @Test
     fun `first frame before timeout cancels pending stall issue`() = runTest {
         val monitorScope = TestScope(StandardTestDispatcher(testScheduler))
         val monitor = PreviewStartupRuntimeIssueMonitor(monitorScope)

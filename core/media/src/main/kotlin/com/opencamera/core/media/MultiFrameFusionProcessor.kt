@@ -28,6 +28,11 @@ class MultiFrameFusionProcessor : MediaPostProcessor {
         val bundle = result.frameBundle
         val intermediatePaths = result.intermediateOutputPaths
 
+        if (result.captureProfile.focusStackSpec != null ||
+            bundle?.frames?.any { it.focusStackRole != FocusStackFrameRole.NONE } == true) {
+            return result.addPipelineNotes("merge:skipped=focus-stack-owner")
+        }
+
         if (bundle == null || result.captureProfile.frameCount <= 1) {
             return result.addPipelineNotes("merge:skipped=no-bundle-or-single-frame")
         }

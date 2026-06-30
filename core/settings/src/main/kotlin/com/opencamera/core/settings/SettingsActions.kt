@@ -22,6 +22,7 @@ sealed interface PersistedSettingsAction {
     data class UpdatePortraitDepthStrength(
         val strength: Int
     ) : PersistedSettingsAction
+    data class UpdatePhotoWatermarkEnabled(val enabled: Boolean) : PersistedSettingsAction
     data class UpdatePhotoWatermarkTemplate(val templateId: String) : PersistedSettingsAction
     data class UpdateWatermarkTextPlacement(
         val templateId: String,
@@ -103,6 +104,10 @@ fun PersistedSettings.reduce(action: PersistedSettingsAction): PersistedSettings
 
         is PersistedSettingsAction.UpdatePortraitDepthStrength -> copy(
             photo = photo.copy(portraitDepthStrength = action.strength.coerceIn(0, 100))
+        )
+
+        is PersistedSettingsAction.UpdatePhotoWatermarkEnabled -> copy(
+            photo = photo.copy(photoWatermarkEnabledByDefault = action.enabled)
         )
 
         is PersistedSettingsAction.UpdatePhotoWatermarkTemplate -> copy(

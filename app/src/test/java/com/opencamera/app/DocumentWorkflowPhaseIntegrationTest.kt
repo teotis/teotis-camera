@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.DocumentBatchStatus
 import com.opencamera.core.session.DocumentWorkflowPhase
 import com.opencamera.core.session.toBatchStatus
@@ -47,9 +48,10 @@ class DocumentWorkflowPhaseIntegrationTest {
     fun `export flow - start progress complete return to shooting`() {
         val r = router()
         r.reduce(CockpitPanelCommand.NavigateToBatchOverview)
-        r.reduce(CockpitPanelCommand.StartExport)
+        documentBatchStartExportCommands(totalPages = 4).forEach(r::reduce)
         assertEquals(CockpitPanelRoute.Export, r.state.route)
         assertTrue(r.state.exportState is ExportState.InProgress)
+        assertEquals(4, (r.state.exportState as ExportState.InProgress).totalPages)
 
         // Progress updates
         r.reduce(CockpitPanelCommand.UpdateExportProgress(currentPage = 3, totalPages = 10))
@@ -72,21 +74,22 @@ class DocumentWorkflowPhaseIntegrationTest {
     fun `export flow - failure and retry`() {
         val r = router()
         r.reduce(CockpitPanelCommand.NavigateToBatchOverview)
-        r.reduce(CockpitPanelCommand.StartExport)
+        documentBatchStartExportCommands(totalPages = 2).forEach(r::reduce)
         r.reduce(CockpitPanelCommand.FailExport)
         assertTrue(r.state.exportState is ExportState.Failed)
 
         // Retry: restart export
-        r.reduce(CockpitPanelCommand.StartExport)
+        documentBatchStartExportCommands(totalPages = 2).forEach(r::reduce)
         assertTrue(r.state.exportState is ExportState.InProgress)
         assertEquals(CockpitPanelRoute.Export, r.state.route)
+        assertEquals(2, (r.state.exportState as ExportState.InProgress).totalPages)
     }
 
     @Test
     fun `close export returns to batch overview`() {
         val r = router()
         r.reduce(CockpitPanelCommand.NavigateToBatchOverview)
-        r.reduce(CockpitPanelCommand.StartExport)
+        documentBatchStartExportCommands(totalPages = 1).forEach(r::reduce)
         assertEquals(CockpitPanelRoute.Export, r.state.route)
 
         r.reduce(CockpitPanelCommand.CloseExport)
@@ -99,7 +102,7 @@ class DocumentWorkflowPhaseIntegrationTest {
     fun `android back from export returns to batch overview`() {
         val r = router()
         r.reduce(CockpitPanelCommand.NavigateToBatchOverview)
-        r.reduce(CockpitPanelCommand.StartExport)
+        documentBatchStartExportCommands(totalPages = 10).forEach(r::reduce)
         r.reduce(CockpitPanelCommand.UpdateExportProgress(5, 10))
         assertEquals(CockpitPanelRoute.Export, r.state.route)
 
@@ -125,10 +128,46 @@ class DocumentWorkflowPhaseIntegrationTest {
     fun `dismiss all from any route returns to none`() {
         val r = router()
         r.reduce(CockpitPanelCommand.NavigateToBatchOverview)
-        r.reduce(CockpitPanelCommand.StartExport)
+        documentBatchStartExportCommands(totalPages = 1).forEach(r::reduce)
         r.reduce(CockpitPanelCommand.DismissAll)
         assertEquals(CockpitPanelRoute.None, r.state.route)
         assertNull(r.state.exportState)
+    }
+
+    @Test
+    fun `document workflow routes close when active mode leaves document`() {
+        assertTrue(
+            shouldCloseDocumentWorkflowRoute(
+                route = CockpitPanelRoute.BatchOverview,
+                activeMode = ModeId.PHOTO,
+                batchStatus = DocumentBatchStatus.ACTIVE
+            )
+        )
+        assertTrue(
+            shouldCloseDocumentWorkflowRoute(
+                route = CockpitPanelRoute.Export,
+                activeMode = ModeId.VIDEO,
+                batchStatus = DocumentBatchStatus.FINISHED
+            )
+        )
+    }
+
+    @Test
+    fun `document overview routes close when batch is inactive but export may show finished batch`() {
+        assertTrue(
+            shouldCloseDocumentWorkflowRoute(
+                route = CockpitPanelRoute.BatchOverview,
+                activeMode = ModeId.DOCUMENT,
+                batchStatus = DocumentBatchStatus.INACTIVE
+            )
+        )
+        assertFalse(
+            shouldCloseDocumentWorkflowRoute(
+                route = CockpitPanelRoute.Export,
+                activeMode = ModeId.DOCUMENT,
+                batchStatus = DocumentBatchStatus.FINISHED
+            )
+        )
     }
 
     @Test
