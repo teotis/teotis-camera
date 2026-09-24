@@ -2,6 +2,7 @@ package com.opencamera.app
 
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -135,14 +136,17 @@ class PanelDismissScrimVisibilityTest {
                 lowLightNightPrompt = Button(context)
             ),
             documentBatchRail = DocumentBatchRailViews(
+                overlay = FrameLayout(context),
                 rail = LinearLayout(context),
                 chip = TextView(context),
-                thumbnail = allocateInstance(ImageView::class.java),
                 itemScroll = NestedScrollView(context),
                 itemList = LinearLayout(context),
+                actionContainer = LinearLayout(context),
                 moveUpButton = Button(context),
                 moveDownButton = Button(context),
-                overviewButton = Button(context)
+                removeButton = Button(context),
+                overviewButton = Button(context),
+                clearButton = Button(context)
             ),
             documentBatchOrganizer = DocumentBatchOrganizerViews(
                 panel = LinearLayout(context),
@@ -162,8 +166,12 @@ class PanelDismissScrimVisibilityTest {
                 chips = LinearLayout(context)
             ),
             runtimeProControls = RuntimeProControlsViews(
-                scroll = HorizontalScrollView(context),
-                chips = LinearLayout(context)
+                overlay = FrameLayout(context),
+                statusLeft = TextView(context),
+                statusRight = TextView(context),
+                statusDetail = TextView(context),
+                rail = LinearLayout(context),
+                scale = com.opencamera.app.procontrols.ImmersiveProScaleView(context)
             ),
             settingsPanel = SettingsPanelViews(
                 panel = NestedScrollView(context),

@@ -65,7 +65,7 @@ class DefaultCameraSession(
     private val effectCapabilityResolver: com.opencamera.core.effect.EffectCapabilityResolver? = null,
     private val capabilityGraphResolver: com.opencamera.core.capability.CapabilityGraphResolver? = null,
     private val capabilityRequirements: () -> List<com.opencamera.core.capability.CapabilityRequirement> = { emptyList() },
-    private val recordingTimerDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val recordingTimerDispatcher: CoroutineDispatcher? = Dispatchers.Default,
     private val elapsedRealtimeMillis: () -> Long = { System.nanoTime() / 1_000_000L }
 ) : CameraSession {
     private val linkRecorder: PerformanceLinkRecorder = linkRecorder ?: InMemoryPerformanceLinkRecorder()
@@ -96,6 +96,9 @@ class DefaultCameraSession(
     )
     private var pendingSwitchTraceHandle: TraceHandle? = null
     private var pendingSwitchSpan: PerformanceSpanSnapshot? = null
+    private var previewStyleStrengthOverride: Float? = null
+    private var previewStyleOriginalComparisonActive = false
+    private var previewStyleRefreshDeferred = false
     @Volatile private var pendingSwitchLensNode: LensNode? = null
     private var currentController: ModeController = createController(
         modeId = initialMode,
@@ -153,6 +156,19 @@ class DefaultCameraSession(
         elapsedRealtimeMillis = elapsedRealtimeMillis
     )
 
+    /**
+     * A capture failure (captureStatus=FAILED) must keep its error visible until
+     * the next successful capture/recording action; preview lifecycle events
+     * (start/active/stop/host re-attach) must not silently erase it (INV-3c).
+     */
+    private fun previewLastErrorOrCaptureFailure(): String? {
+        return if (_state.value.captureStatus == CaptureStatus.FAILED) {
+            _state.value.lastError
+        } else {
+            null
+        }
+    }
+
     private val previewSessionMutations = object : PreviewSessionMutations {
         override fun updatePreviewBlocked(reason: String) {
             updateState(
@@ -168,7 +184,7 @@ class DefaultCameraSession(
                 previewStatus = if (isRecovery) PreviewStatus.RECOVERING else PreviewStatus.STARTING,
                 previewStatusDetail = reason,
                 lastAction = if (isRecovery) "Recovering preview" else "Starting preview",
-                lastError = null
+                lastError = previewLastErrorOrCaptureFailure()
             )
         }
 
@@ -176,7 +192,7 @@ class DefaultCameraSession(
             updateState(
                 previewStatus = PreviewStatus.ACTIVE,
                 lastAction = "Preview active (${firstFrameLatencyMillis} ms first frame)",
-                lastError = null
+                lastError = previewLastErrorOrCaptureFailure()
             )
         }
 
@@ -191,11 +207,22 @@ class DefaultCameraSession(
 
         override fun updatePreviewStopped(reason: String) {
             val hasCameraPermission = _state.value.permissionState.cameraGranted
+            val stopped = _state.value.lifecycle == SessionLifecycle.STOPPED
             updateState(
-                previewStatus = if (hasCameraPermission) PreviewStatus.IDLE else PreviewStatus.BLOCKED,
+                // After Shutdown the preview must stay IDLE; a late PreviewStopped
+                // must not resurrect BLOCKED on a stopped session (INV-4b).
+                previewStatus = if (stopped || hasCameraPermission) {
+                    PreviewStatus.IDLE
+                } else {
+                    PreviewStatus.BLOCKED
+                },
                 previewStatusDetail = reason,
                 lastAction = "Preview stopped",
-                lastError = if (hasCameraPermission) null else "Camera permission missing"
+                lastError = if (hasCameraPermission) {
+                    previewLastErrorOrCaptureFailure()
+                } else {
+                    "Camera permission missing"
+                }
             )
         }
 
@@ -237,13 +264,18 @@ class DefaultCameraSession(
             )
         }
 
-        override fun updatePreviewMeteringRequested(requestId: String, point: PreviewMeteringPoint) {
+        override fun updatePreviewMeteringRequested(
+            requestId: String,
+            point: PreviewMeteringPoint,
+            persistence: com.opencamera.core.device.PreviewMeteringPersistence
+        ) {
             updateState(
                 previewMeteringFeedback = PreviewMeteringFeedback(
                     requestId = requestId,
                     normalizedX = point.normalizedX,
                     normalizedY = point.normalizedY,
-                    status = PreviewMeteringFeedbackStatus.REQUESTED
+                    status = PreviewMeteringFeedbackStatus.REQUESTED,
+                    persistence = persistence
                 )
             )
         }
@@ -252,6 +284,11 @@ class DefaultCameraSession(
             val currentFeedback = _state.value.presentation.previewMeteringFeedback ?: return
             val feedbackStatus = when (result.status) {
                 PreviewMeteringResultStatus.SUCCEEDED -> PreviewMeteringFeedbackStatus.SUCCEEDED
+                PreviewMeteringResultStatus.LOCKED -> PreviewMeteringFeedbackStatus.LOCKED
+                PreviewMeteringResultStatus.DEGRADED_FOCUS_LOCK_ONLY ->
+                    PreviewMeteringFeedbackStatus.DEGRADED_FOCUS_LOCK_ONLY
+                PreviewMeteringResultStatus.DEGRADED_EXPOSURE_LOCK_ONLY ->
+                    PreviewMeteringFeedbackStatus.DEGRADED_EXPOSURE_LOCK_ONLY
                 PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY
                 PreviewMeteringResultStatus.FAILED -> PreviewMeteringFeedbackStatus.FAILED
                 PreviewMeteringResultStatus.UNSUPPORTED -> PreviewMeteringFeedbackStatus.UNSUPPORTED
@@ -274,7 +311,7 @@ class DefaultCameraSession(
             updateState(
                 previewHostAvailable = true,
                 lastAction = lastAction,
-                lastError = null
+                lastError = previewLastErrorOrCaptureFailure()
             )
         }
 
@@ -284,7 +321,11 @@ class DefaultCameraSession(
                 previewStatus = if (hasPermission) PreviewStatus.IDLE else PreviewStatus.BLOCKED,
                 previewStatusDetail = reason,
                 lastAction = "Preview host detached",
-                lastError = if (hasPermission) null else "Camera permission missing"
+                lastError = if (hasPermission) {
+                    previewLastErrorOrCaptureFailure()
+                } else {
+                    "Camera permission missing"
+                }
             )
         }
 
@@ -368,8 +409,16 @@ class DefaultCameraSession(
     private suspend fun processModeControlIntent(intent: SessionIntent) {
         when (intent) {
             is SessionIntent.SettingsUpdated -> handleSettingsUpdated(intent.snapshot)
+            is SessionIntent.PreviewStyleStrengthChanged -> handlePreviewStyleStrengthChanged(intent.strength)
+            is SessionIntent.PreviewStyleOriginalComparisonChanged ->
+                handlePreviewStyleOriginalComparisonChanged(intent.active)
             is SessionIntent.SwitchMode -> handleSwitchMode(intent.modeId)
             SessionIntent.ShutterPressed -> {
+                if (hasTransientStylePreviewOverride()) {
+                    updateState(lastAction = "Release style preview before capture")
+                    trace.record("capture.shutter.blocked", "transient-style-preview")
+                    return
+                }
                 val elapsedNanos = System.nanoTime()
                 _state.value = _state.value.copy(
                     shutterPressedAtElapsedMillis = elapsedNanos / 1_000_000L
@@ -436,10 +485,20 @@ class DefaultCameraSession(
             }
         }
         previewRecoveryProcessor.process(intent)
+        // Guaranteed convergence: when a fatal preview fault or surface loss set the
+        // recording into STOPPING, arm the STOPPING watchdog so the session recovers
+        // even if the device never finalizes (INV-3b).
+        if (state.value.recordingStatus == RecordingStatus.STOPPING) {
+            captureRecordingProcessor.startRecordingWatchdog(RecordingStatus.STOPPING, 15_000L)
+        }
     }
 
     private suspend fun processCaptureRecordingIntent(intent: SessionIntent) {
         captureRecordingProcessor.process(intent)
+        if (previewStyleRefreshDeferred && !shouldDeferPreviewStyleRefresh()) {
+            previewStyleRefreshDeferred = false
+            refreshPreviewStyleRuntime("preview style override cleared after capture")
+        }
     }
 
     private fun processDiagnosticsIntent(intent: SessionIntent) {
@@ -492,6 +551,8 @@ class DefaultCameraSession(
 
         captureRecordingProcessor.cancelPendingCountdown("Countdown cancelled because session stopped")
         captureRecordingProcessor.cancelRecordingWatchdog()
+        captureRecordingProcessor.cancelPostProcessLiveness(null)
+        captureRecordingProcessor.cancelDocumentBatchWatchdog(null)
         currentController.onExit()
         updateState(
             lifecycle = SessionLifecycle.STOPPED,
@@ -503,7 +564,10 @@ class DefaultCameraSession(
             modeSnapshot = currentController.snapshot.value,
             activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
             activeDeviceGraph = resolvedActiveDeviceGraph(),
-            lastAction = "Session stopped"
+            lastAction = "Session stopped",
+            pendingPostprocess = null,
+            captureReadiness = null,
+            pendingCaptureFeedback = null
         )
         trace.record("session.stopped", "mode=${currentController.id}")
         previewRecoveryProcessor.requestPreviewUnbind(reason = "Session stopped", clearHost = false)
@@ -639,6 +703,81 @@ class DefaultCameraSession(
         }
     }
 
+    private suspend fun handlePreviewStyleStrengthChanged(strength: Float?) {
+        val normalized = strength?.coerceIn(0f, 1f)
+        if (previewStyleStrengthOverride == normalized) return
+        if (normalized != null && blockIfCommandNotAdmitted(
+                SessionCommandKind.SETTINGS_UPDATE,
+                "preview.style-strength.blocked"
+            )
+        ) {
+            return
+        }
+        previewStyleStrengthOverride = normalized
+        if (shouldDeferPreviewStyleRefresh()) {
+            previewStyleRefreshDeferred = true
+            return
+        }
+        refreshPreviewStyleRuntime("preview style strength changed")
+    }
+
+    private suspend fun handlePreviewStyleOriginalComparisonChanged(active: Boolean) {
+        if (previewStyleOriginalComparisonActive == active) return
+        if (active && blockIfCommandNotAdmitted(
+                SessionCommandKind.SETTINGS_UPDATE,
+                "preview.style-original.blocked"
+            )
+        ) {
+            return
+        }
+        previewStyleOriginalComparisonActive = active
+        if (shouldDeferPreviewStyleRefresh()) {
+            previewStyleRefreshDeferred = true
+            return
+        }
+        refreshPreviewStyleRuntime(
+            if (active) "preview style original comparison started" else "preview style original comparison ended"
+        )
+    }
+
+    private suspend fun refreshPreviewStyleRuntime(lastAction: String) {
+        currentController.refreshEffectSpec()
+        updateState(
+            modeSnapshot = currentController.snapshot.value,
+            activeDeviceCapabilities = _state.value.activeDeviceCapabilities,
+            activeDeviceGraph = resolvedActiveDeviceGraph(),
+            settings = runtimeConfiguration.settings,
+            lastAction = lastAction,
+            lastError = null
+        )
+    }
+
+    private fun hasTransientStylePreviewOverride(): Boolean =
+        previewStyleOriginalComparisonActive || previewStyleStrengthOverride != null
+
+    private fun shouldDeferPreviewStyleRefresh(): Boolean =
+        captureRecordingProcessor.countdownInProgress() || _state.value.activeShot != null
+
+    private fun effectiveStylePreviewSettings(): SessionSettingsSnapshot {
+        val baseline = runtimeConfiguration.settings
+        val photo = baseline.persisted.photo
+        val strength = when {
+            previewStyleOriginalComparisonActive -> 0f
+            previewStyleStrengthOverride != null -> previewStyleStrengthOverride!!
+            else -> photo.styleStrength
+        }
+        val colorLab = if (previewStyleOriginalComparisonActive) {
+            photo.colorLabSpec.copy(strength = 0f)
+        } else {
+            photo.colorLabSpec
+        }
+        return baseline.copy(
+            persisted = baseline.persisted.copy(
+                photo = photo.copy(styleStrength = strength, colorLabSpec = colorLab)
+            )
+        )
+    }
+
     private suspend fun handleLensFacingToggled() {
         if (blockIfCommandNotAdmitted(SessionCommandKind.LENS_SWITCH, "lens.switch.blocked")) {
             return
@@ -746,6 +885,7 @@ class DefaultCameraSession(
             return
         }
 
+        previewRecoveryProcessor.cancelFocusExposureLockIfActive("zoom changed")
         updateState(
             activeDeviceGraph = resolveActiveDeviceGraph(
                 baseGraph = currentController.deviceGraph(),
@@ -811,6 +951,7 @@ class DefaultCameraSession(
             return
         }
 
+        previewRecoveryProcessor.cancelFocusExposureLockIfActive("zoom changed")
         // Lens node hysteresis: determine target node from zoom ratio thresholds.
         // Logical-only camera ranges can still expose preview baselines; those must not
         // force a physical lens rebind when there is only one real lens node.
@@ -887,38 +1028,7 @@ class DefaultCameraSession(
         ratio: Float,
         currentNode: LensNode?,
         lensNodeMap: Map<LensNode, LensNodeAvailability>
-    ): LensNode {
-        if (lensNodeMap.isEmpty()) return LensNode.WIDE
-        val sorted = lensNodeMap.values
-            .filter { it.available }
-            .sortedByDescending { it.thresholdRatio }
-        if (sorted.isEmpty()) return LensNode.WIDE
-
-        // Find which node range the ratio falls into (from highest threshold down)
-        var target = LensNode.WIDE
-        for (avail in sorted) {
-            if (ratio >= avail.thresholdRatio) {
-                target = avail.node
-                break
-            }
-        }
-
-        // Apply hysteresis when switching between nodes
-        if (currentNode != null && currentNode != target) {
-            val currentThreshold = lensNodeMap[currentNode]?.thresholdRatio ?: return target
-            val targetThreshold = lensNodeMap[target]?.thresholdRatio ?: return target
-            return if (currentThreshold > targetThreshold) {
-                // Switching to lower-zoom node: reference is the higher threshold (current node)
-                val actualDelta = maxOf(0.05f, currentThreshold * LENS_NODE_HYSTERESIS_RATIO)
-                if (ratio <= currentThreshold - actualDelta) target else currentNode
-            } else {
-                // Switching to higher-zoom node: reference is the higher threshold (target)
-                val actualDelta = maxOf(0.05f, targetThreshold * LENS_NODE_HYSTERESIS_RATIO)
-                if (ratio >= targetThreshold + actualDelta) target else currentNode
-            }
-        }
-        return target
-    }
+    ): LensNode = SessionDevicePolicies.evaluateLensNode(ratio, currentNode, lensNodeMap)
 
     /**
      * Computes the discrete preview zoom ratio for a given capture zoom ratio.
@@ -931,12 +1041,7 @@ class DefaultCameraSession(
     internal fun computePreviewZoomRatio(
         captureZoom: Float,
         capability: ZoomRatioCapability
-    ): Float {
-        val previewBases = capability.normalizedPreviewBaseRatios
-            .ifEmpty { previewBaseRatiosFromLensNodeMap(captureZoom, capability.lensNodeMap) }
-        if (previewBases.isEmpty()) return normalizedZoomRatioValue(captureZoom).coerceAtLeast(1f)
-        return computePreviewZoomRatioFromBases(captureZoom, previewBases)
-    }
+    ): Float = SessionDevicePolicies.previewZoomRatio(captureZoom, capability)
 
     /**
      * Computes preview baselines from physical lens thresholds.
@@ -944,113 +1049,7 @@ class DefaultCameraSession(
     internal fun computePreviewZoomRatio(
         captureZoom: Float,
         lensNodeMap: Map<LensNode, LensNodeAvailability>
-    ): Float {
-        val previewBases = previewBaseRatiosFromLensNodeMap(captureZoom, lensNodeMap)
-        if (previewBases.isEmpty()) return normalizedZoomRatioValue(captureZoom).coerceAtLeast(1f)
-        return computePreviewZoomRatioFromBases(captureZoom, previewBases)
-    }
-
-    private fun previewBaseRatiosFromLensNodeMap(
-        captureZoom: Float,
-        lensNodeMap: Map<LensNode, LensNodeAvailability>
-    ): List<Float> {
-        if (lensNodeMap.isEmpty()) return emptyList()
-        return lensNodeMap.values
-            .filter { it.available }
-            .map { threshold ->
-                if (threshold.thresholdRatio <= 0f) {
-                    captureZoom.coerceAtMost(1f).coerceAtLeast(MIN_NON_ZERO_PREVIEW_ZOOM_RATIO)
-                } else {
-                    threshold.thresholdRatio
-                }
-            }
-            .map(::normalizedZoomRatioValue)
-            .filter { it > 0f }
-            .distinct()
-            .sorted()
-    }
-
-    /**
-     * Computes a continuous preview zoom ratio for a given capture zoom ratio
-     * and sorted preview baseline list.
-     *
-     * Within each baseline interval [b_i, b_{i+1}], [previewZoomRatio] is computed
-     * so that the frame-box scale (previewZoom/captureZoom) transitions smoothly
-     * from [FRAME_BOX_SCALE_MAX] down to [FRAME_BOX_SCALE_MIN]. At [FRAME_BOX_SCALE_MIN]
-     * the ratio jumps to the next baseline (where frameBoxScale resets to [FRAME_BOX_SCALE_MAX]);
-     * because the jump is in the same direction as captureZoom increases, the visual frame-box
-     * size remains continuous.
-     *
-     * At exact baseline values, returns the baseline directly.
-     * Below all baselines: returns the first baseline.
-     * Above all baselines: caps at the last baseline.
-     */
-    private fun computePreviewZoomRatioFromBases(
-        captureZoom: Float,
-        previewBases: List<Float>
-    ): Float {
-        val normalizedCaptureZoom = normalizedZoomRatioValue(captureZoom)
-        val bases = previewBases
-            .map(::normalizedZoomRatioValue)
-            .filter { it > 0f }
-            .distinct()
-            .sorted()
-        if (bases.isEmpty()) return normalizedCaptureZoom.coerceAtLeast(1f)
-        if (normalizedCaptureZoom <= bases.first()) return bases.first()
-
-        // Find the interval [currentBase, nextBase] containing normalizedCaptureZoom.
-        // At exact baseline values, return the baseline directly.
-        for (index in 0 until bases.size - 1) {
-            val currentBase = bases[index]
-            val nextBase = bases[index + 1]
-            if (normalizedCaptureZoom == currentBase) return currentBase
-            if (normalizedCaptureZoom > currentBase && normalizedCaptureZoom < nextBase) {
-                return normalizedPreviewZoomContinuous(normalizedCaptureZoom, currentBase, nextBase)
-                    .coerceAtLeast(MIN_NON_ZERO_PREVIEW_ZOOM_RATIO)
-            }
-        }
-        // Above all baselines: cap at last baseline
-        return bases.last()
-    }
-
-    /**
-     * Continuous preview zoom ratio within a [currentBase, nextBase] interval.
-     *
-     * `previewZoomRatio = clamp(s_max * captureZoom, currentBase, s_min * captureZoom)`
-     *
-     * When [nextBase] is null (beyond all baselines), caps at [currentBase].
-     */
-    private fun normalizedPreviewZoomContinuous(
-        captureZoom: Float,
-        currentBase: Float,
-        nextBase: Float?
-    ): Float {
-        if (nextBase == null) return currentBase
-        val upper = FRAME_BOX_SCALE_MAX * captureZoom
-        val lower = FRAME_BOX_SCALE_MIN * captureZoom
-        return if (lower > upper) {
-            currentBase
-        } else {
-            upper.coerceIn(lower, nextBase)
-        }
-    }
-
-    companion object {
-        /** Relative hysteresis ratio for lens node switching (5% of current ratio). */
-        internal const val LENS_NODE_HYSTERESIS_RATIO = 0.05f
-        /**
-         * Minimum frame-box scale relative to preview window (sqrt(0.6) ≈ 0.775).
-         * When frameBoxScale would drop below this, previewZoomRatio switches
-         * to the next higher baseline.
-         */
-        internal const val FRAME_BOX_SCALE_MIN = 0.775f
-        /**
-         * Maximum frame-box scale relative to preview window (sqrt(0.9) ≈ 0.949).
-         * Used as the starting scale at each baseline (closest to full preview).
-         */
-        internal const val FRAME_BOX_SCALE_MAX = 0.949f
-        private const val MIN_NON_ZERO_PREVIEW_ZOOM_RATIO = 0.01f
-    }
+    ): Float = SessionDevicePolicies.previewZoomRatio(captureZoom, lensNodeMap)
 
     private suspend fun handleStillCaptureQualityToggled() {
         if (blockIfCommandNotAdmitted(SessionCommandKind.STILL_CAPTURE_QUALITY, "still-quality.blocked")) {
@@ -1132,6 +1131,7 @@ class DefaultCameraSession(
         if (blockIfCommandNotAdmitted(SessionCommandKind.PREVIEW_RATIO, "preview-ratio.blocked")) {
             return
         }
+        previewRecoveryProcessor.cancelFocusExposureLockIfActive("preview ratio changed")
         val nextRatio = nextPreviewRatio(runtimeConfiguration.previewRatio)
         runtimeConfiguration = runtimeConfiguration.copy(previewRatio = nextRatio)
         val activeGraph = resolveActiveDeviceGraph(
@@ -1444,6 +1444,7 @@ class DefaultCameraSession(
 
         val range = _state.value.activeDeviceCapabilities.previewBrightnessRange
         val clamped = range.clamp(targetSteps)
+        previewRecoveryProcessor.cancelFocusExposureLockIfActive("preview brightness changed")
         val requestId = "brightness-${System.nanoTime()}"
         updateState(
             previewBrightnessFeedback = PreviewBrightnessFeedback(
@@ -1542,76 +1543,22 @@ class DefaultCameraSession(
     }
 
     private fun handleDocumentBatchClear() {
-        val currentBatch = _state.value.presentation.documentBatch
-        if (currentBatch.status == DocumentBatchStatus.INACTIVE) {
-            updateState(lastAction = "No active document batch to clear")
-            return
-        }
-        updateState(
-            documentBatch = currentBatch.copy(
-                items = emptyList(),
-                latestItemId = null,
-                lastMessage = "Batch cleared"
-            ),
-            lastAction = "Document batch cleared"
-        )
+        applyDocumentBatchTransition(DocumentBatchReducer.clear(_state.value.presentation.documentBatch))
     }
 
     private fun handleDocumentBatchRemoveItem(itemId: String) {
-        val currentBatch = _state.value.presentation.documentBatch
-        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
-            updateState(lastAction = "Cannot remove item: batch is not active")
-            return
-        }
-        val item = currentBatch.items.find { it.itemId == itemId }
-        if (item == null) {
-            updateState(lastAction = "Cannot remove item: $itemId not in batch")
-            return
-        }
-        updateState(
-            documentBatch = currentBatch.removeItem(itemId),
-            lastAction = "Removed document page from batch"
-        )
+        applyDocumentBatchTransition(DocumentBatchReducer.remove(_state.value.presentation.documentBatch, itemId))
     }
 
     private fun handleDocumentBatchMoveItem(itemId: String, direction: DocumentBatchMoveDirection) {
-        val currentBatch = _state.value.presentation.documentBatch
-        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
-            updateState(lastAction = "Cannot move item: batch is not active")
-            return
-        }
-        val currentIndex = currentBatch.items.indexOfFirst { it.itemId == itemId }
-        if (currentIndex == -1) {
-            updateState(lastAction = "Cannot move: $itemId not in batch")
-            return
-        }
-        if (currentBatch.items.size < 2) {
-            updateState(lastAction = "Cannot reorder: batch has fewer than 2 items")
-            return
-        }
-        val targetIndex = when (direction) {
-            DocumentBatchMoveDirection.UP -> (currentIndex - 1).coerceAtLeast(0)
-            DocumentBatchMoveDirection.DOWN -> (currentIndex + 1).coerceAtMost(currentBatch.items.lastIndex)
-        }
-        if (targetIndex == currentIndex) {
-            updateState(lastAction = "Item already at target position")
-            return
-        }
-        updateState(
-            documentBatch = currentBatch.moveItem(itemId, direction),
-            lastAction = "Reordered document pages"
+        applyDocumentBatchTransition(
+            DocumentBatchReducer.move(_state.value.presentation.documentBatch, itemId, direction)
         )
     }
 
     private fun handleDocumentBatchReorder(orderedItemIds: List<String>) {
-        val currentBatch = _state.value.presentation.documentBatch
-        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
-            updateState(lastAction = "Cannot reorder: batch is not active")
-            return
-        }
-        updateState(
-            documentBatch = currentBatch.reorder(orderedItemIds),
-            lastAction = "Document pages reordered"
+        applyDocumentBatchTransition(
+            DocumentBatchReducer.reorder(_state.value.presentation.documentBatch, orderedItemIds)
         )
     }
 
@@ -1620,30 +1567,17 @@ class DefaultCameraSession(
         cropStatus: DocumentBatchCropStatus,
         cropRect: CropRect?
     ) {
-        val currentBatch = _state.value.presentation.documentBatch
-        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
-            updateState(lastAction = "Cannot update crop: batch is not active")
-            return
-        }
-        updateState(
-            documentBatch = currentBatch.updateItemCropStatus(itemId, cropStatus, cropRect),
-            lastAction = "Crop status updated for $itemId"
+        applyDocumentBatchTransition(
+            DocumentBatchReducer.updateCrop(_state.value.presentation.documentBatch, itemId, cropStatus, cropRect)
         )
     }
 
     private fun handleDocumentBatchFinish() {
-        val currentBatch = _state.value.presentation.documentBatch
-        if (currentBatch.status != DocumentBatchStatus.ACTIVE) {
-            updateState(lastAction = "Cannot finish: batch is not active")
-            return
-        }
-        updateState(
-            documentBatch = currentBatch.copy(
-                status = DocumentBatchStatus.FINISHED,
-                lastMessage = "Batch finished"
-            ),
-            lastAction = "Document batch finished"
-        )
+        applyDocumentBatchTransition(DocumentBatchReducer.finish(_state.value.presentation.documentBatch))
+    }
+
+    private fun applyDocumentBatchTransition(transition: DocumentBatchTransition) {
+        updateState(documentBatch = transition.batch, lastAction = transition.lastAction)
     }
 
     private fun brightnessLabel(steps: Int): String {
@@ -1680,6 +1614,8 @@ class DefaultCameraSession(
         latestSavedMediaType: SavedMediaType? = _state.value.presentation.latestSavedMediaType,
         latestPipelineNotes: List<String> = _state.value.presentation.latestPipelineNotes,
         pendingCaptureFeedback: CaptureFeedbackPreview? = _state.value.presentation.pendingCaptureFeedback,
+        pendingPostprocess: PendingPostprocessUiState? = _state.value.presentation.pendingPostprocess,
+        captureReadiness: com.opencamera.core.device.CaptureReadiness? = _state.value.presentation.captureReadiness,
         lastError: String? = _state.value.presentation.lastError,
         previewMeteringFeedback: PreviewMeteringFeedback? = _state.value.presentation.previewMeteringFeedback,
         previewBrightnessSteps: Int = _state.value.presentation.previewBrightnessSteps,
@@ -1713,6 +1649,8 @@ class DefaultCameraSession(
                 latestThumbnailSource = latestThumbnailSource,
                 previewSnapshotGeneration = previewSnapshotGeneration,
                 pendingCaptureFeedback = pendingCaptureFeedback,
+                pendingPostprocess = pendingPostprocess,
+                captureReadiness = captureReadiness,
                 lastAction = lastAction,
                 latestCapturePath = latestCapturePath,
                 latestVideoPath = latestVideoPath,
@@ -1858,68 +1796,34 @@ class DefaultCameraSession(
                         runtimeConfiguration.settings.copy(persisted = updatedPersisted)
                     )
                 },
-                settingsSnapshotProvider = { runtimeConfiguration.settings }
+                settingsSnapshotProvider = ::effectiveStylePreviewSettings
             )
         )
     }
 
     private fun defaultLensFacing(availableLensFacings: Set<LensFacing>): LensFacing {
-        return when {
-            LensFacing.BACK in availableLensFacings -> LensFacing.BACK
-            LensFacing.FRONT in availableLensFacings -> LensFacing.FRONT
-            else -> LensFacing.BACK
-        }
+        return SessionDevicePolicies.defaultLensFacing(availableLensFacings)
     }
 
     private fun nextLensFacing(
         current: LensFacing,
         available: Set<LensFacing>
     ): LensFacing {
-        val ordered = available
-            .sortedBy { it.ordinal }
-            .ifEmpty { listOf(current) }
-        val currentIndex = ordered.indexOf(current)
-        if (currentIndex == -1) {
-            return ordered.first()
-        }
-        return ordered[(currentIndex + 1) % ordered.size]
+        return SessionDevicePolicies.nextLensFacing(current, available)
     }
 
     private fun nextPreviewRatio(current: PreviewRatio): PreviewRatio {
-        val ordered = PreviewRatio.entries
-        val currentIndex = ordered.indexOf(current)
-        return ordered[(currentIndex + 1) % ordered.size]
+        return SessionDevicePolicies.nextPreviewRatio(current)
     }
 
-    private fun PreviewRatio.toPreviewStreamAspect(): PreviewStreamAspect = when (this) {
-        PreviewRatio.FULL -> PreviewStreamAspect.FULL
-        PreviewRatio.RATIO_4_3 -> PreviewStreamAspect.RATIO_4_3
-        PreviewRatio.RATIO_16_9 -> PreviewStreamAspect.RATIO_16_9
-        PreviewRatio.RATIO_1_1 -> PreviewStreamAspect.RATIO_1_1
-    }
+    private fun PreviewRatio.toPreviewStreamAspect(): PreviewStreamAspect =
+        SessionDevicePolicies.previewStreamAspect(this)
 
     private fun clampStillCaptureResolutionPreset(
         current: StillCaptureResolutionPreset,
         available: Set<StillCaptureResolutionPreset>
     ): StillCaptureResolutionPreset {
-        val ordered = listOf(
-            StillCaptureResolutionPreset.LARGE_12MP,
-            StillCaptureResolutionPreset.MEDIUM_8MP,
-            StillCaptureResolutionPreset.SMALL_2MP
-        )
-        if (current in available) {
-            return current
-        }
-        val currentIndex = ordered.indexOf(current)
-        if (currentIndex != -1) {
-            for (index in currentIndex + 1..ordered.lastIndex) {
-                val candidate = ordered[index]
-                if (candidate in available) {
-                    return candidate
-                }
-            }
-        }
-        return ordered.firstOrNull { it in available } ?: ordered.last()
+        return SessionDevicePolicies.clampResolutionPreset(current, available)
     }
 
     private fun resolvedStillCaptureOutputSizeSelection(
@@ -1927,76 +1831,27 @@ class DefaultCameraSession(
         available: List<StillCaptureOutputSize>,
         fallbackPreset: StillCaptureResolutionPreset
     ): StillCaptureOutputSize? {
-        if (available.isEmpty()) {
-            return null
-        }
-        if (current != null && current in available) {
-            return current
-        }
-        return resolveOutputSizeForPreset(fallbackPreset, available)
+        return SessionDevicePolicies.resolveOutputSizeSelection(current, available, fallbackPreset)
     }
 
     private fun nextStillCaptureOutputSize(
         current: StillCaptureOutputSize?,
         available: List<StillCaptureOutputSize>
     ): StillCaptureOutputSize {
-        val ordered = available
-            .sortedByDescending { it.pixelCount }
-            .ifEmpty { error("No still capture output sizes available") }
-        val currentIndex = current?.let(ordered::indexOf) ?: -1
-        if (currentIndex == -1) {
-            return ordered.first()
-        }
-        return ordered[(currentIndex + 1) % ordered.size]
-    }
-
-    private fun resolveOutputSizeForPreset(
-        preset: StillCaptureResolutionPreset,
-        available: List<StillCaptureOutputSize>
-    ): StillCaptureOutputSize {
-        val desiredPixels = preset.targetWidth.toLong() * preset.targetHeight.toLong()
-        val sortedByPixels = available.sortedBy { it.pixelCount }
-        return when (preset) {
-            StillCaptureResolutionPreset.LARGE_12MP -> sortedByPixels.last()
-
-            StillCaptureResolutionPreset.MEDIUM_8MP,
-            StillCaptureResolutionPreset.SMALL_2MP -> sortedByPixels
-                .lastOrNull { it.pixelCount <= desiredPixels }
-                ?: sortedByPixels.first()
-        }
+        return SessionDevicePolicies.nextOutputSize(current, available)
     }
 
     private fun resolutionPresetForOutputSize(
         outputSize: StillCaptureOutputSize
     ): StillCaptureResolutionPreset {
-        val outputPixels = outputSize.pixelCount
-        return StillCaptureResolutionPreset.entries.minByOrNull { preset ->
-            kotlin.math.abs(outputPixels - preset.targetWidth.toLong() * preset.targetHeight.toLong())
-        } ?: StillCaptureResolutionPreset.LARGE_12MP
+        return SessionDevicePolicies.resolutionPresetFor(outputSize)
     }
 
     private fun nextStillCaptureResolutionPreset(
         current: StillCaptureResolutionPreset,
         available: Set<StillCaptureResolutionPreset>
     ): StillCaptureResolutionPreset {
-        val ordered = listOf(
-            StillCaptureResolutionPreset.LARGE_12MP,
-            StillCaptureResolutionPreset.MEDIUM_8MP,
-            StillCaptureResolutionPreset.SMALL_2MP
-        ).filter { it in available }
-            .ifEmpty {
-                listOf(
-                    clampStillCaptureResolutionPreset(
-                        current = current,
-                        available = available
-                    )
-                )
-            }
-        val currentIndex = ordered.indexOf(clampStillCaptureResolutionPreset(current, available))
-        if (currentIndex == -1) {
-            return ordered.first()
-        }
-        return ordered[(currentIndex + 1) % ordered.size]
+        return SessionDevicePolicies.nextResolutionPreset(current, available)
     }
 
     private val LensFacing.label: String

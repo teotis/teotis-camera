@@ -10,7 +10,7 @@ import java.io.File
 internal class GalleryLauncher(
     private val activity: AppCompatActivity
 ) {
-    fun open(target: GalleryOpenTarget): Boolean {
+    fun open(target: GalleryOpenTarget): Boolean = runCatching {
         val uri = when (target.kind) {
             GalleryOpenUriKind.CONTENT_URI -> Uri.parse(target.uri)
             GalleryOpenUriKind.ABSOLUTE_FILE -> {
@@ -23,6 +23,7 @@ internal class GalleryLauncher(
             setDataAndType(uri, target.mimeType)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        return runCatching { activity.startActivity(intent) }.isSuccess
-    }
+        activity.startActivity(intent)
+        true
+    }.getOrDefault(false)
 }

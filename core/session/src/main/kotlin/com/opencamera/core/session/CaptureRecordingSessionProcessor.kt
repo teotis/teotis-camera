@@ -85,6 +85,19 @@ internal class CaptureRecordingSessionProcessor(
     private val conservativeForceReleasedShotIds = mutableSetOf<String>()
 
     /**
+     * Shot ids whose terminal outcome (ShotCompleted/ShotFailed) has already been
+     * applied to presentation state. Guards INV-1d: a terminal event is applied at
+     * most once per shot; a failed shot never flips back to saved (INV-3c).
+     */
+    private val appliedTerminalShotIds = mutableSetOf<String>()
+
+    /**
+     * Shot ids for which a Started event has already been accepted. Guards INV-1e:
+     * duplicate Started emissions must not re-enter the shot lifecycle.
+     */
+    private val startedShotIds = mutableSetOf<String>()
+
+    /**
      * Extra grace window granted to conservative kinds (live photo / multi-frame) after the
      * post-process liveness deadline elapses, before the reducer force-releases the shot.
      *
@@ -251,6 +264,32 @@ internal class CaptureRecordingSessionProcessor(
     // ── Shot lifecycle ──────────────────────────────────────────────
 
     private suspend fun handleShotStarted(shot: ShotRequest) {
+        // A shot id can legitimately produce exactly one Started event; a second
+        // Started for the same id is a device-level duplicate.
+        if (shot.shotId in startedShotIds) {
+            trace.record("shot.started.duplicate", "shotId=${shot.shotId}")
+            return
+        }
+        val currentActiveShot = state.value.activeShot
+        if (currentActiveShot != null && currentActiveShot.shotId != shot.shotId) {
+            // A shot with a different id is in flight: this Started event belongs to
+            // a stale device emission (e.g. video recording started after the
+            // REQUESTING watchdog gave up). It must not clobber the newer shot.
+            trace.record(
+                "shot.started.stale",
+                "shotId=${shot.shotId},active=${currentActiveShot.shotId}"
+            )
+            return
+        }
+        // Re-armable photo shots clear activeShot at DataReceived; a duplicate or
+        // delayed Started for the same shot arriving afterwards is stale.
+        if (shot.mediaType == MediaType.PHOTO &&
+            state.value.presentation.pendingPostprocess?.shotId == shot.shotId
+        ) {
+            trace.record("shot.started.stale-after-data", "shotId=${shot.shotId}")
+            return
+        }
+        startedShotIds += shot.shotId
         currentController().onSessionEvent(ModeSessionEvent.ShotStarted(shot))
         recordingElapsedJob?.cancel()
         recordingElapsedJob = null
@@ -497,11 +536,19 @@ internal class CaptureRecordingSessionProcessor(
 
     private suspend fun handleShotCompleted(result: ShotResult) {
         if (result.shotId in forceReleasedShotIds) {
+            if (result.shotId in appliedTerminalShotIds) {
+                trace.record(
+                    "shot.completed.force-released.duplicate",
+                    "result=${result.shotId}"
+                )
+                return
+            }
             trace.record(
                 "shot.completed.force-released.hydrated",
                 "result=${result.shotId}"
             )
             hydrateForceReleasedDocumentBatchItem(result)
+            appliedTerminalShotIds += result.shotId
             return
         }
         if (result.shotId in conservativeForceReleasedShotIds) {
@@ -509,7 +556,6 @@ internal class CaptureRecordingSessionProcessor(
                 "shot.completed.conservative-force-released.stale",
                 "result=${result.shotId}"
             )
-            cancelPostProcessLiveness(result.shotId)
             return
         }
         if (shouldForceReleaseDocumentBatchShot(result.shotId)) {
@@ -517,6 +563,16 @@ internal class CaptureRecordingSessionProcessor(
                 shotId = result.shotId,
                 mediaType = result.mediaType,
                 reason = "deadline-expired:shot-completed"
+            )
+            return
+        }
+        if (result.shotId in appliedTerminalShotIds) {
+            // Stale completion (e.g. interrupted shot whose device events arrive
+            // late): do not re-apply, and do NOT cancel the liveness watchdog -
+            // it remains the convergence mechanism for the lingering UI state.
+            trace.record(
+                "shot.completed.stale",
+                "result=${result.shotId},already-applied"
             )
             return
         }
@@ -587,12 +643,13 @@ internal class CaptureRecordingSessionProcessor(
                         }
                         else -> result.thumbnailSource
                     },
+                    latestThumbnailRevision = s.presentation.latestThumbnailRevision + 1L,
                     lastAction = if (isBackgroundCompletion && result.mediaType == MediaType.PHOTO) {
                         "Previous photo saved"
                     } else if (result.mediaType == MediaType.PHOTO) {
                         val hasFailures = result.hasPostProcessFailures()
                         when {
-                            focusStackRetakePrompt != null -> "Full Clear needs guided retake"
+                            focusStackRetakePrompt != null -> "Full Clear needs retake"
                             result.livePhotoBundle?.bundleStatus == LiveBundleStatus.STILL_ONLY_FALLBACK ->
                                 "Live photo saved (still only)"
                             result.livePhotoBundle?.isTemporalMedia() == true ->
@@ -670,6 +727,7 @@ internal class CaptureRecordingSessionProcessor(
             if (result.mediaType == MediaType.PHOTO) "capture.saved" else "recording.saved",
             result.outputPath
         )
+        appliedTerminalShotIds += result.shotId
         // Complete capture/recording link span
         activeShotSpans.remove(result.shotId)?.let { span ->
             val hasFailures = result.hasPostProcessFailures() || focusStackRetakePrompt != null
@@ -760,6 +818,9 @@ internal class CaptureRecordingSessionProcessor(
             .firstOrNull { it.startsWith("focus-stack:skipped=") }
             ?.removePrefix("focus-stack:skipped=")
             ?: return null
+        if (reason == "foreground-motion") {
+            return "Full Clear detected movement between focus frames. A clean far-focus frame was saved instead. Keep the camera and foreground still, then retake; turn off Full Clear for moving subjects."
+        }
         val detail = when (reason) {
             "missing-near-far" -> "missing near/far frames"
             "no-frame-bundle" -> "missing focus-stack frame bundle"
@@ -770,7 +831,7 @@ internal class CaptureRecordingSessionProcessor(
             "not-focus-stack" -> return null
             else -> reason.replace('-', ' ')
         }
-        return "Full Clear could not combine near and far focus ($detail). Tap the near subject and far background, then retake."
+        return "Full Clear could not combine near and far focus ($detail). Keep the camera and subjects still, then retake."
     }
 
     private suspend fun handleShotFailed(
@@ -801,10 +862,18 @@ internal class CaptureRecordingSessionProcessor(
             )
             return
         }
+        if (shotId in appliedTerminalShotIds) {
+            trace.record(
+                "shot.failed.stale",
+                "shotId=$shotId,already-applied"
+            )
+            return
+        }
         val currentActiveShot = state.value.activeShot
         if (currentActiveShot == null) {
             clearPendingPostprocessIfMatches(shotId)
             resetCaptureStatusFromTerminalOrDataReceived(shotId, reason)
+            appliedTerminalShotIds += shotId
             trace.record("shot.failed.orphaned", "shotId=$shotId,reason=$reason")
             cancelPostProcessLiveness(shotId)
             return
@@ -855,6 +924,7 @@ internal class CaptureRecordingSessionProcessor(
             if (mediaType == MediaType.PHOTO) "capture.failed" else "recording.failed",
             "$shotId:$reason"
         )
+        appliedTerminalShotIds += shotId
         // Complete capture/recording link span as failed
         activeShotSpans.remove(shotId)?.let { span ->
             linkRecorder.completeSpan(span, status = LinkEventStatus.FAILED, detail = reason)
@@ -876,20 +946,27 @@ internal class CaptureRecordingSessionProcessor(
 
     private suspend fun resetCaptureStatusFromTerminalOrDataReceived(shotId: String, reason: String) {
         val currentStatus = state.value.captureStatus
-        if (currentStatus != CaptureStatus.DATA_RECEIVED && currentStatus != CaptureStatus.COMPLETED) {
+        val isCommittedRearmWindow = currentStatus == CaptureStatus.SAVING && state.value.activeShot == null
+        if (currentStatus != CaptureStatus.DATA_RECEIVED &&
+            currentStatus != CaptureStatus.COMPLETED &&
+            !isCommittedRearmWindow
+        ) {
             return
         }
         updateState.update { s ->
+            val readiness = s.presentation.captureReadiness
             s.copy(
                 captureStatus = CaptureStatus.IDLE,
                 presentation = s.presentation.copy(
-                    lastAction = if (currentStatus == CaptureStatus.DATA_RECEIVED) {
-                        "Orphaned postprocess cleared for $shotId"
-                    } else {
-                        "Shot failed after completion for $shotId"
+                    lastAction = when {
+                        currentStatus == CaptureStatus.DATA_RECEIVED ->
+                            "Orphaned postprocess cleared for $shotId"
+                        currentStatus == CaptureStatus.COMPLETED ->
+                            "Shot failed after completion for $shotId"
+                        else -> "Orphaned capture cleared for $shotId"
                     },
                     lastError = reason,
-                    captureReadiness = null
+                    captureReadiness = readiness?.takeIf { it.shotId != shotId }
                 )
             )
         }
@@ -903,6 +980,10 @@ internal class CaptureRecordingSessionProcessor(
         // DFS-14: Clear activeShot if it still matches the interrupted shot.
         val matchedActiveShot = state.value.activeShot
         if (matchedActiveShot != null && matchedActiveShot.shotId == shot.shotId) {
+            // An interruption is a terminal application: a later device-side
+            // ShotCompleted/ShotFailed for the same shot must not re-apply
+            // (INV-1d / INV-3c).
+            appliedTerminalShotIds += shot.shotId
             recordingElapsedJob?.cancel()
             recordingElapsedJob = null
             updateState.update { s ->
@@ -1102,7 +1183,7 @@ internal class CaptureRecordingSessionProcessor(
         }
     }
 
-    private fun cancelDocumentBatchWatchdog(shotId: String?) {
+    internal fun cancelDocumentBatchWatchdog(shotId: String?) {
         if (shotId != null && documentBatchLiveness?.shotId != shotId) return
         documentBatchWatchdogJob?.cancel()
         documentBatchWatchdogJob = null
@@ -1309,14 +1390,40 @@ internal class CaptureRecordingSessionProcessor(
                 if (!stillActive) return@launchRecordingTimer
                 forceReleaseConservativeShot(shotForWatchdog, reason = "conservative-liveness-deadline")
             } else {
-                val stillPending = state.value.presentation.pendingPostprocess?.shotId == shotForWatchdog.shotId
-                if (!stillPending) return@launchRecordingTimer
-                forceReleasePostProcessLiveness(shotForWatchdog, reason = "postprocess-liveness-deadline")
+                // Re-armable still captures live in one of two windows:
+                // (a) re-armed (DataReceived seen): only pendingPostprocess is set,
+                //     released right at the deadline;
+                // (b) still SAVING with activeShot set (no DataReceived yet): the
+                //     pipeline gets the cooperative grace window so a normal late
+                //     completion can still cancel the watchdog; only if it remains
+                //     the current work item afterwards is the shot force-released.
+                // Without (b) a device that never emits DataReceived/Completed
+                // would leave the session stuck in SAVING forever (INV-3a/INV-4a).
+                val hasPending = state.value.presentation.pendingPostprocess?.shotId ==
+                    shotForWatchdog.shotId
+                if (hasPending) {
+                    forceReleasePostProcessLiveness(
+                        shotForWatchdog,
+                        reason = "postprocess-liveness-deadline"
+                    )
+                } else if (state.value.activeShot?.shotId == shotForWatchdog.shotId) {
+                    trace.record(
+                        "liveness.session.cooperative-cancel",
+                        "shotId=${shotForWatchdog.shotId},mode=${state.value.activeMode},shotKind=${shotForWatchdog.shotKind}"
+                    )
+                    delay(conservativeLivenessGraceMs)
+                    val stillActive = state.value.activeShot?.shotId == shotForWatchdog.shotId
+                    if (!stillActive) return@launchRecordingTimer
+                    forceReleasePostProcessLiveness(
+                        shotForWatchdog,
+                        reason = "postprocess-liveness-deadline"
+                    )
+                }
             }
         }
     }
 
-    private fun cancelPostProcessLiveness(shotId: String?) {
+    internal fun cancelPostProcessLiveness(shotId: String?) {
         if (shotId != null && postProcessLiveness?.shotId != shotId) return
         postProcessLivenessJob?.cancel()
         postProcessLivenessJob = null
@@ -1349,13 +1456,19 @@ internal class CaptureRecordingSessionProcessor(
             "shotId=${shot.shotId} stage=${event.stage.name} reason=$reason"
         )
         updateState.update { s ->
+            val activeShotMatches = s.activeShot?.shotId == shot.shotId
             s.copy(
+                // The liveness watchdog only fires while this shot is the current
+                // work item (active or pending), so resetting captureStatus is safe.
                 captureStatus = CaptureStatus.IDLE,
+                activeShot = if (activeShotMatches) null else s.activeShot,
                 presentation = s.presentation.copy(
                     pendingPostprocess = null,
                     captureReadiness = null,
                     lastAction = "Previous photo processing timed out",
-                    lastError = reason
+                    // Keep a more meaningful earlier error (e.g. permission revoke)
+                    // instead of overwriting it with the internal liveness reason.
+                    lastError = s.presentation.lastError ?: reason
                 )
             )
         }

@@ -1,6 +1,7 @@
 package com.opencamera.core.session
 
 import com.opencamera.core.device.PreviewMeteringPoint
+import com.opencamera.core.device.PreviewMeteringPersistence
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.media.CaptureProfile
@@ -58,7 +59,11 @@ class PreviewSessionMutationsTest {
             calls.add("documentPreview:${shot.shotId},$outputPath")
         }
 
-        override fun updatePreviewMeteringRequested(requestId: String, point: PreviewMeteringPoint) {
+        override fun updatePreviewMeteringRequested(
+            requestId: String,
+            point: PreviewMeteringPoint,
+            persistence: PreviewMeteringPersistence
+        ) {
             calls.add("meteringRequested:$requestId,x=${point.normalizedX},y=${point.normalizedY}")
         }
 
@@ -171,7 +176,8 @@ class PreviewSessionMutationsTest {
         val mutations = RecordingMutations()
         mutations.updatePreviewMeteringRequested(
             "meter-1",
-            PreviewMeteringPoint(0.5f, 0.4f)
+            PreviewMeteringPoint(0.5f, 0.4f),
+            PreviewMeteringPersistence.AUTO_CANCEL
         )
         assertEquals(listOf("meteringRequested:meter-1,x=0.5,y=0.4"), mutations.calls)
     }
@@ -239,7 +245,11 @@ class PreviewSessionMutationsTest {
         mutations.updatePreviewThumbnail(ThumbnailSource.None, 0)
         mutations.updateCaptureFeedback("s", "o")
         mutations.updateDocumentBatchPreviewItem(testShotRequest("s"), "o")
-        mutations.updatePreviewMeteringRequested("id", PreviewMeteringPoint(0f, 0f))
+        mutations.updatePreviewMeteringRequested(
+            "id",
+            PreviewMeteringPoint(0f, 0f),
+            PreviewMeteringPersistence.AUTO_CANCEL
+        )
         mutations.updatePreviewMeteringCompleted(
             PreviewMeteringResult("id", PreviewMeteringPoint(0f, 0f), PreviewMeteringResultStatus.FAILED)
         )

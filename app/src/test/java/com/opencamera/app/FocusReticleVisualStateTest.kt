@@ -84,6 +84,26 @@ class FocusReticleVisualStateTest {
         assertTrue(v.expired)
     }
 
+    @Test
+    fun `locked reticle remains visible without animation`() {
+        val v = focusReticleVisualState(FocusReticleStatus.LOCKED, 60_000L)
+
+        assertFalse(v.expired)
+        assertEquals(1.0f, v.alpha, 0.01f)
+        assertTrue(v.ticksVisible)
+        assertFalse(v.animates)
+    }
+
+    @Test
+    fun `degraded locked reticle remains visible in amber`() {
+        val v = focusReticleVisualState(FocusReticleStatus.LOCKED_DEGRADED, 60_000L)
+
+        assertFalse(v.expired)
+        assertEquals(Color.rgb(255, 191, 0), v.ringColor)
+        assertTrue(v.ticksVisible)
+        assertFalse(v.animates)
+    }
+
     // --- DEGRADED state ---
 
     @Test

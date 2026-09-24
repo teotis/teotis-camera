@@ -11,6 +11,7 @@ import com.opencamera.core.settings.ResetTarget
 import com.opencamera.core.settings.applyColorLab
 import com.opencamera.core.settings.filterProfilesFor
 import com.opencamera.core.settings.hasUserAdjustments
+import com.opencamera.core.settings.renderStyleColorSpec
 import com.opencamera.app.i18n.AppTextResolver
 import com.opencamera.core.settings.FeatureCatalog
 import com.opencamera.core.settings.PersistedSettings
@@ -177,13 +178,15 @@ internal data class FilterLabSaveCustomRenderModel(
  * All values are in dp; the native UI layer maps them to px at runtime.
  */
 object StylePresetCardDimensions {
-    const val CARD_WIDTH_DP: Int = 72
-    const val CARD_HEIGHT_DP: Int = 96
-    const val PREVIEW_HEIGHT_DP: Int = 56
-    const val LABEL_HEIGHT_DP: Int = 28
-    const val ITEM_SPACING_DP: Int = 8
-    const val RAIL_HORIZONTAL_PADDING_DP: Int = 16
-    const val RAIL_VERTICAL_PADDING_DP: Int = 8
+    const val CARD_WIDTH_DP: Int = 84
+    const val CARD_HEIGHT_DP: Int = 126
+    const val PREVIEW_HEIGHT_DP: Int = 100
+    const val LABEL_HEIGHT_DP: Int = 26
+    const val ITEM_SPACING_DP: Int = 10
+    const val RAIL_HORIZONTAL_PADDING_DP: Int = 20
+    const val RAIL_VERTICAL_PADDING_DP: Int = 10
+    const val RAIL_HEADER_HEIGHT_DP: Int = 42
+    const val RAIL_STRENGTH_HEIGHT_DP: Int = 44
 }
 
 /**
@@ -212,7 +215,8 @@ internal data class StylePresetRailRenderModel(
     val activeFamily: FilterLabFamily,
     val cards: List<StylePresetCardRenderModel>,
     val isEnabled: Boolean,
-    val supportingText: String
+    val supportingText: String,
+    val styleStrength: Float = 1f
 )
 
 internal fun filterLabFamilyToStylePresetFamily(family: FilterLabFamily): StylePresetFamily = when (family) {
@@ -248,11 +252,17 @@ private fun stylePresetCardRail(
                 isEnabled = isEnabled,
                 applyAction = if (!preset.isSelected) preset.applyAction else null,
                 moodLabel = text.styleCardMoodLabel(preset.preview.moodDescriptor),
-                spec = specByProfileId[preset.profileId]?.renderSpec
+                spec = renderStyleColorSpec(
+                    profileId = preset.profileId,
+                    baseRenderSpec = specByProfileId[preset.profileId]?.renderSpec,
+                    colorLabSpec = settings.photo.colorLabSpec,
+                    styleStrength = settings.photo.styleStrength
+                )
             )
         },
         isEnabled = isEnabled,
-        supportingText = text.styleRailSupportingText(family)
+        supportingText = text.styleRailSupportingText(family),
+        styleStrength = settings.photo.styleStrength.coerceIn(0f, 1f)
     )
 }
 

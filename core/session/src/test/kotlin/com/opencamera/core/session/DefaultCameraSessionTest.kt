@@ -16,6 +16,7 @@ import com.opencamera.core.device.SceneLightState
 import com.opencamera.core.device.StillCaptureOutputSize
 import com.opencamera.core.device.ZoomControlSupport
 import com.opencamera.core.device.ZoomRatioCapability
+import com.opencamera.core.effect.FilterEffect
 import com.opencamera.core.media.FlashMode
 import com.opencamera.core.media.FrameRatio
 import com.opencamera.core.media.LiveBundleStatus
@@ -42,6 +43,7 @@ import com.opencamera.core.mode.ModeId
 import com.opencamera.core.mode.ModeRegistry
 import com.opencamera.core.settings.AudioProfile
 import com.opencamera.core.settings.CountdownDuration
+import com.opencamera.core.settings.ColorLabSpec
 import com.opencamera.core.settings.DEFAULT_FILTER_PROFILES
 import com.opencamera.core.settings.DynamicVideoFpsPolicy
 import com.opencamera.core.settings.FeatureCatalog
@@ -89,6 +91,48 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DefaultCameraSessionTest {
+    @Test
+    fun `preview style comparison is transient and bypasses style plus color lab`() = runTest {
+        val baselinePhoto = PhotoSettings(
+            defaultFilterProfileId = "photo-vivid",
+            styleStrength = 0.72f,
+            colorLabSpec = ColorLabSpec(colorAxis = 0.6f, toneAxis = -0.2f, strength = 0.8f)
+        )
+        val session = createSession(
+            trace = InMemorySessionTrace(),
+            testScope = this,
+            settingsSnapshot = SessionSettingsSnapshot(
+                persisted = PersistedSettings(photo = baselinePhoto)
+            )
+        )
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+
+        val styledSpec = assertNotNull(session.state.value.activeEffectSpec.find<FilterEffect>()).renderSpec
+        session.dispatch(SessionIntent.PreviewStyleOriginalComparisonChanged(true))
+        advanceUntilIdle()
+
+        val originalSpec = assertNotNull(session.state.value.activeEffectSpec.find<FilterEffect>()).renderSpec
+        assertEquals(FilterRenderSpec(), originalSpec)
+        assertEquals(baselinePhoto, session.state.value.settings.persisted.photo)
+
+        session.dispatch(SessionIntent.ShutterPressed)
+        advanceUntilIdle()
+        assertNull(session.state.value.activeShot)
+        assertEquals("Release style preview before capture", session.state.value.lastAction)
+
+        session.dispatch(SessionIntent.PreviewStyleOriginalComparisonChanged(false))
+        session.dispatch(SessionIntent.PreviewStyleStrengthChanged(0.5f))
+        advanceUntilIdle()
+
+        val halfStrengthSpec = assertNotNull(session.state.value.activeEffectSpec.find<FilterEffect>()).renderSpec
+        assertFalse(halfStrengthSpec == originalSpec)
+        assertFalse(halfStrengthSpec == styledSpec)
+        assertEquals(baselinePhoto, session.state.value.settings.persisted.photo)
+    }
+
     @Test
     fun `boot preserves attached preview host state when permission is granted`() = runTest {
         val trace = InMemorySessionTrace()
@@ -810,6 +854,55 @@ class DefaultCameraSessionTest {
     }
 
     @Test
+    fun `zoom change cancels active focus exposure lock before applying zoom`() = runTest {
+        val session = createSession(
+            trace = InMemorySessionTrace(),
+            testScope = this,
+            deviceCapabilities = DeviceCapabilities.DEFAULT.copy(
+                zoomRatioCapability = ZoomRatioCapability(
+                    support = ZoomControlSupport.DISCRETE_PRESET,
+                    supportedRatios = listOf(1f, 2f, 5f),
+                    defaultRatio = 1f
+                )
+            )
+        )
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effects += it }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewLockFocusAndExposure(0.5f, 0.5f))
+        runCurrent()
+        session.dispatch(
+            SessionIntent.PreviewMeteringCompleted(
+                com.opencamera.core.device.PreviewMeteringResult(
+                    requestId = "meter-1",
+                    point = com.opencamera.core.device.PreviewMeteringPoint(0.5f, 0.5f),
+                    status = com.opencamera.core.device.PreviewMeteringResultStatus.LOCKED
+                )
+            )
+        )
+        runCurrent()
+        effects.clear()
+
+        session.dispatch(SessionIntent.ApplyZoomRatio(2f))
+        runCurrent()
+
+        assertEquals(2, effects.size)
+        assertTrue(effects[0] is SessionEffect.CancelPreviewMetering)
+        assertTrue(effects[1] is SessionEffect.ApplyZoomRatio)
+        assertFalse(session.state.value.presentation.hasActiveMeteringHold)
+
+        effectCollector.cancel()
+    }
+
+    @Test
     fun `apply zoom ratio blocks discrete preset during recording`() = runTest {
         val trace = InMemorySessionTrace()
         val session = createSession(
@@ -1342,7 +1435,7 @@ class DefaultCameraSessionTest {
         val failedTraces = trace.snapshot().filter { it.name == "recording.failed" }
         assertEquals(1, failedTraces.size)
         assertTrue(failedTraces[0].detail.contains("Recording interrupted by lifecycle stop"))
-        assertTrue(trace.snapshot().any { it.name == "shot.failed.orphaned" })
+        assertTrue(trace.snapshot().any { it.name == "shot.failed.stale" })
     }
 
     @Test
@@ -1437,7 +1530,7 @@ class DefaultCameraSessionTest {
 
         assertEquals("Session settings updated", session.state.value.lastAction)
         assertTrue(session.state.value.modeSnapshot.state.detail.contains("Filter Rich"))
-        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Watermark Travel Polaroid"))
+        assertTrue(session.state.value.modeSnapshot.state.detail.contains("Watermark Philosophy Like Water"))
         assertEquals("photo-rich", session.state.value.settings.persisted.photo.defaultFilterProfileId)
         assertEquals(
             "travel-polaroid",
@@ -3463,6 +3556,44 @@ class DefaultCameraSessionTest {
 
         val brightnessEffect = effects.filterIsInstance<SessionEffect.ApplyPreviewBrightness>().single()
         assertEquals(2, brightnessEffect.request.exposureCompensationSteps)
+
+        effectCollector.cancel()
+    }
+
+    @Test
+    fun `humanistic pro ISO draft change carries manual params into preview rebind`() = runTest {
+        val trace = InMemorySessionTrace()
+        val session = createSession(trace, this)
+        val effects = mutableListOf<SessionEffect>()
+        val effectCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            session.effects.collect { effect -> effects += effect }
+        }
+
+        session.dispatch(SessionIntent.PermissionsUpdated(cameraGranted = true, microphoneGranted = true))
+        session.dispatch(SessionIntent.PreviewHostAttached)
+        session.dispatch(SessionIntent.Boot)
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.PreviewFirstFrameAvailable(100))
+        session.dispatch(SessionIntent.SwitchMode(ModeId.HUMANISTIC))
+        advanceUntilIdle()
+        session.dispatch(SessionIntent.ProActionPressed)
+        advanceUntilIdle()
+        effects.clear()
+
+        val baseSnapshot = session.state.value.settings
+        session.dispatch(
+            SessionIntent.SettingsUpdated(
+                baseSnapshot.copy(
+                    catalog = baseSnapshot.catalog.copy(
+                        manualCaptureDraft = baseSnapshot.catalog.manualCaptureDraft.copy(iso = 800)
+                    )
+                )
+            )
+        )
+        advanceUntilIdle()
+
+        val bind = effects.filterIsInstance<SessionEffect.BindPreview>().single()
+        assertEquals(800, bind.manualCaptureParams?.iso)
 
         effectCollector.cancel()
     }
@@ -6007,7 +6138,7 @@ class DefaultCameraSessionTest {
         assertEquals("automatic", shot.saveRequest.metadata.customTags["focusStackGuidance"])
         assertEquals("near,far", shot.saveRequest.metadata.customTags["focusStackRoles"])
         assertEquals("checkin-clarity-focus-stack-v1", shot.postProcessSpec.algorithmProfile)
-        assertEquals("Check-in Clarity", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
+        assertEquals("Check-in Clarity Assist", shot.postProcessSpec.exifOverrides["SceneCaptureType"])
         assertEquals("Clarity Assist", shot.postProcessSpec.exifOverrides["CompatSceneCaptureType"])
         assertEquals(2, shot.captureProfile.frameCount)
         assertEquals("focus-stack:auto-near-far-v1", shot.captureProfile.focusStackSpec?.algorithmProfile)
@@ -6069,7 +6200,7 @@ class DefaultCameraSessionTest {
 
         val headline = session.state.value.modeSnapshot.state.headline
         assertTrue(headline.contains("Check-in"), "Headline should contain Check-in, got: $headline")
-        assertTrue(headline.contains("全清"), "Headline should mention 全清, got: $headline")
+        assertTrue(headline.contains("清晰辅助"), "Headline should mention 清晰辅助, got: $headline")
     }
 
     @Test

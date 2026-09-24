@@ -37,7 +37,9 @@ import com.opencamera.core.session.SessionLifecycle
 import com.opencamera.core.session.SessionPresentationState
 import com.opencamera.core.session.SessionState
 import com.opencamera.core.session.SavedMediaType
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,6 +50,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -894,6 +897,58 @@ class CameraSessionCoordinatorTest {
     }
 
     @Test
+    fun `CancelPreviewMetering effect forwards as DeviceCommand`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+
+        session.emitEffect(SessionEffect.CancelPreviewMetering("user tap"))
+        advanceUntilIdle()
+
+        assertTrue(
+            adapter.recordedCommands.contains(DeviceCommand.CancelPreviewMetering("user tap"))
+        )
+    }
+
+    @Test
+    fun `CancelPreviewMetering preempts an in flight metering request`() = runTest {
+        val session = FakeCameraSession()
+        val adapter = FakeCameraDeviceAdapter(blockPreviewMetering = true)
+        val coordinatorScope = TestScope(StandardTestDispatcher(testScheduler))
+        CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = coordinatorScope
+        )
+        advanceUntilIdle()
+        val request = com.opencamera.core.device.PreviewMeteringRequest(
+            requestId = "meter-blocked",
+            point = com.opencamera.core.device.PreviewMeteringPoint(0.5f, 0.4f),
+            persistence = com.opencamera.core.device.PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+        )
+
+        session.emitEffect(SessionEffect.ApplyPreviewMetering(request))
+        runCurrent()
+        adapter.previewMeteringStarted.await()
+        session.emitEffect(SessionEffect.CancelPreviewMetering("user tap"))
+        runCurrent()
+
+        assertEquals(
+            listOf(
+                DeviceCommand.ApplyPreviewMetering(request),
+                DeviceCommand.CancelPreviewMetering("user tap")
+            ),
+            adapter.recordedCommands
+        )
+    }
+
+    @Test
     fun `PreviewMeteringCompleted device event forwards as SessionIntent`() = runTest {
         val session = FakeCameraSession()
         val adapter = FakeCameraDeviceAdapter()
@@ -944,6 +999,53 @@ class CameraSessionCoordinatorTest {
         assertEquals(request, brightnessCommands[0].request)
     }
 
+    @Test
+    fun `manual preview params rebind the same graph and reach the device adapter`() = runTest {
+        val graph = DeviceGraphSpec.stillCapture(
+            preferredLensFacing = LensFacing.BACK,
+            enablePreviewSnapshots = true
+        )
+        val session = FakeCameraSession(
+            initialState = defaultSessionState(
+                activeMode = ModeId.HUMANISTIC,
+                modeId = ModeId.HUMANISTIC,
+                deviceGraph = graph
+            )
+        )
+        val adapter = FakeCameraDeviceAdapter()
+        val coordinator = CameraSessionCoordinator(
+            session = session,
+            cameraAdapter = adapter,
+            scope = TestScope(StandardTestDispatcher(testScheduler))
+        )
+        coordinator.attachPreviewHost(TestLifecycleOwner(), allocateInstance(PreviewView::class.java))
+        advanceUntilIdle()
+
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.HUMANISTIC,
+                deviceGraph = graph,
+                reason = "pro opened",
+                isRecovery = false,
+                manualCaptureParams = com.opencamera.core.settings.ManualCaptureParams()
+            )
+        )
+        advanceUntilIdle()
+        session.emitEffect(
+            SessionEffect.BindPreview(
+                modeId = ModeId.HUMANISTIC,
+                deviceGraph = graph,
+                reason = "iso changed",
+                isRecovery = false,
+                manualCaptureParams = com.opencamera.core.settings.ManualCaptureParams(iso = 800)
+            )
+        )
+        advanceUntilIdle()
+
+        assertEquals(2, adapter.bindRequests)
+        assertEquals(800, adapter.boundManualCaptureParams.last()?.iso)
+    }
+
     private class FakeCameraSession(
         initialState: SessionState = defaultSessionState()
     ) : CameraSession {
@@ -970,7 +1072,8 @@ class CameraSessionCoordinatorTest {
 
     private class FakeCameraDeviceAdapter(
         private val bindResults: ArrayDeque<BindResult> = ArrayDeque(),
-        private val capabilitiesByLensFacing: Map<LensFacing, DeviceCapabilities> = emptyMap()
+        private val capabilitiesByLensFacing: Map<LensFacing, DeviceCapabilities> = emptyMap(),
+        private val blockPreviewMetering: Boolean = false
     ) : CameraDeviceAdapter {
         private val mutableEvents = MutableSharedFlow<DeviceEvent>(
             replay = 8,
@@ -979,7 +1082,9 @@ class CameraSessionCoordinatorTest {
 
         var bindRequests: Int = 0
             private set
+        val boundManualCaptureParams = mutableListOf<com.opencamera.core.settings.ManualCaptureParams?>()
         val recordedCommands = mutableListOf<DeviceCommand>()
+        val previewMeteringStarted = CompletableDeferred<Unit>()
         private var boundGraph: DeviceGraphSpec? = null
 
         override val capabilities: DeviceCapabilities = DeviceCapabilities.DEFAULT
@@ -996,9 +1101,11 @@ class CameraSessionCoordinatorTest {
         override suspend fun bindUseCases(
             lifecycleOwner: androidx.lifecycle.LifecycleOwner,
             previewView: androidx.camera.view.PreviewView,
-            deviceGraph: DeviceGraphSpec
+            deviceGraph: DeviceGraphSpec,
+            manualCaptureParams: com.opencamera.core.settings.ManualCaptureParams?
         ) {
             bindRequests += 1
+            boundManualCaptureParams += manualCaptureParams
             when (val result = bindResults.removeFirstOrNull() ?: BindResult.Success) {
                 BindResult.Success -> boundGraph = deviceGraph
                 is BindResult.Failure -> throw IllegalStateException(result.reason)
@@ -1008,6 +1115,10 @@ class CameraSessionCoordinatorTest {
         override suspend fun dispatch(command: DeviceCommand) {
             recordedCommands += command
             if (command is DeviceCommand.ApplyPreviewMetering) {
+                if (blockPreviewMetering) {
+                    previewMeteringStarted.complete(Unit)
+                    awaitCancellation()
+                }
                 mutableEvents.emit(
                     DeviceEvent.PreviewMeteringCompleted(
                         PreviewMeteringResult(

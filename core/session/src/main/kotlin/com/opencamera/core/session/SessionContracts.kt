@@ -6,6 +6,7 @@ import com.opencamera.core.device.DeviceCapabilities
 import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.LensNode
+import com.opencamera.core.device.PreviewMeteringPersistence
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.RenderRecipe
 import com.opencamera.core.media.CameraPerformanceClass
@@ -112,6 +113,9 @@ private val LOW_RISK_PREVIEW_FILTER_PROFILES = setOf("photo-original", "photo-vi
 enum class PreviewMeteringFeedbackStatus {
     REQUESTED,
     SUCCEEDED,
+    LOCKED,
+    DEGRADED_FOCUS_LOCK_ONLY,
+    DEGRADED_EXPOSURE_LOCK_ONLY,
     DEGRADED_AUTO_EXPOSURE_ONLY,
     FAILED,
     UNSUPPORTED
@@ -122,8 +126,22 @@ data class PreviewMeteringFeedback(
     val normalizedX: Float,
     val normalizedY: Float,
     val status: PreviewMeteringFeedbackStatus,
+    val persistence: PreviewMeteringPersistence = PreviewMeteringPersistence.AUTO_CANCEL,
     val reason: String? = null
-)
+) {
+    val hasActiveMeteringHold: Boolean
+        get() = persistence == PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED &&
+            when (status) {
+                PreviewMeteringFeedbackStatus.REQUESTED,
+                PreviewMeteringFeedbackStatus.LOCKED,
+                PreviewMeteringFeedbackStatus.DEGRADED_FOCUS_LOCK_ONLY,
+                PreviewMeteringFeedbackStatus.DEGRADED_EXPOSURE_LOCK_ONLY -> true
+                PreviewMeteringFeedbackStatus.SUCCEEDED,
+                PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY,
+                PreviewMeteringFeedbackStatus.FAILED,
+                PreviewMeteringFeedbackStatus.UNSUPPORTED -> false
+            }
+}
 
 enum class PreviewBrightnessFeedbackStatus {
     REQUESTED,
@@ -184,6 +202,7 @@ data class SessionPresentationState(
     val countdownRemainingSeconds: Int? = null,
     val previewThumbnailPath: String? = null,
     val latestThumbnailSource: ThumbnailSource? = null,
+    val latestThumbnailRevision: Long = 0L,
     val pendingCaptureFeedback: CaptureFeedbackPreview? = null,
     val previewSnapshotGeneration: Int = 0,
     val lastAction: String = "",
@@ -203,7 +222,10 @@ data class SessionPresentationState(
     val documentBatch: DocumentBatchState = DocumentBatchState.inactive(),
     val pendingPostprocess: PendingPostprocessUiState? = null,
     val captureReadiness: com.opencamera.core.device.CaptureReadiness? = null
-)
+) {
+    val hasActiveMeteringHold: Boolean
+        get() = previewMeteringFeedback?.hasActiveMeteringHold == true
+}
 
 data class SessionState(
     val lifecycle: SessionLifecycle,
@@ -272,6 +294,8 @@ sealed interface SessionIntent {
     data object Boot : SessionIntent
     data object Shutdown : SessionIntent
     data class SettingsUpdated(val snapshot: SessionSettingsSnapshot) : SessionIntent
+    data class PreviewStyleStrengthChanged(val strength: Float?) : SessionIntent
+    data class PreviewStyleOriginalComparisonChanged(val active: Boolean) : SessionIntent
     data class SwitchMode(val modeId: ModeId) : SessionIntent
     data object ShutterPressed : SessionIntent
     data object SecondaryActionPressed : SessionIntent
@@ -334,6 +358,8 @@ sealed interface SessionIntent {
     data class ThermalStateChanged(val thermalState: CameraThermalState) : SessionIntent
     data class PerformanceClassChanged(val performanceClass: CameraPerformanceClass) : SessionIntent
     data class PreviewTapToFocus(val normalizedX: Float, val normalizedY: Float) : SessionIntent
+    data class PreviewLockFocusAndExposure(val normalizedX: Float, val normalizedY: Float) : SessionIntent
+    data object PreviewUnlockFocusAndExposure : SessionIntent
     data class PreviewMeteringCompleted(val result: com.opencamera.core.device.PreviewMeteringResult) : SessionIntent
     data class OutputRotationChanged(val rotation: CameraOutputRotation) : SessionIntent
     data class ApplyPreviewBrightness(val exposureCompensationSteps: Int) : SessionIntent
@@ -369,13 +395,15 @@ sealed interface SessionEffect {
         val modeId: ModeId,
         val deviceGraph: DeviceGraphSpec,
         val reason: String,
-        val isRecovery: Boolean
+        val isRecovery: Boolean,
+        val manualCaptureParams: com.opencamera.core.settings.ManualCaptureParams? = null
     ) : SessionEffect
     data class UnbindPreview(
         val reason: String,
         val clearHost: Boolean
     ) : SessionEffect
     data class ApplyPreviewMetering(val request: com.opencamera.core.device.PreviewMeteringRequest) : SessionEffect
+    data class CancelPreviewMetering(val reason: String) : SessionEffect
     data class UpdateOutputRotation(val rotation: CameraOutputRotation) : SessionEffect
     data class ApplyPreviewBrightness(
         val request: com.opencamera.core.device.PreviewBrightnessRequest

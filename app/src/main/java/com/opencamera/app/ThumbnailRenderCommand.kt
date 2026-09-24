@@ -28,7 +28,12 @@ internal fun nextThumbnailRenderCommand(
     }
 }
 
-internal fun sourceIdentityFor(sourceUri: String?, mediaType: SavedMediaType?): String? {
+internal fun sourceIdentityFor(
+    sourceUri: String?,
+    mediaType: SavedMediaType?,
+    finalRevision: Long = 0L
+): String? {
     if (sourceUri == null) return null
-    return if (mediaType == SavedMediaType.VIDEO) "video:$sourceUri" else sourceUri
+    val baseIdentity = if (mediaType == SavedMediaType.VIDEO) "video:$sourceUri" else sourceUri
+    return if (finalRevision > 0L) "$baseIdentity#final-revision=$finalRevision" else baseIdentity
 }

@@ -1,5 +1,8 @@
 import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.toolchain.JavaLanguageVersion
+import java.nio.channels.FileChannel
+import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Properties
@@ -48,8 +51,46 @@ if (versionPropertiesFile.isFile) {
 val versionMajor = versionProperties.getProperty("VERSION_MAJOR", "2").toInt()
 val versionMinor = versionProperties.getProperty("VERSION_MINOR", "0").toInt()
 val versionPatch = versionProperties.getProperty("VERSION_PATCH", "0").toInt()
-val computedVersionName = "$versionMajor.$versionMinor.$versionPatch"
-val computedVersionCode = versionMajor * 400 + versionMinor * 20 + versionPatch + 1
+
+fun nextArtifactVersion(): Triple<Int, Int, Int> {
+    var nextMinor = versionMinor
+    var nextPatch = versionPatch + 1
+    if (nextPatch > 19) {
+        nextPatch = 0
+        nextMinor += 1
+        check(nextMinor <= 19) { "Minor version overflow: $nextMinor > 19" }
+    }
+    return Triple(versionMajor, nextMinor, nextPatch)
+}
+
+val artifactGenerationRequested =
+    providers.environmentVariable("OPENCAMERA_HANDOFF_GENERATION_AUTHORIZED").orNull == "1"
+if (artifactGenerationRequested) {
+    val lockPath =
+        providers.environmentVariable("OPENCAMERA_HANDOFF_LOCK_FILE").orNull?.let(::file)?.toPath()
+            ?: file("${System.getProperty("java.io.tmpdir")}/opencamera-handoff-artifact.lock").toPath()
+    Files.createDirectories(lockPath.parent)
+    val lockChannel =
+        FileChannel.open(
+            lockPath,
+            StandardOpenOption.CREATE,
+            StandardOpenOption.WRITE,
+        )
+    val artifactLock = lockChannel.tryLock()
+    check(artifactLock != null) {
+        lockChannel.close()
+        "another handoff artifact generation is already running: $lockPath"
+    }
+    gradle.buildFinished {
+        artifactLock.release()
+        lockChannel.close()
+    }
+}
+val configuredVersion =
+    if (artifactGenerationRequested) nextArtifactVersion() else Triple(versionMajor, versionMinor, versionPatch)
+val (configuredVersionMajor, configuredVersionMinor, configuredVersionPatch) = configuredVersion
+val computedVersionName = "$configuredVersionMajor.$configuredVersionMinor.$configuredVersionPatch"
+val computedVersionCode = configuredVersionMajor * 400 + configuredVersionMinor * 20 + configuredVersionPatch + 1
 
 android {
     namespace = "com.opencamera.app"
@@ -109,6 +150,15 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
         unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // Forward capture-reliability knobs (-Dcapture.reliability.*) to the
+            // test JVM so stress seed counts and single-seed replay work from the CLI.
+            it.systemProperties(
+                System.getProperties().entries
+                    .filter { entry -> entry.key.toString().startsWith("capture.reliability.") }
+                    .associate { entry -> entry.key.toString() to entry.value.toString() }
+            )
+        }
     }
 }
 
@@ -165,9 +215,9 @@ dependencies {
     testImplementation("androidx.test.ext:junit:1.2.1")
 }
 
-tasks.register("archiveDebugApk") {
+val generateHandoffDebugApk = tasks.register("generateHandoffDebugApk") {
     group = "build"
-    description = "Builds the debug APK and preserves an incremental copy under work/outputs/apks/debug."
+    description = "Internal task used only by tool/generate_handoff_debug_apk.sh."
     dependsOn("assembleDebug")
 
     doLast {
@@ -193,18 +243,18 @@ tasks.register("archiveDebugApk") {
         println("Updated latest APK: ${latestArchiveApk.relativeTo(rootProject.projectDir)}")
         println("Updated root latest APK: ${latestRootApk.relativeTo(rootProject.projectDir)}")
 
-        // Increment version on every archive build
-        var nextPatch = versionPatch + 1
-        var nextMinor = versionMinor
-        if (nextPatch > 19) {
-            nextPatch = 0
-            nextMinor += 1
-            check(nextMinor <= 19) { "Minor version overflow: $nextMinor > 19" }
+        versionProperties.setProperty("VERSION_MAJOR", configuredVersionMajor.toString())
+        versionProperties.setProperty("VERSION_MINOR", configuredVersionMinor.toString())
+        versionProperties.setProperty("VERSION_PATCH", configuredVersionPatch.toString())
+        versionPropertiesFile.outputStream().use {
+            versionProperties.store(it, "Allocated by generateHandoffDebugApk")
         }
-        versionProperties.setProperty("VERSION_MAJOR", versionMajor.toString())
-        versionProperties.setProperty("VERSION_MINOR", nextMinor.toString())
-        versionProperties.setProperty("VERSION_PATCH", nextPatch.toString())
-        versionPropertiesFile.outputStream().use { versionProperties.store(it, "Auto-incremented by build") }
-        println("Version incremented to: $versionMajor.$nextMinor.$nextPatch")
+        println("Allocated handoff artifact version: $computedVersionName")
+    }
+}
+
+gradle.taskGraph.whenReady {
+    if (hasTask(generateHandoffDebugApk.get()) && !artifactGenerationRequested) {
+        error("generateHandoffDebugApk is internal; run ./tool/generate_handoff_debug_apk.sh")
     }
 }

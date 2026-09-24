@@ -1,5 +1,6 @@
 package com.opencamera.app.camera
 
+import android.util.Log
 import com.opencamera.app.camera.live.LivePhotoMediaStoreWriter
 import com.opencamera.core.media.FrameDescriptor
 import com.opencamera.core.media.LiveBundleStatus
@@ -11,6 +12,8 @@ import com.opencamera.core.media.temporalNotes
 import com.opencamera.core.settings.LiveSaveFormat
 import kotlinx.coroutines.CancellationException
 import java.io.File
+
+private const val TAG = "LivePhotoAssembler"
 
 internal data class CapturedPhotoResult(
     val outputPath: String,
@@ -89,6 +92,7 @@ internal object LivePhotoAssembler {
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Throwable) {
+            Log.w(TAG, "sidecar write failed path=${finalBundle.sidecarPath}", e)
             Result.failure(e)
         }
 
@@ -116,7 +120,25 @@ internal object LivePhotoAssembler {
                     else -> "missing"
                 }
             }")
-            add("gallery-recognition=untested")
+
+            // Gallery recognition is a structured, honest outcome: the container is
+            // validated locally, but recognition by system galleries always stays
+            // pending until real-device evidence (01-forensic-baseline gate).
+            val containerDiagnostics = materializationResult.extraDiagnostics.filter {
+                it.startsWith("gallery-recognition=") || it.startsWith("gallery-recognition:")
+            }
+            if (containerDiagnostics.isNotEmpty()) {
+                addAll(containerDiagnostics)
+            } else {
+                add(
+                    if (materializationResult.materializationSucceeded) {
+                        "gallery-recognition=container-unchecked"
+                    } else {
+                        "gallery-recognition=not-materialized"
+                    }
+                )
+            }
+            add("gallery-recognition:external=pending")
 
             // Share target per format
             when (saveFormat) {
@@ -171,6 +193,7 @@ internal object LivePhotoAssembler {
         val hasSelectedFrames = motionSourceResult.source == LiveMotionSource.PREVIEW_RING_BUFFER &&
             motionSourceResult.selectedFrameSet.frames.isNotEmpty()
         if (!hasSelectedFrames) {
+            Log.w(TAG, "motion materialization skipped: no selected frames source=${motionSourceResult.source}")
             return MaterializationBundleResult(
                 bundle = bundle,
                 materializationSucceeded = false,

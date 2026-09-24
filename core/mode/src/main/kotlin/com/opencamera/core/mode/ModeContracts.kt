@@ -201,6 +201,9 @@ interface ModeController {
 
     suspend fun onEnter()
 
+    /** Refreshes the current preview/capture effect without re-entering the mode lifecycle. */
+    suspend fun refreshEffectSpec() = Unit
+
     suspend fun onExit()
 
     suspend fun handle(intent: ModeIntent): ModeSignal

@@ -17,8 +17,6 @@
     <dimen name="mode_track_height">32dp</dimen>
     <dimen name="zoom_chip_min_width">36dp</dimen>
     <dimen name="zoom_chip_min_height">26dp</dimen>
-    <dimen name="pro_glass_chip_min_width">58dp</dimen>
-    <dimen name="pro_glass_strip_min_height">58dp</dimen>
 
     <!-- Zoom strip layout -->
     <dimen name="zoom_strip_container_height">32dp</dimen>
@@ -66,6 +64,15 @@
     <dimen name="dev_console_scroll_floating_padding">28dp</dimen>
     <dimen name="dev_console_scroll_floating_bottom_margin">72dp</dimen>
     <dimen name="style_rail_bottom_gap">8dp</dimen>
+    <dimen name="document_batch_rail_browsing_width">96dp</dimen>
+    <dimen name="document_batch_rail_selected_width">108dp</dimen>
+    <dimen name="document_batch_thumbnail_browsing_width">52dp</dimen>
+    <dimen name="document_batch_thumbnail_browsing_height">62dp</dimen>
+    <dimen name="document_batch_thumbnail_selected_width">64dp</dimen>
+    <dimen name="document_batch_thumbnail_selected_height">76dp</dimen>
+    <dimen name="document_batch_action_width">96dp</dimen>
+    <dimen name="document_batch_action_height">40dp</dimen>
+    <dimen name="document_batch_action_selected_margin_start">116dp</dimen>
     <dimen name="floating_tool_bottom_clearance">56dp</dimen>
     <dimen name="bottom_cockpit_padding_horizontal">16dp</dimen>
     <dimen name="bottom_cockpit_margin_bottom">14dp</dimen>

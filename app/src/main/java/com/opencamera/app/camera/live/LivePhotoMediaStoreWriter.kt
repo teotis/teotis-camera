@@ -5,8 +5,11 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import com.opencamera.core.media.MotionPhotoContainerSpec
 import com.opencamera.core.media.MotionPhotoJpegContainer
+
+private const val TAG = "LivePhotoMediaStoreWriter"
 
 data class MediaStoreVideoRecord(
     val uri: String,
@@ -18,19 +21,27 @@ data class MediaStoreVideoRecord(
     val isPending: String
 )
 
-open class LivePhotoMediaStoreWriter(private val context: Context) {
+open class LivePhotoMediaStoreWriter(
+    private val context: Context,
+    injectedMediaStoreIo: MediaStoreIo? = null
+) {
+    // Lazy so subclasses constructed with mock contexts (getContentResolver may
+    // not be usable) only touch the resolver when IO actually happens.
+    private val mediaStoreIo: MediaStoreIo by lazy {
+        injectedMediaStoreIo ?: ContentResolverMediaStoreIo(context.contentResolver)
+    }
 
     fun readMediaStoreBytes(uri: Uri): Result<ByteArray> = runCatching {
-        context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        mediaStoreIo.openInputStream(uri)?.use { it.readBytes() }
             ?: throw IllegalStateException("Failed to open input stream for $uri")
-    }
+    }.onFailure { e -> Log.w(TAG, "readMediaStoreBytes failed uri=$uri", e) }
 
     fun overwriteMotionPhotoJpeg(savedUri: Uri, motionPhotoBytes: ByteArray): Result<Unit> = runCatching {
-        context.contentResolver.openOutputStream(savedUri, "wt")?.use { out ->
+        mediaStoreIo.openOutputStream(savedUri, "wt")?.use { out ->
             out.write(motionPhotoBytes)
         } ?: throw IllegalStateException("Failed to open output stream for $savedUri")
-        context.contentResolver.notifyChange(savedUri, null)
-    }
+        mediaStoreIo.notifyChange(savedUri)
+    }.onFailure { e -> Log.w(TAG, "overwriteMotionPhotoJpeg failed savedUri=$savedUri", e) }
 
     open fun insertMotionMp4Sidecar(
         jpegRelativePath: String,
@@ -49,24 +60,41 @@ open class LivePhotoMediaStoreWriter(private val context: Context) {
             }
         }
 
-        val mp4Uri = context.contentResolver.insert(
+        val mp4Uri = mediaStoreIo.insert(
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
             values
         ) ?: throw IllegalStateException("Failed to insert MP4 sidecar into MediaStore for $mp4DisplayName")
 
-        context.contentResolver.openOutputStream(mp4Uri)?.use { out ->
-            out.write(mp4Bytes)
-        } ?: throw IllegalStateException("Failed to open output stream for MP4 sidecar $mp4Uri")
+        try {
+            mediaStoreIo.openOutputStream(mp4Uri, null)?.use { out ->
+                out.write(mp4Bytes)
+            } ?: throw IllegalStateException("Failed to open output stream for MP4 sidecar $mp4Uri")
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val updateValues = ContentValues().apply {
-                put(MediaStore.Video.Media.IS_PENDING, 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val updateValues = ContentValues().apply {
+                    put(MediaStore.Video.Media.IS_PENDING, 0)
+                }
+                val updatedRows = mediaStoreIo.update(mp4Uri, updateValues, null, null)
+                check(updatedRows == 1) {
+                    "Failed to clear pending state for MP4 sidecar $mp4Uri: updatedRows=$updatedRows"
+                }
             }
-            context.contentResolver.update(mp4Uri, updateValues, null, null)
+            mp4Uri
+        } catch (writeFailure: Throwable) {
+            // INV-2e/4d: a pending MediaStore row must not leak when the write or
+            // pending-clear step fails; roll the row back so the store converges.
+            runCatching {
+                mediaStoreIo.delete(mp4Uri)
+            }.onFailure { deleteFailure ->
+                Log.w(
+                    TAG,
+                    "Failed to roll back pending MP4 sidecar $mp4Uri",
+                    deleteFailure
+                )
+            }
+            throw writeFailure
         }
-
-        mp4Uri
-    }
+    }.onFailure { e -> Log.w(TAG, "insertMotionMp4Sidecar failed prefix=$mp4DisplayNamePrefix", e) }
 
     open fun verifyMotionMp4Sidecar(uri: Uri): Result<MediaStoreVideoRecord> = runCatching {
         val projection = buildList {
@@ -80,7 +108,7 @@ open class LivePhotoMediaStoreWriter(private val context: Context) {
             }
         }
 
-        val cursor = context.contentResolver.query(
+        val cursor = mediaStoreIo.query(
             uri,
             projection.toTypedArray(),
             null,
@@ -111,7 +139,7 @@ open class LivePhotoMediaStoreWriter(private val context: Context) {
                     readColumn(MediaStore.Video.Media.IS_PENDING) else "n/a"
             )
         }
-    }
+    }.onFailure { e -> Log.w(TAG, "verifyMotionMp4Sidecar failed uri=$uri", e) }
 
     fun createMotionPhotoBytes(
         savedUri: Uri,
@@ -127,5 +155,5 @@ open class LivePhotoMediaStoreWriter(private val context: Context) {
             motionBytes = motionBytes,
             spec = spec.copy(motionLengthBytes = motionBytes.size.toLong())
         )
-    }
+    }.onFailure { e -> Log.w(TAG, "createMotionPhotoBytes failed savedUri=$savedUri motionPath=$motionPath", e) }
 }

@@ -101,6 +101,22 @@ class ThumbnailRenderCommandTest {
     }
 
     @Test
+    fun `same photo uri with newer final revision requests reload`() {
+        val uri = "content://media/external/images/media/42"
+        val previousIdentity = sourceIdentityFor(uri, SavedMediaType.PHOTO, finalRevision = 1L)
+        val nextIdentity = sourceIdentityFor(uri, SavedMediaType.PHOTO, finalRevision = 2L)
+
+        val command = nextThumbnailRenderCommand(
+            previousRequestedUri = uri,
+            nextRequestedUri = uri,
+            previousSourceIdentity = previousIdentity,
+            nextSourceIdentity = nextIdentity
+        )
+
+        assertEquals(ThumbnailRenderCommand.Load(uri, nextIdentity!!), command)
+    }
+
+    @Test
     fun `source identity for photo is uri itself`() {
         val identity = sourceIdentityFor("content://media/external/images/media/42", SavedMediaType.PHOTO)
         assertEquals("content://media/external/images/media/42", identity)

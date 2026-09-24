@@ -86,7 +86,11 @@ internal class MainActivityRenderer(
             route is CockpitPanelRoute.BatchOverview
         views.filterStrip.scroll.isVisible = route is CockpitPanelRoute.StyleStrip
 
-        views.bottomCockpit.stylePresetCardRail.isVisible = shouldShowStylePresetCardRail(route)
+        val showStyleRail = shouldShowStylePresetCardRail(route)
+        if (!showStyleRail) {
+            views.bottomCockpit.stylePresetCardRail.releaseTransientStylePreview()
+        }
+        views.bottomCockpit.stylePresetCardRail.isVisible = showStyleRail
         views.quickPanel.panel.isVisible = route is CockpitPanelRoute.QuickBubble
         views.panelDismissScrim.isVisible = route.isAnyPanelOpen
             && route !is CockpitPanelRoute.StyleStrip

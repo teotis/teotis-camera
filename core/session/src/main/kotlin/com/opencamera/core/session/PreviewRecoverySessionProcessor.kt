@@ -2,6 +2,7 @@ package com.opencamera.core.session
 
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.PreviewMeteringPoint
+import com.opencamera.core.device.PreviewMeteringPersistence
 import com.opencamera.core.device.PreviewMeteringRequest
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
@@ -65,6 +66,10 @@ internal class PreviewRecoverySessionProcessor(
             is SessionIntent.PreviewRuntimeIssue -> handlePreviewRuntimeIssue(intent.issue)
             is SessionIntent.PreviewStopped -> handlePreviewStopped(intent.reason)
             is SessionIntent.PreviewTapToFocus -> handlePreviewTapToFocus(intent.normalizedX, intent.normalizedY)
+            is SessionIntent.PreviewLockFocusAndExposure ->
+                handlePreviewLockFocusAndExposure(intent.normalizedX, intent.normalizedY)
+            SessionIntent.PreviewUnlockFocusAndExposure ->
+                cancelFocusExposureLockIfActive("user tap")
             is SessionIntent.PreviewMeteringCompleted -> handlePreviewMeteringCompleted(intent.result)
             is SessionIntent.PreviewMeteringFeedbackExpired -> handlePreviewMeteringFeedbackExpired(intent.requestId)
             is SessionIntent.PhotoSceneSignalUpdated -> handlePhotoSceneSignalUpdated(intent.signal)
@@ -271,6 +276,7 @@ internal class PreviewRecoverySessionProcessor(
             cancelRecordingElapsedTimer()
             val activeShot = state.value.activeShot
             if (activeShot != null) {
+                state.value = state.value.copy(recordingStatus = RecordingStatus.STOPPING)
                 effects.emit(SessionEffect.StopActiveShot(activeShot.shotId))
             }
             handlePreviewError("Preview surface lost during recording: $reason")
@@ -322,6 +328,16 @@ internal class PreviewRecoverySessionProcessor(
         }
         if (state.value.recordingStatus == RecordingStatus.RECORDING) {
             cancelRecordingElapsedTimer()
+            if (!issue.isRecoverable) {
+                // A fatal camera fault must not leave the session in RECORDING
+                // forever: stop the recording and let the STOPPING watchdog
+                // guarantee convergence when the finalize event never arrives.
+                val activeShot = state.value.activeShot
+                if (activeShot != null) {
+                    state.value = state.value.copy(recordingStatus = RecordingStatus.STOPPING)
+                    effects.emit(SessionEffect.StopActiveShot(activeShot.shotId))
+                }
+            }
         }
         val renderedReason = issue.displayReason()
         val recoveryWasActive = state.value.previewStatus == PreviewStatus.RECOVERING
@@ -351,13 +367,14 @@ internal class PreviewRecoverySessionProcessor(
         }
     }
 
-    private fun handlePreviewStopped(reason: String) {
+    private suspend fun handlePreviewStopped(reason: String) {
         if (countdownInProgress()) {
             cancelPendingCountdown("Countdown cancelled because preview stopped")
         }
         if (state.value.recordingStatus == RecordingStatus.RECORDING) {
             cancelRecordingElapsedTimer()
         }
+        cancelFocusExposureLockIfActive("preview stopped: $reason")
         mutations.updatePreviewStopped(reason)
         trace.record("preview.stopped", reason)
     }
@@ -365,6 +382,30 @@ internal class PreviewRecoverySessionProcessor(
     // -- Tap-to-focus / metering --
 
     private suspend fun handlePreviewTapToFocus(normalizedX: Float, normalizedY: Float) {
+        if (cancelFocusExposureLockIfActive("preview tap")) {
+            return
+        }
+        requestPreviewMetering(
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
+            persistence = PreviewMeteringPersistence.AUTO_CANCEL
+        )
+    }
+
+    private suspend fun handlePreviewLockFocusAndExposure(normalizedX: Float, normalizedY: Float) {
+        cancelFocusExposureLockIfActive("focus and exposure lock replaced")
+        requestPreviewMetering(
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
+            persistence = PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+        )
+    }
+
+    private suspend fun requestPreviewMetering(
+        normalizedX: Float,
+        normalizedY: Float,
+        persistence: PreviewMeteringPersistence
+    ) {
         val point = PreviewMeteringPoint(normalizedX, normalizedY).clamped()
         val snapshot = state.value
         if (snapshot.previewStatus != PreviewStatus.ACTIVE) {
@@ -385,14 +426,19 @@ internal class PreviewRecoverySessionProcessor(
         val requestId = "meter-$meteringCounter"
         val request = PreviewMeteringRequest(
             requestId = requestId,
-            point = point
+            point = point,
+            persistence = persistence
         )
-        mutations.updatePreviewMeteringRequested(requestId, point)
+        mutations.updatePreviewMeteringRequested(requestId, point, persistence)
         effects.emit(SessionEffect.ApplyPreviewMetering(request))
         scheduleMeteringFeedbackExpiry(requestId, METERING_FEEDBACK_TIMEOUT_MS)
+        val persistenceLabel = when (persistence) {
+            PreviewMeteringPersistence.AUTO_CANCEL -> "auto-cancel"
+            PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED -> "locked"
+        }
         trace.record(
             "preview.metering.requested",
-            "requestId=$requestId,x=${"%.2f".format(point.normalizedX)},y=${"%.2f".format(point.normalizedY)},mode=focus+ae"
+            "requestId=$requestId,x=${"%.2f".format(point.normalizedX)},y=${"%.2f".format(point.normalizedY)},mode=focus+ae,persistence=$persistenceLabel"
         )
         // Start metering link span
         activeMeteringSpan = linkRecorder.startSpan(
@@ -411,9 +457,14 @@ internal class PreviewRecoverySessionProcessor(
             return
         }
         mutations.updatePreviewMeteringCompleted(result)
-        scheduleMeteringFeedbackExpiry(result.requestId, METERING_FEEDBACK_DISPLAY_MS)
+        if (!result.status.holdsFocusExposureLock()) {
+            scheduleMeteringFeedbackExpiry(result.requestId, METERING_FEEDBACK_DISPLAY_MS)
+        }
         val traceLabel = when (result.status) {
             PreviewMeteringResultStatus.SUCCEEDED -> "preview.metering.succeeded"
+            PreviewMeteringResultStatus.LOCKED -> "preview.metering.locked"
+            PreviewMeteringResultStatus.DEGRADED_FOCUS_LOCK_ONLY -> "preview.metering.locked.degraded"
+            PreviewMeteringResultStatus.DEGRADED_EXPOSURE_LOCK_ONLY -> "preview.metering.locked.degraded"
             PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> "preview.metering.degraded"
             PreviewMeteringResultStatus.FAILED -> "preview.metering.failed"
             PreviewMeteringResultStatus.UNSUPPORTED -> "preview.metering.unsupported"
@@ -423,7 +474,10 @@ internal class PreviewRecoverySessionProcessor(
         activeMeteringSpan?.let { span ->
             if (span.correlationId == result.requestId) {
                 val linkStatus = when (result.status) {
-                    PreviewMeteringResultStatus.SUCCEEDED -> LinkEventStatus.COMPLETED
+                    PreviewMeteringResultStatus.SUCCEEDED,
+                    PreviewMeteringResultStatus.LOCKED -> LinkEventStatus.COMPLETED
+                    PreviewMeteringResultStatus.DEGRADED_FOCUS_LOCK_ONLY,
+                    PreviewMeteringResultStatus.DEGRADED_EXPOSURE_LOCK_ONLY,
                     PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> LinkEventStatus.DEGRADED
                     PreviewMeteringResultStatus.FAILED -> LinkEventStatus.FAILED
                     PreviewMeteringResultStatus.UNSUPPORTED -> LinkEventStatus.UNAVAILABLE
@@ -434,14 +488,36 @@ internal class PreviewRecoverySessionProcessor(
         }
     }
 
-    private fun handlePreviewMeteringFeedbackExpired(requestId: String) {
+    private suspend fun handlePreviewMeteringFeedbackExpired(requestId: String) {
         val currentFeedback = state.value.presentation.previewMeteringFeedback
         if (currentFeedback == null || currentFeedback.requestId != requestId) {
             trace.record("preview.metering.expiry.stale", "requestId=$requestId,currentId=${currentFeedback?.requestId}")
             return
         }
+        if (currentFeedback.hasActiveMeteringHold) {
+            if (currentFeedback.status == PreviewMeteringFeedbackStatus.REQUESTED) {
+                cancelFocusExposureLockIfActive("focus and exposure lock timed out")
+            } else {
+                trace.record("preview.metering.expiry.retained", "requestId=$requestId,locked=true")
+            }
+            return
+        }
         mutations.clearPreviewMeteringFeedback(requestId)
         trace.record("preview.metering.expired", "requestId=$requestId")
+    }
+
+    suspend fun cancelFocusExposureLockIfActive(reason: String): Boolean {
+        val currentFeedback = state.value.presentation.previewMeteringFeedback
+        if (currentFeedback?.hasActiveMeteringHold != true) {
+            return false
+        }
+        effects.emit(SessionEffect.CancelPreviewMetering(reason))
+        mutations.clearPreviewMeteringFeedback(currentFeedback.requestId)
+        trace.record(
+            "preview.metering.unlocked",
+            "requestId=${currentFeedback.requestId},reason=$reason"
+        )
+        return true
     }
 
     private fun scheduleMeteringFeedbackExpiry(requestId: String, delayMs: Long) {
@@ -556,12 +632,17 @@ internal class PreviewRecoverySessionProcessor(
         ) {
             return
         }
+        cancelFocusExposureLockIfActive("preview configuration changed: $reason")
         effects.emit(
             SessionEffect.BindPreview(
                 modeId = snapshot.activeMode,
                 deviceGraph = snapshot.activeDeviceGraph,
                 reason = reason,
-                isRecovery = isRecovery
+                isRecovery = isRecovery,
+                manualCaptureParams = snapshot.settings.catalog.manualCaptureDraft.takeIf {
+                    snapshot.activeMode == com.opencamera.core.mode.ModeId.HUMANISTIC &&
+                        snapshot.modeSnapshot.state.isProVariantActive
+                }
             )
         )
     }
@@ -570,6 +651,7 @@ internal class PreviewRecoverySessionProcessor(
         reason: String,
         clearHost: Boolean
     ) {
+        cancelFocusExposureLockIfActive("preview unbound: $reason")
         effects.emit(
             SessionEffect.UnbindPreview(
                 reason = reason,
@@ -587,4 +669,14 @@ internal class PreviewRecoverySessionProcessor(
             snapshot.activeShot == null &&
             snapshot.previewMetrics.consecutiveRecoveryCount < MAX_CONSECUTIVE_RECOVERIES
     }
+}
+
+private fun PreviewMeteringResultStatus.holdsFocusExposureLock(): Boolean = when (this) {
+    PreviewMeteringResultStatus.LOCKED,
+    PreviewMeteringResultStatus.DEGRADED_FOCUS_LOCK_ONLY,
+    PreviewMeteringResultStatus.DEGRADED_EXPOSURE_LOCK_ONLY -> true
+    PreviewMeteringResultStatus.SUCCEEDED,
+    PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY,
+    PreviewMeteringResultStatus.FAILED,
+    PreviewMeteringResultStatus.UNSUPPORTED -> false
 }

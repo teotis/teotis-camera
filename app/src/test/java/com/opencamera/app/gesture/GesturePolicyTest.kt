@@ -62,9 +62,20 @@ class GesturePolicyTest {
     }
 
     @Test
-    fun longPress_mapsToIgnore() {
+    fun longPress_mapsToFocusAndExposureLock() {
         val action = policy.map(GestureEvent.LongPress(100f, 200f), ModeId.PHOTO)
-        assertEquals(GestureAction.Ignore, action)
+        assertEquals(GestureAction.LockFocusAndExposureAt(100f, 200f), action)
+    }
+
+    @Test
+    fun `tap while focus and exposure are locked maps to unlock`() {
+        val action = policy.map(
+            event = GestureEvent.Tap(100f, 200f),
+            activeMode = ModeId.PHOTO,
+            isFocusExposureLocked = true
+        )
+
+        assertEquals(GestureAction.UnlockFocusAndExposure, action)
     }
 
     @Test

@@ -38,6 +38,9 @@
     <string name="style_panel_title">Style</string>
     <string name="color_lab_panel_title">Color Lab</string>
     <string name="button_use_this_style">Use Style</string>
+    <string name="button_hold_original">Hold for original</string>
+    <string name="label_style_strength">Strength</string>
+    <string name="status_style_preview_preparing">Preparing preview</string>
     <string name="style_rail_title_photo">Photo Styles</string>
     <string name="style_rail_title_humanistic">Humanistic Styles</string>
     <string name="style_rail_title_portrait">Portrait Styles</string>
@@ -172,6 +175,10 @@
     <string name="label_tokens">Tokens</string>
     <string name="label_raw">RAW</string>
     <string name="raw_saved_only_value">Record only</string>
+    <string name="label_capture_format">Format</string>
+    <string name="capture_format_jpg">JPG</string>
+    <string name="capture_format_raw_jpg">RAW + JPG</string>
+    <string name="raw_output_unavailable_jpg">RAW output is unavailable; photos are saved as JPG</string>
     <string name="label_iso">ISO</string>
     <string name="label_shutter">Shutter</string>
     <string name="label_ev">EV</string>
@@ -463,7 +470,7 @@
     <string name="watermark_selector_current_default"> | Current default</string>
     <string name="watermark_selector_edit_attrs_frame">Placement, scale, opacity, background</string>
     <string name="watermark_selector_edit_attrs_classic">Placement, scale, opacity</string>
-    <string name="watermark_selector_footer_supported">Classic Overlay keeps its border background fixed; Travel Polaroid and Retro Frame expose frame background variants on their own style pages. All still-photo watermarks embed a reversible original JPEG archive, extractable via the provided tooling.</string>
+    <string name="watermark_selector_footer_supported">Classic Overlay keeps its border background fixed; Philosophy Like Water uses a fixed warm-ivory ticket stock, while Retro Frame exposes frame background variants on its own style page. All still-photo watermarks embed a reversible original JPEG archive, extractable via the provided tooling.</string>
     <string name="watermark_selector_footer_unsupported">Still capture is unavailable on this device, so Watermark Lab stays read-only.</string>
 
     <!-- Watermark detail -->
@@ -483,7 +490,7 @@
     <string name="watermark_template_classic_overlay">Classic overlay</string>
     <string name="watermark_template_pure_text">Translucent Bottom Bar</string>
     <string name="watermark_template_blur_four_border">Blurred image frame</string>
-    <string name="watermark_template_travel_polaroid">Travel Polaroid</string>
+    <string name="watermark_template_travel_polaroid">Philosophy Like Water</string>
     <string name="watermark_template_retro_frame">Retro Frame</string>
     <string name="watermark_template_van_gogh_starry">Van Gogh Starry</string>
     <string name="watermark_template_blue_hour">Blue Hour</string>
@@ -593,6 +600,11 @@
     <string name="document_batch_remove">Remove from batch</string>
     <string name="document_batch_move_up">Move up</string>
     <string name="document_batch_move_down">Move down</string>
+    <string name="document_batch_clear">Clear</string>
+    <string name="document_batch_clear_confirm">Confirm</string>
+    <string name="document_batch_clear_content_description">Clear this document batch</string>
+    <string name="document_batch_clear_confirm_content_description">Tap again to clear this document batch</string>
+    <string name="document_batch_clear_toast">Batch cleared</string>
     <string name="document_batch_crop_applied">Cropped</string>
     <string name="document_batch_crop_skipped">Not cropped</string>
     <string name="document_batch_crop_failed">Crop failed</string>
@@ -667,17 +679,17 @@
     <string name="checkin_scenario_portrait">Portrait</string>
     <string name="checkin_scenario_people_place">People &amp; Place</string>
     <string name="checkin_scenario_object_place">Object &amp; Place</string>
-    <string name="checkin_scenario_clarity">Clarity</string>
+    <string name="checkin_scenario_clarity">Clarity Assist</string>
     <string name="checkin_scenario_desc_portrait">Close-up portrait highlighting expression and posture</string>
     <string name="checkin_scenario_desc_people_place">People combined with environment to capture atmosphere</string>
     <string name="checkin_scenario_desc_object_place">Objects with environment, capturing detail and space</string>
-    <string name="checkin_scenario_desc_clarity">Multi-frame synthesis for sharper detail</string>
+    <string name="checkin_scenario_desc_clarity">Multi-frame assist for sharper detail</string>
     <string name="checkin_scene_prefix">Scene: </string>
     <string name="checkin_focus_mode"> | Focus mode</string>
     <string name="checkin_guidance_portrait">Tip: keep the subject centered, use depth of field to highlight the focus</string>
     <string name="checkin_guidance_people_place">Tip: balance the person and environment, leave space for ambiance</string>
     <string name="checkin_guidance_object_place">Tip: focus on details, use ambient light to enhance texture</string>
-    <string name="checkin_guidance_clarity">Tip: stay steady, multi-frame synthesis will enhance detail</string>
+    <string name="checkin_guidance_clarity">Tip: stay steady; clarity assist uses multi-frame detail enhancement</string>
     <string name="checkin_degraded_badge">Multi-frame unavailable</string>
     <string name="checkin_degraded_depth">Depth effect unavailable, using Focus mode</string>
     <string name="checkin_degraded_multiframe">Multi-frame unavailable, using best single-frame</string>

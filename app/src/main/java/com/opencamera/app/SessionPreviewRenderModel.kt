@@ -11,6 +11,7 @@ import com.opencamera.core.mode.ModeId
 import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PreviewMeteringFeedback
 import com.opencamera.core.session.PreviewMeteringFeedbackStatus
+import com.opencamera.core.device.PreviewMeteringPersistence
 import com.opencamera.core.session.PreviewRatio
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.SessionState
@@ -24,6 +25,7 @@ internal data class PreviewOverlayRenderModel(
     val effectModel: PreviewEffectRenderModel? = null,
     val frame: PreviewFrameRenderModel? = null,
     val previewContentAspect: PreviewContentAspect? = null,
+    val isPreviewMirrored: Boolean = false,
     val isGeometryLocked: Boolean = false,
     val scanGuide: PreviewScanGuideRenderModel? = null
 ) {
@@ -55,17 +57,38 @@ internal data class PreviewScanGuideRenderModel(
 
 internal fun focusReticleRenderModel(
     feedback: PreviewMeteringFeedback
-): FocusReticleRenderModel = FocusReticleRenderModel(
-    normalizedX = feedback.normalizedX,
-    normalizedY = feedback.normalizedY,
-    status = when (feedback.status) {
-        PreviewMeteringFeedbackStatus.REQUESTED -> FocusReticleStatus.REQUESTED
+): FocusReticleRenderModel {
+    val status = when (feedback.status) {
+        PreviewMeteringFeedbackStatus.REQUESTED -> when (feedback.persistence) {
+            PreviewMeteringPersistence.AUTO_CANCEL -> FocusReticleStatus.REQUESTED
+            PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED -> FocusReticleStatus.LOCK_REQUESTED
+        }
         PreviewMeteringFeedbackStatus.SUCCEEDED -> FocusReticleStatus.SUCCEEDED
+        PreviewMeteringFeedbackStatus.LOCKED -> FocusReticleStatus.LOCKED
+        PreviewMeteringFeedbackStatus.DEGRADED_FOCUS_LOCK_ONLY,
+        PreviewMeteringFeedbackStatus.DEGRADED_EXPOSURE_LOCK_ONLY -> FocusReticleStatus.LOCKED_DEGRADED
         PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY -> FocusReticleStatus.DEGRADED
         PreviewMeteringFeedbackStatus.FAILED -> FocusReticleStatus.FAILED
         PreviewMeteringFeedbackStatus.UNSUPPORTED -> FocusReticleStatus.UNSUPPORTED
     }
-)
+    val lockLabel = when (feedback.status) {
+        PreviewMeteringFeedbackStatus.REQUESTED ->
+            "AE/AF".takeIf { feedback.persistence == PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED }
+        PreviewMeteringFeedbackStatus.LOCKED -> "AE/AF"
+        PreviewMeteringFeedbackStatus.DEGRADED_FOCUS_LOCK_ONLY -> "AF"
+        PreviewMeteringFeedbackStatus.DEGRADED_EXPOSURE_LOCK_ONLY -> "AE"
+        PreviewMeteringFeedbackStatus.SUCCEEDED,
+        PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY,
+        PreviewMeteringFeedbackStatus.FAILED,
+        PreviewMeteringFeedbackStatus.UNSUPPORTED -> null
+    }
+    return FocusReticleRenderModel(
+        normalizedX = feedback.normalizedX,
+        normalizedY = feedback.normalizedY,
+        status = status,
+        lockLabel = lockLabel
+    )
+}
 
 internal fun previewOverlayRenderModel(
     state: SessionState,
@@ -135,6 +158,11 @@ internal fun previewOverlayRenderModel(
         effectModel = effectModel,
         frame = frame,
         previewContentAspect = previewContentAspect,
+        isPreviewMirrored = com.opencamera.core.mode.selfieMirrorPolicy(
+            activeLensFacing = state.activeDeviceGraph.activeLensFacing,
+            preferredLensFacing = state.activeDeviceGraph.preferredLensFacing,
+            selfieMirrorEnabled = state.settings.persisted.common.selfieMirrorEnabled
+        ).shouldMirrorPreview,
         isGeometryLocked = isGeometryLocked,
         scanGuide = scanGuide
     )

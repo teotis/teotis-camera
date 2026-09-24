@@ -720,7 +720,10 @@ internal fun sessionCaptureOutputText(
                         bundle = livePhotoBundle,
                         saveFormat = extractLiveSaveFormat(presentation.latestPipelineNotes)
                     )
-                    LivePhotoStatusProjection.statusText(status)?.let { statusText ->
+                    LivePhotoStatusProjection.statusText(
+                        status = status,
+                        pipelineNotes = presentation.latestPipelineNotes
+                    )?.let { statusText ->
                         append(statusText)
                         append('\n')
                     }
@@ -898,7 +901,7 @@ private fun List<StillCaptureOutputSize>.stillCaptureOutputSizeSummary(): String
     return this.take(4).joinToString(separator = "/") { it.label }
 }
 
-private fun extractLiveSaveFormat(pipelineNotes: List<String>): LiveSaveFormat {
+internal fun extractLiveSaveFormat(pipelineNotes: List<String>): LiveSaveFormat {
     val line = pipelineNotes.firstOrNull { it.startsWith("live-export:format=") }
     val key = line?.substringAfter("=")
     return LiveSaveFormat.fromStorageKey(key) ?: LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG

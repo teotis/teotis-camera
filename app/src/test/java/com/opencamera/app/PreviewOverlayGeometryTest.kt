@@ -1,5 +1,6 @@
 package com.opencamera.app
 
+import android.graphics.RectF
 import com.opencamera.core.effect.EffectSpec
 import com.opencamera.core.effect.EffectTarget
 import com.opencamera.core.effect.FrameEffect
@@ -684,6 +685,47 @@ class PreviewOverlayGeometryTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun `exact watermark frame scale preserves capture preview mapping`() {
+        assertEquals(1f, exactCaptureFrameScale(captureZoomRatio = 2f, previewZoomRatio = 2f), 0.001f)
+        assertEquals(0.5f, exactCaptureFrameScale(captureZoomRatio = 2f, previewZoomRatio = 1f), 0.001f)
+        assertEquals(0.1f, exactCaptureFrameScale(captureZoomRatio = 10f, previewZoomRatio = 1f), 0.001f)
+    }
+
+    @Test
+    fun `preview source point maps into shifted composition frame`() {
+        val transform = PreviewSurfaceTransform(
+            scale = 0.8f,
+            pivotX = 540f,
+            pivotY = 1200f,
+            translationX = 0f,
+            translationY = -25.92f,
+            sourceClipRect = RectF(0f, 480f, 1080f, 1920f)
+        )
+
+        val topLeft = transformedPreviewPoint(
+            normalizedX = 0f,
+            normalizedY = 480f / 1920f,
+            viewWidth = 1080,
+            viewHeight = 1920,
+            transform = transform,
+            isMirrored = false
+        )
+        val mirroredTopLeft = transformedPreviewPoint(
+            normalizedX = 0f,
+            normalizedY = 480f / 1920f,
+            viewWidth = 1080,
+            viewHeight = 1920,
+            transform = transform,
+            isMirrored = true
+        )
+
+        assertEquals(108f, topLeft.x, 0.01f)
+        assertEquals(598.08f, topLeft.y, 0.1f)
+        assertEquals(972f, mirroredTopLeft.x, 0.01f)
+        assertEquals(598.08f, mirroredTopLeft.y, 0.1f)
     }
 
     @Test

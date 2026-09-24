@@ -2,7 +2,9 @@ package com.opencamera.app.camera.live
 
 import android.net.Uri
 import android.provider.MediaStore
+import com.opencamera.core.media.MotionPhotoContainerParser
 import com.opencamera.core.media.MotionPhotoContainerSpec
+import com.opencamera.core.media.MotionPhotoJpegContainer
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -201,6 +203,44 @@ class LivePhotoMediaStoreWriterTest {
                 motionBytes,
                 combined.copyOfRange(combined.size - motionBytes.size, combined.size)
             )
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `createMotionPhotoBytes strips previously appended motion and rematerializes once`() {
+        val savedUri = Uri.parse("content://media/external/images/media/42")
+        val jpegBytes = makeMinimalJpeg()
+        val mp4 = makeFakeMp4()
+
+        // Simulate a MediaStore row that already holds a materialized motion photo
+        // (first attempt), then re-read it for a retry.
+        val alreadyMaterialized = MotionPhotoJpegContainer.write(
+            jpegBytes = jpegBytes,
+            motionBytes = mp4,
+            spec = MotionPhotoContainerSpec(motionLengthBytes = mp4.size.toLong())
+        )
+        shadowResolver.registerInputStream(savedUri, ByteArrayInputStream(alreadyMaterialized))
+
+        val tempDir = java.io.File(System.getProperty("java.io.tmpdir"), "motion-test-${System.nanoTime()}")
+        tempDir.mkdirs()
+        val motionFile = java.io.File(tempDir, "test.live.mp4")
+        motionFile.writeBytes(mp4)
+
+        try {
+            val result = writer.createMotionPhotoBytes(
+                savedUri = savedUri,
+                motionPath = motionFile.absolutePath,
+                spec = MotionPhotoContainerSpec(motionLengthBytes = motionFile.length())
+            )
+
+            assertTrue(result.isSuccess)
+            val combined = result.getOrNull()!!
+            val analysis = MotionPhotoContainerParser.analyze(combined)
+            assertTrue("rematerialized container must validate, issues=${analysis.issues}", analysis.valid)
+            assertEquals("exactly one MP4 appended", mp4.size.toLong(), analysis.motionLength)
+            assertTrue(combined.size < alreadyMaterialized.size + mp4.size)
         } finally {
             tempDir.deleteRecursively()
         }

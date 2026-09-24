@@ -20,7 +20,34 @@ internal data class RuntimeProControlsRenderModel(
     val exposureControl: FeatureCatalogControlRenderModel,
     val focusControl: FeatureCatalogControlRenderModel,
     val apertureControl: FeatureCatalogControlRenderModel,
-    val whiteBalanceControl: FeatureCatalogControlRenderModel
+    val whiteBalanceControl: FeatureCatalogControlRenderModel,
+    val primaryControls: List<RuntimeProControlSpec>
+)
+
+internal enum class RuntimeProControlId {
+    FORMAT,
+    ISO,
+    SHUTTER,
+    EV,
+    FOCUS,
+    APERTURE,
+    WHITE_BALANCE
+}
+
+internal data class RuntimeProScaleOption(
+    val label: String,
+    val action: FeatureCatalogAction?,
+    val isSelected: Boolean
+)
+
+internal data class RuntimeProControlSpec(
+    val id: RuntimeProControlId,
+    val railLabel: String,
+    val value: String,
+    val availability: SettingsControlAvailability,
+    val supportLabel: String?,
+    val isSelectable: Boolean,
+    val options: List<RuntimeProScaleOption>
 )
 
 internal fun runtimeProControlsRenderModel(
@@ -36,6 +63,96 @@ internal fun runtimeProControlsRenderModel(
     val hasAppliedManualControls = state.activeDeviceCapabilities.supportsAppliedManualControls
     val editingEnabled = settingsPageEditingEnabled(state)
     val runtimeSupportLabel = manualSupportSummary(text, manualCapabilities)
+    val rawControl = FeatureCatalogControlRenderModel(
+        label = text.get(R.string.label_capture_format),
+        value = if (manualCapabilities.raw == ManualControlSupport.APPLY && draft.rawEnabled) {
+            text.get(R.string.capture_format_raw_jpg)
+        } else {
+            text.get(R.string.capture_format_jpg)
+        },
+        availability = manualCapabilities.raw.toSettingsAvailability(),
+        availabilityLabel = text.availabilityLabel(manualCapabilities.raw.toSettingsAvailability()),
+        supportLabel = if (manualCapabilities.raw == ManualControlSupport.APPLY) {
+            manualCapabilities.raw.manualSupportLabel(text)
+        } else {
+            text.get(R.string.raw_output_unavailable_jpg)
+        },
+        nextAction = FeatureCatalogAction.UpdateManualRawEnabled(!draft.rawEnabled)
+            .takeIf {
+                isVisible && editingEnabled && manualCapabilities.raw == ManualControlSupport.APPLY
+            },
+        isToggleOn = draft.rawEnabled.takeIf {
+            manualCapabilities.raw == ManualControlSupport.APPLY
+        }
+    )
+    val isoControl = FeatureCatalogControlRenderModel(
+        label = text.get(R.string.label_iso),
+        value = draft.iso?.toString() ?: text.get(R.string.label_auto),
+        availability = manualCapabilities.iso.toSettingsAvailability(),
+        availabilityLabel = text.availabilityLabel(manualCapabilities.iso.toSettingsAvailability()),
+        supportLabel = manualCapabilities.iso.manualSupportLabel(text),
+        nextAction = FeatureCatalogAction.UpdateManualIso(
+            nextNullableListValue(draft.iso, MANUAL_ISO_OPTIONS)
+        ).takeIf { isVisible && editingEnabled && manualCapabilities.iso == ManualControlSupport.APPLY }
+    )
+    val shutterControl = FeatureCatalogControlRenderModel(
+        label = text.get(R.string.label_shutter),
+        value = draft.shutterSpeedMillis?.let { "${it}ms" } ?: text.get(R.string.label_auto),
+        availability = manualCapabilities.shutter.toSettingsAvailability(),
+        availabilityLabel = text.availabilityLabel(manualCapabilities.shutter.toSettingsAvailability()),
+        supportLabel = manualCapabilities.shutter.manualSupportLabel(text),
+        nextAction = FeatureCatalogAction.UpdateManualShutterSpeedMillis(
+            nextNullableListValue(draft.shutterSpeedMillis, MANUAL_SHUTTER_OPTIONS)
+        ).takeIf { isVisible && editingEnabled && manualCapabilities.shutter == ManualControlSupport.APPLY }
+    )
+    val exposureControl = FeatureCatalogControlRenderModel(
+        label = text.get(R.string.label_ev),
+        value = draft.exposureCompensationSteps?.let(::manualEvLabel) ?: text.get(R.string.label_auto),
+        availability = manualCapabilities.exposureCompensation.toSettingsAvailability(),
+        availabilityLabel = text.availabilityLabel(manualCapabilities.exposureCompensation.toSettingsAvailability()),
+        supportLabel = manualCapabilities.exposureCompensation.manualSupportLabel(text),
+        nextAction = FeatureCatalogAction.UpdateManualExposureCompensationSteps(
+            nextNullableListValue(draft.exposureCompensationSteps, MANUAL_EXPOSURE_OPTIONS)
+        ).takeIf {
+            isVisible && editingEnabled &&
+                manualCapabilities.exposureCompensation == ManualControlSupport.APPLY
+        }
+    )
+    val focusControl = FeatureCatalogControlRenderModel(
+        label = text.get(R.string.label_focus),
+        value = draft.focusDistanceDiopters?.let { String.format(Locale.US, "%.1fD", it) }
+            ?: text.get(R.string.label_auto),
+        availability = manualCapabilities.focusDistance.toSettingsAvailability(),
+        availabilityLabel = text.availabilityLabel(manualCapabilities.focusDistance.toSettingsAvailability()),
+        supportLabel = manualCapabilities.focusDistance.manualSupportLabel(text),
+        nextAction = FeatureCatalogAction.UpdateManualFocusDistanceDiopters(
+            nextNullableListValue(draft.focusDistanceDiopters, MANUAL_FOCUS_OPTIONS)
+        ).takeIf {
+            isVisible && editingEnabled && manualCapabilities.focusDistance == ManualControlSupport.APPLY
+        }
+    )
+    val apertureControl = FeatureCatalogControlRenderModel(
+        label = text.get(R.string.label_aperture),
+        value = draft.apertureFNumber?.let { "f/${manualOneDecimal(it)}" } ?: text.get(R.string.label_auto),
+        availability = manualCapabilities.aperture.toSettingsAvailability(),
+        availabilityLabel = text.availabilityLabel(manualCapabilities.aperture.toSettingsAvailability()),
+        supportLabel = manualCapabilities.aperture.manualSupportLabel(text),
+        nextAction = FeatureCatalogAction.UpdateManualApertureFNumber(
+            nextNullableListValue(draft.apertureFNumber, MANUAL_APERTURE_OPTIONS)
+        ).takeIf { isVisible && editingEnabled && manualCapabilities.aperture == ManualControlSupport.APPLY }
+    )
+    val whiteBalanceControl = FeatureCatalogControlRenderModel(
+        label = text.get(R.string.label_wb),
+        value = draft.whiteBalanceKelvin?.let { "${it}K" } ?: text.get(R.string.label_auto),
+        availability = manualCapabilities.whiteBalance.toSettingsAvailability(),
+        availabilityLabel = text.availabilityLabel(manualCapabilities.whiteBalance.toSettingsAvailability()),
+        supportLabel = manualCapabilities.whiteBalance.manualSupportLabel(text),
+        nextAction = FeatureCatalogAction.UpdateManualWhiteBalanceKelvin(
+            nextNullableListValue(draft.whiteBalanceKelvin, MANUAL_WHITE_BALANCE_OPTIONS)
+        ).takeIf {
+            isVisible && editingEnabled && manualCapabilities.whiteBalance == ManualControlSupport.APPLY
+        }
+    )
     return RuntimeProControlsRenderModel(
         isVisible = isVisible,
         headline = when (state.activeMode) {
@@ -48,7 +165,12 @@ internal fun runtimeProControlsRenderModel(
             text.get(R.string.pro_controls_supporting_readonly)
         },
         summary = buildString {
-            append(draft.localizedCompactSummary(text))
+            append(
+                draft.localizedCompactSummary(
+                    text = text,
+                    rawApplied = manualCapabilities.raw == ManualControlSupport.APPLY
+                )
+            )
             append(" | ")
             append(runtimeSupportLabel)
             if (!editingEnabled) {
@@ -56,89 +178,184 @@ internal fun runtimeProControlsRenderModel(
                 append(text.get(R.string.pro_controls_finish_capture_hint))
             }
         },
-        rawControl = FeatureCatalogControlRenderModel(
-            label = text.get(R.string.label_raw),
-            value = if (manualCapabilities.raw == ManualControlSupport.SAVED_ONLY) {
-                text.get(R.string.raw_saved_only_value)
-            } else {
-                onOffLabel(draft.rawEnabled, text)
-            },
-            availability = manualCapabilities.raw.toSettingsAvailability(),
-            availabilityLabel = text.availabilityLabel(manualCapabilities.raw.toSettingsAvailability()),
-            supportLabel = manualCapabilities.raw.manualSupportLabel(text),
-            nextAction = FeatureCatalogAction.UpdateManualRawEnabled(!draft.rawEnabled)
-                .takeIf { isVisible && editingEnabled },
-            isToggleOn = if (manualCapabilities.raw == ManualControlSupport.SAVED_ONLY) null else draft.rawEnabled
-        ),
-        isoControl = FeatureCatalogControlRenderModel(
-            label = text.get(R.string.label_iso),
-            value = draft.iso?.toString() ?: text.get(R.string.label_auto),
-            availability = manualCapabilities.iso.toSettingsAvailability(),
-            availabilityLabel = text.availabilityLabel(manualCapabilities.iso.toSettingsAvailability()),
-            supportLabel = manualCapabilities.iso.manualSupportLabel(text),
-            nextAction = FeatureCatalogAction.UpdateManualIso(
-                nextNullableListValue(draft.iso, MANUAL_ISO_OPTIONS)
-            )
-                .takeIf { isVisible && editingEnabled }
-        ),
-        shutterControl = FeatureCatalogControlRenderModel(
-            label = text.get(R.string.label_shutter),
-            value = draft.shutterSpeedMillis?.let { "${it}ms" } ?: text.get(R.string.label_auto),
-            availability = manualCapabilities.shutter.toSettingsAvailability(),
-            availabilityLabel = text.availabilityLabel(manualCapabilities.shutter.toSettingsAvailability()),
-            supportLabel = manualCapabilities.shutter.manualSupportLabel(text),
-            nextAction = FeatureCatalogAction.UpdateManualShutterSpeedMillis(
-                nextNullableListValue(draft.shutterSpeedMillis, MANUAL_SHUTTER_OPTIONS)
-            )
-                .takeIf { isVisible && editingEnabled }
-        ),
-        exposureControl = FeatureCatalogControlRenderModel(
-            label = text.get(R.string.label_ev),
-            value = draft.exposureCompensationSteps?.let(::manualEvLabel) ?: text.get(R.string.label_auto),
-            availability = manualCapabilities.exposureCompensation.toSettingsAvailability(),
-            availabilityLabel = text.availabilityLabel(manualCapabilities.exposureCompensation.toSettingsAvailability()),
-            supportLabel = manualCapabilities.exposureCompensation.manualSupportLabel(text),
-            nextAction = FeatureCatalogAction.UpdateManualExposureCompensationSteps(
-                nextNullableListValue(draft.exposureCompensationSteps, MANUAL_EXPOSURE_OPTIONS)
-            )
-                .takeIf { isVisible && editingEnabled }
-        ),
-        focusControl = FeatureCatalogControlRenderModel(
-            label = text.get(R.string.label_focus),
-            value = draft.focusDistanceDiopters?.let { String.format(Locale.US, "%.1fD", it) }
-                ?: text.get(R.string.label_auto),
-            availability = manualCapabilities.focusDistance.toSettingsAvailability(),
-            availabilityLabel = text.availabilityLabel(manualCapabilities.focusDistance.toSettingsAvailability()),
-            supportLabel = manualCapabilities.focusDistance.manualSupportLabel(text),
-            nextAction = FeatureCatalogAction.UpdateManualFocusDistanceDiopters(
-                nextNullableListValue(draft.focusDistanceDiopters, MANUAL_FOCUS_OPTIONS)
-            )
-                .takeIf { isVisible && editingEnabled }
-        ),
-        apertureControl = FeatureCatalogControlRenderModel(
-            label = text.get(R.string.label_aperture),
-            value = draft.apertureFNumber?.let { "f/${manualOneDecimal(it)}" } ?: text.get(R.string.label_auto),
-            availability = manualCapabilities.aperture.toSettingsAvailability(),
-            availabilityLabel = text.availabilityLabel(manualCapabilities.aperture.toSettingsAvailability()),
-            supportLabel = manualCapabilities.aperture.manualSupportLabel(text),
-            nextAction = FeatureCatalogAction.UpdateManualApertureFNumber(
-                nextNullableListValue(draft.apertureFNumber, MANUAL_APERTURE_OPTIONS)
-            )
-                .takeIf { isVisible && editingEnabled }
-        ),
-        whiteBalanceControl = FeatureCatalogControlRenderModel(
-            label = text.get(R.string.label_wb),
-            value = draft.whiteBalanceKelvin?.let { "${it}K" } ?: text.get(R.string.label_auto),
-            availability = manualCapabilities.whiteBalance.toSettingsAvailability(),
-            availabilityLabel = text.availabilityLabel(manualCapabilities.whiteBalance.toSettingsAvailability()),
-            supportLabel = manualCapabilities.whiteBalance.manualSupportLabel(text),
-            nextAction = FeatureCatalogAction.UpdateManualWhiteBalanceKelvin(
-                nextNullableListValue(draft.whiteBalanceKelvin, MANUAL_WHITE_BALANCE_OPTIONS)
-            )
-                .takeIf { isVisible && editingEnabled }
+        rawControl = rawControl,
+        isoControl = isoControl,
+        shutterControl = shutterControl,
+        exposureControl = exposureControl,
+        focusControl = focusControl,
+        apertureControl = apertureControl,
+        whiteBalanceControl = whiteBalanceControl,
+        primaryControls = buildPrimaryControls(
+            draft = draft,
+            text = text,
+            rawControl = rawControl,
+            isoControl = isoControl,
+            shutterControl = shutterControl,
+            exposureControl = exposureControl,
+            focusControl = focusControl,
+            apertureControl = apertureControl,
+            whiteBalanceControl = whiteBalanceControl,
+            rawSupport = manualCapabilities.raw,
+            editingEnabled = isVisible && editingEnabled
         )
     )
 }
+
+private fun buildPrimaryControls(
+    draft: ManualCaptureParams,
+    text: AppTextResolver,
+    rawControl: FeatureCatalogControlRenderModel,
+    isoControl: FeatureCatalogControlRenderModel,
+    shutterControl: FeatureCatalogControlRenderModel,
+    exposureControl: FeatureCatalogControlRenderModel,
+    focusControl: FeatureCatalogControlRenderModel,
+    apertureControl: FeatureCatalogControlRenderModel,
+    whiteBalanceControl: FeatureCatalogControlRenderModel,
+    rawSupport: ManualControlSupport,
+    editingEnabled: Boolean
+): List<RuntimeProControlSpec> = listOf(
+    RuntimeProControlSpec(
+        id = RuntimeProControlId.FORMAT,
+        railLabel = text.get(R.string.capture_format_jpg),
+        value = rawControl.value,
+        availability = rawControl.availability,
+        supportLabel = rawControl.supportLabel,
+        isSelectable = editingEnabled && rawSupport == ManualControlSupport.APPLY,
+        options = buildList {
+            add(
+                RuntimeProScaleOption(
+                    label = text.get(R.string.capture_format_jpg),
+                    action = FeatureCatalogAction.UpdateManualRawEnabled(false)
+                        .takeIf { editingEnabled && rawSupport == ManualControlSupport.APPLY },
+                    isSelected = !draft.rawEnabled || rawSupport != ManualControlSupport.APPLY
+                )
+            )
+            if (rawSupport == ManualControlSupport.APPLY) {
+                add(
+                    RuntimeProScaleOption(
+                        label = text.get(R.string.capture_format_raw_jpg),
+                        action = FeatureCatalogAction.UpdateManualRawEnabled(true)
+                            .takeIf { editingEnabled },
+                        isSelected = draft.rawEnabled
+                    )
+                )
+            }
+        }
+    ),
+    RuntimeProControlSpec(
+        id = RuntimeProControlId.ISO,
+        railLabel = "ISO",
+        value = isoControl.value,
+        availability = isoControl.availability,
+        supportLabel = isoControl.supportLabel,
+        isSelectable = editingEnabled && isoControl.availability == SettingsControlAvailability.SUPPORTED,
+        options = MANUAL_ISO_OPTIONS.map { value ->
+            RuntimeProScaleOption(
+                label = value?.toString() ?: text.get(R.string.label_auto).uppercase(Locale.ROOT),
+                action = FeatureCatalogAction.UpdateManualIso(value).takeIf {
+                    editingEnabled && isoControl.availability == SettingsControlAvailability.SUPPORTED
+                },
+                isSelected = draft.iso == value
+            )
+        }
+    ),
+    RuntimeProControlSpec(
+        id = RuntimeProControlId.SHUTTER,
+        railLabel = "S",
+        value = shutterControl.value,
+        availability = shutterControl.availability,
+        supportLabel = shutterControl.supportLabel,
+        isSelectable = editingEnabled && shutterControl.availability == SettingsControlAvailability.SUPPORTED,
+        options = MANUAL_SHUTTER_OPTIONS.map { value ->
+            RuntimeProScaleOption(
+                label = value?.let(::manualShutterScaleLabel)
+                    ?: text.get(R.string.label_auto).uppercase(Locale.ROOT),
+                action = FeatureCatalogAction.UpdateManualShutterSpeedMillis(value)
+                    .takeIf {
+                        editingEnabled &&
+                            shutterControl.availability == SettingsControlAvailability.SUPPORTED
+                    },
+                isSelected = draft.shutterSpeedMillis == value
+            )
+        }
+    ),
+    RuntimeProControlSpec(
+        id = RuntimeProControlId.EV,
+        railLabel = "EV",
+        value = exposureControl.value,
+        availability = exposureControl.availability,
+        supportLabel = exposureControl.supportLabel,
+        isSelectable = editingEnabled && exposureControl.availability == SettingsControlAvailability.SUPPORTED,
+        options = MANUAL_EXPOSURE_OPTIONS.map { value ->
+            RuntimeProScaleOption(
+                label = value?.let(::manualEvLabel)
+                    ?: text.get(R.string.label_auto).uppercase(Locale.ROOT),
+                action = FeatureCatalogAction.UpdateManualExposureCompensationSteps(value)
+                    .takeIf {
+                        editingEnabled &&
+                            exposureControl.availability == SettingsControlAvailability.SUPPORTED
+                    },
+                isSelected = draft.exposureCompensationSteps == value
+            )
+        }
+    ),
+    RuntimeProControlSpec(
+        id = RuntimeProControlId.FOCUS,
+        railLabel = "AF",
+        value = focusControl.value,
+        availability = focusControl.availability,
+        supportLabel = focusControl.supportLabel,
+        isSelectable = editingEnabled && focusControl.availability == SettingsControlAvailability.SUPPORTED,
+        options = MANUAL_FOCUS_OPTIONS.map { value ->
+            RuntimeProScaleOption(
+                label = value?.let { manualOneDecimal(it) }
+                    ?: text.get(R.string.label_auto).uppercase(Locale.ROOT),
+                action = FeatureCatalogAction.UpdateManualFocusDistanceDiopters(value)
+                    .takeIf {
+                        editingEnabled &&
+                            focusControl.availability == SettingsControlAvailability.SUPPORTED
+                    },
+                isSelected = draft.focusDistanceDiopters == value
+            )
+        }
+    ),
+    RuntimeProControlSpec(
+        id = RuntimeProControlId.APERTURE,
+        railLabel = "F",
+        value = apertureControl.value,
+        availability = apertureControl.availability,
+        supportLabel = apertureControl.supportLabel,
+        isSelectable = editingEnabled && apertureControl.availability == SettingsControlAvailability.SUPPORTED,
+        options = MANUAL_APERTURE_OPTIONS.map { value ->
+            RuntimeProScaleOption(
+                label = value?.let { "f/${manualOneDecimal(it)}" }
+                    ?: text.get(R.string.label_auto).uppercase(Locale.ROOT),
+                action = FeatureCatalogAction.UpdateManualApertureFNumber(value).takeIf {
+                    editingEnabled && apertureControl.availability == SettingsControlAvailability.SUPPORTED
+                },
+                isSelected = draft.apertureFNumber == value
+            )
+        }
+    ),
+    RuntimeProControlSpec(
+        id = RuntimeProControlId.WHITE_BALANCE,
+        railLabel = "WB",
+        value = whiteBalanceControl.value,
+        availability = whiteBalanceControl.availability,
+        supportLabel = whiteBalanceControl.supportLabel,
+        isSelectable = editingEnabled && whiteBalanceControl.availability == SettingsControlAvailability.SUPPORTED,
+        options = MANUAL_WHITE_BALANCE_OPTIONS.map { value ->
+            RuntimeProScaleOption(
+                label = value?.let { "${it}K" }
+                    ?: text.get(R.string.label_auto).uppercase(Locale.ROOT),
+                action = FeatureCatalogAction.UpdateManualWhiteBalanceKelvin(value).takeIf {
+                    editingEnabled && whiteBalanceControl.availability == SettingsControlAvailability.SUPPORTED
+                },
+                isSelected = draft.whiteBalanceKelvin == value
+            )
+        }
+    )
+)
 
 private fun ManualControlSupport.toSettingsAvailability(): SettingsControlAvailability {
     return when (this) {
@@ -208,11 +425,17 @@ private fun manualSupportSummary(
     }
 }
 
-private fun ManualCaptureParams.localizedCompactSummary(text: AppTextResolver): String {
+private fun ManualCaptureParams.localizedCompactSummary(
+    text: AppTextResolver,
+    rawApplied: Boolean
+): String {
     return buildString {
-        append(text.get(R.string.label_raw))
+        append(text.get(R.string.label_capture_format))
         append(" ")
-        append(text.onOff(rawEnabled))
+        append(
+            if (rawEnabled && rawApplied) text.get(R.string.capture_format_raw_jpg)
+            else text.get(R.string.capture_format_jpg)
+        )
         append(" | ")
         append(text.get(R.string.label_iso))
         append(" ")
@@ -242,6 +465,12 @@ private fun manualEvLabel(steps: Int): String {
         steps > 0 -> "+$steps"
         else -> steps.toString()
     }
+}
+
+private fun manualShutterScaleLabel(milliseconds: Long): String {
+    if (milliseconds >= 1000L) return "${milliseconds / 1000}s"
+    val denominator = (1000.0 / milliseconds.toDouble()).toInt().coerceAtLeast(1)
+    return "1/$denominator"
 }
 
 private fun manualOneDecimal(value: Float): String = String.format(Locale.US, "%.1f", value)

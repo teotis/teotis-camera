@@ -1,6 +1,7 @@
 package com.opencamera.app.camera
 
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.Preview
 import androidx.camera.camera2.interop.Camera2Interop
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.params.RggbChannelVector
@@ -94,7 +95,20 @@ internal fun applyCamera2ManualCaptureConfig(
     builder: ImageCapture.Builder,
     config: Camera2ManualCaptureConfig
 ) {
-    val extender = Camera2Interop.Extender(builder)
+    applyCamera2ManualConfig(Camera2Interop.Extender(builder), config)
+}
+
+internal fun applyCamera2ManualPreviewConfig(
+    builder: Preview.Builder,
+    config: Camera2ManualCaptureConfig
+) {
+    applyCamera2ManualConfig(Camera2Interop.Extender(builder), config)
+}
+
+private fun applyCamera2ManualConfig(
+    extender: Camera2Interop.Extender<*>,
+    config: Camera2ManualCaptureConfig
+) {
     if (config.iso != null || config.shutterTimeNanos != null) {
         extender.setCaptureRequestOption(
             CaptureRequest.CONTROL_AE_MODE,

@@ -17,7 +17,8 @@ interface CameraDeviceAdapter {
     suspend fun bindUseCases(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
-        deviceGraph: DeviceGraphSpec
+        deviceGraph: DeviceGraphSpec,
+        manualCaptureParams: com.opencamera.core.settings.ManualCaptureParams? = null
     )
 
     suspend fun dispatch(command: DeviceCommand)

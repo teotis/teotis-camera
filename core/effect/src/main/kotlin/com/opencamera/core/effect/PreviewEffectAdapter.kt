@@ -131,7 +131,7 @@ class PreviewEffectAdapter {
             "pure-text" -> WatermarkPreviewShape.BOTTOM_BAR
             "blur-four-border" -> WatermarkPreviewShape.FOUR_BORDER
             "professional-bottom-bar" -> WatermarkPreviewShape.BOTTOM_BAR
-            "travel-polaroid",
+            TravelTicketPaperSpec.TEMPLATE_ID,
             "retro-frame",
             "night-street",
             "van-gogh-starry",
@@ -142,7 +142,7 @@ class PreviewEffectAdapter {
 
     private fun resolveWatermarkDecoration(templateId: String): WatermarkPreviewDecoration {
         return when (templateId) {
-            "travel-polaroid" -> WatermarkPreviewDecoration.TRAVEL_MAP
+            TravelTicketPaperSpec.TEMPLATE_ID -> WatermarkPreviewDecoration.TRAVEL_TICKET
             "retro-frame" -> WatermarkPreviewDecoration.ARCHIVAL_PAPER
             "night-street" -> WatermarkPreviewDecoration.NIGHT_MEMORY
             "van-gogh-starry" -> WatermarkPreviewDecoration.STARRY_MOON
@@ -154,6 +154,7 @@ class PreviewEffectAdapter {
 
     private fun resolvePreviewText(effect: WatermarkEffect): String {
         return when (effect.templateId) {
+            TravelTicketPaperSpec.TEMPLATE_ID -> TravelTicketPaperSpec.TITLE
             "blue-hour" -> "BLUE HOUR"
             "van-gogh-starry" -> metadataPreviewLabels(effect).joinToString(" · ")
                 .ifBlank { "Watermark" }
@@ -163,6 +164,7 @@ class PreviewEffectAdapter {
 
     private fun buildPreviewLabels(effect: WatermarkEffect): List<String> {
         if (
+            effect.templateId != TravelTicketPaperSpec.TEMPLATE_ID &&
             effect.templateId != "professional-bottom-bar" &&
             effect.templateId != "pure-text" &&
             effect.templateId != "blur-four-border" &&
@@ -171,8 +173,21 @@ class PreviewEffectAdapter {
         ) {
             return emptyList()
         }
-        if (effect.templateId == "van-gogh-starry" || effect.templateId == "blue-hour") {
-            return metadataPreviewLabels(effect)
+        if (
+            effect.templateId == TravelTicketPaperSpec.TEMPLATE_ID ||
+            effect.templateId == "van-gogh-starry" ||
+            effect.templateId == "blue-hour"
+        ) {
+            return if (effect.templateId == TravelTicketPaperSpec.TEMPLATE_ID) {
+                TravelTicketPaperSpec.supportingLines(
+                    location = effect.tokens["watermarkLocation"] ?: effect.tokens["location"],
+                    profileName = effect.tokens["watermarkProfileName"] ?: effect.tokens["profile-name"],
+                    datetime = effect.tokens["watermarkDatetime"] ?: effect.tokens["datetime"],
+                    model = effect.tokens["watermarkModel"]
+                )
+            } else {
+                metadataPreviewLabels(effect)
+            }
         }
         val labels = mutableListOf<String>()
         effect.tokens["watermarkModel"]?.takeIf { it.isNotBlank() }?.let { labels.add(it) }

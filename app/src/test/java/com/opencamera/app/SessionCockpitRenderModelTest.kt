@@ -241,7 +241,8 @@ class SessionCockpitRenderModelTest {
                 "live-motion:status=encoded",
                 "motion-photo:xmp=present",
                 "motion-photo:appended-mp4-bytes=12345",
-                "gallery-recognition=untested"
+                "gallery-recognition=container-validated",
+                "gallery-recognition:external=pending"
             )
         )
 
@@ -249,12 +250,16 @@ class SessionCockpitRenderModelTest {
         assertTrue(output.contains("live-format:intended=google-motion-photo-jpeg"))
         assertTrue(output.contains("live-format:actual=google-motion-photo-jpeg"))
         assertTrue(output.contains("live-motion:status=encoded"))
-        assertTrue(output.contains("gallery-recognition=untested"))
+        assertTrue(output.contains("gallery-recognition=container-validated"))
+        assertTrue("recognition must not claim system gallery acceptance") {
+            output.contains("gallery-recognition:external=pending")
+        }
+        assertFalse(output.contains("gallery-recognition=untested"))
         // Output must not dump raw metadata blobs
         assertFalse(output.contains("x:xmpmeta"))
         assertFalse(output.contains("rdf:RDF"))
-        // 7 lines: prefix + status line + 4 asset lines + pipeline notes
-        assertEquals(7, output.lines().size, "Output must stay compact for QA")
+        // 8 lines: prefix + status text (2 lines incl. recognition note) + 4 asset lines + pipeline notes
+        assertEquals(8, output.lines().size, "Output must stay compact for QA")
     }
 
     @Test
@@ -276,14 +281,15 @@ class SessionCockpitRenderModelTest {
                 "live-format:actual=still-jpeg",
                 "live-motion:status=failed",
                 "motion-photo:container=failed:motion-encode-error",
-                "gallery-recognition=untested"
+                "gallery-recognition=not-materialized",
+                "gallery-recognition:external=pending"
             )
         )
 
         val output = sessionCaptureOutputText(state, strings, TestAppTextResolver())
         assertTrue(output.contains("live-format:actual=still-jpeg"))
         assertTrue(output.contains("live-motion:status=failed"))
-        assertTrue(output.contains("gallery-recognition=untested"))
+        assertTrue(output.contains("gallery-recognition=not-materialized"))
         assertFalse(output.contains("google-jpeg"))
     }
 
@@ -1026,7 +1032,7 @@ class SessionCockpitRenderModelTest {
         val sheet = quickPanelSheetRenderModel(state, TestAppTextResolver(), strings)
 
         assertEquals("Watermark", sheet.watermarkRow.title)
-        assertEquals("Travel Polaroid", sheet.watermarkRow.value)
+        assertEquals("Philosophy Like Water", sheet.watermarkRow.value)
         assertTrue(sheet.watermarkRow.isEnabled)
         assertNull(sheet.watermarkRow.disabledReason)
     }
@@ -1143,7 +1149,7 @@ class SessionCockpitRenderModelTest {
 
         // The watermark value should be the localized label, not the raw id
         assertNotEquals("travel-polaroid", sheet.watermarkRow.value)
-        assertEquals("Travel Polaroid", sheet.watermarkRow.value)
+        assertEquals("Philosophy Like Water", sheet.watermarkRow.value)
     }
 
     @Test

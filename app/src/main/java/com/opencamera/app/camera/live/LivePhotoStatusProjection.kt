@@ -68,11 +68,16 @@ object LivePhotoStatusProjection {
         }
     }
 
-    fun statusText(status: LivePhotoStatus, formatLabel: String? = null): String? {
+    fun statusText(status: LivePhotoStatus, formatLabel: String? = null, pipelineNotes: List<String> = emptyList()): String? {
         return when (status) {
             is LivePhotoStatus.Materialized -> {
                 val label = formatLabel ?: status.format.label
-                "实况已生成（$label）"
+                val recognition = recognitionNote(pipelineNotes)
+                if (recognition != null) {
+                    "实况已生成（$label）\n$recognition"
+                } else {
+                    "实况已生成（$label）"
+                }
             }
             is LivePhotoStatus.Degraded -> {
                 val label = formatLabel ?: status.format.label
@@ -80,6 +85,29 @@ object LivePhotoStatusProjection {
             }
             LivePhotoStatus.NotRequested -> null
             LivePhotoStatus.Unknown -> "实况状态未知，请查看诊断日志"
+        }
+    }
+
+    /**
+     * Renders the local container-validation outcome. Never claims that a system
+     * gallery recognized the photo: external recognition stays pending real-device
+     * evidence (01-forensic-baseline gate).
+     */
+    fun recognitionNote(pipelineNotes: List<String>): String? {
+        val containerStatus = pipelineNotes
+            .firstOrNull { it.startsWith("gallery-recognition=") }
+            ?.substringAfter("gallery-recognition=")
+        val externalPending = pipelineNotes.any { it == "gallery-recognition:external=pending" }
+        return when {
+            containerStatus == "container-validated" ->
+                if (externalPending) "容器结构已验证 · 系统相册识别待真机验证" else "容器结构已验证"
+            containerStatus != null && containerStatus.startsWith("container-invalid") -> {
+                val reason = containerStatus.removePrefix("container-invalid:")
+                "容器结构异常：${reason.ifEmpty { "未知原因" }}"
+            }
+            containerStatus == "container-unchecked" -> "容器结构未验证"
+            containerStatus == "not-materialized" -> "实况容器未生成"
+            else -> null
         }
     }
 

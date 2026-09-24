@@ -13,7 +13,6 @@ internal data class DocumentBatchRailRenderModel(
     val items: List<DocumentBatchRailItemRenderModel>,
     val latestItemId: String?,
     val organizeEnabled: Boolean,
-    val latestThumbnailUri: String? = null,
     val isSlimShooting: Boolean = false,
     val overviewLabel: String = "",
     val moveUpLabel: String = "",
@@ -66,15 +65,12 @@ internal fun documentBatchRailRenderModel(
     }
 
     val isSlimShooting = cockpitRoute is CockpitPanelRoute.None
-    val latestItem = items.lastOrNull { it.isLatest }
-
     return DocumentBatchRailRenderModel(
         visible = items.isNotEmpty() && isSlimShooting,
         countText = text.documentBatchPageCount(items.size),
         items = items,
         latestItemId = batch.latestItemId,
         organizeEnabled = items.isNotEmpty(),
-        latestThumbnailUri = latestItem?.renderUri,
         isSlimShooting = isSlimShooting,
         overviewLabel = text.get(R.string.button_document_batch_export),
         moveUpLabel = text.get(R.string.document_batch_move_up),

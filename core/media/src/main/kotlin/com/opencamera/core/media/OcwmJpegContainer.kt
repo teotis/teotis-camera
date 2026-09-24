@@ -182,15 +182,17 @@ object OcwmJpegContainer {
         // Verify binary format version from chunk header
         require(sorted.first().formatVersion == 1) { "ocwm-version-unsupported" }
 
-        // Reassemble payload
-        require(totalPayloadLength in 0..Int.MAX_VALUE.toLong()) { "ocwm-payload-length-invalid" }
+        // Reassemble payload. Verify the declared length against the bytes we
+        // actually hold before allocating, so a forged header cannot request a
+        // multi-gigabyte buffer.
+        val availablePayloadBytes = sorted.sumOf { it.payloadSlice.size.toLong() }
+        require(availablePayloadBytes == totalPayloadLength) { "ocwm-chunk-missing" }
         val payload = ByteArray(totalPayloadLength.toInt())
         var offset = 0
         for (chunk in sorted) {
             chunk.payloadSlice.copyInto(payload, offset)
             offset += chunk.payloadSlice.size
         }
-        require(offset == totalPayloadLength.toInt()) { "ocwm-chunk-missing" }
 
         // Parse manifest from chunk 0
         val manifestJson = sorted.first().manifestUtf8
@@ -242,6 +244,10 @@ object OcwmJpegContainer {
 
         var manifestUtf8: String? = null
         if (manifestLength > 0) {
+            // The declared manifest must fit inside this segment's payload; a
+            // forged length must never drive a read past the buffer.
+            val availableManifestBytes = payloadLen - FIXED_HEADER_SIZE
+            if (manifestLength > availableManifestBytes) return null
             manifestUtf8 = String(data, pos, manifestLength, Charsets.UTF_8)
             pos += manifestLength
         }

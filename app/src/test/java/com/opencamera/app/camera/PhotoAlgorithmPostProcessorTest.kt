@@ -292,6 +292,8 @@ class PhotoAlgorithmPostProcessorTest {
         assertEquals("photo-vivid-pro", humanisticProfessional.profile)
         assertTrue(checkInClarity.sharpnessBoost > 0f)
         assertTrue(checkInFocusStack.sharpnessBoost > 0f)
+        assertEquals(0.04f, checkInFocusStack.sharpnessBoost)
+        assertEquals(1.03f, checkInFocusStack.contrast)
         assertTrue(checkInFocusStack.sharpnessBoost < checkInClarity.sharpnessBoost)
         assertTrue(humanisticProfessional.saturation > 1f)
     }
@@ -337,6 +339,7 @@ class PhotoAlgorithmPostProcessorTest {
         assertEquals(1, editor.invocations.size)
         assertEquals("checkin-clarity-focus-stack-v1", editor.invocations.single().spec.profile)
         assertTrue(editor.invocations.single().spec.sharpnessBoost > 0f)
+        assertTrue(editor.invocations.single().spec.sharpnessBoost <= 0.04f)
         assertTrue(result.pipelineNotes.contains("algorithm-render:applied:checkin-clarity-focus-stack-v1"))
     }
 

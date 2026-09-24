@@ -38,6 +38,9 @@
     <string name="style_panel_title">风格</string>
     <string name="color_lab_panel_title">色彩实验室</string>
     <string name="button_use_this_style">使用此风格</string>
+    <string name="button_hold_original">按住看原图</string>
+    <string name="label_style_strength">强度</string>
+    <string name="status_style_preview_preparing">正在准备预览</string>
     <string name="style_rail_title_photo">照片风格</string>
     <string name="style_rail_title_humanistic">人文风格</string>
     <string name="style_rail_title_portrait">人像风格</string>
@@ -176,6 +179,10 @@
     <string name="label_tokens">标记</string>
     <string name="label_raw">RAW</string>
     <string name="raw_saved_only_value">仅记录</string>
+    <string name="label_capture_format">格式</string>
+    <string name="capture_format_jpg">JPG</string>
+    <string name="capture_format_raw_jpg">RAW + JPG</string>
+    <string name="raw_output_unavailable_jpg">RAW 输出暂不可用，当前保存 JPG</string>
     <string name="label_iso">ISO</string>
     <string name="label_shutter">快门</string>
     <string name="label_ev">EV</string>
@@ -463,7 +470,7 @@
     <string name="watermark_selector_current_default"> | 当前默认</string>
     <string name="watermark_selector_edit_attrs_frame">位置、大小、透明度、背景</string>
     <string name="watermark_selector_edit_attrs_classic">位置、大小、透明度</string>
-    <string name="watermark_selector_footer_supported">经典叠加保持其边框背景固定；旅行拍立得和复古边框在其专属样式页上提供边框背景变体。所有静态照片水印均内嵌可逆原始 JPEG 归档，可通过工具脚本提取。</string>
+    <string name="watermark_selector_footer_supported">经典叠加保持其边框背景固定；哲思如水采用固定暖白票纸，复古边框在专属样式页提供边框背景变体。所有静态照片水印均内嵌可逆原始 JPEG 归档，可通过工具脚本提取。</string>
     <string name="watermark_selector_footer_unsupported">此设备不支持拍照，水印实验室保持只读状态。</string>
 
     <!-- Watermark detail -->
@@ -483,7 +490,7 @@
     <string name="watermark_template_classic_overlay">经典叠加</string>
     <string name="watermark_template_pure_text">透光底栏</string>
     <string name="watermark_template_blur_four_border">模糊四边框</string>
-    <string name="watermark_template_travel_polaroid">旅行拍立得</string>
+    <string name="watermark_template_travel_polaroid">哲思如水</string>
     <string name="watermark_template_retro_frame">复古边框</string>
     <string name="watermark_template_van_gogh_starry">梵高星月</string>
     <string name="watermark_template_blue_hour">蓝调时刻</string>
@@ -593,6 +600,11 @@
     <string name="document_batch_remove">移出本轮</string>
     <string name="document_batch_move_up">上移</string>
     <string name="document_batch_move_down">下移</string>
+    <string name="document_batch_clear">清空</string>
+    <string name="document_batch_clear_confirm">确认</string>
+    <string name="document_batch_clear_content_description">清空本轮文档</string>
+    <string name="document_batch_clear_confirm_content_description">再次点击确认清空本轮文档</string>
+    <string name="document_batch_clear_toast">本轮已清空</string>
     <string name="document_batch_crop_applied">已裁边</string>
     <string name="document_batch_crop_skipped">未裁边</string>
     <string name="document_batch_crop_failed">裁边失败</string>
@@ -635,6 +647,7 @@
     <string name="live_photo_asset_motion">动态片段</string>
     <string name="live_photo_asset_sidecar">附属文件</string>
     <string name="live_photo_asset_thumbnail">缩略图</string>
+    <string name="live_photo_playback_unavailable">实况片段不可播放</string>
     <string name="watermark_still_only">水印: 仅静态</string>
     <string name="watermark_metadata_only">水印: 仅元数据</string>
     <string name="watermark_burned_in">水印: 动态嵌入</string>
@@ -680,17 +693,17 @@
     <string name="checkin_scenario_portrait">人像</string>
     <string name="checkin_scenario_people_place">人景</string>
     <string name="checkin_scenario_object_place">物景</string>
-    <string name="checkin_scenario_clarity">全清</string>
+    <string name="checkin_scenario_clarity">清晰辅助</string>
     <string name="checkin_scenario_desc_portrait">人像特写，突出人物表情与姿态</string>
     <string name="checkin_scenario_desc_people_place">人物与环境结合，记录场景氛围</string>
     <string name="checkin_scenario_desc_object_place">物品与环境，记录细节与空间</string>
-    <string name="checkin_scenario_desc_clarity">多帧合成，提升画面清晰度</string>
+    <string name="checkin_scenario_desc_clarity">多帧辅助，提升画面细节清晰度</string>
     <string name="checkin_scene_prefix">场景: </string>
     <string name="checkin_focus_mode"> | 对焦模式</string>
     <string name="checkin_guidance_portrait">建议: 保持人物在画面中心，利用景深突出主体</string>
     <string name="checkin_guidance_people_place">建议: 兼顾人物与环境，适当留白展现空间</string>
     <string name="checkin_guidance_object_place">建议: 对准物品细节，利用环境光线增强质感</string>
-    <string name="checkin_guidance_clarity">建议: 保持稳定，多帧合成将提升细节清晰度</string>
+    <string name="checkin_guidance_clarity">建议: 保持稳定，清晰辅助会用多帧增强细节</string>
     <string name="checkin_degraded_badge">设备不支持多帧合成</string>
     <string name="checkin_degraded_depth">景深效果不可用，使用对焦优先模式</string>
     <string name="checkin_degraded_multiframe">多帧合成不可用，使用单帧最佳效果</string>

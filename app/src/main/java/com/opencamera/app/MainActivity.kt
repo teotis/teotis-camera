@@ -9,7 +9,9 @@ import android.media.MediaActionSound
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.MediaStore
+import android.util.Log
 import android.widget.Toast
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
@@ -48,15 +50,20 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.InputStream
 
 @Suppress("EXPOSED_PARAMETER_TYPE")
 class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
+
+    private companion object {
+        const val TAG = "MainActivity"
+    }
+
     private val container: AppContainer
         get() = (application as OpenCameraApplication).container
 
     private lateinit var views: MainActivityViews
     private val shutterClickSound = MediaActionSound()
+    private var motionPhotoPlaybackDialog: com.opencamera.app.camera.live.MotionPhotoPlaybackDialog? = null
     private var lastRequestedThumbnailUri: String? = null
     private var lastSourceIdentity: String? = null
     private var lastPlayedShutterSoundShotId: String? = null
@@ -82,6 +89,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private var latestFilterStripRenderModel: FilterStripRenderModel? = null
     private var latestSessionState: SessionState? = null
     private var lightPaletteBaseSpec: FilterRenderSpec? = null
+    private var styleRailPreviewBitmap: android.graphics.Bitmap? = null
+    private var styleRailPreviewCapturedAtMillis: Long = 0L
     private var latestDeviceProbeSummary: String? = null
     private val cameraPermissionGate = CameraPermissionGate()
     private lateinit var permissionRequestHistory: PermissionRequestHistory
@@ -100,7 +109,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     private lateinit var actionBinder: MainActivityActionBinder
     private lateinit var documentBatchRailRenderer: DocumentBatchRailRenderer
     private lateinit var documentBatchOrganizerRenderer: DocumentBatchOrganizerRenderer
-    private lateinit var documentBatchZipExporter: DocumentBatchZipExporter
+    private lateinit var documentBatchExportCoordinator: DocumentBatchExportCoordinator
     private lateinit var runtimeProControlsRenderer: RuntimeProControlsRenderer
     private lateinit var cropEditOverlay: DocumentCropEditOverlay
     private lateinit var exportOverlay: DocumentExportOverlay
@@ -129,7 +138,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         views = MainActivityViews.bind(this)
         initRenderers()
         devLogExporter = DevLogExporter(this)
-        documentBatchZipExporter = DocumentBatchZipExporter(documentExportDirectory())
+        documentBatchExportCoordinator = DocumentBatchExportCoordinator(this)
         permissionRequestHistory = PermissionRequestHistory(
             getSharedPreferences("permission_request_history", MODE_PRIVATE)
         )
@@ -205,7 +214,13 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             onSelectFilter = { action -> applySettingsAction(action) },
             isFilterAdjustmentVisible = { panelState.isFilterAdjustmentVisible },
             onApplyStyle = { action -> applySettingsAction(action) },
-            cardRail = views.bottomCockpit.stylePresetCardRail
+            cardRail = views.bottomCockpit.stylePresetCardRail,
+            previewBitmapProvider = ::captureStyleRailPreviewBitmap,
+            onOriginalComparisonChanged = ::setStyleOriginalComparisonActive,
+            onPreviewStyleStrengthChanged = { strength ->
+                dispatch(SessionIntent.PreviewStyleStrengthChanged(strength))
+            },
+            onCommitStyleStrength = ::commitStyleStrength
         )
         devConsoleRenderer = DevConsoleRenderer(this, views.devConsole)
         documentBatchRailRenderer = DocumentBatchRailRenderer(
@@ -217,7 +232,11 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             onMoveDownItemClick = { itemId ->
                 dispatch(SessionIntent.DocumentBatchMoveItem(itemId, com.opencamera.core.session.DocumentBatchMoveDirection.DOWN))
             },
-            onExportRequested = ::startDocumentBatchExport
+            onExportRequested = ::startDocumentBatchExport,
+            onClearBatchClick = {
+                dispatch(SessionIntent.DocumentBatchClear)
+                Toast.makeText(this, R.string.document_batch_clear_toast, Toast.LENGTH_SHORT).show()
+            }
         )
         documentBatchOrganizerRenderer = DocumentBatchOrganizerRenderer(
             views = views.documentBatchOrganizer,
@@ -332,6 +351,8 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 
     override fun onPause() {
+        views.bottomCockpit.stylePresetCardRail.releaseTransientStylePreview()
+        setStyleOriginalComparisonActive(false)
         sessionLifecycleDispatcher.onPause(::dispatch)
         super.onPause()
     }
@@ -437,18 +458,20 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             renderLatestFilterStrip()
         }
         mainRenderer.renderPanelVisibility(activePanelRoute, styleSurfaceRole(state.activeMode) != StyleSurfaceRole.HIDDEN)
-        views.preview.overlayView.render(
-            previewOverlayRenderModel(
-                state = state,
-                effectAdapter = container.previewEffectAdapter,
-                maskSnapshot = container.previewMaskSnapshot,
-                previewContentAspect = previewRatioToContentAspect(state.previewRatio),
-                stagedWatermarkHint = stagedWatermarkHintForOverlay(state),
-                isGeometryLocked = container.cameraCoordinator.isGeometryLocked
-            )
+        val previewOverlayModel = previewOverlayRenderModel(
+            state = state,
+            effectAdapter = container.previewEffectAdapter,
+            maskSnapshot = container.previewMaskSnapshot,
+            previewContentAspect = previewRatioToContentAspect(state.previewRatio),
+            stagedWatermarkHint = stagedWatermarkHintForOverlay(state),
+            isGeometryLocked = container.cameraCoordinator.isGeometryLocked
         )
+        views.preview.overlayView.render(previewOverlayModel)
         views.preview.overlayView.updateFocusReticle(
             state.presentation.previewMeteringFeedback?.let { focusReticleRenderModel(it) }
+        )
+        cockpitRenderer.renderPreviewComposition(
+            views.preview.overlayView.currentPreviewSurfaceTransformOrNull()
         )
         cockpitRenderer.renderPreviewMirror(state)
         maybePlayShutterSound(state)
@@ -496,7 +519,11 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         val nextIdentity = if (pendingThumbnailUri != null) {
             pendingThumbnailUri
         } else {
-            sourceIdentityFor(nextSourceUri, savedMediaType)
+            sourceIdentityFor(
+                sourceUri = nextSourceUri,
+                mediaType = savedMediaType,
+                finalRevision = state.presentation.latestThumbnailRevision
+            )
         }
 
         if (nextIdentity != null && nextIdentity == extractingSourceIdentity) {
@@ -697,7 +724,11 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 
     override fun onDestroy() {
+        motionPhotoPlaybackDialog?.dismiss()
+        motionPhotoPlaybackDialog = null
         sessionLifecycleDispatcher.onDestroy(::dispatch)
+        styleRailPreviewBitmap?.takeIf { !it.isRecycled }?.recycle()
+        styleRailPreviewBitmap = null
         shutterClickSound.release()
         super.onDestroy()
     }
@@ -737,6 +768,53 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             } else if (result is SessionSettingsApplyResult.Applied) {
                 // Eagerly re-render the card rail so the selection ring flips in the
                 // same frame instead of waiting for the settings flow to propagate.
+                renderLatestFilterLab()
+            }
+        }
+    }
+
+    private fun captureStyleRailPreviewBitmap(): android.graphics.Bitmap? {
+        val now = SystemClock.elapsedRealtime()
+        val cached = styleRailPreviewBitmap
+        if (cached != null && !cached.isRecycled && now - styleRailPreviewCapturedAtMillis < 750L) {
+            return cached
+        }
+
+        val source = views.preview.previewView.bitmap ?: return cached
+        val maxWidth = 480
+        val targetWidth = minOf(source.width, maxWidth)
+        val targetHeight = (source.height * (targetWidth / source.width.toFloat()))
+            .toInt()
+            .coerceAtLeast(1)
+        val scaled = if (targetWidth == source.width) {
+            source
+        } else {
+            android.graphics.Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true).also {
+                source.recycle()
+            }
+        }
+        styleRailPreviewBitmap = scaled
+        styleRailPreviewCapturedAtMillis = now
+        return scaled
+    }
+
+    private fun setStyleOriginalComparisonActive(active: Boolean) {
+        dispatch(SessionIntent.PreviewStyleOriginalComparisonChanged(active))
+    }
+
+    private fun commitStyleStrength(strength: Float) {
+        lifecycleScope.launch {
+            val result = container.sessionSettingsManager.apply(
+                PersistedSettingsAction.UpdatePhotoStyleStrength(strength)
+            )
+            if (result is SessionSettingsApplyResult.BlockedByActiveShot) {
+                Toast.makeText(
+                    this@MainActivity,
+                    AppTextResolver(this@MainActivity).get(R.string.settings_blocked_by_capture),
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                dispatch(SessionIntent.PreviewStyleStrengthChanged(null))
                 renderLatestFilterLab()
             }
         }
@@ -1025,6 +1103,10 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
+    override fun dismissDocumentBatchRailTransientInteraction() {
+        documentBatchRailRenderer.dismissTransientActions()
+    }
+
 
     override fun openLatestGalleryMedia() {
         val state = latestSessionState ?: return
@@ -1041,6 +1123,54 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
         }
     }
 
+    /**
+     * Long-press on the thumbnail: in-app playback of the latest live photo's motion
+     * segment (embedded MP4 or sidecar). This is the app's own truth proof that the
+     * motion data decodes; it is not a system-gallery recognition claim.
+     */
+    override fun playLatestLivePhotoMotion() {
+        val state = latestSessionState ?: return
+        val bundle = state.presentation.latestLivePhotoBundle
+        if (bundle == null) {
+            Toast.makeText(this, R.string.live_photo_playback_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val saveFormat = extractLiveSaveFormat(state.presentation.latestPipelineNotes)
+        val segment = com.opencamera.app.camera.live.MotionPhotoPlaybackResolver.resolve(
+            bundle = bundle,
+            saveFormat = saveFormat,
+            pipelineNotes = state.presentation.latestPipelineNotes,
+            readFileBytes = { path, maxBytes ->
+                runCatching {
+                    val file = java.io.File(path)
+                    if (!file.exists()) throw IllegalStateException("motion photo file missing: $path")
+                    file.inputStream().use { input ->
+                        com.opencamera.app.camera.live.readBoundedHead(input, maxBytes)
+                    }
+                }
+            },
+            readContentHead = { ctx, uri, maxBytes ->
+                runCatching {
+                    val input = ctx.contentResolver.openInputStream(uri)
+                        ?: throw IllegalStateException("cannot open $uri")
+                    input.use { stream ->
+                        com.opencamera.app.camera.live.readBoundedHead(stream, maxBytes)
+                    }
+                }
+            },
+            fileLength = { path ->
+                runCatching { java.io.File(path).length() }
+            }
+        ).getOrElse { failure ->
+            Log.w(TAG, "playLatestLivePhotoMotion resolve failed", failure)
+            Toast.makeText(this, R.string.live_photo_playback_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        motionPhotoPlaybackDialog?.dismiss()
+        motionPhotoPlaybackDialog = com.opencamera.app.camera.live.MotionPhotoPlaybackDialog(this, segment).also { it.show() }
+    }
+
     override fun startDocumentBatchExport() {
         val batch = latestSessionState?.presentation?.documentBatch ?: return
         val pageCount = batch.items.size
@@ -1054,61 +1184,29 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
 
         lifecycleScope.launch {
             val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    documentBatchZipExporter.export(batch = batch) { item ->
-                        openDocumentBatchInput(item)
-                    }
-                }
+                documentBatchExportCoordinator.export(batch)
             }
 
             result.onSuccess { exportResult ->
                 panelRouter.reduce(CockpitPanelCommand.UpdateExportProgress(exportResult.exportedPages, pageCount))
                 if (exportResult.exportedPages > 0) {
-                    panelRouter.reduce(CockpitPanelCommand.CompleteExport)
+                    panelRouter.reduce(CockpitPanelCommand.ReturnToShooting)
                     Toast.makeText(
                         this@MainActivity,
                         "导出文件：${exportResult.file.absolutePath}",
                         Toast.LENGTH_LONG
                     ).show()
                 } else {
-                    panelRouter.reduce(CockpitPanelCommand.FailExport)
+                    panelRouter.reduce(CockpitPanelCommand.ReturnToShooting)
                     Toast.makeText(this@MainActivity, R.string.document_export_failed, Toast.LENGTH_SHORT).show()
                 }
                 renderAfterPanelChange()
             }.onFailure {
-                panelRouter.reduce(CockpitPanelCommand.FailExport)
+                panelRouter.reduce(CockpitPanelCommand.ReturnToShooting)
                 renderAfterPanelChange()
                 Toast.makeText(this@MainActivity, R.string.document_export_failed, Toast.LENGTH_SHORT).show()
             }
         }
-    }
-
-    private fun documentExportDirectory(): File {
-        return getExternalFilesDir("document-exports")
-            ?: File(filesDir, "document-exports")
-    }
-
-    private fun openDocumentBatchInput(item: com.opencamera.core.session.DocumentBatchItem): InputStream? {
-        val candidates = listOfNotNull(item.renderUri, item.outputPath).distinct()
-        for (candidate in candidates) {
-            val stream = openDocumentBatchInput(candidate)
-            if (stream != null) return stream
-        }
-        return null
-    }
-
-    private fun openDocumentBatchInput(source: String): InputStream? {
-        if (source.startsWith("content://") || source.startsWith("file://")) {
-            return runCatching { contentResolver.openInputStream(Uri.parse(source)) }.getOrNull()
-        }
-
-        val file = File(source)
-        if (file.isAbsolute && file.isFile) {
-            return runCatching { file.inputStream() }.getOrNull()
-        }
-
-        val mediaStoreUri = contentResolver.resolveDocumentImageUri(source) ?: return null
-        return runCatching { contentResolver.openInputStream(mediaStoreUri) }.getOrNull()
     }
 
     private fun normalizeDocumentWorkflowRoute(state: SessionState) {
@@ -1271,6 +1369,10 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             else -> WatermarkPreviewShape.BACKED_TEXT
         }
         val previewLabels = when (templateId) {
+            "travel-polaroid" -> listOf(
+                com.opencamera.core.effect.TravelTicketPaperSpec.PLACEHOLDER_TRIP,
+                com.opencamera.core.effect.TravelTicketPaperSpec.PLACEHOLDER_DATE
+            )
             "pure-text" -> listOf("BLUE HOUR", "2026.06.22 19:41", "TEOTIS CAMERA")
             "professional-bottom-bar" -> listOf(state.settings.persisted.photo.defaultWatermarkTemplateId)
             "van-gogh-starry" -> listOf("2026.06.22 19:41", "CITY NIGHT", "24mm")
@@ -1278,7 +1380,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             else -> emptyList()
         }
         val decoration = when (templateId) {
-            "travel-polaroid" -> WatermarkPreviewDecoration.TRAVEL_MAP
+            "travel-polaroid" -> WatermarkPreviewDecoration.TRAVEL_TICKET
             "retro-frame" -> WatermarkPreviewDecoration.ARCHIVAL_PAPER
             "night-street" -> WatermarkPreviewDecoration.NIGHT_MEMORY
             "van-gogh-starry" -> WatermarkPreviewDecoration.STARRY_MOON
@@ -1303,6 +1405,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
             templateId = templateId,
             placement = style.textPlacement,
             previewText = when (templateId) {
+                "travel-polaroid" -> com.opencamera.core.effect.TravelTicketPaperSpec.TITLE
                 "van-gogh-starry" -> previewLabels.joinToString(" · ")
                 "blue-hour" -> "BLUE HOUR"
                 else -> templateId
@@ -1331,7 +1434,7 @@ class MainActivity : AppCompatActivity(), MainActivityActionCallbacks {
     }
 }
 
-private fun ContentResolver.resolveDocumentImageUri(outputPath: String): Uri? {
+internal fun ContentResolver.resolveDocumentImageUri(outputPath: String): Uri? {
     val displayName = outputPath.substringAfterLast('/').takeIf { it.isNotBlank() } ?: return null
     val relativePath = outputPath.substringBeforeLast('/', missingDelimiterValue = "")
         .takeIf { it.isNotBlank() }

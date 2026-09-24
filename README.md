@@ -168,9 +168,9 @@ cd teotis-camera
 
 ## 许可证
 
-本项目代码采用 **GNU General Public License v3.0 or later** 许可证。详见 [LICENSE](LICENSE) 文件。
+本项目代码采用 **MIT License** 许可证。详见 [LICENSE](LICENSE) 文件。
 
-这意味着任何复制、修改或分发本项目代码的衍生版本，都必须在 GPLv3 或兼容条款下继续开放相应源码，并保留版权、许可证和署名声明。
+这意味着你可以自由地使用、复制、修改与分发本项目代码，包括将其用于闭源衍生作品，但必须在所有副本或重要部分中保留版权声明与本许可声明。
 
 文档、截图和展示素材默认采用 **Creative Commons Attribution-ShareAlike 4.0 International** 许可证，除非文件中另有说明。
 

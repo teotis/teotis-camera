@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -15,7 +16,11 @@ internal class FilterLabPanelRenderer(
     private val onSelectFilter: (PersistedSettingsAction) -> Unit = {},
     private val isFilterAdjustmentVisible: () -> Boolean = { true },
     private val onApplyStyle: (PersistedSettingsAction) -> Unit = {},
-    private val cardRail: StylePresetCardRailView? = null
+    private val cardRail: StylePresetCardRailView? = null,
+    private val previewBitmapProvider: () -> Bitmap? = { null },
+    private val onOriginalComparisonChanged: (Boolean) -> Unit = {},
+    private val onPreviewStyleStrengthChanged: (Float?) -> Unit = {},
+    private val onCommitStyleStrength: (Float) -> Unit = {}
 ) {
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
@@ -31,8 +36,16 @@ internal class FilterLabPanelRenderer(
         val hasCardRail = model.stylePresetCardRail != null && model.stylePresetCardRail.cards.isNotEmpty()
         cardRail?.let { rail ->
             if (hasCardRail) {
-                rail.renderCards(model.stylePresetCardRail!!.cards, onApplyStyle)
+                rail.render(
+                    model = model.stylePresetCardRail!!,
+                    previewBitmap = previewBitmapProvider(),
+                    onApplyStyle = onApplyStyle,
+                    onStrengthPreviewChanged = onPreviewStyleStrengthChanged,
+                    onStrengthChanged = onCommitStyleStrength,
+                    onOriginalComparisonChanged = onOriginalComparisonChanged
+                )
             } else {
+                rail.releaseTransientStylePreview()
                 rail.renderCards(emptyList(), onApplyStyle)
             }
         }

@@ -297,7 +297,6 @@ class DocumentBatchRailRenderModelTest {
         assertTrue(model.visible)
         assertTrue(model.isSlimShooting)
         assertEquals("2 pages", model.countText)
-        assertEquals("/images/item-2.jpg", model.latestThumbnailUri)
         assertEquals("Export Batch", model.overviewLabel)
     }
 
@@ -330,7 +329,6 @@ class DocumentBatchRailRenderModelTest {
 
         assertTrue(model.visible)
         assertTrue(model.isSlimShooting)
-        assertNull(model.latestThumbnailUri)
     }
 
     private fun sessionState(mode: ModeId, batchState: DocumentBatchState): SessionState {

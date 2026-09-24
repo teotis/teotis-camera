@@ -82,14 +82,28 @@ class RuntimeProControlsRenderModelTest {
 
             assertTrue(model.isVisible)
             assertEquals("Humanistic Professional Controls", model.headline)
+            assertEquals("Format", model.rawControl.label)
+            assertEquals("JPG", model.rawControl.value)
             assertEquals(SettingsControlAvailability.DEGRADED, model.rawControl.availability)
+            assertNull(model.rawControl.nextAction)
             assertEquals(SettingsControlAvailability.SUPPORTED, model.isoControl.availability)
             assertEquals("320", model.isoControl.value)
             assertEquals("33ms", model.shutterControl.value)
             assertEquals("4800K", model.whiteBalanceControl.value)
-            assertTrue(model.summary.contains("RAW On | ISO 320 | Shutter 33ms | WB 4800K"))
+            assertTrue(model.summary.contains("Format JPG | ISO 320 | Shutter 33ms | WB 4800K"))
             assertTrue(model.summary.contains("stay saved-only"))
             assertTrue(model.isoControl.nextAction != null)
+            assertEquals(
+                listOf("JPG", "ISO", "S", "EV", "AF", "F", "WB"),
+                model.primaryControls.map { it.railLabel }
+            )
+            assertFalse(model.primaryControls.first { it.id == RuntimeProControlId.FORMAT }.isSelectable)
+            assertTrue(
+                model.primaryControls
+                    .first { it.id == RuntimeProControlId.ISO }
+                    .options
+                    .any { it.label == "320" && it.isSelected }
+            )
         }
 
 
@@ -120,6 +134,7 @@ class RuntimeProControlsRenderModelTest {
             val modelOff = runtimeProControlsRenderModel(stateOff, TestAppTextResolver())
 
             assertEquals(false, modelOff.rawControl.isToggleOn)
+            assertEquals("JPG", modelOff.rawControl.value)
             assertNull(modelOff.isoControl.isToggleOn)
 
             val stateOn = stateOff.copy(
@@ -135,6 +150,7 @@ class RuntimeProControlsRenderModelTest {
             val modelOn = runtimeProControlsRenderModel(stateOn, TestAppTextResolver())
 
             assertEquals(true, modelOn.rawControl.isToggleOn)
+            assertEquals("RAW + JPG", modelOn.rawControl.value)
         }
 
         @Test
@@ -163,6 +179,9 @@ class RuntimeProControlsRenderModelTest {
             val model = runtimeProControlsRenderModel(state, TestAppTextResolver())
 
             assertNull(model.rawControl.isToggleOn)
+            assertEquals("Format", model.rawControl.label)
+            assertEquals("JPG", model.rawControl.value)
+            assertNull(model.rawControl.nextAction)
         }
 
         @Test
@@ -189,6 +208,7 @@ class RuntimeProControlsRenderModelTest {
             assertEquals("Saved only", model.isoControl.supportLabel)
             assertTrue(model.supportingText.contains("saved-only or temporarily-unsupported"))
             assertTrue(model.summary.contains("stay saved-only"))
+            assertFalse(model.primaryControls.any { it.isSelectable })
         }
 
 

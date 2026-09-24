@@ -716,7 +716,10 @@ class LivePhotoAssemblerTest {
             assertTrue(outcome.diagnostics.any { it.startsWith("live-format:intended=") })
             assertTrue(outcome.diagnostics.any { it.startsWith("live-format:actual=") })
             assertTrue(outcome.diagnostics.any { it.startsWith("live-motion:status=") })
-            assertTrue(outcome.diagnostics.contains("gallery-recognition=untested"))
+            assertTrue("gallery recognition must stay pending external verification",
+                outcome.diagnostics.contains("gallery-recognition:external=pending"))
+            assertFalse("hardcoded untested marker must be gone",
+                outcome.diagnostics.contains("gallery-recognition=untested"))
         } finally {
             tempDir.deleteRecursively()
         }

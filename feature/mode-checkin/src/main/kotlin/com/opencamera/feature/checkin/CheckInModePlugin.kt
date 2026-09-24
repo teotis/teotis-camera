@@ -73,18 +73,11 @@ enum class CheckInScenario(
         filterCategory = FilterProfileCategory.PORTRAIT,
         captureStrategyType = StrategyType.SINGLE_FRAME
     ),
-    // Label downgraded from "全清" (Full Clear / all-clear) to "清晰辅助" (Clarity Assist)
-    // because the current capture path does not produce a true all-in-focus output:
-    //   (1) Focus bracketing uses FocusMeteringAction at two preview points, not a
-    //       controlled lens focus distance (focusDistanceDiopters stays null per frame).
-    //   (2) On real devices the focus-stack fusion processor previously skipped with
-    //       decode-failed when the FAR anchor frame was saved via MediaStore (relative
-    //       display path did not resolve on the filesystem); see
-    //       AndroidFocusStackFusionProcessor.decodeFrame fallback.
-    //   (3) Even with fusion running, the local-contrast strategy is a per-pixel
-    //       near/far selection without alignment or smoothing, which is an assist, not
-    //       a guarantee of full clarity.
     // The scenario id stays "clarity" so persisted settings and metadata remain stable.
+    // On devices with Camera2 manual focus support, the Android capture path now requests
+    // per-frame NEAR/FAR lens focus distances and records them in the frame bundle. Devices
+    // without applied focus-distance support explicitly degrade to preview metering instead
+    // of presenting that fallback as a verified all-in-focus capture.
     CLARITY(
         id = "clarity",
         label = "清晰辅助",

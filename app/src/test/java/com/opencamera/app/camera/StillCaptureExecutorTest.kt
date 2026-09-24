@@ -29,6 +29,7 @@ import com.opencamera.core.media.ThumbnailPolicy
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -222,6 +223,125 @@ class StillCaptureExecutorTest {
         assertEquals(listOf(1, 2), visitedSteps)
         assertTrue(success.diagnostics.contains("test:before-frame=1:near"))
         assertTrue(success.diagnostics.contains("test:before-frame=2:far"))
+    }
+
+    @Test
+    fun `captureMultiFrame uses prepared capture and focus distance for each focus stack frame`() = runBlocking {
+        val executor = createExecutor()
+        val usedCaptures = mutableListOf<String>()
+        val baseCapture = mockImageCapture { callback ->
+            usedCaptures += "base"
+            val results = mock(ImageCapture.OutputFileResults::class.java)
+            `when`(results.savedUri).thenReturn(null)
+            callback.onImageSaved(results)
+        }
+        val nearCapture = mockImageCapture { callback ->
+            usedCaptures += "near"
+            val results = mock(ImageCapture.OutputFileResults::class.java)
+            `when`(results.savedUri).thenReturn(null)
+            callback.onImageSaved(results)
+        }
+        val farCapture = mockImageCapture { callback ->
+            usedCaptures += "far"
+            val results = mock(ImageCapture.OutputFileResults::class.java)
+            `when`(results.savedUri).thenReturn(null)
+            callback.onImageSaved(results)
+        }
+        val plan = createMultiFrameShotPlan(
+            shotId = "focus-stack-prepared-capture",
+            frameCount = 2,
+            focusStackSpec = FocusStackCaptureSpec.automaticNearFar()
+        )
+        val deviceRequest = DeviceShotRequest(
+            shotId = "focus-stack-prepared-capture",
+            template = CaptureTemplate.STILL_CAPTURE,
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            frameCount = 2,
+            focusStackFrameRoles = listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR)
+        )
+
+        val outcome = executor.captureMultiFrame(
+            capture = baseCapture,
+            plan = plan,
+            deviceRequest = deviceRequest,
+            prepareFrameCapture = { step, currentCapture ->
+                when (step.focusStackRole) {
+                    FocusStackFrameRole.NEAR -> {
+                        assertSame(baseCapture, currentCapture)
+                        StillCaptureExecutor.FrameCapturePreparation(
+                            capture = nearCapture,
+                            diagnostics = listOf("test:focus-distance=near:6.0"),
+                            focusDistanceDiopters = 6.0f
+                        )
+                    }
+                    FocusStackFrameRole.FAR -> {
+                        assertSame(nearCapture, currentCapture)
+                        StillCaptureExecutor.FrameCapturePreparation(
+                            capture = farCapture,
+                            diagnostics = listOf("test:focus-distance=far:0.0"),
+                            focusDistanceDiopters = 0.0f
+                        )
+                    }
+                    else -> StillCaptureExecutor.FrameCapturePreparation(capture = currentCapture)
+                }
+            }
+        )
+
+        assertTrue(outcome is PhotoCaptureOutcome.Success)
+        val success = outcome as PhotoCaptureOutcome.Success
+        assertEquals(listOf("near", "far"), usedCaptures)
+        assertTrue(success.diagnostics.contains("test:focus-distance=near:6.0"))
+        assertTrue(success.diagnostics.contains("test:focus-distance=far:0.0"))
+        val frames = success.frameBundle!!.frames
+        assertEquals(6.0f, frames[0].focusDistanceDiopters)
+        assertEquals(0.0f, frames[1].focusDistanceDiopters)
+    }
+
+    @Test
+    fun `captureMultiFrame exposes focus stack frame degradation reasons in diagnostics`() = runBlocking {
+        val executor = createExecutor()
+        val capture = mockImageCapture { callback ->
+            val results = mock(ImageCapture.OutputFileResults::class.java)
+            `when`(results.savedUri).thenReturn(null)
+            callback.onImageSaved(results)
+        }
+        val plan = createMultiFrameShotPlan(
+            shotId = "focus-stack-degraded",
+            frameCount = 2,
+            focusStackSpec = FocusStackCaptureSpec.automaticNearFar()
+        )
+        val deviceRequest = DeviceShotRequest(
+            shotId = "focus-stack-degraded",
+            template = CaptureTemplate.STILL_CAPTURE,
+            shotKind = ShotKind.MULTI_FRAME_CAPTURE,
+            frameCount = 2,
+            focusStackFrameRoles = listOf(FocusStackFrameRole.NEAR, FocusStackFrameRole.FAR)
+        )
+
+        val outcome = executor.captureMultiFrame(
+            capture = capture,
+            plan = plan,
+            deviceRequest = deviceRequest,
+            prepareFrameCapture = { _, currentCapture ->
+                StillCaptureExecutor.FrameCapturePreparation(
+                    capture = currentCapture,
+                    diagnostics = listOf("test:manual-focus=unsupported"),
+                    degradationReasons = listOf("camera-x:manual-focus-unsupported")
+                )
+            }
+        )
+
+        assertTrue(outcome is PhotoCaptureOutcome.Success)
+        val success = outcome as PhotoCaptureOutcome.Success
+        assertTrue(success.diagnostics.contains("device:burst-degraded-frames=2"))
+        assertTrue(
+            success.diagnostics.contains(
+                "device:burst-degradation-reasons=camera-x:manual-focus-unsupported+camera-x:focus-distance-unconfirmed+camera-x:no-per-frame-metadata"
+            ) ||
+                success.diagnostics.contains(
+                    "device:burst-degradation-reasons=camera-x:manual-focus-unsupported+camera-x:no-per-frame-metadata+camera-x:focus-distance-unconfirmed"
+                )
+        )
     }
 
     // --- captureMultiFrame intermediate failure cleanup ---

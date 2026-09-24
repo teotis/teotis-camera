@@ -93,7 +93,7 @@ class BottomCockpitLayoutContractTest {
         val floatingChildren = floatingToolLayer.childElementsByAndroidId()
 
         assertTrue("filterStripScroll" in floatingChildren)
-        assertTrue("runtimeProControlsScroll" in floatingChildren)
+        assertFalse("runtimeProImmersiveOverlay" in floatingChildren)
         assertFalse("buttonModeAction" in floatingChildren)
         assertFalse("focalLengthSlider" in floatingChildren)
 
@@ -111,34 +111,68 @@ class BottomCockpitLayoutContractTest {
     }
 
     @Test
-    fun `runtime pro controls use floating glass strip instead of opaque black bar`() {
-        val proControls = layout.elementByAndroidId("runtimeProControlsScroll")
+    fun `runtime pro controls use immersive preview overlay instead of opaque strip`() {
+        val proControls = layout.elementByAndroidId("runtimeProImmersiveOverlay")
 
-        assertEquals("@drawable/bg_pro_glass_strip", proControls.androidAttr("background"))
-        assertEquals("@dimen/space_16", proControls.androidAttr("layout_marginHorizontal"))
-        assertEquals("@dimen/pro_glass_strip_min_height", proControls.androidAttr("minHeight"))
-        assertEquals("@dimen/space_4", proControls.androidAttr("paddingVertical"))
-        assertFalse(
-            proControls.androidAttr("background") == "@color/oc_root_background",
-            "Runtime pro controls must not regress to the opaque black camera-root background"
-        )
+        assertEquals("0dp", proControls.androidAttr("layout_height"))
+        assertEquals("@id/previewBottomGuide", proControls.appAttr("layout_constraintBottom_toBottomOf"))
+        assertEquals("gone", proControls.androidAttr("visibility"))
+        assertEquals("runtimeProScale", proControls.childElementsByAndroidId().last())
     }
 
     @Test
-    fun `document batch rail is capped above the preview bottom guide and scrolls its page list`() {
+    fun `document batch overlay keeps actions outside the scrollable page rail`() {
+        val overlay = layout.elementByAndroidId("documentBatchRailOverlay")
         val rail = layout.elementByAndroidId("documentBatchRail")
         val itemScroll = layout.elementByAndroidId("documentBatchRailItemScroll")
         val itemList = layout.elementByAndroidId("documentBatchRailItemList")
+        val actionContainer = layout.elementByAndroidId("documentBatchRailActionContainer")
+        val actionButtonIds = listOf(
+            "documentBatchRailMoveUpButton",
+            "documentBatchRailMoveDownButton",
+            "documentBatchRailRemoveButton",
+            "documentBatchRailOverviewButton",
+            "documentBatchRailClearButton"
+        )
 
-        assertEquals("0dp", rail.androidAttr("layout_height"))
-        assertEquals("@id/previewBottomGuide", rail.appAttr("layout_constraintBottom_toBottomOf"))
-        assertEquals("true", rail.appAttr("layout_constrainedHeight"))
+        assertEquals("0dp", overlay.androidAttr("layout_height"))
+        assertEquals("@id/previewBottomGuide", overlay.appAttr("layout_constraintBottom_toBottomOf"))
+        assertEquals("true", overlay.appAttr("layout_constrainedHeight"))
+        assertEquals("@dimen/floating_tool_bottom_clearance", overlay.androidAttr("layout_marginBottom"))
+        assertEquals("match_parent", rail.androidAttr("layout_height"))
 
         assertEquals("androidx.core.widget.NestedScrollView", itemScroll.tagName)
         assertEquals("0dp", itemScroll.androidAttr("layout_height"))
         assertEquals("1", itemScroll.androidAttr("layout_weight"))
         assertEquals("vertical", itemScroll.androidAttr("scrollbars"))
         assertEquals("wrap_content", itemList.androidAttr("layout_height"))
+        assertEquals("LinearLayout", actionContainer.tagName)
+        assertEquals("start|center_vertical", actionContainer.androidAttr("layout_gravity"))
+        assertEquals(
+            "@dimen/document_batch_action_selected_margin_start",
+            actionContainer.androidAttr("layout_marginStart")
+        )
+        assertEquals(
+            116,
+            resolveDimenDp(actionContainer.androidAttr("layout_marginStart"))
+        )
+        val actionParent = actionContainer.parentNode as Element
+        val railParent = rail.parentNode as Element
+        assertEquals("@+id/documentBatchRailOverlay", actionParent.androidAttr("id"))
+        assertEquals("@+id/documentBatchRailOverlay", railParent.androidAttr("id"))
+
+        actionButtonIds.forEach { buttonId ->
+            val button = layout.elementByAndroidId(buttonId)
+            val expectedHeight = if (buttonId == "documentBatchRailClearButton") {
+                "40dp"
+            } else {
+                "@dimen/document_batch_action_height"
+            }
+            assertEquals(expectedHeight, button.androidAttr("layout_height"))
+            assertEquals("0dp", button.androidAttr("minHeight"))
+            assertEquals("0dp", button.androidAttr("insetTop"))
+            assertEquals("0dp", button.androidAttr("insetBottom"))
+        }
     }
 
     @Test
@@ -414,7 +448,7 @@ class BottomCockpitLayoutContractTest {
 
         // Verify that floating-only views are no longer in bottomSheet.
         assertFalse("filterStripScroll" in bottomSheetChildren)
-        assertFalse("runtimeProControlsScroll" in bottomSheetChildren)
+        assertFalse("runtimeProImmersiveOverlay" in bottomSheetChildren)
         assertFalse("buttonModeAction" in bottomSheetChildren)
         assertFalse("stylePresetCardRail" in bottomSheetChildren)
         assertFalse("recordingIndicator" in bottomSheetChildren)
@@ -428,7 +462,7 @@ class BottomCockpitLayoutContractTest {
         val floatingChildren = floatingToolLayer.childElementsByAndroidId()
 
         assertTrue("filterStripScroll" in floatingChildren)
-        assertTrue("runtimeProControlsScroll" in floatingChildren)
+        assertFalse("runtimeProImmersiveOverlay" in floatingChildren)
         assertFalse("buttonModeAction" in floatingChildren)
         assertFalse("stylePresetCardRail" in floatingChildren)
         assertFalse("focalLengthSlider" in floatingChildren)

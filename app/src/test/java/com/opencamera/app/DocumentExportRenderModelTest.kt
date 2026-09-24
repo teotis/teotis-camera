@@ -55,10 +55,10 @@ class DocumentExportRenderModelTest {
     }
 
     @Test
-    fun `success shows return button and hides cancel`() {
+    fun `success hides overlay because completion is Toast-only`() {
         val state = ExportState.Success(totalPages = 7)
         val model = exportRenderModel(panelState(route = CockpitPanelRoute.Export, exportState = state), text)
-        assertTrue(model.visible)
+        assertFalse(model.visible)
         assertTrue(model.showReturnButton)
         assertEquals("Export success, 7 pages", model.titleText)
         assertFalse(model.showRetryButton)
@@ -72,10 +72,10 @@ class DocumentExportRenderModelTest {
     }
 
     @Test
-    fun `failure shows error state with retry`() {
+    fun `failure hides overlay because completion is Toast-only`() {
         val state = ExportState.Failed(errorMessage = "IO error")
         val model = exportRenderModel(panelState(route = CockpitPanelRoute.Export, exportState = state), text)
-        assertTrue(model.visible)
+        assertFalse(model.visible)
         assertTrue(model.isError)
         assertTrue(model.showRetryButton)
         assertTrue(model.showReturnButton)

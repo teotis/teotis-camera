@@ -39,7 +39,7 @@ private val CHECK_IN_SCENARIO_LABELS = mapOf(
     "portrait" to "人像",
     "people-place" to "人景",
     "object-place" to "物景",
-    "clarity" to "全清"
+    "clarity" to "清晰辅助"
 )
 
 private val CHECK_IN_PROFILE_PREFIXES = CHECK_IN_SCENARIO_LABELS.values + setOf("超清")

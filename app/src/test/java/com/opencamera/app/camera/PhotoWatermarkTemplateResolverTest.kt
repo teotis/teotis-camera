@@ -163,11 +163,17 @@ class PhotoWatermarkTemplateResolverTest {
     }
 
     @Test
-    fun `travel polaroid resolver uses default slogan and degrades without location`() {
+    fun `philosophy like water resolver uses fixed title and revised subtitle`() {
         val resolved = resolvePhotoWatermarkTemplate(
             templateId = "travel-polaroid",
             watermarkText = "PHOTO Auto",
-            metadata = MediaMetadata(),
+            metadata = MediaMetadata(
+                customTags = mapOf(
+                    "watermarkModeName" to "Photo",
+                    "watermarkFrameBackground" to "dark",
+                    "watermarkPosition" to "top-right"
+                )
+            ),
             preservedExif = mapOf(
                 ExifInterface.TAG_MODEL to "Teotis Camera Pro",
                 ExifInterface.TAG_DATETIME_ORIGINAL to "2026:04:11 20:16:00"
@@ -175,10 +181,11 @@ class PhotoWatermarkTemplateResolverTest {
         )
 
         assertEquals("travel-polaroid", resolved.templateId)
-        assertEquals("去有天空的地方", resolved.title)
+        assertEquals("哲思如水", resolved.title)
+        assertEquals(listOf("静水流深 · 万物有声", "2026.04.11"), resolved.supportingLines)
         assertEquals(WatermarkFrameBackground.WHITE, resolved.frameBackground)
+        assertEquals(WatermarkTextPlacement.BOTTOM_LEFT, resolved.placement)
         assertTrue(resolved.usesExpandedFrame)
-        assertFalse(resolved.supportingLines.any { it.contains(",") })
     }
 
     @Test
@@ -401,7 +408,7 @@ class PhotoWatermarkTemplateResolverTest {
             )
         )
 
-        assertEquals("OpenCamera DevKit · Check-in 全清 Texture", resolved.title)
+        assertEquals("OpenCamera DevKit · Check-in 清晰辅助 Texture", resolved.title)
         assertTrue(resolved.supportingLines.any { it.contains("2026-06-07 14:30") })
         assertTrue(resolved.supportingLines.any { it.contains("12MP") })
     }

@@ -1,9 +1,51 @@
 package com.opencamera.app.camera
 
+import androidx.camera.core.FocusMeteringAction
+import androidx.camera.core.SurfaceOrientedMeteringPointFactory
+import com.opencamera.core.device.PreviewMeteringPersistence
+import com.opencamera.core.device.PreviewMeteringPoint
+import com.opencamera.core.device.PreviewMeteringRequest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PreviewMeteringActionPlannerTest {
+
+    @Test
+    fun `locked request disables CameraX auto cancel`() {
+        val point = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f)
+        val request = PreviewMeteringRequest(
+            requestId = "lock-1",
+            point = PreviewMeteringPoint(0.5f, 0.5f),
+            persistence = PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+        )
+
+        val action = FocusMeteringAction.Builder(
+            point,
+            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+        ).applyPreviewMeteringPersistence(request).build()
+
+        assertFalse(action.isAutoCancelEnabled)
+    }
+
+    @Test
+    fun `tap request retains configured CameraX auto cancel`() {
+        val point = SurfaceOrientedMeteringPointFactory(1f, 1f).createPoint(0.5f, 0.5f)
+        val request = PreviewMeteringRequest(
+            requestId = "tap-1",
+            point = PreviewMeteringPoint(0.5f, 0.5f),
+            autoCancelMillis = 2_500L
+        )
+
+        val action = FocusMeteringAction.Builder(
+            point,
+            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+        ).applyPreviewMeteringPersistence(request).build()
+
+        assertTrue(action.isAutoCancelEnabled)
+        assertEquals(2_500L, action.autoCancelDurationInMillis)
+    }
 
     @Test
     fun `center point maps to pixel center`() {

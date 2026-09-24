@@ -1,9 +1,12 @@
 package com.opencamera.app
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.LinearGradient
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
@@ -12,19 +15,15 @@ import android.text.TextPaint
 import android.text.TextUtils
 import android.util.AttributeSet
 import android.view.View
-import com.opencamera.core.effect.PreviewStop
-import com.opencamera.core.effect.applyFilterRenderSpecToStops
+import com.opencamera.core.effect.PreviewColorMatrixBuilder
 import com.opencamera.core.settings.FilterRenderSpec
-import com.opencamera.core.settings.StylePresetPreview
+import kotlin.math.max
 
 /**
- * Renders a single style preset card tile with a deterministic visual preview
- * derived from [StylePresetPreview] data.
- *
- * The tile contains:
- * - Top: gradient preview area reflecting contrast, brightness, warmth, monochrome
- * - Bottom: title and mood label
- * - Selected: accent ring around the card
+ * Photographic style tile. A shared live-preview snapshot is cropped into every
+ * tile, then transformed with the candidate style's color matrix so differences
+ * are judged against the same scene. The rail keeps tiles hidden until that
+ * snapshot exists, rather than replacing photography with an abstract gradient.
  */
 internal class StylePresetCardTileView @JvmOverloads constructor(
     context: Context,
@@ -32,119 +31,86 @@ internal class StylePresetCardTileView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val previewPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val previewPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val previewRect = RectF()
-    private var previewGradient: LinearGradient? = null
-    private var previewColors: IntArray = intArrayOf(Color.DKGRAY, Color.LTGRAY)
-    private var previewFractions: FloatArray = floatArrayOf(0f, 1f)
+    private var previewBitmap: Bitmap? = null
 
     private val selectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 2.5f
-        color = Color.argb(200, 85, 214, 190) // oc_accent
+        strokeWidth = 2f * resources.displayMetrics.density
+        color = Color.argb(245, 248, 250, 252)
     }
     private val deselectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = 1.5f
-        color = Color.argb(50, 255, 255, 255)
+        strokeWidth = resources.displayMetrics.density
+        color = Color.argb(54, 255, 255, 255)
+    }
+    private val selectedDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.rgb(85, 214, 190)
     }
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.argb(40, 255, 255, 255)
+        color = Color.argb(230, 13, 15, 18)
     }
     private val titlePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(248, 248, 250, 252) // oc_text_primary
-        textSize = 11f * context.resources.displayMetrics.scaledDensity
-        typeface = Typeface.DEFAULT_BOLD
-        textAlign = Paint.Align.CENTER
-    }
-    private val moodPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(203, 203, 213, 225) // oc_text_secondary
-        textSize = 9f * context.resources.displayMetrics.scaledDensity
+        color = Color.argb(248, 248, 250, 252)
+        textSize = 12f * resources.displayMetrics.scaledDensity
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         textAlign = Paint.Align.CENTER
     }
 
     private var currentModel: StylePresetCardRenderModel? = null
-    private var tileCornerRadius: Float = 8f * context.resources.displayMetrics.density
+    private var currentSpec: FilterRenderSpec? = null
+    private val tileCornerRadius = 7f * resources.displayMetrics.density
     private var pendingSelected: Boolean = false
 
-    fun bind(model: StylePresetCardRenderModel) {
+    fun bind(model: StylePresetCardRenderModel, bitmap: Bitmap? = null) {
         currentModel = model
+        currentSpec = model.spec
         pendingSelected = false
-
-        titlePaint.textSize = 11f * context.resources.displayMetrics.scaledDensity
-        moodPaint.textSize = 9f * context.resources.displayMetrics.scaledDensity
-
         alpha = if (model.isEnabled) 1f else 0.5f
-
-        computePreviewColors(model.preview, model.spec)
-        previewGradient = null
-
+        previewBitmap = bitmap
+        rebuildPreviewShader()
         invalidate()
     }
 
-    /**
-     * Immediately reflect selection visually before the render model arrives,
-     * giving the user frame-accurate click feedback.
-     */
     fun setPendingSelected(selected: Boolean) {
         if (pendingSelected == selected) return
         pendingSelected = selected
         invalidate()
     }
 
-    /**
-     * Scene reference stops: sky blue → neutral gray → warm highlight → dark shadow.
-     * These 4 fixed stops simulate a photographic scene whose colors are
-     * then transformed by the filter's [FilterRenderSpec] to show the
-     * characteristic tonal/color shift of the style preset.
-     */
-    private val sceneStops = listOf(
-        PreviewStop(Color.rgb(135, 180, 220), 0f),
-        PreviewStop(Color.rgb(160, 160, 165), 0.35f),
-        PreviewStop(Color.rgb(220, 190, 155), 0.65f),
-        PreviewStop(Color.rgb(50, 45, 55), 1f)
-    )
-
-    private fun computePreviewColors(
-        preview: StylePresetPreview,
-        spec: FilterRenderSpec?
-    ) {
-        val transformed = if (spec != null) {
-            applyFilterRenderSpecToStops(spec, sceneStops)
-        } else {
-            sceneStops
-        }
-
-        // Monochrome override: for high monochrome level, force grayscale gradient
-        if (preview.monochromeLevel >= 0.65f) {
-            val hiLevel = (180 - preview.monochromeLevel * 100).toInt().coerceIn(80, 200)
-            val loLevel = hiLevel / 2
-            previewColors = intArrayOf(
-                Color.rgb(hiLevel, hiLevel, hiLevel),
-                Color.rgb(hiLevel, hiLevel, hiLevel),
-                Color.rgb(loLevel, loLevel, loLevel),
-                Color.rgb(loLevel, loLevel, loLevel)
-            )
-            previewFractions = floatArrayOf(0f, 0.4f, 0.7f, 1f)
-        } else {
-            previewColors = IntArray(transformed.size) { transformed[it].color }
-            previewFractions = FloatArray(transformed.size) { transformed[it].fraction }
-        }
-    }
-
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        if (w > 0 && h > 0) {
-            val previewHeight = (h * 0.6f)
-            previewRect.set(0f, 0f, w.toFloat(), previewHeight)
-            previewGradient = LinearGradient(
-                0f, 0f, 0f, previewHeight,
-                previewColors,
-                previewFractions,
-                Shader.TileMode.CLAMP
-            )
-            invalidate()
+        val previewHeight = minOf(
+            StylePresetCardDimensions.PREVIEW_HEIGHT_DP * resources.displayMetrics.density,
+            h.toFloat()
+        )
+        previewRect.set(0f, 0f, w.toFloat(), previewHeight)
+        rebuildPreviewShader()
+    }
+
+    private fun rebuildPreviewShader() {
+        if (previewRect.width() <= 0f || previewRect.height() <= 0f) return
+        val bitmap = previewBitmap
+        previewPaint.shader = if (bitmap != null && !bitmap.isRecycled) {
+            BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).also { shader ->
+                val scale = max(
+                    previewRect.width() / bitmap.width.toFloat(),
+                    previewRect.height() / bitmap.height.toFloat()
+                )
+                val dx = (previewRect.width() - bitmap.width * scale) / 2f
+                val dy = (previewRect.height() - bitmap.height * scale) / 2f
+                shader.setLocalMatrix(Matrix().apply {
+                    setScale(scale, scale)
+                    postTranslate(dx, dy)
+                })
+            }
+        } else null
+        previewPaint.color = Color.rgb(28, 31, 36)
+        previewPaint.colorFilter = PreviewColorMatrixBuilder.buildMatrix(currentSpec)?.let {
+            ColorMatrixColorFilter(it)
         }
     }
 
@@ -155,34 +121,37 @@ internal class StylePresetCardTileView @JvmOverloads constructor(
         if (w <= 0f || h <= 0f) return
 
         canvas.drawRoundRect(0f, 0f, w, h, tileCornerRadius, tileCornerRadius, bgPaint)
+        canvas.drawRoundRect(previewRect, tileCornerRadius, tileCornerRadius, previewPaint)
 
-        previewGradient?.let { gradient ->
-            previewPaint.shader = gradient
-            canvas.drawRoundRect(previewRect, tileCornerRadius, tileCornerRadius, previewPaint)
+        val titleRaw = currentModel?.title.orEmpty()
+        val availableWidth = w - 8f * resources.displayMetrics.density
+        val title = TextUtils.ellipsize(
+            titleRaw,
+            titlePaint,
+            availableWidth,
+            TextUtils.TruncateAt.END
+        ).toString()
+        val titleY = previewRect.bottom + 18f * resources.displayMetrics.scaledDensity
+        canvas.drawText(title, w / 2f, titleY, titlePaint)
+
+        val selected = pendingSelected || currentModel?.isSelected == true
+        canvas.drawRoundRect(
+            1f,
+            1f,
+            w - 1f,
+            previewRect.bottom - 1f,
+            tileCornerRadius,
+            tileCornerRadius,
+            if (selected) selectionPaint else deselectionPaint
+        )
+        if (selected) {
+            val radius = 4f * resources.displayMetrics.density
+            canvas.drawCircle(
+                previewRect.right - 10f * resources.displayMetrics.density,
+                previewRect.bottom - 10f * resources.displayMetrics.density,
+                radius,
+                selectedDotPaint
+            )
         }
-
-        val previewBottom = previewRect.bottom
-        val titleY = previewBottom + 13f * resources.displayMetrics.scaledDensity
-        val titleRaw = currentModel?.title ?: ""
-        val availableWidth = w - 2f * 4f * resources.displayMetrics.density
-        val titleText = if (titleRaw.isNotEmpty()) {
-            TextUtils.ellipsize(titleRaw, titlePaint, availableWidth, TextUtils.TruncateAt.END)
-                .toString()
-        } else ""
-
-        canvas.drawText(titleText, w / 2f, titleY, titlePaint)
-
-        val moodY = titleY + 13f * resources.displayMetrics.scaledDensity
-        val moodRaw = currentModel?.moodLabel ?: ""
-        val moodText = if (moodRaw.isNotEmpty()) {
-            TextUtils.ellipsize(moodRaw, moodPaint, availableWidth, TextUtils.TruncateAt.END)
-                .toString()
-        } else ""
-        if (moodText.isNotEmpty()) {
-            canvas.drawText(moodText, w / 2f, moodY, moodPaint)
-        }
-
-        val paint = if (pendingSelected || currentModel?.isSelected == true) selectionPaint else deselectionPaint
-        canvas.drawRoundRect(0f, 0f, w, h, tileCornerRadius, tileCornerRadius, paint)
     }
 }

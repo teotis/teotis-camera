@@ -113,9 +113,10 @@ class MotionPhotoFileMaterializerTest {
             val outputBytes = outputFile.readBytes()
             val outputStr = String(outputBytes, Charsets.UTF_8)
 
-            // XMP must use GCamera: prefix
+            // XMP must use GCamera prefix and declare the Camera prefix alias (dual namespace).
             assertTrue("Output must contain GCamera:MotionPhoto", outputStr.contains("GCamera:MotionPhoto=\"1\""))
-            assertFalse("Output must not use old Camera: prefix", outputStr.contains("xmlns:Camera="))
+            assertTrue("Output must declare Camera: prefix alias", outputStr.contains("xmlns:Camera="))
+            assertTrue("Output must declare GCamera: prefix alias", outputStr.contains("xmlns:GCamera="))
 
             // Last 4 bytes = motion offset trailer pointing to motion payload start
             assertTrue("Output must have at least 4-byte trailer", outputBytes.size >= makeFakeMp4().size + 4)

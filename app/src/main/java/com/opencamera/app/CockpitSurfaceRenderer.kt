@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import android.content.Context
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.view.View
 import android.widget.Button
@@ -35,7 +36,8 @@ internal class CockpitSurfaceRenderer(
     private val shutterVisualDrawable = ShutterVisualDrawable()
     private var shutterDrawableAttached = false
     private val text = com.opencamera.app.i18n.AppTextResolver(context)
-    private var lastAppliedMirrorScaleX: Float = Float.NaN
+    private var previewMirrorSign: Float = 1f
+    private var previewSurfaceTransform: PreviewSurfaceTransform? = null
 
     private val Int.dp: Int
         get() = (this * context.resources.displayMetrics.density).toInt()
@@ -81,10 +83,36 @@ internal class CockpitSurfaceRenderer(
             preferredLensFacing = state.activeDeviceGraph.preferredLensFacing,
             selfieMirrorEnabled = state.settings.persisted.common.selfieMirrorEnabled
         )
-        val scaleX = if (policy.shouldMirrorPreview) -1f else 1f
-        if (scaleX == lastAppliedMirrorScaleX) return
-        lastAppliedMirrorScaleX = scaleX
-        preview.previewView.scaleX = scaleX
+        val mirrorSign = if (policy.shouldMirrorPreview) -1f else 1f
+        if (mirrorSign == previewMirrorSign) return
+        previewMirrorSign = mirrorSign
+        applyPreviewSurfaceTransform()
+    }
+
+    fun renderPreviewComposition(transform: PreviewSurfaceTransform?) {
+        if (previewSurfaceTransform == transform) return
+        previewSurfaceTransform = transform
+        applyPreviewSurfaceTransform()
+    }
+
+    private fun applyPreviewSurfaceTransform() {
+        val previewView = preview.previewView
+        val transform = previewSurfaceTransform
+        val scale = transform?.scale ?: 1f
+        previewView.pivotX = transform?.pivotX ?: previewView.width / 2f
+        previewView.pivotY = transform?.pivotY ?: previewView.height / 2f
+        previewView.scaleX = previewMirrorSign * scale
+        previewView.scaleY = scale
+        previewView.translationX = transform?.translationX ?: 0f
+        previewView.translationY = transform?.translationY ?: 0f
+        previewView.clipBounds = transform?.sourceClipRect?.let { rect ->
+            Rect(
+                kotlin.math.floor(rect.left).toInt(),
+                kotlin.math.floor(rect.top).toInt(),
+                kotlin.math.ceil(rect.right).toInt(),
+                kotlin.math.ceil(rect.bottom).toInt()
+            )
+        }
     }
 
     private var sliderInitialized = false

@@ -30,6 +30,8 @@ internal interface MainActivityActionCallbacks {
     fun requestMicrophonePermission()
     fun showDisabledReason(reason: String)
     fun openLatestGalleryMedia()
+    fun playLatestLivePhotoMotion()
+    fun dismissDocumentBatchRailTransientInteraction()
     fun startDocumentBatchExport()
     fun exportDevLog()
     fun cleanupDevLogByType(type: DevLogTab)

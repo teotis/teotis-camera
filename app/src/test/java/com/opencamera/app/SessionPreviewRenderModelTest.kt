@@ -17,6 +17,7 @@ import com.opencamera.core.session.CaptureStatus
 import com.opencamera.core.session.PermissionState
 import com.opencamera.core.session.PreviewMeteringFeedback
 import com.opencamera.core.session.PreviewMeteringFeedbackStatus
+import com.opencamera.core.device.PreviewMeteringPersistence
 import com.opencamera.core.session.PreviewMetrics
 import com.opencamera.core.session.PreviewStatus
 import com.opencamera.core.session.RecordingStatus
@@ -147,6 +148,54 @@ class SessionPreviewRenderModelTest {
         val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.SUCCEEDED)
         val model = focusReticleRenderModel(feedback)
         assertEquals(FocusReticleStatus.SUCCEEDED, model.status)
+    }
+
+    @Test
+    fun `focusReticleRenderModel maps persistent request to lock requested`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.REQUESTED).copy(
+            persistence = PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+        )
+
+        val model = focusReticleRenderModel(feedback)
+
+        assertEquals(FocusReticleStatus.LOCK_REQUESTED, model.status)
+        assertEquals("AE/AF", model.lockLabel)
+    }
+
+    @Test
+    fun `focusReticleRenderModel maps full lock to persistent locked reticle`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.LOCKED).copy(
+            persistence = PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+        )
+
+        val model = focusReticleRenderModel(feedback)
+
+        assertEquals(FocusReticleStatus.LOCKED, model.status)
+        assertEquals("AE/AF", model.lockLabel)
+    }
+
+    @Test
+    fun `focusReticleRenderModel maps partial lock to degraded locked reticle`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.DEGRADED_FOCUS_LOCK_ONLY).copy(
+            persistence = PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+        )
+
+        val model = focusReticleRenderModel(feedback)
+
+        assertEquals(FocusReticleStatus.LOCKED_DEGRADED, model.status)
+        assertEquals("AF", model.lockLabel)
+    }
+
+    @Test
+    fun `focusReticleRenderModel identifies exposure-only degraded lock`() {
+        val feedback = meteringFeedback(PreviewMeteringFeedbackStatus.DEGRADED_EXPOSURE_LOCK_ONLY).copy(
+            persistence = PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+        )
+
+        val model = focusReticleRenderModel(feedback)
+
+        assertEquals(FocusReticleStatus.LOCKED_DEGRADED, model.status)
+        assertEquals("AE", model.lockLabel)
     }
 
     @Test

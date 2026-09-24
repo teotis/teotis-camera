@@ -11,6 +11,8 @@ import com.opencamera.core.session.CameraSession
 import com.opencamera.core.session.SessionEffect
 import com.opencamera.core.session.SessionIntent
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 
 /**
@@ -32,7 +34,9 @@ class CameraSessionCoordinator(
     private var lifecycleOwner: LifecycleOwner? = null
     private var previewView: PreviewView? = null
     private var attachedMode: ModeId? = null
+    private var attachedManualCaptureParams: com.opencamera.core.settings.ManualCaptureParams? = null
     private var pendingPreviewBind: PendingPreviewBind? = null
+    private var previewMeteringJob: Job? = null
 
     private var modeSwitchState: ModeSwitchState = ModeSwitchState.STABLE
 
@@ -78,7 +82,8 @@ class CameraSessionCoordinator(
                     modeId = pending.modeId,
                     deviceGraph = pending.deviceGraph,
                     reason = pending.reason,
-                    isRecovery = pending.isRecovery
+                    isRecovery = pending.isRecovery,
+                    manualCaptureParams = pending.manualCaptureParams
                 )
             }
         }
@@ -94,31 +99,56 @@ class CameraSessionCoordinator(
             is SessionEffect.StopActiveShot -> cameraAdapter.dispatch(
                 DeviceCommand.StopActiveShot(effect.shotId)
             )
-            is SessionEffect.ApplyZoomRatio -> cameraAdapter.dispatch(
-                DeviceCommand.UpdateZoomRatio(effect.zoomRatio, effect.previewZoomRatio)
-            )
-            is SessionEffect.SwitchLensNode -> cameraAdapter.dispatch(
-                DeviceCommand.SwitchLensNode(effect.lensNode, effect.reason)
-            )
-            is SessionEffect.BindPreview -> bindPreview(
-                modeId = effect.modeId,
-                deviceGraph = effect.deviceGraph,
-                reason = effect.reason,
-                isRecovery = effect.isRecovery
-            )
-            is SessionEffect.UnbindPreview -> unbindPreview(
-                reason = effect.reason,
-                clearHost = effect.clearHost
-            )
-            is SessionEffect.ApplyPreviewMetering -> cameraAdapter.dispatch(
-                DeviceCommand.ApplyPreviewMetering(effect.request)
-            )
+            is SessionEffect.ApplyZoomRatio -> {
+                cancelPreviewMeteringJob("zoom changed")
+                cameraAdapter.dispatch(
+                    DeviceCommand.UpdateZoomRatio(effect.zoomRatio, effect.previewZoomRatio)
+                )
+            }
+            is SessionEffect.SwitchLensNode -> {
+                cancelPreviewMeteringJob("lens node changed")
+                cameraAdapter.dispatch(DeviceCommand.SwitchLensNode(effect.lensNode, effect.reason))
+            }
+            is SessionEffect.BindPreview -> {
+                cancelPreviewMeteringJob("preview rebound")
+                bindPreview(
+                    modeId = effect.modeId,
+                    deviceGraph = effect.deviceGraph,
+                    reason = effect.reason,
+                    isRecovery = effect.isRecovery,
+                    manualCaptureParams = effect.manualCaptureParams
+                )
+            }
+            is SessionEffect.UnbindPreview -> {
+                cancelPreviewMeteringJob("preview unbound")
+                unbindPreview(reason = effect.reason, clearHost = effect.clearHost)
+            }
+            is SessionEffect.ApplyPreviewMetering -> {
+                cancelPreviewMeteringJob("metering replaced")
+                previewMeteringJob = scope.launch {
+                    cameraAdapter.dispatch(DeviceCommand.ApplyPreviewMetering(effect.request))
+                }
+            }
+            is SessionEffect.CancelPreviewMetering -> {
+                cancelPreviewMeteringJob()
+                cameraAdapter.dispatch(DeviceCommand.CancelPreviewMetering(effect.reason))
+            }
             is SessionEffect.UpdateOutputRotation -> cameraAdapter.dispatch(
                 DeviceCommand.UpdateOutputRotation(effect.rotation)
             )
-            is SessionEffect.ApplyPreviewBrightness -> cameraAdapter.dispatch(
-                DeviceCommand.ApplyPreviewBrightness(effect.request)
-            )
+            is SessionEffect.ApplyPreviewBrightness -> {
+                cancelPreviewMeteringJob("preview brightness changed")
+                cameraAdapter.dispatch(DeviceCommand.ApplyPreviewBrightness(effect.request))
+            }
+        }
+    }
+
+    private suspend fun cancelPreviewMeteringJob(cancelDeviceReason: String? = null) {
+        val hadMeteringJob = previewMeteringJob != null
+        previewMeteringJob?.cancelAndJoin()
+        previewMeteringJob = null
+        if (hadMeteringJob && cancelDeviceReason != null) {
+            cameraAdapter.dispatch(DeviceCommand.CancelPreviewMetering(cancelDeviceReason))
         }
     }
 
@@ -188,15 +218,27 @@ class CameraSessionCoordinator(
         modeId: ModeId,
         deviceGraph: DeviceGraphSpec,
         reason: String,
-        isRecovery: Boolean
+        isRecovery: Boolean,
+        manualCaptureParams: com.opencamera.core.settings.ManualCaptureParams? = null
     ) {
-        if (attachedMode == modeId && cameraAdapter.boundGraph() == deviceGraph && !isRecovery) {
+        if (
+            attachedMode == modeId &&
+            cameraAdapter.boundGraph() == deviceGraph &&
+            attachedManualCaptureParams == manualCaptureParams &&
+            !isRecovery
+        ) {
             return
         }
         val owner = lifecycleOwner
         val preview = previewView
         if (owner == null || preview == null) {
-            pendingPreviewBind = PendingPreviewBind(modeId, deviceGraph, reason, isRecovery)
+            pendingPreviewBind = PendingPreviewBind(
+                modeId,
+                deviceGraph,
+                reason,
+                isRecovery,
+                manualCaptureParams
+            )
             return
         }
         val isModeSwitch = attachedMode != null && attachedMode != modeId
@@ -215,15 +257,17 @@ class CameraSessionCoordinator(
             isRecovery = isRecovery
         )
         runCatching {
-            cameraAdapter.bindUseCases(owner, preview, deviceGraph)
+            cameraAdapter.bindUseCases(owner, preview, deviceGraph, manualCaptureParams)
         }.onSuccess {
             attachedMode = modeId
+            attachedManualCaptureParams = manualCaptureParams
             sceneBrightnessSource?.onPreviewStarted()
             if (isModeSwitch) {
                 modeSwitchState = ModeSwitchState.STABLE
             }
         }.onFailure { throwable ->
             attachedMode = null
+            attachedManualCaptureParams = null
             modeSwitchState = ModeSwitchState.STABLE
             runtimeIssueMonitor.onPreviewStopped(throwable.message ?: "bind failure")
             session.dispatch(
@@ -240,6 +284,7 @@ class CameraSessionCoordinator(
     ) {
         cameraAdapter.release()
         attachedMode = null
+        attachedManualCaptureParams = null
         sceneBrightnessSource?.onPreviewStopped()
         runtimeIssueMonitor.onPreviewStopped(reason)
         if (clearHost) {
@@ -261,6 +306,7 @@ class CameraSessionCoordinator(
         sceneBrightnessSource?.onPreviewHostDetached()
         runtimeIssueMonitor.onPreviewHostDetached()
         attachedMode = null
+        attachedManualCaptureParams = null
         lifecycleOwner = null
         previewView = null
     }
@@ -269,6 +315,7 @@ class CameraSessionCoordinator(
         val modeId: ModeId,
         val deviceGraph: DeviceGraphSpec,
         val reason: String,
-        val isRecovery: Boolean
+        val isRecovery: Boolean,
+        val manualCaptureParams: com.opencamera.core.settings.ManualCaptureParams?
     )
 }

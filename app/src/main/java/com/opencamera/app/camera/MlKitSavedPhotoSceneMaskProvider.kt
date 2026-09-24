@@ -1,12 +1,15 @@
 package com.opencamera.app.camera
 
 import android.graphics.Bitmap
+import android.util.Log
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.Segmentation
 import com.google.mlkit.vision.segmentation.SegmentationMask
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+
+private const val TAG = "MlKitSavedPhotoSceneMaskProvider"
 
 internal class MlKitSavedPhotoSceneMaskProvider : SavedPhotoSceneMaskProvider {
     private val segmenter = Segmentation.getClient(
@@ -60,7 +63,8 @@ internal class MlKitSavedPhotoSceneMaskProvider : SavedPhotoSceneMaskProvider {
                     confidence = averageConfidence
                 )
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "subject mask segmentation failed", e)
             SceneMaskResult.Failed("segmentation-exception")
         }
     }

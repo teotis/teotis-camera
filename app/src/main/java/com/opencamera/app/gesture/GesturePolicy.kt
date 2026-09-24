@@ -7,6 +7,8 @@ import com.opencamera.core.session.SessionIntent
 sealed interface GestureAction {
     data class DispatchSession(val intent: SessionIntent) : GestureAction
     data class FocusAt(val x: Float, val y: Float) : GestureAction
+    data class LockFocusAndExposureAt(val x: Float, val y: Float) : GestureAction
+    data object UnlockFocusAndExposure : GestureAction
     data class ShowExposureHint(val deltaY: Float) : GestureAction
     data class AssistModeSwitch(val deltaX: Float) : GestureAction
     data object Ignore : GestureAction
@@ -34,9 +36,18 @@ class GesturePolicy(
         lastDragTimestamp = 0L
     }
 
-    fun map(event: GestureEvent, @Suppress("UNUSED_PARAMETER") activeMode: ModeId, currentZoomRatio: Float = 1.0f): GestureAction {
+    fun map(
+        event: GestureEvent,
+        @Suppress("UNUSED_PARAMETER") activeMode: ModeId,
+        currentZoomRatio: Float = 1.0f,
+        isFocusExposureLocked: Boolean = false
+    ): GestureAction {
         return when (event) {
-            is GestureEvent.Tap -> GestureAction.FocusAt(event.x, event.y)
+            is GestureEvent.Tap -> if (isFocusExposureLocked) {
+                GestureAction.UnlockFocusAndExposure
+            } else {
+                GestureAction.FocusAt(event.x, event.y)
+            }
             is GestureEvent.DoubleTap -> GestureAction.DispatchSession(SessionIntent.LensFacingToggled)
             is GestureEvent.PinchBegin -> {
                 pinchSessionBaseZoom = currentZoomRatio
@@ -78,7 +89,7 @@ class GesturePolicy(
             }
             is GestureEvent.VerticalScroll -> GestureAction.ShowExposureHint(event.deltaY)
             is GestureEvent.HorizontalScroll -> GestureAction.AssistModeSwitch(event.deltaX)
-            is GestureEvent.LongPress -> GestureAction.Ignore
+            is GestureEvent.LongPress -> GestureAction.LockFocusAndExposureAt(event.x, event.y)
             is GestureEvent.DragCancel -> {
                 cancelDrag()
                 GestureAction.Ignore

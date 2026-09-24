@@ -1,13 +1,10 @@
 package com.opencamera.app
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
-import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.util.AttributeSet
@@ -17,10 +14,8 @@ import com.opencamera.core.effect.FilterOverlaySpec
 import com.opencamera.core.effect.FrameGuidelineSpec
 import com.opencamera.core.effect.PreviewColorMatrixBuilder
 import com.opencamera.core.effect.WatermarkHintSpec
-import com.opencamera.core.effect.WatermarkPreviewDecoration
 import com.opencamera.core.effect.WatermarkPreviewShape
 import com.opencamera.core.settings.CompositionGridMode
-import com.opencamera.core.settings.WatermarkTextPlacement
 import kotlin.math.min
 
 class PreviewOverlayView @JvmOverloads constructor(
@@ -71,23 +66,14 @@ class PreviewOverlayView @JvmOverloads constructor(
         strokeWidth = 2f * density
     }
 
-    private val watermarkHintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textSize = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_SP,
-            12f,
-            resources.displayMetrics
-        )
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-    }
-
-    private val watermarkHintBaseTextSizeSp = 12f
-
-    private val watermarkBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        style = Paint.Style.STROKE
-        strokeWidth = 2f * resources.displayMetrics.density
-    }
+    private val watermarkHintRenderer = PreviewWatermarkHintRenderer(
+        context = context,
+        density = density,
+        displayMetrics = resources.displayMetrics,
+        activeFrameRect = ::activeFrameRectOrFullView,
+        viewWidth = { width },
+        viewHeight = { height }
+    )
 
     companion object {
         /** Default alpha for the outside-frame scrim (0–255).  Higher = darker. */
@@ -116,21 +102,14 @@ class PreviewOverlayView @JvmOverloads constructor(
         strokeWidth = 2f * density
     }
 
-    private val watermarkPaperPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val watermarkHairlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1f * density
-    }
-    private val watermarkBlurBandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
+    private val reticleLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
+        textAlign = Paint.Align.CENTER
+        textSize = 9f * density
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
-    private val highDesignWatermarkPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-        isDither = true
-    }
-    private val highDesignWatermarkAssetCache = mutableMapOf<String, Bitmap?>()
+
     private val outsideFramePath = android.graphics.Path()
-    private val drawReusableRect = RectF()
 
     private var vignetteGradient: android.graphics.RadialGradient? = null
     private var vignetteOverlayRect: RectF? = null
@@ -149,6 +128,7 @@ class PreviewOverlayView @JvmOverloads constructor(
 
     /** Cached geometry snapshot — computed once in [render], reused in [onDraw] for same-frame sync. */
     private var cachedGeometry: PreviewContentGeometry? = null
+    private var cachedSurfaceTransform: PreviewSurfaceTransform? = null
 
     /** True while a mode switch rebind is in-flight and geometry must not recompute. */
     private var geometryLocked: Boolean = false
@@ -168,7 +148,9 @@ class PreviewOverlayView @JvmOverloads constructor(
         if (!geometryLocked) {
             renderModel = model
             visibility = if (model.isVisible) VISIBLE else GONE
-            cachedGeometry = computeGeometry(model)
+            val geometryState = computeGeometryState(model)
+            cachedGeometry = geometryState.geometry
+            cachedSurfaceTransform = geometryState.surfaceTransform
             prepareVignetteCache(model)
         } else {
             renderModel = model
@@ -177,30 +159,68 @@ class PreviewOverlayView @JvmOverloads constructor(
         invalidate()
     }
 
-    private fun computeGeometry(model: PreviewOverlayRenderModel): PreviewContentGeometry {
+    private data class PreviewGeometryState(
+        val geometry: PreviewContentGeometry,
+        val surfaceTransform: PreviewSurfaceTransform?
+    )
+
+    private fun computeGeometryState(model: PreviewOverlayRenderModel): PreviewGeometryState {
         val frameRatio = model.frame?.ratio
             ?: model.effectModel?.frameGuideline?.ratio
-        val geometry = previewContentGeometry(
+        val baseGeometry = previewContentGeometry(
             viewWidth = width,
             viewHeight = height,
             ratioWidth = frameRatio?.width ?: 0,
             ratioHeight = frameRatio?.height ?: 0,
             previewContentAspect = model.previewContentAspect
         )
-        val frame = model.frame ?: return geometry
+        val frame = model.frame ?: return PreviewGeometryState(baseGeometry, null)
+        val watermarkHint = model.effectModel?.watermarkHint
+        if (
+            watermarkHint?.shape == WatermarkPreviewShape.EXPANDED_FRAME &&
+            isStaticHighDesignWatermarkTemplate(watermarkHint.templateId)
+        ) {
+            val previewLayout = highDesignWatermarkPreviewLayout(
+                basePhotoSlot = baseGeometry.activeFrameRect,
+                availableBounds = baseGeometry.contentRect
+            )
+            val captureCropRect = scaleRectAroundCenter(
+                baseGeometry.activeFrameRect,
+                exactCaptureFrameScale(
+                    captureZoomRatio = frame.zoomRatio,
+                    previewZoomRatio = frame.previewZoomRatio
+                )
+            )
+            val surfaceScale = previewLayout.photoSlot.width() /
+                captureCropRect.width().coerceAtLeast(1f)
+            return PreviewGeometryState(
+                geometry = baseGeometry.copy(activeFrameRect = previewLayout.photoSlot),
+                surfaceTransform = PreviewSurfaceTransform(
+                    scale = surfaceScale,
+                    pivotX = captureCropRect.centerX(),
+                    pivotY = captureCropRect.centerY(),
+                    translationX = previewLayout.photoSlot.centerX() - captureCropRect.centerX(),
+                    translationY = previewLayout.photoSlot.centerY() - captureCropRect.centerY(),
+                    sourceClipRect = captureCropRect
+                )
+            )
+        }
         val scale = zoomFrameScale(
             captureZoomRatio = frame.zoomRatio,
             previewZoomRatio = frame.previewZoomRatio
         )
-        if (scale >= 0.999f) return geometry
-        val scaled = scaleRectAroundCenter(geometry.activeFrameRect, scale)
+        if (scale >= 0.999f) return PreviewGeometryState(baseGeometry, null)
+        val scaled = scaleRectAroundCenter(baseGeometry.activeFrameRect, scale)
         val clamped = RectF(
-            scaled.left.coerceIn(geometry.contentRect.left, geometry.contentRect.right),
-            scaled.top.coerceIn(geometry.contentRect.top, geometry.contentRect.bottom),
-            scaled.right.coerceIn(geometry.contentRect.left, geometry.contentRect.right),
-            scaled.bottom.coerceIn(geometry.contentRect.top, geometry.contentRect.bottom)
+            scaled.left.coerceIn(baseGeometry.contentRect.left, baseGeometry.contentRect.right),
+            scaled.top.coerceIn(baseGeometry.contentRect.top, baseGeometry.contentRect.bottom),
+            scaled.right.coerceIn(baseGeometry.contentRect.left, baseGeometry.contentRect.right),
+            scaled.bottom.coerceIn(baseGeometry.contentRect.top, baseGeometry.contentRect.bottom)
         )
-        return geometry.copy(activeFrameRect = clamped)
+        return PreviewGeometryState(
+            geometry = baseGeometry.copy(activeFrameRect = clamped),
+            surfaceTransform = null
+        )
     }
 
     internal fun updateFocusReticle(model: FocusReticleRenderModel?) {
@@ -218,7 +238,9 @@ class PreviewOverlayView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        cachedGeometry = computeGeometry(renderModel)
+        val geometryState = computeGeometryState(renderModel)
+        cachedGeometry = geometryState.geometry
+        cachedSurfaceTransform = geometryState.surfaceTransform
         prepareVignetteCache(renderModel)
     }
 
@@ -285,7 +307,7 @@ class PreviewOverlayView @JvmOverloads constructor(
 
     private fun activeContentGeometry(): PreviewContentGeometry {
         cachedGeometry?.let { return it }
-        return computeGeometry(renderModel)
+        return computeGeometryState(renderModel).geometry
     }
 
     private fun activeFrameRectOrFullView(): RectF {
@@ -298,6 +320,11 @@ class PreviewOverlayView @JvmOverloads constructor(
         if (!hasFrame) return null
         return activeContentGeometry().activeFrameRect
     }
+
+    internal fun currentPreviewSurfaceTransformOrNull(): PreviewSurfaceTransform? = cachedSurfaceTransform
+
+    internal fun currentPreviewInteractionBoundsOrNull(): RectF? =
+        cachedSurfaceTransform?.sourceClipRect ?: currentActiveFrameRectOrNull()
 
     private fun drawGrid(
         canvas: Canvas,
@@ -366,776 +393,7 @@ class PreviewOverlayView @JvmOverloads constructor(
     }
 
     private fun drawWatermarkHint(canvas: Canvas, spec: WatermarkHintSpec) {
-        when (spec.shape) {
-            WatermarkPreviewShape.FOUR_BORDER -> drawWatermarkFourBorderHint(canvas, spec)
-            WatermarkPreviewShape.TEXT_ONLY,
-            WatermarkPreviewShape.BACKED_TEXT -> drawWatermarkTextHint(canvas, spec)
-            WatermarkPreviewShape.EXPANDED_FRAME -> drawWatermarkExpandedFrameHint(canvas, spec)
-            WatermarkPreviewShape.BOTTOM_BAR -> drawWatermarkBottomBarHint(canvas, spec)
-        }
-    }
-
-    private fun applyWatermarkTextScale(textScale: Float) {
-        watermarkHintPaint.textSize = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_SP,
-            watermarkHintBaseTextSizeSp * textScale,
-            resources.displayMetrics
-        )
-    }
-
-    private fun drawWatermarkTextHint(canvas: Canvas, spec: WatermarkHintSpec) {
-        applyWatermarkTextScale(spec.textScale)
-        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
-        val rect = activeFrameRectOrFullView()
-        val padding = 16f * density
-        val x: Float
-        val y: Float
-        watermarkHintPaint.textAlign = Paint.Align.LEFT
-        when (spec.placement) {
-            WatermarkTextPlacement.TOP_LEFT -> {
-                x = rect.left + padding
-                y = rect.top + padding + watermarkHintPaint.textSize
-            }
-            WatermarkTextPlacement.TOP_RIGHT -> {
-                x = rect.right - padding
-                y = rect.top + padding + watermarkHintPaint.textSize
-                watermarkHintPaint.textAlign = Paint.Align.RIGHT
-            }
-            WatermarkTextPlacement.BOTTOM_LEFT -> {
-                x = rect.left + padding
-                y = rect.bottom - padding
-            }
-            WatermarkTextPlacement.BOTTOM_RIGHT -> {
-                x = rect.right - padding
-                y = rect.bottom - padding
-                watermarkHintPaint.textAlign = Paint.Align.RIGHT
-            }
-            WatermarkTextPlacement.BOTTOM_CENTER -> {
-                x = rect.centerX()
-                y = rect.bottom - padding
-                watermarkHintPaint.textAlign = Paint.Align.CENTER
-            }
-        }
-        canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
-    }
-
-    private fun drawWatermarkExpandedFrameHint(canvas: Canvas, spec: WatermarkHintSpec) {
-        applyWatermarkTextScale(spec.textScale)
-        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
-        val previousTextColor = watermarkHintPaint.color
-        watermarkHintPaint.color = when (spec.decoration) {
-            WatermarkPreviewDecoration.TRAVEL_MAP -> Color.rgb(42, 82, 61)
-            WatermarkPreviewDecoration.ARCHIVAL_PAPER -> Color.rgb(224, 205, 154)
-            WatermarkPreviewDecoration.NIGHT_MEMORY -> Color.rgb(226, 232, 240)
-            WatermarkPreviewDecoration.STARRY_MOON -> Color.rgb(232, 205, 146)
-            WatermarkPreviewDecoration.BLUE_HOUR -> Color.rgb(196, 218, 246)
-            WatermarkPreviewDecoration.IMPRESSION_CHROMA -> Color.rgb(58, 55, 50)
-            WatermarkPreviewDecoration.NONE -> Color.WHITE
-        }
-        val rect = activeFrameRectOrFullView()
-        val paperAlpha = expandedFramePaperAlpha(spec.templateId, spec.opacity)
-        watermarkPaperPaint.color = when (spec.templateId) {
-            "retro-frame" -> Color.argb((spec.opacity * 184).toInt().coerceIn(0, 184), 14, 36, 29)
-            "night-street" -> Color.argb((spec.opacity * 210).toInt().coerceIn(0, 210), 7, 14, 36)
-            "van-gogh-starry" -> Color.argb((spec.opacity * 218).toInt().coerceIn(0, 218), 5, 18, 48)
-            "blue-hour" -> Color.argb((spec.opacity * 226).toInt().coerceIn(0, 226), 4, 24, 46)
-            else -> Color.argb(paperAlpha, 252, 246, 229)
-        }
-        watermarkHairlinePaint.color = when (spec.templateId) {
-            "retro-frame" -> Color.argb((spec.opacity * 148).toInt().coerceIn(0, 148), 218, 190, 126)
-            "night-street" -> Color.argb((spec.opacity * 88).toInt().coerceIn(0, 88), 168, 178, 198)
-            "van-gogh-starry" -> Color.argb((spec.opacity * 126).toInt().coerceIn(0, 126), 218, 170, 84)
-            "blue-hour" -> Color.argb((spec.opacity * 156).toInt().coerceIn(0, 156), 156, 204, 250)
-            else -> Color.argb((spec.opacity * 72).toInt().coerceIn(0, 72), 96, 68, 42)
-        }
-        val sideBand = (rect.width() * 0.035f).coerceIn(10f * density, 28f * density)
-        val topBand = (rect.height() * 0.035f).coerceIn(8f * density, 24f * density)
-        val leftBand = sideBand.coerceAtMost(rect.left)
-        val rightBand = sideBand.coerceAtMost(width - rect.right)
-        val topFrameBand = topBand.coerceAtMost(rect.top)
-        if (leftBand > 0f) {
-            canvas.drawRect(rect.left - leftBand, rect.top, rect.left, rect.bottom, watermarkPaperPaint)
-        }
-        if (rightBand > 0f) {
-            canvas.drawRect(rect.right, rect.top, rect.right + rightBand, rect.bottom, watermarkPaperPaint)
-        }
-        if (topFrameBand > 0f) {
-            canvas.drawRect(rect.left - leftBand, rect.top - topFrameBand, rect.right + rightBand, rect.top, watermarkPaperPaint)
-        }
-        val bottomRect = expandedFrameBottomBandRect(rect, height, density, spec.templateId)
-        if (bottomRect != null) {
-            canvas.drawRect(
-                bottomRect.left - leftBand,
-                bottomRect.top,
-                bottomRect.right + rightBand,
-                bottomRect.bottom,
-                watermarkPaperPaint
-            )
-        }
-        canvas.drawRect(rect, watermarkHairlinePaint)
-        val drewHighDesignMaterial = drawHighDesignWatermarkPreviewMaterial(
-            canvas = canvas,
-            spec = spec,
-            frameRect = rect,
-            bottomRect = bottomRect,
-            leftBand = leftBand,
-            rightBand = rightBand,
-            topFrameBand = topFrameBand
-        )
-        if (!drewHighDesignMaterial) {
-            when (spec.decoration) {
-                WatermarkPreviewDecoration.TRAVEL_MAP -> {
-                    bottomRect?.let { drawTravelMapPreviewDecoration(canvas, it, spec.opacity) }
-                }
-                WatermarkPreviewDecoration.ARCHIVAL_PAPER -> {
-                    drawArchivalPaperPreviewDecoration(canvas, rect, spec.opacity)
-                }
-                WatermarkPreviewDecoration.NIGHT_MEMORY -> {
-                    drawNightMemoryPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
-                }
-                WatermarkPreviewDecoration.STARRY_MOON -> {
-                    drawStarryMoonPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
-                }
-                WatermarkPreviewDecoration.BLUE_HOUR -> {
-                    drawBlueHourPreviewDecoration(canvas, rect, bottomRect, spec.opacity)
-                }
-                WatermarkPreviewDecoration.IMPRESSION_CHROMA,
-                WatermarkPreviewDecoration.NONE -> Unit
-            }
-        }
-
-        if (bottomRect != null && spec.decoration == WatermarkPreviewDecoration.STARRY_MOON) {
-            drawStarryMoonPreviewText(canvas, spec, bottomRect)
-            watermarkHintPaint.color = previousTextColor
-            return
-        }
-        if (bottomRect != null && spec.decoration == WatermarkPreviewDecoration.BLUE_HOUR) {
-            drawBlueHourPreviewText(canvas, spec, bottomRect)
-            watermarkHintPaint.color = previousTextColor
-            return
-        }
-
-        val padding = 16f * density
-        val textTop = if ((bottomRect?.height() ?: 0f) > watermarkHintPaint.textSize + padding) {
-            rect.bottom + padding + watermarkHintPaint.textSize
-        } else {
-            rect.bottom - padding
-        }
-        val x: Float
-        val y: Float
-        watermarkHintPaint.textAlign = Paint.Align.LEFT
-        when (spec.placement) {
-            WatermarkTextPlacement.TOP_LEFT -> {
-                x = rect.left + padding
-                y = rect.top + padding + watermarkHintPaint.textSize
-            }
-            WatermarkTextPlacement.TOP_RIGHT -> {
-                x = rect.right - padding
-                y = rect.top + padding + watermarkHintPaint.textSize
-                watermarkHintPaint.textAlign = Paint.Align.RIGHT
-            }
-            WatermarkTextPlacement.BOTTOM_LEFT -> {
-                x = rect.left + padding
-                y = textTop
-            }
-            WatermarkTextPlacement.BOTTOM_RIGHT -> {
-                x = rect.right - padding
-                y = textTop
-                watermarkHintPaint.textAlign = Paint.Align.RIGHT
-            }
-            WatermarkTextPlacement.BOTTOM_CENTER -> {
-                x = rect.centerX()
-                y = textTop
-                watermarkHintPaint.textAlign = Paint.Align.CENTER
-            }
-        }
-        canvas.drawText(spec.previewText, x, y, watermarkHintPaint)
-        watermarkHintPaint.color = previousTextColor
-    }
-
-    private fun drawHighDesignWatermarkPreviewMaterial(
-        canvas: Canvas,
-        spec: WatermarkHintSpec,
-        frameRect: RectF,
-        bottomRect: RectF?,
-        leftBand: Float,
-        rightBand: Float,
-        topFrameBand: Float
-    ): Boolean {
-        val assetPath = highDesignWatermarkPreviewAssetPath(spec.templateId, frameRect) ?: return false
-        val asset = highDesignWatermarkAsset(assetPath) ?: return false
-        val bottom = bottomRect?.bottom ?: frameRect.bottom
-        val destination = RectF(
-            frameRect.left - leftBand,
-            frameRect.top - topFrameBand,
-            frameRect.right + rightBand,
-            bottom
-        )
-        if (destination.width() <= 0f || destination.height() <= 0f) return false
-        highDesignWatermarkPaint.alpha = (spec.opacity * 255).toInt().coerceIn(72, 235)
-        canvas.drawBitmap(asset, null, destination, highDesignWatermarkPaint)
-        highDesignWatermarkPaint.alpha = 255
-        return true
-    }
-
-    private fun highDesignWatermarkPreviewAssetPath(templateId: String, frameRect: RectF): String? {
-        val aspect = frameRect.width() / frameRect.height().coerceAtLeast(1f)
-        val suffix = when {
-            aspect < 0.78f -> "portrait"
-            aspect > 1.22f -> "landscape"
-            else -> "square"
-        }
-        return when (templateId) {
-            "van-gogh-starry" -> "watermarks/van_gogh_starry_$suffix.png"
-            "blue-hour" -> "watermarks/blue_hour_$suffix.png"
-            else -> null
-        }
-    }
-
-    private fun highDesignWatermarkAsset(assetPath: String): Bitmap? {
-        return highDesignWatermarkAssetCache.getOrPut(assetPath) {
-            runCatching {
-                context.assets.open(assetPath).use(BitmapFactory::decodeStream)
-            }.getOrNull()
-        }
-    }
-
-    private fun drawTravelMapPreviewDecoration(
-        canvas: Canvas,
-        bottomRect: RectF,
-        opacity: Float
-    ) {
-        val region = RectF(
-            bottomRect.left + bottomRect.width() * 0.54f,
-            bottomRect.top + bottomRect.height() * 0.14f,
-            bottomRect.right - 12f * density,
-            bottomRect.bottom - 12f * density
-        )
-        if (region.width() <= 0f || region.height() <= 0f) return
-
-        val contourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(94, 125, 103)
-            alpha = (opacity * 88).toInt().coerceIn(0, 88)
-            style = Paint.Style.STROKE
-            strokeWidth = 0.8f * density
-        }
-        val routePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(42, 82, 61)
-            alpha = (opacity * 170).toInt().coerceIn(0, 170)
-            style = Paint.Style.STROKE
-            strokeWidth = 1.35f * density
-            strokeCap = Paint.Cap.ROUND
-        }
-
-        listOf(0.18f, 0.46f, 0.74f).forEachIndexed { index, offset ->
-            val path = Path().apply {
-                moveTo(region.left, region.top + region.height() * offset)
-                cubicTo(
-                    region.left + region.width() * 0.22f,
-                    region.top + region.height() * (offset - 0.18f + index * 0.03f),
-                    region.left + region.width() * 0.62f,
-                    region.top + region.height() * (offset + 0.16f - index * 0.04f),
-                    region.right,
-                    region.top + region.height() * (offset - 0.04f)
-                )
-            }
-            canvas.drawPath(path, contourPaint)
-        }
-
-        val startX = region.left + region.width() * 0.16f
-        val startY = region.bottom - region.height() * 0.2f
-        val endX = region.right - region.width() * 0.12f
-        val endY = region.top + region.height() * 0.24f
-        val route = Path().apply {
-            moveTo(startX, startY)
-            cubicTo(
-                region.left + region.width() * 0.38f,
-                region.top + region.height() * 0.72f,
-                region.left + region.width() * 0.58f,
-                region.top + region.height() * 0.36f,
-                endX,
-                endY
-            )
-        }
-        canvas.drawPath(route, routePaint)
-        canvas.drawCircle(startX, startY, 2.4f * density, routePaint)
-        canvas.drawCircle(endX, endY, 2.4f * density, routePaint)
-
-        val crossX = region.right - 9f * density
-        val crossY = region.bottom - 8f * density
-        canvas.drawLine(crossX - 4f * density, crossY, crossX + 4f * density, crossY, routePaint)
-        canvas.drawLine(crossX, crossY - 4f * density, crossX, crossY + 4f * density, routePaint)
-    }
-
-    private fun drawArchivalPaperPreviewDecoration(
-        canvas: Canvas,
-        frameRect: RectF,
-        opacity: Float
-    ) {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(218, 190, 126)
-            alpha = (opacity * 164).toInt().coerceIn(0, 164)
-            style = Paint.Style.STROKE
-            strokeWidth = 1.0f * density
-            strokeCap = Paint.Cap.SQUARE
-        }
-        val finePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(122, 98, 58)
-            alpha = (opacity * 104).toInt().coerceIn(0, 104)
-            style = Paint.Style.STROKE
-            strokeWidth = 0.75f * density
-        }
-        canvas.drawRect(frameRect, paint)
-
-        val corner = 30f * density
-        val inset = 8f * density
-        fun drawCorner(left: Boolean, top: Boolean) {
-            val x = if (left) frameRect.left + inset else frameRect.right - inset
-            val y = if (top) frameRect.top + inset else frameRect.bottom - inset
-            val xDir = if (left) 1f else -1f
-            val yDir = if (top) 1f else -1f
-            canvas.drawLine(x, y, x + xDir * corner, y, paint)
-            canvas.drawLine(x, y, x, y + yDir * corner, paint)
-            canvas.drawLine(
-                x + xDir * corner * 0.42f,
-                y + yDir * 5f * density,
-                x + xDir * corner * 0.92f,
-                y + yDir * 5f * density,
-                finePaint
-            )
-        }
-        drawCorner(left = true, top = true)
-        drawCorner(left = false, top = true)
-        drawCorner(left = true, top = false)
-        drawCorner(left = false, top = false)
-
-    }
-
-    private fun drawNightMemoryPreviewDecoration(
-        canvas: Canvas,
-        frameRect: RectF,
-        bottomRect: RectF?,
-        opacity: Float
-    ) {
-        val coolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(166, 180, 204)
-            alpha = (opacity * 60).toInt().coerceIn(0, 60)
-            style = Paint.Style.STROKE
-            strokeWidth = 0.8f * density
-            strokeCap = Paint.Cap.ROUND
-        }
-        val warmLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(218, 160, 82)
-            alpha = (opacity * 140).toInt().coerceIn(0, 140)
-            style = Paint.Style.STROKE
-            strokeWidth = 1.0f * density
-            strokeCap = Paint.Cap.ROUND
-        }
-        val lampPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(228, 164, 92)
-            alpha = (opacity * 168).toInt().coerceIn(0, 168)
-            style = Paint.Style.FILL
-        }
-        val inset = 9f * density
-        val corner = 24f * density
-        fun drawCorner(left: Boolean, top: Boolean) {
-            val x = if (left) frameRect.left + inset else frameRect.right - inset
-            val y = if (top) frameRect.top + inset else frameRect.bottom - inset
-            val xDir = if (left) 1f else -1f
-            val yDir = if (top) 1f else -1f
-            canvas.drawLine(x, y, x + xDir * corner, y, coolPaint)
-            canvas.drawLine(x, y, x, y + yDir * corner, coolPaint)
-        }
-        drawCorner(left = true, top = true)
-        drawCorner(left = false, top = true)
-        drawCorner(left = true, top = false)
-        drawCorner(left = false, top = false)
-
-        bottomRect?.let { band ->
-            canvas.drawLine(
-                band.left + 18f * density,
-                band.top + 10f * density,
-                band.right - 18f * density,
-                band.top + 11f * density,
-                warmLinePaint
-            )
-            val radius = 2.2f * density
-            canvas.drawCircle(band.right - 24f * density, band.top + 20f * density, radius, lampPaint)
-            canvas.drawCircle(band.right - 34f * density, band.top + 27f * density, radius * 0.55f, lampPaint)
-        }
-    }
-
-    private fun drawStarryMoonPreviewDecoration(
-        canvas: Canvas,
-        frameRect: RectF,
-        bottomRect: RectF?,
-        opacity: Float
-    ) {
-        val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(232, 190, 104)
-            alpha = (opacity * 170).toInt().coerceIn(0, 170)
-            style = Paint.Style.STROKE
-            strokeWidth = 1.0f * density
-            strokeCap = Paint.Cap.ROUND
-        }
-        val coolPaint = Paint(warmPaint).apply {
-            color = Color.rgb(54, 139, 218)
-            alpha = (opacity * 112).toInt().coerceIn(0, 112)
-            strokeWidth = 0.75f * density
-        }
-        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(246, 215, 146)
-            alpha = (opacity * 210).toInt().coerceIn(0, 210)
-            style = Paint.Style.FILL
-        }
-        val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(5, 18, 48)
-            alpha = (opacity * 230).toInt().coerceIn(0, 230)
-            style = Paint.Style.FILL
-        }
-        val moonX = frameRect.left + 34f * density
-        val moonY = frameRect.top + 28f * density
-        val moonR = 10f * density
-        canvas.drawCircle(moonX, moonY, moonR, fillPaint)
-        canvas.drawCircle(moonX + moonR * 0.45f, moonY - moonR * 0.12f, moonR * 0.92f, maskPaint)
-
-        fun wave(y: Float, paint: Paint, shift: Float) {
-            val path = Path().apply {
-                moveTo(frameRect.left + 72f * density, y)
-                cubicTo(
-                    frameRect.left + frameRect.width() * 0.34f,
-                    y - 18f * density + shift,
-                    frameRect.left + frameRect.width() * 0.62f,
-                    y + 18f * density - shift,
-                    frameRect.right - 24f * density,
-                    y - 4f * density
-                )
-            }
-            canvas.drawPath(path, paint)
-        }
-        wave(frameRect.top + 24f * density, warmPaint, 0f)
-        wave(frameRect.top + 30f * density, coolPaint, 4f * density)
-        bottomRect?.let { band ->
-            wave(band.top + band.height() * 0.42f, warmPaint, 2f * density)
-            wave(band.top + band.height() * 0.56f, coolPaint, -2f * density)
-        }
-
-        listOf(
-            frameRect.left + 14f * density to frameRect.top + 48f * density,
-            frameRect.right - 44f * density to frameRect.top + 34f * density,
-            frameRect.right - 22f * density to frameRect.centerY(),
-            frameRect.left + 28f * density to frameRect.bottom - 34f * density,
-            frameRect.right - 32f * density to frameRect.bottom - 26f * density
-        ).forEach { (x, y) ->
-            canvas.drawLine(x - 3f * density, y, x + 3f * density, y, fillPaint)
-            canvas.drawLine(x, y - 3f * density, x, y + 3f * density, fillPaint)
-        }
-    }
-
-    private fun drawBlueHourPreviewDecoration(
-        canvas: Canvas,
-        frameRect: RectF,
-        bottomRect: RectF?,
-        opacity: Float
-    ) {
-        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(158, 202, 238)
-            alpha = (opacity * 178).toInt().coerceIn(0, 178)
-            style = Paint.Style.STROKE
-            strokeWidth = 1.05f * density
-            strokeCap = Paint.Cap.ROUND
-        }
-        val warmPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(230, 184, 104)
-            alpha = (opacity * 178).toInt().coerceIn(0, 178)
-            style = Paint.Style.STROKE
-            strokeWidth = 1.05f * density
-            strokeCap = Paint.Cap.ROUND
-        }
-        val inset = 8f * density
-        val radius = 8f * density
-        canvas.drawRoundRect(
-            RectF(
-                frameRect.left + inset,
-                frameRect.top + inset,
-                frameRect.right - inset,
-                (bottomRect?.bottom ?: frameRect.bottom) - inset
-            ),
-            radius,
-            radius,
-            linePaint
-        )
-        val innerPaint = Paint(linePaint).apply {
-            alpha = (opacity * 118).toInt().coerceIn(0, 118)
-            strokeWidth = 0.7f * density
-        }
-        canvas.drawRoundRect(
-            RectF(
-                frameRect.left + inset * 2.0f,
-                frameRect.top + inset * 1.8f,
-                frameRect.right - inset * 2.0f,
-                (bottomRect?.bottom ?: frameRect.bottom) - inset * 1.8f
-            ),
-            radius * 0.72f,
-            radius * 0.72f,
-            innerPaint
-        )
-        repeat(5) { index ->
-            val y = frameRect.top + inset * (1.05f + index * 0.34f)
-            canvas.drawLine(
-                frameRect.left + inset * (1.2f + index * 0.25f),
-                y,
-                frameRect.right - inset * (1.4f + index * 0.12f),
-                y + density * 1.2f,
-                Paint(linePaint).apply {
-                    alpha = (opacity * (62 + index * 15)).toInt().coerceIn(0, 142)
-                    strokeWidth = 0.55f * density
-                }
-            )
-        }
-        bottomRect?.let { band ->
-            val x = band.right - 58f * density
-            val y = band.top + band.height() * 0.48f
-            canvas.drawCircle(x, y, 6.2f * density, warmPaint)
-            canvas.drawLine(x + 22f * density, y + 9f * density, x + 22f * density, band.bottom - 15f * density, warmPaint)
-            canvas.drawLine(x + 16f * density, band.bottom - 15f * density, x + 28f * density, band.bottom - 15f * density, warmPaint)
-            canvas.drawRect(
-                x - 6f * density,
-                y + 21f * density,
-                x + 7f * density,
-                y + 31f * density,
-                warmPaint
-            )
-        }
-    }
-
-    private fun drawStarryMoonPreviewText(
-        canvas: Canvas,
-        spec: WatermarkHintSpec,
-        bottomRect: RectF
-    ) {
-        val originalTextSize = watermarkHintPaint.textSize
-        val originalTypeface = watermarkHintPaint.typeface
-        watermarkHintPaint.textAlign = Paint.Align.CENTER
-        watermarkHintPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-        watermarkHintPaint.textSize = originalTextSize * 0.84f
-        watermarkHintPaint.alpha = (spec.opacity * 255 * 0.86f).toInt().coerceIn(0, 255)
-        val metadata = spec.previewLabels.takeIf { it.isNotEmpty() }
-            ?.joinToString(" · ")
-            ?: spec.previewText
-        val metrics = watermarkHintPaint.fontMetrics
-        val baseline = bottomRect.centerY() - (metrics.ascent + metrics.descent) / 2f
-        canvas.drawText(metadata, bottomRect.centerX(), baseline, watermarkHintPaint)
-        watermarkHintPaint.typeface = originalTypeface
-        watermarkHintPaint.textSize = originalTextSize
-    }
-
-    private fun drawBlueHourPreviewText(
-        canvas: Canvas,
-        spec: WatermarkHintSpec,
-        bottomRect: RectF
-    ) {
-        val originalTextSize = watermarkHintPaint.textSize
-        val originalTypeface = watermarkHintPaint.typeface
-        val left = bottomRect.left + 24f * density
-        watermarkHintPaint.textAlign = Paint.Align.LEFT
-        watermarkHintPaint.typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
-        watermarkHintPaint.textSize = originalTextSize * 1.42f
-        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
-        val titleMetrics = watermarkHintPaint.fontMetrics
-        val titleBaseline = bottomRect.top + bottomRect.height() * 0.38f - (titleMetrics.ascent + titleMetrics.descent) / 2f
-        canvas.drawText(spec.previewText, left, titleBaseline, watermarkHintPaint)
-
-        watermarkHintPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-        watermarkHintPaint.textSize = originalTextSize * 0.78f
-        watermarkHintPaint.alpha = (spec.opacity * 255 * 0.78f).toInt().coerceIn(0, 255)
-        val metadata = spec.previewLabels.joinToString(" · ")
-        if (metadata.isNotBlank()) {
-            canvas.drawText(
-                metadata.take(42),
-                left,
-                titleBaseline + originalTextSize * 1.35f,
-                watermarkHintPaint
-            )
-        }
-        watermarkHintPaint.typeface = originalTypeface
-        watermarkHintPaint.textSize = originalTextSize
-        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
-    }
-
-    private fun drawWatermarkFourBorderHint(canvas: Canvas, spec: WatermarkHintSpec) {
-        applyWatermarkTextScale(spec.textScale)
-        val rect = activeFrameRectOrFullView()
-        val band = fourBorderPreviewBandWidth(rect, density)
-        val bottomBand = (min(rect.width(), rect.height()) * 0.09f).coerceIn(34f * density, 86f * density)
-        val blurBandAlpha = (spec.opacity * 255 * 0.18f).toInt().coerceIn(0, 255)
-        watermarkBlurBandPaint.alpha = blurBandAlpha
-        canvas.drawRect(rect.left, rect.top, rect.right, rect.top + band, watermarkBlurBandPaint)
-        canvas.drawRect(rect.left, rect.bottom - bottomBand, rect.right, rect.bottom, watermarkBlurBandPaint)
-        canvas.drawRect(rect.left, rect.top + band, rect.left + band, rect.bottom - bottomBand, watermarkBlurBandPaint)
-        canvas.drawRect(rect.right - band, rect.top + band, rect.right, rect.bottom - bottomBand, watermarkBlurBandPaint)
-
-        watermarkBorderPaint.alpha = (spec.opacity * 255 * 0.42f).toInt().coerceIn(0, 255)
-        canvas.drawRect(rect, watermarkBorderPaint)
-        if (spec.decoration == WatermarkPreviewDecoration.IMPRESSION_CHROMA) {
-            drawImpressionChromaPreviewDecoration(canvas, rect, bottomBand, spec.opacity)
-        }
-
-        val originalTextSize = watermarkHintPaint.textSize
-        val originalTypeface = watermarkHintPaint.typeface
-        val metadata = fourBorderPreviewMetadata(spec.previewLabels)
-        val titleTextSize = originalTextSize * 1.08f
-        val metadataTextSize = originalTextSize * 0.76f
-        val lineGap = 5f * density
-
-        watermarkHintPaint.textAlign = Paint.Align.CENTER
-        watermarkHintPaint.setShadowLayer(3f * density, 0f, density, Color.argb(110, 0, 0, 0))
-        watermarkHintPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        watermarkHintPaint.textSize = titleTextSize
-        watermarkHintPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
-        val titleMetrics = watermarkHintPaint.fontMetrics
-        val titleHeight = titleMetrics.descent - titleMetrics.ascent
-
-        watermarkHintPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-        watermarkHintPaint.textSize = metadataTextSize
-        val metadataMetrics = watermarkHintPaint.fontMetrics
-        val metadataHeight = if (metadata.isNotEmpty()) {
-            metadataMetrics.descent - metadataMetrics.ascent
-        } else {
-            0f
-        }
-        val blockHeight = titleHeight + if (metadata.isNotEmpty()) lineGap + metadataHeight else 0f
-        val blockTop = rect.bottom - bottomBand + (bottomBand - blockHeight) / 2f
-
-        watermarkHintPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
-        watermarkHintPaint.textSize = titleTextSize
-        val titleBaseline = blockTop - titleMetrics.ascent
-        canvas.drawText(spec.previewText, rect.centerX(), titleBaseline, watermarkHintPaint)
-
-        if (metadata.isNotEmpty()) {
-            watermarkHintPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-            watermarkHintPaint.textSize = metadataTextSize
-            watermarkHintPaint.alpha = (spec.opacity * 255 * 0.78f).toInt().coerceIn(0, 255)
-            val metadataBaseline = titleBaseline + titleMetrics.descent + lineGap - metadataMetrics.ascent
-            canvas.drawText(metadata, rect.centerX(), metadataBaseline, watermarkHintPaint)
-        }
-
-        watermarkHintPaint.clearShadowLayer()
-        watermarkHintPaint.typeface = originalTypeface
-        watermarkHintPaint.textSize = originalTextSize
-    }
-
-    private fun drawImpressionChromaPreviewDecoration(
-        canvas: Canvas,
-        rect: RectF,
-        bottomBand: Float,
-        opacity: Float
-    ) {
-        val top = rect.bottom - bottomBand + 7f * density
-        val start = RectF(
-            rect.left + 18f * density,
-            top,
-            rect.centerX(),
-            top + 1.2f * density
-        )
-        val end = RectF(
-            rect.centerX(),
-            top,
-            rect.right - 18f * density,
-            top + 1.2f * density
-        )
-        val rosePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(198, 174, 205)
-            alpha = (opacity * 96).toInt().coerceIn(0, 96)
-            style = Paint.Style.FILL
-        }
-        val cyanPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(168, 202, 210)
-            alpha = (opacity * 88).toInt().coerceIn(0, 88)
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(start, 1f * density, 1f * density, rosePaint)
-        canvas.drawRoundRect(end, 1f * density, 1f * density, cyanPaint)
-    }
-
-    private val bottomBarBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-
-    private val bottomBarTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        textSize = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_SP,
-            10f,
-            resources.displayMetrics
-        )
-        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-    }
-
-    private fun drawWatermarkBottomBarHint(canvas: Canvas, spec: WatermarkHintSpec) {
-        val rect = activeFrameRectOrFullView()
-        val isTranslucentBottomBar = spec.templateId == "pure-text"
-        val barRect = if (isTranslucentBottomBar) {
-            val barHeight = maxOf(52f * density, rect.height() * 0.078f)
-            RectF(rect.left, rect.bottom - barHeight, rect.right, rect.bottom)
-        } else {
-            bottomBarPreviewRect(rect, height, density)
-        }
-        val bgColor = spec.barBackground
-        if (bgColor != 0) {
-            bottomBarBackgroundPaint.color = bgColor
-            bottomBarBackgroundPaint.alpha = (spec.opacity * 200).toInt().coerceIn(0, 200)
-            canvas.drawRect(barRect, bottomBarBackgroundPaint)
-        }
-        if (isTranslucentBottomBar) {
-            val accentWidth = 3f * density
-            val accentMargin = 11f * density
-            bottomBarBackgroundPaint.color = Color.rgb(238, 214, 154)
-            bottomBarBackgroundPaint.alpha = (spec.opacity * 225).toInt().coerceIn(0, 225)
-            canvas.drawRoundRect(
-                RectF(
-                    barRect.left + accentMargin,
-                    barRect.top + accentMargin,
-                    barRect.left + accentMargin + accentWidth,
-                    barRect.bottom - accentMargin
-                ),
-                accentWidth,
-                accentWidth,
-                bottomBarBackgroundPaint
-            )
-        }
-        bottomBarTextPaint.alpha = (spec.opacity * 255).toInt().coerceIn(0, 255)
-        val padding = 10f * density
-        if (isTranslucentBottomBar) {
-            bottomBarTextPaint.textAlign = Paint.Align.LEFT
-            bottomBarTextPaint.color = Color.rgb(246, 250, 255)
-            bottomBarTextPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
-            bottomBarTextPaint.textSize = 11.5f * density
-            val leftX = barRect.left + padding + 14f * density
-            val titleY = barRect.top + 23f * density
-            val title = spec.previewLabels.firstOrNull() ?: spec.previewText
-            canvas.drawText(title, leftX, titleY, bottomBarTextPaint)
-
-            val secondary = spec.previewLabels.drop(1).joinToString("  ·  ").ifBlank { spec.previewText }
-            bottomBarTextPaint.color = Color.rgb(196, 214, 232)
-            bottomBarTextPaint.textSize = 8.5f * density
-            canvas.drawText(secondary, leftX, titleY + 17f * density, bottomBarTextPaint)
-            return
-        }
-        val textY = barRect.centerY() - (bottomBarTextPaint.ascent() + bottomBarTextPaint.descent()) / 2f
-        if (spec.previewLabels.isNotEmpty()) {
-            bottomBarTextPaint.textAlign = Paint.Align.LEFT
-            val leftX = barRect.left + padding
-            canvas.drawText(spec.previewLabels.first(), leftX, textY, bottomBarTextPaint)
-            if (spec.previewLabels.size > 1) {
-                bottomBarTextPaint.textAlign = Paint.Align.RIGHT
-                val rightX = barRect.right - padding
-                canvas.drawText(spec.previewLabels.last(), rightX, textY, bottomBarTextPaint)
-            }
-        } else {
-            bottomBarTextPaint.textAlign = Paint.Align.CENTER
-            canvas.drawText(spec.previewText, barRect.centerX(), textY, bottomBarTextPaint)
-        }
+        watermarkHintRenderer.draw(canvas, spec)
     }
 
     private fun drawPreviewFrame(canvas: Canvas, frame: PreviewFrameRenderModel) {
@@ -1196,8 +454,16 @@ class PreviewOverlayView @JvmOverloads constructor(
             return
         }
 
-        val rawCx = model.normalizedX.coerceIn(0f, 1f) * width
-        val rawCy = model.normalizedY.coerceIn(0f, 1f) * height
+        val sourcePoint = transformedPreviewPoint(
+            normalizedX = model.normalizedX,
+            normalizedY = model.normalizedY,
+            viewWidth = width,
+            viewHeight = height,
+            transform = cachedSurfaceTransform,
+            isMirrored = renderModel.isPreviewMirrored
+        )
+        val rawCx = sourcePoint.x
+        val rawCy = sourcePoint.y
         val baseRadius = 24f * density
         val radius = baseRadius * visual.scale
         val tickLength = 8f * density
@@ -1219,8 +485,18 @@ class PreviewOverlayView @JvmOverloads constructor(
             canvas.drawLine(cx + radius, cy, cx + radius + tickLength, cy, reticleTickPaint)
         }
 
-        if (animatingReticle) {
+        model.lockLabel?.let { label ->
+            reticleLabelPaint.color = visual.ringColor
+            reticleLabelPaint.alpha = (visual.alpha * 255).toInt().coerceIn(0, 255)
+            val metrics = reticleLabelPaint.fontMetrics
+            val baseline = cy - (metrics.ascent + metrics.descent) / 2f
+            canvas.drawText(label, cx, baseline, reticleLabelPaint)
+        }
+
+        if (animatingReticle && visual.animates) {
             postInvalidateOnAnimation()
+        } else {
+            animatingReticle = false
         }
     }
 }
@@ -1248,9 +524,41 @@ internal data class PreviewContentGeometry(
     val contentCenterY: Float get() = contentRect.centerY()
 }
 
+internal data class PreviewSurfaceTransform(
+    val scale: Float,
+    val pivotX: Float,
+    val pivotY: Float,
+    val translationX: Float,
+    val translationY: Float,
+    val sourceClipRect: RectF
+)
+
+internal fun transformedPreviewPoint(
+    normalizedX: Float,
+    normalizedY: Float,
+    viewWidth: Int,
+    viewHeight: Int,
+    transform: PreviewSurfaceTransform?,
+    isMirrored: Boolean
+): ReticlePoint {
+    val sourceX = normalizedX.coerceIn(0f, 1f) * viewWidth
+    val sourceY = normalizedY.coerceIn(0f, 1f) * viewHeight
+    if (transform == null) return ReticlePoint(sourceX, sourceY)
+    val horizontalScale = if (isMirrored) -transform.scale else transform.scale
+    return ReticlePoint(
+        x = transform.pivotX + (sourceX - transform.pivotX) * horizontalScale +
+            transform.translationX,
+        y = transform.pivotY + (sourceY - transform.pivotY) * transform.scale +
+            transform.translationY
+    )
+}
+
 internal enum class FocusReticleStatus {
     REQUESTED,
+    LOCK_REQUESTED,
     SUCCEEDED,
+    LOCKED,
+    LOCKED_DEGRADED,
     DEGRADED,
     FAILED,
     UNSUPPORTED
@@ -1259,7 +567,8 @@ internal enum class FocusReticleStatus {
 internal data class FocusReticleRenderModel(
     val normalizedX: Float,
     val normalizedY: Float,
-    val status: FocusReticleStatus
+    val status: FocusReticleStatus,
+    val lockLabel: String? = null
 )
 
 internal data class FocusReticleVisualState(
@@ -1267,7 +576,8 @@ internal data class FocusReticleVisualState(
     val alpha: Float,
     val ringColor: Int,
     val ticksVisible: Boolean,
-    val expired: Boolean
+    val expired: Boolean,
+    val animates: Boolean
 )
 
 internal fun focusReticleVisualState(
@@ -1279,6 +589,7 @@ internal fun focusReticleVisualState(
     val alpha: Float
     val ringColor: Int
     val ticksVisible: Boolean
+    val animates: Boolean
 
     when (status) {
         FocusReticleStatus.REQUESTED -> {
@@ -1291,6 +602,15 @@ internal fun focusReticleVisualState(
             alpha = if (elapsedMs < 400L) 1f else 1f - ((elapsedMs - 400f) / 200f).coerceIn(0f, 1f)
             ringColor = Color.rgb(255, 191, 0)
             ticksVisible = false
+            animates = true
+        }
+        FocusReticleStatus.LOCK_REQUESTED -> {
+            expired = false
+            scale = 1.0f
+            alpha = 1.0f
+            ringColor = Color.rgb(255, 191, 0)
+            ticksVisible = true
+            animates = false
         }
         FocusReticleStatus.SUCCEEDED -> {
             expired = elapsedMs > 500L
@@ -1298,6 +618,23 @@ internal fun focusReticleVisualState(
             alpha = if (elapsedMs < 250L) 1f else 1f - ((elapsedMs - 250f) / 250f).coerceIn(0f, 1f)
             ringColor = Color.WHITE
             ticksVisible = false
+            animates = true
+        }
+        FocusReticleStatus.LOCKED -> {
+            expired = false
+            scale = 1.0f
+            alpha = 1.0f
+            ringColor = Color.WHITE
+            ticksVisible = true
+            animates = false
+        }
+        FocusReticleStatus.LOCKED_DEGRADED -> {
+            expired = false
+            scale = 1.0f
+            alpha = 1.0f
+            ringColor = Color.rgb(255, 191, 0)
+            ticksVisible = true
+            animates = false
         }
         FocusReticleStatus.DEGRADED -> {
             expired = elapsedMs > 600L
@@ -1305,6 +642,7 @@ internal fun focusReticleVisualState(
             alpha = if (elapsedMs < 350L) 1f else 1f - ((elapsedMs - 350f) / 250f).coerceIn(0f, 1f)
             ringColor = Color.rgb(255, 191, 0)
             ticksVisible = true
+            animates = true
         }
         FocusReticleStatus.FAILED, FocusReticleStatus.UNSUPPORTED -> {
             expired = elapsedMs > 400L
@@ -1312,6 +650,7 @@ internal fun focusReticleVisualState(
             alpha = if (elapsedMs < 150L) 0.5f else 0.5f * (1f - ((elapsedMs - 150f) / 250f).coerceIn(0f, 1f))
             ringColor = Color.rgb(128, 128, 128)
             ticksVisible = false
+            animates = true
         }
     }
 
@@ -1320,7 +659,8 @@ internal fun focusReticleVisualState(
         alpha = alpha.coerceIn(0f, 1f),
         ringColor = ringColor,
         ticksVisible = ticksVisible,
-        expired = expired
+        expired = expired,
+        animates = animates
     )
 }
 
@@ -1346,10 +686,10 @@ internal fun clampReticleCenter(
 private const val DEFAULT_SENSOR_CONTENT_WIDTH = 4
 private const val DEFAULT_SENSOR_CONTENT_HEIGHT = 3
 
-/** sqrt(0.60) ≈ 0.775 — minimum linear scale for area-constrained frame box. */
+/** sqrt(0.60) ≈ 0.775 — minimum linear scale for legacy simplified frame previews. */
 internal const val SQRT_AREA_RATIO_MIN = 0.775f
 
-/** Maximum linear frame span at equal preview/capture zoom, leaving 10% margin per side. */
+/** Maximum legacy preview span, leaving room to show simplified watermark material. */
 internal const val SQRT_AREA_RATIO_MAX = 0.80f
 
 /**
@@ -1431,6 +771,12 @@ internal fun zoomFrameScale(captureZoomRatio: Float, previewZoomRatio: Float): F
     return (preview / capture).coerceIn(SQRT_AREA_RATIO_MIN, SQRT_AREA_RATIO_MAX)
 }
 
+internal fun exactCaptureFrameScale(captureZoomRatio: Float, previewZoomRatio: Float): Float {
+    val capture = captureZoomRatio.coerceAtLeast(0.01f)
+    val preview = previewZoomRatio.coerceAtLeast(0.01f)
+    return (preview / capture).coerceIn(0.01f, 1f)
+}
+
 internal fun scaleRectAroundCenter(rect: RectF, scale: Float): RectF {
     val cx = rect.centerX()
     val cy = rect.centerY()
@@ -1468,10 +814,11 @@ internal fun expandedFrameBottomBandRect(
     density: Float,
     templateId: String? = null
 ): RectF? {
-    val bottomBand = if (templateId == "retro-frame") {
-        (rect.height() * 0.095f).coerceIn(42f * density, 104f * density)
-    } else {
-        (rect.height() * 0.15f).coerceIn(56f * density, 150f * density)
+    val bottomBand = when (templateId) {
+        "retro-frame" -> (rect.height() * 0.095f).coerceIn(42f * density, 104f * density)
+        "travel-polaroid" -> (rect.width() * com.opencamera.core.effect.TravelTicketPaperSpec.BOTTOM_BAND_RATIO)
+            .coerceIn(82f * density, 220f * density)
+        else -> (rect.height() * 0.15f).coerceIn(56f * density, 150f * density)
     }
     val bottomFrameBand = bottomBand.coerceAtMost(viewHeight - rect.bottom)
     if (bottomFrameBand <= 0f) return null

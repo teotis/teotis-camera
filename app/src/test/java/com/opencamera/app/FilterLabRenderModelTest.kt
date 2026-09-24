@@ -943,6 +943,23 @@ class FilterLabRenderModelTest {
         }
 
         @Test
+        fun `style preset card rail carries persisted strength into its visual recipe`() {
+            val state = defaultSessionState(
+                activeMode = ModeId.PHOTO,
+                persistedPhotoSettings = PhotoSettings(
+                    defaultFilterProfileId = "photo-vivid",
+                    styleStrength = 0.5f
+                )
+            )
+            val rail = filterLabPageRenderModel(state, TestAppTextResolver()).stylePresetCardRail!!
+            val vivid = rail.cards.first { it.profileId == "photo-vivid" }
+
+            assertEquals(0.5f, rail.styleStrength)
+            assertEquals(1.07f, vivid.spec!!.saturation, 0.0001f)
+            assertEquals(1.04f, vivid.spec!!.contrast, 0.0001f)
+        }
+
+        @Test
         fun `style preset card rail unselected cards have apply actions`() {
             val state = defaultSessionState(
                 activeMode = ModeId.PHOTO,
@@ -1019,6 +1036,8 @@ class FilterLabRenderModelTest {
             assertTrue(StylePresetCardDimensions.CARD_HEIGHT_DP > 0)
             assertTrue(StylePresetCardDimensions.PREVIEW_HEIGHT_DP > 0)
             assertTrue(StylePresetCardDimensions.ITEM_SPACING_DP >= 0)
+            assertTrue(StylePresetCardDimensions.RAIL_HEADER_HEIGHT_DP > 0)
+            assertTrue(StylePresetCardDimensions.RAIL_STRENGTH_HEIGHT_DP > 0)
         }
 
         @Test

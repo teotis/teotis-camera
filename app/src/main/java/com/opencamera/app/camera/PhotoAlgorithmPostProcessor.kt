@@ -27,6 +27,7 @@ import com.opencamera.core.media.PostProcessFailureCause
 import com.opencamera.core.media.PostProcessFailureDisposition
 import com.opencamera.core.media.PostProcessFailureStage
 import com.opencamera.core.media.PostProcessOutputIntegrity
+import com.opencamera.core.media.PerceptualColorGamutGuard
 import com.opencamera.core.media.ProcessorEditorResult
 import com.opencamera.core.media.ProcessorTarget
 import com.opencamera.core.media.ProcessorWork
@@ -485,7 +486,7 @@ private fun isKnownNearNeutralProfile(spec: PhotoAlgorithmSpec): Boolean {
 
 private val NEAR_NEUTRAL_PROFILES = setOf("photo-original", "pro-manual-neutral")
 
-private fun FilterRenderSpec.toPhotoAlgorithmSpec(
+internal fun FilterRenderSpec.toPhotoAlgorithmSpec(
     profile: String,
     recipe: PerceptualColorRecipe = PerceptualColorRecipe.NEUTRAL
 ): PhotoAlgorithmSpec {
@@ -908,6 +909,7 @@ internal class AndroidPhotoAlgorithmEditor(
         val centerY = height / 2f
         val maxDistance = max(1f, sqrt(centerX * centerX + centerY * centerY))
         val hasVignette = spec.vignetteStrength > 0f
+        val colorLabActive = !spec.recipe.isNeutral
         val perceptualScratch = FloatArray(3)
 
         for (y in 0 until height) {
@@ -923,9 +925,19 @@ internal class AndroidPhotoAlgorithmEditor(
                 val blurredBlue = if (needsBlur) averagedChannel(originalPixels, x, y, width, height, 0) else 0f
 
                 val grayscale = originalRed * 0.299f + originalGreen * 0.587f + originalBlue * 0.114f
-                var red = grayscale + (originalRed - grayscale) * spec.saturation
-                var green = grayscale + (originalGreen - grayscale) * spec.saturation
-                var blue = grayscale + (originalBlue - grayscale) * spec.saturation
+                val effectiveSaturation = if (colorLabActive) {
+                    PerceptualColorGamutGuard.saturationFor(
+                        originalRed.toFloat(),
+                        originalGreen.toFloat(),
+                        originalBlue.toFloat(),
+                        spec.saturation
+                    )
+                } else {
+                    spec.saturation
+                }
+                var red = grayscale + (originalRed - grayscale) * effectiveSaturation
+                var green = grayscale + (originalGreen - grayscale) * effectiveSaturation
+                var blue = grayscale + (originalBlue - grayscale) * effectiveSaturation
 
                 if (spec.monochromeMix > 0f) {
                     red = mix(red, grayscale, spec.monochromeMix)
@@ -956,10 +968,17 @@ internal class AndroidPhotoAlgorithmEditor(
                     blue = applyHighlightShadow(blue, spec.highlightCompression, spec.shadowLift)
                 }
 
-                val tintCompensation = spec.tintShift * 0.7f
-                red = applyContrast(red, spec.contrast) + spec.brightnessShift + spec.warmthShift + tintCompensation
-                green = applyContrast(green, spec.contrast) + spec.brightnessShift - spec.tintShift
-                blue = applyContrast(blue, spec.contrast) + spec.brightnessShift - spec.warmthShift + tintCompensation
+                val colorBiasScale = if (colorLabActive) {
+                    PerceptualColorGamutGuard.biasScale(red, green, blue)
+                } else {
+                    1f
+                }
+                val tintCompensation = spec.tintShift * 0.7f * colorBiasScale
+                val adjustedWarmth = spec.warmthShift * colorBiasScale
+                val adjustedTint = spec.tintShift * colorBiasScale
+                red = applyContrast(red, spec.contrast) + spec.brightnessShift + adjustedWarmth + tintCompensation
+                green = applyContrast(green, spec.contrast) + spec.brightnessShift - adjustedTint
+                blue = applyContrast(blue, spec.contrast) + spec.brightnessShift - adjustedWarmth + tintCompensation
 
                 if (spec.sharpnessBoost > 0f) {
                     val sharpenAmount = spec.sharpnessBoost.coerceIn(0f, 0.4f) * 1.6f
@@ -969,13 +988,20 @@ internal class AndroidPhotoAlgorithmEditor(
                 }
 
                 if (spec.warmBoost > 0f || spec.coolBoost > 0f) {
-                    red += (spec.warmBoost * 24f) - (spec.coolBoost * 12f)
-                    green += (spec.warmBoost - spec.coolBoost) * 4f
-                    blue += (spec.coolBoost * 24f) - (spec.warmBoost * 12f)
+                    red += ((spec.warmBoost * 24f) - (spec.coolBoost * 12f)) * colorBiasScale
+                    green += (spec.warmBoost - spec.coolBoost) * 4f * colorBiasScale
+                    blue += ((spec.coolBoost * 24f) - (spec.warmBoost * 12f)) * colorBiasScale
                 }
 
                 if (!spec.recipe.isNeutral) {
-                    applyPerceptualAdjustments(red, green, blue, spec.recipe, perceptualScratch)
+                    applyPerceptualAdjustments(
+                        red,
+                        green,
+                        blue,
+                        spec.recipe,
+                        subjectWeight = 0f,
+                        out = perceptualScratch
+                    )
                     red = perceptualScratch[0]
                     green = perceptualScratch[1]
                     blue = perceptualScratch[2]
@@ -998,10 +1024,12 @@ internal class AndroidPhotoAlgorithmEditor(
                     blue *= falloff
                 }
 
+                prepareOutputChannels(red, green, blue, colorLabActive, perceptualScratch)
+
                 pixels[index] = (alpha shl 24) or
-                    (clampChannel(red).toInt() shl 16) or
-                    (clampChannel(green).toInt() shl 8) or
-                    clampChannel(blue).toInt()
+                    (clampChannel(perceptualScratch[0]).toInt() shl 16) or
+                    (clampChannel(perceptualScratch[1]).toInt() shl 8) or
+                    clampChannel(perceptualScratch[2]).toInt()
             }
         }
 
@@ -1031,6 +1059,7 @@ internal class AndroidPhotoAlgorithmEditor(
         val centerY = height / 2f
         val maxDistance = max(1f, sqrt(centerX * centerX + centerY * centerY))
         val hasVignette = spec.vignetteStrength > 0f
+        val colorLabActive = !spec.recipe.isNeutral
         val perceptualScratch = FloatArray(3)
 
         for (y in 0 until height) {
@@ -1051,9 +1080,19 @@ internal class AndroidPhotoAlgorithmEditor(
                 val subjectWeight = smoothstep(0.15f, 0.85f, rawMaskAlpha)
 
                 val grayscale = originalRed * 0.299f + originalGreen * 0.587f + originalBlue * 0.114f
-                var red = grayscale + (originalRed - grayscale) * spec.saturation
-                var green = grayscale + (originalGreen - grayscale) * spec.saturation
-                var blue = grayscale + (originalBlue - grayscale) * spec.saturation
+                val effectiveSaturation = if (colorLabActive) {
+                    PerceptualColorGamutGuard.saturationFor(
+                        originalRed.toFloat(),
+                        originalGreen.toFloat(),
+                        originalBlue.toFloat(),
+                        spec.saturation
+                    )
+                } else {
+                    spec.saturation
+                }
+                var red = grayscale + (originalRed - grayscale) * effectiveSaturation
+                var green = grayscale + (originalGreen - grayscale) * effectiveSaturation
+                var blue = grayscale + (originalBlue - grayscale) * effectiveSaturation
 
                 if (spec.monochromeMix > 0f) {
                     red = mix(red, grayscale, spec.monochromeMix)
@@ -1085,7 +1124,12 @@ internal class AndroidPhotoAlgorithmEditor(
                     blue = applyHighlightShadow(blue, spec.highlightCompression * subjectScale, spec.shadowLift * subjectScale)
                 }
 
-                val warmthScale = 1f - subjectWeight * 0.6f
+                val colorBiasScale = if (colorLabActive) {
+                    PerceptualColorGamutGuard.biasScale(red, green, blue)
+                } else {
+                    1f
+                }
+                val warmthScale = (1f - subjectWeight * 0.6f) * colorBiasScale
                 val tintCompensation = spec.tintShift * 0.7f * warmthScale
                 val adjustedWarmth = spec.warmthShift * warmthScale
                 val adjustedTint = spec.tintShift * warmthScale
@@ -1101,15 +1145,20 @@ internal class AndroidPhotoAlgorithmEditor(
                 }
 
                 if (spec.warmBoost > 0f || spec.coolBoost > 0f) {
-                    val warmScale = 1f - subjectWeight * 0.4f
+                    val warmScale = (1f - subjectWeight * 0.4f) * colorBiasScale
                     red += ((spec.warmBoost * 24f) - (spec.coolBoost * 12f)) * warmScale
                     green += ((spec.warmBoost - spec.coolBoost) * 4f) * warmScale
                     blue += ((spec.coolBoost * 24f) - (spec.warmBoost * 12f)) * warmScale
                 }
 
                 if (!spec.recipe.isNeutral) {
-                    applyPerceptualAdjustmentsMaskAware(
-                        red, green, blue, spec.recipe, subjectWeight, perceptualScratch
+                    applyPerceptualAdjustments(
+                        red,
+                        green,
+                        blue,
+                        spec.recipe,
+                        subjectWeight,
+                        perceptualScratch
                     )
                     red = perceptualScratch[0]
                     green = perceptualScratch[1]
@@ -1134,10 +1183,12 @@ internal class AndroidPhotoAlgorithmEditor(
                     blue *= falloff
                 }
 
+                prepareOutputChannels(red, green, blue, colorLabActive, perceptualScratch)
+
                 pixels[index] = (alpha shl 24) or
-                    (clampChannel(red).toInt() shl 16) or
-                    (clampChannel(green).toInt() shl 8) or
-                    clampChannel(blue).toInt()
+                    (clampChannel(perceptualScratch[0]).toInt() shl 16) or
+                    (clampChannel(perceptualScratch[1]).toInt() shl 8) or
+                    clampChannel(perceptualScratch[2]).toInt()
             }
         }
 
@@ -1145,7 +1196,7 @@ internal class AndroidPhotoAlgorithmEditor(
         return listOf("scene-mask:saved=applied", "color-render:subject-protected", "color-render:background-adjusted")
     }
 
-    private fun applyPerceptualAdjustmentsMaskAware(
+    private fun applyPerceptualAdjustments(
         rIn: Float,
         gIn: Float,
         bIn: Float,
@@ -1169,7 +1220,9 @@ internal class AndroidPhotoAlgorithmEditor(
         val neutralMask = (1f - chromaNorm * 2f).coerceIn(0f, 1f)
         val protectionFactor = neutralMask * recipe.neutralProtection
 
-        val chromaScale = 1f + recipe.chromaBoost * 0.3f * (1f - protectionFactor) * (1f - subjectWeight * 0.3f)
+        val chromaHeadroom = PerceptualColorGamutGuard.saturationBoostHeadroom(r, g, b)
+        val chromaScale = 1f + recipe.chromaBoost * 0.3f * (1f - protectionFactor) *
+            (1f - subjectWeight * 0.3f) * chromaHeadroom
         val gray = r * 0.2126f + g * 0.7152f + b * 0.0722f
         r = gray + (r - gray) * chromaScale
         g = gray + (g - gray) * chromaScale
@@ -1180,8 +1233,11 @@ internal class AndroidPhotoAlgorithmEditor(
 
         val warmR = recipe.warmthBias.coerceAtLeast(0f)
         val coolB = (-recipe.warmthBias).coerceAtLeast(0f)
-        val warmAmount = (warmR * 18f - coolB * 10f) * (1f - combinedSkinProtect * 0.6f)
-        val coolAmount = (coolB * 18f - warmR * 10f) * (1f - combinedSkinProtect * 0.6f)
+        val recipeBiasScale = PerceptualColorGamutGuard.biasScale(r, g, b)
+        val warmAmount = (warmR * 18f - coolB * 10f) *
+            (1f - combinedSkinProtect * 0.6f) * recipeBiasScale
+        val coolAmount = (coolB * 18f - warmR * 10f) *
+            (1f - combinedSkinProtect * 0.6f) * recipeBiasScale
         r += warmAmount
         b += coolAmount
 
@@ -1190,7 +1246,8 @@ internal class AndroidPhotoAlgorithmEditor(
         r += shadowR
         b += highlightB
 
-        val tintAmount = recipe.tintBias * 8f * (1f - combinedSkinProtect * 0.5f)
+        val tintAmount = recipe.tintBias * 8f *
+            (1f - combinedSkinProtect * 0.5f) * recipeBiasScale
         g -= tintAmount
 
         out[0] = r
@@ -1216,57 +1273,6 @@ internal class AndroidPhotoAlgorithmEditor(
 
     internal fun restorePreservedExif(target: ProcessorTarget, preservedExif: Map<String, String>): String? =
         contentResolver.restorePreservedExif(target, preservedExif)
-
-    private fun applyPerceptualAdjustments(
-        rIn: Float,
-        gIn: Float,
-        bIn: Float,
-        recipe: PerceptualColorRecipe,
-        out: FloatArray
-    ) {
-        val luma = rIn * 0.2126f + gIn * 0.7152f + bIn * 0.0722f
-        val lumaNorm = (luma / 255f).coerceIn(0f, 1f)
-
-        val shadowMask = (1f - lumaNorm).coerceIn(0f, 1f)
-        val highlightMask = lumaNorm.coerceIn(0f, 1f)
-
-        var r = rIn + recipe.toneLift * shadowMask * 28f - recipe.toneDepth * highlightMask * 22f
-        var g = gIn + recipe.toneLift * shadowMask * 26f - recipe.toneDepth * highlightMask * 20f
-        var b = bIn + recipe.toneLift * shadowMask * 24f - recipe.toneDepth * highlightMask * 18f
-
-        val chroma = maxOf(r, g, b) - minOf(r, g, b)
-        val chromaNorm = (chroma / 255f).coerceIn(0f, 1f)
-        val neutralMask = (1f - chromaNorm * 2f).coerceIn(0f, 1f)
-        val protectionFactor = neutralMask * recipe.neutralProtection
-
-        val chromaScale = 1f + recipe.chromaBoost * 0.3f * (1f - protectionFactor)
-        val gray = r * 0.2126f + g * 0.7152f + b * 0.0722f
-        r = gray + (r - gray) * chromaScale
-        g = gray + (g - gray) * chromaScale
-        b = gray + (b - gray) * chromaScale
-
-        val skinMask = detectSkinMask(r, g, b)
-        val skinProtect = skinMask * recipe.skinProtection
-
-        val warmR = recipe.warmthBias.coerceAtLeast(0f)
-        val coolB = (-recipe.warmthBias).coerceAtLeast(0f)
-        val warmAmount = (warmR * 18f - coolB * 10f) * (1f - skinProtect * 0.6f)
-        val coolAmount = (coolB * 18f - warmR * 10f) * (1f - skinProtect * 0.6f)
-        r += warmAmount
-        b += coolAmount
-
-        val shadowR = recipe.shadowTint * shadowMask * 12f
-        val highlightB = recipe.highlightTint * highlightMask * 10f
-        r += shadowR
-        b += highlightB
-
-        val tintAmount = recipe.tintBias * 8f * (1f - skinProtect * 0.5f)
-        g -= tintAmount
-
-        out[0] = r
-        out[1] = g
-        out[2] = b
-    }
 
     private fun detectSkinMask(r: Float, g: Float, b: Float): Float {
         if (r < 60f || g < 40f || b < 20f) return 0f
@@ -1457,10 +1463,10 @@ internal fun resolvePhotoAlgorithmSpec(
 
         "clarity-focus-stack-v1" -> PhotoAlgorithmSpec(
             profile = profile,
-            contrast = 1.06f,
-            saturation = 1.02f,
-            sharpnessBoost = 0.10f,
-            highlightCompression = 0.06f,
+            contrast = 1.03f,
+            saturation = 1.01f,
+            sharpnessBoost = 0.04f,
+            highlightCompression = 0.04f,
             shadowLift = 0.04f
         )
 
@@ -1521,6 +1527,22 @@ private fun canonicalPhotoAlgorithmProfile(profile: String): String {
 
 private fun applyContrast(channel: Float, contrast: Float): Float {
     return (channel - 128f) * contrast + 128f
+}
+
+private fun prepareOutputChannels(
+    red: Float,
+    green: Float,
+    blue: Float,
+    colorLabActive: Boolean,
+    out: FloatArray
+) {
+    if (colorLabActive) {
+        PerceptualColorGamutGuard.compressToOutputGamut(red, green, blue, out)
+    } else {
+        out[0] = red
+        out[1] = green
+        out[2] = blue
+    }
 }
 
 private fun applyHighlightShadow(

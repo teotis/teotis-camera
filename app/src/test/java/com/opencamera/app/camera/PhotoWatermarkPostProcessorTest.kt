@@ -2,7 +2,12 @@ package com.opencamera.app.camera
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Shader
 import androidx.test.core.app.ApplicationProvider
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaOutputHandle
@@ -22,6 +27,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -355,21 +361,21 @@ class PhotoWatermarkPostProcessorTest {
         val result = renderPhotoWatermarkBitmap(source, template)
         val bmp = result.bitmap
 
-        assertTrue(bmp.width >= 432, "travel polaroid should have a more visible side paper frame")
-        assertTrue(bmp.height >= 410, "travel polaroid should have a more generous bottom paper band")
+        assertEquals(450, bmp.width, "formal master uses 60 px of total side paper per 960 px photo opening")
+        assertEquals(450, bmp.height, "formal master uses a 300 px bottom band per 960 px photo opening")
         bmp.recycle(); source.recycle()
     }
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun `travel polaroid draws green map details on right side of bottom band`() {
+    fun `travel ticket paper draws cobalt ticket coral stamp and lime stub in bottom band`() {
         val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
             eraseColor(Color.rgb(80, 130, 180))
         }
         val template = ResolvedPhotoWatermarkTemplate(
             templateId = "travel-polaroid",
-            title = "Go see the sky",
-            supportingLines = emptyList(),
+            title = "TRAVEL POLAROID",
+            supportingLines = listOf("COAST RUN • 24 KM", "2026.07.10"),
             frameBackground = WatermarkFrameBackground.WHITE,
             usesExpandedFrame = true,
             placement = WatermarkTextPlacement.BOTTOM_LEFT,
@@ -378,20 +384,68 @@ class PhotoWatermarkPostProcessorTest {
         )
 
         val bmp = renderPhotoWatermarkBitmap(source, template).bitmap
-        val greenInkCount = countGreenInk(
+        val bandTop = 300
+        val cobaltInkCount = countPixelsNearColor(
             bitmap = bmp,
-            left = (bmp.width * 0.58f).toInt(),
-            top = 330,
-            right = bmp.width - 18,
-            bottom = bmp.height - 18
+            left = (bmp.width * 0.54f).toInt(),
+            top = bandTop,
+            right = bmp.width,
+            bottom = bmp.height,
+            target = Color.rgb(18, 87, 214),
+            tolerance = 36
+        )
+        val coralInkCount = countPixelsNearColor(
+            bitmap = bmp,
+            left = (bmp.width * 0.54f).toInt(),
+            top = bandTop,
+            right = bmp.width,
+            bottom = bmp.height,
+            target = Color.rgb(255, 101, 82),
+            tolerance = 40
+        )
+        val limeInkCount = countPixelsNearColor(
+            bitmap = bmp,
+            left = (bmp.width * 0.78f).toInt(),
+            top = bandTop,
+            right = bmp.width,
+            bottom = bmp.height,
+            target = Color.rgb(184, 235, 21),
+            tolerance = 40
         )
 
-        assertTrue(
-            greenInkCount > 30,
-            "travel bottom band should contain green map strokes, count=$greenInkCount, " +
-                "maxGreenAdvantage=${maxGreenAdvantage(bmp, (bmp.width * 0.58f).toInt(), 330, bmp.width - 18, bmp.height - 18)}"
-        )
+        assertTrue(cobaltInkCount > 800, "ticket body should be cobalt, count=$cobaltInkCount")
+        assertTrue(coralInkCount > 30, "ticket stamp should be coral, count=$coralInkCount")
+        assertTrue(limeInkCount > 120, "ticket stub should be lime, count=$limeInkCount")
         bmp.recycle(); source.recycle()
+    }
+
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun `travel ticket paper can export an actual canvas visual evidence sample`() {
+        val source = createTravelTicketEvidenceSource(width = 900, height = 675)
+        val template = ResolvedPhotoWatermarkTemplate(
+            templateId = "travel-polaroid",
+            title = "TRAVEL POLAROID",
+            supportingLines = listOf("COAST RUN • 24 KM", "2026.07.10"),
+            frameBackground = WatermarkFrameBackground.WHITE,
+            usesExpandedFrame = true,
+            placement = WatermarkTextPlacement.BOTTOM_LEFT,
+            textScale = 1f,
+            textOpacity = 1f
+        )
+
+        val output = renderPhotoWatermarkBitmap(source, template).bitmap
+        System.getenv("TRAVEL_TICKET_VISUAL_OUTPUT")?.takeIf(String::isNotBlank)?.let { outputPath ->
+            val file = File(outputPath)
+            file.parentFile?.mkdirs()
+            file.outputStream().use { stream ->
+                assertTrue(output.compress(Bitmap.CompressFormat.PNG, 100, stream))
+            }
+        }
+
+        assertTrue(output.width > source.width)
+        assertTrue(output.height > source.height)
+        output.recycle(); source.recycle()
     }
 
     @Test
@@ -582,6 +636,7 @@ class PhotoWatermarkPostProcessorTest {
                 bottom = bitmap.height
             )
             val textSafeInk = countTextSafeAssetInk(bitmap, asset.packageId)
+            val topBackingBlockInk = countTopPhotoBackingBlockInk(bitmap, asset.packageId)
             val chromaResidue = countChromaKeyResidue(bitmap)
 
             assertEquals(0, centerAlpha, "scheme 3 asset must not bake the reference photo center")
@@ -594,6 +649,10 @@ class PhotoWatermarkPostProcessorTest {
                 assertTrue(
                     textSafeInk > bitmap.width,
                     "van-gogh-starry asset should preserve subtle texture behind metadata instead of cutting a black text block"
+                )
+                assertTrue(
+                    topBackingBlockInk < bitmap.width,
+                    "van-gogh-starry asset should clear top backing blocks and keep only painted strokes, count=$topBackingBlockInk"
                 )
             }
             assertTrue(
@@ -1113,7 +1172,7 @@ class PhotoWatermarkPostProcessorTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun `scheme three omits the precise continuous inner photo frame inside the outer art`() {
+    fun `scheme three keeps blue hour hairline while omitting starry inner photo frame`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val provider = AndroidPhotoWatermarkEditor(context).staticWatermarkAssetProvider
         val source = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888).apply {
@@ -1154,10 +1213,17 @@ class PhotoWatermarkPostProcessorTest {
                 templateId = template.templateId
             )
 
-            assertTrue(
-                frameCoverage < 0.16f,
-                "${template.templateId} should not render a continuous precise inner photo frame, coverage=$frameCoverage"
-            )
+            if (template.templateId == "blue-hour") {
+                assertTrue(
+                    frameCoverage >= 0.72f,
+                    "${template.templateId} should render the fine pale inner photo frame, coverage=$frameCoverage"
+                )
+            } else {
+                assertTrue(
+                    frameCoverage < 0.16f,
+                    "${template.templateId} should not render a continuous precise inner photo frame, coverage=$frameCoverage"
+                )
+            }
             bmp.recycle()
         }
         source.recycle()
@@ -1847,6 +1913,69 @@ class PhotoWatermarkPostProcessorTest {
         return count
     }
 
+    private fun createTravelTicketEvidenceSource(width: Int, height: Int): Bitmap {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val skyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                0f,
+                0f,
+                height.toFloat(),
+                intArrayOf(Color.rgb(38, 157, 235), Color.rgb(160, 221, 245), Color.rgb(255, 192, 105)),
+                floatArrayOf(0f, 0.62f, 1f),
+                Shader.TileMode.CLAMP
+            )
+        }
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), skyPaint)
+        val mountainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(40, 92, 78) }
+        val mountainPath = Path().apply {
+            moveTo(0f, height * 0.78f)
+            lineTo(width * 0.18f, height * 0.44f)
+            lineTo(width * 0.32f, height * 0.7f)
+            lineTo(width * 0.5f, height * 0.34f)
+            lineTo(width * 0.68f, height * 0.68f)
+            lineTo(width * 0.82f, height * 0.48f)
+            lineTo(width.toFloat(), height * 0.74f)
+            lineTo(width.toFloat(), height.toFloat())
+            lineTo(0f, height.toFloat())
+            close()
+        }
+        canvas.drawPath(mountainPath, mountainPaint)
+        canvas.drawCircle(width * 0.78f, height * 0.23f, width * 0.075f, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(255, 210, 62)
+        })
+        return bitmap
+    }
+
+    private fun countPixelsNearColor(
+        bitmap: Bitmap,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+        target: Int,
+        tolerance: Int
+    ): Int {
+        var count = 0
+        val targetRed = Color.red(target)
+        val targetGreen = Color.green(target)
+        val targetBlue = Color.blue(target)
+        for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(bitmap.height)) {
+            for (x in left.coerceAtLeast(0) until right.coerceAtMost(bitmap.width)) {
+                val pixel = bitmap.getPixel(x, y)
+                if (
+                    kotlin.math.abs(Color.red(pixel) - targetRed) <= tolerance &&
+                    kotlin.math.abs(Color.green(pixel) - targetGreen) <= tolerance &&
+                    kotlin.math.abs(Color.blue(pixel) - targetBlue) <= tolerance
+                ) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
     private fun maxGreenAdvantage(
         bitmap: Bitmap,
         left: Int,
@@ -2009,6 +2138,34 @@ class PhotoWatermarkPostProcessorTest {
             bottom = bounds[3],
             minAlpha = 20
         )
+    }
+
+    private fun countTopPhotoBackingBlockInk(bitmap: Bitmap, packageId: String): Int {
+        if (packageId != "van-gogh-starry") return 0
+        val left = (bitmap.width * 0.08f).toInt()
+        val top = (bitmap.height * 0.055f).toInt()
+        val right = (bitmap.width * 0.92f).toInt()
+        val bottom = (bitmap.height * 0.145f).toInt()
+        var count = 0
+        for (y in top until bottom) {
+            for (x in left until right) {
+                val pixel = bitmap.getPixel(x, y)
+                val alpha = Color.alpha(pixel)
+                val red = Color.red(pixel)
+                val green = Color.green(pixel)
+                val blue = Color.blue(pixel)
+                val spread = maxOf(red, green, blue) - minOf(red, green, blue)
+                val maxChannel = maxOf(red, green, blue)
+                val blueStroke = blue >= 70 && blue >= red + 24 && blue >= green - 6
+                val goldStroke = red >= 132 && green >= 88 && blue <= 142 && red >= blue + 24
+                val brightAccent = red >= 184 && green >= 150 && blue >= 92 && spread >= 36
+                val paintedStroke = blueStroke || goldStroke || brightAccent || spread >= 92
+                if (alpha >= 96 && spread < 86 && maxChannel < 218 && !paintedStroke) {
+                    count += 1
+                }
+            }
+        }
+        return count
     }
 
     private fun countChromaKeyResidue(bitmap: Bitmap): Int {

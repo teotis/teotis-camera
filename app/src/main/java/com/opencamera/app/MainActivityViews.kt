@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.SeekBar
@@ -179,14 +180,17 @@ internal data class FloatingUtilityViews(
 )
 
 internal data class DocumentBatchRailViews(
+    val overlay: android.widget.FrameLayout,
     val rail: LinearLayout,
     val chip: android.widget.TextView,
-    val thumbnail: android.widget.ImageView,
     val itemScroll: NestedScrollView,
     val itemList: LinearLayout,
+    val actionContainer: LinearLayout,
     val moveUpButton: Button,
     val moveDownButton: Button,
-    val overviewButton: Button
+    val removeButton: Button,
+    val overviewButton: Button,
+    val clearButton: Button
 )
 
 internal data class FilterStripViews(
@@ -195,8 +199,12 @@ internal data class FilterStripViews(
 )
 
 internal data class RuntimeProControlsViews(
-    val scroll: android.widget.HorizontalScrollView,
-    val chips: LinearLayout
+    val overlay: FrameLayout,
+    val statusLeft: TextView,
+    val statusRight: TextView,
+    val statusDetail: TextView,
+    val rail: LinearLayout,
+    val scale: com.opencamera.app.procontrols.ImmersiveProScaleView
 )
 
 internal data class DocumentBatchOrganizerViews(
@@ -399,14 +407,17 @@ internal data class MainActivityViews(
                 modeAction = activity.findViewById(R.id.buttonModeAction)
             )
             val documentBatchRail = DocumentBatchRailViews(
+                overlay = activity.findViewById(R.id.documentBatchRailOverlay),
                 rail = activity.findViewById(R.id.documentBatchRail),
                 chip = activity.findViewById(R.id.documentBatchRailChip),
-                thumbnail = activity.findViewById(R.id.documentBatchRailThumbnail),
                 itemScroll = activity.findViewById(R.id.documentBatchRailItemScroll),
                 itemList = activity.findViewById(R.id.documentBatchRailItemList),
+                actionContainer = activity.findViewById(R.id.documentBatchRailActionContainer),
                 moveUpButton = activity.findViewById(R.id.documentBatchRailMoveUpButton),
                 moveDownButton = activity.findViewById(R.id.documentBatchRailMoveDownButton),
-                overviewButton = activity.findViewById(R.id.documentBatchRailOverviewButton)
+                removeButton = activity.findViewById(R.id.documentBatchRailRemoveButton),
+                overviewButton = activity.findViewById(R.id.documentBatchRailOverviewButton),
+                clearButton = activity.findViewById(R.id.documentBatchRailClearButton)
             )
             documentBatchRail.itemScroll.setNestedScrollingEnabled(true)
             val documentBatchOrganizer = DocumentBatchOrganizerViews(
@@ -427,8 +438,12 @@ internal data class MainActivityViews(
                 chips = activity.findViewById(R.id.filterStripChips)
             )
             val runtimeProControls = RuntimeProControlsViews(
-                scroll = activity.findViewById(R.id.runtimeProControlsScroll),
-                chips = activity.findViewById(R.id.runtimeProControlsChips)
+                overlay = activity.findViewById(R.id.runtimeProImmersiveOverlay),
+                statusLeft = activity.findViewById(R.id.runtimeProStatusLeft),
+                statusRight = activity.findViewById(R.id.runtimeProStatusRight),
+                statusDetail = activity.findViewById(R.id.runtimeProStatusDetail),
+                rail = activity.findViewById(R.id.runtimeProParameterRail),
+                scale = activity.findViewById(R.id.runtimeProScale)
             )
             val bottomCockpit = BottomCockpitViews(
                 shutter = activity.findViewById(R.id.buttonShutter),

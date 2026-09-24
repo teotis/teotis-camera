@@ -15,6 +15,8 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     is SessionIntent.DeviceCapabilitiesUpdated -> SessionIntentOwner.LIFECYCLE
 
     is SessionIntent.SettingsUpdated,
+    is SessionIntent.PreviewStyleStrengthChanged,
+    is SessionIntent.PreviewStyleOriginalComparisonChanged,
     is SessionIntent.SwitchMode,
     SessionIntent.ShutterPressed,
     SessionIntent.SecondaryActionPressed,
@@ -53,6 +55,8 @@ internal fun SessionIntent.owner(): SessionIntentOwner = when (this) {
     is SessionIntent.PreviewRuntimeIssue,
     is SessionIntent.PreviewStopped,
     is SessionIntent.PreviewTapToFocus,
+    is SessionIntent.PreviewLockFocusAndExposure,
+    SessionIntent.PreviewUnlockFocusAndExposure,
     is SessionIntent.PreviewMeteringCompleted,
     is SessionIntent.PhotoSceneSignalUpdated,
     SessionIntent.PhotoLowLightPromptExpired,

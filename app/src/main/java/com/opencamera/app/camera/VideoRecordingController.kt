@@ -1,6 +1,9 @@
 package com.opencamera.app.camera
 
+import android.util.Log
 import com.opencamera.core.media.ShotPlan
+
+private const val TAG = "VideoRecordingController"
 
 /**
  * Events translated from CameraX VideoRecordEvent by the Adapter.
@@ -86,7 +89,10 @@ internal class VideoRecordingController(
         _activePlan = null
         _activeFrameRateHint = null
 
-        if (wasInterrupted) return
+        if (wasInterrupted) {
+            Log.w(TAG, "Finalize ignored for interrupted shotId=$shotId")
+            return
+        }
 
         if (event.hasError) {
             outcomes.add(
@@ -129,6 +135,7 @@ internal class VideoRecordingController(
      */
     fun clearRecording() {
         if (_activePlan != null) {
+            Log.i(TAG, "clearRecording during rebind shotId=${_activePlan?.request?.shotId}")
             qualityTrackerStop()
             _currentTorchEnabled = false
             _activePlan = null

@@ -47,6 +47,7 @@ data class CameraLensProfile(
         StillCaptureResolutionPreset.entries.toSet(),
     val videoSpecConstraints: VideoSpecConstraints = DeviceCapabilities.DEFAULT.videoSpecConstraints,
     val manualControlCapabilities: ManualControlCapabilityMatrix? = null,
+    val minimumFocusDistanceDiopters: Float? = null,
     val previewBrightnessRange: PreviewBrightnessRange = PreviewBrightnessRange.CONSERVATIVE,
     val stillCaptureCameraProbe: StillCaptureCameraProbe? = null,
     /** Hardware camera ID, used for physical camera selection in multi-camera devices. */
@@ -431,6 +432,9 @@ internal fun detectCameraLensProfiles(context: Context): List<CameraLensProfile>
             hasFlashUnit = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true,
             zoomRatioCapability = zoomCap,
             manualControlCapabilities = manualControlCapabilities,
+            minimumFocusDistanceDiopters = characteristics
+                .get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE)
+                ?.takeIf { it > 0f },
             previewBrightnessRange = detectPreviewBrightnessRange(characteristics),
             availableStillCaptureOutputSizes = normalizedJpegSizes,
             availableStillCaptureResolutionPresets = resolveAvailableStillCaptureResolutionPresets(

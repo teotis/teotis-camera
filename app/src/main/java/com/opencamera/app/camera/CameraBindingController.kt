@@ -1,6 +1,8 @@
 package com.opencamera.app.camera
 
 import android.content.Context
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CaptureRequest
 import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.Camera
@@ -13,6 +15,10 @@ import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.FocusMeteringAction
+import androidx.camera.camera2.interop.Camera2CameraControl
+import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.CaptureRequestOptions
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -34,6 +40,7 @@ import com.opencamera.core.device.PreviewBrightnessRequest
 import com.opencamera.core.device.PreviewBrightnessResult
 import com.opencamera.core.device.PreviewBrightnessResultStatus
 import com.opencamera.core.device.PreviewMeteringMode
+import com.opencamera.core.device.PreviewMeteringPersistence
 import com.opencamera.core.device.PreviewMeteringRequest
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
@@ -46,11 +53,9 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.guava.await
 import kotlinx.coroutines.withContext
-import java.util.concurrent.TimeUnit
 
 private const val TAG = "CameraBindingController"
 private const val PREVIEW_METERING_POINT_SIZE = 0.15f
-private const val MIN_PREVIEW_METERING_AUTO_CANCEL_MILLIS = 1L
 
 internal class CameraBindingExecutionContext(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Main.immediate
@@ -94,6 +99,11 @@ internal enum class LensTransitionState {
     TRANSITIONING
 }
 
+private data class PreviewAeLockAttempt(
+    val applied: Boolean,
+    val failure: Throwable? = null
+)
+
 /**
  * Sole owner of camera binding state: ProcessCameraProvider, bound use cases (ImageCapture,
  * VideoCapture, Camera), DeviceGraphSpec, lifecycle/preview hosts, observers, and current
@@ -106,6 +116,7 @@ internal enum class LensTransitionState {
  * Follows the VideoRecordingController pattern: adapter provides lambda callbacks for
  * CameraX integration; typed events are emitted via the [emitEvent] lambda.
  */
+@ExperimentalCamera2Interop
 internal class CameraBindingController(
     private val context: Context,
     private val capabilities: DeviceCapabilities,
@@ -195,7 +206,8 @@ internal class CameraBindingController(
         deviceGraph: DeviceGraphSpec,
         resetPreviewObserver: Boolean = true,
         resetPreviewMetrics: Boolean = true,
-        closeActiveRecording: Boolean = true
+        closeActiveRecording: Boolean = true,
+        manualCaptureConfigOverride: Camera2ManualCaptureConfig? = null
     ) {
         val p = ProcessCameraProvider.getInstance(context).await()
         val resolvedQuality = resolvedStillCaptureQuality(deviceGraph)
@@ -210,7 +222,8 @@ internal class CameraBindingController(
                 stillCaptureResolutionPreset = resolvedPreset,
                 resetPreviewObserver = resetPreviewObserver,
                 resetPreviewMetrics = resetPreviewMetrics,
-                closeActiveRecording = closeActiveRecording
+                closeActiveRecording = closeActiveRecording,
+                manualCaptureConfigOverride = manualCaptureConfigOverride
             )
         }
     }
@@ -250,6 +263,7 @@ internal class CameraBindingController(
     suspend fun switchLensNode(lensNode: LensNode, reason: String) {
         // Duplicate guard: already transitioning to this node
         if (_lensTransitionState == LensTransitionState.TRANSITIONING && _lensTransitionTarget == lensNode) {
+            Log.d(TAG, "switchLensNode duplicate ignored lens=${lensNode.tagValue} reason=$reason")
             return
         }
 
@@ -352,6 +366,7 @@ internal class CameraBindingController(
             boundUseCaseCamera.cameraControl.setZoomRatio(targetPreviewZoomRatio)
             _lensTransitionState = LensTransitionState.IDLE
             _lensTransitionTarget = null
+            Log.i(TAG, "switchLensNode succeeded lens=${lensNode.tagValue} physicalId=$physicalCameraId reason=$reason")
         }
     }
 
@@ -407,22 +422,18 @@ internal class CameraBindingController(
                 pixel.y,
                 PREVIEW_METERING_POINT_SIZE
             )
-            val autoCancelMillis = request.autoCancelMillis
-                .coerceAtLeast(MIN_PREVIEW_METERING_AUTO_CANCEL_MILLIS)
-
-            val focusAndAeAction = FocusMeteringAction.Builder(
+            val focusAndAeBuilder = FocusMeteringAction.Builder(
                 meteringPoint,
                 FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
             )
-                .setAutoCancelDuration(autoCancelMillis, TimeUnit.MILLISECONDS)
-                .build()
-
-            val aeOnlyAction = FocusMeteringAction.Builder(
+            val aeOnlyBuilder = FocusMeteringAction.Builder(
                 meteringPoint,
                 FocusMeteringAction.FLAG_AE
             )
-                .setAutoCancelDuration(autoCancelMillis, TimeUnit.MILLISECONDS)
-                .build()
+            focusAndAeBuilder.applyPreviewMeteringPersistence(request)
+            aeOnlyBuilder.applyPreviewMeteringPersistence(request)
+            val focusAndAeAction = focusAndAeBuilder.build()
+            val aeOnlyAction = aeOnlyBuilder.build()
 
             val selected = when (request.mode) {
                 PreviewMeteringMode.FOCUS_AND_AUTO_EXPOSURE -> when {
@@ -453,15 +464,43 @@ internal class CameraBindingController(
             }
 
             val cameraXResult = camera.cameraControl.startFocusAndMetering(selected.first).await()
+            if (request.persistence == PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED) {
+                val focusLocked = selected.second == PreviewMeteringResultStatus.SUCCEEDED &&
+                    cameraXResult.isFocusSuccessful
+                val exposureLockAttempt = applyPreviewAeLock(camera, enabled = true)
+                val exposureLocked = exposureLockAttempt.applied
+                val lockedStatus = when {
+                    focusLocked && exposureLocked -> PreviewMeteringResultStatus.LOCKED
+                    focusLocked -> PreviewMeteringResultStatus.DEGRADED_FOCUS_LOCK_ONLY
+                    exposureLocked -> PreviewMeteringResultStatus.DEGRADED_EXPOSURE_LOCK_ONLY
+                    else -> PreviewMeteringResultStatus.FAILED
+                }
+                val reason = when (lockedStatus) {
+                    PreviewMeteringResultStatus.LOCKED -> null
+                    PreviewMeteringResultStatus.DEGRADED_FOCUS_LOCK_ONLY ->
+                        "Exposure lock is unavailable; focus remains locked"
+                    PreviewMeteringResultStatus.DEGRADED_EXPOSURE_LOCK_ONLY ->
+                        "Focus did not lock; exposure remains locked"
+                    PreviewMeteringResultStatus.FAILED ->
+                        "Focus and exposure could not be locked"
+                    else -> null
+                }
+                if (lockedStatus == PreviewMeteringResultStatus.FAILED) {
+                    camera.cameraControl.cancelFocusAndMetering().await()
+                }
+                return@withContext PreviewMeteringResult(
+                    requestId = request.requestId,
+                    point = point,
+                    status = lockedStatus,
+                    reason = reason
+                )
+            }
+
             val status = selected.second
             val reason = if (
                 status == PreviewMeteringResultStatus.SUCCEEDED &&
                 !cameraXResult.isFocusSuccessful
-            ) {
-                "Focus did not lock"
-            } else {
-                null
-            }
+            ) "Focus did not lock" else null
             PreviewMeteringResult(
                 requestId = request.requestId,
                 point = point,
@@ -471,6 +510,40 @@ internal class CameraBindingController(
         }
 
         emitEvent(com.opencamera.core.device.DeviceEvent.PreviewMeteringCompleted(result))
+    }
+
+    suspend fun cancelPreviewMetering() {
+        withContext(Dispatchers.Main.immediate) {
+            val camera = boundCamera ?: return@withContext
+            var failure: Throwable? = null
+            runCatching {
+                camera.cameraControl.cancelFocusAndMetering().await()
+            }.onFailure { failure = it }
+            val exposureUnlockAttempt = applyPreviewAeLock(camera, enabled = false)
+            if (failure == null) failure = exposureUnlockAttempt.failure
+            failure?.let { throw it }
+        }
+    }
+
+    private suspend fun applyPreviewAeLock(camera: Camera, enabled: Boolean): PreviewAeLockAttempt {
+        val isLockAvailable = runCatching {
+            Camera2CameraInfo.from(camera.cameraInfo)
+                .getCameraCharacteristic(CameraCharacteristics.CONTROL_AE_LOCK_AVAILABLE) == true
+        }.getOrDefault(false)
+        if (!isLockAvailable) return PreviewAeLockAttempt(applied = false)
+
+        val options = CaptureRequestOptions.Builder()
+            .setCaptureRequestOption(CaptureRequest.CONTROL_AE_LOCK, enabled)
+            .build()
+        return runCatching {
+            Camera2CameraControl.from(camera.cameraControl)
+                .addCaptureRequestOptions(options)
+                .await()
+            PreviewAeLockAttempt(applied = true)
+        }.getOrElse { throwable ->
+            Log.w(TAG, "Camera2 AE lock request failed enabled=$enabled", throwable)
+            PreviewAeLockAttempt(applied = false, failure = throwable)
+        }
     }
 
     private fun previewMeteringResult(
@@ -726,9 +799,12 @@ internal class CameraBindingController(
         }
         removeCameraStateObserver()
 
-        val preview = Preview.Builder()
+        val previewBuilder = Preview.Builder()
             .setResolutionSelector(previewResolutionSelectorForAspect(deviceGraph.preview.streamAspect))
-            .build()
+        manualCaptureConfigOverride?.let { config ->
+            applyCamera2ManualPreviewConfig(previewBuilder, config)
+        }
+        val preview = previewBuilder.build()
             .also { useCase -> useCase.setSurfaceProvider(previewView.surfaceProvider) }
 
         adapterCallbacks.livePreviewFrameSource?.stop("unbind")

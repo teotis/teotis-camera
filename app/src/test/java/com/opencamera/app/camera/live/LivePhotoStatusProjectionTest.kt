@@ -240,4 +240,50 @@ class LivePhotoStatusProjectionTest {
         val deg = status as LivePhotoStatus.Degraded
         assertEquals("motion-segment-failed", deg.reason)
     }
+
+    // --- Gallery recognition notes ---
+
+    @Test
+    fun `recognition note shows validated container with pending external verification`() {
+        val notes = listOf(
+            "gallery-recognition=container-validated",
+            "gallery-recognition:motion-offset=12345",
+            "gallery-recognition:external=pending"
+        )
+        val note = LivePhotoStatusProjection.recognitionNote(notes)
+        assertEquals("容器结构已验证 · 系统相册识别待真机验证", note)
+    }
+
+    @Test
+    fun `recognition note hides pending marker when absent`() {
+        val notes = listOf("gallery-recognition=container-validated")
+        assertEquals("容器结构已验证", LivePhotoStatusProjection.recognitionNote(notes))
+    }
+
+    @Test
+    fun `recognition note surfaces container invalid reason`() {
+        val notes = listOf(
+            "gallery-recognition=container-invalid:motion-offset-not-mp4",
+            "gallery-recognition:external=pending"
+        )
+        assertEquals("容器结构异常：motion-offset-not-mp4", LivePhotoStatusProjection.recognitionNote(notes))
+    }
+
+    @Test
+    fun `recognition note is null when no recognition diagnostics exist`() {
+        assertNull(LivePhotoStatusProjection.recognitionNote(emptyList()))
+    }
+
+    @Test
+    fun `status text for materialized includes recognition note`() {
+        val notes = listOf(
+            "gallery-recognition=container-validated",
+            "gallery-recognition:external=pending"
+        )
+        val text = LivePhotoStatusProjection.statusText(
+            status = LivePhotoStatus.Materialized(LiveSaveFormat.GOOGLE_MOTION_PHOTO_JPEG),
+            pipelineNotes = notes
+        )
+        assertEquals("实况已生成（Motion Photo）\n容器结构已验证 · 系统相册识别待真机验证", text)
+    }
 }

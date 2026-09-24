@@ -22,6 +22,7 @@ import com.opencamera.core.media.FrameBundleFrame
 import com.opencamera.core.media.FrameRole
 import com.opencamera.core.media.LivePhotoCaptureSpec
 import com.opencamera.core.media.MediaOutputHandle
+import com.opencamera.core.media.MotionPhotoContainerParser
 import com.opencamera.core.media.MotionPhotoContainerSpec
 import com.opencamera.core.media.MotionScore
 import com.opencamera.core.media.NoiseModel
@@ -54,6 +55,12 @@ internal class StillCaptureExecutor(
     private val captureOutputFactory: CaptureOutputFactory,
     private val multiFrameExecutionPlanner: MultiFrameCaptureExecutionPlanner,
 ) {
+    data class FrameCapturePreparation(
+        val capture: ImageCapture,
+        val diagnostics: List<String> = emptyList(),
+        val focusDistanceDiopters: Float? = null,
+        val degradationReasons: List<String> = emptyList()
+    )
 
     /**
      * Execute a single-frame photo capture via CameraX ImageCapture.
@@ -109,7 +116,16 @@ internal class StillCaptureExecutor(
         capture: ImageCapture,
         plan: ShotPlan,
         deviceRequest: DeviceShotRequest,
-        beforeFrameCapture: suspend (MultiFrameCaptureStep) -> List<String> = { emptyList() }
+        beforeFrameCapture: suspend (MultiFrameCaptureStep) -> List<String> = { emptyList() },
+        prepareFrameCapture: suspend (
+            MultiFrameCaptureStep,
+            ImageCapture
+        ) -> FrameCapturePreparation = { step, currentCapture ->
+            FrameCapturePreparation(
+                capture = currentCapture,
+                diagnostics = beforeFrameCapture(step)
+            )
+        }
     ): PhotoCaptureOutcome {
         val executionPlan = multiFrameExecutionPlanner.plan(deviceRequest)
         val temporaryOutputs = MultiFrameTemporaryOutputTracker()
@@ -118,11 +134,14 @@ internal class StillCaptureExecutor(
         var finalOutputHandle: MediaOutputHandle? = null
         var firstFrameDeviceCaptureStartedAt: Long = 0L
         var lastFrameDeviceCaptureCompletedAt: Long = 0L
+        var activeCapture = capture
         val framePreparationDiagnostics = mutableListOf<String>()
 
         try {
             executionPlan.steps.forEachIndexed { stepIndex, step ->
-                framePreparationDiagnostics += beforeFrameCapture(step)
+                val preparation = prepareFrameCapture(step, activeCapture)
+                activeCapture = preparation.capture
+                framePreparationDiagnostics += preparation.diagnostics
                 val request = when (step.outputRole) {
                     MultiFrameOutputRole.TEMPORARY -> captureOutputFactory.createTemporaryPhotoOutputRequest(
                         shotId = plan.request.shotId,
@@ -133,7 +152,7 @@ internal class StillCaptureExecutor(
                 }
                 temporaryOutputs.register(request.cleanupFile)
 
-                when (val result = captureSinglePhoto(capture, request)) {
+                when (val result = captureSinglePhoto(preparation.capture, request)) {
                     is PhotoCaptureOutcome.Failure -> {
                         temporaryOutputs.cleanup()
                         return result
@@ -147,6 +166,16 @@ internal class StillCaptureExecutor(
                             finalOutputPath = result.outputPath
                             finalOutputHandle = result.outputHandle
                         }
+                        val degradationReasons = buildList {
+                            addAll(preparation.degradationReasons)
+                            add("camera-x:no-per-frame-metadata")
+                            if (
+                                step.focusStackRole != com.opencamera.core.media.FocusStackFrameRole.NONE &&
+                                preparation.focusDistanceDiopters == null
+                            ) {
+                                add("camera-x:focus-distance-unconfirmed")
+                            }
+                        }
                         bundleFrames += FrameBundleFrame(
                             frameIndex = step.frameIndex,
                             pixelReference = PixelReference.File(result.outputPath),
@@ -155,10 +184,11 @@ internal class StillCaptureExecutor(
                                 MultiFrameOutputRole.TEMPORARY -> FrameRole.FUSION_SUPPLEMENT
                             },
                             focusStackRole = step.focusStackRole,
+                            focusDistanceDiopters = preparation.focusDistanceDiopters,
                             noiseModel = NoiseModel.Unknown,
                             motionScore = MotionScore.Unknown,
-                            isDegraded = true,
-                            degradationReasons = listOf("camera-x:no-per-frame-metadata")
+                            isDegraded = degradationReasons.isNotEmpty(),
+                            degradationReasons = degradationReasons
                         )
                     }
                 }
@@ -169,6 +199,7 @@ internal class StillCaptureExecutor(
                 }
             }
         } catch (throwable: Throwable) {
+            Log.e(TAG, "captureMultiFrame failed shotId=${plan.request.shotId}", throwable)
             temporaryOutputs.cleanup()
             throw throwable
         }
@@ -181,14 +212,21 @@ internal class StillCaptureExecutor(
         val resolvedFinalOutputHandle = finalOutputHandle
             ?: MediaOutputHandle(displayPath = resolvedFinalOutputPath)
 
+        val frameDegradationReasons = bundleFrames
+            .flatMap { it.degradationReasons }
+            .distinct()
         val bundle = FrameBundle(
             shotId = plan.request.shotId,
             frames = bundleFrames,
-            diagnostics = listOf(
-                "device:burst-bundle-frames=${bundleFrames.size}",
-                "device:burst-metadata=unknown",
-                "device:burst-final-frame=${executionPlan.finalFrameIndex}"
-            )
+            diagnostics = buildList {
+                add("device:burst-bundle-frames=${bundleFrames.size}")
+                add("device:burst-metadata=unknown")
+                add("device:burst-final-frame=${executionPlan.finalFrameIndex}")
+                if (frameDegradationReasons.isNotEmpty()) {
+                    add("device:burst-degraded-frames=${bundleFrames.count { it.isDegraded }}")
+                    add("device:burst-degradation-reasons=${frameDegradationReasons.joinToString("+")}")
+                }
+            }
         )
 
         return PhotoCaptureOutcome.Success(
@@ -294,10 +332,36 @@ internal class StillCaptureExecutor(
                                 )
                             )
                             combinedResult.mapCatching { combinedBytes ->
+                                // Structural validation of the exact bytes that will be the
+                                // final MediaStore file. Recognition by system galleries is
+                                // reported separately as pending external verification.
+                                val validation = MotionPhotoContainerParser.analyze(combinedBytes)
+                                val containerDiagnostics = if (validation.valid) {
+                                    buildList {
+                                        add("gallery-recognition=container-validated")
+                                        validation.motionOffset?.let {
+                                            add("gallery-recognition:motion-offset=$it")
+                                        }
+                                        validation.xmp?.microVideoOffset?.let {
+                                            add("gallery-recognition:micro-video-offset=$it")
+                                        }
+                                        validation.xmp?.presentationTimestampUs?.let {
+                                            add("gallery-recognition:timestamp-us=$it")
+                                        }
+                                    }
+                                } else {
+                                    listOf(
+                                        "gallery-recognition=container-invalid:${
+                                            validation.issues.firstOrNull() ?: "unknown"
+                                        }"
+                                    )
+                                }
                                 mediaStoreWriter.overwriteMotionPhotoJpeg(savedUri, combinedBytes)
                                     .getOrThrow()
-                            }.map {
-                                MotionPhotoMaterializationResult(outputUri = savedUri.toString())
+                                MotionPhotoMaterializationResult(
+                                    outputUri = savedUri.toString(),
+                                    diagnostics = containerDiagnostics
+                                )
                             }
                         } else {
                             Result.failure(

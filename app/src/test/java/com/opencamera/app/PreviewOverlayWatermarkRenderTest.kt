@@ -49,37 +49,55 @@ class PreviewOverlayWatermarkRenderTest {
     }
 
     @Test
-    fun `default 1x frame uses eighty percent of preview span for watermark breathing room`() {
-        val view = PreviewOverlayView(ApplicationProvider.getApplicationContext())
-        view.layout(0, 0, 1080, 1920)
-        view.render(
-            PreviewOverlayRenderModel(
-                gridMode = CompositionGridMode.OFF,
-                isGridVisible = false,
-                countdownLabel = null,
-                isCountdownVisible = false,
-                effectModel = PreviewEffectRenderModel(
-                    filterOverlay = null,
-                    watermarkHint = WatermarkHintSpec(
-                        templateId = "travel-polaroid",
-                        placement = WatermarkTextPlacement.BOTTOM_LEFT,
-                        previewText = "OpenCamera",
-                        opacity = 0.8f,
-                        shape = WatermarkPreviewShape.EXPANDED_FRAME
-                    ),
-                    frameGuideline = null,
-                    compositionGrid = null
-                ),
-                frame = PreviewFrameRenderModel(
-                    ratio = FrameRatio.RATIO_4_3,
-                    label = "4:3",
-                    dimOutsideFrame = true,
-                    zoomRatio = 1f,
-                    previewZoomRatio = 1f
-                ),
-                previewContentAspect = PreviewContentAspect(4, 3)
-            )
+    fun `high design preview uses saved render frame proportions around photo slot`() {
+        val photoSlot = RectF(100f, 200f, 900f, 1200f)
+
+        val destination = highDesignWatermarkFrameMetrics(
+            photoWidth = photoSlot.width(),
+            photoHeight = photoSlot.height()
+        ).destinationAround(photoSlot)
+
+        assertEquals(78.4f, destination.left, 0.01f)
+        assertEquals(117f, destination.top, 0.01f)
+        assertEquals(921.6f, destination.right, 0.01f)
+        assertEquals(1328f, destination.bottom, 0.01f)
+    }
+
+    @Test
+    fun `high design preview selects asset variant from expanded output aspect`() {
+        val landscapePhotoSlot = RectF(0f, 0f, 1600f, 1200f)
+        val destination = highDesignWatermarkFrameMetrics(
+            photoWidth = landscapePhotoSlot.width(),
+            photoHeight = landscapePhotoSlot.height()
+        ).destinationAround(landscapePhotoSlot)
+
+        assertEquals("square", highDesignWatermarkAssetSuffix(destination.width() / destination.height()))
+    }
+
+    @Test
+    fun `high design preview fits the complete composition around the eighty percent photo slot`() {
+        val content = RectF(0f, 480f, 1080f, 1920f)
+
+        val layout = highDesignWatermarkPreviewLayout(
+            basePhotoSlot = content,
+            availableBounds = content
         )
+
+        assertEquals(0.8f, layout.photoSlot.width() / content.width(), 0.01f)
+        assertEquals(0.8f, layout.photoSlot.height() / content.height(), 0.01f)
+        assertTrue(layout.destination.left >= content.left)
+        assertTrue(layout.destination.top >= content.top)
+        assertTrue(layout.destination.right <= content.right)
+        assertTrue(layout.destination.bottom <= content.bottom)
+        assertTrue(
+            layout.photoSlot.centerY() < content.centerY(),
+            "photo slot should move upward to reserve the larger final metadata band"
+        )
+    }
+
+    @Test
+    fun `high design watermark keeps an eighty percent composition window at equal zoom`() {
+        val view = renderHighDesignPreview(captureZoomRatio = 1f, previewZoomRatio = 1f)
 
         val rect = requireNotNull(view.currentActiveFrameRectOrNull())
         val content = previewContentGeometry(
@@ -90,10 +108,37 @@ class PreviewOverlayWatermarkRenderTest {
 
         assertEquals(0.8f, rect.width() / content.width(), 0.01f)
         assertEquals(0.8f, rect.height() / content.height(), 0.01f)
-        assertTrue(
-            content.bottom - rect.bottom >= content.height() * 0.09f,
-            "frame should leave a visible bottom watermark region: content=$content frame=$rect"
-        )
+
+        val transform = requireNotNull(view.currentPreviewSurfaceTransformOrNull())
+        assertEquals(0.8f, transform.scale, 0.01f)
+        assertEquals(content.left, transform.sourceClipRect.left, 0.01f)
+        assertEquals(content.top, transform.sourceClipRect.top, 0.01f)
+        assertEquals(content.right, transform.sourceClipRect.right, 0.01f)
+        assertEquals(content.bottom, transform.sourceClipRect.bottom, 0.01f)
+        assertEquals(0f, transform.translationX, 0.01f)
+        assertEquals(-25.92f, transform.translationY, 0.1f)
+    }
+
+    @Test
+    fun `high design watermark maps tighter capture crop into the same composition window`() {
+        val view = renderHighDesignPreview(captureZoomRatio = 2f, previewZoomRatio = 1f)
+        val content = previewContentGeometry(
+            viewWidth = 1080,
+            viewHeight = 1920,
+            previewContentAspect = PreviewContentAspect(4, 3)
+        ).contentRect
+        val frame = requireNotNull(view.currentActiveFrameRectOrNull())
+        val transform = requireNotNull(view.currentPreviewSurfaceTransformOrNull())
+        val interactionBounds = requireNotNull(view.currentPreviewInteractionBoundsOrNull())
+
+        assertEquals(0.8f, frame.width() / content.width(), 0.01f)
+        assertEquals(0.5f, transform.sourceClipRect.width() / content.width(), 0.01f)
+        assertEquals(0.5f, transform.sourceClipRect.height() / content.height(), 0.01f)
+        assertEquals(1.6f, transform.scale, 0.01f)
+        assertEquals(transform.sourceClipRect.left, interactionBounds.left, 0.01f)
+        assertEquals(transform.sourceClipRect.top, interactionBounds.top, 0.01f)
+        assertEquals(transform.sourceClipRect.right, interactionBounds.right, 0.01f)
+        assertEquals(transform.sourceClipRect.bottom, interactionBounds.bottom, 0.01f)
     }
 
     @Test
@@ -199,22 +244,53 @@ class PreviewOverlayWatermarkRenderTest {
 
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun `travel preview draws map strokes in right side of reserved band`() {
-        val bitmap = drawExpandedFramePreview(
+    fun `travel ticket preview draws cobalt body coral stamp and lime stub`() {
+        val preview = drawExpandedFramePreviewWithFrame(
             templateId = "travel-polaroid",
-            decoration = WatermarkPreviewDecoration.TRAVEL_MAP,
+            decoration = WatermarkPreviewDecoration.TRAVEL_TICKET,
             placement = WatermarkTextPlacement.BOTTOM_LEFT
         )
-
-        val greenInkCount = countGreenInk(
-            bitmap = bitmap,
-            left = 590,
-            top = 1640,
-            right = 970,
-            bottom = 1770
+        val bitmap = preview.bitmap
+        val band = requireNotNull(
+            expandedFrameBottomBandRect(
+                rect = preview.frame,
+                viewHeight = bitmap.height,
+                density = preview.density,
+                templateId = "travel-polaroid"
+            )
         )
 
-        assertTrue(greenInkCount > 20, "travel preview should include green map strokes")
+        val cobaltInkCount = countPixelsNearColor(
+            bitmap = bitmap,
+            left = (band.left + band.width() * 0.54f).toInt(),
+            top = band.top.toInt(),
+            right = band.right.toInt(),
+            bottom = band.bottom.toInt(),
+            target = Color.rgb(18, 87, 214),
+            tolerance = 40
+        )
+        val coralInkCount = countPixelsNearColor(
+            bitmap = bitmap,
+            left = (band.left + band.width() * 0.54f).toInt(),
+            top = band.top.toInt(),
+            right = band.right.toInt(),
+            bottom = band.bottom.toInt(),
+            target = Color.rgb(255, 101, 82),
+            tolerance = 44
+        )
+        val limeInkCount = countPixelsNearColor(
+            bitmap = bitmap,
+            left = (band.left + band.width() * 0.78f).toInt(),
+            top = band.top.toInt(),
+            right = band.right.toInt(),
+            bottom = band.bottom.toInt(),
+            target = Color.rgb(184, 235, 21),
+            tolerance = 44
+        )
+
+        assertTrue(cobaltInkCount > 500, "preview ticket body should be cobalt, count=$cobaltInkCount")
+        assertTrue(coralInkCount > 20, "preview ticket stamp should be coral, count=$coralInkCount")
+        assertTrue(limeInkCount > 80, "preview ticket stub should be lime, count=$limeInkCount")
         bitmap.recycle()
     }
 
@@ -468,6 +544,43 @@ class PreviewOverlayWatermarkRenderTest {
         return bitmap
     }
 
+    private fun renderHighDesignPreview(
+        captureZoomRatio: Float,
+        previewZoomRatio: Float
+    ): PreviewOverlayView {
+        return PreviewOverlayView(ApplicationProvider.getApplicationContext()).apply {
+            layout(0, 0, 1080, 1920)
+            render(
+                PreviewOverlayRenderModel(
+                    gridMode = CompositionGridMode.OFF,
+                    isGridVisible = false,
+                    countdownLabel = null,
+                    isCountdownVisible = false,
+                    effectModel = PreviewEffectRenderModel(
+                        filterOverlay = null,
+                        watermarkHint = WatermarkHintSpec(
+                            templateId = "blue-hour",
+                            placement = WatermarkTextPlacement.BOTTOM_LEFT,
+                            previewText = "OpenCamera",
+                            opacity = 0.8f,
+                            shape = WatermarkPreviewShape.EXPANDED_FRAME
+                        ),
+                        frameGuideline = null,
+                        compositionGrid = null
+                    ),
+                    frame = PreviewFrameRenderModel(
+                        ratio = FrameRatio.RATIO_4_3,
+                        label = "4:3",
+                        dimOutsideFrame = true,
+                        zoomRatio = captureZoomRatio,
+                        previewZoomRatio = previewZoomRatio
+                    ),
+                    previewContentAspect = PreviewContentAspect(4, 3)
+                )
+            )
+        }
+    }
+
     private data class BottomBarPreview(
         val bitmap: Bitmap,
         val frame: RectF,
@@ -532,6 +645,31 @@ class PreviewOverlayWatermarkRenderTest {
                     Color.alpha(pixel) > 20 &&
                     Color.green(pixel) > Color.red(pixel) + 5 &&
                     Color.green(pixel) > Color.blue(pixel) + 3
+                ) {
+                    count += 1
+                }
+            }
+        }
+        return count
+    }
+
+    private fun countPixelsNearColor(
+        bitmap: Bitmap,
+        left: Int,
+        top: Int,
+        right: Int,
+        bottom: Int,
+        target: Int,
+        tolerance: Int
+    ): Int {
+        var count = 0
+        for (y in top.coerceAtLeast(0) until bottom.coerceAtMost(bitmap.height)) {
+            for (x in left.coerceAtLeast(0) until right.coerceAtMost(bitmap.width)) {
+                val pixel = bitmap.getPixel(x, y)
+                if (
+                    kotlin.math.abs(Color.red(pixel) - Color.red(target)) <= tolerance &&
+                    kotlin.math.abs(Color.green(pixel) - Color.green(target)) <= tolerance &&
+                    kotlin.math.abs(Color.blue(pixel) - Color.blue(target)) <= tolerance
                 ) {
                     count += 1
                 }

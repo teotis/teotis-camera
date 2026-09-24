@@ -231,19 +231,29 @@ class PreviewEffectAdapterTest {
     }
 
     @Test
-    fun `travel polaroid watermark hint is expanded frame`() {
+    fun `travel ticket paper watermark hint uses expanded ticket decoration`() {
         val model = adapter.adapt(
             EffectSpec(listOf(
                 WatermarkEffect(
                     templateId = "travel-polaroid",
-                    tokens = mapOf("watermarkModel" to "Camera"),
+                    tokens = mapOf(
+                        "watermarkModel" to "Camera",
+                        "watermarkDatetime" to "2026-07-10 09:30",
+                        "watermarkLocation" to "COAST RUN",
+                        "watermarkProfileName" to "24 KM"
+                    ),
                     style = WatermarkStyleSettings()
                 )
             ))
         )
 
         assertEquals(WatermarkPreviewShape.EXPANDED_FRAME, model.watermarkHint?.shape)
-        assertEquals(WatermarkPreviewDecoration.TRAVEL_MAP, model.watermarkHint?.decoration)
+        assertEquals(WatermarkPreviewDecoration.TRAVEL_TICKET, model.watermarkHint?.decoration)
+        assertEquals("哲思如水", model.watermarkHint?.previewText)
+        assertEquals(
+            listOf("静水流深 · 万物有声", "COAST RUN · 24 KM · 2026.07.10"),
+            model.watermarkHint?.previewLabels
+        )
     }
 
     @Test

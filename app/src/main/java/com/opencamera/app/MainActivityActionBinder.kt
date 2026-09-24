@@ -124,6 +124,10 @@ internal class MainActivityActionBinder(
         views.preview.thumbnail.setOnClickListener {
             callbacks.openLatestGalleryMedia()
         }
+        views.preview.thumbnail.setOnLongClickListener {
+            callbacks.playLatestLivePhotoMotion()
+            true
+        }
     }
 
     private fun bindSettingsActions() {
@@ -438,15 +442,23 @@ internal class MainActivityActionBinder(
             if (event !is GestureEvent.PinchZoom && event !is GestureEvent.PinchBegin) {
                 gesturePolicy.syncZoomRatio(currentZoom)
             }
-            when (val action = gesturePolicy.map(event, activeMode, currentZoom)) {
+            when (
+                val action = gesturePolicy.map(
+                    event = event,
+                    activeMode = activeMode,
+                    currentZoomRatio = currentZoom,
+                    isFocusExposureLocked = snap.sessionState?.presentation?.hasActiveMeteringHold == true
+                )
+            ) {
                 is GestureAction.DispatchSession -> callbacks.dispatch(action.intent)
                 is GestureAction.FocusAt -> {
+                    callbacks.dismissDocumentBatchRailTransientInteraction()
                     val tap = normalizedPreviewTapOrNull(
                         tapX = action.x,
                         tapY = action.y,
                         viewWidth = previewView.width,
                         viewHeight = previewView.height,
-                        activeFrameRect = overlayView.currentActiveFrameRectOrNull()
+                        activeFrameRect = overlayView.currentPreviewInteractionBoundsOrNull()
                     ) ?: return@GestureRouter
                     callbacks.dispatch(
                         SessionIntent.PreviewTapToFocus(
@@ -454,6 +466,25 @@ internal class MainActivityActionBinder(
                             normalizedY = tap.y
                         )
                     )
+                }
+                is GestureAction.LockFocusAndExposureAt -> {
+                    callbacks.dismissDocumentBatchRailTransientInteraction()
+                    val press = normalizedPreviewTapOrNull(
+                        tapX = action.x,
+                        tapY = action.y,
+                        viewWidth = previewView.width,
+                        viewHeight = previewView.height,
+                        activeFrameRect = overlayView.currentPreviewInteractionBoundsOrNull()
+                    ) ?: return@GestureRouter
+                    callbacks.dispatch(
+                        SessionIntent.PreviewLockFocusAndExposure(
+                            normalizedX = press.x,
+                            normalizedY = press.y
+                        )
+                    )
+                }
+                GestureAction.UnlockFocusAndExposure -> {
+                    callbacks.dispatch(SessionIntent.PreviewUnlockFocusAndExposure)
                 }
                 is GestureAction.ShowExposureHint -> {
                     // EV via vertical scroll intentionally deferred:

@@ -96,7 +96,7 @@ class SessionSettingsRenderModelTest {
             assertTrue(summary.contains("Settings: Grid 3x3 | Shutter sound Off | Selfie mirror On"))
             assertTrue(
                 summary.contains(
-                    "Photo defaults: Filter Portrait Retro | Portrait Native Portrait | Watermark Travel Polaroid | Live On (Motion Photo) | Timer 3s"
+                    "Photo defaults: Filter Portrait Retro | Portrait Native Portrait | Watermark Philosophy Like Water | Live On (Motion Photo) | Timer 3s"
                 )
             )
             assertTrue(summary.contains("Video defaults: 4K 25fps | Mic Concert | Low-light auto 24fps | Filter Rich"))
@@ -115,7 +115,7 @@ class SessionSettingsRenderModelTest {
 
             assertEquals("Grid 3x3 | Shutter sound Off | Selfie mirror On", model.commonSummary)
             assertEquals(
-                "Filter Portrait Retro | Portrait Native Portrait | Watermark Travel Polaroid | Live On (Motion Photo) | Timer 3s",
+                "Filter Portrait Retro | Portrait Native Portrait | Watermark Philosophy Like Water | Live On (Motion Photo) | Timer 3s",
                 model.photoSummary
             )
             assertEquals(
@@ -144,7 +144,7 @@ class SessionSettingsRenderModelTest {
                 model.photoSection.portraitLab.buttonLabel
             )
             assertEquals(
-                "Watermark Lab\nTravel Polaroid\n部分支持 • Open selector + per-template tuning; 7 templates",
+                "Watermark Lab\nPhilosophy Like Water\n部分支持 • Open selector + per-template tuning; 7 templates",
                 model.photoSection.watermarkTemplate.buttonLabel
             )
             assertEquals(

@@ -44,6 +44,90 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
+    <!-- Humanistic Pro: immersive overlay keeps the scene clear and reveals one scale at a time. -->
+    <FrameLayout
+        android:id="@+id/runtimeProImmersiveOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="72dp"
+        android:layout_marginBottom="12dp"
+        android:elevation="3dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/previewBottomGuide"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/runtimeProStatusLeft"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|top"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_pro_status_scrim"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="5dp"
+            android:textColor="@color/oc_text_primary"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/runtimeProStatusRight"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end|top"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="76dp"
+            android:background="@drawable/bg_pro_status_scrim"
+            android:fontFamily="monospace"
+            android:includeFontPadding="false"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="5dp"
+            android:textColor="@color/oc_text_secondary"
+            android:textSize="10sp" />
+
+        <LinearLayout
+            android:id="@+id/runtimeProParameterRail"
+            android:layout_width="60dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/bg_pro_rail_scrim"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingVertical="6dp" />
+
+        <TextView
+            android:id="@+id/runtimeProStatusDetail"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|bottom"
+            android:layout_marginStart="84dp"
+            android:layout_marginEnd="72dp"
+            android:layout_marginBottom="82dp"
+            android:background="@drawable/bg_pro_status_scrim"
+            android:ellipsize="end"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp"
+            android:textColor="@color/oc_text_secondary"
+            android:textSize="10sp" />
+
+        <com.opencamera.app.procontrols.ImmersiveProScaleView
+            android:id="@+id/runtimeProScale"
+            android:layout_width="match_parent"
+            android:layout_height="76dp"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginStart="84dp"
+            android:layout_marginEnd="72dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/bg_pro_scale_scrim"
+            android:paddingHorizontal="4dp" />
+    </FrameLayout>
+
     <!-- Panel dismiss scrim: transparent overlay that dismisses panels on outside tap.
          Elevation 4dp places scrim above bottom controls (0dp) so they cannot be
          accidentally tapped while a panel overlay is open. -->
@@ -195,95 +279,133 @@
             android:text="@string/button_dev_entry" />
     </LinearLayout>
 
-    <!-- Document batch side rail: compact vertical order control in shooting mode. -->
-    <LinearLayout
-        android:id="@+id/documentBatchRail"
-        android:layout_width="104dp"
+    <!-- Document batch overlay: ordered thumbnail rail plus non-intrusive preview actions. -->
+    <FrameLayout
+        android:id="@+id/documentBatchRailOverlay"
+        android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="@dimen/space_8"
         android:layout_marginTop="88dp"
-        android:background="@drawable/document_batch_rail_chip_bg"
-        android:gravity="center_horizontal"
-        android:orientation="vertical"
-        android:paddingHorizontal="6dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="@dimen/space_8"
+        android:layout_marginBottom="@dimen/floating_tool_bottom_clearance"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:visibility="gone"
         app:layout_constrainedHeight="true"
         app:layout_constraintBottom_toBottomOf="@id/previewBottomGuide"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/topPanel">
 
-        <TextView
-            android:id="@+id/documentBatchRailChip"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#33FFFFFF"
-            android:gravity="center"
-            android:paddingHorizontal="4dp"
-            android:paddingVertical="3dp"
-            android:textColor="#FFFFFFFF"
-            android:textSize="11sp"
-            android:visibility="gone" />
+        <LinearLayout
+            android:id="@+id/documentBatchRail"
+            android:layout_width="@dimen/document_batch_rail_browsing_width"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_document_batch_rail_quiet"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            android:paddingHorizontal="6dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="@dimen/space_8">
 
-        <ImageView
-            android:id="@+id/documentBatchRailThumbnail"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginTop="4dp"
-            android:scaleType="centerCrop"
-            android:background="#20FFFFFF"
-            android:visibility="gone" />
-
-        <androidx.core.widget.NestedScrollView
-            android:id="@+id/documentBatchRailItemScroll"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:layout_marginTop="2dp"
-            android:fadeScrollbars="false"
-            android:fillViewport="false"
-            android:overScrollMode="ifContentScrolls"
-            android:scrollbars="vertical"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/documentBatchRailItemList"
+            <TextView
+                android:id="@+id/documentBatchRailChip"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </androidx.core.widget.NestedScrollView>
+                android:background="@drawable/bg_document_batch_rail_chip_quiet"
+                android:gravity="center"
+                android:paddingHorizontal="4dp"
+                android:paddingVertical="3dp"
+                android:textColor="#FFFFFFFF"
+                android:textSize="11sp"
+                android:visibility="gone" />
 
-        <Button
-            android:id="@+id/documentBatchRailMoveUpButton"
-            style="@style/Widget.OpenCamera.RightRailButton"
-            android:layout_width="match_parent"
-            android:layout_height="28dp"
-            android:layout_marginTop="6dp"
-            android:minHeight="0dp"
-            android:textSize="10sp"
-            android:visibility="gone" />
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/documentBatchRailItemScroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="2dp"
+                android:fadeScrollbars="false"
+                android:fillViewport="false"
+                android:overScrollMode="ifContentScrolls"
+                android:scrollbars="vertical"
+                android:visibility="gone">
 
-        <Button
-            android:id="@+id/documentBatchRailMoveDownButton"
-            style="@style/Widget.OpenCamera.RightRailButton"
-            android:layout_width="match_parent"
-            android:layout_height="28dp"
-            android:layout_marginTop="4dp"
-            android:minHeight="0dp"
-            android:textSize="10sp"
-            android:visibility="gone" />
+                <LinearLayout
+                    android:id="@+id/documentBatchRailItemList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </androidx.core.widget.NestedScrollView>
 
-        <Button
-            android:id="@+id/documentBatchRailOverviewButton"
-            style="@style/Widget.OpenCamera.RightRailButton"
-            android:layout_width="match_parent"
-            android:layout_height="28dp"
-            android:layout_marginTop="6dp"
-            android:minHeight="0dp"
-            android:textSize="10sp"
-            android:visibility="gone" />
-    </LinearLayout>
+            <Button
+                android:id="@+id/documentBatchRailClearButton"
+                style="@style/Widget.OpenCamera.RightRailButton"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:layout_marginTop="6dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:textSize="10sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/documentBatchRailActionContainer"
+            android:layout_width="@dimen/document_batch_action_width"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="@dimen/document_batch_action_selected_margin_start"
+            android:background="@android:color/transparent"
+            android:elevation="10dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/documentBatchRailMoveUpButton"
+                style="@style/Widget.OpenCamera.RightRailButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/document_batch_action_height"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/documentBatchRailMoveDownButton"
+                style="@style/Widget.OpenCamera.RightRailButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/document_batch_action_height"
+                android:layout_marginTop="4dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/documentBatchRailRemoveButton"
+                style="@style/Widget.OpenCamera.RightRailButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/document_batch_action_height"
+                android:layout_marginTop="4dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/documentBatchRailOverviewButton"
+                style="@style/Widget.OpenCamera.RightRailButton"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/document_batch_action_height"
+                android:layout_marginTop="6dp"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minHeight="0dp"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </FrameLayout>
 
     <!-- Overlay: Quick Panel Sheet -->
     <androidx.core.widget.NestedScrollView
@@ -1682,30 +1804,6 @@
 
             <LinearLayout
                 android:id="@+id/filterStripChips"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal" />
-        </HorizontalScrollView>
-
-        <!-- Runtime pro controls: compact manual parameter strip for Humanistic Professional mode. -->
-        <HorizontalScrollView
-            android:id="@+id/runtimeProControlsScroll"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="@dimen/pro_glass_strip_min_height"
-            android:layout_marginTop="44dp"
-            android:layout_marginHorizontal="@dimen/space_16"
-            android:background="@drawable/bg_pro_glass_strip"
-            android:clipToPadding="false"
-            android:fadeScrollbars="false"
-            android:paddingHorizontal="@dimen/space_8"
-            android:paddingVertical="@dimen/space_4"
-            android:scrollbars="none"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/runtimeProControlsChips"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"

@@ -4,6 +4,7 @@ import com.opencamera.core.device.DeviceGraphSpec
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.device.PreviewMeteringPoint
+import com.opencamera.core.device.PreviewMeteringPersistence
 import com.opencamera.core.device.PreviewMeteringResult
 import com.opencamera.core.device.PreviewMeteringResultStatus
 import com.opencamera.core.media.CaptureProfile
@@ -174,12 +175,45 @@ class PreviewRecoverySessionProcessorTest {
             calls.add("documentPreview:${shot.shotId},$outputPath")
         }
 
-        override fun updatePreviewMeteringRequested(requestId: String, point: PreviewMeteringPoint) {
+        override fun updatePreviewMeteringRequested(
+            requestId: String,
+            point: PreviewMeteringPoint,
+            persistence: PreviewMeteringPersistence
+        ) {
             calls.add("meteringRequested:$requestId")
+            flow.value = flow.value.copy(
+                presentation = flow.value.presentation.copy(
+                    previewMeteringFeedback = PreviewMeteringFeedback(
+                        requestId = requestId,
+                        normalizedX = point.normalizedX,
+                        normalizedY = point.normalizedY,
+                        status = PreviewMeteringFeedbackStatus.REQUESTED,
+                        persistence = persistence
+                    )
+                )
+            )
         }
 
         override fun updatePreviewMeteringCompleted(result: PreviewMeteringResult) {
             calls.add("meteringCompleted:${result.requestId}")
+            val current = flow.value.presentation.previewMeteringFeedback ?: return
+            val status = when (result.status) {
+                PreviewMeteringResultStatus.SUCCEEDED -> PreviewMeteringFeedbackStatus.SUCCEEDED
+                PreviewMeteringResultStatus.LOCKED -> PreviewMeteringFeedbackStatus.LOCKED
+                PreviewMeteringResultStatus.DEGRADED_FOCUS_LOCK_ONLY ->
+                    PreviewMeteringFeedbackStatus.DEGRADED_FOCUS_LOCK_ONLY
+                PreviewMeteringResultStatus.DEGRADED_EXPOSURE_LOCK_ONLY ->
+                    PreviewMeteringFeedbackStatus.DEGRADED_EXPOSURE_LOCK_ONLY
+                PreviewMeteringResultStatus.DEGRADED_AUTO_EXPOSURE_ONLY ->
+                    PreviewMeteringFeedbackStatus.DEGRADED_AUTO_EXPOSURE_ONLY
+                PreviewMeteringResultStatus.FAILED -> PreviewMeteringFeedbackStatus.FAILED
+                PreviewMeteringResultStatus.UNSUPPORTED -> PreviewMeteringFeedbackStatus.UNSUPPORTED
+            }
+            flow.value = flow.value.copy(
+                presentation = flow.value.presentation.copy(
+                    previewMeteringFeedback = current.copy(status = status, reason = result.reason)
+                )
+            )
         }
 
         override fun clearPreviewMeteringFeedback(requestId: String) {
@@ -747,6 +781,92 @@ class PreviewRecoverySessionProcessorTest {
         assertEquals(0.5f, effect.request.point.normalizedX, 0.01f)
         assertEquals(0.4f, effect.request.point.normalizedY, 0.01f)
         assertTrue(harness.mutations.calls.any { it.startsWith("meteringRequested:") })
+    }
+
+    @Test
+    fun `PreviewLockFocusAndExposure emits persistent metering request`() = runTest {
+        val harness = Harness(runningState().copy(previewStatus = PreviewStatus.ACTIVE))
+
+        harness.dispatch(SessionIntent.PreviewLockFocusAndExposure(0.25f, 0.75f))
+
+        val effect = harness.lastEffect()
+        assertTrue(effect is SessionEffect.ApplyPreviewMetering)
+        assertEquals(PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED, effect.request.persistence)
+        assertEquals(0.25f, effect.request.point.normalizedX)
+        assertEquals(0.75f, effect.request.point.normalizedY)
+        assertTrue(harness.state.value.presentation.hasActiveMeteringHold)
+    }
+
+    @Test
+    fun `locked metering result remains visible until explicitly cancelled`() = runTest {
+        val harness = Harness(runningState().copy(previewStatus = PreviewStatus.ACTIVE))
+        harness.dispatch(SessionIntent.PreviewLockFocusAndExposure(0.5f, 0.4f))
+        harness.dispatch(
+            SessionIntent.PreviewMeteringCompleted(
+                PreviewMeteringResult(
+                    requestId = "meter-1",
+                    point = PreviewMeteringPoint(0.5f, 0.4f),
+                    status = PreviewMeteringResultStatus.LOCKED
+                )
+            )
+        )
+
+        harness.dispatch(SessionIntent.PreviewMeteringFeedbackExpired("meter-1"))
+
+        assertEquals(
+            PreviewMeteringFeedbackStatus.LOCKED,
+            harness.state.value.presentation.previewMeteringFeedback?.status
+        )
+        assertTrue(harness.state.value.presentation.hasActiveMeteringHold)
+        assertTrue(harness.trace.snapshot().any { it.name == "preview.metering.expiry.retained" })
+    }
+
+    @Test
+    fun `tap while locked cancels metering instead of starting a new focus request`() = runTest {
+        val harness = Harness(
+            runningState().copy(
+                previewStatus = PreviewStatus.ACTIVE,
+                presentation = SessionPresentationState(
+                    previewMeteringFeedback = PreviewMeteringFeedback(
+                        requestId = "meter-1",
+                        normalizedX = 0.5f,
+                        normalizedY = 0.4f,
+                        status = PreviewMeteringFeedbackStatus.LOCKED,
+                        persistence = PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+                    )
+                )
+            )
+        )
+
+        harness.dispatch(SessionIntent.PreviewTapToFocus(0.7f, 0.7f))
+
+        assertTrue(harness.lastEffect() is SessionEffect.CancelPreviewMetering)
+        assertFalse(harness.allEffects().any { it is SessionEffect.ApplyPreviewMetering })
+        assertFalse(harness.state.value.presentation.hasActiveMeteringHold)
+    }
+
+    @Test
+    fun `preview rebind cancels active focus exposure lock before binding`() = runTest {
+        val harness = Harness(
+            runningState().copy(
+                previewStatus = PreviewStatus.ACTIVE,
+                presentation = SessionPresentationState(
+                    previewMeteringFeedback = PreviewMeteringFeedback(
+                        requestId = "meter-1",
+                        normalizedX = 0.5f,
+                        normalizedY = 0.4f,
+                        status = PreviewMeteringFeedbackStatus.LOCKED,
+                        persistence = PreviewMeteringPersistence.HOLD_UNTIL_CANCELLED
+                    )
+                )
+            )
+        )
+
+        harness.processor.requestPreviewBinding("mode changed")
+
+        assertTrue(harness.allEffects()[0] is SessionEffect.CancelPreviewMetering)
+        assertTrue(harness.allEffects()[1] is SessionEffect.BindPreview)
+        assertFalse(harness.state.value.presentation.hasActiveMeteringHold)
     }
 
     @Test

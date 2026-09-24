@@ -170,9 +170,9 @@ cd teotis-camera
 
 ## License
 
-The source code is licensed under the **GNU General Public License v3.0 or later**. See [LICENSE](LICENSE) for details.
+The source code is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
 
-This means any copied, modified, or redistributed derivative of the code must keep the corresponding source code open under GPLv3 or compatible terms, and must preserve copyright, license, and attribution notices.
+This means you are free to use, copy, modify, and distribute the code, including in proprietary derivative works, provided the copyright notice and this permission notice are preserved in all copies or substantial portions of the Software.
 
 Documentation, screenshots, and visual assets are licensed under the **Creative Commons Attribution-ShareAlike 4.0 International License** unless otherwise noted.
 

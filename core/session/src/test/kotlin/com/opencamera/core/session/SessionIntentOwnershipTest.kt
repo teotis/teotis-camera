@@ -63,6 +63,18 @@ class SessionIntentOwnershipTest {
     }
 
     @Test
+    fun `focus exposure lock intents map to PREVIEW_RECOVERY`() {
+        assertEquals(
+            SessionIntentOwner.PREVIEW_RECOVERY,
+            SessionIntent.PreviewLockFocusAndExposure(0.5f, 0.5f).owner()
+        )
+        assertEquals(
+            SessionIntentOwner.PREVIEW_RECOVERY,
+            SessionIntent.PreviewUnlockFocusAndExposure.owner()
+        )
+    }
+
+    @Test
     fun `CountdownTick maps to CAPTURE_RECORDING`() {
         assertEquals(
             SessionIntentOwner.CAPTURE_RECORDING,

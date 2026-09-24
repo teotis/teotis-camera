@@ -296,9 +296,12 @@ val DEFAULT_WATERMARK_TEMPLATES: List<WatermarkTemplate> = listOf(
     ),
     WatermarkTemplate(
         id = "travel-polaroid",
-        label = "Travel Polaroid",
-        tokenKeys = setOf("model", "datetime", "location"),
-        supportsFrameBorder = true
+        label = "Philosophy Like Water",
+        tokenKeys = setOf("model", "datetime", "location", "profile-name"),
+        supportsFrameBorder = true,
+        kind = WatermarkTemplateKind.EXPANDED_FRAME,
+        allowedPlacements = setOf(WatermarkTextPlacement.BOTTOM_LEFT),
+        allowedFrameBackgrounds = setOf(WatermarkFrameBackground.WHITE)
     ),
     WatermarkTemplate(
         id = "retro-frame",

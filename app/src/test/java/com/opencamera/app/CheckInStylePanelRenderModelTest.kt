@@ -93,6 +93,22 @@ class CheckInStylePanelRenderModelTest {
             assertEquals("clarity", activeCards.first().scenarioId)
         }
 
+        @Test
+        fun `checkInStylePanelRenderModel labels clarity as assist`() {
+            val state = defaultSessionState(
+                activeMode = ModeId.CHECK_IN,
+                persistedPhotoSettings = PhotoSettings(
+                    defaultCheckInScenario = "clarity",
+                    defaultPortraitFilterProfileId = "portrait-blue"
+                )
+            )
+            val model = checkInStylePanelRenderModel(state, TestAppTextResolver())
+
+            val clarityCard = model.scenarioCards.first { it.scenarioId == "clarity" }
+            assertEquals("Clarity Assist", clarityCard.label)
+            assertTrue(model.scenarioSummary.contains("Clarity Assist"))
+        }
+
 
 
         @Test
@@ -303,7 +319,7 @@ class CheckInStylePanelRenderModelTest {
                 R.string.watermark_template_expanded_frame -> "扩展边框"
                 R.string.watermark_template_pure_text -> "透光底栏"
                 R.string.watermark_template_blur_four_border -> "模糊四边框"
-                R.string.watermark_template_travel_polaroid -> "旅行拍立得"
+                R.string.watermark_template_travel_polaroid -> "哲思如水"
                 R.string.watermark_template_retro_frame -> "复古边框"
                 R.string.button_watermark_style_short -> "样式"
                 R.string.label_tokens -> "标记"

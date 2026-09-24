@@ -44,14 +44,14 @@ internal fun exportRenderModel(
             retryLabel = text.get(R.string.button_document_export_retry)
         )
         is ExportState.Success -> DocumentExportRenderModel(
-            visible = true,
+            visible = false,
             titleText = text.get(R.string.document_export_success).format(exportState.totalPages),
             progressText = "",
             showReturnButton = true,
             returnLabel = text.get(R.string.button_document_export_return)
         )
         is ExportState.Failed -> DocumentExportRenderModel(
-            visible = true,
+            visible = false,
             titleText = text.get(R.string.document_export_failed),
             progressText = exportState.errorMessage,
             isError = true,

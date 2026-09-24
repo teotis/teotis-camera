@@ -1,5 +1,6 @@
 package com.opencamera.app.camera
 
+import android.util.Log
 import com.opencamera.core.device.DeviceRuntimeIssue
 import com.opencamera.core.device.DeviceRuntimeIssueKind
 import com.opencamera.core.session.classifyPreviewStartCategory
@@ -11,6 +12,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+
+private const val TAG = "PreviewStartupRuntimeIssueMonitor"
 
 class PreviewStartupRuntimeIssueMonitor(
     private val scope: CoroutineScope
@@ -41,6 +44,8 @@ class PreviewStartupRuntimeIssueMonitor(
         val timeoutMillis = previewStartWatchdogMillis(reason)
         pendingTimeoutJob = scope.launch {
             delay(timeoutMillis)
+            val categoryLabel = classifyPreviewStartCategory(reason).label
+            Log.w(TAG, "preview startup watchdog fired reason=$reason timeout=${timeoutMillis}ms category=$categoryLabel")
             mutableRuntimeIssues.emit(
                 DeviceRuntimeIssue(
                     kind = DeviceRuntimeIssueKind.PREVIEW_STALL,

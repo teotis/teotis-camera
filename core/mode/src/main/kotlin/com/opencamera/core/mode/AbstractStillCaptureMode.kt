@@ -160,6 +160,10 @@ abstract class AbstractStillCaptureMode(
         context.eventSink("${modeEventPrefix()}.enter")
         onModeEnter()
         updateSnapshot(headline = enterHeadline())
+        refreshEffectSpec()
+    }
+
+    override suspend fun refreshEffectSpec() {
         context.onEffectSpecChanged(buildEffectSpec())
     }
 

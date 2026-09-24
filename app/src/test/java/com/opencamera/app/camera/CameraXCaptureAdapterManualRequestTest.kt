@@ -1,5 +1,8 @@
 package com.opencamera.app.camera
 
+import android.hardware.camera2.CaptureRequest
+import androidx.camera.camera2.impl.Camera2ImplConfig
+import androidx.camera.core.Preview
 import com.opencamera.core.device.CaptureTemplate
 import com.opencamera.core.device.DeviceShotRequest
 import com.opencamera.core.device.ManualControlCapabilityMatrix
@@ -10,8 +13,35 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class CameraXCaptureAdapterManualRequestTest {
+    @Test
+    fun `manual ISO and shutter are installed on the preview use case`() {
+        val builder = Preview.Builder()
+
+        applyCamera2ManualPreviewConfig(
+            builder,
+            Camera2ManualCaptureConfig(
+                iso = 800,
+                shutterTimeNanos = 33_000_000L
+            )
+        )
+
+        val camera2Config = Camera2ImplConfig(builder.useCaseConfig)
+        assertEquals(
+            CaptureRequest.CONTROL_AE_MODE_OFF,
+            camera2Config.getCaptureRequestOption(CaptureRequest.CONTROL_AE_MODE)
+        )
+        assertEquals(800, camera2Config.getCaptureRequestOption(CaptureRequest.SENSOR_SENSITIVITY))
+        assertEquals(
+            33_000_000L,
+            camera2Config.getCaptureRequestOption(CaptureRequest.SENSOR_EXPOSURE_TIME)
+        )
+    }
+
     @Test
     fun `manual request maps camera2 supported fields into adapter config`() {
         val config = resolveCamera2ManualCaptureConfig(

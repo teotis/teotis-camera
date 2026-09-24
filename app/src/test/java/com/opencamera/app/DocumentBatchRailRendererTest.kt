@@ -1,6 +1,8 @@
 package com.opencamera.app
 
+import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -21,230 +23,318 @@ class DocumentBatchRailRendererTest {
 
     private lateinit var views: DocumentBatchRailViews
     private var overviewClickCount = 0
+    private var clearClickCount = 0
     private var movedUpItemId: String? = null
     private var movedDownItemId: String? = null
+    private var removedItemId: String? = null
 
     @Before
     fun setup() {
         val context = RuntimeEnvironment.getApplication()
+        val overlay = FrameLayout(context)
         val rail = LinearLayout(context)
         val chip = TextView(context)
-        val thumbnail = ImageView(context)
         val itemScroll = NestedScrollView(context)
         val itemList = LinearLayout(context)
+        val actionContainer = LinearLayout(context)
         val moveUpButton = Button(context)
         val moveDownButton = Button(context)
+        val removeButton = Button(context)
         val overviewButton = Button(context)
+        val clearButton = Button(context)
 
         rail.addView(chip)
-        rail.addView(thumbnail)
         itemScroll.addView(itemList)
         rail.addView(itemScroll)
-        rail.addView(moveUpButton)
-        rail.addView(moveDownButton)
-        rail.addView(overviewButton)
+        rail.addView(clearButton)
+        actionContainer.addView(moveUpButton)
+        actionContainer.addView(moveDownButton)
+        actionContainer.addView(removeButton)
+        actionContainer.addView(overviewButton)
+        overlay.addView(rail)
+        overlay.addView(actionContainer)
 
         views = DocumentBatchRailViews(
+            overlay = overlay,
             rail = rail,
             chip = chip,
-            thumbnail = thumbnail,
             itemScroll = itemScroll,
             itemList = itemList,
+            actionContainer = actionContainer,
             moveUpButton = moveUpButton,
             moveDownButton = moveDownButton,
-            overviewButton = overviewButton
+            removeButton = removeButton,
+            overviewButton = overviewButton,
+            clearButton = clearButton
         )
         overviewClickCount = 0
+        clearClickCount = 0
         movedUpItemId = null
         movedDownItemId = null
+        removedItemId = null
     }
 
-    private fun renderer(): DocumentBatchRailRenderer {
-        return DocumentBatchRailRenderer(
-            views = views,
-            onRemoveItemClick = {},
-            onMoveUpItemClick = { movedUpItemId = it },
-            onMoveDownItemClick = { movedDownItemId = it },
-            onExportRequested = { overviewClickCount++ }
-        )
-    }
+    private fun renderer(): DocumentBatchRailRenderer = DocumentBatchRailRenderer(
+        views = views,
+        onRemoveItemClick = { removedItemId = it },
+        onMoveUpItemClick = { movedUpItemId = it },
+        onMoveDownItemClick = { movedDownItemId = it },
+        onExportRequested = { overviewClickCount++ },
+        onClearBatchClick = { clearClickCount++ }
+    )
+
+    private fun threePageModel(): DocumentBatchRailRenderModel = DocumentBatchRailRenderModel(
+        visible = true,
+        countText = "3 pages",
+        items = listOf(
+            railItem("item-1", 1, isLatest = false, canMoveUp = false, canMoveDown = true),
+            railItem("item-2", 2, isLatest = true, canMoveUp = true, canMoveDown = true),
+            railItem("item-3", 3, isLatest = false, canMoveUp = true, canMoveDown = false)
+        ),
+        latestItemId = "item-2",
+        organizeEnabled = true,
+        isSlimShooting = true,
+        overviewLabel = "导出文件",
+        moveUpLabel = "上移",
+        moveDownLabel = "下移"
+    )
 
     @Test
     fun `hides rail when model not visible`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = false,
-            countText = "",
-            items = emptyList(),
-            latestItemId = null,
-            organizeEnabled = false
+        renderer().render(
+            DocumentBatchRailRenderModel(
+                visible = false,
+                countText = "",
+                items = emptyList(),
+                latestItemId = null,
+                organizeEnabled = false
+            )
         )
 
-        renderer().render(model)
-
-        assertFalse(views.rail.visibility == android.view.View.VISIBLE)
+        assertFalse(views.rail.visibility == View.VISIBLE)
     }
 
     @Test
-    fun `slim shooting shows chip with count text`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "3 pages",
-            items = emptyList(),
-            latestItemId = null,
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/test.jpg",
-            isSlimShooting = true,
-            overviewLabel = "查看批次"
-        )
+    fun `shooting rail immediately shows ordered thumbnails without expand step`() {
+        renderer().render(threePageModel())
 
-        renderer().render(model)
-
-        assertTrue(views.chip.visibility == android.view.View.VISIBLE)
         assertEquals("3 pages", views.chip.text.toString())
+        assertEquals(3, views.itemList.childCount)
+        assertTrue(views.itemScroll.visibility == View.VISIBLE)
+        assertTrue(views.itemList.getChildAt(0).contentDescription.toString().contains("1"))
+        assertTrue(views.itemList.getChildAt(1).contentDescription.toString().contains("2"))
+        assertTrue(views.itemList.getChildAt(2).contentDescription.toString().contains("3"))
+        val density = RuntimeEnvironment.getApplication().resources.displayMetrics.density
+        val browsingCellChrome = (44 * density).toInt()
+        assertTrue(
+            views.rail.layoutParams.width >= pageThumbnail(0).layoutParams.width + browsingCellChrome,
+            "Browsing rail must fit thumbnail, page label, margins, and padding"
+        )
     }
 
     @Test
-    fun `slim shooting keeps legacy thumbnail hidden when URI present`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "1 pages",
-            items = emptyList(),
-            latestItemId = null,
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/test.jpg",
-            isSlimShooting = true,
-            overviewLabel = "查看批次"
-        )
+    fun `first thumbnail tap immediately selects page and exposes floating actions`() {
+        val r = renderer()
+        r.render(threePageModel())
 
-        renderer().render(model)
+        pageCell(1).performClick()
 
-        assertFalse(views.thumbnail.visibility == android.view.View.VISIBLE)
+        assertTrue(pageCell(1).isSelected)
+        assertEquals("move_up_item-2", views.moveUpButton.tag)
+        assertEquals("move_down_item-2", views.moveDownButton.tag)
+        assertEquals("remove_item-2", views.removeButton.tag)
+        assertEquals("export_batch", views.overviewButton.tag)
+        assertTrue(views.actionContainer.visibility == View.VISIBLE)
+        assertTrue(views.actionContainer.parent === views.overlay)
+        assertFalse(views.actionContainer.parent === views.rail)
+        val actionParams = views.actionContainer.layoutParams as FrameLayout.LayoutParams
+        assertTrue(actionParams.marginStart >= views.rail.layoutParams.width)
+        assertEquals(0, overviewClickCount)
     }
 
     @Test
-    fun `slim shooting hides thumbnail when no URI`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "1 pages",
-            items = emptyList(),
-            latestItemId = null,
-            organizeEnabled = true,
-            latestThumbnailUri = null,
-            isSlimShooting = true,
-            overviewLabel = "查看批次"
+    fun `selected thumbnail grows while other thumbnails stay compact`() {
+        val r = renderer()
+        r.render(threePageModel())
+        val compactWidth = pageThumbnail(0).layoutParams.width
+        val compactHeight = pageThumbnail(0).layoutParams.height
+
+        pageCell(1).performClick()
+
+        assertTrue(pageThumbnail(1).layoutParams.width > compactWidth)
+        assertTrue(pageThumbnail(1).layoutParams.height > compactHeight)
+        assertEquals(compactWidth, pageThumbnail(0).layoutParams.width)
+        assertEquals(compactHeight, pageThumbnail(0).layoutParams.height)
+        val density = RuntimeEnvironment.getApplication().resources.displayMetrics.density
+        val selectedCellChrome = (44 * density).toInt()
+        assertTrue(
+            views.rail.layoutParams.width >= pageThumbnail(1).layoutParams.width + selectedCellChrome,
+            "Selected rail must fit the enlarged thumbnail, page label, margins, and padding"
         )
-
-        renderer().render(model)
-
-        assertFalse(views.thumbnail.visibility == android.view.View.VISIBLE)
     }
 
     @Test
-    fun `slim shooting shows only export action below the page rail`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "2 pages",
-            items = emptyList(),
-            latestItemId = null,
-            organizeEnabled = true,
-            latestThumbnailUri = null,
-            isSlimShooting = true,
-            overviewLabel = "导出文件"
-        )
+    fun `tapping selected page hides actions but keeps every thumbnail visible`() {
+        val r = renderer()
+        r.render(threePageModel())
+        pageCell(0).performClick()
 
-        renderer().render(model)
+        pageCell(0).performClick()
 
-        assertFalse(views.moveUpButton.visibility == android.view.View.VISIBLE)
-        assertFalse(views.moveDownButton.visibility == android.view.View.VISIBLE)
-        assertTrue(views.overviewButton.visibility == android.view.View.VISIBLE)
-        assertEquals("导出文件", views.overviewButton.text.toString())
+        assertEquals(3, views.itemList.childCount)
+        assertTrue(views.itemScroll.visibility == View.VISIBLE)
+        assertFalse(pageCell(0).isSelected)
+        assertNull(views.moveDownButton.tag)
+        assertEquals("clear_batch", views.clearButton.tag)
     }
 
     @Test
-    fun `overview button click triggers callback`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "2 pages",
-            items = emptyList(),
-            latestItemId = null,
-            organizeEnabled = true,
-            latestThumbnailUri = null,
-            isSlimShooting = true,
-            overviewLabel = "查看批次"
+    fun `rail blank area dismisses actions without collapsing thumbnail list`() {
+        val r = renderer()
+        r.render(threePageModel())
+        pageCell(1).performClick()
+
+        views.rail.performClick()
+
+        assertEquals(3, views.itemList.childCount)
+        assertTrue(views.itemScroll.visibility == View.VISIBLE)
+        assertNull(views.moveDownButton.tag)
+        assertEquals("clear_batch", views.clearButton.tag)
+    }
+
+    @Test
+    fun `page count is informational and never hides thumbnails`() {
+        val r = renderer()
+        r.render(threePageModel())
+        pageCell(1).performClick()
+
+        views.chip.performClick()
+
+        assertEquals(3, views.itemList.childCount)
+        assertTrue(views.itemScroll.visibility == View.VISIBLE)
+        assertNull(views.moveDownButton.tag)
+        assertEquals(0, overviewClickCount)
+    }
+
+    @Test
+    fun `preview dismissal clears actions but preserves one-step page access`() {
+        val r = renderer()
+        r.render(threePageModel())
+        pageCell(1).performClick()
+
+        assertTrue(r.dismissTransientActions())
+
+        assertEquals(3, views.itemList.childCount)
+        assertTrue(views.itemScroll.visibility == View.VISIBLE)
+        assertNull(views.moveUpButton.tag)
+        assertNull(views.moveDownButton.tag)
+        assertNull(views.overviewButton.tag)
+        assertEquals("clear_batch", views.clearButton.tag)
+    }
+
+    @Test
+    fun `quiet rail ignores preview dismissal`() {
+        val r = renderer()
+        r.render(threePageModel())
+
+        assertFalse(r.dismissTransientActions())
+        assertEquals(3, views.itemList.childCount)
+    }
+
+    @Test
+    fun `new capture appends thumbnail and clears stale page actions`() {
+        val model = threePageModel()
+        val r = renderer()
+        r.render(model)
+        pageCell(0).performClick()
+
+        r.render(
+            model.copy(
+                countText = "4 pages",
+                items = model.items + railItem(
+                    "item-4",
+                    4,
+                    isLatest = true,
+                    canMoveUp = true,
+                    canMoveDown = false
+                ),
+                latestItemId = "item-4"
+            )
         )
 
-        renderer().render(model)
+        assertEquals(4, views.itemList.childCount)
+        assertTrue(views.itemScroll.visibility == View.VISIBLE)
+        assertNull(views.moveDownButton.tag)
+    }
+
+    @Test
+    fun `removing selected page keeps remaining thumbnails and removes stale actions`() {
+        val model = threePageModel()
+        val r = renderer()
+        r.render(model)
+        pageCell(0).performClick()
+
+        r.render(
+            model.copy(
+                countText = "2 pages",
+                items = model.items.drop(1),
+                latestItemId = "item-3"
+            )
+        )
+
+        assertEquals(2, views.itemList.childCount)
+        assertTrue(views.itemScroll.visibility == View.VISIBLE)
+        assertNull(views.moveDownButton.tag)
+    }
+
+    @Test
+    fun `selecting another thumbnail moves actions to that page`() {
+        val r = renderer()
+        r.render(threePageModel())
+        pageCell(0).performClick()
+        assertEquals("move_down_item-1", views.moveDownButton.tag)
+
+        pageCell(2).performClick()
+
+        assertFalse(pageCell(0).isSelected)
+        assertTrue(pageCell(2).isSelected)
+        assertEquals("move_down_item-3", views.moveDownButton.tag)
+        assertFalse(views.moveDownButton.isEnabled)
+        assertEquals("move_up_item-3", views.moveUpButton.tag)
+    }
+
+    @Test
+    fun `selected action callbacks target selected page`() {
+        val r = renderer()
+        r.render(threePageModel())
+        pageCell(1).performClick()
+
+        views.moveUpButton.performClick()
+        views.moveDownButton.performClick()
+        views.removeButton.performClick()
         views.overviewButton.performClick()
 
+        assertEquals("item-2", movedUpItemId)
+        assertEquals("item-2", movedDownItemId)
+        assertEquals("item-2", removedItemId)
         assertEquals(1, overviewClickCount)
     }
 
     @Test
-    fun `thumbnail click does not open the batch overview panel`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "1 pages",
-            items = emptyList(),
-            latestItemId = null,
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/test.jpg",
-            isSlimShooting = true,
-            overviewLabel = "查看批次"
-        )
+    fun `batch clear remains guarded in browsing state`() {
+        val r = renderer()
+        r.render(threePageModel())
 
-        renderer().render(model)
-        views.thumbnail.performClick()
+        views.clearButton.performClick()
+        assertEquals(0, clearClickCount)
+        views.clearButton.performClick()
 
-        assertEquals(0, overviewClickCount)
+        assertEquals(1, clearClickCount)
+        assertEquals(3, views.itemList.childCount)
     }
 
     @Test
-    fun `chip click does not open the batch overview panel`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "1 pages",
-            items = emptyList(),
-            latestItemId = null,
-            organizeEnabled = true,
-            latestThumbnailUri = null,
-            isSlimShooting = true,
-            overviewLabel = "查看批次"
-        )
-
-        renderer().render(model)
-        views.chip.performClick()
-
-        assertEquals(0, overviewClickCount)
-    }
-
-    @Test
-    fun `slim shooting renders readable vertical page cells`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "2 pages",
-            items = listOf(
-                railItem("item-1", 1, isLatest = false, canMoveUp = false, canMoveDown = true),
-                railItem("item-2", 2, isLatest = true, canMoveUp = true, canMoveDown = false)
-            ),
-            latestItemId = "item-2",
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/item-2.jpg",
-            isSlimShooting = true,
-            overviewLabel = "整理",
-            moveUpLabel = "上移",
-            moveDownLabel = "下移"
-        )
-
-        renderer().render(model)
-
-        assertEquals(2, views.itemList.childCount)
-        assertTrue(views.itemScroll.visibility == android.view.View.VISIBLE)
-        assertFalse(views.moveUpButton.visibility == android.view.View.VISIBLE)
-        assertFalse(views.moveDownButton.visibility == android.view.View.VISIBLE)
-    }
-
-    @Test
-    fun `slim shooting keeps long page list scrollable`() {
+    fun `long page sequence stays scrollable from default state`() {
         val items = (1..12).map { page ->
             railItem(
                 itemId = "item-$page",
@@ -254,154 +344,40 @@ class DocumentBatchRailRendererTest {
                 canMoveDown = page < 12
             )
         }
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
+        val model = threePageModel().copy(
             countText = "12 pages",
             items = items,
-            latestItemId = "item-12",
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/item-12.jpg",
-            isSlimShooting = true,
-            overviewLabel = "导出文件",
-            moveUpLabel = "上移",
-            moveDownLabel = "下移"
+            latestItemId = "item-12"
         )
 
         renderer().render(model)
 
         assertEquals(12, views.itemList.childCount)
-        assertTrue(views.itemScroll.visibility == android.view.View.VISIBLE)
         assertTrue(views.itemScroll.isNestedScrollingEnabled)
         assertTrue(views.itemScroll.isVerticalScrollBarEnabled)
     }
 
     @Test
-    fun `page cell click selects that page without opening the batch overview panel`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "3 pages",
-            items = listOf(
-                railItem("item-1", 1, isLatest = false, canMoveUp = false, canMoveDown = true),
-                railItem("item-2", 2, isLatest = true, canMoveUp = true, canMoveDown = true),
-                railItem("item-3", 3, isLatest = false, canMoveUp = true, canMoveDown = false)
-            ),
-            latestItemId = "item-2",
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/item-2.jpg",
-            isSlimShooting = true,
-            overviewLabel = "整理",
-            moveUpLabel = "上移",
-            moveDownLabel = "下移"
-        )
+    fun `mode route reset returns to visible browsing rail`() {
+        val model = threePageModel()
+        val r = renderer()
+        r.render(model)
+        pageCell(0).performClick()
 
-        renderer().render(model)
-        val firstCell = views.itemList.getChildAt(0) as LinearLayout
-        firstCell.performClick()
-        val selectedFirstCell = views.itemList.getChildAt(0) as LinearLayout
+        r.render(model.copy(visible = false, isSlimShooting = false))
+        r.render(model)
 
-        assertTrue(selectedFirstCell.isSelected)
-        assertEquals(0, overviewClickCount)
-        assertEquals(null, movedUpItemId)
-        assertEquals(null, movedDownItemId)
+        assertEquals(3, views.itemList.childCount)
+        assertTrue(views.itemScroll.visibility == View.VISIBLE)
+        assertNull(views.moveDownButton.tag)
     }
 
-    @Test
-    fun `non-selected page cells do not show move arrows`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "3 pages",
-            items = listOf(
-                railItem("item-1", 1, isLatest = false, canMoveUp = false, canMoveDown = true),
-                railItem("item-2", 2, isLatest = true, canMoveUp = true, canMoveDown = true),
-                railItem("item-3", 3, isLatest = false, canMoveUp = true, canMoveDown = false)
-            ),
-            latestItemId = "item-2",
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/item-2.jpg",
-            isSlimShooting = true,
-            overviewLabel = "整理",
-            moveUpLabel = "上移",
-            moveDownLabel = "下移"
-        )
+    private fun pageCell(index: Int): LinearLayout =
+        views.itemList.getChildAt(index) as LinearLayout
 
-        renderer().render(model)
-
-        // Default selection falls to latestItemId = item-2; cells for item-1 and item-3
-        // must not expose move arrows.
-        assertNull(views.rail.findViewWithTag<android.widget.TextView>("move_up_item-1"))
-        assertNull(views.rail.findViewWithTag<android.widget.TextView>("move_down_item-1"))
-        assertNull(views.rail.findViewWithTag<android.widget.TextView>("move_up_item-3"))
-        assertNull(views.rail.findViewWithTag<android.widget.TextView>("move_down_item-3"))
-    }
-
-    @Test
-    fun `selected page cell shows large move controls`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "3 pages",
-            items = listOf(
-                railItem("item-1", 1, isLatest = false, canMoveUp = false, canMoveDown = true),
-                railItem("item-2", 2, isLatest = true, canMoveUp = true, canMoveDown = true),
-                railItem("item-3", 3, isLatest = false, canMoveUp = true, canMoveDown = false)
-            ),
-            latestItemId = "item-2",
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/item-2.jpg",
-            isSlimShooting = true,
-            overviewLabel = "整理",
-            moveUpLabel = "上移",
-            moveDownLabel = "下移"
-        )
-
-        renderer().render(model)
-
-        val moveUp = views.rail.findViewWithTag<android.widget.TextView>("move_up_item-2")
-        val moveDown = views.rail.findViewWithTag<android.widget.TextView>("move_down_item-2")
-        assertNotNull(moveUp, "Selected cell should expose a move-up control")
-        assertNotNull(moveDown, "Selected cell should expose a move-down control")
-        assertTrue(moveUp.visibility == android.view.View.VISIBLE)
-        assertTrue(moveDown.visibility == android.view.View.VISIBLE)
-        // Large touch target: at least 32dp tall.
-        val density = RuntimeEnvironment.getApplication().resources.displayMetrics.density
-        assertTrue(moveDown.layoutParams.height >= (32 * density).toInt(),
-            "Selected move control height=${moveDown.layoutParams.height} should be >= 32dp")
-    }
-
-    @Test
-    fun `move arrow on selected cell targets that page instead of only latest page`() {
-        val model = DocumentBatchRailRenderModel(
-            visible = true,
-            countText = "3 pages",
-            items = listOf(
-                railItem("item-1", 1, isLatest = false, canMoveUp = false, canMoveDown = true),
-                railItem("item-2", 2, isLatest = true, canMoveUp = true, canMoveDown = true),
-                railItem("item-3", 3, isLatest = false, canMoveUp = true, canMoveDown = false)
-            ),
-            latestItemId = "item-2",
-            organizeEnabled = true,
-            latestThumbnailUri = "/images/item-2.jpg",
-            isSlimShooting = true,
-            overviewLabel = "整理",
-            moveUpLabel = "上移",
-            moveDownLabel = "下移"
-        )
-
-        renderer().render(model)
-        // Select item-1, then its move-down arrow should target item-1.
-        val firstCell = views.itemList.getChildAt(0) as LinearLayout
-        firstCell.performClick()
-        val firstCellMoveDown = views.rail.findViewWithTag<android.widget.TextView>("move_down_item-1")
-        assertNotNull(firstCellMoveDown)
-        firstCellMoveDown.performClick()
-        assertEquals("item-1", movedDownItemId)
-
-        // Select item-3, then its move-up arrow should target item-3.
-        val thirdCell = views.itemList.getChildAt(2) as LinearLayout
-        thirdCell.performClick()
-        val thirdCellMoveUp = views.rail.findViewWithTag<android.widget.TextView>("move_up_item-3")
-        assertNotNull(thirdCellMoveUp)
-        thirdCellMoveUp.performClick()
-        assertEquals("item-3", movedUpItemId)
+    private fun pageThumbnail(index: Int): ImageView {
+        val topRow = pageCell(index).getChildAt(0) as LinearLayout
+        return topRow.getChildAt(1) as ImageView
     }
 
     private fun railItem(
@@ -410,16 +386,14 @@ class DocumentBatchRailRendererTest {
         isLatest: Boolean,
         canMoveUp: Boolean,
         canMoveDown: Boolean
-    ): DocumentBatchRailItemRenderModel {
-        return DocumentBatchRailItemRenderModel(
-            itemId = itemId,
-            pageNumber = pageNumber,
-            renderUri = "/images/$itemId.jpg",
-            statusLabel = null,
-            isLatest = isLatest,
-            canMoveUp = canMoveUp,
-            canMoveDown = canMoveDown,
-            removeContentDescription = "Remove"
-        )
-    }
+    ): DocumentBatchRailItemRenderModel = DocumentBatchRailItemRenderModel(
+        itemId = itemId,
+        pageNumber = pageNumber,
+        renderUri = "/images/$itemId.jpg",
+        statusLabel = null,
+        isLatest = isLatest,
+        canMoveUp = canMoveUp,
+        canMoveDown = canMoveDown,
+        removeContentDescription = "Remove"
+    )
 }

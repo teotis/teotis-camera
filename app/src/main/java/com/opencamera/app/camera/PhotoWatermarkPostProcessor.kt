@@ -17,6 +17,9 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import androidx.exifinterface.media.ExifInterface
+import com.opencamera.app.highDesignWatermarkAssetSuffix
+import com.opencamera.app.highDesignWatermarkFrameMetrics
+import com.opencamera.core.effect.TravelTicketPaperSpec
 import com.opencamera.core.media.AlgorithmJobClass
 import com.opencamera.core.media.MediaMetadata
 import com.opencamera.core.media.MediaPostProcessor
@@ -85,8 +88,11 @@ internal enum class WatermarkSceneVariant(
     LANDSCAPE(1660f / 1080f);
 
     companion object {
-        fun closestTo(aspect: Float): WatermarkSceneVariant =
-            entries.minBy { kotlin.math.abs(it.referenceAspect - aspect) }
+        fun closestTo(aspect: Float): WatermarkSceneVariant = when (highDesignWatermarkAssetSuffix(aspect)) {
+            "portrait" -> PORTRAIT
+            "landscape" -> LANDSCAPE
+            else -> SQUARE
+        }
     }
 }
 
@@ -586,10 +592,8 @@ private const val MIN_PADDING_PX = 18f
 private const val MIN_CORNER_RADIUS_PX = 12f
 private const val BLUR_DOWNSAMPLE_DIVISOR = 18
 private const val BLUR_EDGE_DOWNSAMPLE_DIVISOR = 8
-
 private enum class ExpandedFrameDecoration {
     NONE,
-    TRAVEL_MAP,
     ARCHIVAL_PAPER,
     NIGHT_MEMORY
 }
@@ -732,6 +736,7 @@ internal enum class PhotoWatermarkTemplateType(
     fun resolveFrameBackground(requested: WatermarkFrameBackground?): WatermarkFrameBackground {
         val resolved = requested ?: defaultFrameBackground
         return when (this) {
+            TRAVEL_POLAROID -> WatermarkFrameBackground.WHITE
             BLUR_FOUR_BORDER -> resolved.takeIf { it in SUPPORTED_BLUR_BACKGROUNDS }
                 ?: defaultFrameBackground
             RETRO_FRAME -> resolved.takeIf { it in SUPPORTED_RETRO_FRAME_BACKGROUNDS }
@@ -804,19 +809,12 @@ internal fun renderPhotoWatermarkBitmap(
             )
         }
 
-        PhotoWatermarkTemplateType.TRAVEL_POLAROID -> drawExpandedFrame(
+        PhotoWatermarkTemplateType.TRAVEL_POLAROID -> drawTravelTicketPaperFrame(
             source = bitmap,
             template = template,
             titleTextSize = titleTextSize,
             detailTextSize = detailTextSize,
-            padding = padding,
-            sideBorderScale = 1.0f,
-            topBorderScale = 0.9f,
-            bottomBandScale = 4.6f,
-            titleColor = Color.rgb(42, 82, 61),
-            detailColor = Color.rgb(94, 125, 103),
-            centered = false,
-            decoration = ExpandedFrameDecoration.TRAVEL_MAP
+            padding = padding
         )
 
         PhotoWatermarkTemplateType.PURE_TEXT -> {
@@ -1129,15 +1127,6 @@ private fun drawExpandedFrame(
     }
 
     when (decoration) {
-        ExpandedFrameDecoration.TRAVEL_MAP -> drawTravelMapDecoration(
-            canvas = canvas,
-            framedWidth = framedWidth,
-            framedHeight = framedHeight,
-            bandTop = topBorder + source.height,
-            sideBorder = sideBorder,
-            padding = padding
-        )
-
         ExpandedFrameDecoration.ARCHIVAL_PAPER -> drawArchivalPaperBorder(
             canvas = canvas,
             framedWidth = framedWidth,
@@ -1169,6 +1158,192 @@ private fun drawExpandedFrame(
     )
 }
 
+private fun drawTravelTicketPaperFrame(
+    source: Bitmap,
+    template: ResolvedPhotoWatermarkTemplate,
+    titleTextSize: Float,
+    detailTextSize: Float,
+    padding: Float
+): PhotoWatermarkBitmapRenderResult {
+    val sideBorder = maxOf(MIN_PADDING_PX, source.width * TravelTicketPaperSpec.SIDE_BORDER_RATIO)
+    val topBorder = sideBorder
+    val resolvedTitleSize = maxOf(titleTextSize, source.width * 0.062f) * template.textScale
+    val resolvedDetailSize = maxOf(detailTextSize * 0.82f, source.width * 0.027f)
+    val bottomBandHeight = maxOf(source.width * TravelTicketPaperSpec.BOTTOM_BAND_RATIO, resolvedTitleSize * 4.25f)
+    val framedWidth = (source.width + sideBorder * 2f).toInt()
+    val framedHeight = (source.height + topBorder + bottomBandHeight).toInt()
+    val bandTop = topBorder + source.height
+    val output = Bitmap.createBitmap(framedWidth, framedHeight, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(output)
+
+    val paperPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TravelTicketPaperSpec.PAPER_COLOR
+        style = Paint.Style.FILL
+    }
+    canvas.drawRect(0f, 0f, framedWidth.toFloat(), framedHeight.toFloat(), paperPaint)
+    canvas.drawBitmap(source, sideBorder, topBorder, null)
+
+    val photoKeylinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TravelTicketPaperSpec.COBALT_COLOR
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(2f, framedWidth * 0.0026f)
+        alpha = 220
+    }
+    canvas.drawRect(
+        sideBorder,
+        topBorder,
+        sideBorder + source.width,
+        topBorder + source.height,
+        photoKeylinePaint
+    )
+
+    val ticketLeft = framedWidth * TravelTicketPaperSpec.TICKET_LEFT_RATIO
+    val ticketRight = framedWidth - sideBorder
+    val ticketTop = bandTop + bottomBandHeight * TravelTicketPaperSpec.TICKET_TOP_RATIO
+    val ticketBottom = bandTop + bottomBandHeight * TravelTicketPaperSpec.TICKET_BOTTOM_RATIO
+    val ticketRect = RectF(ticketLeft, ticketTop, ticketRight, ticketBottom)
+    val ticketRadius = maxOf(5f, framedWidth * 0.009f)
+    val limeWidth = ticketRect.width() * TravelTicketPaperSpec.LIME_STUB_RATIO
+    val blueRect = RectF(ticketRect.left, ticketRect.top, ticketRect.right - limeWidth, ticketRect.bottom)
+    val limeRect = RectF(blueRect.right, ticketRect.top, ticketRect.right, ticketRect.bottom)
+    val cobaltPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TravelTicketPaperSpec.COBALT_COLOR }
+    val limePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = TravelTicketPaperSpec.LIME_COLOR }
+    val ticketClip = Path().apply { addRoundRect(ticketRect, ticketRadius, ticketRadius, Path.Direction.CW) }
+    canvas.save()
+    canvas.clipPath(ticketClip)
+    canvas.drawRect(ticketRect, cobaltPaint)
+    canvas.drawRect(limeRect, limePaint)
+    canvas.restore()
+
+    val perforationRadius = maxOf(3.5f, ticketRect.height() * 0.045f)
+    val perforationPitch = perforationRadius * 2.9f
+    var perforationY = ticketRect.top + perforationPitch * 0.65f
+    while (perforationY < ticketRect.bottom - perforationRadius) {
+        canvas.drawCircle(ticketRect.left, perforationY, perforationRadius, paperPaint)
+        perforationY += perforationPitch
+    }
+
+    val stampCenterX = blueRect.left + blueRect.width() * 0.43f
+    val stampCenterY = blueRect.centerY()
+    val stampRadius = minOf(blueRect.width() * 0.24f, blueRect.height() * 0.34f)
+    val coralStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TravelTicketPaperSpec.CORAL_COLOR
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(2f, framedWidth * 0.0034f)
+        strokeCap = Paint.Cap.ROUND
+    }
+    canvas.drawCircle(stampCenterX, stampCenterY, stampRadius, coralStroke)
+    val sunRadius = stampRadius * 0.28f
+    val sunCenterY = stampCenterY - stampRadius * 0.1f
+    canvas.drawArc(
+        RectF(
+            stampCenterX - sunRadius,
+            sunCenterY - sunRadius,
+            stampCenterX + sunRadius,
+            sunCenterY + sunRadius
+        ),
+        180f,
+        180f,
+        false,
+        coralStroke
+    )
+    repeat(3) { index ->
+        val waveY = stampCenterY + stampRadius * (0.12f + index * 0.12f)
+        val wave = Path().apply {
+            moveTo(stampCenterX - stampRadius * 0.54f, waveY)
+            cubicTo(
+                stampCenterX - stampRadius * 0.2f, waveY - stampRadius * 0.12f,
+                stampCenterX + stampRadius * 0.2f, waveY + stampRadius * 0.12f,
+                stampCenterX + stampRadius * 0.54f, waveY
+            )
+        }
+        canvas.drawPath(wave, coralStroke)
+    }
+    listOf(-0.62f, -0.31f, 0f, 0.31f, 0.62f).forEach { offset ->
+        val angle = Math.toRadians((-90f + offset * 70f).toDouble())
+        val inner = stampRadius * 0.48f
+        val outer = stampRadius * 0.62f
+        canvas.drawLine(
+            stampCenterX + kotlin.math.cos(angle).toFloat() * inner,
+            sunCenterY + kotlin.math.sin(angle).toFloat() * inner,
+            stampCenterX + kotlin.math.cos(angle).toFloat() * outer,
+            sunCenterY + kotlin.math.sin(angle).toFloat() * outer,
+            coralStroke
+        )
+    }
+
+    val stampTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TravelTicketPaperSpec.CORAL_COLOR
+        textSize = maxOf(8f, stampRadius * 0.25f)
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+    }
+    canvas.drawText("LET'S GO", stampCenterX, stampCenterY + stampRadius * 0.76f, stampTextPaint)
+
+    val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TravelTicketPaperSpec.PAPER_COLOR
+        style = Paint.Style.STROKE
+        strokeWidth = maxOf(2.4f, framedWidth * 0.0042f)
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    val arrowStartX = blueRect.right - blueRect.width() * 0.22f
+    val arrowEndX = blueRect.right - blueRect.width() * 0.07f
+    val arrowHalf = ticketRect.height() * 0.085f
+    canvas.drawLine(arrowStartX, stampCenterY, arrowEndX, stampCenterY, arrowPaint)
+    canvas.drawLine(arrowEndX - arrowHalf, stampCenterY - arrowHalf, arrowEndX, stampCenterY, arrowPaint)
+    canvas.drawLine(arrowEndX - arrowHalf, stampCenterY + arrowHalf, arrowEndX, stampCenterY, arrowPaint)
+
+    val serialPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TravelTicketPaperSpec.BLACK_COLOR
+        textSize = maxOf(8f, limeWidth * 0.32f)
+        typeface = Typeface.create("sans-serif-condensed", Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+    }
+    shrinkTextToWidth(serialPaint, TravelTicketPaperSpec.serial(template.supportingLines), limeRect.width() * 0.78f, 6f)
+    canvas.drawText(
+        TravelTicketPaperSpec.serial(template.supportingLines),
+        limeRect.centerX(),
+        limeRect.bottom - limeRect.height() * 0.07f,
+        serialPaint
+    )
+
+    val leftContentX = sideBorder + padding * 0.7f
+    val leftContentRight = ticketRect.left - padding * 0.65f
+    val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TravelTicketPaperSpec.BLACK_COLOR
+        textSize = resolvedTitleSize
+        typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
+        textAlign = Paint.Align.LEFT
+        alpha = (255 * template.textOpacity).toInt().coerceIn(0, 255)
+    }
+    shrinkTextToWidth(titlePaint, template.title, leftContentRight - leftContentX, source.width * 0.045f)
+    val titleBaseline = bandTop + bottomBandHeight * 0.39f - titlePaint.fontMetrics.ascent * 0.16f
+    canvas.drawText(template.title, leftContentX, titleBaseline, titlePaint)
+
+    val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = TravelTicketPaperSpec.BLACK_COLOR
+        textSize = resolvedDetailSize
+        typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+        textAlign = Paint.Align.LEFT
+        alpha = (255 * template.textOpacity).toInt().coerceIn(0, 255)
+    }
+    var detailBaseline = bandTop + bottomBandHeight * 0.63f
+    val detailStep = maxOf(resolvedDetailSize * 1.55f, bottomBandHeight * 0.14f)
+    template.supportingLines.take(2).forEach { line ->
+        canvas.drawText(fitText(line.uppercase(Locale.ROOT), detailPaint, leftContentRight - leftContentX), leftContentX, detailBaseline, detailPaint)
+        detailBaseline += detailStep
+    }
+
+    return PhotoWatermarkBitmapRenderResult(bitmap = output, warning = template.warning)
+}
+
+private fun shrinkTextToWidth(paint: Paint, text: String, maxWidth: Float, minimumSize: Float) {
+    while (paint.textSize > minimumSize && paint.measureText(text) > maxWidth) {
+        paint.textSize *= 0.96f
+    }
+}
+
 private fun drawVanGoghStarryFrame(
     source: Bitmap,
     template: ResolvedPhotoWatermarkTemplate,
@@ -1177,9 +1352,16 @@ private fun drawVanGoghStarryFrame(
     frameAssetProvider: VanGoghStarryFrameAssetProvider?,
     staticWatermarkAssetProvider: StaticWatermarkAssetProvider?
 ): PhotoWatermarkBitmapRenderResult {
-    val sideBorder = (source.width * 0.027f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
-    val topBorder = (source.height * 0.083f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
-    val bottomBandHeight = maxOf(detailTextSize * 4.0f, source.height * 0.128f)
+    val frameMetrics = highDesignWatermarkFrameMetrics(
+        photoWidth = source.width.toFloat(),
+        photoHeight = source.height.toFloat(),
+        minimumSideBorder = MIN_PADDING_PX,
+        minimumTopBorder = MIN_PADDING_PX,
+        minimumBottomBandHeight = detailTextSize * 4.0f
+    )
+    val sideBorder = frameMetrics.sideBorder
+    val topBorder = frameMetrics.topBorder
+    val bottomBandHeight = frameMetrics.bottomBandHeight
     val metadata = starryMoonMetadata(template.supportingLines)
     val textSlot = metadata.takeIf(String::isNotBlank)?.let {
         HighDesignTextSlotSpec(
@@ -1220,9 +1402,16 @@ private fun drawBlueHourFrame(
     padding: Float,
     staticWatermarkAssetProvider: StaticWatermarkAssetProvider? = null
 ): PhotoWatermarkBitmapRenderResult {
-    val sideBorder = (source.width * 0.027f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
-    val topBorder = (source.height * 0.083f).coerceAtLeast(MIN_PADDING_PX * 1.0f)
-    val bottomBandHeight = maxOf(titleTextSize * 2.2f, source.height * 0.128f, padding * 2.8f)
+    val frameMetrics = highDesignWatermarkFrameMetrics(
+        photoWidth = source.width.toFloat(),
+        photoHeight = source.height.toFloat(),
+        minimumSideBorder = MIN_PADDING_PX,
+        minimumTopBorder = MIN_PADDING_PX,
+        minimumBottomBandHeight = maxOf(titleTextSize * 2.2f, padding * 2.8f)
+    )
+    val sideBorder = frameMetrics.sideBorder
+    val topBorder = frameMetrics.topBorder
+    val bottomBandHeight = frameMetrics.bottomBandHeight
     val titleSlot = HighDesignTextSlotSpec(
         text = template.title,
         style = WatermarkTextSlotStyle.BLUE_HOUR_TITLE,
@@ -1402,6 +1591,11 @@ private fun renderStaticWatermarkScene(
                         destination = layer.destination,
                         photoSlot = scene.photoSlot
                     )
+                    drawBlueHourInnerPhotoFrame(
+                        canvas = canvas,
+                        templateId = scene.templateId,
+                        photoSlot = scene.photoSlot
+                    )
                 } else {
                     sceneWarning = mergeWarnings(
                         sceneWarning,
@@ -1489,6 +1683,27 @@ private fun drawStaticHighDesignThemeWash(
         style = Paint.Style.FILL
     })
     canvas.restoreToCount(checkpoint)
+}
+
+private fun drawBlueHourInnerPhotoFrame(
+    canvas: Canvas,
+    templateId: String,
+    photoSlot: RectF
+) {
+    if (templateId != TEMPLATE_BLUE_HOUR) return
+    val strokeWidth = (minOf(photoSlot.width(), photoSlot.height()) * 0.0024f).coerceIn(1.8f, 5.5f)
+    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(96, 3, 18, 45)
+        style = Paint.Style.STROKE
+        this.strokeWidth = strokeWidth * 2.2f
+    }
+    val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(232, 174, 214, 244)
+        style = Paint.Style.STROKE
+        this.strokeWidth = strokeWidth
+    }
+    canvas.drawRect(photoSlot, shadowPaint)
+    canvas.drawRect(photoSlot, framePaint)
 }
 
 private fun drawBitmapFill(bitmap: Bitmap, destination: RectF, canvas: Canvas) {
@@ -2103,78 +2318,6 @@ private fun drawGrandTourFrameBackground(
     }
 }
 
-private fun drawTravelMapDecoration(
-    canvas: Canvas,
-    framedWidth: Int,
-    framedHeight: Int,
-    bandTop: Float,
-    sideBorder: Float,
-    padding: Float
-) {
-    val left = maxOf(framedWidth * 0.56f, framedWidth / 2f + padding)
-    val right = framedWidth - sideBorder - padding * 0.55f
-    val top = bandTop + padding * 0.72f
-    val bottom = framedHeight - padding * 0.7f
-    if (right <= left || bottom <= top) return
-
-    val width = right - left
-    val height = bottom - top
-    val contourPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(72, 83, 132, 100)
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.2f, framedWidth * 0.0024f)
-        strokeCap = Paint.Cap.ROUND
-    }
-    repeat(3) { index ->
-        val offset = index * height * 0.19f
-        val contour = Path().apply {
-            moveTo(left + width * 0.02f, top + height * (0.2f + index * 0.11f))
-            cubicTo(
-                left + width * 0.24f, top - height * 0.05f + offset,
-                left + width * 0.43f, top + height * 0.52f + offset,
-                left + width * 0.64f, top + height * 0.28f + offset
-            )
-            cubicTo(
-                left + width * 0.78f, top + height * 0.12f + offset,
-                left + width * 0.9f, top + height * 0.48f + offset,
-                right, top + height * 0.34f + offset
-            )
-        }
-        canvas.drawPath(contour, contourPaint)
-    }
-
-    val routePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(178, 42, 82, 61)
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.8f, framedWidth * 0.0035f)
-        strokeCap = Paint.Cap.ROUND
-    }
-    val route = Path().apply {
-        moveTo(left + width * 0.08f, bottom - height * 0.14f)
-        cubicTo(
-            left + width * 0.28f, top + height * 0.36f,
-            left + width * 0.48f, bottom - height * 0.12f,
-            left + width * 0.7f, top + height * 0.24f
-        )
-    }
-    canvas.drawPath(route, routePaint)
-
-    val markerRadius = maxOf(2.4f, framedWidth * 0.006f)
-    val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(210, 42, 82, 61)
-        style = Paint.Style.STROKE
-        strokeWidth = maxOf(1.4f, markerRadius * 0.42f)
-    }
-    canvas.drawCircle(left + width * 0.08f, bottom - height * 0.14f, markerRadius, markerPaint)
-    canvas.drawCircle(left + width * 0.7f, top + height * 0.24f, markerRadius, markerPaint)
-
-    val crossX = left + width * 0.89f
-    val crossY = bottom - height * 0.2f
-    val crossSize = markerRadius * 1.9f
-    canvas.drawLine(crossX - crossSize, crossY, crossX + crossSize, crossY, markerPaint)
-    canvas.drawLine(crossX, crossY - crossSize, crossX, crossY + crossSize, markerPaint)
-}
-
 private fun drawNightMemoryFrameWash(
     canvas: Canvas,
     framedWidth: Int,
@@ -2466,10 +2609,20 @@ internal fun resolvePhotoWatermarkTemplate(
     )
     val supportedTokens = templateType.resolveMetadataTokens(metadata.customTags)
         .mapNotNull(tokenValues::get)
+    val supportingLines = if (templateType == PhotoWatermarkTemplateType.TRAVEL_POLAROID) {
+        TravelTicketPaperSpec.supportingLines(
+            location = location,
+            profileName = profileName,
+            datetime = datetime,
+            model = model
+        )
+    } else {
+        chunkWatermarkTokens(supportedTokens)
+    }
     return ResolvedPhotoWatermarkTemplate(
         templateId = templateType.storageKey,
         title = resolveWatermarkTitle(templateType, watermarkText, metadata.customTags, model),
-        supportingLines = chunkWatermarkTokens(supportedTokens),
+        supportingLines = supportingLines,
         frameBackground = templateType.resolveFrameBackground(
             WatermarkFrameBackground.fromStorageKey(
                 metadata.customTags[PHOTO_WATERMARK_BACKGROUND_KEY]
@@ -2497,6 +2650,9 @@ private fun resolvePhotoWatermarkPlacement(
     templateType: PhotoWatermarkTemplateType,
     customTags: Map<String, String>
 ): WatermarkTextPlacement {
+    if (templateType == PhotoWatermarkTemplateType.TRAVEL_POLAROID) {
+        return WatermarkTextPlacement.BOTTOM_LEFT
+    }
     val contentPlacement = if (customTags["mode"] == "check-in") {
         WatermarkTextPlacement.fromStorageKey(customTags[CHECK_IN_CONTENT_WATERMARK_PLACEMENT_KEY])
     } else {
@@ -2551,6 +2707,9 @@ private fun resolveWatermarkTitle(
     if (templateType == PhotoWatermarkTemplateType.BLUE_HOUR) {
         return "BLUE HOUR"
     }
+    if (templateType == PhotoWatermarkTemplateType.TRAVEL_POLAROID) {
+        return TravelTicketPaperSpec.TITLE
+    }
     if (modeName != null) {
         val title = buildString {
             append(deviceModel)
@@ -2564,11 +2723,7 @@ private fun resolveWatermarkTitle(
         return title
     }
     val normalizedText = watermarkText.trim().ifBlank { "OpenCamera" }
-    return when {
-        templateType == PhotoWatermarkTemplateType.TRAVEL_POLAROID &&
-            normalizedText.startsWith("PHOTO ") -> "去有天空的地方"
-        else -> normalizedText
-    }
+    return normalizedText
 }
 
 private fun resolveDeviceModel(

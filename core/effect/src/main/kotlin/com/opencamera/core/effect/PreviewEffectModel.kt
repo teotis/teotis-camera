@@ -18,7 +18,7 @@ enum class WatermarkPreviewShape {
 
 enum class WatermarkPreviewDecoration {
     NONE,
-    TRAVEL_MAP,
+    TRAVEL_TICKET,
     ARCHIVAL_PAPER,
     NIGHT_MEMORY,
     STARRY_MOON,

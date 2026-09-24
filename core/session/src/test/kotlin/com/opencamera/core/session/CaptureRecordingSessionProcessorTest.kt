@@ -309,12 +309,34 @@ class CaptureRecordingSessionProcessorTest {
         harness.process(SessionIntent.ShotCompleted(result))
 
         assertEquals(CaptureStatus.IDLE, harness.state.value.captureStatus)
-        assertEquals("Full Clear needs guided retake", harness.state.value.presentation.lastAction)
+        assertEquals("Full Clear needs retake", harness.state.value.presentation.lastAction)
         assertEquals(
-            "Full Clear could not combine near and far focus (missing near/far frames). Tap the near subject and far background, then retake.",
+            "Full Clear could not combine near and far focus (missing near/far frames). Keep the camera and subjects still, then retake.",
             harness.state.value.presentation.lastError
         )
         assertEquals(result.pipelineNotes, harness.state.value.presentation.latestPipelineNotes)
+    }
+
+    @Test
+    fun `handleShotCompleted explains motion fallback without claiming guided taps exist`() = runTest {
+        val harness = Harness(runningState().copy(
+            activeShot = multiFrameShotRequest("focus-stack-motion")
+        ))
+        val result = testShotResult("focus-stack-motion", MediaType.PHOTO).copy(
+            pipelineNotes = listOf(
+                "focus-stack:skipped=foreground-motion",
+                "focus-stack:fallback=far-anchor",
+                "focus-stack:motion-risk=localized"
+            )
+        )
+
+        harness.process(SessionIntent.ShotCompleted(result))
+
+        assertEquals("Full Clear needs retake", harness.state.value.presentation.lastAction)
+        assertEquals(
+            "Full Clear detected movement between focus frames. A clean far-focus frame was saved instead. Keep the camera and foreground still, then retake; turn off Full Clear for moving subjects.",
+            harness.state.value.presentation.lastError
+        )
     }
 
     @Test
@@ -324,6 +346,7 @@ class CaptureRecordingSessionProcessorTest {
         ))
         harness.process(SessionIntent.ShotCompleted(testShotResult("shot-1", MediaType.PHOTO)))
         assertTrue(harness.state.value.presentation.latestThumbnailSource is ThumbnailSource.SavedMedia)
+        assertEquals(1L, harness.state.value.presentation.latestThumbnailRevision)
     }
 
     @Test

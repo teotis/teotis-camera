@@ -1,6 +1,7 @@
 package com.opencamera.app
 
 import android.view.View
+import android.graphics.RectF
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -31,6 +32,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 
 @RunWith(RobolectricTestRunner::class)
@@ -117,6 +119,44 @@ class CockpitSurfaceRendererTest {
         // Second call with same state should be a no-op (idempotent)
         renderer.renderPreviewMirror(state)
         assertEquals(-1f, previewView.scaleX)
+    }
+
+    @Test
+    fun `preview composition scales complete source into frame and composes with mirror`() {
+        val previewView = PreviewView(org.robolectric.RuntimeEnvironment.getApplication()).apply {
+            layout(0, 0, 1080, 1920)
+        }
+        val renderer = createRenderer(previewView)
+        val transform = PreviewSurfaceTransform(
+            scale = 0.8f,
+            pivotX = 540f,
+            pivotY = 1200f,
+            translationX = 0f,
+            translationY = -25.92f,
+            sourceClipRect = RectF(0f, 480f, 1080f, 1920f)
+        )
+
+        renderer.renderPreviewComposition(transform)
+
+        assertEquals(0.8f, previewView.scaleX)
+        assertEquals(0.8f, previewView.scaleY)
+        assertEquals(-25.92f, previewView.translationY, 0.01f)
+        assertEquals(android.graphics.Rect(0, 480, 1080, 1920), previewView.clipBounds)
+
+        renderer.renderPreviewMirror(
+            sessionState(lensFacing = LensFacing.FRONT, selfieMirrorEnabled = true)
+        )
+
+        assertEquals(-0.8f, previewView.scaleX)
+        assertEquals(0.8f, previewView.scaleY)
+
+        renderer.renderPreviewComposition(null)
+
+        assertEquals(-1f, previewView.scaleX)
+        assertEquals(1f, previewView.scaleY)
+        assertEquals(0f, previewView.translationX)
+        assertEquals(0f, previewView.translationY)
+        assertNull(previewView.clipBounds)
     }
 
     @Test

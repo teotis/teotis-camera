@@ -1,11 +1,14 @@
 package com.opencamera.app
 
+import android.util.Log
 import com.opencamera.core.session.DocumentBatchItem
 import com.opencamera.core.session.DocumentBatchState
 import java.io.File
 import java.io.InputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
+
+private const val TAG = "DocumentBatchZipExporter"
 
 internal data class DocumentBatchZipExportResult(
     val file: File,
@@ -27,23 +30,29 @@ internal class DocumentBatchZipExporter(
         val skipped = mutableListOf<String>()
         var exported = 0
 
-        ZipOutputStream(outputFile.outputStream().buffered()).use { zip ->
-            orderedItems.forEachIndexed { index, item ->
-                val input = openInput(item)
-                if (input == null) {
-                    skipped += item.itemId
-                    return@forEachIndexed
+        try {
+            ZipOutputStream(outputFile.outputStream().buffered()).use { zip ->
+                orderedItems.forEachIndexed { index, item ->
+                    val input = openInput(item)
+                    if (input == null) {
+                        skipped += item.itemId
+                        Log.w(TAG, "skipped page itemId=${item.itemId} (openInput returned null)")
+                        return@forEachIndexed
+                    }
+                    input.use { stream ->
+                        zip.putNextEntry(ZipEntry(entryNameFor(index, orderedItems.size, item)))
+                        stream.copyTo(zip)
+                        zip.closeEntry()
+                        exported += 1
+                    }
                 }
-                input.use { stream ->
-                    zip.putNextEntry(ZipEntry(entryNameFor(index, orderedItems.size, item)))
-                    stream.copyTo(zip)
-                    zip.closeEntry()
-                    exported += 1
-                }
+                zip.putNextEntry(ZipEntry("manifest.txt"))
+                zip.write(buildManifest(batch, orderedItems, skipped).toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
             }
-            zip.putNextEntry(ZipEntry("manifest.txt"))
-            zip.write(buildManifest(batch, orderedItems, skipped).toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
+        } catch (e: Exception) {
+            Log.e(TAG, "document batch zip export failed batchId=${batch.batchId} outputFile=$outputFile", e)
+            throw e
         }
 
         return DocumentBatchZipExportResult(

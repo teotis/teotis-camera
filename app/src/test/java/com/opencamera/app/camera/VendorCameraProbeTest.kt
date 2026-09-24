@@ -78,6 +78,41 @@ class VendorCameraProbeTest {
     }
 
     @Test
+    fun `summary from probe text exposes per camera actionable opportunities`() {
+        val content = """
+            ===== VENDOR CAMERA PROBE =====
+              [camera-extensions]
+                extensions: BACK night=supported hdr=supported
+            === cameraId=0 ===
+              lens-facing: BACK
+              hardware-level: LEVEL_3
+              physical-camera-ids: 1, 2, 3
+                READY RAW / DNG 管线 (raw-pipeline)
+                VERIFY_ON_DEVICE 逻辑多摄与物理镜头 (logical-multi-camera)
+                UNAVAILABLE 景深输出 (depth-output)
+            === cameraId=1 ===
+              lens-facing: FRONT
+              hardware-level: FULL
+                READY RAW / DNG 管线 (raw-pipeline)
+                READY YUV 多帧计算摄影 (multi-frame-yuv)
+            ===== PROBE COMPLETE =====
+        """.trimIndent()
+
+        val summary = VendorCameraProbe.summaryFromProbeText(content).orEmpty()
+
+        assertTrue(summary.contains("cameraId=0 BACK LEVEL_3 physical=1, 2, 3"))
+        assertTrue(summary.contains("READY RAW / DNG 管线 (raw-pipeline)"))
+        assertTrue(summary.contains("VERIFY_ON_DEVICE 逻辑多摄与物理镜头 (logical-multi-camera)"))
+        assertFalse(summary.contains("UNAVAILABLE"))
+        assertTrue(summary.contains("cameraId=1 FRONT FULL"))
+        assertTrue(summary.contains("READY YUV 多帧计算摄影 (multi-frame-yuv)"))
+        assertEquals(
+            2,
+            Regex(Regex.escape("READY RAW / DNG 管线 (raw-pipeline)")).findAll(summary).count()
+        )
+    }
+
+    @Test
     fun `extension probe failure is recorded without throwing`() {
         val output = StringBuilder()
 

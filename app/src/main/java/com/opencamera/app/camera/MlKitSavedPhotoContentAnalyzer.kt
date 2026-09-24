@@ -1,11 +1,14 @@
 package com.opencamera.app.camera
 
 import android.graphics.Bitmap
+import android.util.Log
 import com.opencamera.core.media.ContentUnderstandingFamily
 import com.opencamera.core.media.ContentUnderstandingPipelineNotes
 import com.opencamera.core.media.ContentUnderstandingSnapshot
 import com.opencamera.core.media.SceneMaskQuality
 import com.opencamera.core.media.SceneMaskSupport
+
+private const val TAG = "MlKitSavedPhotoContentAnalyzer"
 
 internal object MlKitSavedPhotoContentFamilies {
     val ALL: List<ContentUnderstandingFamily> = listOf(
@@ -89,6 +92,7 @@ internal class MlKitSavedPhotoContentAnalyzer(
         } catch (e: Exception) {
             failedFamilies += family
             failures += "mlkit-content:${family.key}=failed:${e::class.java.simpleName}"
+            Log.w(TAG, "mlkit family ${family.key} failed", e)
             emptyList()
         }
     }

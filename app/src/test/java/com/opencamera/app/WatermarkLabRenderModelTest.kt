@@ -72,6 +72,7 @@ class WatermarkLabRenderModelTest {
             assertFalse(model.items.any { it.templateId == "professional-bottom-bar" })
             assertFalse(model.items.any { it.templateId == "night-street" })
             assertTrue(selected.isSelected)
+            assertEquals("Philosophy Like Water", selected.title)
             assertEquals(null, selected.useAction)
             assertTrue(selected.supportingText.contains("Current default"))
             assertEquals("Style", selected.editButtonLabel)
@@ -114,7 +115,7 @@ class WatermarkLabRenderModelTest {
                 text = TestAppTextResolver()
             )
 
-            assertEquals("Travel Polaroid", model.headline)
+            assertEquals("Philosophy Like Water", model.headline)
             assertEquals("", model.heroSummary)
             assertEquals(
                 PersistedSettingsAction.UpdateWatermarkTextPlacement(
@@ -140,7 +141,7 @@ class WatermarkLabRenderModelTest {
             assertEquals(
                 PersistedSettingsAction.UpdateWatermarkFrameBackground(
                     templateId = "travel-polaroid",
-                    background = WatermarkFrameBackground.SOURCE_VIVID_BLUR
+                    background = WatermarkFrameBackground.WHITE
                 ),
                 model.frameBackgroundControl?.nextAction
             )

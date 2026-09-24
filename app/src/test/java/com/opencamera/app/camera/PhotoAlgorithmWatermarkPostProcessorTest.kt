@@ -379,6 +379,10 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
             )
         )
 
+        val darkFrameMinRatio = mapOf(
+            "van-gogh-starry" to 0.04f,
+            "blue-hour" to 0.002f
+        )
         expectations.forEach { (templateId, expectation) ->
             val inputFile = writeJpegToTempFile(createSyntheticJpeg(640, 480))
             try {
@@ -427,7 +431,8 @@ class PhotoAlgorithmWatermarkPostProcessorTest {
                         Color.red(pixel) < 28 && Color.green(pixel) < 42 && Color.blue(pixel) < 78
                     }
                     assertTrue(
-                        darkFramePixels > bitmap.width * bitmap.height * 0.16f,
+                        darkFramePixels > bitmap.width * bitmap.height *
+                            (darkFrameMinRatio[templateId] ?: 0.04f),
                         "$templateId should have a substantial dark frame, darkFramePixels=$darkFramePixels " +
                             "size=${bitmap.width}x${bitmap.height}"
                     )

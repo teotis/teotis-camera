@@ -90,13 +90,57 @@ object VendorCameraProbe {
     }
 
     fun summaryFromProbeText(content: String): String? {
-        return content.lineSequence()
-            .map { it.trim() }
-            .filter { line ->
-                line.startsWith("extensions: ") ||
-                    line.startsWith("image-quality-ext: ")
+        val summaryLines = mutableListOf<String>()
+        var cameraId: String? = null
+        var lensFacing: String? = null
+        var hardwareLevel: String? = null
+        var physicalIds: String? = null
+        val opportunities = mutableListOf<String>()
+
+        fun flushCamera() {
+            val id = cameraId ?: return
+            val identity = buildString {
+                append("cameraId=$id")
+                lensFacing?.let { append(" $it") }
+                hardwareLevel?.let { append(" $it") }
+                physicalIds?.let { append(" physical=$it") }
             }
-            .distinct()
+            summaryLines += identity
+            summaryLines += opportunities.map { "  $it" }
+            cameraId = null
+            lensFacing = null
+            hardwareLevel = null
+            physicalIds = null
+            opportunities.clear()
+        }
+
+        content.lineSequence().map { it.trim() }.forEach { line ->
+            when {
+                line.startsWith("extensions: ") || line.startsWith("image-quality-ext: ") -> {
+                    summaryLines += line
+                }
+                line.startsWith("=== cameraId=") -> {
+                    flushCamera()
+                    cameraId = line.removePrefix("=== cameraId=").removeSuffix(" ===")
+                }
+                line.startsWith("--- physical-camera") -> flushCamera()
+                cameraId != null && line.startsWith("lens-facing: ") -> {
+                    lensFacing = line.removePrefix("lens-facing: ")
+                }
+                cameraId != null && line.startsWith("hardware-level: ") -> {
+                    hardwareLevel = line.removePrefix("hardware-level: ")
+                }
+                cameraId != null && line.startsWith("physical-camera-ids: ") -> {
+                    physicalIds = line.removePrefix("physical-camera-ids: ")
+                }
+                cameraId != null && (
+                    line.startsWith("READY ") || line.startsWith("VERIFY_ON_DEVICE ")
+                ) -> opportunities += line
+            }
+        }
+        flushCamera()
+
+        return summaryLines
             .joinToString(separator = "\n")
             .takeIf { it.isNotBlank() }
     }
@@ -133,6 +177,12 @@ object VendorCameraProbe {
 
         appendProbeSection(sb, "sensor-info") { appendSensorInfo(sb, chars) }
         appendProbeSection(sb, "lens-info") { appendLensInfo(sb, chars) }
+        appendProbeSection(sb, "development-assessment") {
+            appendCameraDevelopmentAssessment(sb, chars, physicalIds.size)
+        }
+        appendProbeSection(sb, "control-surface") { appendControlSurface(sb, chars) }
+        appendProbeSection(sb, "stream-inventory") { appendStreamInventory(sb, chars) }
+        appendProbeSection(sb, "advanced-platform") { appendAdvancedPlatformFeatures(sb, chars) }
         appendProbeSection(sb, "extended-scene-modes") { appendExtendedSceneModeProbe(sb, chars) }
         appendProbeSection(sb, "raw-capability") { appendRawCapability(sb, chars) }
         appendProbeSection(sb, "characteristics-keys") { appendAllCharacteristicsKeys(sb, chars) }
@@ -165,6 +215,12 @@ object VendorCameraProbe {
         }
         appendProbeSection(sb, "physical-sensor-info") { appendSensorInfo(sb, chars) }
         appendProbeSection(sb, "physical-lens-info") { appendLensInfo(sb, chars) }
+        appendProbeSection(sb, "physical-development-assessment") {
+            appendCameraDevelopmentAssessment(sb, chars, physicalCameraCount = 0)
+        }
+        appendProbeSection(sb, "physical-control-surface") { appendControlSurface(sb, chars) }
+        appendProbeSection(sb, "physical-stream-inventory") { appendStreamInventory(sb, chars) }
+        appendProbeSection(sb, "physical-advanced-platform") { appendAdvancedPlatformFeatures(sb, chars) }
         appendProbeSection(sb, "physical-raw-capability") { appendRawCapability(sb, chars) }
         appendProbeSection(sb, "physical-characteristics-keys") { appendAllCharacteristicsKeys(sb, chars) }
         appendProbeSection(sb, "physical-hidden-via-reflection") { appendVendorKeysViaReflection(sb, chars) }
@@ -232,6 +288,304 @@ object VendorCameraProbe {
         if (oisModes != null && oisModes.isNotEmpty()) {
             sb.appendLine("    ois-modes: ${oisModes.joinToString { oisLabel(it) }}")
         }
+    }
+
+    // ── Development assessment ──────────────────────────────
+
+    private fun appendCameraDevelopmentAssessment(
+        sb: StringBuilder,
+        chars: CameraCharacteristics,
+        physicalCameraCount: Int
+    ) {
+        val capabilities = chars.get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
+            ?.toSet()
+            .orEmpty()
+        val configMap = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        val requestKeys = chars.safeList { availableCaptureRequestKeys }
+        val resultKeys = chars.safeList { availableCaptureResultKeys }
+        val physicalRequestKeys = chars.safeList { availablePhysicalCameraRequestKeys }
+        val oisModes = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION)
+            ?: intArrayOf()
+        val videoStabilizationModes = chars.get(
+            CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES
+        ) ?: intArrayOf()
+        val facts = CameraDevelopmentFacts(
+            hardwareLevel = hardwareLevelLabel(
+                chars.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)
+            ),
+            physicalCameraCount = physicalCameraCount,
+            supportsManualSensor = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR
+            ),
+            supportsManualPostProcessing = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_POST_PROCESSING
+            ),
+            supportsRaw = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_RAW
+            ),
+            supportsBurst = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_BURST_CAPTURE
+            ),
+            supportsYuvReprocessing = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_YUV_REPROCESSING
+            ),
+            supportsPrivateReprocessing = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_PRIVATE_REPROCESSING
+            ),
+            supportsRemosaicReprocessing = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_REMOSAIC_REPROCESSING
+            ),
+            supportsDepth = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_DEPTH_OUTPUT
+            ),
+            supportsHighSpeedVideo = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_CONSTRAINED_HIGH_SPEED_VIDEO
+            ),
+            supportsTenBitDynamicRange = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_DYNAMIC_RANGE_TEN_BIT
+            ),
+            supportsUltraHighResolution = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR
+            ),
+            supportsStreamUseCases = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_STREAM_USE_CASE
+            ),
+            supportsOfflineProcessing = capabilities.contains(
+                CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES_OFFLINE_PROCESSING
+            ),
+            hasIsoRange = chars.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE) != null,
+            hasExposureTimeRange = chars.get(CameraCharacteristics.SENSOR_INFO_EXPOSURE_TIME_RANGE) != null,
+            hasManualFocusDistance = (chars.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 0f) > 0f,
+            hasRawOutput = configMap.hasAnyOutput(
+                ImageFormat.RAW_SENSOR,
+                ImageFormat.RAW10,
+                ImageFormat.RAW12,
+                ImageFormat.RAW_PRIVATE
+            ),
+            hasYuvOutput = configMap.hasAnyOutput(ImageFormat.YUV_420_888),
+            hasHighResolutionJpeg = configMap.outputSizes(ImageFormat.JPEG, highResolution = true).isNotEmpty(),
+            hasOpticalStabilization = oisModes.contains(
+                CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON
+            ),
+            hasVideoStabilization = videoStabilizationModes.any { it != 0 },
+            vendorRequestKeyCount = requestKeys.count { isVendorKeyName(it.name) },
+            vendorResultKeyCount = resultKeys.count { isVendorKeyName(it.name) },
+            physicalRequestKeyCount = physicalRequestKeys.size
+        )
+
+        sb.appendLine(formatCameraDevelopmentAssessment(assessCameraDevelopmentFeatures(facts)))
+    }
+
+    // ── Public control surface ───────────────────────────────
+
+    private fun appendControlSurface(sb: StringBuilder, chars: CameraCharacteristics) {
+        sb.appendLine("  [control-surface]")
+        appendLabeledModes(
+            sb,
+            "ae-modes",
+            chars.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES),
+            ::aeModeLabel
+        )
+        appendLabeledModes(
+            sb,
+            "af-modes",
+            chars.get(CameraCharacteristics.CONTROL_AF_AVAILABLE_MODES),
+            ::afModeLabel
+        )
+        appendLabeledModes(
+            sb,
+            "awb-modes",
+            chars.get(CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES),
+            ::awbModeLabel
+        )
+        appendLabeledModes(
+            sb,
+            "ois-modes",
+            chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_OPTICAL_STABILIZATION),
+            ::oisLabel
+        )
+        appendLabeledModes(
+            sb,
+            "video-stabilization-modes",
+            chars.get(CameraCharacteristics.CONTROL_AVAILABLE_VIDEO_STABILIZATION_MODES),
+            ::videoStabilizationLabel
+        )
+        appendLabeledModes(
+            sb,
+            "face-detect-modes",
+            chars.get(CameraCharacteristics.STATISTICS_INFO_AVAILABLE_FACE_DETECT_MODES),
+            ::faceDetectModeLabel
+        )
+
+        sb.appendLine("    flash-available: ${chars.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) ?: false}")
+        sb.appendLine("    minimum-focus-distance: ${chars.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: "none"}")
+        sb.appendLine("    hyperfocal-distance: ${chars.get(CameraCharacteristics.LENS_INFO_HYPERFOCAL_DISTANCE) ?: "none"}")
+        sb.appendLine("    max-face-count: ${chars.get(CameraCharacteristics.STATISTICS_INFO_MAX_FACE_COUNT) ?: 0}")
+        sb.appendLine("    max-regions: AE=${chars.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AE) ?: 0}, " +
+            "AF=${chars.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) ?: 0}, " +
+            "AWB=${chars.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AWB) ?: 0}")
+        sb.appendLine("    ae-compensation-range: ${formatAnyValue(chars.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE))}")
+        sb.appendLine("    ae-compensation-step: ${formatAnyValue(chars.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP))}")
+        appendLabeledModes(sb, "edge-modes", chars.get(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES)) { it.toString() }
+        appendLabeledModes(sb, "noise-reduction-modes", chars.get(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES)) { it.toString() }
+        appendLabeledModes(sb, "tonemap-modes", chars.get(CameraCharacteristics.TONEMAP_AVAILABLE_TONE_MAP_MODES)) { it.toString() }
+        sb.appendLine("    tonemap-max-curve-points: ${chars.get(CameraCharacteristics.TONEMAP_MAX_CURVE_POINTS) ?: 0}")
+    }
+
+    private fun appendLabeledModes(
+        sb: StringBuilder,
+        label: String,
+        values: IntArray?,
+        formatter: (Int) -> String
+    ) {
+        sb.appendLine("    $label: ${values?.joinToString { formatter(it) }?.ifBlank { "none" } ?: "none"}")
+    }
+
+    // ── Stream inventory ─────────────────────────────────────
+
+    private fun appendStreamInventory(sb: StringBuilder, chars: CameraCharacteristics) {
+        val configMap = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        sb.appendLine("  [stream-inventory]")
+        if (configMap == null) {
+            sb.appendLine("    unavailable")
+            return
+        }
+
+        listOf(
+            ImageFormat.JPEG to "JPEG",
+            ImageFormat.YUV_420_888 to "YUV_420_888",
+            ImageFormat.PRIVATE to "PRIVATE",
+            ImageFormat.HEIC to "HEIC",
+            ImageFormat.RAW_SENSOR to "RAW_SENSOR",
+            ImageFormat.RAW10 to "RAW10",
+            ImageFormat.RAW12 to "RAW12",
+            ImageFormat.RAW_PRIVATE to "RAW_PRIVATE",
+            ImageFormat.DEPTH_JPEG to "DEPTH_JPEG",
+            ImageFormat.DEPTH16 to "DEPTH16",
+            ImageFormat.DEPTH_POINT_CLOUD to "DEPTH_POINT_CLOUD"
+        ).forEach { (format, label) ->
+            val sizes = configMap.outputSizes(format, highResolution = false)
+            val highResolutionSizes = configMap.outputSizes(format, highResolution = true)
+            if (sizes.isNotEmpty() || highResolutionSizes.isNotEmpty()) {
+                sb.appendLine("    $label: ${formatSizeInventory(sizes, highResolutionSizes)}")
+            }
+        }
+
+        val highSpeedSizes = runCatching { configMap.highSpeedVideoSizes?.toList().orEmpty() }
+            .getOrDefault(emptyList())
+        if (highSpeedSizes.isNotEmpty()) {
+            sb.appendLine("    high-speed-video:")
+            highSpeedSizes.sortedByDescending { it.width.toLong() * it.height }.forEach { size ->
+                val ranges = runCatching { configMap.getHighSpeedVideoFpsRangesFor(size)?.toList().orEmpty() }
+                    .getOrDefault(emptyList())
+                sb.appendLine("      ${size.width}×${size.height}: ${ranges.joinToString { "${it.lower}-${it.upper}fps" }}")
+            }
+        }
+    }
+
+    private fun formatSizeInventory(standard: List<Size>, highResolution: List<Size>): String {
+        val parts = mutableListOf<String>()
+        if (standard.isNotEmpty()) {
+            val max = standard.maxBy { it.width.toLong() * it.height }
+            parts += "standard=${standard.size},max=${max.width}×${max.height}"
+        }
+        if (highResolution.isNotEmpty()) {
+            val max = highResolution.maxBy { it.width.toLong() * it.height }
+            parts += "high-res=${highResolution.size},max=${max.width}×${max.height}"
+        }
+        return parts.joinToString(" | ")
+    }
+
+    // ── Advanced Android platform features ──────────────────
+
+    private fun appendAdvancedPlatformFeatures(sb: StringBuilder, chars: CameraCharacteristics) {
+        sb.appendLine("  [advanced-platform]")
+        val dynamicRangeProfiles = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            chars.get(CameraCharacteristics.REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES)
+        } else null
+        val colorSpaceProfiles = if (android.os.Build.VERSION.SDK_INT >= 34) {
+            chars.get(CameraCharacteristics.REQUEST_AVAILABLE_COLOR_SPACE_PROFILES)
+        } else null
+        val streamUseCases = if (android.os.Build.VERSION.SDK_INT >= 33) {
+            chars.get(CameraCharacteristics.SCALER_AVAILABLE_STREAM_USE_CASES)
+        } else null
+        sb.appendLine("    dynamic-range-profiles: ${formatDynamicRangeProfiles(dynamicRangeProfiles)}")
+        sb.appendLine("    color-space-profiles: ${formatColorSpaceProfiles(colorSpaceProfiles)}")
+        sb.appendLine("    stream-use-cases: ${formatStreamUseCases(streamUseCases)}")
+        sb.appendLine("    max-output-streams: raw=${chars.get(CameraCharacteristics.REQUEST_MAX_NUM_OUTPUT_RAW) ?: 0}, " +
+            "processed=${chars.get(CameraCharacteristics.REQUEST_MAX_NUM_OUTPUT_PROC) ?: 0}, " +
+            "stalling=${chars.get(CameraCharacteristics.REQUEST_MAX_NUM_OUTPUT_PROC_STALLING) ?: 0}")
+        sb.appendLine("    pipeline-depth: ${chars.get(CameraCharacteristics.REQUEST_PIPELINE_MAX_DEPTH) ?: 0}")
+        sb.appendLine("    partial-result-count: ${chars.get(CameraCharacteristics.REQUEST_PARTIAL_RESULT_COUNT) ?: 0}")
+        sb.appendLine("    sync-max-latency: ${formatAnyValue(chars.get(CameraCharacteristics.SYNC_MAX_LATENCY))}")
+        val sensorSyncType = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            chars.get(CameraCharacteristics.LOGICAL_MULTI_CAMERA_SENSOR_SYNC_TYPE)
+        } else null
+        sb.appendLine("    logical-sensor-sync-type: ${formatAnyValue(sensorSyncType)}")
+    }
+
+    @android.annotation.TargetApi(33)
+    private fun formatDynamicRangeProfiles(
+        profiles: android.hardware.camera2.params.DynamicRangeProfiles?
+    ): String {
+        if (profiles == null) return "none"
+        return profiles.supportedProfiles
+            .sorted()
+            .joinToString(separator = " | ") { profile ->
+                val constraints = profiles.getProfileCaptureRequestConstraints(profile)
+                    .sorted()
+                    .joinToString { dynamicRangeProfileLabel(it) }
+                    .ifBlank { "none" }
+                val latency = profiles.isExtraLatencyPresent(profile)
+                "${dynamicRangeProfileLabel(profile)}{constraints=$constraints,extra-latency=$latency}"
+            }
+            .ifBlank { "none" }
+    }
+
+    @android.annotation.TargetApi(33)
+    private fun dynamicRangeProfileLabel(profile: Long): String = when (profile) {
+        android.hardware.camera2.params.DynamicRangeProfiles.STANDARD -> "STANDARD"
+        android.hardware.camera2.params.DynamicRangeProfiles.HLG10 -> "HLG10"
+        android.hardware.camera2.params.DynamicRangeProfiles.HDR10 -> "HDR10"
+        android.hardware.camera2.params.DynamicRangeProfiles.HDR10_PLUS -> "HDR10_PLUS"
+        else -> "0x${profile.toString(16)}"
+    }
+
+    @android.annotation.TargetApi(34)
+    private fun formatColorSpaceProfiles(
+        profiles: android.hardware.camera2.params.ColorSpaceProfiles?
+    ): String {
+        if (profiles == null) return "none"
+        return listOf(
+            ImageFormat.JPEG to "JPEG",
+            ImageFormat.YUV_420_888 to "YUV_420_888",
+            ImageFormat.PRIVATE to "PRIVATE",
+            ImageFormat.HEIC to "HEIC",
+            ImageFormat.RAW_SENSOR to "RAW_SENSOR"
+        ).mapNotNull { (format, label) ->
+            val colorSpaces = runCatching { profiles.getSupportedColorSpaces(format) }
+                .getOrDefault(emptySet())
+            colorSpaces.takeIf { it.isNotEmpty() }
+                ?.let { "$label=${it.joinToString { colorSpace -> colorSpace.name }}" }
+        }.joinToString(separator = " | ").ifBlank { "none" }
+    }
+
+    private fun formatStreamUseCases(useCases: LongArray?): String {
+        return useCases
+            ?.joinToString { streamUseCaseLabel(it) }
+            ?.ifBlank { "none" }
+            ?: "none"
+    }
+
+    private fun streamUseCaseLabel(useCase: Long): String = when (useCase) {
+        0L -> "DEFAULT"
+        1L -> "PREVIEW"
+        2L -> "STILL_CAPTURE"
+        3L -> "VIDEO_RECORD"
+        4L -> "PREVIEW_VIDEO_STILL"
+        5L -> "VIDEO_CALL"
+        6L -> "CROPPED_RAW"
+        else -> "0x${useCase.toString(16)}"
     }
 
     // ── Extended scene modes (Android 16+, accessed via reflection) ──
@@ -338,14 +692,7 @@ object VendorCameraProbe {
             val value = chars.get(key)
             val formatted = formatKeyValue(keyName, value)
 
-            if (keyName.startsWith("org.") || keyName.startsWith("com.") ||
-                keyName.contains("vendor") || keyName.contains("Vendor") ||
-                keyName.contains("extension") || keyName.contains("Extension") ||
-                keyName.contains("xiaomi") || keyName.contains("qualcomm") ||
-                keyName.contains("samsung") || keyName.contains("mediatek") ||
-                keyName.contains("oppo") || keyName.contains("vivo") ||
-                keyName.contains("oneplus") || keyName.contains("huawei")
-            ) {
+            if (isVendorKeyName(keyName)) {
                 vendorKeys += "  $formatted"
             } else {
                 standardKeys += "  $formatted"
@@ -456,7 +803,7 @@ object VendorCameraProbe {
         val captureRequestKeys = chars.safeList { availableCaptureRequestKeys }
         if (captureRequestKeys.isNotEmpty()) {
             sb.appendLine("  [available-capture-request-keys] (${captureRequestKeys.size})")
-            val vendor = captureRequestKeys.filter { it.name.contains("vendor") || it.name.startsWith("org.") || it.name.startsWith("com.") }
+            val vendor = captureRequestKeys.filter { isVendorKeyName(it.name) }
             val std = captureRequestKeys.filter { it !in vendor }
             std.forEach { sb.appendLine("    ${it.name}") }
             if (vendor.isNotEmpty()) {
@@ -468,7 +815,7 @@ object VendorCameraProbe {
         val resultKeys = chars.safeList { availableCaptureResultKeys }
         if (resultKeys.isNotEmpty()) {
             sb.appendLine("  [available-capture-result-keys] (${resultKeys.size})")
-            val vendor = resultKeys.filter { it.name.contains("vendor") || it.name.startsWith("org.") || it.name.startsWith("com.") }
+            val vendor = resultKeys.filter { isVendorKeyName(it.name) }
             val std = resultKeys.filter { it !in vendor }
             std.forEach { sb.appendLine("    ${it.name}") }
             if (vendor.isNotEmpty()) {
@@ -480,7 +827,7 @@ object VendorCameraProbe {
         val sessionKeys = chars.safeList { availableSessionKeys }
         if (sessionKeys.isNotEmpty()) {
             sb.appendLine("  [available-session-keys] (${sessionKeys.size})")
-            val vendor = sessionKeys.filter { it.name.contains("vendor") || it.name.startsWith("org.") || it.name.startsWith("com.") }
+            val vendor = sessionKeys.filter { isVendorKeyName(it.name) }
             val std = sessionKeys.filter { it !in vendor }
             std.forEach { sb.appendLine("    ${it.name}") }
             if (vendor.isNotEmpty()) {
@@ -494,6 +841,41 @@ object VendorCameraProbe {
             sb.appendLine("  [available-physical-camera-request-keys] (${physicalRequestKeys.size})")
             physicalRequestKeys.forEach { sb.appendLine("    ${it.name}") }
         }
+    }
+
+    private fun isVendorKeyName(name: String): Boolean {
+        val normalized = name.lowercase(Locale.ROOT)
+        return normalized.startsWith("org.") ||
+            normalized.startsWith("com.") ||
+            "vendor" in normalized ||
+            "extension" in normalized ||
+            "xiaomi" in normalized ||
+            "qualcomm" in normalized ||
+            "samsung" in normalized ||
+            "mediatek" in normalized ||
+            "oppo" in normalized ||
+            "vivo" in normalized ||
+            "oneplus" in normalized ||
+            "huawei" in normalized
+    }
+
+    private fun StreamConfigurationMap?.hasAnyOutput(vararg formats: Int): Boolean {
+        return this != null && formats.any { outputSizes(it, highResolution = false).isNotEmpty() }
+    }
+
+    private fun StreamConfigurationMap?.outputSizes(
+        format: Int,
+        highResolution: Boolean
+    ): List<Size> {
+        if (this == null) return emptyList()
+        return runCatching {
+            val sizes = if (highResolution) {
+                getHighResolutionOutputSizes(format)
+            } else {
+                getOutputSizes(format)
+            }
+            sizes?.toList().orEmpty()
+        }.getOrDefault(emptyList())
     }
 
     // ── Value formatting ─────────────────────────────────────
@@ -617,6 +999,53 @@ object VendorCameraProbe {
     private fun oisLabel(mode: Int): String = when (mode) {
         CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_OFF -> "OFF"
         CameraCharacteristics.LENS_OPTICAL_STABILIZATION_MODE_ON -> "ON"
+        else -> "0x${mode.toString(16)}"
+    }
+
+    private fun aeModeLabel(mode: Int): String = when (mode) {
+        CameraCharacteristics.CONTROL_AE_MODE_OFF -> "OFF"
+        CameraCharacteristics.CONTROL_AE_MODE_ON -> "ON"
+        CameraCharacteristics.CONTROL_AE_MODE_ON_AUTO_FLASH -> "AUTO_FLASH"
+        CameraCharacteristics.CONTROL_AE_MODE_ON_ALWAYS_FLASH -> "ALWAYS_FLASH"
+        CameraCharacteristics.CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE -> "AUTO_FLASH_REDEYE"
+        CameraCharacteristics.CONTROL_AE_MODE_ON_EXTERNAL_FLASH -> "EXTERNAL_FLASH"
+        else -> "0x${mode.toString(16)}"
+    }
+
+    private fun afModeLabel(mode: Int): String = when (mode) {
+        CameraCharacteristics.CONTROL_AF_MODE_OFF -> "OFF"
+        CameraCharacteristics.CONTROL_AF_MODE_AUTO -> "AUTO"
+        CameraCharacteristics.CONTROL_AF_MODE_MACRO -> "MACRO"
+        CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_VIDEO -> "CONTINUOUS_VIDEO"
+        CameraCharacteristics.CONTROL_AF_MODE_CONTINUOUS_PICTURE -> "CONTINUOUS_PICTURE"
+        CameraCharacteristics.CONTROL_AF_MODE_EDOF -> "EDOF"
+        else -> "0x${mode.toString(16)}"
+    }
+
+    private fun awbModeLabel(mode: Int): String = when (mode) {
+        CameraCharacteristics.CONTROL_AWB_MODE_OFF -> "OFF"
+        CameraCharacteristics.CONTROL_AWB_MODE_AUTO -> "AUTO"
+        CameraCharacteristics.CONTROL_AWB_MODE_INCANDESCENT -> "INCANDESCENT"
+        CameraCharacteristics.CONTROL_AWB_MODE_FLUORESCENT -> "FLUORESCENT"
+        CameraCharacteristics.CONTROL_AWB_MODE_WARM_FLUORESCENT -> "WARM_FLUORESCENT"
+        CameraCharacteristics.CONTROL_AWB_MODE_DAYLIGHT -> "DAYLIGHT"
+        CameraCharacteristics.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT -> "CLOUDY_DAYLIGHT"
+        CameraCharacteristics.CONTROL_AWB_MODE_TWILIGHT -> "TWILIGHT"
+        CameraCharacteristics.CONTROL_AWB_MODE_SHADE -> "SHADE"
+        else -> "0x${mode.toString(16)}"
+    }
+
+    private fun videoStabilizationLabel(mode: Int): String = when (mode) {
+        CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_OFF -> "OFF"
+        CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_ON -> "ON"
+        CameraCharacteristics.CONTROL_VIDEO_STABILIZATION_MODE_PREVIEW_STABILIZATION -> "PREVIEW_STABILIZATION"
+        else -> "0x${mode.toString(16)}"
+    }
+
+    private fun faceDetectModeLabel(mode: Int): String = when (mode) {
+        CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_OFF -> "OFF"
+        CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_SIMPLE -> "SIMPLE"
+        CameraCharacteristics.STATISTICS_FACE_DETECT_MODE_FULL -> "FULL"
         else -> "0x${mode.toString(16)}"
     }
 

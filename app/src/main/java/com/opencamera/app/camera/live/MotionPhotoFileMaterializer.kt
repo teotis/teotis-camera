@@ -30,11 +30,18 @@ class MotionPhotoFileMaterializer {
             val stillBytes = stillFile.readBytes()
             val motionBytes = motionFile.readBytes()
 
+            // A still that is already a motion photo (re-materialization) must be stripped
+            // so the XMP lengths and appended MP4 are written exactly once.
+            val cleanStillBytes = MotionPhotoJpegContainer.stripMotionSegment(stillBytes)
+
             // Create combined Motion Photo
             val combinedBytes = MotionPhotoJpegContainer.write(
-                jpegBytes = stillBytes,
+                jpegBytes = cleanStillBytes,
                 motionBytes = motionBytes,
-                spec = spec.copy(motionLengthBytes = motionBytes.size.toLong())
+                spec = spec.copy(
+                    motionLengthBytes = motionBytes.size.toLong(),
+                    stillLengthBytes = cleanStillBytes.size.toLong()
+                )
             )
 
             // Write to output file

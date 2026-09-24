@@ -421,15 +421,24 @@ enum class PreviewMeteringMode {
     AUTO_EXPOSURE_ONLY
 }
 
+enum class PreviewMeteringPersistence {
+    AUTO_CANCEL,
+    HOLD_UNTIL_CANCELLED
+}
+
 data class PreviewMeteringRequest(
     val requestId: String,
     val point: PreviewMeteringPoint,
     val mode: PreviewMeteringMode = PreviewMeteringMode.FOCUS_AND_AUTO_EXPOSURE,
+    val persistence: PreviewMeteringPersistence = PreviewMeteringPersistence.AUTO_CANCEL,
     val autoCancelMillis: Long = 3_000L
 )
 
 enum class PreviewMeteringResultStatus {
     SUCCEEDED,
+    LOCKED,
+    DEGRADED_FOCUS_LOCK_ONLY,
+    DEGRADED_EXPOSURE_LOCK_ONLY,
     DEGRADED_AUTO_EXPOSURE_ONLY,
     FAILED,
     UNSUPPORTED
@@ -672,6 +681,7 @@ sealed interface DeviceCommand {
     data class UpdateZoomRatio(val zoomRatio: Float, val previewZoomRatio: Float) : DeviceCommand
     data class SwitchLensNode(val lensNode: LensNode, val reason: String) : DeviceCommand
     data class ApplyPreviewMetering(val request: PreviewMeteringRequest) : DeviceCommand
+    data class CancelPreviewMetering(val reason: String) : DeviceCommand
     data class UpdateOutputRotation(val rotation: CameraOutputRotation) : DeviceCommand
     data class ApplyPreviewBrightness(val request: PreviewBrightnessRequest) : DeviceCommand
 }

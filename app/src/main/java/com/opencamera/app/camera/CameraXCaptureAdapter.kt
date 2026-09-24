@@ -126,6 +126,7 @@ import com.opencamera.core.media.ThumbnailSource
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Job
@@ -152,6 +153,7 @@ private const val TAG = "CameraXCaptureAdapter"
 private const val VIDEO_COVER_THUMBNAIL_SIZE = 512
 private const val FOCUS_STACK_METERING_POINT_SIZE = 0.18f
 private const val FOCUS_STACK_METERING_AUTO_CANCEL_MILLIS = 1_500L
+private const val FOCUS_STACK_MANUAL_FOCUS_SETTLE_MILLIS = 120L
 
 internal class CameraXCaptureWorkScopes(
     private val callbackDispatcher: CoroutineDispatcher = Dispatchers.Main.immediate,
@@ -326,11 +328,21 @@ class CameraXCaptureAdapter(
     override suspend fun bindUseCases(
         lifecycleOwner: LifecycleOwner,
         previewView: PreviewView,
-        deviceGraph: DeviceGraphSpec
+        deviceGraph: DeviceGraphSpec,
+        manualCaptureParams: com.opencamera.core.settings.ManualCaptureParams?
     ) {
         workScopes.activeCallbackScope()
+        val resolvedCapabilities = capabilitiesFor(deviceGraph).resolvedManualControlCapabilities
+        val manualConfig = manualCaptureParams
+            ?.filterToExecutableCapabilities(resolvedCapabilities)
+            ?.toCamera2ManualCaptureConfig()
         runCatching {
-            _bindingController.bind(lifecycleOwner, previewView, deviceGraph)
+            _bindingController.bind(
+                lifecycleOwner = lifecycleOwner,
+                previewView = previewView,
+                deviceGraph = deviceGraph,
+                manualCaptureConfigOverride = manualConfig
+            )
         }.getOrElse { throwable ->
             _bindingController.invalidateCachedProviderState(
                 classifyPreviewBindingFailure(throwable)
@@ -344,6 +356,7 @@ class CameraXCaptureAdapter(
             is DeviceCommand.ExecuteShot -> runCatching {
                 executeShot(command.plan)
             }.getOrElse { throwable ->
+                Log.e(TAG, "executeShot failed shotId=${command.plan.request.shotId}", throwable)
                 emitShotFailure(
                     shotId = command.plan.request.shotId,
                     mediaType = command.plan.request.mediaType,
@@ -354,6 +367,7 @@ class CameraXCaptureAdapter(
             is DeviceCommand.StopActiveShot -> runCatching {
                 stopActiveShot(command.shotId)
             }.getOrElse { throwable ->
+                Log.e(TAG, "stopActiveShot failed shotId=${command.shotId}", throwable)
                 val activePlan = recordingController.activePlan()
                 recordingController.stopRecording()
                 emitShotFailure(
@@ -366,6 +380,7 @@ class CameraXCaptureAdapter(
             is DeviceCommand.UpdateZoomRatio -> runCatching {
                 _bindingController.updateZoomRatio(command.zoomRatio, command.previewZoomRatio)
             }.onFailure { throwable ->
+                Log.w(TAG, "updateZoomRatio failed ratio=${command.zoomRatio}", throwable)
                 val issue = classifyPreviewBindingFailure(throwable)
                 _bindingController.invalidateCachedProviderState(issue)
                 _events.emit(
@@ -378,6 +393,7 @@ class CameraXCaptureAdapter(
             is DeviceCommand.SwitchLensNode -> runCatching {
                 _bindingController.switchLensNode(command.lensNode, command.reason)
             }.onFailure { throwable ->
+                Log.w(TAG, "switchLensNode command failed lens=${command.lensNode.tagValue} reason=${command.reason}", throwable)
                 val issue = classifyPreviewBindingFailure(throwable)
                 _bindingController.invalidateCachedProviderState(issue)
                 _events.emit(
@@ -387,9 +403,12 @@ class CameraXCaptureAdapter(
                 )
             }
 
-            is DeviceCommand.ApplyPreviewMetering -> runCatching {
+            is DeviceCommand.ApplyPreviewMetering -> try {
                 _bindingController.applyPreviewMetering(command.request)
-            }.onFailure { throwable ->
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (throwable: Throwable) {
+                Log.w(TAG, "applyPreviewMetering failed requestId=${command.request.requestId}", throwable)
                 _events.emit(
                     DeviceEvent.PreviewMeteringCompleted(
                         PreviewMeteringResult(
@@ -401,9 +420,24 @@ class CameraXCaptureAdapter(
                     )
                 )
             }
+            is DeviceCommand.CancelPreviewMetering -> runCatching {
+                _bindingController.cancelPreviewMetering()
+            }.onFailure { throwable ->
+                Log.w(TAG, "cancelPreviewMetering failed reason=${command.reason}", throwable)
+                _events.emit(
+                    DeviceEvent.RuntimeIssue(
+                        DeviceRuntimeIssue(
+                            kind = DeviceRuntimeIssueKind.CAMERA_RECOVERABLE,
+                            reason = throwable.message ?: "Preview metering cancellation failed",
+                            isRecoverable = true
+                        )
+                    )
+                )
+            }
             is DeviceCommand.UpdateOutputRotation -> runCatching {
                 _bindingController.applyOutputRotation(command.rotation)
             }.onFailure { throwable ->
+                Log.w(TAG, "updateOutputRotation failed", throwable)
                 _events.emit(
                     DeviceEvent.RuntimeIssue(
                         DeviceRuntimeIssue(
@@ -418,6 +452,7 @@ class CameraXCaptureAdapter(
             is DeviceCommand.ApplyPreviewBrightness -> runCatching {
                 _bindingController.applyPreviewBrightness(command.request)
             }.onFailure { throwable ->
+                Log.w(TAG, "applyPreviewBrightness failed requestId=${command.request.requestId}", throwable)
                 _events.emit(
                     DeviceEvent.PreviewBrightnessApplied(
                         PreviewBrightnessResult(
@@ -517,6 +552,7 @@ class CameraXCaptureAdapter(
             captureCommittedArmedMediaType = plan.request.mediaType
         }
 
+        val postCaptureDiagnostics = mutableListOf<String>()
         val execution = when (plan.request.shotKind) {
             ShotKind.STILL_CAPTURE -> {
                 val request = captureOutputFactory.createPhotoOutputRequest(plan.saveTask.saveRequest)
@@ -524,14 +560,22 @@ class CameraXCaptureAdapter(
             }
 
             ShotKind.MULTI_FRAME_CAPTURE -> {
-                stillCaptureExecutor.captureMultiFrame(
-                    capture = capture,
-                    plan = plan,
-                    deviceRequest = deviceRequest,
-                    beforeFrameCapture = { step ->
-                        applyFocusStackFramePreparation(step)
-                    }
-                )
+                try {
+                    stillCaptureExecutor.captureMultiFrame(
+                        capture = capture,
+                        plan = plan,
+                        deviceRequest = deviceRequest,
+                        prepareFrameCapture = { step, currentCapture ->
+                            prepareFocusStackFrameCapture(
+                                step = step,
+                                currentCapture = currentCapture,
+                                deviceRequest = deviceRequest
+                            )
+                        }
+                    )
+                } finally {
+                    postCaptureDiagnostics += restoreStillCaptureRequestAfterFocusStack(deviceRequest)
+                }
             }
 
             ShotKind.LIVE_PHOTO -> stillCaptureExecutor.captureLivePhoto(
@@ -585,7 +629,8 @@ class CameraXCaptureAdapter(
                     deviceDiagnostics = deviceRequest.diagnostics +
                         adapterManualDiagnostics +
                         captureTimingDiagnostics +
-                        execution.diagnostics,
+                        execution.diagnostics +
+                        postCaptureDiagnostics,
                     requestedAtElapsedMillis = requestedAt,
                     deviceCaptureStartedAtElapsedMillis = execution.deviceCaptureStartedAtElapsedMillis,
                     deviceCaptureCompletedAtElapsedMillis = execution.deviceCaptureCompletedAtElapsedMillis
@@ -658,7 +703,125 @@ class CameraXCaptureAdapter(
         }
     }
 
-    private suspend fun applyFocusStackFramePreparation(
+    private suspend fun prepareFocusStackFrameCapture(
+        step: MultiFrameCaptureStep,
+        currentCapture: ImageCapture,
+        deviceRequest: DeviceShotRequest
+    ): StillCaptureExecutor.FrameCapturePreparation {
+        val role = step.focusStackRole
+        if (role == FocusStackFrameRole.NONE) {
+            return StillCaptureExecutor.FrameCapturePreparation(capture = currentCapture)
+        }
+
+        val manualFocusDistance = focusStackManualFocusDistance(
+            role = role,
+            cameraProfiles = cameraProfiles,
+            preferredLensFacing = _bindingController.currentGraph?.preferredLensFacing
+        )
+        if (
+            manualFocusDistance != null &&
+            deviceRequest.manualControlCapabilities.focusDistance == ManualControlSupport.APPLY
+        ) {
+            val manualPreparation = runCatching {
+                applyFocusStackManualFramePreparation(
+                    role = role,
+                    focusDistanceDiopters = manualFocusDistance,
+                    currentCapture = currentCapture,
+                    deviceRequest = deviceRequest
+                )
+            }.getOrElse { throwable ->
+                val meteringDiagnostics = applyFocusStackMeteringFramePreparation(step)
+                return StillCaptureExecutor.FrameCapturePreparation(
+                    capture = currentCapture,
+                    diagnostics = listOf(
+                        "device:focus-stack-manual=${role.name.lowercase()}:failed:${throwable.message ?: "unknown"}"
+                    ) + meteringDiagnostics,
+                    degradationReasons = listOf("camera-x:manual-focus-rebind-failed")
+                )
+            }
+            return manualPreparation
+        }
+
+        val meteringDiagnostics = applyFocusStackMeteringFramePreparation(step)
+        return StillCaptureExecutor.FrameCapturePreparation(
+            capture = currentCapture,
+            diagnostics = listOf(
+                "device:focus-stack-manual=${role.name.lowercase()}:unsupported"
+            ) + meteringDiagnostics,
+            degradationReasons = listOf("camera-x:manual-focus-unsupported")
+        )
+    }
+
+    private suspend fun applyFocusStackManualFramePreparation(
+        role: FocusStackFrameRole,
+        focusDistanceDiopters: Float,
+        currentCapture: ImageCapture,
+        deviceRequest: DeviceShotRequest
+    ): StillCaptureExecutor.FrameCapturePreparation {
+        return withContext(Dispatchers.Main.immediate) {
+            val deviceGraph = _bindingController.currentGraph
+                ?: return@withContext StillCaptureExecutor.FrameCapturePreparation(
+                    capture = currentCapture,
+                    diagnostics = listOf(
+                        "device:focus-stack-manual=${role.name.lowercase()}:failed-graph-unbound"
+                    ),
+                    degradationReasons = listOf("camera-x:manual-focus-graph-unbound")
+                )
+            val lifecycleOwner = _bindingController.currentLifecycleOwner
+                ?: return@withContext StillCaptureExecutor.FrameCapturePreparation(
+                    capture = currentCapture,
+                    diagnostics = listOf(
+                        "device:focus-stack-manual=${role.name.lowercase()}:failed-lifecycle-unbound"
+                    ),
+                    degradationReasons = listOf("camera-x:manual-focus-lifecycle-unbound")
+                )
+            val previewView = _bindingController.currentBoundPreviewView
+                ?: return@withContext StillCaptureExecutor.FrameCapturePreparation(
+                    capture = currentCapture,
+                    diagnostics = listOf(
+                        "device:focus-stack-manual=${role.name.lowercase()}:failed-preview-unbound"
+                    ),
+                    degradationReasons = listOf("camera-x:manual-focus-preview-unbound")
+                )
+            val requestedQuality = resolvedStillCaptureQuality(
+                deviceGraph = deviceGraph,
+                deviceRequest = deviceRequest
+            )
+            val requestedResolutionPreset = resolvedStillCaptureResolutionPreset(deviceGraph)
+            val requestedManualCaptureConfig = resolveCamera2ManualCaptureConfig(deviceRequest)
+            val focusStackManualConfig = (requestedManualCaptureConfig ?: Camera2ManualCaptureConfig())
+                .copy(focusDistanceDiopters = focusDistanceDiopters)
+
+            _bindingController.rebindForStillCapture(
+                lifecycleOwner = lifecycleOwner,
+                previewView = previewView,
+                deviceGraph = deviceGraph,
+                stillCaptureQuality = requestedQuality,
+                stillCaptureResolutionPreset = requestedResolutionPreset,
+                manualCaptureConfigOverride = focusStackManualConfig
+            )
+            delay(FOCUS_STACK_MANUAL_FOCUS_SETTLE_MILLIS)
+            val reboundCapture = _bindingController.currentImageCapture
+                ?: return@withContext StillCaptureExecutor.FrameCapturePreparation(
+                    capture = currentCapture,
+                    diagnostics = listOf(
+                        "device:focus-stack-manual=${role.name.lowercase()}:failed-capture-unbound"
+                    ),
+                    degradationReasons = listOf("camera-x:manual-focus-capture-unbound")
+                )
+            StillCaptureExecutor.FrameCapturePreparation(
+                capture = reboundCapture,
+                diagnostics = listOf(
+                    "device:focus-stack-manual=${role.name.lowercase()}:applied",
+                    "device:focus-stack-focus-distance=${role.name.lowercase()}:$focusDistanceDiopters",
+                    "device:focus-stack-focus-settle-ms=${role.name.lowercase()}:$FOCUS_STACK_MANUAL_FOCUS_SETTLE_MILLIS"
+                ),
+                focusDistanceDiopters = focusDistanceDiopters
+            )
+        }
+    }
+
+    private suspend fun applyFocusStackMeteringFramePreparation(
         step: MultiFrameCaptureStep
     ): List<String> {
         val role = step.focusStackRole
@@ -1084,6 +1247,59 @@ class CameraXCaptureAdapter(
                     ?: error("PreviewView is not attached"),
                 deviceGraph = deviceGraph,
                 videoSpecOverride = runtimeVideoSpec
+            )
+        }
+    }
+
+    private suspend fun restoreStillCaptureRequestAfterFocusStack(
+        deviceRequest: DeviceShotRequest
+    ): List<String> {
+        val deviceGraph = _bindingController.currentGraph
+            ?: return listOf("device:focus-stack-manual-restore=skipped-graph-unbound")
+        if (deviceGraph.template != CaptureTemplate.STILL_CAPTURE) {
+            return listOf("device:focus-stack-manual-restore=skipped-template-${deviceGraph.template.name.lowercase()}")
+        }
+        val requestedQuality = resolvedStillCaptureQuality(
+            deviceGraph = deviceGraph,
+            deviceRequest = deviceRequest
+        )
+        val requestedResolutionPreset = resolvedStillCaptureResolutionPreset(deviceGraph)
+        val requestedOutputSize = resolvedStillCaptureOutputSize(
+            deviceGraph = deviceGraph,
+            availableOutputSizes = capabilitiesFor(deviceGraph).availableStillCaptureOutputSizes
+        )
+        val requestedManualCaptureConfig = resolveCamera2ManualCaptureConfig(deviceRequest)
+        if (_bindingController.ensureStillCaptureRequestConfigChanged(
+                requestedQuality = requestedQuality,
+                requestedResolutionPreset = requestedResolutionPreset,
+                requestedOutputSize = requestedOutputSize,
+                requestedManualCaptureConfig = requestedManualCaptureConfig
+            )
+        ) {
+            return listOf("device:focus-stack-manual-restore=unchanged")
+        }
+
+        return withContext(Dispatchers.Main.immediate) {
+            runCatching {
+                _bindingController.rebindForStillCapture(
+                    lifecycleOwner = _bindingController.currentLifecycleOwner
+                        ?: error("LifecycleOwner is not attached"),
+                    previewView = _bindingController.currentBoundPreviewView
+                        ?: error("PreviewView is not attached"),
+                    deviceGraph = deviceGraph,
+                    stillCaptureQuality = requestedQuality,
+                    stillCaptureResolutionPreset = requestedResolutionPreset,
+                    manualCaptureConfigOverride = requestedManualCaptureConfig
+                )
+            }.fold(
+                onSuccess = {
+                    listOf("device:focus-stack-manual-restore=applied")
+                },
+                onFailure = { throwable ->
+                    listOf(
+                        "device:focus-stack-manual-restore=failed:${throwable.message ?: "unknown"}"
+                    )
+                }
             )
         }
     }
